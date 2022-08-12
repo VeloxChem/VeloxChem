@@ -83,7 +83,7 @@ TYPED_TEST(CBufferTest, DefaultConstructor)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+    CBuffer<Scalar, Backend, NRows, NCols> buf;
 
     ASSERT_EQ(buf.nRows(), NRows);
     ASSERT_EQ(buf.nColumns(), NCols);
@@ -100,32 +100,32 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensions)
 
     if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         ASSERT_EQ(buf.nColumns(), 10);
     }
     else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         ASSERT_EQ(buf.nColumns(), 10);
     }
     else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         ASSERT_EQ(buf.nRows(), 10);
     }
     else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10, 5);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_EQ(buf.nColumns(), 5);
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>();
 
         ASSERT_EQ(buf.nRows(), NRows);
         ASSERT_EQ(buf.nColumns(), NCols);
@@ -139,34 +139,34 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndRawPointer)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto data = new Scalar[100];
 
     if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_EQ(buf.size(), 10);
     }
     else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_EQ(buf.size(), NRows * 10);
     }
     else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_EQ(buf.size(), 10 * NCols);
     }
     else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data, 10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data, 10, 5);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_EQ(buf.nColumns(), 5);
@@ -174,14 +174,14 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndRawPointer)
     }
     else if constexpr (kind == Kind::N)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_EQ(buf.size(), 10);
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data);
 
         ASSERT_EQ(buf.nRows(), NRows);
         ASSERT_EQ(buf.nColumns(), NCols);
@@ -198,34 +198,34 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndStdVector)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto data = std::vector<Scalar>(100);
 
     if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_EQ(buf.size(), 10);
     }
     else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_EQ(buf.size(), NRows * 10);
     }
     else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data, 10);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_EQ(buf.size(), 10 * NCols);
     }
     else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data, 10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data, 10, 5);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_EQ(buf.nColumns(), 5);
@@ -233,14 +233,14 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndStdVector)
     }
     else if constexpr (kind == Kind::N)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_EQ(buf.size(), 10);
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data);
 
         ASSERT_EQ(buf.nRows(), NRows);
         ASSERT_EQ(buf.nColumns(), NCols);
@@ -255,13 +255,13 @@ TYPED_TEST(CBufferTest, ConstructorWithStdVector)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     if constexpr (kind == Kind::X)
     {
         auto data = std::vector<Scalar>(10);
 
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(data);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(data);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_EQ(buf.size(), 10);
@@ -279,8 +279,8 @@ TYPED_TEST(CBufferTest, CopyConstructor)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> src{};
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> dst{src};
+    CBuffer<Scalar, Backend, NRows, NCols> src{};
+    CBuffer<Scalar, Backend, NRows, NCols> dst{src};
 
     // the two objects are exactly equal, but independent from each other
     ASSERT_EQ(dst, src);
@@ -293,8 +293,8 @@ TYPED_TEST(CBufferTest, CopyAssignment)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> src{};
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> dst{};
+    CBuffer<Scalar, Backend, NRows, NCols> src{};
+    CBuffer<Scalar, Backend, NRows, NCols> dst{};
 
     dst = src;
 
@@ -309,12 +309,12 @@ TYPED_TEST(CBufferTest, MoveConstructor)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> src{};
+    CBuffer<Scalar, Backend, NRows, NCols> src{};
 
     auto nrows = src.nRows();
     auto ncols = src.nColumns();
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> dst{std::move(src)};
+    CBuffer<Scalar, Backend, NRows, NCols> dst{std::move(src)};
 
     // dst "steals" representation of src
     ASSERT_EQ(dst.nRows(), nrows);
@@ -333,12 +333,12 @@ TYPED_TEST(CBufferTest, MoveAssignment)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> src{};
+    CBuffer<Scalar, Backend, NRows, NCols> src{};
 
     auto nrows = src.nRows();
     auto ncols = src.nColumns();
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> dst{};
+    CBuffer<Scalar, Backend, NRows, NCols> dst{};
 
     dst = std::move(src);
 
@@ -359,29 +359,29 @@ TYPED_TEST(CBufferTest, DefaultConstructorAndResize)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+    CBuffer<Scalar, Backend, NRows, NCols> buf;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
         buf.resize(10);
 
         ASSERT_EQ(buf.nColumns(), 10);
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
         buf.resize(10);
 
         ASSERT_EQ(buf.nColumns(), 10);
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
         buf.resize(10);
 
         ASSERT_EQ(buf.nRows(), 10);
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
         buf.resize(10, 5);
 
@@ -404,32 +404,32 @@ TYPED_TEST(CBufferTest, DefaultConstructorAndSetZero)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+    CBuffer<Scalar, Backend, NRows, NCols> buf;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
         buf.setZero(10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(7), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
         buf.setZero(10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(2, 7), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
         buf.setZero(10);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_NEAR(buf(7, 2), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
         buf.setZero(10, 5);
 
@@ -437,7 +437,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorAndSetZero)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_NEAR(buf(4, 3), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
         buf.setZero();
 
@@ -465,7 +465,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetZero)
 
     if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setZero();
 
@@ -474,7 +474,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetZero)
     }
     else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setZero();
 
@@ -483,7 +483,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetZero)
     }
     else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setZero();
 
@@ -492,7 +492,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetZero)
     }
     else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10, 5);
 
         buf.setZero();
 
@@ -500,9 +500,9 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetZero)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_NEAR(buf(4, 3), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>();
 
         buf.setZero();
 
@@ -512,7 +512,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetZero)
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>();
 
         buf.setZero();
 
@@ -528,11 +528,11 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetZero)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+    CBuffer<Scalar, Backend, NRows, NCols> buf;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
         buf.resize(10);
 
@@ -541,7 +541,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetZero)
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(7), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
         buf.resize(10);
 
@@ -550,7 +550,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetZero)
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(2, 7), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
         buf.resize(10);
 
@@ -559,7 +559,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetZero)
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_NEAR(buf(7, 2), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
         buf.resize(10, 5);
 
@@ -569,7 +569,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetZero)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_NEAR(buf(4, 3), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
         buf.resize();
         buf.setZero();
@@ -595,32 +595,32 @@ TYPED_TEST(CBufferTest, DefaultConstructorAndSetConstant)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+    CBuffer<Scalar, Backend, NRows, NCols> buf;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
         buf.setConstant(Scalar{42}, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(7), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
         buf.setConstant(Scalar{42}, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(2, 7), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
         buf.setConstant(Scalar{42}, 10);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_NEAR(buf(7, 2), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
         buf.setConstant(Scalar{42}, 10, 5);
 
@@ -628,7 +628,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorAndSetConstant)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_NEAR(buf(4, 3), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
         buf.setConstant(Scalar{42});
 
@@ -656,7 +656,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetConstant)
 
     if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setConstant(Scalar{42});
 
@@ -665,7 +665,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetConstant)
     }
     else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setConstant(Scalar{42});
 
@@ -674,7 +674,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetConstant)
     }
     else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setConstant(Scalar{42});
 
@@ -683,7 +683,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetConstant)
     }
     else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10, 5);
 
         buf.setConstant(Scalar{42});
 
@@ -691,9 +691,9 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetConstant)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_NEAR(buf(4, 3), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>();
 
         buf.setConstant(Scalar{42});
 
@@ -703,7 +703,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetConstant)
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>();
 
         buf.setConstant(Scalar{42});
 
@@ -719,11 +719,11 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetConstant)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+    CBuffer<Scalar, Backend, NRows, NCols> buf;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
         buf.resize(10);
 
@@ -732,7 +732,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetConstant)
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(7), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
         buf.resize(10);
 
@@ -741,7 +741,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetConstant)
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(2, 7), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
         buf.resize(10);
 
@@ -750,7 +750,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetConstant)
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_NEAR(buf(7, 2), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
         buf.resize(10, 5);
 
@@ -760,7 +760,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetConstant)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_NEAR(buf(4, 3), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
         buf.resize();
         buf.setConstant(Scalar{42});
@@ -786,9 +786,9 @@ TYPED_TEST(CBufferTest, DefaultConstructorAndSetRandom)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+    CBuffer<Scalar, Backend, NRows, NCols> buf;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto LB = Scalar{1};
     auto UB = Scalar{5};
@@ -796,28 +796,28 @@ TYPED_TEST(CBufferTest, DefaultConstructorAndSetRandom)
     // check that the value in the buffer is between the bounds of the RNG
     auto pred = [LB, UB](Scalar x) { return ((x - UB) * (x - LB) <= 0); };
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
         buf.setRandom(LB, UB, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_PRED1(pred, buf(7));
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
         buf.setRandom(LB, UB, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_PRED1(pred, buf(2, 7));
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
         buf.setRandom(LB, UB, 10);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_PRED1(pred, buf(7, 2));
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
         buf.setRandom(LB, UB, 10, 5);
 
@@ -825,7 +825,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorAndSetRandom)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_PRED1(pred, buf(4, 3));
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
         buf.setRandom(LB, UB);
 
@@ -849,7 +849,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetRandom)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto LB = Scalar{1};
     auto UB = Scalar{5};
@@ -857,36 +857,36 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetRandom)
     // check that the value in the buffer is between the bounds of the RNG
     auto pred = [LB, UB](Scalar x) { return ((x - UB) * (x - LB) <= 0); };
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setRandom(LB, UB);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_PRED1(pred, buf(7));
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setRandom(LB, UB);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_PRED1(pred, buf(2, 7));
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10);
 
         buf.setRandom(LB, UB);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_PRED1(pred, buf(7, 2));
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>(10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>(10, 5);
 
         buf.setRandom(LB, UB);
 
@@ -894,9 +894,9 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetRandom)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_PRED1(pred, buf(4, 3));
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>();
 
         buf.setRandom(LB, UB);
 
@@ -906,7 +906,7 @@ TYPED_TEST(CBufferTest, ConstructorWithDimensionsAndSetRandom)
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>();
 
         buf.setRandom(LB, UB);
 
@@ -922,9 +922,9 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetRandom)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    buffer::CBuffer<Scalar, Backend, NRows, NCols> buf;
+    CBuffer<Scalar, Backend, NRows, NCols> buf;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto LB = Scalar{1};
     auto UB = Scalar{5};
@@ -932,7 +932,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetRandom)
     // check that the value in the buffer is between the bounds of the RNG
     auto pred = [LB, UB](Scalar x) { return ((x - UB) * (x - LB) <= 0); };
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
         buf.resize(10);
 
@@ -941,7 +941,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetRandom)
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_PRED1(pred, buf(7));
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
         buf.resize(10);
 
@@ -950,7 +950,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetRandom)
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_PRED1(pred, buf(2, 7));
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
         buf.resize(10);
 
@@ -959,7 +959,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetRandom)
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_PRED1(pred, buf(7, 2));
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
         buf.resize(10, 5);
 
@@ -969,7 +969,7 @@ TYPED_TEST(CBufferTest, DefaultConstructorResizeAndSetRandom)
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_PRED1(pred, buf(4, 3));
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
         buf.resize();
 
@@ -997,40 +997,40 @@ TYPED_TEST(CBufferTest, Zero)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(7), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(2, 7), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Zero(10);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_NEAR(buf(7, 2), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero(10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Zero(10, 5);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_NEAR(buf(4, 3), Scalar{0}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Zero();
 
         ASSERT_EQ(buf.nRows(), NRows);
         ASSERT_EQ(buf.nColumns(), NCols);
@@ -1038,7 +1038,7 @@ TYPED_TEST(CBufferTest, Zero)
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Zero();
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Zero();
 
         ASSERT_EQ(buf.nColumns(), NCols);
         ASSERT_NEAR(buf(4), Scalar{0}, 1.0e-14);
@@ -1052,40 +1052,40 @@ TYPED_TEST(CBufferTest, Constant)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(7), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_NEAR(buf(2, 7), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_NEAR(buf(7, 2), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_NEAR(buf(4, 3), Scalar{42}, 1.0e-14);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         ASSERT_EQ(buf.nRows(), NRows);
         ASSERT_EQ(buf.nColumns(), NCols);
@@ -1093,7 +1093,7 @@ TYPED_TEST(CBufferTest, Constant)
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         ASSERT_EQ(buf.nColumns(), NCols);
         ASSERT_NEAR(buf(4), Scalar{42}, 1.0e-14);
@@ -1107,7 +1107,7 @@ TYPED_TEST(CBufferTest, Random)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto LB = Scalar{1};
     auto UB = Scalar{5};
@@ -1115,38 +1115,38 @@ TYPED_TEST(CBufferTest, Random)
     // check that the value in the buffer is between the bounds of the RNG
     auto pred = [LB, UB](Scalar x) { return ((x - UB) * (x - LB) <= 0); };
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_PRED1(pred, buf(7));
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB, 10);
 
         ASSERT_EQ(buf.nColumns(), 10);
         ASSERT_PRED1(pred, buf(2, 7));
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB, 10);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_PRED1(pred, buf(7, 2));
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB, 10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB, 10, 5);
 
         ASSERT_EQ(buf.nRows(), 10);
         ASSERT_EQ(buf.nColumns(), 5);
         ASSERT_PRED1(pred, buf(4, 3));
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB);
 
         ASSERT_EQ(buf.nRows(), NRows);
         ASSERT_EQ(buf.nColumns(), NCols);
@@ -1154,7 +1154,7 @@ TYPED_TEST(CBufferTest, Random)
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Random(LB, UB);
 
         ASSERT_EQ(buf.nColumns(), NCols);
         ASSERT_PRED1(pred, buf(4));
@@ -1168,59 +1168,59 @@ TYPED_TEST(CBufferTest, Broadcast)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
         buf.broadcast(0, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         ASSERT_EQ(buf, ref);
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
         buf.broadcast(0, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         ASSERT_EQ(buf, ref);
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
         buf.broadcast(0, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         ASSERT_EQ(buf, ref);
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
         buf.broadcast(0, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
 
         ASSERT_EQ(buf, ref);
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
         buf.broadcast(0, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         ASSERT_EQ(buf, ref);
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
         buf.broadcast(0, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         ASSERT_EQ(buf, ref);
     }
@@ -1233,70 +1233,70 @@ TYPED_TEST(CBufferTest, ReduceSum)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto sz   = mpi::nodes(MPI_COMM_WORLD);
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         buf.reduce_sum(0, sz, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
 
         if (rank == mpi::master())
         {
             ASSERT_EQ(buf, ref);
         }
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         buf.reduce_sum(0, sz, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
 
         if (rank == mpi::master())
         {
             ASSERT_EQ(buf, ref);
         }
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         buf.reduce_sum(0, sz, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10);
 
         if (rank == mpi::master())
         {
             ASSERT_EQ(buf, ref);
         }
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
 
         buf.reduce_sum(0, sz, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10, 5);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42}, 10, 5);
 
         if (rank == mpi::master())
         {
             ASSERT_EQ(buf, ref);
         }
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         buf.reduce_sum(0, sz, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42});
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42});
 
         if (rank == mpi::master())
         {
@@ -1305,11 +1305,11 @@ TYPED_TEST(CBufferTest, ReduceSum)
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         buf.reduce_sum(0, sz, MPI_COMM_WORLD);
 
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42});
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(sz * Scalar{42});
 
         if (rank == mpi::master())
         {
@@ -1325,14 +1325,14 @@ TYPED_TEST(CBufferTest, Scatter)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto sz   = mpi::nodes(MPI_COMM_WORLD);
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         buf.scatter(rank, sz, MPI_COMM_WORLD);
 
@@ -1340,16 +1340,16 @@ TYPED_TEST(CBufferTest, Scatter)
         auto                chunk_sz = mpi::batch_size(10, rank, sz);
         std::vector<Scalar> foo(10);
         std::fill_n(foo.begin(), chunk_sz, Scalar{42});
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>(foo);
 
         for (auto i = 0; i < chunk_sz; ++i)
         {
             ASSERT_NEAR(buf(i), ref(i), 1.0e-14);
         }
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         buf.scatter(rank, sz, MPI_COMM_WORLD);
 
@@ -1357,7 +1357,7 @@ TYPED_TEST(CBufferTest, Scatter)
         auto                rows_in_chunk = mpi::batch_size(NRows, rank, sz);
         std::vector<Scalar> foo(NRows * 10);
         std::fill_n(foo.begin(), rows_in_chunk * 10, Scalar{42});
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
 
         for (auto i = 0; i < rows_in_chunk; ++i)
         {
@@ -1367,9 +1367,9 @@ TYPED_TEST(CBufferTest, Scatter)
             }
         }
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
 
         buf.scatter(rank, sz, MPI_COMM_WORLD);
 
@@ -1377,7 +1377,7 @@ TYPED_TEST(CBufferTest, Scatter)
         auto                rows_in_chunk = mpi::batch_size(10, rank, sz);
         std::vector<Scalar> foo(10 * NCols);
         std::fill_n(foo.begin(), rows_in_chunk * NCols, Scalar{42});
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
 
         for (auto i = 0; i < rows_in_chunk; ++i)
         {
@@ -1387,9 +1387,9 @@ TYPED_TEST(CBufferTest, Scatter)
             }
         }
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
 
         buf.scatter(rank, sz, MPI_COMM_WORLD);
 
@@ -1397,7 +1397,7 @@ TYPED_TEST(CBufferTest, Scatter)
         auto                rows_in_chunk = mpi::batch_size(10, rank, sz);
         std::vector<Scalar> foo(10 * 5);
         std::fill_n(foo.begin(), rows_in_chunk * 5, Scalar{42});
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10, 5);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>(foo, 10, 5);
 
         for (auto i = 0; i < rows_in_chunk; ++i)
         {
@@ -1407,9 +1407,9 @@ TYPED_TEST(CBufferTest, Scatter)
             }
         }
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         buf.scatter(rank, sz, MPI_COMM_WORLD);
 
@@ -1417,7 +1417,7 @@ TYPED_TEST(CBufferTest, Scatter)
         auto                rows_in_chunk = mpi::batch_size(NRows, rank, sz);
         std::vector<Scalar> foo(NRows * NCols);
         std::fill_n(foo.begin(), rows_in_chunk * NCols, Scalar{42});
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>(foo);
 
         for (auto i = 0; i < rows_in_chunk; ++i)
         {
@@ -1429,7 +1429,7 @@ TYPED_TEST(CBufferTest, Scatter)
     }
     else
     {
-        auto buf = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
 
         buf.scatter(rank, sz, MPI_COMM_WORLD);
 
@@ -1437,7 +1437,7 @@ TYPED_TEST(CBufferTest, Scatter)
         auto                chunk_sz = mpi::batch_size(NCols, rank, sz);
         std::vector<Scalar> foo(NCols);
         std::fill_n(foo.begin(), chunk_sz, Scalar{42});
-        auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+        auto ref = CBuffer<Scalar, Backend, NRows, NCols>(foo);
 
         for (auto i = 0; i < chunk_sz; ++i)
         {
@@ -1453,93 +1453,93 @@ TYPED_TEST(CBufferTest, Gather)
     constexpr auto NRows = TypeParam::NRows;
     constexpr auto NCols = TypeParam::NCols;
 
-    constexpr auto kind = buffer::getKind<NRows, NCols>();
+    constexpr auto kind = getKind<NRows, NCols>();
 
     auto sz   = mpi::nodes(MPI_COMM_WORLD);
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
-    if constexpr (kind == buffer::Kind::X)
+    if constexpr (kind == Kind::X)
     {
         // on each rank, generate a buffer which contains a chunk_sz part of the data
         auto                chunk_sz = mpi::batch_size(10, rank, sz);
         std::vector<Scalar> foo(10);
         std::fill_n(foo.begin(), chunk_sz, Scalar{42});
-        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+        auto buf_0 = CBuffer<Scalar, Backend, NRows, NCols>(foo);
 
         // after gathering, we have a buffer with 10 elements equal to 42
         auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
 
         if (rank == mpi::master())
         {
-            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+            auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
             ASSERT_EQ(buf_1, ref);
         }
     }
-    else if constexpr (kind == buffer::Kind::MY)
+    else if constexpr (kind == Kind::MY)
     {
         // on each rank, generate a buffer which contains rows_in_chunk rows of the data
         auto                rows_in_chunk = mpi::batch_size(NRows, rank, sz);
         std::vector<Scalar> foo(NRows * 10);
         std::fill_n(foo.begin(), rows_in_chunk * 10, Scalar{42});
-        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
+        auto buf_0 = CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
 
         // after gathering, we have a buffer with NRows*10 elements equal to 42
         auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
 
         if (rank == mpi::master())
         {
-            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+            auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
             ASSERT_EQ(buf_1, ref);
         }
     }
-    else if constexpr (kind == buffer::Kind::XN)
+    else if constexpr (kind == Kind::XN)
     {
         // on each rank, generate a buffer which contains rows_in_chunk rows of the data
         auto                rows_in_chunk = mpi::batch_size(10, rank, sz);
         std::vector<Scalar> foo(10 * NCols);
         std::fill_n(foo.begin(), rows_in_chunk * NCols, Scalar{42});
-        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
+        auto buf_0 = CBuffer<Scalar, Backend, NRows, NCols>(foo, 10);
 
         // after gathering, we have a buffer with 10*NCols elements equal to 42
         auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
 
         if (rank == mpi::master())
         {
-            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
+            auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10);
             ASSERT_EQ(buf_1, ref);
         }
     }
-    else if constexpr (kind == buffer::Kind::XY)
+    else if constexpr (kind == Kind::XY)
     {
         // on each rank, generate a buffer which contains rows_in_chunk rows of the data
         auto                rows_in_chunk = mpi::batch_size(10, rank, sz);
         std::vector<Scalar> foo(10 * 5);
         std::fill_n(foo.begin(), rows_in_chunk * 5, Scalar{42});
-        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo, 10, 5);
+        auto buf_0 = CBuffer<Scalar, Backend, NRows, NCols>(foo, 10, 5);
 
         // after gathering, we have a buffer with 10*5 elements equal to 42
         auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
 
         if (rank == mpi::master())
         {
-            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
+            auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42}, 10, 5);
             ASSERT_EQ(buf_1, ref);
         }
     }
-    else if constexpr (kind == buffer::Kind::MN)
+    else if constexpr (kind == Kind::MN)
     {
         // on each rank, generate a buffer which contains rows_in_chunk rows of the data
         auto                rows_in_chunk = mpi::batch_size(NRows, rank, sz);
         std::vector<Scalar> foo(NRows * NCols);
         std::fill_n(foo.begin(), rows_in_chunk * NCols, Scalar{42});
-        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+        auto buf_0 = CBuffer<Scalar, Backend, NRows, NCols>(foo);
 
         // after gathering, we have a buffer with NRows*NCols elements equal to 42
         auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
 
         if (rank == mpi::master())
         {
-            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+            auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
             ASSERT_EQ(buf_1, ref);
         }
     }
@@ -1549,15 +1549,78 @@ TYPED_TEST(CBufferTest, Gather)
         auto                chunk_sz = mpi::batch_size(10, rank, sz);
         std::vector<Scalar> foo(10);
         std::fill_n(foo.begin(), chunk_sz, Scalar{42});
-        auto buf_0 = buffer::CBuffer<Scalar, Backend, NRows, NCols>(foo);
+        auto buf_0 = CBuffer<Scalar, Backend, NRows, NCols>(foo);
 
         // after gathering, we have a buffer with 10 elements equal to 42
         auto buf_1 = buf_0.gather(rank, sz, MPI_COMM_WORLD);
 
         if (rank == mpi::master())
         {
-            auto ref = buffer::CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
+            auto ref = CBuffer<Scalar, Backend, NRows, NCols>::Constant(Scalar{42});
             ASSERT_EQ(buf_1, ref);
         }
+    }
+}
+
+TYPED_TEST(CBufferTest, Slice)
+{
+    using Scalar         = typename TypeParam::value_type;
+    using Backend        = typename TypeParam::backend_type;
+    constexpr auto NRows = TypeParam::NRows;
+    constexpr auto NCols = TypeParam::NCols;
+
+    constexpr auto kind = getKind<NRows, NCols>();
+
+    // take a slice containing rows {0, 1} and columns {2, 3, 4}
+    auto rows = seqN(0, 2);
+    auto cols = seqN(2, 3);
+
+    if constexpr (kind == Kind::X)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, 10, 10);
+
+        auto ref = CBuffer<Scalar, Backend, 1, Dynamic>(std::vector<Scalar>{2, 3, 4}, cols.size());
+
+        ASSERT_EQ(buf.slice(cols), ref);
+    }
+    else if constexpr (kind == Kind::MY)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, NRows * 5, 5);
+
+        auto ref = CBuffer<Scalar, Backend, Dynamic, Dynamic>(std::vector<Scalar>{2, 3, 4, 7, 8, 9}, rows.size(), cols.size());
+
+        ASSERT_EQ(buf.slice(rows, cols), ref);
+    }
+    else if constexpr (kind == Kind::XN)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, 5 * NCols, 5);
+
+        auto ref = CBuffer<Scalar, Backend, Dynamic, Dynamic>(std::vector<Scalar>{2, 3, 4, 12, 13, 14}, rows.size(), cols.size());
+
+        ASSERT_EQ(buf.slice(rows, cols), ref);
+    }
+    else if constexpr (kind == Kind::XY)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, 15, 3, 5);
+
+        auto ref = CBuffer<Scalar, Backend, Dynamic, Dynamic>(std::vector<Scalar>{2, 3, 4, 7, 8, 9}, rows.size(), cols.size());
+
+        ASSERT_EQ(buf.slice(rows, cols), ref);
+    }
+    else if constexpr (kind == Kind::MN)
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, NRows * NCols);
+
+        auto ref = CBuffer<Scalar, Backend, Dynamic, Dynamic>(std::vector<Scalar>{2, 3, 4, 7, 8, 9}, rows.size(), cols.size());
+
+        ASSERT_EQ(buf.slice(rows, cols), ref);
+    }
+    else
+    {
+        auto buf = CBuffer<Scalar, Backend, NRows, NCols>::Linspace(0, NCols);
+
+        auto ref = CBuffer<Scalar, Backend, 1, Dynamic>(std::vector<Scalar>{2, 3, 4}, cols.size());
+
+        ASSERT_EQ(buf.slice(cols), ref);
     }
 }

@@ -38,6 +38,7 @@
 
 #include "Device.hpp"
 #include "ErrorHandler.hpp"
+#include "IntegerSequence.hpp"
 #include "MathFunc.hpp"
 #include "MemAlloc.hpp"
 #include "MetaUtils.hpp"
@@ -265,7 +266,7 @@ class CBuffer
 #ifdef VLX_USE_DEVICE
             const auto block = dim3(256);
             const auto grid  = dim3((_nColumns + block.x - 1) / block.x);
-            // TODO
+            // TODO write kernel!
             // deviceLaunch((device::full1D<value_type>), grid, block, 0, 0, _data, fill_value, _nColumns);
             DEVICE_CHECK(deviceStreamSynchronize(0));
 #endif
@@ -315,9 +316,9 @@ class CBuffer
     {
         if constexpr (mem::is_on_host_v<backend_type>)
         {
+            auto pdata = _data;
             for (size_type i = 0; i < _nRows; ++i)
             {
-                auto pdata = _data;
 #pragma omp simd aligned(pdata : Alignment)
                 for (size_type j = 0; j < _nColumns; ++j)
                 {
@@ -350,9 +351,9 @@ class CBuffer
 
         if constexpr (mem::is_on_host_v<backend_type>)
         {
+            auto pdata = _data;
             for (size_type i = 0; i < _nRows; ++i)
             {
-                auto pdata = _data;
 #pragma omp simd aligned(pdata : Alignment)
                 for (size_type j = 0; j < _nColumns; ++j)
                 {
@@ -538,6 +539,107 @@ class CBuffer
         return os.str();
     }
 
+    /** @{ Slicing functions */
+    /** Obtain a new 1D buffer as slice of current 1D buffer.
+     *
+     * @tparam Indices the type of the array of indices describing the slice.
+     * @param[in] idxs the indices describing the slice.
+     * @return a 1D slice of the current 1D buffer.
+     *
+     * The `idxs` argument can be any object that implements:
+     *
+     * \code
+     * <integral type> operator[](<integral type>) const;
+     * <integral type> size() const;
+     * \endcode
+     *
+     * for example, `std::array`, `std::vector`, and `buffer::IndexSequence`.
+     */
+    template <typename Indices,
+              typename ReturnType        = CBuffer<value_type, backend_type, size_type{1}, Dynamic>,
+              auto L_                    = Layout1D,
+              std::enable_if_t<L_, bool> = true>
+    [[nodiscard]] auto
+    _slice(const Indices &idxs) const -> ReturnType
+    {
+        // allocate new buffer of appropriate dimensions
+        auto buf = ReturnType(idxs.size());
+
+        if constexpr (mem::is_on_host_v<backend_type>)
+        {
+            // loop over given row and column indices
+            // and copy elements from `this` buffer to destination
+            auto src = _data;
+            auto dst = buf.data();
+#pragma omp simd aligned(src, dst : Alignment)
+            for (auto i = 0; i < idxs.size(); ++i)
+            {
+                dst[i] = src[idxs[i]];
+            }
+        }
+        else
+        {
+            // TODO GPU implementation
+        }
+
+        return buf;
+    }
+
+    /** Obtain a new 2D buffer as slice of current 2D buffer.
+     *
+     * @tparam RowIndices the type of the array of indices describing the rows in the slice.
+     * @tparam ColIndices the type of the array of indices describing the columns in the slice.
+     * @param[in] rows the indices describing the rows in the slice.
+     * @param[in] cols the indices describing the columns in the slice.
+     * @return a 1D slice of the current 1D buffer.
+     *
+     * The `rows` and `cols` arguments can be any object that implements:
+     *
+     * \code
+     * <integral type> operator[](<integral type>) const;
+     * <integral type> size() const;
+     * \endcode
+     *
+     * for example, `std::array`, `std::vector`, and `buffer::IndexSequence`.
+     */
+    template <typename RowIndices,
+              typename ColIndices,
+              typename ReturnType         = CBuffer<value_type, backend_type, Dynamic, Dynamic>,
+              auto L_                     = Layout1D,
+              std::enable_if_t<!L_, bool> = true>
+    [[nodiscard]] auto
+    _slice(const RowIndices &rows, const ColIndices &cols) const -> ReturnType
+    {
+        // allocate new buffer of appropriate dimensions
+        auto buf = ReturnType(rows.size(), cols.size());
+
+        if constexpr (mem::is_on_host_v<backend_type>)
+        {
+            // loop over given row and column indices
+            // and copy elements from `this` buffer to destination
+            auto src           = _data;
+            auto dst           = buf.data();
+            auto n_padded_cols = buf.nPaddedColumns();
+
+            for (auto i = 0; i < rows.size(); ++i)
+            {
+#pragma omp simd aligned(src, dst : Alignment)
+                for (auto j = 0; j < cols.size(); ++j)
+                {
+                    dst[i * n_padded_cols + j] = src[rows[i] * _nPaddedColumns + cols[j]];
+                }
+            }
+        }
+        else
+        {
+            // TODO GPU implementation
+        }
+
+        return buf;
+    }
+    /**}@*/
+
+    /** @{ MPI functions */
     /** Compute pattern for MPI scattering/gathering of 1D buffer.
      *
      * @param[in] rank the rank of the calling process.
@@ -573,7 +675,7 @@ class CBuffer
      * rank 3: [ o o * * * * * * | x x x x x x x x ]
      *
      * Here, the "x" are padding elements, which are inaccessible when accessing
-     * elements of the buffer through `operator[]`, `operator()`, and `at()`.
+     * elements of the buffer through `operator()` and `at()`.
      * The "*" are placeholder elements: they are rubbish, but still accessible!
      *
      * When gathering over 4 processes, we pick 3, 2, 2, and 2 elements,
@@ -661,7 +763,7 @@ class CBuffer
      *         \ * * * * * * * * | * x x x x x x x /
      *
      * Here, the "x" are padding elements, which are inaccessible when accessing
-     * elements of the buffer through `operator[]`, `operator()`, and `at()`.
+     * elements of the buffer through `operator()` and `at()`.
      * The "*" are placeholder elements: they are rubbish, but still accessible!
      * Note how rank 3 (the 4th process) gets no actual values after the scatter!
      *
@@ -740,6 +842,7 @@ class CBuffer
 
         return {count, counts, displs};
     }
+    /**}@*/
 
    public:
     /** Default CTOR.
@@ -1487,7 +1590,9 @@ class CBuffer
     /** @{ Equality/inequality operators */
     /** Check approximate equality.
      *
-     * @tparam Bother backend of right-hand side in comparison.
+     * @tparam B_RHS backend of right-hand side in comparison.
+     * @tparam NRows_RHS compile-time number of rows of right-hand side in comparison.
+     * @tparam NCols_RHS compile-time number of columns of right-hand side in comparison.
      * @param[in] lhs left-hand side of comparison.
      * @param[in] rhs right-hand side of comparison.
      *
@@ -1498,36 +1603,33 @@ class CBuffer
      * We compare the actual elements in `_data`, *i.e.* excluding the padding elements
      * which are, most likely, garbage!
      */
-    template <typename Bother>
+    template <typename B_RHS, auto NRows_RHS, auto NCols_RHS>
     friend auto
-    operator==(const CBuffer<T, B, NRows, NCols> &lhs, const CBuffer<T, Bother, NRows, NCols> &rhs) -> bool
+    operator==(const CBuffer<T, B, NRows, NCols> &lhs, const CBuffer<T, B_RHS, NRows_RHS, NCols_RHS> &rhs) -> bool
     {
-        if (lhs._nElements != rhs._nElements)
+        if (lhs.size() != rhs.size())
         {
             return false;
         }
 
-        if (lhs._nElements == 0)
-        {
-            return true;
-        }
-
-        if (lhs._nRows != rhs._nRows)
+        if (lhs._nRows != rhs.nRows())
         {
             return false;
         }
 
-        if (lhs._nColumns != rhs._nColumns)
+        if (lhs._nColumns != rhs.nColumns())
         {
             return false;
         }
 
+        auto rhs_padded_cols = rhs.nPaddedColumns();
+        auto rhs_data        = rhs.data();
         for (size_type i = 0; i < lhs._nRows; ++i)
         {
             for (size_type j = 0; j < lhs._nColumns; ++j)
             {
                 auto lhs_v = lhs._data[i * lhs._nPaddedColumns + j];
-                auto rhs_v = rhs._data[i * rhs._nPaddedColumns + j];
+                auto rhs_v = rhs_data[i * rhs_padded_cols + j];
 
                 if (std::abs(lhs_v - rhs_v) > 1.0e-13)
                 {
@@ -1715,48 +1817,31 @@ class CBuffer
         return (_nElements == 0);
     }
 
-    /** Obtain a new 1D buffer as slice of current 1D buffer.
+    /** @{ Slicing functions */
+    /** Obtain a new buffer as slice of current buffer.
      *
-     */
-    template <typename RowIndices, typename ColumnIndices, auto L_ = Layout1D, std::enable_if_t<L_, bool> = true>
-    [[nodiscard]] auto
-    slice(const ColumnIndices &cols) const -> CBuffer<value_type, backend_type, 1, Dynamic>
-    {
-        // allocate new buffer of appropriate dimensions
-        auto dst = CBuffer<value_type, backend_type, 1, Dynamic>(cols.size());
-
-        // loop over given row and column indices
-        // and copy elements from `this` buffer to destination
-        for (auto i = 0; i < cols.size(); ++i)
-        {
-            dst(i) = this->operator()(cols[i]);
-        }
-
-        return dst;
-    }
-
-    /** Obtain a new 2D buffer as slice of current 2D buffer.
+     * @tparam SliceIndices the type(s) of the array(s) of indices describing the slice.
+     * @param[in] idxs the array(s) of indices describing the slice.
+     * @return a slice of the current buffer.
      *
+     * The `idxs` arguments can be any object that implements:
+     *
+     * \code
+     * <integral type> operator[](<integral type>) const;
+     * <integral type> size() const;
+     * \endcode
+     *
+     * for example, `std::array`, `std::vector`, and `buffer::IndexSequence`.
      */
-    template <typename RowIndices, typename ColumnIndices, auto L_ = Layout1D, std::enable_if_t<!L_, bool> = true>
+    template <typename... SliceIndices, auto _NRows = (sizeof...(SliceIndices) == 1) ? 1 : Dynamic>
     [[nodiscard]] auto
-    slice(const RowIndices &rows, const ColumnIndices &cols) const -> CBuffer<value_type, backend_type, Dynamic, Dynamic>
+    slice(SliceIndices &&...idxs) -> CBuffer<value_type, backend_type, _NRows, Dynamic>
     {
-        // allocate new buffer of appropriate dimensions
-        auto dst = CBuffer<value_type, backend_type, Dynamic, Dynamic>(rows.size(), cols.size());
+        static_assert((sizeof...(SliceIndices) == 1) || (sizeof...(SliceIndices) == 2), "");
 
-        // loop over given row and column indices
-        // and copy elements from `this` buffer to destination
-        for (auto i = 0; i < rows.size(); ++i)
-        {
-            for (auto j = 0; j < cols.size(); ++j)
-            {
-                dst(i, j) = this->operator()(rows[i], cols[j]);
-            }
-        }
-
-        return dst;
+        return _slice(std::forward<SliceIndices>(idxs)...);
     }
+    /**}@*/
 
     /** Converts buffer object to text output. */
     [[nodiscard]] auto
