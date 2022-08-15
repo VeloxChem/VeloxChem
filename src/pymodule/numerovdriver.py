@@ -405,7 +405,7 @@ class NumerovDriver:
             scf_prop.compute_scf_prop(geometry, ao_basis, scf_drv.scf_tensors)
 
             # save energies and dipole moments
-            pec_energies['i'].append(scf_drv.get_scf_energy())
+            pec_energies['i'].append(scf_drv.scf_energy)
             if not self.el_transition:
                 if self.rank == mpi_master():
                     dipole_moment = scf_prop.get_property('dipole moment')
@@ -439,7 +439,7 @@ class NumerovDriver:
                     rsp_prop.compute(geometry, ao_basis, scf_drv.scf_tensors)
 
                     total_energy = (rsp_prop.rsp_property['eigenvalues'][-1] +
-                                    scf_drv.iter_data[-1]['energy'])
+                                    scf_drv.scf_energy)
 
                     # detect PEC minimum
                     if prev_energy and not f_minimum_found:
@@ -839,7 +839,8 @@ class NumerovDriver:
         cur_str = 'Number of Geometries          : '
         cur_str += str(len(self.pec_displacements))
         self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Wave Function Model           : ' + scf_drv.get_scf_type()
+        cur_str = 'Wave Function Model           : '
+        cur_str += scf_drv.get_scf_type_str()
         self.ostream.print_header(cur_str.ljust(str_width))
         cur_str = 'SCF Convergece Threshold      : {:.1e}'.format(
             scf_drv.conv_thresh)

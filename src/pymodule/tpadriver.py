@@ -66,8 +66,6 @@ class TPADriver(NonLinearSolver):
 
         super().__init__(comm, ostream)
 
-        self.is_converged = False
-
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
@@ -77,7 +75,7 @@ class TPADriver(NonLinearSolver):
         self.max_iter = 50
 
         # input keywords
-        self.input_keywords['response'].update({
+        self._input_keywords['response'].update({
             'frequencies': ('seq_range', 'frequencies'),
             'damping': ('float', 'damping parameter'),
         })
@@ -201,6 +199,8 @@ class TPADriver(NonLinearSolver):
 
         Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
+        self._is_converged = Nb_drv.is_converged
+
         kX = {}
         Focks = {}
 
@@ -252,8 +252,6 @@ class TPADriver(NonLinearSolver):
         self.ostream.flush()
 
         profiler.end(self.ostream)
-
-        self.is_converged = True
 
         return tpa_dict
 
@@ -735,9 +733,9 @@ class TPADriver(NonLinearSolver):
             Ncd = self.complex_lrmat2vec(kcd, nocc, norb)
             Nb = self.complex_lrmat2vec(kb, nocc, norb)
 
-            na_x2_nyz += np.dot(Na.T, self.x2_contract(kcd, B, da, nocc, norb))
-            nx_a2_nyz += np.dot(self.a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.dot(self.a2_contract(kcd, A, da, nocc, norb), Nb)
+            na_x2_nyz += np.dot(Na.T, self._x2_contract(kcd, B, da, nocc, norb))
+            nx_a2_nyz += np.dot(self._a2_contract(kb, A, da, nocc, norb), Ncd)
+            nx_a2_nyz += np.dot(self._a2_contract(kcd, A, da, nocc, norb), Nb)
 
         elif inp_dict['flag'] == 'BD':
             kbd = inp_dict['kbd']
@@ -747,9 +745,9 @@ class TPADriver(NonLinearSolver):
             Nbd = self.complex_lrmat2vec(kbd, nocc, norb)
             Nc = self.complex_lrmat2vec(kc, nocc, norb)
 
-            na_x2_nyz += np.dot(Na.T, self.x2_contract(kbd, C, da, nocc, norb))
-            nx_a2_nyz += np.dot(self.a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.dot(self.a2_contract(kbd, A, da, nocc, norb), Nc)
+            na_x2_nyz += np.dot(Na.T, self._x2_contract(kbd, C, da, nocc, norb))
+            nx_a2_nyz += np.dot(self._a2_contract(kc, A, da, nocc, norb), Nbd)
+            nx_a2_nyz += np.dot(self._a2_contract(kbd, A, da, nocc, norb), Nc)
 
         return {
             'key': (w, -w, w),
@@ -858,7 +856,7 @@ class TPADriver(NonLinearSolver):
 
         return self.commut(kA, self.commut(kB, F0) + 3 * Fb)
 
-    def print_component(self, label, freq, value, width):
+    def _print_component(self, label, freq, value, width):
         """
         Prints TPA component.
 

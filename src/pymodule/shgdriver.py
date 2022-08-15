@@ -85,8 +85,6 @@ class SHGDriver(NonLinearSolver):
 
         super().__init__(comm, ostream)
 
-        self.is_converged = False
-
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
@@ -104,7 +102,7 @@ class SHGDriver(NonLinearSolver):
         self.shg_type = 'full'
 
         # input keywords
-        self.input_keywords['response'].update({
+        self._input_keywords['response'].update({
             'frequencies': ('seq_range', 'frequencies'),
             'damping': ('float', 'damping parameter'),
             'a_operator': ('str_lower', 'A operator'),
@@ -143,6 +141,9 @@ class SHGDriver(NonLinearSolver):
         :return:
               A dictonary containing the E[3], X[2], A[2] contractions
         """
+
+        # check dft setup
+        self._dft_sanity_check()
 
         profiler = Profiler({
             'timing': False,
@@ -229,7 +230,7 @@ class SHGDriver(NonLinearSolver):
 
         N_drv = ComplexResponse(self.comm, self.ostream)
 
-        if self.dft:
+        if self._dft:
             N_drv.update_settings({}, self.method_dict)
 
         cpp_keywords = {
@@ -247,6 +248,8 @@ class SHGDriver(NonLinearSolver):
 
         N_results = N_drv.compute(molecule, ao_basis, scf_tensors, AB)
 
+        self._is_converged = N_drv.is_converged
+
         kX = N_results['kappas']
         Focks = N_results['focks']
 
@@ -259,8 +262,6 @@ class SHGDriver(NonLinearSolver):
                                             ao_basis, profiler)
 
         profiler.end(self.ostream)
-
-        self.is_converged = True
 
         # Compute dipole vector
         scf_prop = FirstOrderProperties(self.comm, self.ostream)
@@ -285,10 +286,10 @@ class SHGDriver(NonLinearSolver):
             width = len(title)
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
-            self.print_component('mu_x', 0, dip[0], width)
-            self.print_component('mu_y', 0, dip[1], width)
-            self.print_component('mu_z', 0, dip[2], width)
-            self.print_component('|mu|', 0, dip_norm, width)
+            self._print_component('mu_x', 0, dip[0], width)
+            self._print_component('mu_y', 0, dip[1], width)
+            self._print_component('mu_z', 0, dip[2], width)
+            self._print_component('|mu|', 0, dip_norm, width)
             self.ostream.print_blank()
             self.ostream.print_blank()
 
@@ -317,10 +318,10 @@ class SHGDriver(NonLinearSolver):
 
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self.print_component('beta(vec)_x', freq, beta[freq][0], width)
-                self.print_component('beta(vec)_y', freq, beta[freq][1], width)
-                self.print_component('beta(vec)_z', freq, beta[freq][2], width)
-                self.print_component('beta', freq, beta_bar[freq], width)
+                self._print_component('beta(vec)_x', freq, beta[freq][0], width)
+                self._print_component('beta(vec)_y', freq, beta[freq][1], width)
+                self._print_component('beta(vec)_z', freq, beta[freq][2], width)
+                self._print_component('beta', freq, beta_bar[freq], width)
                 self.ostream.print_blank()
 
             title = 'Reference: '
@@ -386,7 +387,7 @@ class SHGDriver(NonLinearSolver):
 
         nocc = molecule.number_of_alpha_electrons()
 
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
@@ -449,9 +450,9 @@ class SHGDriver(NonLinearSolver):
                 x2_kX_X = {}
                 for cart_1 in 'xyz':
                     for cart_2 in 'xyz':
-                        a2_kX_X[cart_1 + cart_2] = self.a2_contract(
+                        a2_kX_X[cart_1 + cart_2] = self._a2_contract(
                             kX[(cart_1, wb)], X[cart_2], d_a_mo, nocc, norb)
-                        x2_kX_X[cart_1 + cart_2] = self.x2_contract(
+                        x2_kX_X[cart_1 + cart_2] = self._x2_contract(
                             kX[(cart_1, wb)], X[cart_2], d_a_mo, nocc, norb)
 
                 for eta in 'xyz':
@@ -607,7 +608,7 @@ class SHGDriver(NonLinearSolver):
         """
 
         if self.rank == mpi_master():
-            self.print_fock_header()
+            self._print_fock_header()
 
         ww = [wb for (wb, wc) in wi]
 
@@ -640,19 +641,19 @@ class SHGDriver(NonLinearSolver):
         time_start_fock = time.time()
 
         if self.shg_type == 'reduced':
-            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real',
-                                            dft_dict, first_order_dens,
-                                            second_order_dens, 'shg_red')
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                             dft_dict, first_order_dens,
+                                             second_order_dens, 'shg_red')
         elif self.shg_type == 'full':
-            dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis,
-                                            'real_and_imag', dft_dict,
-                                            first_order_dens, second_order_dens,
-                                            'shg')
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', dft_dict,
+                                             first_order_dens,
+                                             second_order_dens, 'shg')
 
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
-        self.print_fock_time(total_time_fock)
+        self._print_fock_time(total_time_fock)
 
         focks = {'F0': F0}
         for key in keys:
@@ -711,7 +712,7 @@ class SHGDriver(NonLinearSolver):
                 fo['F_lam_yz'][wb].data,
             ]).T.copy()
 
-            vec_pack = self.collect_vectors_in_columns(vec_pack)
+            vec_pack = self._collect_vectors_in_columns(vec_pack)
 
             if self.rank != mpi_master():
                 continue
@@ -735,21 +736,21 @@ class SHGDriver(NonLinearSolver):
 
             # Make all Xi terms
 
-            xi_sig_x = 3 * self.xi(k_x, k_x, F_x, F_x, F0_a)
-            xi_sig_x += self.xi(k_y, k_y, F_y, F_y, F0_a)
-            xi_sig_x += self.xi(k_z, k_z, F_z, F_z, F0_a)
+            xi_sig_x = 3 * self._xi(k_x, k_x, F_x, F_x, F0_a)
+            xi_sig_x += self._xi(k_y, k_y, F_y, F_y, F0_a)
+            xi_sig_x += self._xi(k_z, k_z, F_z, F_z, F0_a)
 
-            xi_sig_y = 3 * self.xi(k_y, k_y, F_y, F_y, F0_a)
-            xi_sig_y += self.xi(k_z, k_z, F_z, F_z, F0_a)
-            xi_sig_y += self.xi(k_x, k_x, F_x, F_x, F0_a)
+            xi_sig_y = 3 * self._xi(k_y, k_y, F_y, F_y, F0_a)
+            xi_sig_y += self._xi(k_z, k_z, F_z, F_z, F0_a)
+            xi_sig_y += self._xi(k_x, k_x, F_x, F_x, F0_a)
 
-            xi_sig_z = 3 * self.xi(k_z, k_z, F_z, F_z, F0_a)
-            xi_sig_z += self.xi(k_x, k_x, F_x, F_x, F0_a)
-            xi_sig_z += self.xi(k_y, k_y, F_y, F_y, F0_a)
+            xi_sig_z = 3 * self._xi(k_z, k_z, F_z, F_z, F0_a)
+            xi_sig_z += self._xi(k_x, k_x, F_x, F_x, F0_a)
+            xi_sig_z += self._xi(k_y, k_y, F_y, F_y, F0_a)
 
-            xi_lam_xy = self.xi(k_x, k_y, F_x, F_y, F0_a)
-            xi_lam_xz = self.xi(k_x, k_z, F_x, F_z, F0_a)
-            xi_lam_yz = self.xi(k_y, k_z, F_y, F_z, F0_a)
+            xi_lam_xy = self._xi(k_x, k_y, F_x, F_y, F0_a)
+            xi_lam_xz = self._xi(k_x, k_z, F_x, F_z, F0_a)
+            xi_lam_yz = self._xi(k_y, k_z, F_y, F_z, F0_a)
 
             # Store Transformed Fock Matrices
 
@@ -811,7 +812,7 @@ class SHGDriver(NonLinearSolver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_component(self, label, freq, value, width):
+    def _print_component(self, label, freq, value, width):
         """
         Prints SHG component.
 

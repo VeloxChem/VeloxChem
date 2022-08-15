@@ -31,7 +31,6 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCFunctional
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
@@ -53,8 +52,8 @@ class NonLinearSolver:
 
     :param comm:
         The MPI communicator.
-    :param use_split_comm:
-        The flag for using split communicators.
+    :param ostream:
+        The output stream.
 
     Instance variables
         - eri_thresh: The electron repulsion integrals screening threshold.
@@ -63,10 +62,6 @@ class NonLinearSolver:
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
-        - pe: The flag for running polarizable embedding calculation.
-        - pe_options: The dictionary with options for polarizable embedding.
-        - use_split_comm: The flag for using split communicators.
-        - split_comm_ratio: The list of ratios for split communicators.
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
@@ -98,17 +93,12 @@ class NonLinearSolver:
         self.batch_size = None
 
         # dft
-        self.dft = False
+        self.xcfun = None
         self.grid_level = 4
-        self.xcfun = XCFunctional()
+        self._dft = False
 
         # polarizable embedding
-        self.pe = False
-        self.pe_options = {}
-
-        # split communicators
-        self.use_split_comm = False
-        self.split_comm_ratio = None
+        self.potfile = None
 
         # static electric field
         self.electric_field = None
@@ -117,15 +107,15 @@ class NonLinearSolver:
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
         self.lindep_thresh = 1.0e-6
-        self.is_converged = False
+        self._is_converged = False
 
         # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        self._comm = comm
+        self._rank = self._comm.Get_rank()
+        self._nodes = self._comm.Get_size()
 
         # output stream
-        self.ostream = ostream
+        self._ostream = ostream
 
         # restart information
         self.restart = True
@@ -141,10 +131,10 @@ class NonLinearSolver:
         self.program_end_time = None
 
         # filename
-        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
+        self._filename = f'veloxchem_rsp_{get_datetime_string()}'
 
         # input keywords
-        self.input_keywords = {
+        self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'qq_type': ('str_upper', 'ERI screening scheme'),
@@ -159,14 +149,68 @@ class NonLinearSolver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
             },
+            'method_settings': {
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+                'potfile': ('str', 'potential file for polarizable embedding'),
+                'electric_field': ('seq_fixed', 'static electric field'),
+            },
         }
+
+    @property
+    def comm(self):
+        """
+        Returns the MPI communicator.
+        """
+
+        return self._comm
+
+    @property
+    def rank(self):
+        """
+        Returns the MPI rank.
+        """
+
+        return self._rank
+
+    @property
+    def nodes(self):
+        """
+        Returns the number of MPI processes.
+        """
+
+        return self._nodes
+
+    @property
+    def nnodes(self):
+        """
+        Returns the number of MPI processes.
+        """
+
+        return self._nodes
+
+    @property
+    def ostream(self):
+        """
+        Returns the output stream.
+        """
+
+        return self._ostream
+
+    @property
+    def is_converged(self):
+        """
+        Returns whether linear solver is converged.
+        """
+
+        return self._is_converged
 
     def print_keywords(self):
         """
         Prints input keywords in nonlinear solver.
         """
 
-        print_keywords(self.input_keywords, self.ostream)
+        print_keywords(self._input_keywords, self.ostream)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -184,7 +228,8 @@ class NonLinearSolver:
         self.method_dict = dict(method_dict)
 
         rsp_keywords = {
-            key: val[0] for key, val in self.input_keywords['response'].items()
+            key: val[0]
+            for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -192,31 +237,55 @@ class NonLinearSolver:
         if 'program_end_time' in rsp_dict:
             self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
-            self.filename = rsp_dict['filename']
+            self._filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}.rsp.h5'
+                self.checkpoint_file = f'{self._filename}.rsp.h5'
 
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+        method_keywords = {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
 
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Nonlinear solver: Undefined XC functional')
+        parse_input(self, method_keywords, method_dict)
 
-        if 'potfile' in method_dict:
+        self._dft_sanity_check()
+
+        if self.potfile is not None:
             errmsg = 'NonLinearSolver: The \'potfile\' keyword is not supported '
             errmsg += 'in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-        if 'electric_field' in method_dict:
+        if self.electric_field is not None:
             errmsg = 'NonLinearSolver: The \'electric field\' keyword is not '
             errmsg += 'supported in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-    def init_eri(self, molecule, basis):
+    def _dft_sanity_check(self):
+        """
+        Checks DFT settings and updates relevant attributes.
+        """
+
+        # check xc functional
+        if self.xcfun is not None:
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'NonLinearSolver: Undefined XC functional')
+        self._dft = (self.xcfun is not None)
+
+        # check grid level
+        if self._dft and (self.grid_level < 1 or self.grid_level > 6):
+            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
+            warn_msg += ' Using default value. ***'
+            self.ostream.print_blank()
+            self.ostream.print_header(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+            self.grid_level = 4
+
+    def _init_eri(self, molecule, basis):
         """
         Initializes ERI.
 
@@ -229,29 +298,15 @@ class NonLinearSolver:
             The dictionary of ERI information.
         """
 
-        if self.use_split_comm:
-            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
-
-        if self.use_split_comm:
-            screening = None
-            valstr = 'ERI'
-            if self.dft:
-                valstr += '/DFT'
-            if self.pe:
-                valstr += '/PE'
-            self.ostream.print_info(
-                'Using sub-communicators for {}.'.format(valstr))
-            self.ostream.print_blank()
-        else:
-            eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-            screening = eri_drv.compute(get_qq_scheme(self.qq_type),
-                                        self.eri_thresh, molecule, basis)
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        screening = eri_drv.compute(get_qq_scheme(self.qq_type),
+                                    self.eri_thresh, molecule, basis)
 
         return {
             'screening': screening,
         }
 
-    def init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_tensors):
         """
         Initializes DFT.
 
@@ -263,8 +318,8 @@ class NonLinearSolver:
         :return:
             The dictionary of DFT information.
         """
-        # generate integration grid
-        if self.dft:
+
+        if self._dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
@@ -296,48 +351,6 @@ class NonLinearSolver:
             'dft_func_label': dft_func_label,
         }
 
-    def init_pe(self, molecule, basis):
-        """
-        Initializes polarizable embedding.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-
-        :return:
-            The dictionary of polarizable embedding information.
-        """
-
-        # set up polarizable embedding
-        if self.pe:
-            from .polembed import PolEmbed
-            pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
-            V_es = pe_drv.compute_multipole_potential_integrals()
-
-            cppe_info = 'Using CPPE {} for polarizable embedding.'.format(
-                pe_drv.get_cppe_version())
-            self.ostream.print_info(cppe_info)
-            self.ostream.print_blank()
-
-            pot_info = "Reading polarizable embedding potential: {}".format(
-                self.pe_options['potfile'])
-            self.ostream.print_info(pot_info)
-            self.ostream.print_blank()
-
-            with open(str(self.pe_options['potfile']), 'r') as f_pot:
-                potfile_text = '\n'.join(f_pot.readlines())
-        else:
-            pe_drv = None
-            V_es = None
-            potfile_text = ''
-
-        return {
-            'pe_drv': pe_drv,
-            'V_es': V_es,
-            'potfile_text': potfile_text,
-        }
-
     def compute(self, molecule, basis, scf_tensors):
         """
         Solves for the nonlinear response functions.
@@ -355,8 +368,8 @@ class NonLinearSolver:
 
         return None
 
-    def comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict,
-                      first_order_dens, second_order_dens, mode):
+    def _comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict,
+                       first_order_dens, second_order_dens, mode):
         """
         Computes and returns a list of Fock matrices.
 
@@ -383,9 +396,9 @@ class NonLinearSolver:
             A list of Fock matrices
         """
 
-        f_total = self.comp_two_el_int(mo, molecule, ao_basis, dft_dict,
-                                       first_order_dens, second_order_dens,
-                                       mode)
+        f_total = self._comp_two_el_int(mo, molecule, ao_basis, dft_dict,
+                                        first_order_dens, second_order_dens,
+                                        mode)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
         ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
@@ -399,8 +412,8 @@ class NonLinearSolver:
         else:
             return None
 
-    def comp_two_el_int(self, mo, molecule, ao_basis, dft_dict,
-                        first_order_dens, second_order_dens, mode):
+    def _comp_two_el_int(self, mo, molecule, ao_basis, dft_dict,
+                         first_order_dens, second_order_dens, mode):
         """
         Computes the two-electron part of the Fock matix in MO basis.
 
@@ -443,7 +456,7 @@ class NonLinearSolver:
 
         # double-check batch size for DFT
 
-        if self.dft:
+        if self._dft:
             if self.rank == mpi_master():
                 num_1 = len(first_order_dens)
                 num_2 = len(second_order_dens)
@@ -473,7 +486,7 @@ class NonLinearSolver:
 
                 batch_size_first_order = (batch_size // size_2) * size_1
 
-                errmsg = 'NonLinearSolver.comp_nlr_fock: '
+                errmsg = 'NonLinearSolver._comp_nlr_fock: '
                 errmsg += f'inconsistent number of density matrices (mode={mode})'
                 assert_msg_critical(condition, errmsg)
             else:
@@ -503,7 +516,7 @@ class NonLinearSolver:
             # form density matrices
 
             if self.rank == mpi_master():
-                if self.dft:
+                if self._dft:
                     batch_start_first_order = batch_size_first_order * batch_ind
                     batch_end_first_order = min(
                         batch_start_first_order + batch_size_first_order,
@@ -526,18 +539,18 @@ class NonLinearSolver:
 
                 dens2 = AODensityMatrix(dts2, denmat.rest)
             else:
-                if self.dft:
+                if self._dft:
                     dens1 = AODensityMatrix()
                 dens2 = AODensityMatrix()
 
-            if self.dft:
+            if self._dft:
                 dens1.broadcast(self.rank, self.comm)
             dens2.broadcast(self.rank, self.comm)
 
             fock = AOFockMatrix(dens2)
             fock_flag = fockmat.rgenjk
 
-            if self.dft:
+            if self._dft:
                 if self.xcfun.is_hybrid():
                     fock_flag = fockmat.rgenjkx
                     fact_xc = self.xcfun.get_frac_exact_exchange()
@@ -550,10 +563,10 @@ class NonLinearSolver:
                 fock.set_fock_type(fock_flag, i)
 
             eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
-            if self.dft and not self.xcfun.is_hybrid():
+            if self._dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
-            if self.dft:
+            if self._dft:
                 xc_drv = XCIntegrator(self.comm)
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
@@ -587,7 +600,8 @@ class NonLinearSolver:
 
         return dist_fabs
 
-    def flip_yz(self, X):
+    @staticmethod
+    def flip_yz(X):
         """
         This method takes a first-order response vector with a given sign of
         the frequency and returns the first-order response vector with reversed
@@ -610,7 +624,7 @@ class NonLinearSolver:
 
         return None
 
-    def print_fock_header(self):
+    def _print_fock_header(self):
         """
         Prints header for Fock computation
         """
@@ -620,7 +634,7 @@ class NonLinearSolver:
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-    def print_fock_time(self, time):
+    def _print_fock_time(self, time):
         """
         Prints time for Fock computation
 
@@ -633,25 +647,7 @@ class NonLinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_component(self, label, value, width):
-        """
-        Prints response function components.
-
-        :param label:
-            The label
-        :param freq:
-            The frequency
-        :param value:
-            The complex value
-        :param width:
-            The width for the output
-        """
-
-        w_str = '{:<9s} {:20.8f} {:20.8f}j'.format(label, value.real,
-                                                   value.imag)
-        self.ostream.print_header(w_str.ljust(width))
-
-    def s4(self, k1, k2, k3, D, nocc, norb):
+    def _s4(self, k1, k2, k3, D, nocc, norb):
         """
         Used for the contraction of the S[4] tensor with three response vectors
 
@@ -672,12 +668,12 @@ class NonLinearSolver:
             The contraction of S[4] for S[4] dict
         """
 
-        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
-        S4_132 = self.s4_contract(k1, k3, k2, D, nocc, norb)
+        S4_123 = self._s4_contract(k1, k2, k3, D, nocc, norb)
+        S4_132 = self._s4_contract(k1, k3, k2, D, nocc, norb)
 
         return S4_123 + S4_132
 
-    def s4_contract(self, k1, k2, k3, D, nocc, norb):
+    def _s4_contract(self, k1, k2, k3, D, nocc, norb):
         """
         Returns the contraction of the S[4] tensor 
 
@@ -702,7 +698,8 @@ class NonLinearSolver:
         S4N1N2N3_c = self.complex_lrmat2vec(S4N1N2N3, nocc, norb)
         return (2. / 6) * S4N1N2N3_c
 
-    def flip_xy(self, X):
+    @staticmethod
+    def flip_xy(X):
         """
         Swaps upper and lower parts of a response vector.
 
@@ -722,7 +719,7 @@ class NonLinearSolver:
 
         return None
 
-    def s4_for_r4(self, k1, k2, k3, D, nocc, norb):
+    def _s4_for_r4(self, k1, k2, k3, D, nocc, norb):
         """
         Returns the contraction of S[4] for the contraction of R[4]
 
@@ -743,11 +740,11 @@ class NonLinearSolver:
             The contraction of S[4] for the contraction of R[4]
         """
 
-        S4_123 = self.s4_contract(k1, k2, k3, D, nocc, norb)
+        S4_123 = self._s4_contract(k1, k2, k3, D, nocc, norb)
 
         return S4_123
 
-    def collect_vectors_in_columns(self, sendbuf):
+    def _collect_vectors_in_columns(self, sendbuf):
         """
         Collects vectors into 2d array (column-wise).
 
@@ -778,7 +775,8 @@ class NonLinearSolver:
 
         return recvbuf
 
-    def ao2mo(self, mo, A):
+    @staticmethod
+    def ao2mo(mo, A):
         """
         Transform a matrix to molecular basis
 
@@ -793,7 +791,8 @@ class NonLinearSolver:
 
         return np.linalg.multi_dot([mo.T, A, mo])
 
-    def commut_mo_density(self, A, nocc):
+    @staticmethod
+    def commut_mo_density(A, nocc):
         """
         Commutes matrix A and MO density
 
@@ -815,7 +814,8 @@ class NonLinearSolver:
 
         return mat
 
-    def commut(self, A, B):
+    @staticmethod
+    def commut(A, B):
         """
         Commutes two matricies A and B
 
@@ -830,7 +830,7 @@ class NonLinearSolver:
 
         return np.matmul(A, B) - np.matmul(B, A)
 
-    def x3_contract(self, k1, k2, X, D, nocc, norb):
+    def _x3_contract(self, k1, k2, X, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 3 with two
         first-order response matrices. X[3]N1N2 = (1/2)[[k2,[k1,X]],D.T]
@@ -856,7 +856,7 @@ class NonLinearSolver:
         X3NxNy_c = self.complex_lrmat2vec(X3NxNy, nocc, norb)
         return (1. / 2) * X3NxNy_c
 
-    def x2_contract(self, k, X, D, nocc, norb):
+    def _x2_contract(self, k, X, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 2 with a
         second-order response matrix. X[2]N1 = [[k1,X],D.T]
@@ -880,7 +880,7 @@ class NonLinearSolver:
         X2Nx_c = self.complex_lrmat2vec(XNx, nocc, norb)
         return X2Nx_c
 
-    def a2_contract(self, k, A, D, nocc, norb):
+    def _a2_contract(self, k, A, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 2 with a
         second-order response matrix. A[2]N1 = -(1 / 2)[[k1,X],D.T]
@@ -906,7 +906,7 @@ class NonLinearSolver:
         A2Nx_c = self.complex_lrmat2vec(ANx, nocc, norb)
         return -(1. / 2) * A2Nx_c
 
-    def a3_contract(self, k1, k2, A, D, nocc, norb):
+    def _a3_contract(self, k1, k2, A, D, nocc, norb):
         """
         Contracts the generalized dipole gradient tensor of rank 3 with two
         first-order response matrices. A[3]N1N2 = -(1/6)[[k2,[k1,A]],D.T]
@@ -932,7 +932,7 @@ class NonLinearSolver:
         A3NxNy_c = self.complex_lrmat2vec(A3NxNy, nocc, norb)
         return -(1. / 6) * A3NxNy_c
 
-    def zi(self, kB, kC, kD, Fc, Fd, Fbc, Fcb, F0):
+    def _zi(self, kB, kC, kD, Fc, Fd, Fbc, Fcb, F0):
         """
         Returns a matrix used for the E[4] contraction
 
@@ -955,7 +955,8 @@ class NonLinearSolver:
 
         return (self.commut(kB, M1 + M2 + 3 * (Fbc + Fcb)))
 
-    def anti_sym(self, vec):
+    @staticmethod
+    def anti_sym(vec):
         """
         Returns an antisymetrized vector
 
@@ -975,7 +976,7 @@ class NonLinearSolver:
 
         return None
 
-    def xi(self, kA, kB, Fa, Fb, F0):
+    def _xi(self, kA, kB, Fa, Fb, F0):
         """
         Returns a matrix used for the E[3] contraction
 
@@ -999,7 +1000,8 @@ class NonLinearSolver:
                       self.commut(kB,
                                   self.commut(kA, F0) + 2 * Fa))
 
-    def complex_lrmat2vec(self, mat, nocc, norb):
+    @staticmethod
+    def complex_lrmat2vec(mat, nocc, norb):
         """
         Converts complex matrix to vector.
 

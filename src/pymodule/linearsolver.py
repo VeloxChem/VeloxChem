@@ -49,7 +49,8 @@ from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, print_keywords, get_datetime_string
+from .inputparser import (parse_input, print_keywords, print_attributes,
+                          get_datetime_string)
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .checkpoint import write_rsp_hdf5
@@ -63,8 +64,8 @@ class LinearSolver:
 
     :param comm:
         The MPI communicator.
-    :param use_split_comm:
-        The flag for using split communicators.
+    :param ostream:
+        The output stream.
 
     Instance variables
         - eri_thresh: The electron repulsion integrals screening threshold.
@@ -118,17 +119,18 @@ class LinearSolver:
         self.batch_size = None
 
         # dft
-        self.dft = False
-        self.grid_level = 4
         self.xcfun = None
+        self.grid_level = 4
+        self._dft = False
 
         # polarizable embedding
-        self.pe = False
+        self.potfile = None
         self.pe_options = {}
+        self._pe = False
 
         # split communicators
         self.use_split_comm = False
-        self.split_comm_ratio = None
+        self._split_comm_ratio = None
 
         # static electric field
         self.electric_field = None
@@ -136,18 +138,18 @@ class LinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.cur_iter = 0
-        self.small_thresh = 1.0e-10
         self.lindep_thresh = 1.0e-6
-        self.is_converged = False
+        self._small_thresh = 1.0e-10
+        self._cur_iter = 0
+        self._is_converged = False
 
         # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
+        self._comm = comm
+        self._rank = self._comm.Get_rank()
+        self._nodes = self._comm.Get_size()
 
         # output stream
-        self.ostream = ostream
+        self._ostream = ostream
 
         # restart information
         self.restart = True
@@ -159,25 +161,28 @@ class LinearSolver:
         self.memory_profiling = False
         self.memory_tracing = False
 
+        # verbosity of output (1-3)
+        self.print_level = 2
+
         # program end time for graceful exit
         self.program_end_time = None
 
         # filename
-        self.filename = f'veloxchem_rsp_{get_datetime_string()}'
+        self._filename = f'veloxchem_rsp_{get_datetime_string()}'
 
         # distributed arrays
-        self.dist_bger = None
-        self.dist_bung = None
-        self.dist_e2bger = None
-        self.dist_e2bung = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
         # nonlinear flag and distributed Fock matrices
         self.nonlinear = False
-        self.dist_fock_ger = None
-        self.dist_fock_ung = None
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
 
         # input keywords
-        self.input_keywords = {
+        self._input_keywords = {
             'response': {
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'qq_type': ('str_upper', 'ERI screening scheme'),
@@ -191,24 +196,78 @@ class LinearSolver:
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
+                'print_level': ('int', 'verbosity of output (1-3)'),
             },
             'method_settings': {
-                'dft': ('bool', 'use DFT'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
-                'pe': ('bool', 'use polarizable embedding'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 'use_split_comm': ('bool', 'use split communicators'),
             },
         }
 
+    @property
+    def comm(self):
+        """
+        Returns the MPI communicator.
+        """
+
+        return self._comm
+
+    @property
+    def rank(self):
+        """
+        Returns the MPI rank.
+        """
+
+        return self._rank
+
+    @property
+    def nodes(self):
+        """
+        Returns the number of MPI processes.
+        """
+
+        return self._nodes
+
+    @property
+    def nnodes(self):
+        """
+        Returns the number of MPI processes.
+        """
+
+        return self._nodes
+
+    @property
+    def ostream(self):
+        """
+        Returns the output stream.
+        """
+
+        return self._ostream
+
+    @property
+    def is_converged(self):
+        """
+        Returns whether linear solver is converged.
+        """
+
+        return self._is_converged
+
     def print_keywords(self):
         """
         Prints input keywords in linear solver.
         """
 
-        print_keywords(self.input_keywords, self.ostream)
+        print_keywords(self._input_keywords, self.ostream)
+
+    def print_attributes(self):
+        """
+        Prints attributes in linear solver.
+        """
+
+        print_attributes(self._input_keywords, self.ostream)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -224,7 +283,8 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0] for key, val in self.input_keywords['response'].items()
+            key: val[0]
+            for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -232,57 +292,27 @@ class LinearSolver:
         if 'program_end_time' in rsp_dict:
             self.program_end_time = rsp_dict['program_end_time']
         if 'filename' in rsp_dict:
-            self.filename = rsp_dict['filename']
+            self._filename = rsp_dict['filename']
             if 'checkpoint_file' not in rsp_dict:
-                self.checkpoint_file = f'{self.filename}.rsp.h5'
+                self.checkpoint_file = f'{self._filename}.rsp.h5'
 
         method_keywords = {
             key: val[0]
-            for key, val in self.input_keywords['method_settings'].items()
+            for key, val in self._input_keywords['method_settings'].items()
         }
 
         parse_input(self, method_keywords, method_dict)
 
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'LinearSolver: Undefined XC functional')
+        self._dft_sanity_check()
 
-        if 'pe_options' not in method_dict:
-            method_dict['pe_options'] = {}
-
-        if ('potfile' in method_dict) or method_dict['pe_options']:
-            if 'pe' not in method_dict:
-                self.pe = True
-
-        if self.pe:
-            from .polembed import PolEmbed
-
-            if ('potfile' in method_dict and
-                    'potfile' not in method_dict['pe_options']):
-                method_dict['pe_options']['potfile'] = method_dict['potfile']
-            assert_msg_critical('potfile' in method_dict['pe_options'],
-                                'LinearSolver: No potential file defined')
-            self.pe_options = dict(method_dict['pe_options'])
-
-            cppe_potfile = None
-            if self.rank == mpi_master():
-                potfile = self.pe_options['potfile']
-                if not Path(potfile).is_file():
-                    potfile = str(
-                        Path(self.filename).parent / Path(potfile).name)
-                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
-            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
-            self.pe_options['potfile'] = cppe_potfile
+        self._pe_sanity_check(method_dict)
 
         if self.electric_field is not None:
             assert_msg_critical(
                 len(self.electric_field) == 3,
                 'LinearSolver: Expecting 3 values in \'electric field\' input')
             assert_msg_critical(
-                not self.pe,
+                not self._pe,
                 'LinearSolver: \'electric field\' input is incompatible ' +
                 'with polarizable embedding')
             # disable restart of calculation with static electric field since
@@ -290,7 +320,62 @@ class LinearSolver:
             # field
             self.restart = False
 
-    def init_eri(self, molecule, basis):
+    def _dft_sanity_check(self):
+        """
+        Checks DFT settings and updates relevant attributes.
+        """
+
+        # check xc functional
+        if self.xcfun is not None:
+            if isinstance(self.xcfun, str):
+                self.xcfun = parse_xc_func(self.xcfun.upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'LinearSolver: Undefined XC functional')
+        self._dft = (self.xcfun is not None)
+
+        # check grid level
+        if self._dft and (self.grid_level < 1 or self.grid_level > 6):
+            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
+            warn_msg += ' Using default value. ***'
+            self.ostream.print_blank()
+            self.ostream.print_header(warn_msg)
+            self.ostream.print_blank()
+            self.ostream.flush()
+            self.grid_level = 4
+
+    def _pe_sanity_check(self, method_dict=None):
+        """
+        Checks PE settings and updates relevant attributes.
+
+        :param method_dict:
+            The dicitonary of method settings.
+        """
+
+        if method_dict:
+            if 'pe_options' in method_dict:
+                self.pe_options = dict(method_dict['pe_options'])
+            else:
+                self.pe_options = {}
+
+        if self.potfile:
+            self.pe_options['potfile'] = self.potfile
+
+        self._pe = ('potfile' in self.pe_options)
+
+        if self._pe:
+            from .polembed import PolEmbed
+
+            cppe_potfile = None
+            if self.rank == mpi_master():
+                potfile = self.pe_options['potfile']
+                if not Path(potfile).is_file():
+                    potfile = str(
+                        Path(self._filename).parent / Path(potfile).name)
+                cppe_potfile = PolEmbed.write_cppe_potfile(potfile)
+            cppe_potfile = self.comm.bcast(cppe_potfile, root=mpi_master())
+            self.pe_options['potfile'] = cppe_potfile
+
+    def _init_eri(self, molecule, basis):
         """
         Initializes ERI.
 
@@ -304,14 +389,14 @@ class LinearSolver:
         """
 
         if self.use_split_comm:
-            self.use_split_comm = ((self.dft or self.pe) and self.nodes >= 8)
+            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
 
         if self.use_split_comm:
             screening = None
             valstr = 'ERI'
-            if self.dft:
+            if self._dft:
                 valstr += '/DFT'
-            if self.pe:
+            if self._pe:
                 valstr += '/PE'
             self.ostream.print_info(
                 'Using sub-communicators for {}.'.format(valstr))
@@ -325,7 +410,7 @@ class LinearSolver:
             'screening': screening,
         }
 
-    def init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_tensors):
         """
         Initializes DFT.
 
@@ -338,16 +423,7 @@ class LinearSolver:
             The dictionary of DFT information.
         """
 
-        if self.dft:
-            # check dft setup
-            assert_msg_critical(self.xcfun is not None,
-                                'LinearSolver: Undefined XC functional')
-            if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
-                assert_msg_critical(not self.xcfun.is_undefined(),
-                                    'LinearSolver: Undefined XC functional')
-
-            # generate integration grid
+        if self._dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
@@ -379,7 +455,7 @@ class LinearSolver:
             'dft_func_label': dft_func_label,
         }
 
-    def init_pe(self, molecule, basis):
+    def _init_pe(self, molecule, basis):
         """
         Initializes polarizable embedding.
 
@@ -392,8 +468,7 @@ class LinearSolver:
             The dictionary of polarizable embedding information.
         """
 
-        # set up polarizable embedding
-        if self.pe:
+        if self._pe:
             from .polembed import PolEmbed
             pe_drv = PolEmbed(molecule, basis, self.pe_options, self.comm)
             V_es = pe_drv.compute_multipole_potential_integrals()
@@ -421,7 +496,7 @@ class LinearSolver:
             'potfile_text': potfile_text,
         }
 
-    def read_checkpoint(self, rsp_vector_labels):
+    def _read_checkpoint(self, rsp_vector_labels):
         """
         Reads distributed arrays from checkpoint file.
 
@@ -436,18 +511,19 @@ class LinearSolver:
         ]
 
         if self.nonlinear:
-            (self.dist_bger, self.dist_bung, self.dist_e2bger, self.dist_e2bung,
-             self.dist_fock_ger, self.dist_fock_ung) = dist_arrays
+            (self._dist_bger, self._dist_bung, self._dist_e2bger,
+             self._dist_e2bung, self._dist_fock_ger,
+             self._dist_fock_ung) = dist_arrays
         else:
-            (self.dist_bger, self.dist_bung, self.dist_e2bger,
-             self.dist_e2bung) = dist_arrays
+            (self._dist_bger, self._dist_bung, self._dist_e2bger,
+             self._dist_e2bung) = dist_arrays
 
         checkpoint_text = 'Restarting from checkpoint file: '
         checkpoint_text += self.checkpoint_file
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
 
-    def append_trial_vectors(self, bger, bung):
+    def _append_trial_vectors(self, bger, bung):
         """
         Appends distributed trial vectors.
 
@@ -457,21 +533,21 @@ class LinearSolver:
             The distributed ungerade trial vectors.
         """
 
-        if self.dist_bger is None:
-            self.dist_bger = DistributedArray(bger.data,
-                                              self.comm,
-                                              distribute=False)
+        if self._dist_bger is None:
+            self._dist_bger = DistributedArray(bger.data,
+                                               self.comm,
+                                               distribute=False)
         else:
-            self.dist_bger.append(bger, axis=1)
+            self._dist_bger.append(bger, axis=1)
 
-        if self.dist_bung is None:
-            self.dist_bung = DistributedArray(bung.data,
-                                              self.comm,
-                                              distribute=False)
+        if self._dist_bung is None:
+            self._dist_bung = DistributedArray(bung.data,
+                                               self.comm,
+                                               distribute=False)
         else:
-            self.dist_bung.append(bung, axis=1)
+            self._dist_bung.append(bung, axis=1)
 
-    def append_sigma_vectors(self, e2bger, e2bung):
+    def _append_sigma_vectors(self, e2bger, e2bung):
         """
         Appends distributed sigma (E2 b) vectors.
 
@@ -481,21 +557,21 @@ class LinearSolver:
             The distributed ungerade sigma vectors.
         """
 
-        if self.dist_e2bger is None:
-            self.dist_e2bger = DistributedArray(e2bger.data,
-                                                self.comm,
-                                                distribute=False)
+        if self._dist_e2bger is None:
+            self._dist_e2bger = DistributedArray(e2bger.data,
+                                                 self.comm,
+                                                 distribute=False)
         else:
-            self.dist_e2bger.append(e2bger, axis=1)
+            self._dist_e2bger.append(e2bger, axis=1)
 
-        if self.dist_e2bung is None:
-            self.dist_e2bung = DistributedArray(e2bung.data,
-                                                self.comm,
-                                                distribute=False)
+        if self._dist_e2bung is None:
+            self._dist_e2bung = DistributedArray(e2bung.data,
+                                                 self.comm,
+                                                 distribute=False)
         else:
-            self.dist_e2bung.append(e2bung, axis=1)
+            self._dist_e2bung.append(e2bung, axis=1)
 
-    def append_fock_matrices(self, fock_ger, fock_ung):
+    def _append_fock_matrices(self, fock_ger, fock_ung):
         """
         Appends distributed Fock matrices in MO.
 
@@ -505,19 +581,19 @@ class LinearSolver:
             The distributed ungerade Fock matrices in MO.
         """
 
-        if self.dist_fock_ger is None:
-            self.dist_fock_ger = DistributedArray(fock_ger.data,
-                                                  self.comm,
-                                                  distribute=False)
+        if self._dist_fock_ger is None:
+            self._dist_fock_ger = DistributedArray(fock_ger.data,
+                                                   self.comm,
+                                                   distribute=False)
         else:
-            self.dist_fock_ger.append(fock_ger, axis=1)
+            self._dist_fock_ger.append(fock_ger, axis=1)
 
-        if self.dist_fock_ung is None:
-            self.dist_fock_ung = DistributedArray(fock_ung.data,
-                                                  self.comm,
-                                                  distribute=False)
+        if self._dist_fock_ung is None:
+            self._dist_fock_ung = DistributedArray(fock_ung.data,
+                                                   self.comm,
+                                                   distribute=False)
         else:
-            self.dist_fock_ung.append(fock_ung, axis=1)
+            self._dist_fock_ung.append(fock_ung, axis=1)
 
     def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
@@ -539,16 +615,16 @@ class LinearSolver:
 
         return None
 
-    def e2n_half_size(self,
-                      vecs_ger,
-                      vecs_ung,
-                      molecule,
-                      basis,
-                      scf_tensors,
-                      eri_dict,
-                      dft_dict,
-                      pe_dict,
-                      profiler=None):
+    def _e2n_half_size(self,
+                       vecs_ger,
+                       vecs_ung,
+                       molecule,
+                       basis,
+                       scf_tensors,
+                       eri_dict,
+                       dft_dict,
+                       pe_dict,
+                       profiler=None):
         """
         Computes the E2 b matrix vector product.
 
@@ -584,12 +660,12 @@ class LinearSolver:
         if self.rank == mpi_master():
             assert_msg_critical(
                 vecs_ger.data.ndim == 2 and vecs_ung.data.ndim == 2,
-                'LinearSolver.e2n_half_size: '
+                'LinearSolver._e2n_half_size: '
                 'invalid shape of trial vectors')
 
             assert_msg_critical(
                 vecs_ger.shape(0) == vecs_ung.shape(0),
-                'LinearSolver.e2n_half_size: '
+                'LinearSolver._e2n_half_size: '
                 'inconsistent shape of trial vectors')
 
             mo = scf_tensors['C_alpha']
@@ -660,8 +736,8 @@ class LinearSolver:
 
             fock = AOFockMatrix(dens)
 
-            self.comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
-                              pe_dict, profiler)
+            self._comp_lr_fock(fock, dens, molecule, basis, eri_dict, dft_dict,
+                               pe_dict, profiler)
 
             e2_ger = None
             e2_ung = None
@@ -711,26 +787,26 @@ class LinearSolver:
 
             vecs_e2_ger = DistributedArray(e2_ger, self.comm)
             vecs_e2_ung = DistributedArray(e2_ung, self.comm)
-            self.append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
+            self._append_sigma_vectors(vecs_e2_ger, vecs_e2_ung)
 
             if self.nonlinear:
                 dist_fock_ger = DistributedArray(fock_ger, self.comm)
                 dist_fock_ung = DistributedArray(fock_ung, self.comm)
-                self.append_fock_matrices(dist_fock_ger, dist_fock_ung)
+                self._append_fock_matrices(dist_fock_ger, dist_fock_ung)
 
-        self.append_trial_vectors(vecs_ger, vecs_ung)
+        self._append_trial_vectors(vecs_ger, vecs_ung)
 
         self.ostream.print_blank()
 
-    def comp_lr_fock(self,
-                     fock,
-                     dens,
-                     molecule,
-                     basis,
-                     eri_dict,
-                     dft_dict,
-                     pe_dict,
-                     profiler=None):
+    def _comp_lr_fock(self,
+                      fock,
+                      dens,
+                      molecule,
+                      basis,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None):
         """
         Computes Fock/Fxc matrix (2e part) for linear response calculation.
 
@@ -763,7 +839,7 @@ class LinearSolver:
         # set flags for Fock matrices
 
         fock_flag = fockmat.rgenjk
-        if self.dft:
+        if self._dft:
             if self.xcfun.is_hybrid():
                 fock_flag = fockmat.rgenjkx
                 fact_xc = self.xcfun.get_frac_exact_exchange()
@@ -777,8 +853,8 @@ class LinearSolver:
         # calculate Fock on subcommunicators
 
         if self.use_split_comm:
-            self.comp_lr_fock_split_comm(fock, dens, molecule, basis, eri_dict,
-                                         dft_dict, pe_dict)
+            self._comp_lr_fock_split_comm(fock, dens, molecule, basis, eri_dict,
+                                          dft_dict, pe_dict)
 
         else:
             t0 = tm.time()
@@ -787,7 +863,7 @@ class LinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('ERI', tm.time() - t0)
 
-            if self.dft:
+            if self._dft:
                 t0 = tm.time()
                 if not self.xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
@@ -799,7 +875,7 @@ class LinearSolver:
                 if profiler is not None:
                     profiler.add_timing_info('DFT', tm.time() - t0)
 
-            if self.pe:
+            if self._pe:
                 t0 = tm.time()
                 pe_drv.V_es = V_es.copy()
                 for ifock in range(fock.number_of_fock_matrices()):
@@ -812,8 +888,8 @@ class LinearSolver:
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
-    def comp_lr_fock_split_comm(self, fock, dens, molecule, basis, eri_dict,
-                                dft_dict, pe_dict):
+    def _comp_lr_fock_split_comm(self, fock, dens, molecule, basis, eri_dict,
+                                 dft_dict, pe_dict):
         """
         Computes linear response Fock/Fxc matrix on split communicators.
 
@@ -839,24 +915,24 @@ class LinearSolver:
         V_es = pe_dict['V_es']
         pe_drv = pe_dict['pe_drv']
 
-        if self.split_comm_ratio is None:
-            if self.dft and self.pe:
-                self.split_comm_ratio = [0.34, 0.33, 0.33]
-            elif self.dft:
-                self.split_comm_ratio = [0.5, 0.5, 0.0]
-            elif self.pe:
-                self.split_comm_ratio = [0.5, 0.0, 0.5]
+        if self._split_comm_ratio is None:
+            if self._dft and self._pe:
+                self._split_comm_ratio = [0.34, 0.33, 0.33]
+            elif self._dft:
+                self._split_comm_ratio = [0.5, 0.5, 0.0]
+            elif self._pe:
+                self._split_comm_ratio = [0.5, 0.0, 0.5]
             else:
-                self.split_comm_ratio = [1.0, 0.0, 0.0]
+                self._split_comm_ratio = [1.0, 0.0, 0.0]
 
-        if self.dft:
-            dft_nodes = int(float(self.nodes) * self.split_comm_ratio[1] + 0.5)
+        if self._dft:
+            dft_nodes = int(float(self.nodes) * self._split_comm_ratio[1] + 0.5)
             dft_nodes = max(1, dft_nodes)
         else:
             dft_nodes = 0
 
-        if self.pe:
-            pe_nodes = int(float(self.nodes) * self.split_comm_ratio[2] + 0.5)
+        if self._pe:
+            pe_nodes = int(float(self.nodes) * self._split_comm_ratio[2] + 0.5)
             pe_nodes = max(1, pe_nodes)
         else:
             pe_nodes = 0
@@ -883,10 +959,10 @@ class LinearSolver:
         if self.rank != mpi_master():
             molgrid = MolecularGrid()
             V_es = np.zeros(0)
-        if self.dft:
+        if self._dft:
             if local_comm.Get_rank() == mpi_master():
                 molgrid.broadcast(cross_comm.Get_rank(), cross_comm)
-        if self.pe:
+        if self._pe:
             if local_comm.Get_rank() == mpi_master():
                 V_es = cross_comm.bcast(V_es, root=mpi_master())
 
@@ -898,7 +974,7 @@ class LinearSolver:
             local_screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                               self.eri_thresh, molecule, basis)
             eri_drv.compute(fock, dens, molecule, basis, local_screening)
-            if self.dft and not self.xcfun.is_hybrid():
+            if self._dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
 
@@ -932,22 +1008,22 @@ class LinearSolver:
         if self.rank == mpi_master():
             time_eri = dt[0] * eri_nodes
             time_dft = 0.0
-            if self.dft:
+            if self._dft:
                 time_dft = dt[1] * dft_nodes
             time_pe = 0.0
-            if self.pe:
-                pe_root = 2 if self.dft else 1
+            if self._pe:
+                pe_root = 2 if self._dft else 1
                 time_pe = dt[pe_root] * pe_nodes
             time_sum = time_eri + time_dft + time_pe
-            self.split_comm_ratio = [
+            self._split_comm_ratio = [
                 time_eri / time_sum,
                 time_dft / time_sum,
                 time_pe / time_sum,
             ]
-        self.split_comm_ratio = self.comm.bcast(self.split_comm_ratio,
-                                                root=mpi_master())
+        self._split_comm_ratio = self.comm.bcast(self._split_comm_ratio,
+                                                 root=mpi_master())
 
-    def write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
+    def _write_checkpoint(self, molecule, basis, dft_dict, pe_dict, labels):
         """
         Writes checkpoint file.
 
@@ -976,19 +1052,19 @@ class LinearSolver:
         if success:
             if self.nonlinear:
                 dist_arrays = [
-                    self.dist_bger, self.dist_bung, self.dist_e2bger,
-                    self.dist_e2bung, self.dist_fock_ger, self.dist_fock_ung
+                    self._dist_bger, self._dist_bung, self._dist_e2bger,
+                    self._dist_e2bung, self._dist_fock_ger, self._dist_fock_ung
                 ]
             else:
                 dist_arrays = [
-                    self.dist_bger, self.dist_bung, self.dist_e2bger,
-                    self.dist_e2bung
+                    self._dist_bger, self._dist_bung, self._dist_e2bger,
+                    self._dist_e2bung
                 ]
 
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
 
-    def graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
+    def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
         """
         Gracefully exits the program.
 
@@ -1012,7 +1088,7 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict, labels)
+        self._write_checkpoint(molecule, basis, dft_dict, pe_dict, labels)
 
         self.ostream.print_info('...done.')
         self.ostream.print_blank()
@@ -1022,7 +1098,7 @@ class LinearSolver:
 
         sys.exit(0)
 
-    def need_graceful_exit(self, next_iter_in_hours):
+    def _need_graceful_exit(self, next_iter_in_hours):
         """
         Checks if a graceful exit is needed.
 
@@ -1042,7 +1118,7 @@ class LinearSolver:
                 return True
         return False
 
-    def print_header(self, title, nstates=None, n_freqs=None, n_points=None):
+    def _print_header(self, title, nstates=None, n_freqs=None, n_points=None):
         """
         Prints linear response solver setup header to output stream.
 
@@ -1094,7 +1170,7 @@ class LinearSolver:
                 self.batch_size)
             self.ostream.print_header(cur_str.ljust(str_width))
 
-        if self.dft:
+        if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
@@ -1105,11 +1181,11 @@ class LinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def print_iteration(self, relative_residual_norm, xvs):
+    def _print_iteration(self, relative_residual_norm, xvs):
 
         return
 
-    def print_convergence(self, title):
+    def _print_convergence(self, title):
         """
         Prints information after convergence.
 
@@ -1119,18 +1195,18 @@ class LinearSolver:
 
         width = 92
         output_conv = '*** '
-        if self.is_converged:
+        if self._is_converged:
             output_conv += '{:s} converged'.format(title)
         else:
             output_conv += '{:s} NOT converged'.format(title)
-        output_conv += ' in {:d} iterations. '.format(self.cur_iter + 1)
+        output_conv += ' in {:d} iterations. '.format(self._cur_iter + 1)
         output_conv += 'Time: {:.2f} sec'.format(tm.time() - self.start_time)
         self.ostream.print_header(output_conv.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def check_convergence(self, relative_residual_norm):
+    def _check_convergence(self, relative_residual_norm):
         """
         Checks convergence.
 
@@ -1138,15 +1214,17 @@ class LinearSolver:
             Relative residual norms.
         """
 
+        self._is_converged = False
+
         if self.rank == mpi_master():
             max_residual = max(relative_residual_norm.values())
             if max_residual < self.conv_thresh:
-                self.is_converged = True
+                self._is_converged = True
 
-        self.is_converged = self.comm.bcast(self.is_converged,
-                                            root=mpi_master())
+        self._is_converged = self.comm.bcast(self._is_converged,
+                                             root=mpi_master())
 
-    def decomp_grad(self, grad):
+    def _decomp_grad(self, grad):
         """
         Decomposes gradient into gerade and ungerade parts.
 
@@ -1176,15 +1254,15 @@ class LinearSolver:
 
         return ger.T, ung.T
 
-    def get_precond(self, orb_ene, nocc, norb, w):
+    def _get_precond(self, orb_ene, nocc, norb, w):
 
         return None
 
-    def preconditioning(self, precond, v_in):
+    def _preconditioning(self, precond, v_in):
 
         return None
 
-    def precond_trials(self, vectors, precond):
+    def _precond_trials(self, vectors, precond):
         """
         Applies preconditioner to trial vectors.
 
@@ -1199,12 +1277,12 @@ class LinearSolver:
 
         return None, None
 
-    def setup_trials(self,
-                     vectors,
-                     precond,
-                     dist_bger=None,
-                     dist_bung=None,
-                     renormalize=True):
+    def _setup_trials(self,
+                      vectors,
+                      precond,
+                      dist_bger=None,
+                      dist_bung=None,
+                      renormalize=True):
         """
         Computes orthonormalized trial vectors.
 
@@ -1223,7 +1301,7 @@ class LinearSolver:
             The orthonormalized gerade and ungerade trial vectors.
         """
 
-        dist_new_ger, dist_new_ung = self.precond_trials(vectors, precond)
+        dist_new_ger, dist_new_ung = self._precond_trials(vectors, precond)
 
         if dist_new_ger.data.size == 0:
             dist_new_ger.data = np.zeros((dist_new_ung.shape(0), 0))
@@ -1245,18 +1323,18 @@ class LinearSolver:
 
         if renormalize:
             if dist_new_ger.data.ndim > 0 and dist_new_ger.shape(0) > 0:
-                dist_new_ger = self.remove_linear_dependence_half_distributed(
+                dist_new_ger = self._remove_linear_dependence_half_size(
                     dist_new_ger, self.lindep_thresh)
-                dist_new_ger = self.orthogonalize_gram_schmidt_half_distributed(
+                dist_new_ger = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ger)
-                dist_new_ger = self.normalize_half_distributed(dist_new_ger)
+                dist_new_ger = self._normalize_half_size(dist_new_ger)
 
             if dist_new_ung.data.ndim > 0 and dist_new_ung.shape(0) > 0:
-                dist_new_ung = self.remove_linear_dependence_half_distributed(
+                dist_new_ung = self._remove_linear_dependence_half_size(
                     dist_new_ung, self.lindep_thresh)
-                dist_new_ung = self.orthogonalize_gram_schmidt_half_distributed(
+                dist_new_ung = self._orthogonalize_gram_schmidt_half_size(
                     dist_new_ung)
-                dist_new_ung = self.normalize_half_distributed(dist_new_ung)
+                dist_new_ung = self._normalize_half_size(dist_new_ung)
 
         if self.rank == mpi_master():
             assert_msg_critical(
@@ -1457,7 +1535,8 @@ class LinearSolver:
         else:
             return tuple()
 
-    def commut_mo_density(self, A, nocc):
+    @staticmethod
+    def commut_mo_density(A, nocc):
         """
         Commutes matrix A and MO density
 
@@ -1479,7 +1558,8 @@ class LinearSolver:
 
         return mat
 
-    def commut(self, A, B):
+    @staticmethod
+    def commut(A, B):
         """
         Commutes two matricies A and B
 
@@ -1566,7 +1646,7 @@ class LinearSolver:
         mask = l > b_norm * threshold
         return np.matmul(basis, T[:, mask])
 
-    def remove_linear_dependence_half_distributed(self, basis, threshold):
+    def _remove_linear_dependence_half_size(self, basis, threshold):
         """
         Removes linear dependence in a set of symmetrized vectors.
 
@@ -1620,7 +1700,7 @@ class LinearSolver:
 
         return tvecs
 
-    def orthogonalize_gram_schmidt_half_distributed(self, tvecs):
+    def _orthogonalize_gram_schmidt_half_size(self, tvecs):
         """
         Applies modified Gram Schmidt orthogonalization to trial vectors.
 
@@ -1673,7 +1753,7 @@ class LinearSolver:
 
         return vecs
 
-    def normalize_half_distributed(self, vecs):
+    def _normalize_half_size(self, vecs):
         """
         Normalizes half-sized vectors by dividing by vector norm.
 
@@ -1693,7 +1773,7 @@ class LinearSolver:
         return vecs
 
     @staticmethod
-    def construct_ed_sd_half(orb_ene, nocc, norb):
+    def construct_ediag_sdiag_half(orb_ene, nocc, norb):
         """
         Gets the upper half of E0 and S0 diagonal elements as arrays.
 
@@ -1812,7 +1892,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 occ_cube_name = '{:s}_S{:d}_NTO_H{:d}.cube'.format(
-                    self.filename, root + 1, i_nto + 1)
+                    self._filename, root + 1, i_nto + 1)
                 vis_drv.write_data(occ_cube_name, cubic_grid, molecule, 'nto',
                                    ind_occ, 'alpha')
                 filenames.append(occ_cube_name)
@@ -1828,7 +1908,7 @@ class LinearSolver:
 
             if self.rank == mpi_master():
                 vir_cube_name = '{:s}_S{:d}_NTO_P{:d}.cube'.format(
-                    self.filename, root + 1, i_nto + 1)
+                    self._filename, root + 1, i_nto + 1)
                 vis_drv.write_data(vir_cube_name, cubic_grid, molecule, 'nto',
                                    ind_vir, 'alpha')
                 filenames.append(vir_cube_name)
@@ -1896,7 +1976,7 @@ class LinearSolver:
 
         if self.rank == mpi_master():
             detach_cube_name = '{:s}_S{:d}_detach.cube'.format(
-                self.filename, root + 1)
+                self._filename, root + 1)
             vis_drv.write_data(detach_cube_name, cubic_grid, molecule,
                                'detachment', 0, 'alpha')
             filenames.append(detach_cube_name)
@@ -1909,7 +1989,7 @@ class LinearSolver:
 
         if self.rank == mpi_master():
             attach_cube_name = '{:s}_S{:d}_attach.cube'.format(
-                self.filename, root + 1)
+                self._filename, root + 1)
             vis_drv.write_data(attach_cube_name, cubic_grid, molecule,
                                'attachment', 1, 'alpha')
             filenames.append(attach_cube_name)

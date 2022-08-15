@@ -198,7 +198,6 @@ class ScfHessianDriver(HessianDriver):
                     mu_plus = prop.get_property('dipole moment')
 
                 if self.do_raman:
-                    lr_drv.is_converged = False
                     lr_results_p = lr_drv.compute(new_mol, ao_basis,
                                                   self.scf_drv.scf_tensors)
 
@@ -214,7 +213,6 @@ class ScfHessianDriver(HessianDriver):
                     mu_minus = prop.get_property('dipole moment')
 
                 if self.do_raman:
-                    lr_drv.is_converged = False
                     lr_results_m = lr_drv.compute(new_mol, ao_basis,
                                                   self.scf_drv.scf_tensors)
                     if self.rank == mpi_master():

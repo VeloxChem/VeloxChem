@@ -81,7 +81,7 @@ class ComplexResponse(LinearSolver):
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumbers()
 
-        self.input_keywords['response'].update({
+        self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
             'a_components': ('str_lower', 'Cartesian components of A operator'),
             'b_operator': ('str_lower', 'B operator'),
@@ -105,7 +105,7 @@ class ComplexResponse(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def get_precond(self, orb_ene, nocc, norb, w, d):
+    def _get_precond(self, orb_ene, nocc, norb, w, d):
         """
         Constructs the preconditioners.
 
@@ -126,7 +126,7 @@ class ComplexResponse(LinearSolver):
 
         # spawning needed components
 
-        ediag, sdiag = self.construct_ed_sd_half(orb_ene, nocc, norb)
+        ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
         sdiag_fp = sdiag**4
@@ -156,7 +156,7 @@ class ComplexResponse(LinearSolver):
 
         return DistributedArray(p_mat, self.comm)
 
-    def preconditioning(self, precond, v_in):
+    def _preconditioning(self, precond, v_in):
         """
         Applies preconditioner to a tuple of distributed trial vectors.
 
@@ -193,7 +193,7 @@ class ComplexResponse(LinearSolver):
 
         return DistributedArray(v_mat, self.comm, distribute=False)
 
-    def precond_trials(self, vectors, precond):
+    def _precond_trials(self, vectors, precond):
         """
         Applies preconditioner to distributed trial vectors.
 
@@ -210,23 +210,23 @@ class ComplexResponse(LinearSolver):
         trials_ung = []
 
         for (op, w), vec in vectors.items():
-            v = self.preconditioning(precond[w], vec)
+            v = self._preconditioning(precond[w], vec)
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
-            if vn > self.small_thresh:
+            if vn > self._small_thresh:
                 norms = np.sqrt(norms_2)
                 # real gerade
-                if norms[0] > self.small_thresh:
+                if norms[0] > self._small_thresh:
                     trials_ger.append(v.data[:, 0])
                 # real ungerade
-                if norms[1] > self.small_thresh:
+                if norms[1] > self._small_thresh:
                     trials_ung.append(v.data[:, 1])
                 # imaginary ungerade
-                if norms[2] > self.small_thresh:
+                if norms[2] > self._small_thresh:
                     trials_ung.append(v.data[:, 2])
                 # imaginary gerade
-                if norms[3] > self.small_thresh:
+                if norms[3] > self._small_thresh:
                     trials_ger.append(v.data[:, 3])
 
         new_ger = np.array(trials_ger).T
@@ -258,15 +258,28 @@ class ComplexResponse(LinearSolver):
             a non-linear response module.
         """
 
-        self.dist_bger = None
-        self.dist_bung = None
-        self.dist_e2bger = None
-        self.dist_e2bung = None
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
 
         self.nonlinear = False
-        self.dist_fock_ger = None
-        self.dist_fock_ung = None
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
 
+        # check dft setup
+        self._dft_sanity_check()
+
+        # check pe setup
+        self._pe_sanity_check()
+
+        # check print level (verbosity of output)
+        if self.print_level < 2:
+            self.print_level = 1
+        if self.print_level > 2:
+            self.print_level = 3
+
+        # initialize profiler
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -275,8 +288,8 @@ class ComplexResponse(LinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header('Complex Response Solver',
-                              n_freqs=len(self.frequencies))
+            self._print_header('Complex Response Solver',
+                               n_freqs=len(self.frequencies))
 
         self.start_time = tm.time()
 
@@ -296,13 +309,13 @@ class ComplexResponse(LinearSolver):
         nocc = molecule.number_of_alpha_electrons()
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
 
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
 
         # right-hand side (gradient)
         if self.rank == mpi_master():
@@ -327,7 +340,7 @@ class ComplexResponse(LinearSolver):
         d = self.damping
         freqs = set([w for (op, w) in op_freq_keys])
         precond = {
-            w: self.get_precond(orb_ene, nocc, norb, w, d) for w in freqs
+            w: self._get_precond(orb_ene, nocc, norb, w, d) for w in freqs
         }
 
         # distribute the gradient and right-hand side:
@@ -338,7 +351,7 @@ class ComplexResponse(LinearSolver):
         dist_rhs = {}
         for key in op_freq_keys:
             if self.rank == mpi_master():
-                gradger, gradung = self.decomp_grad(v_grad[key])
+                gradger, gradung = self._decomp_grad(v_grad[key])
                 grad_mat = np.hstack((
                     gradger.real.reshape(-1, 1),
                     gradung.real.reshape(-1, 1),
@@ -379,14 +392,14 @@ class ComplexResponse(LinearSolver):
 
         # read initial guess from restart file
         if self.restart:
-            self.read_checkpoint(rsp_vector_labels)
+            self._read_checkpoint(rsp_vector_labels)
 
         # generate initial guess from scratch
         else:
-            bger, bung = self.setup_trials(dist_rhs, precond)
+            bger, bung = self._setup_trials(dist_rhs, precond)
 
-            self.e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                               eri_dict, dft_dict, pe_dict)
+            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
+                                eri_dict, dft_dict, pe_dict)
 
         profiler.check_memory_usage('Initial guess')
 
@@ -396,8 +409,8 @@ class ComplexResponse(LinearSolver):
         relative_residual_norm = {}
 
         signal_handler = SignalHandler()
-        signal_handler.add_sigterm_function(self.graceful_exit, molecule, basis,
-                                            dft_dict, pe_dict,
+        signal_handler.add_sigterm_function(self._graceful_exit, molecule,
+                                            basis, dft_dict, pe_dict,
                                             rsp_vector_labels)
 
         iter_per_trial_in_hours = None
@@ -412,14 +425,14 @@ class ComplexResponse(LinearSolver):
             profiler.start_timer('ReducedSpace')
 
             xvs = []
-            self.cur_iter = iteration
+            self._cur_iter = iteration
 
-            n_ger = self.dist_bger.shape(1)
-            n_ung = self.dist_bung.shape(1)
+            n_ger = self._dist_bger.shape(1)
+            n_ung = self._dist_bung.shape(1)
 
-            e2gg = self.dist_bger.matmul_AtB(self.dist_e2bger, 2.0)
-            e2uu = self.dist_bung.matmul_AtB(self.dist_e2bung, 2.0)
-            s2ug = self.dist_bung.matmul_AtB(self.dist_bger, 2.0)
+            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
+            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
+            s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
 
             for op, w in op_freq_keys:
                 if (iteration == 0 or
@@ -432,10 +445,10 @@ class ComplexResponse(LinearSolver):
 
                     # projections onto gerade and ungerade subspaces:
 
-                    g_realger = self.dist_bger.matmul_AtB(grad_rg, 2.0)
-                    g_imagger = self.dist_bger.matmul_AtB(grad_ig, 2.0)
-                    g_realung = self.dist_bung.matmul_AtB(grad_ru, 2.0)
-                    g_imagung = self.dist_bung.matmul_AtB(grad_iu, 2.0)
+                    g_realger = self._dist_bger.matmul_AtB(grad_rg, 2.0)
+                    g_imagger = self._dist_bger.matmul_AtB(grad_ig, 2.0)
+                    g_realung = self._dist_bung.matmul_AtB(grad_ru, 2.0)
+                    g_imagung = self._dist_bung.matmul_AtB(grad_iu, 2.0)
 
                     # creating gradient and matrix for linear equation
 
@@ -509,26 +522,26 @@ class ComplexResponse(LinearSolver):
 
                     # ...and projecting them onto respective subspace
 
-                    x_realger = self.dist_bger.matmul_AB_no_gather(c_realger)
-                    x_realung = self.dist_bung.matmul_AB_no_gather(c_realung)
-                    x_imagung = self.dist_bung.matmul_AB_no_gather(c_imagung)
-                    x_imagger = self.dist_bger.matmul_AB_no_gather(c_imagger)
+                    x_realger = self._dist_bger.matmul_AB_no_gather(c_realger)
+                    x_realung = self._dist_bung.matmul_AB_no_gather(c_realung)
+                    x_imagung = self._dist_bung.matmul_AB_no_gather(c_imagung)
+                    x_imagger = self._dist_bger.matmul_AB_no_gather(c_imagger)
 
                     # composing E2 matrices projected onto solution subspace
 
-                    e2realger = self.dist_e2bger.matmul_AB_no_gather(c_realger)
-                    e2imagger = self.dist_e2bger.matmul_AB_no_gather(c_imagger)
-                    e2realung = self.dist_e2bung.matmul_AB_no_gather(c_realung)
-                    e2imagung = self.dist_e2bung.matmul_AB_no_gather(c_imagung)
+                    e2realger = self._dist_e2bger.matmul_AB_no_gather(c_realger)
+                    e2imagger = self._dist_e2bger.matmul_AB_no_gather(c_imagger)
+                    e2realung = self._dist_e2bung.matmul_AB_no_gather(c_realung)
+                    e2imagung = self._dist_e2bung.matmul_AB_no_gather(c_imagung)
 
                     if self.nonlinear:
-                        fock_realger = self.dist_fock_ger.matmul_AB_no_gather(
+                        fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_realger)
-                        fock_imagger = self.dist_fock_ger.matmul_AB_no_gather(
+                        fock_imagger = self._dist_fock_ger.matmul_AB_no_gather(
                             c_imagger)
-                        fock_realung = self.dist_fock_ung.matmul_AB_no_gather(
+                        fock_realung = self._dist_fock_ung.matmul_AB_no_gather(
                             c_realung)
-                        fock_imagung = self.dist_fock_ung.matmul_AB_no_gather(
+                        fock_imagung = self._dist_fock_ung.matmul_AB_no_gather(
                             c_imagung)
 
                         fock_full_data = (
@@ -576,7 +589,7 @@ class ComplexResponse(LinearSolver):
 
                     x = DistributedArray(x_data, self.comm, distribute=False)
 
-                    x_full = self.get_full_solution_vector(x)
+                    x_full = self._get_full_solution_vector(x)
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
@@ -607,29 +620,30 @@ class ComplexResponse(LinearSolver):
                         n_ung))
                 self.ostream.print_blank()
 
-                profiler.print_memory_subspace(
-                    {
-                        'dist_bger': self.dist_bger,
-                        'dist_bung': self.dist_bung,
-                        'dist_e2bger': self.dist_e2bger,
-                        'dist_e2bung': self.dist_e2bung,
-                        'precond': precond,
-                        'solutions': solutions,
-                        'residuals': residuals,
-                    }, self.ostream)
+                if self.print_level > 1:
+                    profiler.print_memory_subspace(
+                        {
+                            'dist_bger': self._dist_bger,
+                            'dist_bung': self._dist_bung,
+                            'dist_e2bger': self._dist_e2bger,
+                            'dist_e2bung': self._dist_e2bung,
+                            'precond': precond,
+                            'solutions': solutions,
+                            'residuals': residuals,
+                        }, self.ostream)
 
                 profiler.check_memory_usage(
                     'Iteration {:d} subspace'.format(iteration + 1))
 
                 profiler.print_memory_tracing(self.ostream)
 
-                self.print_iteration(relative_residual_norm, xvs)
+                self._print_iteration(relative_residual_norm, xvs)
 
             profiler.stop_timer('ReducedSpace')
 
             # check convergence
 
-            self.check_convergence(relative_residual_norm)
+            self._check_convergence(relative_residual_norm)
 
             if self.is_converged:
                 break
@@ -638,8 +652,8 @@ class ComplexResponse(LinearSolver):
 
             # spawning new trial vectors from residuals
 
-            new_trials_ger, new_trials_ung = self.setup_trials(
-                residuals, precond, self.dist_bger, self.dist_bung)
+            new_trials_ger, new_trials_ung = self._setup_trials(
+                residuals, precond, self._dist_bger, self._dist_bung)
 
             residuals.clear()
 
@@ -653,17 +667,17 @@ class ComplexResponse(LinearSolver):
 
             if iter_per_trial_in_hours is not None:
                 next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
-                if self.need_graceful_exit(next_iter_in_hours):
-                    self.graceful_exit(molecule, basis, dft_dict, pe_dict,
-                                       rsp_vector_labels)
+                if self._need_graceful_exit(next_iter_in_hours):
+                    self._graceful_exit(molecule, basis, dft_dict, pe_dict,
+                                        rsp_vector_labels)
 
             profiler.start_timer('FockBuild')
 
             # creating new sigma and rho linear transformations
 
-            self.e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                               scf_tensors, eri_dict, dft_dict, pe_dict,
-                               profiler)
+            self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
+                                scf_tensors, eri_dict, dft_dict, pe_dict,
+                                profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
@@ -675,12 +689,12 @@ class ComplexResponse(LinearSolver):
 
         signal_handler.remove_sigterm_function()
 
-        self.write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                              rsp_vector_labels)
+        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
+                               rsp_vector_labels)
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence('Complex response')
+            self._print_convergence('Complex response')
 
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
@@ -710,7 +724,7 @@ class ComplexResponse(LinearSolver):
                                     pe_dict['potfile_text'])
 
                 for bop, w in solutions:
-                    x = self.get_full_solution_vector(solutions[(bop, w)])
+                    x = self._get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
                         for aop in self.a_components:
@@ -741,7 +755,7 @@ class ComplexResponse(LinearSolver):
                 kappas = {}
 
                 for op, w in solutions:
-                    x = self.get_full_solution_vector(solutions[(op, w)])
+                    x = self._get_full_solution_vector(solutions[(op, w)])
                     x = self.comm.bcast(x, root=mpi_master())
                     kappas[(op, w)] = (self.lrvec2mat(x.real, nocc, norb) +
                                        1j * self.lrvec2mat(x.imag, nocc, norb))
@@ -750,7 +764,7 @@ class ComplexResponse(LinearSolver):
 
         return None
 
-    def get_full_solution_vector(self, solution):
+    def _get_full_solution_vector(self, solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -775,7 +789,7 @@ class ComplexResponse(LinearSolver):
         else:
             return None
 
-    def print_iteration(self, relative_residual_norm, xvs):
+    def _print_iteration(self, relative_residual_norm, xvs):
         """
         Prints information of the iteration.
 
@@ -788,7 +802,7 @@ class ComplexResponse(LinearSolver):
 
         width = 92
 
-        output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
+        output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
         output_header += '{:.2e} and {:.2e}'.format(
             max(relative_residual_norm.values()),
@@ -796,7 +810,7 @@ class ComplexResponse(LinearSolver):
         self.ostream.print_header(output_header.ljust(width))
         self.ostream.print_blank()
 
-        if not self.nonlinear:
+        if (not self.nonlinear) and (self.print_level > 1):
             output_header = 'Operator:  {} ({})'.format(self.b_operator,
                                                         self.b_components)
             self.ostream.print_header(output_header.ljust(width))
