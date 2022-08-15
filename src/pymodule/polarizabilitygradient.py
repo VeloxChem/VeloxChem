@@ -587,6 +587,7 @@ class PolOrbitalResponse(CphfSolver):
 
             # Get fock matrices from cphf_results
             fock_ao_rhs = self.cphf_results['fock_ao_rhs']
+            fock_gxc_ao = self.cphf_results['fock_gxc_ao']
             dm_oo = self.cphf_results['dm_oo']
             dm_vv = self.cphf_results['dm_vv']
             cphf_ov = self.cphf_results['cphf_ov']
@@ -687,19 +688,29 @@ class PolOrbitalResponse(CphfSolver):
         # TODO: what shape should we use: (dof**2, nao, nao) or (dof, dof, nao, nao)?
         omega = np.zeros((dof*dof, nao, nao))
 
+        # Calculate omega (without for-loops)
+        # Construct epsilon_dm_ao
+        epsilon_dm_ao = -np.einsum('mi,ii,xyij,nj->xymn', mo_occ, eo_diag, dm_oo, mo_occ)
+        epsilon_dm_ao -= np.einsum('ma,aa,xyab,nb->xymn', mo_vir, ev_diag, dm_vv, mo_vir)
+        epsilon_cphf_ao = np.einsum('mi,ii,xyia,na->xymn', mo_occ, eo_diag, cphf_ov.reshape(dof,dof,nocc,nvir), mo_vir)
+        epsilon_dm_ao -= (epsilon_cphf_ao + epsilon_cphf_ao.transpose(0,1,3,2)) # OV + VO
+
         for m in range(dof):
             for n in range(dof):
-                # Construct epsilon_dm_ao
-                epsilon_dm_ao = -np.linalg.multi_dot(
-                    [mo_occ,
-                     np.matmul(eo_diag, dm_oo[m,n]), mo_occ.T])
-                epsilon_dm_ao -= np.linalg.multi_dot(
-                    [mo_vir, np.matmul(ev_diag, dm_vv[m,n]), mo_vir.T])
+                # TODO: delete commented out code
+                #epsilon_dm_ao = -np.linalg.multi_dot(
+                #    [mo_occ,
+                #     np.matmul(eo_diag, dm_oo[m,n]), mo_occ.T])
+                #epsilon_dm_ao -= np.linalg.multi_dot(
+                #    [mo_vir, np.matmul(ev_diag, dm_vv[m,n]), mo_vir.T])
 
-                epsilon_cphf_ao = np.linalg.multi_dot(
-                    [mo_occ,
-                     np.matmul(eo_diag, cphf_ov[dof*m+n]), mo_vir.T])
-                epsilon_dm_ao -= (epsilon_cphf_ao + epsilon_cphf_ao.T)
+                #epsilon_cphf_ao = np.linalg.multi_dot(
+                #    [mo_occ,
+                #     np.matmul(eo_diag, cphf_ov[dof*m+n]), mo_vir.T])
+                #epsilon_dm_ao -= (epsilon_cphf_ao + epsilon_cphf_ao.T)
+
+                # TODO: move outside for-loop when all Fock matrices can be
+                # extracted into a numpy array at the same time.
 
                 # Because the excitation vector is not symmetric,
                 # we need both the matrix (OO block in omega, and probably VO)
@@ -757,7 +768,12 @@ class PolOrbitalResponse(CphfSolver):
                   + np.linalg.multi_dot([D_occ, fmat, D_occ])
                   )
 
-                omega[m*dof+n] = epsilon_dm_ao + omega_1pdm_2pdm_contribs + dipole_ints_contrib_ao[m,n]
+                omega[m*dof+n] = epsilon_dm_ao[m,n] + omega_1pdm_2pdm_contribs + dipole_ints_contrib_ao[m,n]
+
+                if self.dft:
+                    factor = -0.5 
+                    omega[m*dof+n] += factor * np.linalg.multi_dot([D_occ,
+                                              fock_gxc_ao.alpha_to_numpy(2*(m*dof+n)), D_occ])
 
         # add omega multipliers in AO basis to cphf_results dictionary
         self.cphf_results['omega_ao'] = omega
