@@ -79,8 +79,9 @@ def _known_aliases_for_keywords():
         'td': ('cis', 'tdhf', 'tda', 'tddft'),
         'rpa': 'tdhf',
         'absorption': 'uv-vis',
+        'cd': ('ecd',),
         'uvvis': 'uv-vis',
-        'spectrum': ('uv-vis',),
+        'spectrum': ('uv-vis', 'ecd'),
     }
 
 

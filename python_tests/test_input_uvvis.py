@@ -117,7 +117,7 @@ class TestInputUVVis:
                     assert np.max(
                         np.abs(osc_str - ref_data['osc_str'])) < 1.0e-4
 
-    def test_input_rhf_uvvis_cis(self, capsys):
+    def test_input_rhf_cis_uvvis(self, capsys):
 
         # vlxtag: RHF, CIS, UV-Vis
 
@@ -138,7 +138,7 @@ class TestInputUVVis:
 
         self.run_input_uvvis(capsys, xcfun, tamm_dancoff, ref_data)
 
-    def test_input_rhf_uvvis_tdhf(self, capsys):
+    def test_input_rhf_tdhf_uvvis(self, capsys):
 
         # vlxtag: RHF, TDHF, UV-Vis
 
@@ -159,7 +159,7 @@ class TestInputUVVis:
 
         self.run_input_uvvis(capsys, xcfun, tamm_dancoff, ref_data)
 
-    def test_input_rks_uvvis_tda(self, capsys):
+    def test_input_rks_tda_uvvis(self, capsys):
 
         # vlxtag: RKS, TDA, UV-Vis
 
@@ -180,7 +180,7 @@ class TestInputUVVis:
 
         self.run_input_uvvis(capsys, xcfun, tamm_dancoff, ref_data)
 
-    def test_input_rks_uvvis_tddft(self, capsys):
+    def test_input_rks_tddft_uvvis(self, capsys):
 
         # vlxtag: RKS, TDDFT, UV-Vis
 
