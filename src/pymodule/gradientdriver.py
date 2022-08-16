@@ -312,7 +312,7 @@ class GradientDriver:
     def grad_tddft_xc_contrib(self, molecule, ao_basis, rhow_den, xmy_den,
                               gs_density, xcfun_label):
         """
-        Calculates exchange-correlation contribution to tddft gradient.
+        Calculates exchange-correlation contribution to TDDFT gradient.
 
         :param molecule:
             The molecule.
@@ -328,7 +328,7 @@ class GradientDriver:
             The label of the xc functional.
 
         :return:
-            The exchange-correlation contribution to tddft gradient.
+            The exchange-correlation contribution to TDDFT gradient.
         """
 
         grid_drv = GridDriver(self.comm)

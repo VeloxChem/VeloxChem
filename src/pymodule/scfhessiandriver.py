@@ -793,6 +793,7 @@ class ScfHessianDriver(HessianDriver):
         if self.do_raman:
             # linear response driver for polarizability calculation
             lr_drv = LinearResponseSolver(self.comm, self.scf_drv.ostream)
+            lr_drv.update_settings({}, self.method_dict) # include rsp_settings dict for frequencies etc.
             #lr_ostream_state = lr_drv.ostream.state
             #lr_drv.ostream.state = False
             # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
