@@ -175,7 +175,11 @@ template <typename T>
 auto
 host_deallocate(T *p) noexcept -> void
 {
-    if (p) __vlx_free(p);
+    if (p)
+    {
+        __vlx_free(p);
+        p = nullptr;
+    }
 }
 }  // namespace detail
 

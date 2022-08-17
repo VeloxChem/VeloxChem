@@ -83,7 +83,7 @@ class CXCMolecularGradient
      @param densityMatrix the AO density matrix (to be contracted with GTO
             gradient).
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
+     @param gsDensityGrid the ground state density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      */
     void _compVxcContrib(CDenseMatrix&           molecularGradient,
@@ -106,8 +106,8 @@ class CXCMolecularGradient
      @param densityMatrix the AO density matrix (to be contracted with GTO
             gradient).
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGrid the perturbed density grid.
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGrid the perturbed density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
      */
@@ -133,8 +133,8 @@ class CXCMolecularGradient
      @param densityMatrix the AO density matrix (to be contracted with GTO
             gradient).
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGridQuad the perturbed density grid for quadratic
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGridQuad the perturbed density grid for quadratic
             response.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
@@ -164,10 +164,10 @@ class CXCMolecularGradient
      @param rwDensityMatrixOne the perturbed AO density matrix (relaxed_density_ao).
      @param rwDensityMatrixTwo the perturbed AO density matrix (x_minus_y_ao).
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGridOne the perturbed density grid from rwDensityMatrixOne.
-     @param rwDenistyGridTwo the perturbed density grid from rwDensityMatrixTwo.
-     @param rwDenistyGridQuad the perturbed density grid for quadratic
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGridOne the perturbed density grid from rwDensityMatrixOne.
+     @param rwDensityGridTwo the perturbed density grid from rwDensityMatrixTwo.
+     @param rwDensityGridQuad the perturbed density grid for quadratic
             response (QRF).
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
@@ -178,8 +178,8 @@ class CXCMolecularGradient
                            const CMolecularBasis&     basis,
                            const xcfun                xcFuncType,
                            const CAODensityMatrix&    gsDensityMatrix,
-                           const CAODensityMatrix&    rwdensityMatrixOne,
-                           const CAODensityMatrix&    rwdensityMatrixTwo,
+                           const CAODensityMatrix&    rwDensityMatrixOne,
+                           const CAODensityMatrix&    rwDensityMatrixTwo,
                            const CMolecularGrid&      molecularGrid,
                            const CDensityGrid&        gsDensityGrid,
                            const CDensityGrid&        rwDensityGridOne,
@@ -199,7 +199,7 @@ class CXCMolecularGradient
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
+     @param gsDensityGrid the ground state density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param gridOffset the batch offset in vector grid points.
      @param nGridPoints the number of grid points in batch.
@@ -224,7 +224,7 @@ class CXCMolecularGradient
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
+     @param gsDensityGrid the ground state density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param gridOffset the batch offset in vector grid points.
      @param nGridPoints the number of grid points in batch.
@@ -249,8 +249,8 @@ class CXCMolecularGradient
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGrid the perturbed density grid.
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGrid the perturbed density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
      @param gridOffset the batch offset in vector grid points.
@@ -278,8 +278,8 @@ class CXCMolecularGradient
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGrid the perturbed density grid.
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGrid the perturbed density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
      @param gridOffset the batch offset in vector grid points.
@@ -307,8 +307,8 @@ class CXCMolecularGradient
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGridQuad the perturbed density grid for quadratic
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGridQuad the perturbed density grid for quadratic
             response.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
@@ -339,8 +339,8 @@ class CXCMolecularGradient
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGridQuad the perturbed density grid for quadratic
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGridQuad the perturbed density grid for quadratic
             response.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
@@ -366,16 +366,16 @@ class CXCMolecularGradient
      functional contribution to molecular gradient.
 
      @param molecularGradient the molecular gradient object.
-     @param gsdensityMatrix the ground state AO density matrix.
+     @param gsDensityMatrix the ground state AO density matrix.
      @param rwDensityMatrixOne the perturbed AO density matrix (relaxed_density_ao).
      @param rwDensityMatrixTwo the perturbed AO density matrix (x_minus_y_ao).
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGridOne the perturbed density grid from rwDensityMatrixOne.
-     @param rwDenistyGridTwo the perturbed density grid from rwDensityMatrixTwo.
-     @param rwDenistyGridQuad the perturbed density grid for quadratic
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGridOne the perturbed density grid from rwDensityMatrixOne.
+     @param rwDensityGridTwo the perturbed density grid from rwDensityMatrixTwo.
+     @param rwDensityGridQuad the perturbed density grid for quadratic
             response (QRF).
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
@@ -405,16 +405,16 @@ class CXCMolecularGradient
      functional contribution to molecular gradient.
 
      @param molecularGradient the molecular gradient object.
-     @param gsdensityMatrix the ground state AO density matrix.
+     @param gsDensityMatrix the ground state AO density matrix.
      @param rwDensityMatrixOne the perturbed AO density matrix (relaxed_density_ao).
      @param rwDensityMatrixTwo the perturbed AO density matrix (x_minus_y_ao).
      @param molecule the molecule.
      @param basis the molecular basis.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGridOne the perturbed density grid from rwDensityMatrixOne.
-     @param rwDenistyGridTwo the perturbed density grid from rwDensityMatrixTwo.
-     @param rwDenistyGridQuad the perturbed density grid for quadratic
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGridOne the perturbed density grid from rwDensityMatrixOne.
+     @param rwDensityGridTwo the perturbed density grid from rwDensityMatrixTwo.
+     @param rwDensityGridQuad the perturbed density grid for quadratic
             response (QRF).
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
@@ -507,7 +507,7 @@ class CXCMolecularGradient
      @param iAtom the index of the atom.
      @param gradientDensityGrid the nuclear gradient grid.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
+     @param gsDensityGrid the ground state density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param gridOffset the batch offset in vector grid points.
      @param gridBlockPosition the position of grid block.
@@ -531,7 +531,7 @@ class CXCMolecularGradient
      @param iAtom the index of the atom.
      @param gradientDensityGrid the nuclear gradient grid.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
+     @param gsDensityGrid the ground state density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param gridOffset the batch offset in vector grid points.
      @param gridBlockPosition the position of grid block.
@@ -555,8 +555,8 @@ class CXCMolecularGradient
      @param iAtom the index of the atom.
      @param gradientDensityGrid the nuclear gradient grid.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGrid the perturbed density grid.
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGrid the perturbed density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
      @param gridOffset the batch offset in vector grid points.
@@ -583,8 +583,8 @@ class CXCMolecularGradient
      @param iAtom the index of the atom.
      @param gradientDensityGrid the nuclear gradient grid.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGrid the perturbed density grid.
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGrid the perturbed density grid.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
      @param gridOffset the batch offset in vector grid points.
@@ -611,8 +611,8 @@ class CXCMolecularGradient
      @param iAtom the index of the atom.
      @param gradientDensityGrid the nuclear gradient grid.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGridQuad the perturbed density grid for quadratic
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGridQuad the perturbed density grid for quadratic
             response.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
@@ -642,8 +642,8 @@ class CXCMolecularGradient
      @param iAtom the index of the atom.
      @param gradientDensityGrid the nuclear gradient grid.
      @param molecularGrid the molecular grid.
-     @param gsDenistyGrid the ground state density grid.
-     @param rwDenistyGridQuad the perturbed density grid for quadratic
+     @param gsDensityGrid the ground state density grid.
+     @param rwDensityGridQuad the perturbed density grid for quadratic
             response.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param xcHessianGrid the exchange-correlation hessian grid.
