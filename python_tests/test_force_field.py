@@ -97,3 +97,11 @@ class TestForceField:
             scf_final_h5_file = Path(inpfile).with_suffix('.scf.tensors.h5')
             if scf_final_h5_file.is_file():
                 scf_final_h5_file.unlink()
+
+            mol_name = Path(inpfile).stem
+            ff_dir = Path(inpfile).parent / (mol_name + '_files')
+            for ffver in [0, 1]:
+                for ftype in ['top', 'itp']:
+                    ff_file = ff_dir / (mol_name + f'_{ffver:02d}.{ftype}')
+                    if ff_file.is_file():
+                        ff_file.unlink()
