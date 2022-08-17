@@ -161,12 +161,20 @@ class PolarizabilityGradient():
             lambda_ao = np.einsum('mi,xia,na->xmn', mo_occ, lambda_mo,
                                   mo_vir).reshape(dof, dof, nao, nao) # occ-vir
             lambda_ao += lambda_ao.transpose(0,1,3,2) # vir-occ
-            rel_dm_ao = orbrsp_results['unrel_dm_ao'] #+ lambda_ao # TODO: undo comment
+            rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao # TODO: undo comment
 
             # analytical polarizability gradient
             pol_gradient = np.zeros((dof, dof, natm, 3))
             # dictionary to translate from numbers to operator components 'xyz'
             component_dict = {0: 'x', 1: 'y', 2: 'z'}
+
+            if self.dft:
+                if self.xcfun.is_hybrid():
+                    frac_K = self.xcfun.get_frac_exact_exchange()
+                else:
+                    frac_K = 0.0
+            else:
+                frac_K = 1.0
 
             # loop over atoms and contract integral derivatives with density matrices
             # add the corresponding contribution to the gradient
@@ -178,17 +186,9 @@ class PolarizabilityGradient():
                 d_eri = eri_deriv(molecule, basis, i)
                 d_dipole = dipole_deriv(molecule, basis, i)
 
-                if self.dft:
-                    if self.xcfun.is_hybrid():
-                        frac_K = self.xcfun.get_frac_exact_exchange()
-                    else:
-                        frac_K = 0.0
-                else:
-                    frac_K = 1.0
-
                 # Calculate the analytic polarizability gradient
                 pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_hcore)
-                                 #+1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
+                                 +1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
                                  +1.0 * (
                                  +2.0 * np.einsum('mt,xynp,amtnp->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
                                  -1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
@@ -220,8 +220,11 @@ class PolarizabilityGradient():
 
                         # Takes only one vector type, but two are needed to account for
                         # the different {x,y,z} components of the response vectors
-                        # doing only diagonal components for now
-                        xmy_sym = 0.5 * (xmy[i] + xmy[i].T)
+                        # doing only diagonal components for now.
+                        # The sqrt2 takes into account the fact that we need to
+                        # symmetrize with respect to the polarizability components.
+                        # (see contraction with two-electron integrals above).
+                        xmy_sym = np.sqrt(2) * 0.5 * (xmy[i] + xmy[i].T)
                         xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
 
                     else:
@@ -525,7 +528,7 @@ class PolOrbitalResponse(CphfSolver):
         screening = eri_drv.compute(get_qq_scheme(self.qq_type),
                                     self.eri_thresh, molecule, basis)
 
-		# TODO: replace by comp_lr_fock?
+        # TODO: replace by comp_lr_fock?
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
 
         if self.dft:
