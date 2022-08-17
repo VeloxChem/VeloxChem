@@ -100,7 +100,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
     /**
     Implements third order derivatives of PKZB exchange functional
 
-    @param xcHessianGrid the exchange-correlation hessian grid.
+    @param xcCubicHessianGrid the exchange-correlation hessian grid.
     @param factor the scale factor of functional contribution.
     @param densityGrid the density grid.
     */
@@ -109,7 +109,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
     /**
      Implements third order derivatives of PKZB exchange functional
 
-    @param xcHessianGrid the exchange-correlation hessian grid.
+    @param xcCubicHessianGrid the exchange-correlation hessian grid.
     @param factor the scale factor of functional contribution.
     @param densityGrid the density grid.
     */
@@ -118,7 +118,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
     /**
     Implements third order derivatives of PKZB exchange functional
 
-    @param xcHessianGrid the exchange-correlation hessian grid.
+    @param xcCubicHessianGrid the exchange-correlation hessian grid.
     @param factor the scale factor of functional contribution.
     @param densityGrid the density grid.
     */

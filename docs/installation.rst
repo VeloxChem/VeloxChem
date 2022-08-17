@@ -118,7 +118,7 @@ packaged on the `conda-forge <https://conda-forge.org/>`_ channel provide build 
     which will install VeloxChem using ``N`` cores.
   - You can set options for CMake as follows::
 
-      $ SKBUILD_CONFIGURE_OPTIONS="-DCMAKE_CXX_COMPILER=mpicxx" python -m pip install .
+      $ CMAKE_ARGS="-DCMAKE_CXX_COMPILER=mpicxx" python -m pip install .
 
 - The environment now contains all that is necessary to run VeloxChem. You can deactivate it by
   ::

@@ -26,7 +26,7 @@
 default:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-33ac6b4
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-0a3283e
   interruptible: true
 
 workflow:

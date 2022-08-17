@@ -4,6 +4,7 @@ target_sources(utests
     CodataTest.cpp
     ErrorHandlerTest.cpp
     FourIndexesTest.cpp
+    IntegerSequenceTest.cpp
     MemAllocTest.cpp
     MemBlock2DTest.cpp
     MemBlockTest.cpp

@@ -6,7 +6,7 @@ else()
   include(FetchContent)
   FetchContent_Declare(_gtest
     QUIET
-    URL https://github.com/google/googletest/archive/release-1.10.0.tar.gz
+    URL https://github.com/google/googletest/archive/release-1.12.1.tar.gz
   )
   # for windows: Prevent overriding the parent project's compiler/linker settings
   set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
