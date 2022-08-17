@@ -263,7 +263,6 @@ class OptimizationDriver:
 
                 for src_f, dest_f in zip(src_files, dest_files):
                     if src_f.is_file():
-                        dest_f.parent.mkdir(parents=True, exist_ok=True)
                         self.copy_file(src_f, dest_f)
                         valstr = f'Saving file: {str(dest_f)}'
                         self.ostream.print_info(valstr)
@@ -370,6 +369,8 @@ class OptimizationDriver:
         """
 
         if (not dest.is_file()) or (not src.samefile(dest)):
+            if not dest.parent.is_dir():
+                dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(src.read_text())
 
     @staticmethod

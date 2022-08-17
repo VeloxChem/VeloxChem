@@ -26,6 +26,7 @@
 from mpi4py import MPI
 from pathlib import Path
 import numpy as np
+import tempfile
 import sys
 import re
 
@@ -120,10 +121,12 @@ class ForceFieldGenerator:
         self.scan_geometries = None
         self.target_dihedrals = None
         self.ffversion = 0
-        self.workdir = Path('.')
+        self._workdir = None
 
         # resp settings
         self.resp_dict = None
+
+        self.keep_files = True
 
         # mpi information
         self.comm = comm
@@ -162,6 +165,7 @@ class ForceFieldGenerator:
             'n_rounds': 'int',
             'partial_charges': 'seq_fixed',
             'original_top_file': 'str',
+            'keep_files': 'bool',
         }
 
         parse_input(self, ffg_keywords, ffg_dict)
@@ -243,50 +247,66 @@ class ForceFieldGenerator:
         inp_dir = Path(self.molecule_name).parent
         self.read_qm_scan_xyz_files(self.scan_xyz_files, inp_dir)
 
-        self.workdir = Path(self.molecule_name + '_files')
         mol_name = Path(self.molecule_name).stem
 
         self.ffversion = 0
 
-        if self.original_top_file is None:
-            original_itp_file = self.workdir / (mol_name +
-                                                f'_{self.ffversion:02d}.itp')
-            original_top_file = original_itp_file.with_suffix('.top')
+        with tempfile.TemporaryDirectory() as temp_dir:
 
-            if self.rank == mpi_master():
-                self.workdir.mkdir(parents=True, exist_ok=True)
-                self.write_original_itp(original_itp_file,
-                                        list(self.atom_types),
-                                        self.partial_charges)
-                self.write_top(original_top_file, original_itp_file)
-            self.comm.barrier()
+            self._workdir = Path(temp_dir)
 
-        else:
-            original_top_file = Path(self.original_top_file)
+            if self.original_top_file is None:
+                original_itp_file = self._workdir / (
+                    mol_name + f'_{self.ffversion:02d}.itp')
+                original_top_file = original_itp_file.with_suffix('.top')
 
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            f'Original topology file: {str(original_top_file)}')
-        self.ostream.print_blank()
-        self.ostream.flush()
+                if self.rank == mpi_master():
+                    self.write_original_itp(original_itp_file,
+                                            list(self.atom_types),
+                                            self.partial_charges)
+                    self.write_top(original_top_file, original_itp_file)
+                self.comm.barrier()
 
-        # validate original force field
+            else:
+                original_top_file = Path(self.original_top_file)
 
-        for i, dih in enumerate(self.target_dihedrals):
-            self.validate_force_field(original_top_file, i)
+            self.ostream.print_info(
+                f'Original topology file: {original_top_file.name}')
+            self.ostream.print_blank()
+            self.ostream.flush()
 
-        # fit dihedral potentials
+            # validate original force field
 
-        n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
-        target_top_file = original_top_file
-        for i_round in range(n_rounds):
             for i, dih in enumerate(self.target_dihedrals):
-                target_top_file = self.dihedral_correction(target_top_file, i)
+                self.validate_force_field(original_top_file, i)
 
-        # validate final force field
+            # fit dihedral potentials
 
-        for i, dih in enumerate(self.target_dihedrals):
-            self.validate_force_field(target_top_file, i)
+            n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
+            target_top_file = original_top_file
+            for i_round in range(n_rounds):
+                for i, dih in enumerate(self.target_dihedrals):
+                    target_top_file = self.dihedral_correction(
+                        target_top_file, i)
+
+            # validate final force field
+
+            for i, dih in enumerate(self.target_dihedrals):
+                self.validate_force_field(target_top_file, i)
+
+            # save output files
+
+            if self.rank == mpi_master() and self.keep_files:
+                out_dir = Path(self.molecule_name + '_files')
+                for ffver in range(self.ffversion + 1):
+                    for ftype in ['itp', 'top']:
+                        fname = mol_name + f'_{ffver:02d}.{ftype}'
+                        self.copy_file(self._workdir / fname, out_dir / fname)
+                        valstr = f'Saving file: {str(out_dir / fname)}'
+                        self.ostream.print_info(valstr)
+
+                self.ostream.print_blank()
+                self.ostream.flush()
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
@@ -878,6 +898,8 @@ class ForceFieldGenerator:
         """
 
         if (not dest.is_file()) or (not src.samefile(dest)):
+            if not dest.parent.is_dir():
+                dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(src.read_text())
 
     def dihedral_correction(self, top_file, i, kT=None):
@@ -909,14 +931,19 @@ class ForceFieldGenerator:
             return v
 
         top_fname = top_file if isinstance(top_file, str) else str(top_file)
-        itp_fname = self.get_included_file(top_fname)
+
+        if self.rank == mpi_master():
+            itp_fname = self.get_included_file(top_fname)
+        else:
+            itp_fname = None
+        itp_fname = self.comm.bcast(itp_fname, root=mpi_master())
 
         mol_name = Path(self.molecule_name).stem
 
         self.ffversion += 1
-        new_itp_fname = str(self.workdir /
+        new_itp_fname = str(self._workdir /
                             f'{mol_name}_{self.ffversion:02d}.itp')
-        new_top_fname = str(self.workdir /
+        new_top_fname = str(self._workdir /
                             f'{mol_name}_{self.ffversion:02d}.top')
 
         if itp_fname != new_itp_fname:
@@ -936,7 +963,7 @@ class ForceFieldGenerator:
 
         # MM scan with dihedral parameters set to zero
 
-        output_dir = self.workdir / f'{mol_name}_dih_corr' / f'{i+1}'
+        output_dir = self._workdir / f'{mol_name}_dih_corr' / f'{i+1}'
         zero_itp_file = output_dir / f'{mol_name}_zero.itp'
         zero_top_file = output_dir / f'{mol_name}_zero.top'
 
@@ -947,7 +974,11 @@ class ForceFieldGenerator:
             self.set_dihedral_parameters(zero_itp_file, dih, [0.] * 6)
         self.comm.barrier()
 
-        mm_zero_scan = self.perform_mm_scan(zero_top_file, dih, geom, angles)
+        mm_zero_scan = self.perform_mm_scan(zero_top_file,
+                                            dih,
+                                            geom,
+                                            angles,
+                                            print_energies=False)
 
         # fitting Ryckaert-Bellemans function
 
@@ -975,7 +1006,8 @@ class ForceFieldGenerator:
 
         self.ostream.print_info('...done.')
         self.ostream.print_blank()
-        self.ostream.print_info(f'Generated new topology file: {new_top_fname}')
+        self.ostream.print_info(
+            f'Generated new topology file: {Path(new_top_fname).name}')
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -994,7 +1026,7 @@ class ForceFieldGenerator:
             A dictionary containing the results of validation.
         """
 
-        self.ostream.print_info(f'Validating {str(top_file)} ...')
+        self.ostream.print_info(f'Validating {top_file.name} ...')
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -1031,7 +1063,12 @@ class ForceFieldGenerator:
             'qm_scan_kJpermol': qm_scan.copy(),
         }
 
-    def perform_mm_scan(self, top_file, dihedral, geometries, angles):
+    def perform_mm_scan(self,
+                        top_file,
+                        dihedral,
+                        geometries,
+                        angles,
+                        print_energies=True):
         """
         Performs MM scan of a specific dihedral.
 
@@ -1049,7 +1086,11 @@ class ForceFieldGenerator:
 
         top_fname = top_file if isinstance(top_file, str) else str(top_file)
 
-        itp_fname = self.get_included_file(top_fname)
+        if self.rank == mpi_master():
+            itp_fname = self.get_included_file(top_fname)
+        else:
+            itp_fname = None
+        itp_fname = self.comm.bcast(itp_fname, root=mpi_master())
 
         top_file = Path(top_fname)
 
@@ -1058,9 +1099,10 @@ class ForceFieldGenerator:
             scan_dir.mkdir(parents=True, exist_ok=True)
         self.comm.barrier()
 
-        self.ostream.print_info('      Dihedral           MM energy')
-        self.ostream.print_info('  --------------------------------')
-        self.ostream.flush()
+        if print_energies:
+            self.ostream.print_info('      Dihedral           MM energy')
+            self.ostream.print_info('  --------------------------------')
+            self.ostream.flush()
 
         energies = []
         for i, (geom, angle) in enumerate(zip(geometries, angles)):
@@ -1084,9 +1126,10 @@ class ForceFieldGenerator:
             pot_energy *= 4.184 * hartree_in_kcalpermol()
             energies.append(pot_energy)
 
-            self.ostream.print_info(
-                f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
-            self.ostream.flush()
+            if print_energies:
+                self.ostream.print_info(
+                    f'  {angle:8.1f} deg {pot_energy:12.3f} kJ/mol')
+                self.ostream.flush()
 
         return energies
 
@@ -1112,6 +1155,7 @@ class ForceFieldGenerator:
         opt_drv.update_settings({
             'constraints': constraints,
             'filename': str(Path(top_file).parent / Path(top_file).stem),
+            'keep_files': self.keep_files,
         })
         final_mol = opt_drv.compute(molecule)
 
