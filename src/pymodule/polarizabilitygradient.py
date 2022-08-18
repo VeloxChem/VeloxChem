@@ -161,7 +161,7 @@ class PolarizabilityGradient():
             lambda_ao = np.einsum('mi,xia,na->xmn', mo_occ, lambda_mo,
                                   mo_vir).reshape(dof, dof, nao, nao) # occ-vir
             lambda_ao += lambda_ao.transpose(0,1,3,2) # vir-occ
-            rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao # TODO: undo comment
+            rel_dm_ao = orbrsp_results['unrel_dm_ao'] #+ lambda_ao # TODO: undo comment
 
             # analytical polarizability gradient
             pol_gradient = np.zeros((dof, dof, natm, 3))
@@ -188,7 +188,7 @@ class PolarizabilityGradient():
 
                 # Calculate the analytic polarizability gradient
                 pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_hcore)
-                                 +1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
+                                 #+1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
                                  +1.0 * (
                                  +2.0 * np.einsum('mt,xynp,amtnp->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
                                  -1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
