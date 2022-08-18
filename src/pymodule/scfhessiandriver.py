@@ -95,8 +95,11 @@ class ScfHessianDriver(HessianDriver):
         self.iter_count = 0
         self.is_converged = False
 
+        self.frequency = 0.0
 
-    def update_settings(self, method_dict, freq_dict=None, cphf_dict=None):
+
+    def update_settings(self, method_dict, freq_dict=None, cphf_dict=None,
+                        rsp_dict=None):
         """
         Updates settings in ScfHessianDriver.
 
@@ -106,6 +109,9 @@ class ScfHessianDriver(HessianDriver):
             The input dictionary of Hessian/frequency settings group.
         :param cphf_dict:
             The input dictionary of CPHF (orbital response) settings.
+        :param rsp_dict:
+            The input dictionary for linear response settings
+            (needed to compute the numericalpolarizability gradient).
         """
 
         super().update_settings(method_dict, freq_dict)
@@ -132,6 +138,16 @@ class ScfHessianDriver(HessianDriver):
         if 'do_raman' in freq_dict:
             key = freq_dict['do_raman'].lower()
             self.do_raman = (key in ['yes', 'y'])
+
+        # The frequency for the frequency-dependent polarizability
+        if 'frequency' in freq_dict:
+            self.frequency = float(grad_dict['frequency'])
+
+        # Settings for the linear response driver used to calculate
+        # the polarizability.
+        if rsp_dict is None:
+            rsp_dict = {}
+        self.rsp_dict = dict(rsp_dict)
 
         # The electronic energy
         self.elec_energy = self.scf_drv.get_scf_energy()
@@ -217,6 +233,7 @@ class ScfHessianDriver(HessianDriver):
         if self.do_raman:
             # linear response driver for polarizability calculation
             lr_drv = LinearResponseSolver(self.comm, self.scf_drv.ostream)
+            lr_drv.update_settings(self.rsp_dict, self.method_dict)
             # polarizability: 3 coordinates x 3 coordinates
             # (ignoring frequencies)
             # polarizability gradient: dictionary goes through
@@ -264,13 +281,12 @@ class ScfHessianDriver(HessianDriver):
                     if self.rank == mpi_master():
                         for ind_aop, aop in enumerate('xyz'):
                             for ind_bop, bop in enumerate('xyz'):
-                                # TODO: here the freq. is hard-coded to 0.0!
                                 comp_plus = (
                                     lr_results_p['response_functions'][aop, bop,
-                                                                       0.0])
+                                                                       self.frequency])
                                 comp_minus = (
                                     lr_results_m['response_functions'][aop, bop,
-                                                                       0.0])
+                                                                       self.frequency])
                                 self.polarizability_gradient[
                                     ind_aop, ind_bop,
                                     3 * i + x] = ((comp_plus - comp_minus) /
@@ -793,7 +809,7 @@ class ScfHessianDriver(HessianDriver):
         if self.do_raman:
             # linear response driver for polarizability calculation
             lr_drv = LinearResponseSolver(self.comm, self.scf_drv.ostream)
-            lr_drv.update_settings({}, self.method_dict) # include rsp_settings dict for frequencies etc.
+            lr_drv.update_settings(self.rsp_dict, self.method_dict) # include rsp_settings dict for frequencies etc.
             #lr_ostream_state = lr_drv.ostream.state
             #lr_drv.ostream.state = False
             # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
@@ -840,8 +856,8 @@ class ScfHessianDriver(HessianDriver):
                             for bop in range(3):
                                 self.polarizability_gradient[aop, bop, 3*i + d] = (
                                     # TODO: careful with the hard-coded frequency!!
-                                    ( lr_results_p['response_functions'][component_dict[aop], component_dict[bop], 0.0]
-                                    - lr_results_m['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
+                                    ( lr_results_p['response_functions'][component_dict[aop], component_dict[bop], self.frequency]
+                                    - lr_results_m['response_functions'][component_dict[aop], component_dict[bop], self.frequency] ) /
                                     (2.0 * self.delta_h) )
 
 
@@ -914,10 +930,10 @@ class ScfHessianDriver(HessianDriver):
                         for aop in range(3):
                             for bop in range(3):
                                 self.polarizability_gradient[aop, bop, 3*i + d] = (
-                                    ( lr_results_m2['response_functions'][component_dict[aop], component_dict[bop], 0.0]
-                                    - 8 * lr_results_m1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
-                                    + 8 * lr_results_p1['response_functions'][component_dict[aop], component_dict[bop], 0.0]
-                                    - lr_results_p2['response_functions'][component_dict[aop], component_dict[bop], 0.0] ) /
+                                    ( lr_results_m2['response_functions'][component_dict[aop], component_dict[bop], self.frequency]
+                                    - 8 * lr_results_m1['response_functions'][component_dict[aop], component_dict[bop], self.frequency]
+                                    + 8 * lr_results_p1['response_functions'][component_dict[aop], component_dict[bop], self.frequency]
+                                    - lr_results_p2['response_functions'][component_dict[aop], component_dict[bop], self.frequency] ) /
                                     (12.0 * self.delta_h) )
 
                     for c in range(3):

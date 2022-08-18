@@ -103,6 +103,7 @@ class PolarizabilityGradient():
 
         if 'frequency' in grad_dict:
             self.frequency = float(grad_dict['frequency'])
+            print("Updating frequency...: ", self.frequency)
             if 'frequency' not in orbrsp_dict:
                 orbrsp_dict['frequency'] = grad_dict['frequency']
 
@@ -139,6 +140,7 @@ class PolarizabilityGradient():
 
         if self.rank == mpi_master():
             mo = scf_tensors['C'] # only alpha part
+            ovlp = scf_tensors['S']
             nao = mo.shape[0]
             nocc = molecule.number_of_alpha_electrons()
             mo_occ = mo[:, :nocc].copy()
@@ -161,7 +163,7 @@ class PolarizabilityGradient():
             lambda_ao = np.einsum('mi,xia,na->xmn', mo_occ, lambda_mo,
                                   mo_vir).reshape(dof, dof, nao, nao) # occ-vir
             lambda_ao += lambda_ao.transpose(0,1,3,2) # vir-occ
-            rel_dm_ao = orbrsp_results['unrel_dm_ao'] #+ lambda_ao # TODO: undo comment
+            rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao # TODO: undo comment
 
             # analytical polarizability gradient
             pol_gradient = np.zeros((dof, dof, natm, 3))
@@ -176,6 +178,9 @@ class PolarizabilityGradient():
             else:
                 frac_K = 1.0
 
+            # TODO: remove this member variable once the freq-dependent gradient is correct.
+            freq_dep_contrib = np.zeros((dof, dof, natm, 3))
+
             # loop over atoms and contract integral derivatives with density matrices
             # add the corresponding contribution to the gradient
             for i in range(natm):
@@ -186,9 +191,20 @@ class PolarizabilityGradient():
                 d_eri = eri_deriv(molecule, basis, i)
                 d_dipole = dipole_deriv(molecule, basis, i)
 
+                # TODO: remove freq_dep_contrib
+                freq_dep_contrib[:, :, i] += -0.5 * self.frequency * ( np.einsum('amk,nl,xmn,ykl->xya', d_ovlp, ovlp, xpy, xmy)
+                                                         + np.einsum('amk,nl,xmn,ykl->xya', d_ovlp, ovlp, xmy, xpy)
+                                                         + np.einsum('mk,anl,xmn,ykl->xya', ovlp, d_ovlp, xpy, xmy)
+                                                         + np.einsum('mk,anl,xmn,ykl->xya', ovlp, d_ovlp, xmy, xpy)
+                                                          )
                 # Calculate the analytic polarizability gradient
                 pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_hcore)
-                                 #+1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
+                                 +1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
+                                 -0.5 * self.frequency * ( np.einsum('amk,nl,xmn,ykl->xya', d_ovlp, ovlp, xpy, xmy)
+                                                         + np.einsum('amk,nl,xmn,ykl->xya', d_ovlp, ovlp, xmy, xpy)
+                                                         + np.einsum('mk,anl,xmn,ykl->xya', ovlp, d_ovlp, xpy, xmy)
+                                                         + np.einsum('mk,anl,xmn,ykl->xya', ovlp, d_ovlp, xmy, xpy)
+                                                          )
                                  +1.0 * (
                                  +2.0 * np.einsum('mt,xynp,amtnp->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
                                  -1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
@@ -246,6 +262,7 @@ class PolarizabilityGradient():
 
 
             self.pol_gradient = pol_gradient.reshape(dof, dof, 3 * natm)
+            self.freq_dep_contrib = freq_dep_contrib.reshape(dof, dof, 3 * natm)
 
     def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, xmy_den,
                               gs_density, xcfun_label):
