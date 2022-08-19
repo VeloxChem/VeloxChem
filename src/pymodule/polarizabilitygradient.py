@@ -703,6 +703,11 @@ class PolOrbitalResponse(CphfSolver):
             eo_diag = np.diag(eocc)
             ev_diag = np.diag(evir)
 
+            # Transform the overlap matrix to MO basis
+            # (required for the frequency-dependent contribuion)
+            ovlp_oo = np.linalg.multi_dot([mo_occ.T, ovlp, mo_occ])
+            ovlp_vv = np.linalg.multi_dot([mo_vir.T, ovlp, mo_vir])
+ 
             # Get fock matrices from cphf_results
             fock_ao_rhs = self.cphf_results['fock_ao_rhs']
             fock_gxc_ao = self.cphf_results['fock_gxc_ao']
@@ -773,6 +778,24 @@ class PolOrbitalResponse(CphfSolver):
                                      + np.einsum('ma,xyab,nb->xymn', mo_vir,
                                                  dipole_ints_contrib_vv, mo_vir)
                                      )
+
+            # Compute the frequency-dependent contribution to the 
+            # occupied-occupied and virtual-virtual blocks of omega
+            freq_contrib_oo = 0.5 * self.frequency * ( np.einsum('xla,yib,ik->xykl', xpy, xmy, ovlp_oo)
+                                                     + np.einsum('xla,yib,ik->xykl', xmy, xpy, ovlp_oo)
+                                                     + np.einsum('xia,ylb,ik->xykl', xpy, xmy, ovlp_oo)
+                                                     + np.einsum('xia,ylb,ik->xykl', xmy, xpy, ovlp_oo)
+                            )
+
+            freq_contrib_vv = 0.5 * self.frequency * ( np.einsum('xid,yja,ac->xycd', xpy, xmy, ovlp_vv)
+                                                     + np.einsum('xid,yja,ac->xycd', xmy, xpy, ovlp_vv)
+                                                     + np.einsum('xia,yjd,ac->xycd', xpy, xmy, ovlp_vv)
+                                                     + np.einsum('xia,yjd,ac->xycd', xmy, xpy, ovlp_vv)
+                            )
+
+            freq_contrib_ao = ( np.einsum('mi,xyij,nj->xymn', mo_occ, freq_contrib_oo, mo_occ)
+                              + np.einsum('ma,xyab,nb->xymn', mo_vir, freq_contrib_vv, mo_vir)
+                                )
 
             # Transform the vectors to the AO basis
             xpy_ao = np.einsum('mi,xia,na->xmn', mo_occ, xpy, mo_vir)
@@ -887,7 +910,7 @@ class PolOrbitalResponse(CphfSolver):
                   + np.linalg.multi_dot([D_occ, fmat, D_occ])
                   )
 
-                omega[m*dof+n] = epsilon_dm_ao[m,n] + omega_1pdm_2pdm_contribs + dipole_ints_contrib_ao[m,n]
+                omega[m*dof+n] = epsilon_dm_ao[m,n] + omega_1pdm_2pdm_contribs + dipole_ints_contrib_ao[m,n] + freq_contrib_ao[m,n]
 
                 if self.dft:
                     factor = -0.5
