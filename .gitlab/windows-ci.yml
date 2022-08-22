@@ -18,7 +18,7 @@ baboon:build:
   stage: build
   script:
     - cmake -S. -Bbuild -GNinja -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_BUILD_TYPE=Release -DENABLE_ARCH_FLAGS=OFF
-    - cmake --build build --parallel 6 --config Release -- -v -d stats
+    - cmake --build build --parallel 6 --config Release --target utests -- -v -d stats
   artifacts:
     paths:
       - build
