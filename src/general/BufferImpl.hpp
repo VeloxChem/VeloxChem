@@ -31,6 +31,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <ostream>
 #include <sstream>
 #include <string>
 #include <type_traits>
@@ -2058,14 +2059,13 @@ class CBuffer
         }
     }
     /**}@*/
+
+    friend std::ostream &
+    operator<<(std::ostream &output, const CBuffer &source)
+    {
+        return (output << source.repr());
+    }
 };
 }  // namespace buffer
-
-template <typename T, typename B, auto NRows = Dynamic, auto NCols = Dynamic>
-std::ostream &
-operator<<(std::ostream &output, const buffer::CBuffer<T, B, NRows, NCols> &source)
-{
-    return (output << source.repr());
-}
 
 #endif /* BufferImpl_hpp */

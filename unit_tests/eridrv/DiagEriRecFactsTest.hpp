@@ -26,14 +26,14 @@
 #ifndef DiagEriRecFactsTest_hpp
 #define DiagEriRecFactsTest_hpp
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 class CDiagEriRecFactsTest : public ::testing::Test
 {
    protected:
-    CDiagEriRecFactsTest() {};
+    CDiagEriRecFactsTest(){};
 
-    virtual ~CDiagEriRecFactsTest() {};
+    virtual ~CDiagEriRecFactsTest(){};
 };
 
 #endif /* DiagEriRecFactsTest_hpp */

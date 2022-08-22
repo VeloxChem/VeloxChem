@@ -27,6 +27,7 @@
 
 #include "BinnedGtoBlock.hpp"
 #include "BinnedGtoPairBlock.hpp"
+#include "Buffer.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularBasisSetter.hpp"
 #include "Molecule.hpp"

@@ -27,6 +27,7 @@
 
 #include "BinnedGtoBlock.hpp"
 #include "BinnedGtoPairBlock.hpp"
+#include "Buffer.hpp"
 #include "CheckFunctions.hpp"
 #include "DiagEriRecFacts.hpp"
 #include "MolecularBasisSetter.hpp"
