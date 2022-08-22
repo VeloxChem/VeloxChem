@@ -76,6 +76,8 @@ def _known_aliases_for_keywords():
     return {
         'hf': ('rhf', 'uhf', 'rohf'),
         'dft': ('rks', 'uks', 'roks'),
+        'rsp': ('lr',),
+        'response': ('lr',),
         'td': ('cis', 'tdhf', 'tda', 'tddft'),
         'rpa': 'tdhf',
         'absorption': 'uv-vis',
