@@ -1,66 +1,55 @@
 find_package(GTest QUIET)
-if(TARGET GTest::GTest)
-  message(STATUS "Found GTest: ${GTEST_LIBRARIES}")
+if(NOT TARGET GTest::GTest)
+  message(STATUS "Suitable Google Test could not be located. Unit tests target won't be available!")
 else()
-  message(STATUS "Suitable Google Test could not be located. Fetching and building!")
-  include(FetchContent)
-  FetchContent_Declare(_gtest
-    QUIET
-    URL https://github.com/google/googletest/archive/release-1.12.1.tar.gz
-  )
-  # for windows: Prevent overriding the parent project's compiler/linker settings
-  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-  # prevent Google Test from using PThreads
-  set(gtest_disable_pthreads ON CACHE BOOL "" FORCE)
-  # do not build Google Mock
-  set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+  message(STATUS "Found GTest: ${GTEST_LIBRARIES}")
+  file(RELATIVE_PATH _build_dir ${PROJECT_SOURCE_DIR} ${PROJECT_BINARY_DIR})
+  message(STATUS "Compile unit tests with: cmake --build ${_build_dir} --target utests")
 
-  FetchContent_MakeAvailable(_gtest)
-
-  # Provide an alias, so linking to GTest looks the same regardless if it was
-  # found on the system or if it was fetched at configuration
-  add_library(GTest::GTest ALIAS gtest)
+  add_executable(utests 
+    EXCLUDE_FROM_ALL
+    UnitTestVeloxChem.cpp
+    )
+  
+  target_link_libraries(utests
+    PRIVATE
+      GTest::GTest
+      vlxobjs
+    )
+  
+  add_subdirectory(dft)
+  add_subdirectory(eridrv)
+  add_subdirectory(general)
+  add_subdirectory(math)
+  add_subdirectory(moldata)
+  add_subdirectory(oneints)
+  add_subdirectory(oneints_amom)
+  add_subdirectory(oneints_dip)
+  add_subdirectory(oneints_ef)
+  add_subdirectory(oneints_kin)
+  add_subdirectory(oneints_lmom)
+  add_subdirectory(oneints_npot)
+  add_subdirectory(oneints_ovl)
+  add_subdirectory(orbdata)
+  add_subdirectory(response)
+  add_subdirectory(specfunc)
+  add_subdirectory(tools)
+  add_subdirectory(twoints)
+  add_subdirectory(visualization)
+  
+  set_target_properties(utests
+    PROPERTIES
+      OUTPUT_NAME UnitTestVeloxChem.x
+    )
+  
+  include(GoogleTest)
+  gtest_discover_tests(utests
+    PROPERTIES
+      LABELS "unit"
+    DISCOVERY_TIMEOUT  # how long to wait (in seconds) before crashing
+      240
+    DISCOVERY_MODE  # when to discover the tests
+      PRE_TEST
+    )
 endif()
 
-add_executable(utests UnitTestVeloxChem.cpp)
-
-target_link_libraries(utests
-  PRIVATE
-    GTest::GTest
-    vlxobjs
-  )
-
-add_subdirectory(dft)
-add_subdirectory(eridrv)
-add_subdirectory(general)
-add_subdirectory(math)
-add_subdirectory(moldata)
-add_subdirectory(oneints)
-add_subdirectory(oneints_amom)
-add_subdirectory(oneints_dip)
-add_subdirectory(oneints_ef)
-add_subdirectory(oneints_kin)
-add_subdirectory(oneints_lmom)
-add_subdirectory(oneints_npot)
-add_subdirectory(oneints_ovl)
-add_subdirectory(orbdata)
-add_subdirectory(response)
-add_subdirectory(specfunc)
-add_subdirectory(tools)
-add_subdirectory(twoints)
-add_subdirectory(visualization)
-
-set_target_properties(utests
-  PROPERTIES
-    OUTPUT_NAME UnitTestVeloxChem.x
-  )
-
-include(GoogleTest)
-gtest_discover_tests(utests
-  PROPERTIES
-    LABELS "unit"
-  DISCOVERY_TIMEOUT  # how long to wait (in seconds) before crashing
-    240
-  DISCOVERY_MODE  # when to discover the tests
-    PRE_TEST
-  )

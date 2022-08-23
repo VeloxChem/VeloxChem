@@ -37,7 +37,7 @@
 #
 #   CXXFLAGS
 
-option(ENABLE_ARCH_FLAGS "Enable architecture-specific compiler flags" ON)
+option_with_print(ENABLE_ARCH_FLAGS "Enable architecture-specific compiler flags" ON)
 
 # code needs C++17 at least
 set(CMAKE_CXX_STANDARD 17)

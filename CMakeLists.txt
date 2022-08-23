@@ -28,9 +28,9 @@ endfunction()
 # Wraps an option with default ON/OFF. Adds nice messaging to option()
 # Written by Lori A. Burns (@loriab) and Ryan M. Richard (@ryanmrichard)
 # Syntax: option_with_print(<option name> <description> <default value>)
-macro(option variable msge default)
+macro(option_with_print variable msge default)
   print_option(${variable} ${default})
-  _option(${variable} ${msge} ${default})
+  option(${variable} ${msge} ${default})
 endmacro()
 
 # Wraps an option with a default other than ON/OFF and prints it

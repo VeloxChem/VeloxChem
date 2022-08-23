@@ -28,6 +28,7 @@
 #include <vector>
 
 #include "BinnedGtoBlock.hpp"
+#include "Buffer.hpp"
 #include "CheckFunctions.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularBasisSetter.hpp"

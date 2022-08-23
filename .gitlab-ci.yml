@@ -82,7 +82,7 @@ monkey:cmake_build:
         -GNinja
         -DCMAKE_CXX_COMPILER=mpiicpc
         -DVLX_LA_VENDOR=MKL
-    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" -- -v -d stats
+    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target utests -- -v -d stats
   artifacts:
     paths:
       - build
