@@ -37,7 +37,7 @@ class TestForceField:
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'butane.inp')
 
-        task = MpiTask([inpfile])
+        task = MpiTask([inpfile, None])
 
         if is_mpi_master(task.mpi_comm):
             gaff_file = here / 'inputs' / 'gaff-2.11.dat'

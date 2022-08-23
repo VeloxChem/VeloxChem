@@ -58,7 +58,7 @@ class TestLinearSolver:
             H   0.0  -1.4   1.1
         """
         mol = Molecule.read_str(mol_str, units='bohr')
-        bas = MolecularBasis.read(mol, 'aug-cc-pvdz')
+        bas = MolecularBasis.read(mol, 'aug-cc-pvdz', ostream=None)
 
         return mol, bas
 

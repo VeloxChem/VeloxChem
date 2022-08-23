@@ -20,10 +20,11 @@ class TestPDFT:
         """
         molecule = Molecule.read_str(O2_xyz)
         molecule.set_multiplicity(3)
-        basis = MolecularBasis.read(molecule, "cc-pvdz")
+        basis = MolecularBasis.read(molecule, 'cc-pvdz', ostream=None)
 
         # Optimize ROHF wavefunction
         scfdrv = ScfRestrictedOpenDriver()
+        scfdrv.ostream.state = False
         scfdrv.compute(molecule, basis)
 
         # Compute SLDA correction

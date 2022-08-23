@@ -28,6 +28,7 @@ class TestXTBHessianDriver:
         xtb_drv.compute(task.molecule, task.ostream)
 
         xtb_hessian_drv = XTBHessianDriver(xtb_drv)
+        xtb_hessian_drv.ostream.state = False
         xtb_hessian_drv.compute(task.molecule)
 
         if is_mpi_master(task.mpi_comm):

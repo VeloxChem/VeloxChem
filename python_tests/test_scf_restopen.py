@@ -14,7 +14,9 @@ class TestScfRestrictedOpenShell:
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
-        task.ao_basis = MolecularBasis.read(task.molecule, basis_label)
+        task.ao_basis = MolecularBasis.read(task.molecule,
+                                            basis_label,
+                                            ostream=None)
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile

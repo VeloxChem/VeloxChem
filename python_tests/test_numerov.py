@@ -162,19 +162,16 @@ class TestNumerov:
             ref_osc[b] = [float(line.split()[2]) for line in data_lines[b]]
 
         num_drv = NumerovDriver()
-
+        num_drv.ostream.state = False
         num_drv.update_settings(numerov_dict)
 
         self.read_data(num_drv)
 
         results = num_drv.compute()
-
         assert num_drv.is_converged
 
         exc = results['excitation_energies']
         osc = results['oscillator_strengths']
-
-        print(exc, ref_exc)
 
         if len(exc.keys()) == 3:
             for b in 'PQR':

@@ -29,7 +29,9 @@ class TestROHFOrbitalEnergies:
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
-        task.ao_basis = MolecularBasis.read(task.molecule, basis_label)
+        task.ao_basis = MolecularBasis.read(task.molecule,
+                                            basis_label,
+                                            ostream=None)
 
         scf_drv = ScfRestrictedOpenDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],

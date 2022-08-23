@@ -53,7 +53,10 @@ class TestBasis:
                 fname = Path(temp_dir, basis_name)
                 with open(str(fname), 'w') as f_basis:
                     f_basis.write(basis_text)
-                basis = MolecularBasis.read(molecule, basis_name, temp_dir)
+                basis = MolecularBasis.read(molecule,
+                                            basis_name,
+                                            temp_dir,
+                                            ostream=None)
 
             ref_basis = MolecularBasis()
 
