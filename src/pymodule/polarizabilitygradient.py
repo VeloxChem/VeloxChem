@@ -587,22 +587,44 @@ class PolOrbitalResponse(CphfSolver):
                 fock_ao_rhs_xmy[i] = fock_ao_rhs.alpha_to_numpy(dof**2 + dof + i)
 
             # Contract with the second vector
-            sdp_pds = 0.5 * (
-                     np.einsum('mr,xrp,ypz->xymz', ovlp, xpy_ao, fock_ao_rhs_xpy)
-                    +np.einsum('mr,xrp,ypz->xymz', ovlp, xmy_ao, fock_ao_rhs_xmy)
-                    -np.einsum('rz,xpr,ypm->xymz', ovlp, xpy_ao, fock_ao_rhs_xpy)
-                    -np.einsum('rz,xpr,ypm->xymz', ovlp, xmy_ao, fock_ao_rhs_xmy)
-                    -np.einsum('mr,xrp,yzp->xymz', ovlp, xpy_ao, fock_ao_rhs_xpy)
-                    +np.einsum('mr,xrp,yzp->xymz', ovlp, xmy_ao, fock_ao_rhs_xmy)
-                    +np.einsum('rz,xpr,ymp->xymz', ovlp, xpy_ao, fock_ao_rhs_xpy)
-                    -np.einsum('rz,xpr,ymp->xymz', ovlp, xmy_ao, fock_ao_rhs_xmy)
-                )
+            #sdp_pds = 0.5 * (
+            #         np.einsum('mr,xrp,ypz->xymz', ovlp, xpy_ao, fock_ao_rhs_xpy.transpose(0,2,1))
+            #        +np.einsum('mr,xrp,ypz->xymz', ovlp, xmy_ao, fock_ao_rhs_xmy.transpose(0,2,1))
+            #        -np.einsum('rz,xpr,ypm->xymz', ovlp, xpy_ao, fock_ao_rhs_xpy.transpose(0,2,1))
+            #        -np.einsum('rz,xpr,ypm->xymz', ovlp, xmy_ao, fock_ao_rhs_xmy.transpose(0,2,1))
+            #        -np.einsum('mr,xrp,yzp->xymz', ovlp, xpy_ao, fock_ao_rhs_xpy.transpose(0,2,1))
+            #        +np.einsum('mr,xrp,yzp->xymz', ovlp, xmy_ao, fock_ao_rhs_xmy.transpose(0,2,1))
+            #        +np.einsum('rz,xpr,ymp->xymz', ovlp, xpy_ao, fock_ao_rhs_xpy.transpose(0,2,1))
+            #        -np.einsum('rz,xpr,ymp->xymz', ovlp, xmy_ao, fock_ao_rhs_xmy.transpose(0,2,1))
+            #    )
+
+            fock_mo_rhs_2dm = 0.25 * (
+                 np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('xmt,ymc->xytc', fock_ao_rhs_xpy.transpose(0,2,1), xpy_ao))
+               - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('xmt,ymc->xytc', fock_ao_rhs_xmy.transpose(0,2,1), xmy_ao))
+               + np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('ymt,xmc->xytc', fock_ao_rhs_xpy.transpose(0,2,1), xpy_ao))
+               - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('ymt,xmc->xytc', fock_ao_rhs_xmy.transpose(0,2,1), xmy_ao)) 
+                
+               - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('xtm,ymc->xytc', fock_ao_rhs_xpy.transpose(0,2,1), xpy_ao))
+               - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('xtm,ymc->xytc', fock_ao_rhs_xmy.transpose(0,2,1), xmy_ao))
+               - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('ytm,xmc->xytc', fock_ao_rhs_xpy.transpose(0,2,1), xpy_ao))
+               - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('ytm,xmc->xytc', fock_ao_rhs_xmy.transpose(0,2,1), xmy_ao)) 
+                
+               + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, np.einsum('xmt,ycm->xyct', fock_ao_rhs_xpy.transpose(0,2,1), xpy_ao))
+               + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, np.einsum('xmt,ycm->xyct', fock_ao_rhs_xmy.transpose(0,2,1), xmy_ao))
+               + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, np.einsum('ymt,xcm->xyct', fock_ao_rhs_xpy.transpose(0,2,1), xpy_ao))
+               + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, np.einsum('ymt,xcm->xyct', fock_ao_rhs_xmy.transpose(0,2,1), xmy_ao)) 
+                
+               - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('xtm,ycm->xytc', fock_ao_rhs_xpy.transpose(0,2,1), xpy_ao))
+               + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('xtm,ycm->xytc', fock_ao_rhs_xmy.transpose(0,2,1), xmy_ao))
+               - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('ytm,xcm->xytc', fock_ao_rhs_xpy.transpose(0,2,1), xpy_ao))
+               + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, np.einsum('ytm,xcm->xytc', fock_ao_rhs_xmy.transpose(0,2,1), xmy_ao))
+               ).reshape(dof**2, nocc, nvir)
 
             # Symmetrize wrt. Cartesian components
-            sdp_pds_sym = 0.5 * (sdp_pds + sdp_pds.transpose(1,0,2,3))
+            #sdp_pds_sym = 0.5 * (sdp_pds + sdp_pds.transpose(1,0,2,3))
 
             # Transform 2PDM contributions to MO basis
-            fock_mo_rhs_2dm = np.einsum('mi,xymn,na->xyia', mo_occ, sdp_pds_sym, mo_vir).reshape(dof**2, nocc, nvir)
+            #fock_mo_rhs_2dm = np.einsum('mi,xymn,na->xyia', mo_occ, sdp_pds_sym, mo_vir).reshape(dof**2, nocc, nvir)
 
             # Calculate the dipole contributions to the RHS:
             # Dipole integrals in AO basis
