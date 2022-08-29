@@ -214,6 +214,7 @@ export_dft(py::module& m)
             "Broadcasts MolecularGrid object.",
             "rank"_a,
             "py_comm"_a)
+        .def("test_partition", &CMolecularGrid::testPartition)
         .def(py::self == py::self);
 
     // CGridDriver class

@@ -32,7 +32,12 @@
 
 #include <mpi.h>
 
+#include "AODensityMatrix.hpp"
+#include "DenseMatrix.hpp"
+#include "DensityGridDriver.hpp"
 #include "MemBlock2D.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
 
 /**
  Class CMolecularGrid class generates molecular grid.
@@ -112,14 +117,20 @@ class CMolecularGrid
      @return true if molecular grid objects are not equal, false otherwise.
      */
     bool operator!=(const CMolecularGrid& other) const;
-    
-    
+
     /**
      Reduces size of molecular grid by slicing all grid points beoynd given number of grid points.
 
      @param nGridPoints the number of grid points.
      */
     void slice(const int32_t nGridPoints);
+
+    /**
+     Gets grid points in molecular grid object.
+
+     @return the grid points.
+     */
+    CMemBlock2D<double> getGridPoints() const;
 
     /**
      Gets number of grid points in molecular grid object.
@@ -233,6 +244,30 @@ class CMolecularGrid
      @return the spatial extent (min x, min y, min z, max x, max y, max z).
      */
     std::array<double, 6> getSpatialExtent() const;
+
+    /**
+     Tests partitioning of grid points into boxes.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param density the AO density matrix.
+     @return the Vxc matrix.
+     */
+    CDenseMatrix testPartition(const CMolecule&        molecule,
+                               const CMolecularBasis&  basis,
+                               const CAODensityMatrix& density,
+                               const std::string&      xcFuncLabel,
+                               CDensityGridDriver      dgdrv) const;
+
+    /**
+     Gets grid points in a box.
+
+     @param boxdim the spatial extent of the box (min x, min y, min z, max x, max y, max z).
+     @param points the old grid points (CMemBlock2D object).
+     @return the new grid points (CMemBlock2D object).
+     */
+    CMemBlock2D<double> getGridPointsInBox(const std::array<double, 6>& boxdim,
+                                           const CMemBlock2D<double>&   points) const;
 
     /**
      Converts molecular grid object to text and insert it into output text
