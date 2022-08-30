@@ -46,6 +46,7 @@ target_link_libraries(vlxobjs
     OpenMP::OpenMP_CXX
     MPI::MPI_CXX
     Math::LA
+    Libxc::xc
   )
 
 add_subdirectory(device)

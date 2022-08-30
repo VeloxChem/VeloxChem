@@ -58,5 +58,7 @@ find_package(Python 3.7 REQUIRED COMPONENTS Interpreter Development NumPy)
 
 # download pybind11 if not available on the system
 include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
+# download Libxc if not available on the system
+include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_Libxc.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/vlx.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_save_flags.cmake)
