@@ -48,11 +48,6 @@ target_link_libraries(vlxobjs
     Math::LA
   )
 
-set_target_properties(vlxobjs
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE 1
-  )
-
 add_subdirectory(device)
 add_subdirectory(dft)
 add_subdirectory(dftfuncs)

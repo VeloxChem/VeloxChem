@@ -13,7 +13,7 @@ message(STATUS "C++ compiler flags")
 message(STATUS "   From environment       : ${CMAKE_CXX_FLAGS}")
 message(STATUS "   Build-type-specific    : ${CMAKE_CXX_FLAGS_${_cmake_build_type_upper}}")
 message(STATUS "   Vectorization flag     : ${ARCH_FLAG}")
-message(STATUS "   Project defaults       : ${VLX_CXX_FLAGS}")
+message(STATUS "   Project defaults       : ${CMAKE_CXX${CMAKE_CXX_STANDARD}_STANDARD_COMPILE_OPTION} ${VLX_CXX_FLAGS}")
 message(STATUS "   User-appended          : ${EXTRA_CXXFLAGS}")
 message(STATUS "   OpenMP parallelization : ${OpenMP_CXX_FLAGS}")
 
