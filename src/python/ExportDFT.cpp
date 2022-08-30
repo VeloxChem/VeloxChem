@@ -44,6 +44,7 @@
 #include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
+#include "XCNewIntegrator.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -304,6 +305,18 @@ export_dft(py::module& m)
              "quadMode"_a)
         .def("integrate_pdft", &integrate_pdft);
     
+    // CXCNewIntegrator class
+
+    PyClass<CXCNewIntegrator>(m, "XCNewIntegrator")
+        .def(py::init(&vlx_general::create<CXCNewIntegrator>), "comm"_a = py::none())
+        .def("set_number_of_points_threshold", &CXCNewIntegrator::setNumberOfPointsThreshold)
+        .def("set_maximum_level", &CXCNewIntegrator::setMaximumLevel)
+        .def("get_number_of_boxes", &CXCNewIntegrator::getNumberOfBoxes)
+        .def("initialize_grid", &CXCNewIntegrator::initializeGrid)
+        .def("partition_grid", &CXCNewIntegrator::partitionGrid)
+        .def("get_grid_info", &CXCNewIntegrator::getGridInformation)
+        .def("integrate_vxc", &CXCNewIntegrator::integrateVxc);
+
     // CXCMolecularGradient class
 
     PyClass<CXCMolecularGradient>(m, "XCMolecularGradient")

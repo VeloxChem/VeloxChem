@@ -20,6 +20,7 @@ target_sources(vlxobjs
     XCHessianGrid.cpp
     XCIntegrator.cpp
     XCMolecularGradient.cpp
+    XCNewIntegrator.cpp
   )
 
 target_include_directories(vlxobjs
