@@ -36,13 +36,7 @@
 
 CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
 
-    : _boxes(std::list<std::array<double, 6>>())
-
-    , _pointsInBoxes(std::list<CMemBlock2D<double>>())
-
-    , _numberOfPointsThreshold(800)
-
-    , _maximumLevel(100)
+    : _numberOfPointsThreshold(800)
 {
     _locRank = mpi::rank(comm);
 
@@ -61,12 +55,6 @@ CXCNewIntegrator::setNumberOfPointsThreshold(const int32_t thresh)
     _numberOfPointsThreshold = thresh;
 }
 
-void
-CXCNewIntegrator::setMaximumLevel(const int32_t maxlevel)
-{
-    _maximumLevel = maxlevel;
-}
-
 int32_t
 CXCNewIntegrator::getNumberOfBoxes() const
 {
@@ -76,215 +64,169 @@ CXCNewIntegrator::getNumberOfBoxes() const
 void
 CXCNewIntegrator::initializeGrid(const CMolecularGrid& molgrid)
 {
-    auto box = molgrid.getSpatialExtent();
+    auto boxdim = molgrid.getSpatialExtent();
 
-    double xmin = box[0] - 0.0001;
+    boxdim[0] -= 0.0001;
 
-    double ymin = box[1] - 0.0001;
+    boxdim[1] -= 0.0001;
 
-    double zmin = box[2] - 0.0001;
+    boxdim[2] -= 0.0001;
 
-    double xmax = box[3] + 0.0001;
+    boxdim[3] += 0.0001;
 
-    double ymax = box[4] + 0.0001;
+    boxdim[4] += 0.0001;
 
-    double zmax = box[5] + 0.0001;
-
-    double xhalf = 0.5 * (xmax + xmin);
-
-    double yhalf = 0.5 * (ymax + ymin);
-
-    double zhalf = 0.5 * (zmax + zmin);
-
-    double maxlen = std::max({xmax - xmin, ymax - ymin, zmax - zmin});
+    boxdim[5] += 0.0001;
 
     _boxes.clear();
 
-    _boxes.push_back(std::array<double, 6>({xhalf - 0.5 * maxlen, yhalf - 0.5 * maxlen, zhalf - 0.5 * maxlen,
-                                            xhalf + 0.5 * maxlen, yhalf + 0.5 * maxlen, zhalf + 0.5 * maxlen}));
-
-    _pointsInBoxes.clear();
-
-    _pointsInBoxes.push_back(molgrid.getGridPoints());
+    _boxes.push_back(CGridBox(boxdim, molgrid.getGridPoints()));
 }
 
 void
 CXCNewIntegrator::partitionGrid()
 {
-    // go through the levels
+   auto box = _boxes.begin();
 
-    for (int32_t level = 0; level < _maximumLevel; level++)
-    {
-        // check number of grid points in the boxes
+   while (box != _boxes.end())
+   {
+        auto npoints = box->getNumberOfGridPoints();
 
-        bool done = true;
-
-        for (auto p = _pointsInBoxes.cbegin(); p != _pointsInBoxes.cend(); ++p)
+        if (npoints <= _numberOfPointsThreshold)
         {
-            if ((*p).size(0) > _numberOfPointsThreshold)
-            {
-                done = false;
-
-                break;
-            }
+            ++box;
         }
-
-        if (done) break;
-
-        // need to further divide the boxes
-
-        auto box_iter = _boxes.begin();
-
-        auto points_iter = _pointsInBoxes.begin();
-
-        while ((box_iter != _boxes.end()) && (points_iter != _pointsInBoxes.end()))
+        else
         {
-            const std::array<double, 6>& box = *box_iter;
+            // divide the box
 
-            const CMemBlock2D<double>& points = *points_iter;
+            // box info
 
-            auto npoints = points.size(0);
+            auto boxdim = box->getBoxDimension();
 
-            if (npoints <= _numberOfPointsThreshold)
+            auto xmin = boxdim[0];
+
+            auto ymin = boxdim[1];
+
+            auto zmin = boxdim[2];
+
+            auto xmax = boxdim[3];
+
+            auto ymax = boxdim[4];
+
+            auto zmax = boxdim[5];
+
+            // grid points info
+
+            auto xcoords = box->getCoordinatesX();
+
+            auto ycoords = box->getCoordinatesY();
+
+            auto zcoords = box->getCoordinatesZ();
+
+            auto weights = box->getWeights();
+
+            // find the center for dividing the box
+
+            double xhalf = 0.0;
+
+            double yhalf = 0.0;
+
+            double zhalf = 0.0;
+
+            for (int32_t g = 0; g < npoints; g++)
             {
-                ++box_iter;
+                xhalf += xcoords[g];
 
-                ++points_iter;
+                yhalf += ycoords[g];
+
+                zhalf += zcoords[g];
             }
-            else
+
+            xhalf /= (double)npoints;
+
+            yhalf /= (double)npoints;
+
+            zhalf /= (double)npoints;
+
+            // sub boxes and grid points
+
+            std::vector<std::array<double, 6>> subboxdims;
+
+            std::vector<CMemBlock2D<double>> subgridpoints;
+
+            std::vector<int32_t> subnumpoints;
+
+            for (int32_t xval = 0; xval < 2; xval++)
             {
-                // divide the box
+                std::array<double, 2> xrange = (!xval) ? std::array<double, 2>({xmin, xhalf}) :
+                                                         std::array<double, 2>({xhalf, xmax});
 
-                // box info
-
-                auto xmin = box[0];
-
-                auto ymin = box[1];
-
-                auto zmin = box[2];
-
-                auto xmax = box[3];
-
-                auto ymax = box[4];
-
-                auto zmax = box[5];
-
-                // grid points info
-
-                auto xcoords = points.data(0);
-
-                auto ycoords = points.data(1);
-
-                auto zcoords = points.data(2);
-
-                auto weights = points.data(3);
-
-                // find the center for dividing the box
-
-                double xhalf = 0.0;
-
-                double yhalf = 0.0;
-
-                double zhalf = 0.0;
-
-                for (int32_t g = 0; g < npoints; g++)
+                for (int32_t yval = 0; yval < 2; yval++)
                 {
-                    xhalf += xcoords[g];
+                    std::array<double, 2> yrange = (!yval) ? std::array<double, 2>({ymin, yhalf}) :
+                                                             std::array<double, 2>({yhalf, ymax});
 
-                    yhalf += ycoords[g];
-
-                    zhalf += zcoords[g];
-                }
-
-                xhalf /= (double)npoints;
-
-                yhalf /= (double)npoints;
-
-                zhalf /= (double)npoints;
-
-                // sub boxes and grid points
-
-                std::vector<std::array<double, 6>> subboxes;
-
-                std::vector<CMemBlock2D<double>> subgridpoints;
-
-                std::vector<int32_t> subnumpoints;
-
-                for (int32_t xval = 0; xval < 2; xval++)
-                {
-                    std::array<double, 2> xrange = (!xval) ? std::array<double, 2>({xmin, xhalf}) :
-                                                             std::array<double, 2>({xhalf, xmax});
-
-                    for (int32_t yval = 0; yval < 2; yval++)
+                    for (int32_t zval = 0; zval < 2; zval++)
                     {
-                        std::array<double, 2> yrange = (!yval) ? std::array<double, 2>({ymin, yhalf}) :
-                                                                 std::array<double, 2>({yhalf, ymax});
+                        std::array<double, 2> zrange = (!zval) ? std::array<double, 2>({zmin, zhalf}) :
+                                                                 std::array<double, 2>({zhalf, zmax});
 
-                        for (int32_t zval = 0; zval < 2; zval++)
-                        {
-                            std::array<double, 2> zrange = (!zval) ? std::array<double, 2>({zmin, zhalf}) :
-                                                                     std::array<double, 2>({zhalf, zmax});
+                        subboxdims.push_back(std::array<double, 6>(
+                            {xrange[0], yrange[0], zrange[0], xrange[1], yrange[1], zrange[1]}));
 
-                            subboxes.push_back(std::array<double, 6>({xrange[0], yrange[0], zrange[0],
-                                                                      xrange[1], yrange[1], zrange[1]}));
+                        subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
 
-                            subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
-
-                            subnumpoints.push_back(0);
-                        }
+                        subnumpoints.push_back(0);
                     }
                 }
-
-                for (int32_t g = 0; g < npoints; g++)
-                {
-                    int32_t xval = (xcoords[g] < xhalf) ? 0 : 1;
-
-                    int32_t yval = (ycoords[g] < yhalf) ? 0 : 1;
-
-                    int32_t zval = (zcoords[g] < zhalf) ? 0 : 1;
-
-                    // x y z  id
-                    // ---------
-                    // 0 0 0   0
-                    // 0 0 1   1
-                    // 0 1 0   2
-                    // 0 1 1   3
-                    // 1 0 0   4
-                    // 1 0 1   5
-                    // 1 1 0   6
-                    // 1 1 1   7
-
-                    int32_t box_id = (xval << 2) | (yval << 1) | (zval << 0);
-
-                    auto count = subnumpoints[box_id];
-
-                    subgridpoints[box_id].data(0)[count] = xcoords[g];
-
-                    subgridpoints[box_id].data(1)[count] = ycoords[g];
-
-                    subgridpoints[box_id].data(2)[count] = zcoords[g];
-
-                    subgridpoints[box_id].data(3)[count] = weights[g];
-
-                    subnumpoints[box_id]++;
-                }
-
-                for (int32_t box_id = 0; box_id < static_cast<int32_t>(subboxes.size()); box_id++)
-                {
-                    auto count = subnumpoints[box_id];
-
-                    if (count > 0)
-                    {
-                        _boxes.push_back(subboxes[box_id]);
-
-                        _pointsInBoxes.push_back(subgridpoints[box_id].slice(0, count));
-                    }
-                }
-
-                box_iter = _boxes.erase(box_iter);
-
-                points_iter = _pointsInBoxes.erase(points_iter);
             }
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                int32_t xval = (xcoords[g] < xhalf) ? 0 : 1;
+
+                int32_t yval = (ycoords[g] < yhalf) ? 0 : 1;
+
+                int32_t zval = (zcoords[g] < zhalf) ? 0 : 1;
+
+                // x y z  id
+                // ---------
+                // 0 0 0   0
+                // 0 0 1   1
+                // 0 1 0   2
+                // 0 1 1   3
+                // 1 0 0   4
+                // 1 0 1   5
+                // 1 1 0   6
+                // 1 1 1   7
+
+                int32_t box_id = (xval << 2) | (yval << 1) | (zval << 0);
+
+                auto count = subnumpoints[box_id];
+
+                subgridpoints[box_id].data(0)[count] = xcoords[g];
+
+                subgridpoints[box_id].data(1)[count] = ycoords[g];
+
+                subgridpoints[box_id].data(2)[count] = zcoords[g];
+
+                subgridpoints[box_id].data(3)[count] = weights[g];
+
+                subnumpoints[box_id]++;
+            }
+
+            for (int32_t box_id = 0; box_id < static_cast<int32_t>(subboxdims.size()); box_id++)
+            {
+                auto count = subnumpoints[box_id];
+
+                if (count > 0)
+                {
+                    _boxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
+                }
+            }
+
+            box = _boxes.erase(box);
         }
     }
 }
@@ -296,25 +238,21 @@ CXCNewIntegrator::getGridInformation() const
 
     ss << "Number of grid boxes: " << getNumberOfBoxes() << "\n";
 
-    auto box_iter = _boxes.begin();
+    int32_t boxind = 0;
 
-    auto points_iter = _pointsInBoxes.begin();
-
-    for (int32_t i = 0; i < getNumberOfBoxes(); i++)
+    for (auto box = _boxes.cbegin(); box != _boxes.cend(); ++box)
     {
-        const std::array<double, 6>& box = *box_iter;
+        auto boxdim = box->getBoxDimension();
 
-        auto npoints = (*points_iter).size(0);
+        auto npoints = box->getNumberOfGridPoints();
 
-        ss << "  Grid box " << i << ", number of points: " << npoints << ", xyz: ";
+        ss << "  Grid boxdim " << boxind << ", number of points: " << npoints << ", xyz: ";
 
-        ss << "(" << box[0] << ", " << box[1] << ", " << box[2] << "), ";
+        ss << "(" << boxdim[0] << ", " << boxdim[1] << ", " << boxdim[2] << "), ";
 
-        ss << "(" << box[3] << ", " << box[4] << ", " << box[5] << ")\n";
+        ss << "(" << boxdim[3] << ", " << boxdim[4] << ", " << boxdim[5] << ")\n";
 
-        ++box_iter;
-
-        ++points_iter;
+        ++boxind;
     }
 
     return ss.str();
@@ -338,11 +276,11 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
     mat_Vxc.zero();
 
-    for (auto p = _pointsInBoxes.cbegin(); p != _pointsInBoxes.cend(); ++p)
+    for (auto box = _boxes.cbegin(); box != _boxes.cend(); ++box)
     {
         // grid points in box
 
-        const CMemBlock2D<double>& points = *p;
+        const CMemBlock2D<double>& points = box->getGridPoints();
 
         // generate reference density grid and compute exchange-correlation functional derivative
 

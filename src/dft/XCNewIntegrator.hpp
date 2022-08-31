@@ -32,6 +32,7 @@
 
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "GridBox.hpp"
 #include "GtoContainer.hpp"
 #include "MemBlock2D.hpp"
 #include "MolecularGrid.hpp"
@@ -62,24 +63,14 @@ class CXCNewIntegrator
     MPI_Comm _locComm;
 
     /**
-     Boxes (xmin,ymin,zmin,xmax,ymax,zmax) containing grid points.
+     Grid boxes containing DFT grid points.
      */
-    std::list<std::array<double, 6>> _boxes;
-
-    /**
-     Grid points (x,y,z,w) in the boxes.
-     */
-    std::list<CMemBlock2D<double>> _pointsInBoxes;
+    std::list<CGridBox> _boxes;
 
     /**
      Threshold for number of points in one box.
      */
     int32_t _numberOfPointsThreshold;
-
-    /**
-     Maximum level for dividing the boxes.
-     */
-    int32_t _maximumLevel;
 
     CDenseMatrix _integratePartialVxcFockForLDA(const CMemBlock2D<double>& points,
                                                 const CGtoContainer*       gtoContainer,
@@ -104,13 +95,6 @@ class CXCNewIntegrator
      @param thresh the threshold for number of points in one box
      */
     void setNumberOfPointsThreshold(const int32_t thresh);
-
-    /**
-     Sets the maximum level of dividing the boxes.
-
-     @param maxlevel the maximum level.
-     */
-    void setMaximumLevel(const int32_t maxlevel);
 
     /**
      Gets number of boxes.

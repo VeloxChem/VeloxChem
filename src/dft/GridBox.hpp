@@ -1,0 +1,160 @@
+//
+//                           VELOXCHEM 1.0-RC2
+//         ----------------------------------------------------
+//                     An Electronic Structure Code
+//
+//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
+//
+//  SPDX-License-Identifier: LGPL-3.0-or-later
+//
+//  This file is part of VeloxChem.
+//
+//  VeloxChem is free software: you can redistribute it and/or modify it under
+//  the terms of the GNU Lesser General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or (at your option)
+//  any later version.
+//
+//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+//  License for more details.
+//
+//  You should have received a copy of the GNU Lesser General Public License
+//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
+#ifndef GridBox_hpp
+#define GridBox_hpp
+
+#include <array>
+
+#include "MemBlock2D.hpp"
+
+/**
+ Class CGridBox contains DFT grid points.
+
+ @author X. Li
+ */
+class CGridBox
+{
+    /**
+     Dimension of the box (xmin,ymin,zmin,xmax,ymax,zmax).
+     */
+    std::array<double, 6> _dimension;
+
+    /**
+     DFT grid points (x,y,z,weight).
+     */
+    CMemBlock2D<double> _points;
+
+   public:
+    /**
+     Creates an empty grid box object.
+     */
+    CGridBox();
+
+    /**
+     Creates a grid box object from dimension and points.
+     */
+    CGridBox(const std::array<double, 6>& dimension, const CMemBlock2D<double>& points);
+
+    /**
+     Creates a grid box object by copying other grid box object.
+
+     @param source the grid box object.
+     */
+    CGridBox(const CGridBox& source);
+
+    /**
+     Creates a grid box object by moving other grid box object.
+
+     @param source the grid box object.
+     */
+    CGridBox(CGridBox&& source) noexcept;
+
+    /**
+     Destroys a grid box object.
+     */
+    ~CGridBox();
+
+    /**
+     Assigns a grid box object by copying other grid box object.
+
+     @param source the grid box object.
+     */
+    CGridBox& operator=(const CGridBox& source);
+
+    /**
+     Assigns a grid box object by moving other grid box object.
+
+     @param source the grid box object.
+     */
+    CGridBox& operator=(CGridBox&& source) noexcept;
+
+    /**
+     Compares grid box object with other grid box object.
+
+     @param other the grid box object.
+     @return true if grid box objects are equal, false otherwise.
+     */
+    bool operator==(const CGridBox& other) const;
+
+    /**
+     Compares grid box object with other grid box object.
+
+     @param other the grid box object.
+     @return true if grid box objects are not equal, false otherwise.
+     */
+    bool operator!=(const CGridBox& other) const;
+
+    /**
+     Gets the box dimension.
+
+     @return the box dimension
+     */
+    std::array<double, 6> getBoxDimension() const;
+
+    /**
+     Gets the grid points.
+
+     @return the grid points.
+     */
+    CMemBlock2D<double> getGridPoints() const;
+
+    /**
+     Gets number of grid points.
+
+     @return the number of grid points.
+     */
+    int32_t getNumberOfGridPoints() const;
+
+    /**
+     Gets Cartesian X coordinates of grid points.
+
+     @return the constant pointer to Cartesian X coordinates of grid points.
+     */
+    const double* getCoordinatesX() const;
+    
+    /**
+     Gets Cartesian Y coordinates of grid points.
+
+     @return the constant  pointer to Cartesian Y coordinates of grid points.
+     */
+    const double* getCoordinatesY() const;
+    
+    /**
+     Gets Cartesian Z coordinates of grid points.
+
+     @return the constant pointer to Cartesian Z coordinates of grid points.
+     */
+    const double* getCoordinatesZ() const;
+    
+    /**
+     Gets weights of grid points.
+
+     @return the constant pointer to weights of grid points.
+     */
+    const double* getWeights() const;
+};
+
+#endif /* GridBox_hpp */

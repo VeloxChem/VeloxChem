@@ -4,6 +4,7 @@ target_sources(vlxobjs
     DensityGrid.cpp
     DensityGridDriver.cpp
     DensityGridQuad.cpp
+    GridBox.cpp
     GridDriver.cpp
     GtoFunc.cpp
     GtoFuncForGGA.cpp
