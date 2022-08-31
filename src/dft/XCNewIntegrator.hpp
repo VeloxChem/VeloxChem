@@ -26,7 +26,7 @@
 #ifndef XCNewIntegrator_hpp
 #define XCNewIntegrator_hpp
 
-#include <vector>
+#include <list>
 #include <array>
 #include <string>
 
@@ -64,12 +64,12 @@ class CXCNewIntegrator
     /**
      Boxes (xmin,ymin,zmin,xmax,ymax,zmax) containing grid points.
      */
-    std::vector<std::array<double, 6>> _boxes;
+    std::list<std::array<double, 6>> _boxes;
 
     /**
      Grid points (x,y,z,w) in the boxes.
      */
-    std::vector<CMemBlock2D<double>> _pointsInBoxes;
+    std::list<CMemBlock2D<double>> _pointsInBoxes;
 
     /**
      Threshold for number of points in one box.

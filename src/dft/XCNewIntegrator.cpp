@@ -36,9 +36,9 @@
 
 CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
 
-    : _boxes(std::vector<std::array<double, 6>>())
+    : _boxes(std::list<std::array<double, 6>>())
 
-    , _pointsInBoxes(std::vector<CMemBlock2D<double>>())
+    , _pointsInBoxes(std::list<CMemBlock2D<double>>())
 
     , _numberOfPointsThreshold(800)
 
@@ -119,9 +119,9 @@ CXCNewIntegrator::partitionGrid()
 
         bool done = true;
 
-        for (int32_t i = 0; i < getNumberOfBoxes(); i++)
+        for (auto p = _pointsInBoxes.cbegin(); p != _pointsInBoxes.cend(); ++p)
         {
-            if (_pointsInBoxes[i].size(0) > _numberOfPointsThreshold)
+            if ((*p).size(0) > _numberOfPointsThreshold)
             {
                 done = false;
 
@@ -133,19 +133,25 @@ CXCNewIntegrator::partitionGrid()
 
         // need to further divide the boxes
 
-        std::vector<std::array<double ,6>> new_boxes;
+        auto box_iter = _boxes.begin();
 
-        std::vector<CMemBlock2D<double>> new_points_in_boxes;
+        auto points_iter = _pointsInBoxes.begin();
 
-        for (int32_t i = 0; i < getNumberOfBoxes(); i++)
+        while ((box_iter != _boxes.end()) && (points_iter != _pointsInBoxes.end()))
         {
-            const std::array<double, 6>& box = _boxes[i];
+            const std::array<double, 6>& box = *box_iter;
 
-            const CMemBlock2D<double>& points = _pointsInBoxes[i];
+            const CMemBlock2D<double>& points = *points_iter;
 
             auto npoints = points.size(0);
 
-            if (npoints > _numberOfPointsThreshold)
+            if (npoints <= _numberOfPointsThreshold)
+            {
+                ++box_iter;
+
+                ++points_iter;
+            }
+            else
             {
                 // divide the box
 
@@ -163,12 +169,6 @@ CXCNewIntegrator::partitionGrid()
 
                 auto zmax = box[5];
 
-                double xhalf = 0.5 * (xmax + xmin);
-
-                double yhalf = 0.5 * (ymax + ymin);
-
-                double zhalf = 0.5 * (zmax + zmin);
-
                 // grid points info
 
                 auto xcoords = points.data(0);
@@ -178,6 +178,29 @@ CXCNewIntegrator::partitionGrid()
                 auto zcoords = points.data(2);
 
                 auto weights = points.data(3);
+
+                // find the center for dividing the box
+
+                double xhalf = 0.0;
+
+                double yhalf = 0.0;
+
+                double zhalf = 0.0;
+
+                for (int32_t g = 0; g < npoints; g++)
+                {
+                    xhalf += xcoords[g];
+
+                    yhalf += ycoords[g];
+
+                    zhalf += zcoords[g];
+                }
+
+                xhalf /= (double)npoints;
+
+                yhalf /= (double)npoints;
+
+                zhalf /= (double)npoints;
 
                 // sub boxes and grid points
 
@@ -252,25 +275,17 @@ CXCNewIntegrator::partitionGrid()
 
                     if (count > 0)
                     {
-                        new_boxes.push_back(subboxes[box_id]);
+                        _boxes.push_back(subboxes[box_id]);
 
-                        new_points_in_boxes.push_back(subgridpoints[box_id].slice(0, count));
+                        _pointsInBoxes.push_back(subgridpoints[box_id].slice(0, count));
                     }
                 }
-            }
-            else
-            {
-                // keep the box
 
-                new_boxes.push_back(box);
+                box_iter = _boxes.erase(box_iter);
 
-                new_points_in_boxes.push_back(points);
+                points_iter = _pointsInBoxes.erase(points_iter);
             }
         }
-
-        _boxes = new_boxes;
-
-        _pointsInBoxes = new_points_in_boxes;
     }
 }
 
@@ -281,17 +296,25 @@ CXCNewIntegrator::getGridInformation() const
 
     ss << "Number of grid boxes: " << getNumberOfBoxes() << "\n";
 
+    auto box_iter = _boxes.begin();
+
+    auto points_iter = _pointsInBoxes.begin();
+
     for (int32_t i = 0; i < getNumberOfBoxes(); i++)
     {
-        const std::array<double, 6>& box = _boxes[i];
+        const std::array<double, 6>& box = *box_iter;
 
-        auto npoints = _pointsInBoxes[i].size(0);
+        auto npoints = (*points_iter).size(0);
 
         ss << "  Grid box " << i << ", number of points: " << npoints << ", xyz: ";
 
         ss << "(" << box[0] << ", " << box[1] << ", " << box[2] << "), ";
 
         ss << "(" << box[3] << ", " << box[4] << ", " << box[5] << ")\n";
+
+        ++box_iter;
+
+        ++points_iter;
     }
 
     return ss.str();
@@ -315,11 +338,11 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
     mat_Vxc.zero();
 
-    for (int32_t i = 0; i < getNumberOfBoxes(); i++)
+    for (auto p = _pointsInBoxes.cbegin(); p != _pointsInBoxes.cend(); ++p)
     {
         // grid points in box
 
-        const CMemBlock2D<double>& points = _pointsInBoxes[i];
+        const CMemBlock2D<double>& points = *p;
 
         // generate reference density grid and compute exchange-correlation functional derivative
 
