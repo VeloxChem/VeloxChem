@@ -42,7 +42,7 @@ class TestDftGridPartition:
         xc_drv = XCNewIntegrator()
         xc_drv.initialize_grid(mol_grid)
         xc_drv.partition_grid()
-        vxc2 = xc_drv.integrate_vxc(molecule, basis, density, xcfun_label)
+        vxc2 = xc_drv.integrate_vxc_fock(molecule, basis, density, xcfun_label)
 
         max_diff2 = np.max(
             np.abs(vxc2.to_numpy() - vxc_ref.get_matrix().to_numpy()))

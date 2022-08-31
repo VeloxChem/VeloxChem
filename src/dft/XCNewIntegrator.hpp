@@ -32,10 +32,12 @@
 
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "GtoContainer.hpp"
 #include "MemBlock2D.hpp"
 #include "MolecularGrid.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "XCGradientGrid.hpp"
 
 /**
  Class CXCNewIntegrator implements XC integrator.
@@ -78,6 +80,10 @@ class CXCNewIntegrator
      Maximum level for dividing the boxes.
      */
     int32_t _maximumLevel;
+
+    CDenseMatrix _integratePartialVxcFockForLDA(const CMemBlock2D<double>& points,
+                                                const CGtoContainer*       gtoContainer,
+                                                const CXCGradientGrid&     xcGradientGrid) const;
 
    public:
     /**
@@ -124,10 +130,10 @@ class CXCNewIntegrator
 
     std::string getGridInformation() const;
 
-    CDenseMatrix integrateVxc(const CMolecule&        molecule,
-                              const CMolecularBasis&  basis,
-                              const CAODensityMatrix& densityMatrix,
-                              const std::string&      xcFuncLabel) const;
+    CDenseMatrix integrateVxcFock(const CMolecule&        molecule,
+                                  const CMolecularBasis&  basis,
+                                  const CAODensityMatrix& densityMatrix,
+                                  const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCNewIntegrator_hpp */

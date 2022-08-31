@@ -30,8 +30,8 @@
 
 #include "DenseLinearAlgebra.hpp"
 #include "FunctionalParser.hpp"
-#include "GtoContainer.hpp"
 #include "GtoFunc.hpp"
+#include "XCFuncType.hpp"
 #include "XCVarsType.hpp"
 
 CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
@@ -298,10 +298,10 @@ CXCNewIntegrator::getGridInformation() const
 }
 
 CDenseMatrix
-CXCNewIntegrator::integrateVxc(const CMolecule&        molecule,
-                               const CMolecularBasis&  basis,
-                               const CAODensityMatrix& densityMatrix,
-                               const std::string&      xcFuncLabel) const
+CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
+                                   const CMolecularBasis&  basis,
+                                   const CAODensityMatrix& densityMatrix,
+                                   const std::string&      xcFuncLabel) const
 {
     // create GTOs container
 
@@ -317,72 +317,38 @@ CXCNewIntegrator::integrateVxc(const CMolecule&        molecule,
 
     for (int32_t i = 0; i < getNumberOfBoxes(); i++)
     {
-        // grid points info
+        // grid points in box
 
         const CMemBlock2D<double>& points = _pointsInBoxes[i];
-
-        auto npoints = points.size(0);
-
-        auto xcoords = points.data(0);
-
-        auto ycoords = points.data(1);
-
-        auto zcoords = points.data(2);
-
-        auto weights = points.data(3);
-
-        // GTO values on grid points
-
-        CMemBlock2D<double> gaos(npoints, naos);
-
-        gaos.zero();
-
-        gtorec::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, 0, 0, npoints);
-
-        CDenseMatrix mat_chi(naos, npoints);
-
-        for (int32_t nu = 0; nu < naos; nu++)
-        {
-            std::memcpy(mat_chi.row(nu), gaos.data(nu), npoints * sizeof(double));
-        }
 
         // generate reference density grid and compute exchange-correlation functional derivative
 
         auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
+        auto xcfuntype = fvxc.getFunctionalType();
+
         CDensityGridDriver dgdrv(_locComm);
 
         CMolecularGrid mgrid(points);
 
-        auto dengrid = dgdrv.generate(densityMatrix, molecule, basis, mgrid, fvxc.getFunctionalType());
+        auto dengrid = dgdrv.generate(densityMatrix, molecule, basis, mgrid, xcfuntype);
 
-        CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), dengrid.getDensityGridType(), fvxc.getFunctionalType());
+        CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), dengrid.getDensityGridType(), xcfuntype);
 
         fvxc.compute(vxcgrid, dengrid);
 
-        auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
+        // compute partial contribution to Vxc matrix
 
-        // eq.(30), JCTC 2021, 17, 1512-1521
+        CDenseMatrix partial_mat_Vxc;
 
-        CDenseMatrix mat_G(naos, npoints);
-
-        mat_G.zero();
-
-        for (int32_t nu = 0; nu < naos; nu++)
+        if (xcfuntype == xcfun::lda)
         {
-            auto G_nu = mat_G.row(nu);
-
-            auto chi_nu = mat_chi.row(nu);
-
-            for (int32_t g = 0; g < npoints; g++)
-            {
-                G_nu[g] = weights[g] * grhoa[g] * chi_nu[g];
-            }
+            partial_mat_Vxc = _integratePartialVxcFockForLDA(points, gtovec, vxcgrid);
         }
-
-        // eq.(31), JCTC 2021, 17, 1512-1521
-
-        auto partial_mat_Vxc = denblas::multABt(mat_chi, mat_G);
+        else if (xcfuntype == xcfun::gga)
+        {
+            //partial_mat_Vxc = _integratePartialVxcFockForGGA(points, gtovec, vxcgrid);
+        }
 
         mat_Vxc = denblas::addAB(mat_Vxc, partial_mat_Vxc, 1.0);
     }
@@ -392,4 +358,65 @@ CXCNewIntegrator::integrateVxc(const CMolecule&        molecule,
     delete gtovec;
 
     return mat_Vxc;
+}
+
+CDenseMatrix
+CXCNewIntegrator::_integratePartialVxcFockForLDA(const CMemBlock2D<double>& points,
+                                                 const CGtoContainer*       gtoContainer,
+                                                 const CXCGradientGrid&     xcGradientGrid) const
+{
+    // grid points info
+
+    auto npoints = points.size(0);
+
+    auto xcoords = points.data(0);
+
+    auto ycoords = points.data(1);
+
+    auto zcoords = points.data(2);
+
+    auto weights = points.data(3);
+
+    // GTO values on grid points
+
+    auto naos = gtoContainer->getNumberOfAtomicOrbitals();
+
+    CMemBlock2D<double> gaos(npoints, naos);
+
+    gaos.zero();
+
+    gtorec::computeGtosValuesForLDA(gaos, gtoContainer, xcoords, ycoords, zcoords, 0, 0, npoints);
+
+    CDenseMatrix mat_chi(naos, npoints);
+
+    for (int32_t nu = 0; nu < naos; nu++)
+    {
+        std::memcpy(mat_chi.row(nu), gaos.data(nu), npoints * sizeof(double));
+    }
+
+    // exchange-correlation functional derivative
+
+    auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
+
+    // eq.(30), JCTC 2021, 17, 1512-1521
+
+    CDenseMatrix mat_G(naos, npoints);
+
+    mat_G.zero();
+
+    for (int32_t nu = 0; nu < naos; nu++)
+    {
+        auto G_nu = mat_G.row(nu);
+
+        auto chi_nu = mat_chi.row(nu);
+
+        for (int32_t g = 0; g < npoints; g++)
+        {
+            G_nu[g] = weights[g] * grhoa[g] * chi_nu[g];
+        }
+    }
+
+    // eq.(31), JCTC 2021, 17, 1512-1521
+
+    return denblas::multABt(mat_chi, mat_G);
 }

@@ -315,7 +315,7 @@ export_dft(py::module& m)
         .def("initialize_grid", &CXCNewIntegrator::initializeGrid)
         .def("partition_grid", &CXCNewIntegrator::partitionGrid)
         .def("get_grid_info", &CXCNewIntegrator::getGridInformation)
-        .def("integrate_vxc", &CXCNewIntegrator::integrateVxc);
+        .def("integrate_vxc_fock", &CXCNewIntegrator::integrateVxcFock);
 
     // CXCMolecularGradient class
 
