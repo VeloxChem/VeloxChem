@@ -112,6 +112,10 @@ class CXCNewIntegrator
 
     void partitionGrid();
 
+    std::list<CGridBox> divideBoxIntoEight(const CGridBox& box) const;
+
+    std::list<CGridBox> divideBoxIntoTwo(const CGridBox& box) const;
+
     std::string getGridInformation() const;
 
     CDenseMatrix integrateVxcFock(const CMolecule&        molecule,

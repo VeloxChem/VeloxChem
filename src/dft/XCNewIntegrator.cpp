@@ -92,143 +92,292 @@ CXCNewIntegrator::partitionGrid()
    {
         auto npoints = box->getNumberOfGridPoints();
 
-        if (npoints <= _numberOfPointsThreshold)
+        if (npoints > _numberOfPointsThreshold * 8)
         {
-            ++box;
-        }
-        else
-        {
-            // divide the box
+            auto newboxes = divideBoxIntoEight(*box);
 
-            // box info
-
-            auto boxdim = box->getBoxDimension();
-
-            auto xmin = boxdim[0];
-
-            auto ymin = boxdim[1];
-
-            auto zmin = boxdim[2];
-
-            auto xmax = boxdim[3];
-
-            auto ymax = boxdim[4];
-
-            auto zmax = boxdim[5];
-
-            // grid points info
-
-            auto xcoords = box->getCoordinatesX();
-
-            auto ycoords = box->getCoordinatesY();
-
-            auto zcoords = box->getCoordinatesZ();
-
-            auto weights = box->getWeights();
-
-            // find the center for dividing the box
-
-            double xhalf = 0.0;
-
-            double yhalf = 0.0;
-
-            double zhalf = 0.0;
-
-            for (int32_t g = 0; g < npoints; g++)
-            {
-                xhalf += xcoords[g];
-
-                yhalf += ycoords[g];
-
-                zhalf += zcoords[g];
-            }
-
-            xhalf /= (double)npoints;
-
-            yhalf /= (double)npoints;
-
-            zhalf /= (double)npoints;
-
-            // sub boxes and grid points
-
-            std::vector<std::array<double, 6>> subboxdims;
-
-            std::vector<CMemBlock2D<double>> subgridpoints;
-
-            std::vector<int32_t> subnumpoints;
-
-            for (int32_t xval = 0; xval < 2; xval++)
-            {
-                std::array<double, 2> xrange = (!xval) ? std::array<double, 2>({xmin, xhalf}) :
-                                                         std::array<double, 2>({xhalf, xmax});
-
-                for (int32_t yval = 0; yval < 2; yval++)
-                {
-                    std::array<double, 2> yrange = (!yval) ? std::array<double, 2>({ymin, yhalf}) :
-                                                             std::array<double, 2>({yhalf, ymax});
-
-                    for (int32_t zval = 0; zval < 2; zval++)
-                    {
-                        std::array<double, 2> zrange = (!zval) ? std::array<double, 2>({zmin, zhalf}) :
-                                                                 std::array<double, 2>({zhalf, zmax});
-
-                        subboxdims.push_back(std::array<double, 6>(
-                            {xrange[0], yrange[0], zrange[0], xrange[1], yrange[1], zrange[1]}));
-
-                        subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
-
-                        subnumpoints.push_back(0);
-                    }
-                }
-            }
-
-            for (int32_t g = 0; g < npoints; g++)
-            {
-                int32_t xval = (xcoords[g] < xhalf) ? 0 : 1;
-
-                int32_t yval = (ycoords[g] < yhalf) ? 0 : 1;
-
-                int32_t zval = (zcoords[g] < zhalf) ? 0 : 1;
-
-                // x y z  id
-                // ---------
-                // 0 0 0   0
-                // 0 0 1   1
-                // 0 1 0   2
-                // 0 1 1   3
-                // 1 0 0   4
-                // 1 0 1   5
-                // 1 1 0   6
-                // 1 1 1   7
-
-                int32_t box_id = (xval << 2) | (yval << 1) | (zval << 0);
-
-                auto count = subnumpoints[box_id];
-
-                subgridpoints[box_id].data(0)[count] = xcoords[g];
-
-                subgridpoints[box_id].data(1)[count] = ycoords[g];
-
-                subgridpoints[box_id].data(2)[count] = zcoords[g];
-
-                subgridpoints[box_id].data(3)[count] = weights[g];
-
-                subnumpoints[box_id]++;
-            }
-
-            for (int32_t box_id = 0; box_id < static_cast<int32_t>(subboxdims.size()); box_id++)
-            {
-                auto count = subnumpoints[box_id];
-
-                if (count > 0)
-                {
-                    _boxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
-                }
-            }
+            _boxes.insert(_boxes.end(), newboxes.begin(), newboxes.end());
 
             box = _boxes.erase(box);
         }
+        else if (npoints > _numberOfPointsThreshold)
+        {
+            auto newboxes = divideBoxIntoTwo(*box);
+
+            _boxes.insert(_boxes.end(), newboxes.begin(), newboxes.end());
+
+            box = _boxes.erase(box);
+        }
+        else
+        {
+            ++box;
+        }
     }
+}
+
+std::list<CGridBox>
+CXCNewIntegrator::divideBoxIntoEight(const CGridBox& box) const
+{
+    // box info
+
+    auto boxdim = box.getBoxDimension();
+
+    auto xmin = boxdim[0];
+
+    auto ymin = boxdim[1];
+
+    auto zmin = boxdim[2];
+
+    auto xmax = boxdim[3];
+
+    auto ymax = boxdim[4];
+
+    auto zmax = boxdim[5];
+
+    // grid points info
+
+    auto npoints = box.getNumberOfGridPoints();
+
+    auto xcoords = box.getCoordinatesX();
+
+    auto ycoords = box.getCoordinatesY();
+
+    auto zcoords = box.getCoordinatesZ();
+
+    auto weights = box.getWeights();
+
+    // find the center for dividing the box
+
+    double xhalf = 0.0;
+
+    double yhalf = 0.0;
+
+    double zhalf = 0.0;
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        xhalf += xcoords[g];
+
+        yhalf += ycoords[g];
+
+        zhalf += zcoords[g];
+    }
+
+    xhalf /= (double)npoints;
+
+    yhalf /= (double)npoints;
+
+    zhalf /= (double)npoints;
+
+    // sub boxes and grid points
+
+    std::vector<std::array<double, 6>> subboxdims;
+
+    std::vector<CMemBlock2D<double>> subgridpoints;
+
+    std::vector<int32_t> subnumpoints;
+
+    std::vector<std::array<double, 2>> xrange({std::array<double, 2>({xmin, xhalf}), std::array<double, 2>({xhalf, xmax})});
+
+    std::vector<std::array<double, 2>> yrange({std::array<double, 2>({ymin, yhalf}), std::array<double, 2>({yhalf, ymax})});
+
+    std::vector<std::array<double, 2>> zrange({std::array<double, 2>({zmin, zhalf}), std::array<double, 2>({zhalf, zmax})});
+
+    for (const auto& x : xrange)
+    {
+        for (const auto& y : yrange)
+        {
+            for (const auto& z : zrange)
+            {
+                subboxdims.push_back(std::array<double, 6>({x[0], y[0], z[0], x[1], y[1], z[1]}));
+
+                subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
+
+                subnumpoints.push_back(0);
+            }
+        }
+    }
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        int32_t xval = (xcoords[g] < xhalf) ? 0 : 1;
+
+        int32_t yval = (ycoords[g] < yhalf) ? 0 : 1;
+
+        int32_t zval = (zcoords[g] < zhalf) ? 0 : 1;
+
+        // x y z  id
+        // ---------
+        // 0 0 0   0
+        // 0 0 1   1
+        // 0 1 0   2
+        // 0 1 1   3
+        // 1 0 0   4
+        // 1 0 1   5
+        // 1 1 0   6
+        // 1 1 1   7
+
+        int32_t box_id = (xval << 2) | (yval << 1) | (zval << 0);
+
+        auto count = subnumpoints[box_id];
+
+        subgridpoints[box_id].data(0)[count] = xcoords[g];
+
+        subgridpoints[box_id].data(1)[count] = ycoords[g];
+
+        subgridpoints[box_id].data(2)[count] = zcoords[g];
+
+        subgridpoints[box_id].data(3)[count] = weights[g];
+
+        subnumpoints[box_id]++;
+    }
+
+    std::list<CGridBox> newboxes;
+
+    for (int32_t box_id = 0; box_id < static_cast<int32_t>(subboxdims.size()); box_id++)
+    {
+        auto count = subnumpoints[box_id];
+
+        if (count > 0)
+        {
+            newboxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
+        }
+    }
+
+    return newboxes;
+}
+
+std::list<CGridBox>
+CXCNewIntegrator::divideBoxIntoTwo(const CGridBox& box) const
+{
+    // box info
+
+    auto boxdim = box.getBoxDimension();
+
+    auto xmin = boxdim[0];
+
+    auto ymin = boxdim[1];
+
+    auto zmin = boxdim[2];
+
+    auto xmax = boxdim[3];
+
+    auto ymax = boxdim[4];
+
+    auto zmax = boxdim[5];
+
+    auto xlen = xmax - xmin;
+
+    auto ylen = ymax - ymin;
+
+    auto zlen = zmax - zmin;
+
+    // the dimension that will be divided
+
+    int32_t coord_index = 0;
+
+    if ((ylen >= xlen) && (ylen >= zlen)) coord_index = 1;
+
+    else if ((zlen >= xlen) && (zlen >= ylen)) coord_index = 2;
+
+    // grid points info
+
+    auto npoints = box.getNumberOfGridPoints();
+
+    auto xcoords = box.getCoordinatesX();
+
+    auto ycoords = box.getCoordinatesY();
+
+    auto zcoords = box.getCoordinatesZ();
+
+    auto weights = box.getWeights();
+
+    // find the center for dividing the box
+
+    double half = 0.0;
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        if (coord_index == 0) half += xcoords[g];
+
+        else if (coord_index == 1) half += ycoords[g];
+
+        else if (coord_index == 2) half += zcoords[g];
+    }
+
+    half /= (double)npoints;
+
+    // sub boxes and grid points
+
+    std::vector<std::array<double, 6>> subboxdims;
+
+    std::vector<CMemBlock2D<double>> subgridpoints;
+
+    std::vector<int32_t> subnumpoints;
+
+    if (coord_index == 0)
+    {
+        subboxdims.push_back(std::array<double, 6>({xmin, ymin, zmin, half, ymax, zmax}));
+
+        subboxdims.push_back(std::array<double, 6>({half, ymin, zmin, xmax, ymax, zmax}));
+    }
+    else if (coord_index == 1)
+    {
+        subboxdims.push_back(std::array<double, 6>({xmin, ymin, zmin, xmax, half, zmax}));
+
+        subboxdims.push_back(std::array<double, 6>({xmin, half, zmin, xmax, ymax, zmax}));
+    }
+    else if (coord_index == 2)
+    {
+        subboxdims.push_back(std::array<double, 6>({xmin, ymin, zmin, xmax, ymax, half}));
+
+        subboxdims.push_back(std::array<double, 6>({xmin, ymin, half, xmax, ymax, zmax}));
+    }
+
+    subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
+
+    subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
+
+    subnumpoints.push_back(0);
+
+    subnumpoints.push_back(0);
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        int32_t box_id = -1;
+
+        if (coord_index == 0) box_id = (xcoords[g] < half) ? 0 : 1;
+
+        else if (coord_index == 1) box_id = (ycoords[g] < half) ? 0 : 1;
+
+        else if (coord_index == 2) box_id = (zcoords[g] < half) ? 0 : 1;
+
+        auto count = subnumpoints[box_id];
+
+        subgridpoints[box_id].data(0)[count] = xcoords[g];
+
+        subgridpoints[box_id].data(1)[count] = ycoords[g];
+
+        subgridpoints[box_id].data(2)[count] = zcoords[g];
+
+        subgridpoints[box_id].data(3)[count] = weights[g];
+
+        subnumpoints[box_id]++;
+    }
+
+    std::list<CGridBox> newboxes;
+
+    for (int32_t box_id = 0; box_id < static_cast<int32_t>(subboxdims.size()); box_id++)
+    {
+        auto count = subnumpoints[box_id];
+
+        if (count > 0)
+        {
+            newboxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
+        }
+    }
+
+    return newboxes;
 }
 
 std::string
