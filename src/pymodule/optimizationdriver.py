@@ -29,6 +29,7 @@ from io import StringIO
 import numpy as np
 import time as tm
 import tempfile
+from platform import system
 
 from .veloxchemlib import CommonNeighbors
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstroms
@@ -195,127 +196,136 @@ class OptimizationDriver:
 
         # run within temp_dir since geomeTRIC will generate intermediate files
 
-        with tempfile.TemporaryDirectory() as temp_dir:
+        temp_dir = tempfile.TemporaryDirectory()
+        temp_path = Path(temp_dir.name)
+
+        if self.rank == mpi_master():
+            self.clean_up_file(Path(self.filename + '.log'))
+            self.clean_up_file(
+                Path(self.filename + '.tmp', 'hessian', 'hessian.txt'))
+            self.clean_up_file(
+                Path(self.filename + '.tmp', 'hessian', 'coords.xyz'))
+
+        # filename is used by geomeTRIC to create .log and other files
+
+        filename = Path(self.filename).name
+        filename = str(temp_path / f'{filename}_{self.rank}')
+
+        if self.constraints:
+            constr_filename = Path(filename).with_suffix('.constr.txt')
+            with open(str(constr_filename), 'w') as fh:
+                for line in self.constraints:
+                    print(line, file=fh)
+        else:
+            constr_filename = None
+
+        # redirect geomeTRIC stdout/stderr
+
+        with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
+                StringIO()) as fg_err:
+            try:
+                m = geometric.optimize.run_optimizer(
+                    customengine=opt_engine,
+                    coordsys=self.coordsys,
+                    check=self.check_interval,
+                    maxiter=self.max_iter,
+                    converge=self.conv_flags(),
+                    constraints=constr_filename,
+                    transition=self.transition,
+                    hessian=self.hessian,
+                    input=rf'{filename}.optinp')
+            except geometric.errors.HessianExit:
+                hessian_exit = True
+
+        # save output files
+
+        if self.rank == mpi_master() and self.keep_files:
+            src_files = [
+                Path(filename + '_optim.xyz'),
+                Path(filename + '.log'),
+                Path(filename + '.vdata_first'),
+                Path(filename + '.vdata_last'),
+                Path(filename + '.tmp', 'hessian', 'hessian.txt'),
+                Path(filename + '.tmp', 'hessian', 'coords.xyz'),
+            ]
+
+            dest_files = [
+                Path(self.filename + '_optim.xyz'),
+                Path(self.filename + '.log'),
+                Path(self.filename + '.vdata_first'),
+                Path(self.filename + '.vdata_last'),
+                Path(self.filename + '.tmp', 'hessian', 'hessian.txt'),
+                Path(self.filename + '.tmp', 'hessian', 'coords.xyz'),
+            ]
+
+            if constr_filename is not None:
+                src_files.append(constr_filename)
+                dest_files.append(
+                    Path(self.filename).with_suffix('.constr.txt'))
+
+            for src_f, dest_f in zip(src_files, dest_files):
+                if src_f.is_file():
+                    self.copy_file(src_f, dest_f)
+                    valstr = f'Saving file: {str(dest_f)}'
+                    self.ostream.print_info(valstr)
+
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+        # post-process and print results while temp_dir is still available
+
+        if hessian_exit:
+            if self.rank == mpi_master() and self.hessian == 'stop':
+                self.print_vib_analysis(filename, 'vdata_first')
+            final_mol = molecule
+
+        else:
+            coords = m.xyzs[-1] / geometric.nifty.bohr2ang
+            labels = molecule.get_labels()
 
             if self.rank == mpi_master():
-                self.clean_up_file(Path(self.filename + '.log'))
-                self.clean_up_file(
-                    Path(self.filename + '.tmp', 'hessian', 'hessian.txt'))
-                self.clean_up_file(
-                    Path(self.filename + '.tmp', 'hessian', 'coords.xyz'))
-
-            # filename is used by geomeTRIC to create .log and other files
-
-            filename = Path(self.filename).name
-            filename = str(Path(temp_dir, f'{filename}_{self.rank}'))
-
-            if self.constraints:
-                constr_filename = Path(filename).with_suffix('.constr.txt')
-                with open(str(constr_filename), 'w') as fh:
-                    for line in self.constraints:
-                        print(line, file=fh)
+                final_mol = Molecule(labels,
+                                     coords.reshape(-1, 3),
+                                     units='au')
             else:
-                constr_filename = None
+                final_mol = Molecule()
+            final_mol.broadcast(self.rank, self.comm)
 
-            # redirect geomeTRIC stdout/stderr
+            if self.rank == mpi_master():
+                self.grad_drv.ostream.print_info(
+                    'Geometry optimization completed.')
+                self.ostream.print_blank()
 
-            with redirect_stdout(StringIO()) as fg_out, redirect_stderr(
-                    StringIO()) as fg_err:
-                try:
-                    m = geometric.optimize.run_optimizer(
-                        customengine=opt_engine,
-                        coordsys=self.coordsys,
-                        check=self.check_interval,
-                        maxiter=self.max_iter,
-                        converge=self.conv_flags(),
-                        constraints=constr_filename,
-                        transition=self.transition,
-                        hessian=self.hessian,
-                        input=rf'{filename}.optinp')
-                except geometric.errors.HessianExit:
-                    hessian_exit = True
+                self.ostream.print_block(final_mol.get_string())
 
-            # save output files
+                if self.constraints and '$scan' in self.constraints:
+                    self.print_scan_result(m)
+                else:
+                    self.print_opt_result(m)
+                    if self.ref_xyz:
+                        self.print_ic_rmsd(final_mol, self.ref_xyz)
+                    else:
+                        self.print_ic_rmsd(final_mol, molecule)
 
-            if self.rank == mpi_master() and self.keep_files:
-                src_files = [
-                    Path(filename + '_optim.xyz'),
-                    Path(filename + '.log'),
-                    Path(filename + '.vdata_first'),
-                    Path(filename + '.vdata_last'),
-                    Path(filename + '.tmp', 'hessian', 'hessian.txt'),
-                    Path(filename + '.tmp', 'hessian', 'coords.xyz'),
-                ]
+                if self.cna:
+                    self.cna_analysis(final_mol, molecule, self.ref_xyz)
 
-                dest_files = [
-                    Path(self.filename + '_optim.xyz'),
-                    Path(self.filename + '.log'),
-                    Path(self.filename + '.vdata_first'),
-                    Path(self.filename + '.vdata_last'),
-                    Path(self.filename + '.tmp', 'hessian', 'hessian.txt'),
-                    Path(self.filename + '.tmp', 'hessian', 'coords.xyz'),
-                ]
+                if self.hessian in ['last', 'first+last', 'each']:
+                    self.print_vib_analysis(filename, 'vdata_last')
 
-                if constr_filename is not None:
-                    src_files.append(constr_filename)
-                    dest_files.append(
-                        Path(self.filename).with_suffix('.constr.txt'))
-
-                for src_f, dest_f in zip(src_files, dest_files):
-                    if src_f.is_file():
-                        self.copy_file(src_f, dest_f)
-                        valstr = f'Saving file: {str(dest_f)}'
-                        self.ostream.print_info(valstr)
-
+                valstr = '*** Time spent in Optimization Driver: '
+                valstr += '{:.2f} sec'.format(tm.time() - start_time)
+                self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-            # post-process and print results while temp_dir is still available
-
-            if hessian_exit:
-                if self.rank == mpi_master() and self.hessian == 'stop':
-                    self.print_vib_analysis(filename, 'vdata_first')
-                final_mol = molecule
-
+        try:
+            temp_dir.cleanup()
+        except (NotADirectoryError, PermissionError):
+            if system() == "Windows":
+                pass
             else:
-                coords = m.xyzs[-1] / geometric.nifty.bohr2ang
-                labels = molecule.get_labels()
-
-                if self.rank == mpi_master():
-                    final_mol = Molecule(labels,
-                                         coords.reshape(-1, 3),
-                                         units='au')
-                else:
-                    final_mol = Molecule()
-                final_mol.broadcast(self.rank, self.comm)
-
-                if self.rank == mpi_master():
-                    self.grad_drv.ostream.print_info(
-                        'Geometry optimization completed.')
-                    self.ostream.print_blank()
-
-                    self.ostream.print_block(final_mol.get_string())
-
-                    if self.constraints and '$scan' in self.constraints:
-                        self.print_scan_result(m)
-                    else:
-                        self.print_opt_result(m)
-                        if self.ref_xyz:
-                            self.print_ic_rmsd(final_mol, self.ref_xyz)
-                        else:
-                            self.print_ic_rmsd(final_mol, molecule)
-
-                    if self.cna:
-                        self.cna_analysis(final_mol, molecule, self.ref_xyz)
-
-                    if self.hessian in ['last', 'first+last', 'each']:
-                        self.print_vib_analysis(filename, 'vdata_last')
-
-                    valstr = '*** Time spent in Optimization Driver: '
-                    valstr += '{:.2f} sec'.format(tm.time() - start_time)
-                    self.ostream.print_header(valstr)
-                    self.ostream.print_blank()
-                    self.ostream.flush()
+                raise
 
         return final_mol
 
