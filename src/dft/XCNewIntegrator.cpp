@@ -26,6 +26,7 @@
 #include "XCNewIntegrator.hpp"
 
 #include <algorithm>
+#include <iomanip>
 #include <sstream>
 
 #include "DenseLinearAlgebra.hpp"
@@ -92,15 +93,7 @@ CXCNewIntegrator::partitionGrid()
    {
         auto npoints = box->getNumberOfGridPoints();
 
-        if (npoints > _numberOfPointsThreshold * 8)
-        {
-            auto newboxes = divideBoxIntoEight(*box);
-
-            _boxes.insert(_boxes.end(), newboxes.begin(), newboxes.end());
-
-            box = _boxes.erase(box);
-        }
-        else if (npoints > _numberOfPointsThreshold)
+        if (npoints > _numberOfPointsThreshold)
         {
             auto newboxes = divideBoxIntoTwo(*box);
 
@@ -238,10 +231,7 @@ CXCNewIntegrator::divideBoxIntoEight(const CGridBox& box) const
     {
         auto count = subnumpoints[box_id];
 
-        if (count > 0)
-        {
-            newboxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
-        }
+        if (count > 0) newboxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
     }
 
     return newboxes;
@@ -274,11 +264,11 @@ CXCNewIntegrator::divideBoxIntoTwo(const CGridBox& box) const
 
     // the dimension that will be divided
 
-    int32_t coord_index = 0;
+    int32_t icart = 0;
 
-    if ((ylen >= xlen) && (ylen >= zlen)) coord_index = 1;
+    if ((ylen >= xlen) && (ylen >= zlen)) icart = 1;
 
-    else if ((zlen >= xlen) && (zlen >= ylen)) coord_index = 2;
+    else if ((zlen >= xlen) && (zlen >= ylen)) icart = 2;
 
     // grid points info
 
@@ -292,20 +282,18 @@ CXCNewIntegrator::divideBoxIntoTwo(const CGridBox& box) const
 
     auto weights = box.getWeights();
 
+    std::vector<const double*> coords({xcoords, ycoords, zcoords});
+
     // find the center for dividing the box
 
-    double half = 0.0;
+    double center = 0.0;
 
     for (int32_t g = 0; g < npoints; g++)
     {
-        if (coord_index == 0) half += xcoords[g];
-
-        else if (coord_index == 1) half += ycoords[g];
-
-        else if (coord_index == 2) half += zcoords[g];
+        center += coords[icart][g];
     }
 
-    half /= (double)npoints;
+    center /= (double)npoints;
 
     // sub boxes and grid points
 
@@ -315,42 +303,38 @@ CXCNewIntegrator::divideBoxIntoTwo(const CGridBox& box) const
 
     std::vector<int32_t> subnumpoints;
 
-    if (coord_index == 0)
+    for (int32_t box_id = 0; box_id < 2; box_id++)
     {
-        subboxdims.push_back(std::array<double, 6>({xmin, ymin, zmin, half, ymax, zmax}));
+        subboxdims.push_back(std::array<double, 6>(boxdim));
 
-        subboxdims.push_back(std::array<double, 6>({half, ymin, zmin, xmax, ymax, zmax}));
-    }
-    else if (coord_index == 1)
-    {
-        subboxdims.push_back(std::array<double, 6>({xmin, ymin, zmin, xmax, half, zmax}));
+        subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
 
-        subboxdims.push_back(std::array<double, 6>({xmin, half, zmin, xmax, ymax, zmax}));
-    }
-    else if (coord_index == 2)
-    {
-        subboxdims.push_back(std::array<double, 6>({xmin, ymin, zmin, xmax, ymax, half}));
-
-        subboxdims.push_back(std::array<double, 6>({xmin, ymin, half, xmax, ymax, zmax}));
+        subnumpoints.push_back(0);
     }
 
-    subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
+    // update subboxdims
 
-    subgridpoints.push_back(CMemBlock2D<double>(npoints, 4));
+    // icart == 0
+    // std::array<double, 6>({xmin, ymin, zmin, center, ymax, zmax})
+    // std::array<double, 6>({center, ymin, zmin, xmax, ymax, zmax})
 
-    subnumpoints.push_back(0);
+    // icart == 1
+    // std::array<double, 6>({xmin, ymin, zmin, xmax, center, zmax})
+    // std::array<double, 6>({xmin, center, zmin, xmax, ymax, zmax})
 
-    subnumpoints.push_back(0);
+    // icart == 2
+    // std::array<double, 6>({xmin, ymin, zmin, xmax, ymax, center})
+    // std::array<double, 6>({xmin, ymin, center, xmax, ymax, zmax})
+
+    subboxdims[0][3 + icart] = center;
+
+    subboxdims[1][icart] = center;
+
+    // update subgridpoints
 
     for (int32_t g = 0; g < npoints; g++)
     {
-        int32_t box_id = -1;
-
-        if (coord_index == 0) box_id = (xcoords[g] < half) ? 0 : 1;
-
-        else if (coord_index == 1) box_id = (ycoords[g] < half) ? 0 : 1;
-
-        else if (coord_index == 2) box_id = (zcoords[g] < half) ? 0 : 1;
+        int32_t box_id = (coords[icart][g] < center) ? 0 : 1;
 
         auto count = subnumpoints[box_id];
 
@@ -362,7 +346,7 @@ CXCNewIntegrator::divideBoxIntoTwo(const CGridBox& box) const
 
         subgridpoints[box_id].data(3)[count] = weights[g];
 
-        subnumpoints[box_id]++;
+        ++subnumpoints[box_id];
     }
 
     std::list<CGridBox> newboxes;
@@ -371,10 +355,7 @@ CXCNewIntegrator::divideBoxIntoTwo(const CGridBox& box) const
     {
         auto count = subnumpoints[box_id];
 
-        if (count > 0)
-        {
-            newboxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
-        }
+        if (count > 0) newboxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
     }
 
     return newboxes;
@@ -395,7 +376,7 @@ CXCNewIntegrator::getGridInformation() const
 
         auto npoints = box->getNumberOfGridPoints();
 
-        ss << "  Grid boxdim " << boxind << ", number of points: " << npoints << ", xyz: ";
+        ss << "  Grid box " << boxind << ", number of points: " << npoints << ", xyz: ";
 
         ss << "(" << boxdim[0] << ", " << boxdim[1] << ", " << boxdim[2] << "), ";
 
@@ -403,6 +384,72 @@ CXCNewIntegrator::getGridInformation() const
 
         ++boxind;
     }
+
+    return ss.str();
+}
+
+std::string
+CXCNewIntegrator::getGridStatistics() const
+{
+    std::stringstream ss;
+
+    ss << "Threshold for number of points per box: " << _numberOfPointsThreshold << "\n";
+
+    ss << "Total number of boxes: " << getNumberOfBoxes() << "\n";
+
+    int32_t npoints_max = -1, npoints_min = -1, npoints_sum = 0;
+
+    int32_t nboxes_dense = 0, nboxes_sparse = 0;
+
+    int32_t npoints_bin = 100;
+
+    std::vector<int32_t> nboxes_count(_numberOfPointsThreshold / npoints_bin + 1, 0);
+
+    for (auto box = _boxes.cbegin(); box != _boxes.cend(); ++box)
+    {
+        auto npoints = box->getNumberOfGridPoints();
+
+        if ((npoints_max == -1) || (npoints > npoints_max)) npoints_max = npoints;
+
+        if ((npoints_min == -1) || (npoints < npoints_min)) npoints_min = npoints;
+
+        npoints_sum += npoints;
+
+        if (npoints > 0.8 * _numberOfPointsThreshold) ++nboxes_dense;
+
+        if (npoints < 0.1 * _numberOfPointsThreshold) ++nboxes_sparse;
+
+        ++nboxes_count[npoints / npoints_bin];
+    }
+
+    ss << "Maximum number of points per box: " << npoints_max << "\n";
+
+    ss << "Minimum number of points per box: " << npoints_min << "\n";
+
+    ss << "Total number of points in all boxes: " << npoints_sum << "\n";
+
+    ss << "Average number of points per box: " << npoints_sum / getNumberOfBoxes() << "\n";
+
+    ss << nboxes_dense << " boxes with npoints > 80\% of threshold " << "\n";
+
+    ss << nboxes_sparse << " boxes with npoints < 10\% of threshold " << "\n";
+
+    ss << "-----------------\n";
+
+    ss << " NPoints  NBoxes\n";
+
+    ss << "-----------------\n";
+
+    for (auto i = 0; i < static_cast<int32_t>(nboxes_count.size()); i++)
+    {
+        ss << std::right << std::setfill(' ') << std::setw(4) << i * npoints_bin << "-";
+
+        ss << std::left << std::setfill(' ') << std::setw(4) << (i + 1) * npoints_bin - 1 << ":";
+
+        ss << std::right << std::setfill(' ') << std::setw(6) << nboxes_count[i] << "\n";
+    }
+
+    ss << "-----------------\n";
 
     return ss.str();
 }

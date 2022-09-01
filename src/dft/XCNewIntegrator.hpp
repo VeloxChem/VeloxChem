@@ -110,14 +110,51 @@ class CXCNewIntegrator
      */
     void initializeGrid(const CMolecularGrid& molgrid);
 
+    /**
+     Partitions the grid points.
+     */
     void partitionGrid();
 
+    /**
+     Divides a grid box into eight boxes.
+
+     @param box the grid box.
+     @return a list of smaller boxes.
+     */
     std::list<CGridBox> divideBoxIntoEight(const CGridBox& box) const;
 
+    /**
+     Divides a grid box into two boxes.
+
+     @param box the grid box.
+     @return a list of smaller boxes.
+     */
     std::list<CGridBox> divideBoxIntoTwo(const CGridBox& box) const;
 
+    /**
+     Gets information about grid boxes.
+
+     @return a string containing information about grid boxes.
+     */
     std::string getGridInformation() const;
 
+    /**
+     Gets statistics about grid boxes.
+
+     @return a string containing statistics about grid boxes.
+     */
+    std::string getGridStatistics() const;
+
+    /**
+     Integrates first-order exchnage-correlation functional contribution to AO
+     Kohn-Sham matrix.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix object.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the AO Kohn-Sham matrix as a CDenseMatrix object.
+     */
     CDenseMatrix integrateVxcFock(const CMolecule&        molecule,
                                   const CMolecularBasis&  basis,
                                   const CAODensityMatrix& densityMatrix,
