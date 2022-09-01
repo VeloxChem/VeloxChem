@@ -455,7 +455,7 @@ CXCNewIntegrator::getGridStatistics() const
     return ss.str();
 }
 
-CDenseMatrix
+CAOKohnShamMatrix
 CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
                                    const CMolecularBasis&  basis,
                                    const CAODensityMatrix& densityMatrix,
@@ -469,9 +469,11 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
     auto naos = gtovec->getNumberOfAtomicOrbitals();
 
-    CDenseMatrix mat_Vxc(naos, naos);
+    CAOKohnShamMatrix mat_Vxc(densityMatrix.getNumberOfRows(0), densityMatrix.getNumberOfColumns(0), true);
 
     mat_Vxc.zero();
+
+    double nele = 0.0, xcene = 0.0;
 
     for (auto box = _boxes.cbegin(); box != _boxes.cend(); ++box)
     {
@@ -529,12 +531,32 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
             //partial_mat_Vxc = _integratePartialVxcFockForGGA(npoints, xcoords, ycoords, zcoords, weights, mat_chi, vxcgrid);
         }
 
-        mat_Vxc = denblas::addAB(mat_Vxc, partial_mat_Vxc, 1.0);
+        for (int32_t i = 0; i < partial_mat_Vxc.getNumberOfElements(); i++)
+        {
+            mat_Vxc.getMatrix(0)[i] += partial_mat_Vxc.values()[i];
+        }
+
+        // compute partial contribution to XC energy
+
+        auto rhoa = dengrid.alphaDensity(0);
+
+        auto efunc = vxcgrid.xcFunctionalValues();
+
+        for (int32_t i = 0; i < npoints; i++)
+        {
+            nele += weights[i] * rhoa[i];
+
+            xcene += weights[i] * efunc[i];
+        }
     }
 
     // destroy GTOs container
 
     delete gtovec;
+
+    mat_Vxc.setNumberOfElectrons(nele);
+
+    mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
     return mat_Vxc;
 }
@@ -550,6 +572,8 @@ CXCNewIntegrator::_generateDensityGrid(const int32_t           npoints,
     dengrid.zero();
 
     auto rhoa = dengrid.alphaDensity(0);
+
+    auto rhob = dengrid.betaDensity(0);
 
     // eq.(26), JCTC 2021, 17, 1512-1521
 
@@ -572,6 +596,8 @@ CXCNewIntegrator::_generateDensityGrid(const int32_t           npoints,
             rhoa[g] += F_nu[g] * chi_nu[g];
         }
     }
+
+    std::memcpy(rhob, rhoa, npoints * sizeof(double));
 
     return dengrid;
 }

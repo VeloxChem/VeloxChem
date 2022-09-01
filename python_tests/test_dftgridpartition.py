@@ -45,7 +45,8 @@ class TestDftGridPartition:
         vxc2 = xc_drv.integrate_vxc_fock(molecule, basis, density, xcfun_label)
 
         max_diff2 = np.max(
-            np.abs(vxc2.to_numpy() - vxc_ref.get_matrix().to_numpy()))
+            np.abs(vxc2.get_matrix().to_numpy() -
+                   vxc_ref.get_matrix().to_numpy()))
         assert max_diff2 < 1.0e-11
 
     @pytest.mark.skipif(not is_single_node(), reason='single node only')

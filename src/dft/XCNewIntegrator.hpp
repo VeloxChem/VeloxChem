@@ -31,6 +31,7 @@
 #include <string>
 
 #include "AODensityMatrix.hpp"
+#include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "GridBox.hpp"
 #include "GtoContainer.hpp"
@@ -184,12 +185,12 @@ class CXCNewIntegrator
      @param basis the molecular basis.
      @param densityMatrix the AO density matrix object.
      @param xcFuncLabel the label of exchange-correlation functional.
-     @return the AO Kohn-Sham matrix as a CDenseMatrix object.
+     @return the AO Kohn-Sham matrix.
      */
-    CDenseMatrix integrateVxcFock(const CMolecule&        molecule,
-                                  const CMolecularBasis&  basis,
-                                  const CAODensityMatrix& densityMatrix,
-                                  const std::string&      xcFuncLabel) const;
+    CAOKohnShamMatrix integrateVxcFock(const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& densityMatrix,
+                                       const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCNewIntegrator_hpp */
