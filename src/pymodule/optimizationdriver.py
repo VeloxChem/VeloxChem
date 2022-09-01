@@ -231,7 +231,7 @@ class OptimizationDriver:
                         constraints=constr_filename,
                         transition=self.transition,
                         hessian=self.hessian,
-                        input=filename + '.optinp')
+                        input=rf'{filename}.optinp')
                 except geometric.errors.HessianExit:
                     hessian_exit = True
 
