@@ -72,9 +72,40 @@ class CXCNewIntegrator
      */
     int32_t _numberOfPointsThreshold;
 
-    CDenseMatrix _integratePartialVxcFockForLDA(const CMemBlock2D<double>& points,
-                                                const CGtoContainer*       gtoContainer,
-                                                const CXCGradientGrid&     xcGradientGrid) const;
+    /**
+     Generates density grid.
+
+     @param npoints the number of grid points.
+     @param gtoValuesOnGridPoints the GTO values on grid points.
+     @param densityMatrix the AO density matrix.
+     @param xcFunType the type of exchange-correlation functional.
+     @return the density grid.
+     */
+    CDensityGrid _generateDensityGrid(const int32_t           npoints,
+                                      const CDenseMatrix&     gtoValuesOnGridPoints,
+                                      const CAODensityMatrix& densityMatrix,
+                                      const xcfun             xcFunType) const;
+
+    /**
+     Integrates first-order exchnage-correlation functional contribution to AO
+     Kohn-Sham matrix.
+
+     @param npoints the number of grid points.
+     @param xcoords the X coordinates of grid points.
+     @param ycoords the Y coordinates of grid points.
+     @param zcoords the Z coordinates of grid points.
+     @param weights the weights of grid points.
+     @param gtoValuesOnGridPoints the label of exchange-correlation functional.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the AO Kohn-Sham matrix as a CDenseMatrix object.
+     */
+    CDenseMatrix _integratePartialVxcFockForLDA(const int32_t          npoints,
+                                                const double*          xcoords,
+                                                const double*          ycoords,
+                                                const double*          zcoords,
+                                                const double*          weights,
+                                                const CDenseMatrix&    gtoValuesOnGridPoints,
+                                                const CXCGradientGrid& xcGradientGrid) const;
 
    public:
     /**
