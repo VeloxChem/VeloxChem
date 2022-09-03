@@ -35,7 +35,9 @@
 #include <mpi.h>
 
 #include "DenseLinearAlgebra.hpp"
+#include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
+#include "GridPartitioner.hpp"
 #include "GtoContainer.hpp"
 #include "GtoFunc.hpp"
 #include "XCVarsType.hpp"
@@ -43,6 +45,8 @@
 CMolecularGrid::CMolecularGrid()
 
     : _isDistributed(false)
+
+    , _isPartitioned(false)
 {
 }
 
@@ -51,6 +55,8 @@ CMolecularGrid::CMolecularGrid(const CMemBlock2D<double>& gridPoints)
     : _isDistributed(false)
 
     , _gridPoints(gridPoints)
+
+    , _isPartitioned(false)
 {
 }
 
@@ -59,6 +65,12 @@ CMolecularGrid::CMolecularGrid(const CMolecularGrid& source)
     : _isDistributed(source._isDistributed)
 
     , _gridPoints(source._gridPoints)
+
+    , _isPartitioned(source._isPartitioned)
+
+    , _gridPointCounts(source._gridPointCounts)
+
+    , _gridPointDisplacements(source._gridPointDisplacements)
 {
 }
 
@@ -67,6 +79,12 @@ CMolecularGrid::CMolecularGrid(CMolecularGrid&& source) noexcept
     : _isDistributed(std::move(source._isDistributed))
 
     , _gridPoints(std::move(source._gridPoints))
+
+    , _isPartitioned(std::move(source._isPartitioned))
+
+    , _gridPointCounts(std::move(source._gridPointCounts))
+
+    , _gridPointDisplacements(std::move(source._gridPointDisplacements))
 {
 }
 
@@ -83,6 +101,12 @@ CMolecularGrid::operator=(const CMolecularGrid& source)
 
     _gridPoints = source._gridPoints;
 
+    _isPartitioned = source._isPartitioned;
+
+    _gridPointCounts = source._gridPointCounts;
+
+    _gridPointDisplacements = source._gridPointDisplacements;
+
     return *this;
 }
 
@@ -95,6 +119,12 @@ CMolecularGrid::operator=(CMolecularGrid&& source) noexcept
 
     _gridPoints = std::move(source._gridPoints);
 
+    _isPartitioned = std::move(source._isPartitioned);
+
+    _gridPointCounts = std::move(source._gridPointCounts);
+
+    _gridPointDisplacements = std::move(source._gridPointDisplacements);
+
     return *this;
 }
 
@@ -104,6 +134,12 @@ CMolecularGrid::operator==(const CMolecularGrid& other) const
     if (_isDistributed != other._isDistributed) return false;
 
     if (_gridPoints != other._gridPoints) return false;
+
+    if (_isPartitioned != other._isPartitioned) return false;
+
+    if (_gridPointCounts != other._gridPointCounts) return false;
+
+    if (_gridPointDisplacements != other._gridPointDisplacements) return false;
 
     return true;
 }
@@ -117,6 +153,10 @@ CMolecularGrid::operator!=(const CMolecularGrid& other) const
 void
 CMolecularGrid::slice(const int32_t nGridPoints)
 {
+    std::string errpartitioned("MolecularGrid.slice: Cannot slice partitioned molecular grid");
+
+    errors::assertMsgCritical(!_isPartitioned, errpartitioned);
+
     if (nGridPoints < getNumberOfGridPoints())
     {
         _gridPoints = _gridPoints.slice(0, nGridPoints); 
@@ -186,6 +226,10 @@ CMolecularGrid::getWeights()
 void
 CMolecularGrid::distribute(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
+    std::string errpartitioned("MolecularGrid.distribute: Cannot distribute partitioned molecular grid");
+
+    errors::assertMsgCritical(!_isPartitioned, errpartitioned);
+
     if (!_isDistributed)
     {
         _isDistributed = true;
@@ -197,6 +241,10 @@ CMolecularGrid::distribute(int32_t rank, int32_t nodes, MPI_Comm comm)
 void
 CMolecularGrid::broadcast(int32_t rank, MPI_Comm comm)
 {
+    std::string errpartitioned("MolecularGrid.broadcast: Cannot broadcast partitioned molecular grid");
+
+    errors::assertMsgCritical(!_isPartitioned, errpartitioned);
+
     _gridPoints.broadcast(rank, comm);
 }
 
@@ -398,286 +446,66 @@ CMolecularGrid::getSpatialExtent() const
     return rext;
 }
 
-CDenseMatrix
-CMolecularGrid::testPartition(const CMolecule&        molecule,
-                              const CMolecularBasis&  basis,
-                              const CAODensityMatrix& density,
-                              const std::string&      xcFuncLabel,
-                              CDensityGridDriver      dgdrv) const
+void
+CMolecularGrid::partitionGridPoints()
 {
-    // determine the boundary of grid points
-
-    auto spatial_extent = getSpatialExtent();
-
-    // xmin, ymin, zmin
-
-    spatial_extent[0] -= 0.0001;
-    spatial_extent[1] -= 0.0001;
-    spatial_extent[2] -= 0.0001;
-
-    // xmax, ymax, zmax
-
-    spatial_extent[3] += 0.0001;
-    spatial_extent[4] += 0.0001;
-    spatial_extent[5] += 0.0001;
-
-    // grid point info
-
-    auto totalgridpoints = getNumberOfGridPoints();
-    auto allgridpoints = getGridPoints();
-
-    // start with one box
-
-    std::vector<std::array<double ,6>> boxes;
-    std::vector<CMemBlock2D<double>> points_in_boxes;
-
-    boxes.push_back(spatial_extent);
-    points_in_boxes.push_back(allgridpoints);
-
-    // divide the boxes
-
-    const int32_t count_thresh = 800;
-
-    for(int32_t level = 0; level < 100; level++)
+    if (!_isPartitioned)
     {
-        auto numboxes = static_cast<int32_t>(boxes.size());
+        _isPartitioned = true;
 
-        // check number of grid points in the boxes
+        auto boxdim = getSpatialExtent();
 
-        bool done = true;
+        // xmin, ymin, zmin
 
-        for (int32_t k = 0; k < numboxes; k++)
-        {
-            if (points_in_boxes[k].size(0) > count_thresh)
-            {
-                done = false;
-                break;
-            }
-        }
+        for (int32_t i = 0; i < 3; i++) boxdim[i] -= 0.0001;
 
-        if (done) break;
+        // xmax, ymax, zmax
 
-        // start dividing the boxes
+        for (int32_t i = 3; i < 6; i++) boxdim[i] += 0.0001;
 
-        std::cout << "Level: " << level << std::endl;
+        CGridPartitioner partitioner(CGridBox(boxdim, _gridPoints));
 
-        std::vector<std::array<double ,6>> new_boxes;
-        std::vector<CMemBlock2D<double>> new_points_in_boxes;
+        partitioner.partitionGridPoints();
 
-        for (int32_t k = 0; k < numboxes; k++)
-        {
-            if (points_in_boxes[k].size(0) <= count_thresh)
-            {
-                new_boxes.push_back(boxes[k]);
-                new_points_in_boxes.push_back(points_in_boxes[k]);
-            }
-            else
-            {
-                auto xmin = boxes[k][0];
-                auto ymin = boxes[k][1];
-                auto zmin = boxes[k][2];
+        _gridPoints = partitioner.getAllGridPoints();
 
-                auto xmax = boxes[k][3];
-                auto ymax = boxes[k][4];
-                auto zmax = boxes[k][5];
+        _gridPointCounts = partitioner.getGridPointCounts();
 
-                double xhalf = 0.5 * (xmax + xmin);
-                double yhalf = 0.5 * (ymax + ymin);
-                double zhalf = 0.5 * (zmax + zmin);
+        _gridPointDisplacements = partitioner.getGridPointDisplacements();
 
-                std::vector<std::array<double, 6>> newboxdims = {
-                    std::array<double, 6>({xmin, ymin, zmin, xhalf, yhalf, zhalf}),
-                    std::array<double, 6>({xhalf, ymin, zmin, xmax, yhalf, zhalf}),
-                    std::array<double, 6>({xmin, yhalf, zmin, xhalf, ymax, zhalf}),
-                    std::array<double, 6>({xmin, ymin, zhalf, xhalf, yhalf, zmax}),
-                    std::array<double, 6>({xhalf, yhalf, zmin, xmax, ymax, zhalf}),
-                    std::array<double, 6>({xhalf, ymin, zhalf, xmax, yhalf, zmax}),
-                    std::array<double, 6>({xmin, yhalf, zhalf, xhalf, ymax, zmax}),
-                    std::array<double, 6>({xhalf, yhalf, zhalf, xmax, ymax, zmax}),
-                };
+        std::cout << partitioner.getGridInformation() << std::endl;
 
-                auto points = points_in_boxes[k];
-
-                auto numdims = static_cast<int32_t>(newboxdims.size());
-
-                for (int32_t d = 0; d < numdims; d++)
-                {
-                    auto newpoints = getGridPointsInBox(newboxdims[d], points);
-                    new_boxes.push_back(newboxdims[d]);
-                    new_points_in_boxes.push_back(newpoints);
-                }
-            }
-        }
-
-        boxes = new_boxes;
-        points_in_boxes = new_points_in_boxes;
+        std::cout << partitioner.getGridStatistics() << std::endl;
     }
-
-    auto numboxes = static_cast<int32_t>(boxes.size());
-    int32_t count_sum = 0;
-
-    for (int32_t k = 0; k < numboxes; k++)
-    {
-        std::cout << "box " << k << ": ";
-        std::cout << "(" << boxes[k][0] << ", " << boxes[k][1] << ", " << boxes[k][2] << "), ";
-        std::cout << "(" << boxes[k][3] << ", " << boxes[k][4] << ", " << boxes[k][5] << ")  ";
-        std::cout << "n=" << points_in_boxes[k].size(0) << std::endl;
-        count_sum += points_in_boxes[k].size(0);
-    }
-
-    std::cout << "----" << std::endl;
-    std::cout << "Sum of grid points in boxes: " << count_sum << std::endl;
-    std::cout << "Total number of grid points: " << totalgridpoints << std::endl;
-
-    // create GTOs container
-
-    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
-
-    // set up number of AOs
-
-    auto naos = gtovec->getNumberOfAtomicOrbitals();
-
-    CDenseMatrix mat_Vxc(naos, naos);
-
-    mat_Vxc.zero();
-
-    for (int32_t k = 0; k < numboxes; k++)
-    {
-        auto points = points_in_boxes[k];
-
-        auto npoints = points.size(0);
-        auto xcoords = points.data(0);
-        auto ycoords = points.data(1);
-        auto zcoords = points.data(2);
-        auto weights = points.data(3);
-
-        std::cout << "Computing GTOs on " << npoints << " grid points..." << std::endl;
-
-        CMemBlock2D<double> gaos(npoints, naos);
-        CMemBlock2D<double> gaox(npoints, naos);
-        CMemBlock2D<double> gaoy(npoints, naos);
-        CMemBlock2D<double> gaoz(npoints, naos);
-
-        gaos.zero();
-        gaox.zero();
-        gaoy.zero();
-        gaoz.zero();
-
-        gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, 0, 0, npoints);
-
-        // chi: GTO at grid points
-
-        CDenseMatrix mat_chi(naos, npoints);
-
-        for (int32_t nu = 0; nu < naos; nu++)
-        {
-            for (int32_t g = 0; g < npoints; g++)
-            {
-                mat_chi.row(nu)[g] = gaos.data(nu)[g];
-            }
-        }
-
-        // eq.(26), JCTC 2021, 17, 1512-1521
-
-        auto mat_F = denblas::multAB(density.getReferenceToDensity(0), mat_chi);
-
-        // eq.(27), JCTC 2021, 17, 1512-1521
-
-        CMemBlock<double> rho(npoints);
-
-        rho.zero();
-
-        for (int32_t nu = 0; nu < naos; nu++)
-        {
-            auto F_nu = mat_F.row(nu);
-            auto chi_nu = mat_chi.row(nu);
-
-            for (int32_t g = 0; g < npoints; g++)
-            {
-                rho.at(g) += F_nu[g] * chi_nu[g];
-            }
-        }
-
-        // generate reference density grid and compute exchange-correlation functional derivative
-
-        CMolecularGrid mgrid(points);
-
-        auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-
-        auto dengrid = dgdrv.generate(density, molecule, basis, mgrid, fvxc.getFunctionalType());
-
-        CXCGradientGrid vxcgrid(mgrid.getNumberOfGridPoints(), dengrid.getDensityGridType(), fvxc.getFunctionalType());
-
-        fvxc.compute(vxcgrid, dengrid);
-
-        auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
-
-        // eq.(30), JCTC 2021, 17, 1512-1521
-
-        CDenseMatrix mat_G(naos, npoints);
-        mat_G.zero();
-
-        for (int32_t nu = 0; nu < naos; nu++)
-        {
-            auto G_nu = mat_G.row(nu);
-            auto chi_nu = mat_chi.row(nu);
-
-            for (int32_t g = 0; g < npoints; g++)
-            {
-                G_nu[g] = weights[g] * grhoa[g] * chi_nu[g];
-            }
-        }
-
-        auto mat_V = denblas::multABt(mat_chi, mat_G);
-        mat_Vxc = denblas::addAB(mat_Vxc, mat_V, 1.0);
-    }
-
-    // destroy GTOs container
-
-    delete gtovec;
-
-    return mat_Vxc;
 }
 
-CMemBlock2D<double>
-CMolecularGrid::getGridPointsInBox(const std::array<double, 6>& boxdim,
-                                   const CMemBlock2D<double>&   points) const
+void
+CMolecularGrid::distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    auto npoints = points.size(0);
-
-    auto xcoords = points.data(0);
-    auto ycoords = points.data(1);
-    auto zcoords = points.data(2);
-    auto weights = points.data(3);
-
-    CMemBlock2D<double> new_points (npoints, 4);
-
-    auto xmin = boxdim[0];
-    auto ymin = boxdim[1];
-    auto zmin = boxdim[2];
-
-    auto xmax = boxdim[3];
-    auto ymax = boxdim[4];
-    auto zmax = boxdim[5];
-
-    int32_t count = 0;
-
-    for(int32_t i = 0; i < npoints; i++)
+    if (!_isDistributed)
     {
-        if (xmin <= xcoords[i] && xcoords[i] < xmax &&
-            ymin <= ycoords[i] && ycoords[i] < ymax &&
-            zmin <= zcoords[i] && zcoords[i] < zmax)
-        {
-            new_points.data(0)[count] = xcoords[i];
-            new_points.data(1)[count] = ycoords[i];
-            new_points.data(2)[count] = zcoords[i];
-            new_points.data(3)[count] = weights[i];
+        _isDistributed = true;
 
-            count++;
-        }
+        _gridPointCounts.scatter(rank, nodes, comm);
+
+        _gridPointDisplacements.scatter(rank, nodes, comm);
+
+        // broadcast all grid points, since counts and displacements are already distributed
+
+        _gridPoints.broadcast(rank, comm);
     }
+}
 
-    return new_points.slice(0, count);
+CMemBlock<int32_t>
+CMolecularGrid::getGridPointCounts() const
+{
+    return _gridPointCounts;
+}
+
+CMemBlock<int32_t>
+CMolecularGrid::getGridPointDisplacements() const
+{
+    return _gridPointDisplacements;
 }
 
 std::ostream&

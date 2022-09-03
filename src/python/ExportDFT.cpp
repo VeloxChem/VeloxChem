@@ -215,7 +215,17 @@ export_dft(py::module& m)
             "Broadcasts MolecularGrid object.",
             "rank"_a,
             "py_comm"_a)
-        .def("test_partition", &CMolecularGrid::testPartition)
+        .def("partition_grid_points", &CMolecularGrid::partitionGridPoints)
+        .def(
+            "distribute_counts_and_displacements",
+            [](CMolecularGrid& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.distributeCountsAndDisplacements(rank, nodes, *comm);
+            },
+            "Distributes MolecularGrid counts and displacements.",
+            "rank"_a,
+            "nodes"_a,
+            "py_comm"_a)
         .def(py::self == py::self);
 
     // CGridDriver class
@@ -309,12 +319,6 @@ export_dft(py::module& m)
 
     PyClass<CXCNewIntegrator>(m, "XCNewIntegrator")
         .def(py::init(&vlx_general::create<CXCNewIntegrator>), "comm"_a = py::none())
-        .def("set_number_of_points_threshold", &CXCNewIntegrator::setNumberOfPointsThreshold)
-        .def("get_number_of_boxes", &CXCNewIntegrator::getNumberOfBoxes)
-        .def("initialize_grid", &CXCNewIntegrator::initializeGrid)
-        .def("partition_grid", &CXCNewIntegrator::partitionGrid)
-        .def("get_grid_info", &CXCNewIntegrator::getGridInformation)
-        .def("get_grid_statistics", &CXCNewIntegrator::getGridStatistics)
         .def("integrate_vxc_fock", &CXCNewIntegrator::integrateVxcFock);
 
     // CXCMolecularGradient class

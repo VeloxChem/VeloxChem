@@ -70,16 +70,6 @@ class CXCNewIntegrator
     std::list<CTimer> _timers;
 
     /**
-     Grid boxes containing DFT grid points.
-     */
-    std::list<CGridBox> _boxes;
-
-    /**
-     Threshold for number of points in one box.
-     */
-    int32_t _numberOfPointsThreshold;
-
-    /**
      Generates density grid.
 
      @param npoints the number of grid points.
@@ -132,74 +122,20 @@ class CXCNewIntegrator
     ~CXCNewIntegrator();
 
     /**
-     Sets threshold for number of points in one box.
-
-     @param thresh the threshold for number of points in one box
-     */
-    void setNumberOfPointsThreshold(const int32_t thresh);
-
-    /**
-     Gets number of boxes.
-
-     @return the number of boxes.
-     */
-    int32_t getNumberOfBoxes() const;
-
-    /**
-     Initializes molecular grid.
-
-     @param molgrid the molecular grid.
-     */
-    void initializeGrid(const CMolecularGrid& molgrid);
-
-    /**
-     Partitions the grid points.
-     */
-    void partitionGrid();
-
-    /**
-     Divides a grid box into eight boxes.
-
-     @param box the grid box.
-     @return a list of smaller boxes.
-     */
-    std::list<CGridBox> divideBoxIntoEight(const CGridBox& box) const;
-
-    /**
-     Divides a grid box into two boxes.
-
-     @param box the grid box.
-     @return a list of smaller boxes.
-     */
-    std::list<CGridBox> divideBoxIntoTwo(const CGridBox& box) const;
-
-    /**
-     Gets information about grid boxes.
-
-     @return a string containing information about grid boxes.
-     */
-    std::string getGridInformation() const;
-
-    /**
-     Gets statistics about grid boxes.
-
-     @return a string containing statistics about grid boxes.
-     */
-    std::string getGridStatistics() const;
-
-    /**
      Integrates first-order exchnage-correlation functional contribution to AO
      Kohn-Sham matrix.
 
      @param molecule the molecule.
      @param basis the molecular basis.
      @param densityMatrix the AO density matrix object.
+     @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the AO Kohn-Sham matrix.
      */
     CAOKohnShamMatrix integrateVxcFock(const CMolecule&        molecule,
                                        const CMolecularBasis&  basis,
                                        const CAODensityMatrix& densityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
                                        const std::string&      xcFuncLabel) const;
 };
 

@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import (GridDriver, DensityGridDriver, XCIntegrator,
-                                    XCNewIntegrator)
+from veloxchem.veloxchemlib import (GridDriver, XCIntegrator, XCNewIntegrator)
 from veloxchem.veloxchemlib import is_single_node
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -27,26 +26,18 @@ class TestDftGridPartition:
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        dengrid_drv = DensityGridDriver()
-        vxc = mol_grid.test_partition(molecule, basis, density, xcfun_label,
-                                      dengrid_drv)
-
         xc_drv = XCIntegrator()
         vxc_ref = xc_drv.integrate(density, molecule, basis, mol_grid,
                                    xcfun_label)
-
-        max_diff = np.max(
-            np.abs(vxc.to_numpy() - vxc_ref.get_matrix().to_numpy()))
-        assert max_diff < 1.0e-11
+        vxc_ref_mat = vxc_ref.get_matrix()
 
         xc_drv = XCNewIntegrator()
-        xc_drv.initialize_grid(mol_grid)
-        xc_drv.partition_grid()
-        vxc2 = xc_drv.integrate_vxc_fock(molecule, basis, density, xcfun_label)
+        mol_grid.partition_grid_points()
+        vxc = xc_drv.integrate_vxc_fock(molecule, basis, density, mol_grid,
+                                        xcfun_label)
+        vxc_mat = vxc.get_matrix()
 
-        max_diff2 = np.max(
-            np.abs(vxc2.get_matrix().to_numpy() -
-                   vxc_ref.get_matrix().to_numpy()))
+        max_diff2 = np.max(np.abs(vxc_mat.to_numpy() - vxc_ref_mat.to_numpy()))
         assert max_diff2 < 1.0e-11
 
     @pytest.mark.skipif(not is_single_node(), reason='single node only')

@@ -35,6 +35,7 @@
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGridDriver.hpp"
+#include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
@@ -55,6 +56,21 @@ class CMolecularGrid
      The grid points (coordinates, weights).
      */
     CMemBlock2D<double> _gridPoints;
+
+    /**
+     The parition status of molecular grid object.
+     */
+    bool _isPartitioned;
+
+    /**
+     The number of grid points in the partitioned grid boxes.
+     */
+    CMemBlock<int32_t> _gridPointCounts;
+
+    /**
+     The displacement of grid points in the partitioned grid boxes.
+     */
+    CMemBlock<int32_t> _gridPointDisplacements;
 
    public:
     /**
@@ -246,28 +262,33 @@ class CMolecularGrid
     std::array<double, 6> getSpatialExtent() const;
 
     /**
-     Tests partitioning of grid points into boxes.
-
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param density the AO density matrix.
-     @return the Vxc matrix.
+     Partitions grid points into boxes.
      */
-    CDenseMatrix testPartition(const CMolecule&        molecule,
-                               const CMolecularBasis&  basis,
-                               const CAODensityMatrix& density,
-                               const std::string&      xcFuncLabel,
-                               CDensityGridDriver      dgdrv) const;
+    void partitionGridPoints();
 
     /**
-     Gets grid points in a box.
+     Distributes grid point counts and displacements within domain of MPI
+     communacator and sets distribution flag to true.
 
-     @param boxdim the spatial extent of the box (min x, min y, min z, max x, max y, max z).
-     @param points the old grid points (CMemBlock2D object).
-     @return the new grid points (CMemBlock2D object).
+     @param rank the rank of MPI process.
+     @param nodes the number of nodes in MPI domain.
+     @param comm he MPI communicator.
      */
-    CMemBlock2D<double> getGridPointsInBox(const std::array<double, 6>& boxdim,
-                                           const CMemBlock2D<double>&   points) const;
+    void distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm);
+
+    /**
+     Gets the grid point counts.
+
+     @return the grid point counts.
+     */
+    CMemBlock<int32_t> getGridPointCounts() const;
+
+    /**
+     Gets the grid point displacements.
+
+     @return the grid point displacements.
+     */
+    CMemBlock<int32_t> getGridPointDisplacements() const;
 
     /**
      Converts molecular grid object to text and insert it into output text
