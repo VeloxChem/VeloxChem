@@ -4,9 +4,11 @@ target_sources(vlxobjs
     ErrorHandler.cpp
     FourIndexes.cpp
     MpiFunc.cpp
+    MultiTimer.cpp
     OMPTasks.cpp
     StringFormat.cpp
     ThreeIndexes.cpp
+    Timer.cpp
     TwoIndexes.cpp
   )
 

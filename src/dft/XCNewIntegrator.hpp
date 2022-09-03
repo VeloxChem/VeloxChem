@@ -39,6 +39,7 @@
 #include "MolecularGrid.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "MultiTimer.hpp"
 #include "XCGradientGrid.hpp"
 
 /**
@@ -64,6 +65,11 @@ class CXCNewIntegrator
     MPI_Comm _locComm;
 
     /**
+     Timers for DFT integration.
+     */
+    std::list<CTimer> _timers;
+
+    /**
      Grid boxes containing DFT grid points.
      */
     std::list<CGridBox> _boxes;
@@ -80,12 +86,14 @@ class CXCNewIntegrator
      @param gtoValuesOnGridPoints the GTO values on grid points.
      @param densityMatrix the AO density matrix.
      @param xcFunType the type of exchange-correlation functional.
+     @param timer the timer.
      @return the density grid.
      */
     CDensityGrid _generateDensityGrid(const int32_t           npoints,
                                       const CDenseMatrix&     gtoValuesOnGridPoints,
                                       const CAODensityMatrix& densityMatrix,
-                                      const xcfun             xcFunType) const;
+                                      const xcfun             xcFunType,
+                                      CMultiTimer&            timer) const;
 
     /**
      Integrates first-order exchnage-correlation functional contribution to AO
@@ -97,7 +105,8 @@ class CXCNewIntegrator
      @param zcoords the Z coordinates of grid points.
      @param weights the weights of grid points.
      @param gtoValuesOnGridPoints the label of exchange-correlation functional.
-     @param xcFuncLabel the label of exchange-correlation functional.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param timer the timer.
      @return the AO Kohn-Sham matrix as a CDenseMatrix object.
      */
     CDenseMatrix _integratePartialVxcFockForLDA(const int32_t          npoints,
@@ -106,7 +115,8 @@ class CXCNewIntegrator
                                                 const double*          zcoords,
                                                 const double*          weights,
                                                 const CDenseMatrix&    gtoValuesOnGridPoints,
-                                                const CXCGradientGrid& xcGradientGrid) const;
+                                                const CXCGradientGrid& xcGradientGrid,
+                                                CMultiTimer&           timer) const;
 
    public:
     /**

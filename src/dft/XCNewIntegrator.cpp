@@ -28,6 +28,9 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <iostream>
+
+#include <omp.h>
 
 #include "DenseLinearAlgebra.hpp"
 #include "DensityGridType.hpp"
@@ -38,7 +41,7 @@
 
 CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
 
-    : _numberOfPointsThreshold(800)
+    : _numberOfPointsThreshold(1024)
 {
     _locRank = mpi::rank(comm);
 
@@ -461,6 +464,8 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
                                    const CAODensityMatrix& densityMatrix,
                                    const std::string&      xcFuncLabel) const
 {
+    CMultiTimer timer;
+
     // create GTOs container
 
     CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
@@ -475,8 +480,12 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
     double nele = 0.0, xcene = 0.0;
 
+    timer.start("Total timing");
+
     for (auto box = _boxes.cbegin(); box != _boxes.cend(); ++box)
     {
+        timer.start("GTO evaluation");
+
         // grid points in box
 
         auto npoints = box->getNumberOfGridPoints();
@@ -493,16 +502,94 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
         CMemBlock2D<double> gaos(npoints, naos);
 
-        gaos.zero();
+        #pragma omp parallel
+        {
+            auto nthreads = omp_get_max_threads();
 
-        gtorec::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, 0, 0, npoints);
+            auto thread_id = omp_get_thread_num();
 
-        CDenseMatrix mat_chi(naos, npoints);
+            auto b_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto b_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            CMemBlock2D<double> local_gaos(b_size, naos);
+
+            local_gaos.zero();
+
+            gtorec::computeGtosValuesForLDA(local_gaos, gtovec, xcoords, ycoords, zcoords, b_offset, 0, b_size);
+
+            for (int32_t nu = 0; nu < naos; nu++)
+            {
+                std::memcpy(gaos.data(nu) + b_offset, local_gaos.data(nu), b_size * sizeof(double));
+            }
+        }
+
+        timer.stop("GTO evaluation");
+
+        timer.start("GTO screening");
+
+        std::vector<int32_t> aoinds(naos);
+
+        int32_t aocount = 0;
 
         for (int32_t nu = 0; nu < naos; nu++)
         {
-            std::memcpy(mat_chi.row(nu), gaos.data(nu), npoints * sizeof(double));
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if (std::fabs(gaos_nu[g]) > 1.0e-12)
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
         }
+
+        aoinds.resize(aocount);
+
+        CDenseMatrix mat_chi(aocount, npoints);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+        }
+
+        timer.stop("GTO screening");
+
+        timer.start("Density matrix");
+
+        // generate sub density matrix
+
+        CDenseMatrix sub_dens(aocount, aocount);
+
+        const CDenseMatrix& dens = densityMatrix.getReferenceToDensity(0);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            auto sub_dens_row = sub_dens.row(i);
+
+            auto dens_row = dens.row(aoinds[i]);
+
+            for (int32_t j = 0; j < aocount; j++)
+            {
+                sub_dens_row[j] = dens_row[aoinds[j]];
+            }
+        }
+
+        CAODensityMatrix sub_dens_mat({sub_dens}, denmat::rest);
+
+        timer.stop("Density matrix");
 
         // generate density grid
 
@@ -510,7 +597,9 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
         auto xcfuntype = fvxc.getFunctionalType();
 
-        auto dengrid = _generateDensityGrid(npoints, mat_chi, densityMatrix, xcfuntype);
+        auto dengrid = _generateDensityGrid(npoints, mat_chi, sub_dens_mat, xcfuntype, timer);
+
+        timer.start("XC functional");
 
         // compute exchange-correlation functional derivative
 
@@ -518,23 +607,38 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
         fvxc.compute(vxcgrid, dengrid);
 
+        timer.stop("XC functional");
+
         // compute partial contribution to Vxc matrix
 
         CDenseMatrix partial_mat_Vxc;
 
         if (xcfuntype == xcfun::lda)
         {
-            partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, xcoords, ycoords, zcoords, weights, mat_chi, vxcgrid);
+            partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, xcoords, ycoords, zcoords, weights, mat_chi, vxcgrid, timer);
         }
         else if (xcfuntype == xcfun::gga)
         {
             //partial_mat_Vxc = _integratePartialVxcFockForGGA(npoints, xcoords, ycoords, zcoords, weights, mat_chi, vxcgrid);
         }
 
-        for (int32_t i = 0; i < partial_mat_Vxc.getNumberOfElements(); i++)
+        timer.start("Vxc matrix dist.");
+
+        for (int32_t row = 0; row < partial_mat_Vxc.getNumberOfRows(); row++)
         {
-            mat_Vxc.getMatrix(0)[i] += partial_mat_Vxc.values()[i];
+            auto row_orig = aoinds[row];
+
+            for (int32_t col = 0; col < partial_mat_Vxc.getNumberOfColumns(); col++)
+            {
+                auto col_orig = aoinds[col];
+
+                mat_Vxc.getMatrix(0)[row_orig * naos + col_orig] += partial_mat_Vxc.row(row)[col];
+            }
         }
+
+        timer.stop("Vxc matrix dist.");
+
+        timer.start("XC energy");
 
         // compute partial contribution to XC energy
 
@@ -548,11 +652,21 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
             xcene += weights[i] * efunc[i];
         }
+
+        timer.stop("XC energy");
     }
 
     // destroy GTOs container
 
     delete gtovec;
+
+    timer.stop("Total timing");
+
+    std::cout << "Timing of new integrator" << std::endl;
+
+    std::cout << "------------------------" << std::endl;
+
+    std::cout << timer.getSummary() << std::endl;
 
     mat_Vxc.setNumberOfElectrons(nele);
 
@@ -565,7 +679,8 @@ CDensityGrid
 CXCNewIntegrator::_generateDensityGrid(const int32_t           npoints,
                                        const CDenseMatrix&     gtoValuesOnGridPoints,
                                        const CAODensityMatrix& densityMatrix,
-                                       const xcfun             xcFunType) const
+                                       const xcfun             xcFunType,
+                                       CMultiTimer&            timer) const
 {
     CDensityGrid dengrid(npoints, densityMatrix.getNumberOfDensityMatrices(), xcFunType, dengrid::ab);
 
@@ -577,11 +692,17 @@ CXCNewIntegrator::_generateDensityGrid(const int32_t           npoints,
 
     // eq.(26), JCTC 2021, 17, 1512-1521
 
+    timer.start("Density grid matmul");
+
     const CDenseMatrix& mat_chi = gtoValuesOnGridPoints;
 
     auto mat_F = denblas::multAB(densityMatrix.getReferenceToDensity(0), mat_chi);
 
+    timer.stop("Density grid matmul");
+
     // eq.(27), JCTC 2021, 17, 1512-1521
+
+    timer.start("Density grid rho");
 
     auto naos = mat_chi.getNumberOfRows();
 
@@ -599,6 +720,8 @@ CXCNewIntegrator::_generateDensityGrid(const int32_t           npoints,
 
     std::memcpy(rhob, rhoa, npoints * sizeof(double));
 
+    timer.stop("Density grid rho");
+
     return dengrid;
 }
 
@@ -609,7 +732,8 @@ CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t          npoints,
                                                  const double*          zcoords,
                                                  const double*          weights,
                                                  const CDenseMatrix&    gtoValuesOnGridPoints,
-                                                 const CXCGradientGrid& xcGradientGrid) const
+                                                 const CXCGradientGrid& xcGradientGrid,
+                                                 CMultiTimer&           timer) const
 {
     // GTO values on grid points
 
@@ -620,6 +744,8 @@ CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t          npoints,
     auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
 
     // eq.(30), JCTC 2021, 17, 1512-1521
+
+    timer.start("Vxc matrix G");
 
     auto naos = mat_chi.getNumberOfRows();
 
@@ -639,7 +765,15 @@ CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t          npoints,
         }
     }
 
+    timer.stop("Vxc matrix G");
+
     // eq.(31), JCTC 2021, 17, 1512-1521
 
-    return denblas::multABt(mat_chi, mat_G);
+    timer.start("Vxc matrix matmul");
+
+    auto mat_Vxc = denblas::multABt(mat_chi, mat_G);
+
+    timer.stop("Vxc matrix matmul");
+
+    return mat_Vxc;
 }
