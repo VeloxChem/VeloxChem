@@ -40,6 +40,7 @@
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
+#include "XCFunctional.hpp"
 #include "XCGradientGrid.hpp"
 
 /**
@@ -65,12 +66,34 @@ class CXCNewIntegrator
     MPI_Comm _locComm;
 
     /**
+     Screening threshold for GTO values on grid points.
+     */
+    double _screeningThresholdForGTOValues;
+
+    /**
      Timers for DFT integration.
      */
     std::list<CTimer> _timers;
 
     /**
-     Generates density grid.
+     Integrates first-order LDA exchnage-correlation functional contribution to
+     AO Kohn-Sham matrix.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix object.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the AO Kohn-Sham matrix.
+     */
+    CAOKohnShamMatrix _integrateVxcFockForLDA(const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const CAODensityMatrix& densityMatrix,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const CXCFunctional&    xcFunctional) const;
+
+    /**
+     Generates density grid for LDA.
 
      @param npoints the number of grid points.
      @param gtoValuesOnGridPoints the GTO values on grid points.
@@ -79,11 +102,11 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the density grid.
      */
-    CDensityGrid _generateDensityGrid(const int32_t           npoints,
-                                      const CDenseMatrix&     gtoValuesOnGridPoints,
-                                      const CAODensityMatrix& densityMatrix,
-                                      const xcfun             xcFunType,
-                                      CMultiTimer&            timer) const;
+    CDensityGrid _generateDensityGridForLDA(const int32_t           npoints,
+                                            const CDenseMatrix&     gtoValuesOnGridPoints,
+                                            const CAODensityMatrix& densityMatrix,
+                                            const xcfun             xcFunType,
+                                            CMultiTimer&            timer) const;
 
     /**
      Integrates first-order exchnage-correlation functional contribution to AO

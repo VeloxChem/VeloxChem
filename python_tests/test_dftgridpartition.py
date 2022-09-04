@@ -1,8 +1,8 @@
 import numpy as np
-import pytest
 
-from veloxchem.veloxchemlib import (GridDriver, XCIntegrator, XCNewIntegrator)
-from veloxchem.veloxchemlib import is_single_node
+from veloxchem.veloxchemlib import (GridDriver, MolecularGrid, XCIntegrator,
+                                    XCNewIntegrator)
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -24,23 +24,30 @@ class TestDftGridPartition:
 
         grid_drv = GridDriver()
         grid_drv.set_level(grid_level)
-        mol_grid = grid_drv.generate(molecule)
+        mol_grid_ref = grid_drv.generate(molecule)
+        mol_grid = MolecularGrid(mol_grid_ref)
 
-        xc_drv = XCIntegrator()
-        vxc_ref = xc_drv.integrate(density, molecule, basis, mol_grid,
-                                   xcfun_label)
-        vxc_ref_mat = vxc_ref.get_matrix()
+        xc_drv_ref = XCIntegrator()
+        mol_grid_ref.distribute(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
+        vxc_ref = xc_drv_ref.integrate(density, molecule, basis, mol_grid,
+                                       xcfun_label)
+        vxc_ref.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
         xc_drv = XCNewIntegrator()
         mol_grid.partition_grid_points()
+        mol_grid.distribute_counts_and_displacements(scf_drv.rank,
+                                                     scf_drv.nodes,
+                                                     scf_drv.comm)
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, density, mol_grid,
                                         xcfun_label)
-        vxc_mat = vxc.get_matrix()
+        vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        max_diff2 = np.max(np.abs(vxc_mat.to_numpy() - vxc_ref_mat.to_numpy()))
-        assert max_diff2 < 1.0e-11
+        if is_mpi_master():
+            vxc_ref_mat = vxc_ref.get_matrix().to_numpy()
+            vxc_mat = vxc.get_matrix().to_numpy()
+            max_diff2 = np.max(np.abs(vxc_mat - vxc_ref_mat))
+            assert max_diff2 < 1.0e-11
 
-    @pytest.mark.skipif(not is_single_node(), reason='single node only')
     def test_slater(self):
 
         mol_str = """

@@ -272,6 +272,14 @@ public:
      @return the pointer to first element of Kohn-Sham matrix.
      */
     double* getKohnSham(const bool beta=false);
+
+    /**
+     Adds matrix contribution to Kohn-Sham matrix.
+
+     @param matrix the dense matrix.
+     @param beta requires Kohn-Sham matrix with beta spin.
+     */
+    void addMatrixContribution(const CDenseMatrix& matrix, const bool beta=false);
     
     /**
      Gets constant reference to specific Kohn-Sham matrix.

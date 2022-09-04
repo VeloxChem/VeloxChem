@@ -40,6 +40,8 @@
 #include "XCVarsType.hpp"
 
 CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
+
+    : _screeningThresholdForGTOValues(1.0e-12)
 {
     _locRank = mpi::rank(comm);
 
@@ -58,6 +60,44 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
                                    const CAODensityMatrix& densityMatrix,
                                    const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (densityMatrix.isClosedShell())
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+           return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+           //return _integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCNewIntegrator.integrateVxcFock: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCNewIntegrator.integrateVxcFock: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+
+    return CAOKohnShamMatrix();
+}
+
+CAOKohnShamMatrix
+CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& densityMatrix,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -143,7 +183,7 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if (std::fabs(gaos_nu[g]) > 1.0e-12)
+                if (std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues)
                 {
                     skip = false;
 
@@ -174,33 +214,40 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
         // generate sub density matrix
 
-        CDenseMatrix sub_dens(aocount, aocount);
+        CAODensityMatrix sub_dens_mat;
 
-        const CDenseMatrix& dens = densityMatrix.getReferenceToDensity(0);
-
-        for (int32_t i = 0; i < aocount; i++)
+        if (aocount < naos)
         {
-            auto sub_dens_row = sub_dens.row(i);
+            CDenseMatrix sub_dens(aocount, aocount);
 
-            auto dens_row = dens.row(aoinds[i]);
+            const CDenseMatrix& dens = densityMatrix.getReferenceToDensity(0);
 
-            for (int32_t j = 0; j < aocount; j++)
+            for (int32_t i = 0; i < aocount; i++)
             {
-                sub_dens_row[j] = dens_row[aoinds[j]];
-            }
-        }
+                auto sub_dens_row = sub_dens.row(i);
 
-        CAODensityMatrix sub_dens_mat({sub_dens}, denmat::rest);
+                auto dens_row = dens.row(aoinds[i]);
+
+                for (int32_t j = 0; j < aocount; j++)
+                {
+                    sub_dens_row[j] = dens_row[aoinds[j]];
+                }
+            }
+
+            sub_dens_mat = CAODensityMatrix({sub_dens}, denmat::rest);
+        }
+        else
+        {
+            sub_dens_mat = densityMatrix;
+        }
 
         timer.stop("Density matrix");
 
         // generate density grid
 
-        auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+        auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto xcfuntype = fvxc.getFunctionalType();
-
-        auto dengrid = _generateDensityGrid(npoints, mat_chi, sub_dens_mat, xcfuntype, timer);
+        auto dengrid = _generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat, xcfuntype, timer);
 
         timer.start("XC functional");
 
@@ -208,35 +255,37 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
         CXCGradientGrid vxcgrid(npoints, dengrid.getDensityGridType(), xcfuntype);
 
-        fvxc.compute(vxcgrid, dengrid);
+        xcFunctional.compute(vxcgrid, dengrid);
 
         timer.stop("XC functional");
 
         // compute partial contribution to Vxc matrix
 
-        CDenseMatrix partial_mat_Vxc;
-
-        if (xcfuntype == xcfun::lda)
-        {
-            partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, xcoords, ycoords, zcoords, weights, mat_chi, vxcgrid, timer);
-        }
-        else if (xcfuntype == xcfun::gga)
-        {
-            //partial_mat_Vxc = _integratePartialVxcFockForGGA(npoints, xcoords, ycoords, zcoords, weights, mat_chi, vxcgrid);
-        }
+        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, xcoords, ycoords, zcoords, weights, mat_chi, vxcgrid, timer);
 
         timer.start("Vxc matrix dist.");
 
-        for (int32_t row = 0; row < partial_mat_Vxc.getNumberOfRows(); row++)
+        if (aocount < naos)
         {
-            auto row_orig = aoinds[row];
-
-            for (int32_t col = 0; col < partial_mat_Vxc.getNumberOfColumns(); col++)
+            for (int32_t row = 0; row < partial_mat_Vxc.getNumberOfRows(); row++)
             {
-                auto col_orig = aoinds[col];
+                auto row_orig = aoinds[row];
 
-                mat_Vxc.getMatrix(0)[row_orig * naos + col_orig] += partial_mat_Vxc.row(row)[col];
+                auto mat_Vxc_row_orig = mat_Vxc.getMatrix(0) + row_orig * naos;
+
+                auto partial_mat_Vxc_row = partial_mat_Vxc.row(row);
+
+                for (int32_t col = 0; col < partial_mat_Vxc.getNumberOfColumns(); col++)
+                {
+                    auto col_orig = aoinds[col];
+
+                    mat_Vxc_row_orig[col_orig] += partial_mat_Vxc_row[col];
+                }
             }
+        }
+        else
+        {
+            mat_Vxc.addMatrixContribution(partial_mat_Vxc);
         }
 
         timer.stop("Vxc matrix dist.");
@@ -279,11 +328,11 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 }
 
 CDensityGrid
-CXCNewIntegrator::_generateDensityGrid(const int32_t           npoints,
-                                       const CDenseMatrix&     gtoValuesOnGridPoints,
-                                       const CAODensityMatrix& densityMatrix,
-                                       const xcfun             xcFunType,
-                                       CMultiTimer&            timer) const
+CXCNewIntegrator::_generateDensityGridForLDA(const int32_t           npoints,
+                                             const CDenseMatrix&     gtoValuesOnGridPoints,
+                                             const CAODensityMatrix& densityMatrix,
+                                             const xcfun             xcFunType,
+                                             CMultiTimer&            timer) const
 {
     CDensityGrid dengrid(npoints, densityMatrix.getNumberOfDensityMatrices(), xcFunType, dengrid::ab);
 

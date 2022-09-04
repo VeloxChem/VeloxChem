@@ -432,6 +432,28 @@ CAOKohnShamMatrix::getKohnSham(const bool beta)
     return nullptr;
 }
 
+void
+CAOKohnShamMatrix::addMatrixContribution(const CDenseMatrix& matrix, const bool beta)
+{
+    // set up pointer to one electron matrix
+
+    auto matptr = matrix.values();
+
+    // set up pointer to Kohn-Sham matrix
+
+    auto ksptr = getKohnSham(beta);
+
+    // add matrix
+
+    auto ndim = getNumberOfElements();
+
+#pragma omp simd aligned(ksptr, matptr : VLX_ALIGN)
+    for (int32_t i = 0; i < ndim; i++)
+    {
+        ksptr[i] += matptr[i];
+    }
+}
+
 const CDenseMatrix&
 CAOKohnShamMatrix::getReferenceToKohnSham(const bool beta) const
 {
