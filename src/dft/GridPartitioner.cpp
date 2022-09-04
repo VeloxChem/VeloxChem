@@ -25,6 +25,7 @@
 
 #include "GridPartitioner.hpp"
 
+#include <algorithm>
 #include <iomanip>
 #include <sstream>
 
@@ -98,26 +99,11 @@ CGridPartitioner::divideBoxIntoEight(const CGridBox& box) const
 
     // find the center for dividing the box
 
-    double xhalf = 0.0;
+    auto xhalf = findCenter(xcoords, npoints);
 
-    double yhalf = 0.0;
+    auto yhalf = findCenter(ycoords, npoints);
 
-    double zhalf = 0.0;
-
-    for (int32_t g = 0; g < npoints; g++)
-    {
-        xhalf += xcoords[g];
-
-        yhalf += ycoords[g];
-
-        zhalf += zcoords[g];
-    }
-
-    xhalf /= (double)npoints;
-
-    yhalf /= (double)npoints;
-
-    zhalf /= (double)npoints;
+    auto zhalf = findCenter(zcoords, npoints);
 
     // sub boxes and grid points
 
@@ -243,14 +229,7 @@ CGridPartitioner::divideBoxIntoTwo(const CGridBox& box) const
 
     // find the center for dividing the box
 
-    double center = 0.0;
-
-    for (int32_t g = 0; g < npoints; g++)
-    {
-        center += coords[icart][g];
-    }
-
-    center /= (double)npoints;
+    auto center = findMedian(coords[icart], npoints);
 
     // sub boxes and grid points
 
@@ -316,6 +295,154 @@ CGridPartitioner::divideBoxIntoTwo(const CGridBox& box) const
     }
 
     return newboxes;
+}
+
+double
+CGridPartitioner::findCenter(const double* ptr, const int32_t num) const
+{
+    double center = 0.0;
+
+    for (int32_t i = 0; i < num; i++)
+    {
+        center += ptr[i];
+    }
+
+    center /= num;
+
+    return center;
+}
+
+double
+CGridPartitioner::findMedian(const double* ptr, const int32_t num) const
+{
+    // Note: ptr and num are not checked
+    // Assuming ptr is a valid pointer and num > 0
+
+    // use approximate median for large number (2^20 or ~1 million)
+
+    if (num > 1048576) return estimateMedianP2(ptr, num);
+
+    // sort data
+
+    std::vector<double> vec(ptr, ptr + num);
+
+    std::sort(vec.begin(), vec.end());
+
+    // divide at threshold for special cases
+
+    if (1024 * 2 <= num && num <= 1024 * 3) return 0.5 * (vec[1024 - 1] + vec[1024]);
+
+    if (1024 * 4 <= num && num <= 1024 * 5) return 0.5 * (vec[1024 - 1] + vec[1024]);
+
+    // divide evenly otherwise
+
+    if (num % 2 == 1)
+    {
+        return vec[num / 2];
+    }
+    else
+    {
+        return 0.5 * (vec[num / 2 - 1] + vec[num / 2]);
+    }
+}
+
+double
+CGridPartitioner::estimateMedianP2(const double* ptr, const int32_t num) const
+{
+    // Note: ptr and num are not checked
+    // Assuming ptr is a valid pointer and num is reasonably large (e.g. > 100)
+
+    // Reference: The P2 algorithm (https://doi.org/10.1145/4372.4378)
+
+    const double p = 0.5;
+
+    std::vector<double> q(ptr, ptr + 5);
+
+    std::sort(q.begin(), q.end());
+
+    std::vector<int32_t> n({0, 1, 2, 3, 4});
+
+    std::vector<double> nprime({0.0, 2.0 * p, 4.0 * p, 2.0 + 2.0 * p, 4.0});
+
+    std::vector<double> dnprime({0.0, p / 2.0, p, (1.0 + p) / 2.0, 1.0});
+
+    for (int32_t j = 5; j < num; j++)
+    {
+        int32_t k = -1;
+
+        if (ptr[j] < q[0])
+        {
+            q[0] = ptr[j];
+
+            k = 0;
+        }
+        else if (ptr[j] < q[1])
+        {
+            k = 0;
+        }
+        else if (ptr[j] < q[2])
+        {
+            k = 1;
+        }
+        else if (ptr[j] < q[3])
+        {
+            k = 2;
+        }
+        else if (ptr[j] < q[4])
+        {
+            k = 3;
+        }
+        else
+        {
+            q[4] = ptr[j];
+
+            k = 3;
+        }
+
+        for (int32_t i = k + 1; i < 5; i++)
+        {
+            ++n[i];
+        }
+
+        for (int32_t i = 0; i < 5; i++)
+        {
+            nprime[i] += dnprime[i];
+        }
+
+        for (int32_t i = 1; i < 4; i++)
+        {
+            double di = nprime[i] - n[i];
+
+            if (((di >= 1.0) && (n[i + 1] - n[i] > 1.0)) || ((di <= -1.0) && (n[i - 1] - n[i] < -1.0)))
+            {
+                int32_t di_sign = 0;
+
+                if (di > 0.0) di_sign = 1;
+
+                else if (di < 0.0) di_sign = -1;
+
+                double qiprime = q[i] + static_cast<double>(di_sign) / (n[i + 1] - n[i - 1]) * (
+
+                        (n[i] - n[i - 1] + di_sign) * (q[i + 1] - q[i]) / (n[i + 1] - n[i]) +
+
+                        (n[i + 1] - n[i] - di_sign) * (q[i] - q[i - 1]) / (n[i] - n[i - 1]));
+
+                if ((q[i - 1] < qiprime) && (qiprime < q[i + 1]))
+                {
+                    q[i] = qiprime;
+                }
+                else
+                {
+                    q[i] += static_cast<double>(di_sign) * (q[i + di_sign] - q[i]) / (n[i + di_sign] - n[i]);
+
+                }
+
+                n[i] += di_sign;
+            }
+        }
+    }
+
+    return q[2];
 }
 
 int32_t

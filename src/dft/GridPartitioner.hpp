@@ -83,6 +83,34 @@ class CGridPartitioner
     std::list<CGridBox> divideBoxIntoTwo(const CGridBox& box) const;
 
     /**
+     Finds one-dimensional center of points.
+
+     @param ptr the pointer to data.
+     @param num the number of data points.
+     @return the one-dimensional center.
+     */
+    double findCenter(const double* ptr, const int32_t num) const;
+
+    /**
+     Finds one-dimensional median.
+
+     @param ptr the pointer to data.
+     @param num the number of data points.
+     @return the one-dimensional median.
+     */
+    double findMedian(const double* ptr, const int32_t num) const;
+
+    /**
+     Estimates one-dimensional median using the P2 algorithm.
+     https://doi.org/10.1145/4372.4378
+
+     @param ptr the pointer to data.
+     @param num the number of data points.
+     @return the estimated one-dimensional median.
+     */
+    double estimateMedianP2(const double* ptr, const int32_t num) const;
+
+    /**
      Gets number of boxes.
 
      @return the number of boxes.
