@@ -174,6 +174,13 @@ class CDenseMatrix
     void symmetrize();
 
     /**
+     Symmetrizes elements of square matrix: a_ij = a_ji = factor * (a_ij + a_ji).
+
+     @param factor the factor.
+     */
+    void symmetrizeAndScale(const double factor);
+
+    /**
      Reduces dense matrix objects from all MPI process within domain of MPI
      communicator into dense matrix object on master node by summing them.
 

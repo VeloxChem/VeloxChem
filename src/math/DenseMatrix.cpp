@@ -208,6 +208,31 @@ CDenseMatrix::symmetrize()
     }
 }
 
+void
+CDenseMatrix::symmetrizeAndScale(const double factor)
+{
+    if (_nRows == _nColumns)
+    {
+        auto fmat = _values.data();
+
+        for (int32_t i = 0; i < _nRows; i++)
+        {
+            for (int32_t j = i; j < _nRows; j++)
+            {
+                auto ijoff = i * _nColumns + j;
+
+                auto jioff = j * _nColumns + i;
+
+                auto fval = factor * (fmat[ijoff] + fmat[jioff]);
+
+                fmat[ijoff] = fval;
+
+                fmat[jioff] = fval;
+            }
+        }
+    }
+}
+
 CDenseMatrix
 CDenseMatrix::slice(const int32_t iRow, const int32_t iColumn, const int32_t nRows, const int32_t nColumns) const
 {

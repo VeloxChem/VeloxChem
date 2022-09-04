@@ -92,6 +92,12 @@ class CXCNewIntegrator
                                               const CMolecularGrid&   molecularGrid,
                                               const CXCFunctional&    xcFunctional) const;
 
+    CAOKohnShamMatrix _integrateVxcFockForGGA(const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const CAODensityMatrix& densityMatrix,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const CXCFunctional&    xcFunctional) const;
+
     /**
      Generates density grid for LDA.
 
@@ -104,6 +110,15 @@ class CXCNewIntegrator
      */
     CDensityGrid _generateDensityGridForLDA(const int32_t           npoints,
                                             const CDenseMatrix&     gtoValuesOnGridPoints,
+                                            const CAODensityMatrix& densityMatrix,
+                                            const xcfun             xcFunType,
+                                            CMultiTimer&            timer) const;
+
+    CDensityGrid _generateDensityGridForGGA(const int32_t           npoints,
+                                            const CDenseMatrix&     gtoValues,
+                                            const CDenseMatrix&     gtoValuesX,
+                                            const CDenseMatrix&     gtoValuesY,
+                                            const CDenseMatrix&     gtoValuesZ,
                                             const CAODensityMatrix& densityMatrix,
                                             const xcfun             xcFunType,
                                             CMultiTimer&            timer) const;
@@ -129,6 +144,19 @@ class CXCNewIntegrator
                                                 const double*          weights,
                                                 const CDenseMatrix&    gtoValuesOnGridPoints,
                                                 const CXCGradientGrid& xcGradientGrid,
+                                                CMultiTimer&           timer) const;
+
+    CDenseMatrix _integratePartialVxcFockForGGA(const int32_t          npoints,
+                                                const double*          xcoords,
+                                                const double*          ycoords,
+                                                const double*          zcoords,
+                                                const double*          weights,
+                                                const CDenseMatrix&    gtoValues,
+                                                const CDenseMatrix&    gtoValuesX,
+                                                const CDenseMatrix&    gtoValuesY,
+                                                const CDenseMatrix&    gtoValuesZ,
+                                                const CXCGradientGrid& xcGradientGrid,
+                                                const CDensityGrid&    densityGrid,
                                                 CMultiTimer&           timer) const;
 
    public:

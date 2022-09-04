@@ -11,7 +11,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 class TestDftGridPartition:
 
     def run_dft_grid_partition(self, mol_str, basis_label, xcfun_label,
-                               grid_level):
+                               grid_level, tol):
 
         molecule = Molecule.read_str(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, basis_label)
@@ -45,8 +45,7 @@ class TestDftGridPartition:
         if is_mpi_master():
             vxc_ref_mat = vxc_ref.get_matrix().to_numpy()
             vxc_mat = vxc.get_matrix().to_numpy()
-            max_diff2 = np.max(np.abs(vxc_mat - vxc_ref_mat))
-            assert max_diff2 < 1.0e-11
+            assert np.max(np.abs(vxc_mat - vxc_ref_mat)) < tol
 
     def test_slater(self):
 
@@ -61,6 +60,25 @@ class TestDftGridPartition:
         basis_label = 'def2-svp'
         xcfun_label = 'slater'
         grid_level = 4
+        tol = 1.0e-11
 
         self.run_dft_grid_partition(mol_str, basis_label, xcfun_label,
-                                    grid_level)
+                                    grid_level, tol)
+
+    def test_b3lyp(self):
+
+        mol_str = """
+            O  0.0000000000   0.0000000000  -0.0254395383
+            H  0.0000000000   0.7695699584   0.5948147012
+            H  0.0000000000  -0.7695699584   0.5948147012
+            O  4.0000000000   0.0000000000  -0.0254395383
+            H  4.0000000000   0.7695699584   0.5948147012
+            H  4.0000000000  -0.7695699584   0.5948147012
+        """
+        basis_label = 'def2-svp'
+        xcfun_label = 'b3lyp'
+        grid_level = 4
+        tol = 1.0e-10
+
+        self.run_dft_grid_partition(mol_str, basis_label, xcfun_label,
+                                    grid_level, tol)
