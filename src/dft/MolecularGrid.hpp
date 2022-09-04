@@ -263,8 +263,10 @@ class CMolecularGrid
 
     /**
      Partitions grid points into boxes.
+
+     @return summary of grid points partitioning as a string.
      */
-    void partitionGridPoints();
+    std::string partitionGridPoints();
 
     /**
      Distributes grid point counts and displacements within domain of MPI

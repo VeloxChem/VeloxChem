@@ -489,8 +489,6 @@ CGridPartitioner::getGridStatistics() const
 
     int32_t npoints_max = -1, npoints_min = -1, npoints_sum = 0;
 
-    int32_t nboxes_dense = 0, nboxes_sparse = 0;
-
     int32_t npoints_bin = 100;
 
     std::vector<int32_t> nboxes_count(_numberOfPointsThreshold / npoints_bin + 1, 0);
@@ -505,24 +503,16 @@ CGridPartitioner::getGridStatistics() const
 
         npoints_sum += npoints;
 
-        if (npoints > 0.8 * _numberOfPointsThreshold) ++nboxes_dense;
-
-        if (npoints < 0.1 * _numberOfPointsThreshold) ++nboxes_sparse;
-
         ++nboxes_count[npoints / npoints_bin];
     }
+
+    ss << "Total number of points in all boxes: " << npoints_sum << "\n";
 
     ss << "Maximum number of points per box: " << npoints_max << "\n";
 
     ss << "Minimum number of points per box: " << npoints_min << "\n";
 
-    ss << "Total number of points in all boxes: " << npoints_sum << "\n";
-
     ss << "Average number of points per box: " << npoints_sum / getNumberOfBoxes() << "\n";
-
-    ss << nboxes_dense << " boxes with npoints > 80\% of threshold " << "\n";
-
-    ss << nboxes_sparse << " boxes with npoints < 10\% of threshold " << "\n";
 
     ss << "-----------------\n";
 

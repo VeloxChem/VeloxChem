@@ -446,7 +446,7 @@ CMolecularGrid::getSpatialExtent() const
     return rext;
 }
 
-void
+std::string
 CMolecularGrid::partitionGridPoints()
 {
     if (!_isPartitioned)
@@ -473,10 +473,10 @@ CMolecularGrid::partitionGridPoints()
 
         _gridPointDisplacements = partitioner.getGridPointDisplacements();
 
-        std::cout << partitioner.getGridInformation() << std::endl;
-
-        std::cout << partitioner.getGridStatistics() << std::endl;
+        return partitioner.getGridStatistics();
     }
+
+    return std::string("");
 }
 
 void
