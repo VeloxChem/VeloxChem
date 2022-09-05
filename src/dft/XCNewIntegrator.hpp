@@ -81,7 +81,7 @@ class CXCNewIntegrator
 
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param densityMatrix the AO density matrix object.
+     @param densityMatrix the AO density matrix.
      @param molecularGrid the molecular grid.
      @param xcFunctional the exchange-correlation functional.
      @return the AO Kohn-Sham matrix.
@@ -92,6 +92,17 @@ class CXCNewIntegrator
                                               const CMolecularGrid&   molecularGrid,
                                               const CXCFunctional&    xcFunctional) const;
 
+    /**
+     Integrates first-order GGA exchnage-correlation functional contribution to
+     AO Kohn-Sham matrix.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the AO Kohn-Sham matrix.
+     */
     CAOKohnShamMatrix _integrateVxcFockForGGA(const CMolecule&        molecule,
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& densityMatrix,
@@ -102,18 +113,31 @@ class CXCNewIntegrator
      Generates density grid for LDA.
 
      @param npoints the number of grid points.
-     @param gtoValuesOnGridPoints the GTO values on grid points.
+     @param gtoValues the GTO values on grid points.
      @param densityMatrix the AO density matrix.
      @param xcFunType the type of exchange-correlation functional.
      @param timer the timer.
      @return the density grid.
      */
     CDensityGrid _generateDensityGridForLDA(const int32_t           npoints,
-                                            const CDenseMatrix&     gtoValuesOnGridPoints,
+                                            const CDenseMatrix&     gtoValues,
                                             const CAODensityMatrix& densityMatrix,
                                             const xcfun             xcFunType,
                                             CMultiTimer&            timer) const;
 
+    /**
+     Generates density grid for GGA.
+
+     @param npoints the number of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param gtoValuesX the GTO gradient X values on grid points.
+     @param gtoValuesY the GTO gradient Y values on grid points.
+     @param gtoValuesZ the GTO gradient Z values on grid points.
+     @param densityMatrix the AO density matrix.
+     @param xcFunType the type of exchange-correlation functional.
+     @param timer the timer.
+     @return the density grid.
+     */
     CDensityGrid _generateDensityGridForGGA(const int32_t           npoints,
                                             const CDenseMatrix&     gtoValues,
                                             const CDenseMatrix&     gtoValuesX,
@@ -124,28 +148,43 @@ class CXCNewIntegrator
                                             CMultiTimer&            timer) const;
 
     /**
-     Integrates first-order exchnage-correlation functional contribution to AO
-     Kohn-Sham matrix.
+     Integrates LDA contribution to AO Kohn-Sham matrix.
 
      @param npoints the number of grid points.
      @param xcoords the X coordinates of grid points.
      @param ycoords the Y coordinates of grid points.
      @param zcoords the Z coordinates of grid points.
      @param weights the weights of grid points.
-     @param gtoValuesOnGridPoints the label of exchange-correlation functional.
+     @param gtoValues the GTO values on grid points.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param timer the timer.
-     @return the AO Kohn-Sham matrix as a CDenseMatrix object.
+     @return the contribution as a CDenseMatrix object.
      */
     CDenseMatrix _integratePartialVxcFockForLDA(const int32_t          npoints,
                                                 const double*          xcoords,
                                                 const double*          ycoords,
                                                 const double*          zcoords,
                                                 const double*          weights,
-                                                const CDenseMatrix&    gtoValuesOnGridPoints,
+                                                const CDenseMatrix&    gtoValues,
                                                 const CXCGradientGrid& xcGradientGrid,
                                                 CMultiTimer&           timer) const;
 
+    /**
+     Integrates GGA contribution to AO Kohn-Sham matrix.
+
+     @param npoints the number of grid points.
+     @param xcoords the X coordinates of grid points.
+     @param ycoords the Y coordinates of grid points.
+     @param zcoords the Z coordinates of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param gtoValuesX the GTO gradient X values on grid points.
+     @param gtoValuesY the GTO gradient Y values on grid points.
+     @param gtoValuesZ the GTO gradient Z values on grid points.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
     CDenseMatrix _integratePartialVxcFockForGGA(const int32_t          npoints,
                                                 const double*          xcoords,
                                                 const double*          ycoords,

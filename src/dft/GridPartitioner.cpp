@@ -584,7 +584,7 @@ CGridPartitioner::getGridPointCounts() const
 
     for (auto box = _boxes.cbegin(); box != _boxes.cend(); ++box)
     {
-        counts.data(index)[0] = box->getNumberOfGridPoints();
+        counts.data()[index] = box->getNumberOfGridPoints();
 
         ++index;
     }
@@ -601,7 +601,7 @@ CGridPartitioner::getGridPointDisplacements() const
 
     for (auto box = _boxes.cbegin(); box != _boxes.cend(); ++box)
     {
-        displacements.data(index)[0] = count;
+        displacements.data()[index] = count;
 
         ++index;
 

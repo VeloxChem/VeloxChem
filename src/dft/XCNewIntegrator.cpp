@@ -124,9 +124,9 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     for (int32_t box_id = 0; box_id < counts.size(); box_id++)
     {
-        auto count = counts.data(box_id)[0];
+        auto count = counts.data()[box_id];
 
-        auto displ = displacements.data(box_id)[0];
+        auto displ = displacements.data()[box_id];
 
         timer.start("GTO evaluation");
 
@@ -359,9 +359,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     for (int32_t box_id = 0; box_id < counts.size(); box_id++)
     {
-        auto count = counts.data(box_id)[0];
+        auto count = counts.data()[box_id];
 
-        auto displ = displacements.data(box_id)[0];
+        auto displ = displacements.data()[box_id];
 
         timer.start("GTO evaluation");
 
@@ -613,7 +613,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
 CDensityGrid
 CXCNewIntegrator::_generateDensityGridForLDA(const int32_t           npoints,
-                                             const CDenseMatrix&     gtoValuesOnGridPoints,
+                                             const CDenseMatrix&     gtoValues,
                                              const CAODensityMatrix& densityMatrix,
                                              const xcfun             xcFunType,
                                              CMultiTimer&            timer) const
@@ -630,7 +630,7 @@ CXCNewIntegrator::_generateDensityGridForLDA(const int32_t           npoints,
 
     timer.start("Density grid matmul");
 
-    const CDenseMatrix& mat_chi = gtoValuesOnGridPoints;
+    const CDenseMatrix& mat_chi = gtoValues;
 
     auto mat_F = denblas::multAB(densityMatrix.getReferenceToDensity(0), mat_chi);
 
@@ -785,13 +785,13 @@ CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t          npoints,
                                                  const double*          ycoords,
                                                  const double*          zcoords,
                                                  const double*          weights,
-                                                 const CDenseMatrix&    gtoValuesOnGridPoints,
+                                                 const CDenseMatrix&    gtoValues,
                                                  const CXCGradientGrid& xcGradientGrid,
                                                  CMultiTimer&           timer) const
 {
     // GTO values on grid points
 
-    const CDenseMatrix& mat_chi = gtoValuesOnGridPoints;
+    const CDenseMatrix& mat_chi = gtoValues;
 
     // exchange-correlation functional derivative
 

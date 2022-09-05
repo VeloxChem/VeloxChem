@@ -499,7 +499,7 @@ CMolecularGrid::distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MP
 
         for (int32_t box_id = 0; box_id < numboxes; box_id++)
         {
-            auto count = _gridPointCounts.data(box_id)[0];
+            auto count = _gridPointCounts.data()[box_id];
 
             count_index_pairs.push_back(std::make_pair(count, box_id));
         }
