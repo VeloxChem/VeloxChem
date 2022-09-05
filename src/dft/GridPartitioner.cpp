@@ -328,22 +328,17 @@ CGridPartitioner::findMedian(const double* ptr, const int32_t num) const
 
     std::sort(vec.begin(), vec.end());
 
-    // divide at threshold for special cases
+    // divide as evenly as possible
 
-    if (1024 * 2 <= num && num <= 1024 * 3) return 0.5 * (vec[1024 - 1] + vec[1024]);
+    if ((1024 * 2 < num) && (num <= 1024 * 3)) return 0.5 * (vec[num / 3 * 1 - 1] + vec[num / 3 * 1]);
 
-    if (1024 * 4 <= num && num <= 1024 * 5) return 0.5 * (vec[1024 - 1] + vec[1024]);
+    if ((1024 * 4 < num) && (num <= 1024 * 5)) return 0.5 * (vec[num / 5 * 2 - 1] + vec[num / 5 * 2]);
 
-    // divide evenly otherwise
+    if ((1024 * 6 < num) && (num <= 1024 * 7)) return 0.5 * (vec[num / 7 * 3 - 1] + vec[num / 7 * 3]);
 
-    if (num % 2 == 1)
-    {
-        return vec[num / 2];
-    }
-    else
-    {
-        return 0.5 * (vec[num / 2 - 1] + vec[num / 2]);
-    }
+    if ((1024 * 8 < num) && (num <= 1024 * 9)) return 0.5 * (vec[num / 9 * 4 - 1] + vec[num / 9 * 4]);
+
+    return 0.5 * (vec[num / 2 - 1] + vec[num / 2]);
 }
 
 double

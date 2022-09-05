@@ -30,7 +30,8 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <iostream>
+#include <utility>
+#include <vector>
 
 #include <mpi.h>
 
@@ -455,11 +456,11 @@ CMolecularGrid::partitionGridPoints()
 
         auto boxdim = getSpatialExtent();
 
-        // xmin, ymin, zmin
+        // padding xmin, ymin & zmin
 
         for (int32_t i = 0; i < 3; i++) boxdim[i] -= 0.0001;
 
-        // xmax, ymax, zmax
+        // padding xmax, ymax & zmax
 
         for (int32_t i = 3; i < 6; i++) boxdim[i] += 0.0001;
 
@@ -482,9 +483,52 @@ CMolecularGrid::partitionGridPoints()
 void
 CMolecularGrid::distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
+    std::string errnotpartitioned("MolecularGrid.distributeCountsAndDisplacements: Cannot broadcast unpartitioned molecular grid");
+
+    errors::assertMsgCritical(_isPartitioned, errnotpartitioned);
+
     if (!_isDistributed)
     {
         _isDistributed = true;
+
+        auto numboxes = _gridPointCounts.size();
+
+        // sort before distribute
+
+        std::vector<std::pair<int32_t, int32_t>> count_index_pairs;
+
+        for (int32_t box_id = 0; box_id < numboxes; box_id++)
+        {
+            auto count = _gridPointCounts.data(box_id)[0];
+
+            count_index_pairs.push_back(std::make_pair(count, box_id));
+        }
+
+        std::sort(count_index_pairs.begin(), count_index_pairs.end());
+
+        // re-arrange sorted indices for parallelization
+
+        std::vector<int32_t> newcounts;
+
+        std::vector<int32_t> newdispls;
+
+        for (int32_t p = 0; p < nodes; p++)
+        {
+            for (int32_t box_id = numboxes - 1 - p; box_id >= 0; box_id -= nodes)
+            {
+                auto index = count_index_pairs[box_id].second;
+
+                newcounts.push_back(_gridPointCounts.data()[index]);
+
+                newdispls.push_back(_gridPointDisplacements.data()[index]);
+            }
+        }
+
+        std::memcpy(_gridPointCounts.data(), newcounts.data(), numboxes * sizeof(int32_t));
+
+        std::memcpy(_gridPointDisplacements.data(), newdispls.data(), numboxes * sizeof(int32_t));
+
+        // distribute counts and displacements
 
         _gridPointCounts.scatter(rank, nodes, comm);
 
