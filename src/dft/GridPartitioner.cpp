@@ -328,15 +328,17 @@ CGridPartitioner::findMedian(const double* ptr, const int32_t num) const
 
     std::sort(vec.begin(), vec.end());
 
-    // divide as evenly as possible
+    // divide at proper position (1/3 for 2-3x thresh, 2/5 for 4-5x thresh, etc., and 1/2 otherwise)
 
-    if ((1024 * 2 < num) && (num <= 1024 * 3)) return 0.5 * (vec[num / 3 * 1 - 1] + vec[num / 3 * 1]);
+    auto thresh = _numberOfPointsThreshold;
 
-    if ((1024 * 4 < num) && (num <= 1024 * 5)) return 0.5 * (vec[num / 5 * 2 - 1] + vec[num / 5 * 2]);
+    if ((thresh * 2 < num) && (num <= thresh * 3)) return 0.5 * (vec[num / 3 * 1 - 1] + vec[num / 3 * 1]);
 
-    if ((1024 * 6 < num) && (num <= 1024 * 7)) return 0.5 * (vec[num / 7 * 3 - 1] + vec[num / 7 * 3]);
+    if ((thresh * 4 < num) && (num <= thresh * 5)) return 0.5 * (vec[num / 5 * 2 - 1] + vec[num / 5 * 2]);
 
-    if ((1024 * 8 < num) && (num <= 1024 * 9)) return 0.5 * (vec[num / 9 * 4 - 1] + vec[num / 9 * 4]);
+    if ((thresh * 6 < num) && (num <= thresh * 7)) return 0.5 * (vec[num / 7 * 3 - 1] + vec[num / 7 * 3]);
+
+    if ((thresh * 8 < num) && (num <= thresh * 9)) return 0.5 * (vec[num / 9 * 4 - 1] + vec[num / 9 * 4]);
 
     return 0.5 * (vec[num / 2 - 1] + vec[num / 2]);
 }
