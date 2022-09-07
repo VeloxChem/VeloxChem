@@ -3,6 +3,7 @@ target_sources(vlxobjs
     AOKohnShamMatrix.cpp
     DensityGrid.cpp
     DensityGridDriver.cpp
+    DensityGridGenerator.cpp
     DensityGridQuad.cpp
     GridBox.cpp
     GridDriver.cpp

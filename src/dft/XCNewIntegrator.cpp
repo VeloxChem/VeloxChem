@@ -34,6 +34,7 @@
 #include <omp.h>
 
 #include "DenseLinearAlgebra.hpp"
+#include "DensityGridGenerator.hpp"
 #include "DensityGridType.hpp"
 #include "FunctionalParser.hpp"
 #include "GtoFunc.hpp"
@@ -248,7 +249,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto dengrid = _generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat, xcfuntype, timer);
+        auto dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat, xcfuntype, timer);
 
         timer.start("XC functional");
 
@@ -529,7 +530,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto dengrid = _generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, xcfuntype, timer);
+        auto dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, xcfuntype, timer);
 
         timer.start("XC functional");
 
@@ -609,174 +610,6 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
     return mat_Vxc;
-}
-
-CDensityGrid
-CXCNewIntegrator::_generateDensityGridForLDA(const int32_t           npoints,
-                                             const CDenseMatrix&     gtoValues,
-                                             const CAODensityMatrix& densityMatrix,
-                                             const xcfun             xcFunType,
-                                             CMultiTimer&            timer) const
-{
-    CDensityGrid dengrid(npoints, densityMatrix.getNumberOfDensityMatrices(), xcFunType, dengrid::ab);
-
-    dengrid.zero();
-
-    auto rhoa = dengrid.alphaDensity(0);
-
-    auto rhob = dengrid.betaDensity(0);
-
-    // eq.(26), JCTC 2021, 17, 1512-1521
-
-    timer.start("Density grid matmul");
-
-    const CDenseMatrix& mat_chi = gtoValues;
-
-    auto mat_F = denblas::multAB(densityMatrix.getReferenceToDensity(0), mat_chi);
-
-    timer.stop("Density grid matmul");
-
-    // eq.(27), JCTC 2021, 17, 1512-1521
-
-    timer.start("Density grid rho");
-
-    auto naos = mat_chi.getNumberOfRows();
-
-    for (int32_t nu = 0; nu < naos; nu++)
-    {
-        auto F_nu = mat_F.row(nu);
-
-        auto chi_nu = mat_chi.row(nu);
-
-        for (int32_t g = 0; g < npoints; g++)
-        {
-            rhoa[g] += F_nu[g] * chi_nu[g];
-        }
-    }
-
-    std::memcpy(rhob, rhoa, npoints * sizeof(double));
-
-    timer.stop("Density grid rho");
-
-    return dengrid;
-}
-
-CDensityGrid
-CXCNewIntegrator::_generateDensityGridForGGA(const int32_t           npoints,
-                                             const CDenseMatrix&     gtoValues,
-                                             const CDenseMatrix&     gtoValuesX,
-                                             const CDenseMatrix&     gtoValuesY,
-                                             const CDenseMatrix&     gtoValuesZ,
-                                             const CAODensityMatrix& densityMatrix,
-                                             const xcfun             xcFunType,
-                                             CMultiTimer&            timer) const
-{
-    CDensityGrid dengrid(npoints, densityMatrix.getNumberOfDensityMatrices(), xcFunType, dengrid::ab);
-
-    dengrid.zero();
-
-    auto rhoa = dengrid.alphaDensity(0);
-
-    auto rhob = dengrid.betaDensity(0);
-
-    auto grada = dengrid.alphaDensityGradient(0);
-
-    auto gradb = dengrid.betaDensityGradient(0);
-
-    auto gradab = dengrid.mixedDensityGradient(0);
-
-    auto gradax = dengrid.alphaDensityGradientX(0);
-
-    auto graday = dengrid.alphaDensityGradientY(0);
-
-    auto gradaz = dengrid.alphaDensityGradientZ(0);
-
-    auto gradbx = dengrid.betaDensityGradientX(0);
-
-    auto gradby = dengrid.betaDensityGradientY(0);
-
-    auto gradbz = dengrid.betaDensityGradientZ(0);
-
-    // eq.(26), JCTC 2021, 17, 1512-1521
-
-    timer.start("Density grid matmul");
-
-    const CDenseMatrix& mat_chi = gtoValues;
-
-    const CDenseMatrix& mat_chi_x = gtoValuesX;
-
-    const CDenseMatrix& mat_chi_y = gtoValuesY;
-
-    const CDenseMatrix& mat_chi_z = gtoValuesZ;
-
-    auto den_mat = densityMatrix.getReferenceToDensity(0);
-
-    auto mat_F = denblas::multAB(den_mat, mat_chi);
-
-    auto mat_F_x = denblas::multAB(den_mat, mat_chi_x);
-
-    auto mat_F_y = denblas::multAB(den_mat, mat_chi_y);
-
-    auto mat_F_z = denblas::multAB(den_mat, mat_chi_z);
-
-    timer.stop("Density grid matmul");
-
-    // eq.(27), JCTC 2021, 17, 1512-1521
-
-    timer.start("Density grid rho");
-
-    auto naos = mat_chi.getNumberOfRows();
-
-    for (int32_t nu = 0; nu < naos; nu++)
-    {
-        auto F_nu = mat_F.row(nu);
-
-        auto F_x_nu = mat_F_x.row(nu);
-
-        auto F_y_nu = mat_F_y.row(nu);
-
-        auto F_z_nu = mat_F_z.row(nu);
-
-        auto chi_nu = mat_chi.row(nu);
-
-        auto chi_x_nu = mat_chi_x.row(nu);
-
-        auto chi_y_nu = mat_chi_y.row(nu);
-
-        auto chi_z_nu = mat_chi_z.row(nu);
-
-        for (int32_t g = 0; g < npoints; g++)
-        {
-            rhoa[g] += F_nu[g] * chi_nu[g];
-
-            gradax[g] += F_nu[g] * chi_x_nu[g] + F_x_nu[g] * chi_nu[g];
-
-            graday[g] += F_nu[g] * chi_y_nu[g] + F_y_nu[g] * chi_nu[g];
-
-            gradaz[g] += F_nu[g] * chi_z_nu[g] + F_z_nu[g] * chi_nu[g];
-        }
-    }
-
-    std::memcpy(rhob, rhoa, npoints * sizeof(double));
-
-    std::memcpy(gradbx, gradax, npoints * sizeof(double));
-
-    std::memcpy(gradby, graday, npoints * sizeof(double));
-
-    std::memcpy(gradbz, gradaz, npoints * sizeof(double));
-
-    for (int32_t g = 0; g < npoints; g++)
-    {
-        grada[g] = std::sqrt(gradax[g] * gradax[g] + graday[g] * graday[g] + gradaz[g] * gradaz[g]);
-
-        gradb[g] = std::sqrt(gradbx[g] * gradbx[g] + gradby[g] * gradby[g] + gradbz[g] * gradbz[g]);
-
-        gradab[g] = gradax[g] * gradbx[g] + graday[g] * gradby[g] + gradaz[g] * gradbz[g];
-    }
-
-    timer.stop("Density grid rho");
-
-    return dengrid;
 }
 
 CDenseMatrix
