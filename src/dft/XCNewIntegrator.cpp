@@ -143,6 +143,29 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         auto weights = molecularGrid.getWeights() + displ;
 
+        // determine spatial extent of grid points
+
+        double xmin = xcoords[0], ymin = ycoords[0], zmin = zcoords[0];
+
+        double xmax = xcoords[0], ymax = ycoords[0], zmax = zcoords[0];
+
+        for (int32_t g = 0; g < npoints; g++)
+        {
+            if (xmin > xcoords[g]) xmin = xcoords[g];
+
+            if (ymin > ycoords[g]) ymin = ycoords[g];
+
+            if (zmin > zcoords[g]) zmin = zcoords[g];
+
+            if (xmax < xcoords[g]) xmax = xcoords[g];
+
+            if (ymax < ycoords[g]) ymax = ycoords[g];
+
+            if (zmax < zcoords[g]) zmax = zcoords[g];
+        }
+
+        std::array<double, 6> boxdim({xmin, ymin, zmin, xmax, ymax, zmax});
+
         // GTO values on grid points
 
         CMemBlock2D<double> gaos(npoints, naos);
@@ -161,7 +184,8 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
             local_gaos.zero();
 
-            gtorec::computeGtosValuesForLDA(local_gaos, gtovec, xcoords, ycoords, zcoords, batch_offset, 0, batch_size);
+            gtorec::computeGtosValuesForLDA(local_gaos, gtovec, xcoords, ycoords, zcoords, batch_offset, batch_size,
+                                            boxdim, _screeningThresholdForGTOValues);
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
@@ -378,6 +402,29 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto weights = molecularGrid.getWeights() + displ;
 
+        // determine spatial extent of grid points
+
+        double xmin = xcoords[0], ymin = ycoords[0], zmin = zcoords[0];
+
+        double xmax = xcoords[0], ymax = ycoords[0], zmax = zcoords[0];
+
+        for (int32_t g = 0; g < npoints; g++)
+        {
+            if (xmin > xcoords[g]) xmin = xcoords[g];
+
+            if (ymin > ycoords[g]) ymin = ycoords[g];
+
+            if (zmin > zcoords[g]) zmin = zcoords[g];
+
+            if (xmax < xcoords[g]) xmax = xcoords[g];
+
+            if (ymax < ycoords[g]) ymax = ycoords[g];
+
+            if (zmax < zcoords[g]) zmax = zcoords[g];
+        }
+
+        std::array<double, 6> boxdim({xmin, ymin, zmin, xmax, ymax, zmax});
+
         // GTO values on grid points
 
         CMemBlock2D<double> gaos(npoints, naos);
@@ -415,7 +462,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             local_gaoz.zero();
 
             gtorec::computeGtosValuesForGGA(local_gaos, local_gaox, local_gaoy, local_gaoz, gtovec, xcoords, ycoords, zcoords,
-                                            batch_offset, 0, batch_size);
+                                            batch_offset, batch_size, boxdim, _screeningThresholdForGTOValues);
 
             for (int32_t nu = 0; nu < naos; nu++)
             {

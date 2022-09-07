@@ -34,6 +34,330 @@
 namespace gtorec {  // gtorec namespace
 
     void
+    computeGtosValuesForLDA(CMemBlock2D<double>&         gtoValues,
+                            const CGtoContainer*         gtoContainer,
+                            const double*                gridCoordinatesX,
+                            const double*                gridCoordinatesY,
+                            const double*                gridCoordinatesZ,
+                            const int32_t                gridOffset,
+                            const int32_t                nGridPoints,
+                            const std::array<double, 6>& boxDimension,
+                            const double                 gtoThreshold)
+    {
+        // spatial extent of grid box
+
+        auto xmin = boxDimension[0];
+
+        auto ymin = boxDimension[1];
+
+        auto zmin = boxDimension[2];
+
+        auto xmax = boxDimension[3];
+
+        auto ymax = boxDimension[4];
+
+        auto zmax = boxDimension[5];
+
+        // local copy of GTOs containers
+
+        auto gtovec = CGtoContainer(*gtoContainer);
+
+        // loop over GTOs container data
+
+        for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+        {
+            auto bgtos = gtovec.getGtoBlock(i);
+
+            // angular momentum data for bra and ket
+
+            auto bang = bgtos.getAngularMomentum();
+
+            // set up Cartesian GTOs buffer
+
+            auto nvcomp = xcfun_components(xcfun::lda);
+
+            auto bncart = angmom::to_CartesianComponents(bang);
+
+            auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+
+            // set up spherical GTOs buffer
+
+            auto bnspher = angmom::to_SphericalComponents(bang);
+
+            CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+
+            // pointers to primitives data
+
+            auto bfnorms = bgtos.getNormFactors();
+
+            auto bfexps = bgtos.getExponents();
+
+            auto bfx = bgtos.getCoordinatesX();
+
+            auto bfy = bgtos.getCoordinatesY();
+
+            auto bfz = bgtos.getCoordinatesZ();
+
+            // pointers to contraction pattern
+
+            auto spos = bgtos.getStartPositions();
+
+            auto epos = bgtos.getEndPositions();
+
+            // loop over contracted GTOs
+
+            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+            {
+                // contracted GTO screening
+
+                double rx = 0.0, ry = 0.0, rz = 0.0;
+
+                if      (bfx[spos[j]] < xmin) rx = xmin - bfx[spos[j]];
+
+                else if (bfx[spos[j]] > xmax) rx = bfx[spos[j]] - xmax;
+
+                if      (bfy[spos[j]] < ymin) ry = ymin - bfy[spos[j]];
+
+                else if (bfy[spos[j]] > ymax) ry = bfy[spos[j]] - ymax;
+
+                if      (bfz[spos[j]] < zmin) rz = zmin - bfz[spos[j]];
+
+                else if (bfz[spos[j]] > zmax) rz = bfz[spos[j]] - zmax;
+
+                auto r2 = rx * rx + ry * ry + rz * rz;
+
+                if (r2 > 1.0)
+                {
+                    auto minexp = bfexps[spos[j]];
+
+                    auto maxcoef = std::fabs(bfnorms[spos[j]]);
+
+                    for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
+                    {
+                        auto bexp = bfexps[iprim];
+
+                        auto bnorm = std::fabs(bfnorms[iprim]);
+
+                        if (minexp > bexp) minexp = bexp;
+
+                        if (maxcoef < bnorm) maxcoef = bnorm;
+                    }
+
+                    // gto: r^{ang} |C| exp(-alpha r^2)
+
+                    auto gtolimit = maxcoef * std::exp(-minexp * r2);
+
+                    if (bang > 0)
+                    {
+                        auto r = std::sqrt(r2);
+
+                        for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
+                    }
+
+                    if (gtolimit < gtoThreshold) continue;
+                }
+
+                // compute j-th GTO values on batch of grid points
+
+                gtorec::computeGtoValuesOnGrid(
+                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, bgtos, j, xcfun::lda);
+
+                // distribute j-th GTO values into grid values matrix
+
+                for (int32_t k = 0; k < bnspher; k++)
+                {
+                    auto bgaos = bspherbuff.data(k);
+
+                    auto gvals = gtoValues.data((bgtos.getIdentifiers(k))[j]);
+
+                    #pragma omp simd aligned(bgaos, gvals : VLX_ALIGN)
+                    for (int32_t l = 0; l < nGridPoints; l++)
+                    {
+                        gvals[l] = bgaos[l];
+                    }
+                }
+            }
+        }
+    }
+
+    void
+    computeGtosValuesForGGA(CMemBlock2D<double>&         gtoValues,
+                            CMemBlock2D<double>&         gtoValuesX,
+                            CMemBlock2D<double>&         gtoValuesY,
+                            CMemBlock2D<double>&         gtoValuesZ,
+                            const CGtoContainer*         gtoContainer,
+                            const double*                gridCoordinatesX,
+                            const double*                gridCoordinatesY,
+                            const double*                gridCoordinatesZ,
+                            const int32_t                gridOffset,
+                            const int32_t                nGridPoints,
+                            const std::array<double, 6>& boxDimension,
+                            const double                 gtoThreshold)
+    {
+        // spatial extent of grid box
+
+        auto xmin = boxDimension[0];
+
+        auto ymin = boxDimension[1];
+
+        auto zmin = boxDimension[2];
+
+        auto xmax = boxDimension[3];
+
+        auto ymax = boxDimension[4];
+
+        auto zmax = boxDimension[5];
+
+        // local copy of GTOs containers
+
+        auto gtovec = CGtoContainer(*gtoContainer);
+
+        // loop over GTOs container data
+
+        for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+        {
+            auto bgtos = gtovec.getGtoBlock(i);
+
+            // angular momentum data for bra and ket
+
+            auto bang = bgtos.getAngularMomentum();
+
+            // set up Cartesian GTOs buffer
+
+            auto nvcomp = xcfun_components(xcfun::gga);
+
+            auto bncart = angmom::to_CartesianComponents(bang);
+
+            auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+
+            // set up spherical GTOs buffer
+
+            auto bnspher = angmom::to_SphericalComponents(bang);
+
+            CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+
+            // pointers to primitives data
+
+            auto bfnorms = bgtos.getNormFactors();
+
+            auto bfexps = bgtos.getExponents();
+
+            auto bfx = bgtos.getCoordinatesX();
+
+            auto bfy = bgtos.getCoordinatesY();
+
+            auto bfz = bgtos.getCoordinatesZ();
+
+            // pointers to contraction pattern
+
+            auto spos = bgtos.getStartPositions();
+
+            auto epos = bgtos.getEndPositions();
+
+            // loop over contracted GTOs
+
+            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+            {
+                // contracted GTO screening
+
+                double rx = 0.0, ry = 0.0, rz = 0.0;
+
+                if      (bfx[spos[j]] < xmin) rx = xmin - bfx[spos[j]];
+
+                else if (bfx[spos[j]] > xmax) rx = bfx[spos[j]] - xmax;
+
+                if      (bfy[spos[j]] < ymin) ry = ymin - bfy[spos[j]];
+
+                else if (bfy[spos[j]] > ymax) ry = bfy[spos[j]] - ymax;
+
+                if      (bfz[spos[j]] < zmin) rz = zmin - bfz[spos[j]];
+
+                else if (bfz[spos[j]] > zmax) rz = bfz[spos[j]] - zmax;
+
+                auto r2 = rx * rx + ry * ry + rz * rz;
+
+                if (r2 > 1.0)
+                {
+                    auto minexp = bfexps[spos[j]];
+
+                    auto maxexp = bfexps[spos[j]];
+
+                    auto maxcoef = std::fabs(bfnorms[spos[j]]);
+
+                    for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
+                    {
+                        auto bexp = bfexps[iprim];
+
+                        auto bnorm = std::fabs(bfnorms[iprim]);
+
+                        if (minexp > bexp) minexp = bexp;
+
+                        if (maxexp < bexp) maxexp = bexp;
+
+                        if (maxcoef < bnorm) maxcoef = bnorm;
+                    }
+
+                    // gto  :           r^{ang}   |C| exp(-alpha r^2)
+                    // gto_m:           r^{ang-1} |C| exp(-alpha r^2)
+                    // gto_p: (2 alpha) r^{ang+1} |C| exp(-alpha r^2)
+
+                    // Note that gto_m < gto (r > 1)
+
+                    auto r = std::sqrt(r2);
+
+                    auto gtolimit = maxcoef * std::exp(-minexp * r2);
+
+                    for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
+
+                    auto gtolimit_p = 2.0 * maxexp * r * gtolimit;
+
+                    if ((gtolimit < gtoThreshold) && (gtolimit_p < gtoThreshold)) continue;
+                }
+
+                // compute j-th GTO values on batch of grid points
+
+                gtorec::computeGtoValuesOnGrid(
+                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, bgtos, j, xcfun::gga);
+
+                // distribute j-th GTO values into grid values matrix
+
+                for (int32_t k = 0; k < bnspher; k++)
+                {
+                    auto bgaos = bspherbuff.data(4 * k);
+
+                    auto bgaox = bspherbuff.data(4 * k + 1);
+
+                    auto bgaoy = bspherbuff.data(4 * k + 2);
+
+                    auto bgaoz = bspherbuff.data(4 * k + 3);
+
+                    auto idx = (bgtos.getIdentifiers(k))[j];
+
+                    auto gvals = gtoValues.data(idx);
+
+                    auto gvalx = gtoValuesX.data(idx);
+
+                    auto gvaly = gtoValuesY.data(idx);
+
+                    auto gvalz = gtoValuesZ.data(idx);
+
+                    #pragma omp simd aligned(bgaos, bgaox, bgaoy, bgaoz, gvals, gvalx, gvaly, gvalz : VLX_ALIGN)
+                    for (int32_t l = 0; l < nGridPoints; l++)
+                    {
+                        gvals[l] = bgaos[l];
+
+                        gvalx[l] = bgaox[l];
+
+                        gvaly[l] = bgaoy[l];
+
+                        gvalz[l] = bgaoz[l];
+                    }
+                }
+            }
+        }
+    }
+
+    void
     computeGtosValuesForLDA(CMemBlock2D<double>& gtoValues,
                             const CGtoContainer* gtoContainer,
                             const double*        gridCoordinatesX,
