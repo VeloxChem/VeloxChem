@@ -33,6 +33,7 @@
 
 #include <omp.h>
 
+#include "AngularMomentum.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DensityGridType.hpp"
@@ -383,10 +384,10 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     timer.start("Total timing");
 
+    int32_t skip_count_total = 0, num_blocks_total = 0;
+
     for (int32_t box_id = 0; box_id < counts.size(); box_id++)
     {
-        timer.start("GTO evaluation");
-
         // grid points in box
 
         auto npoints = counts.data()[box_id];
@@ -401,6 +402,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto weights = molecularGrid.getWeights();
 
+        timer.start("AO pre-selection");
+
         // determine spatial extent of grid points
 
         double xmin = xcoords[gridblockpos], ymin = ycoords[gridblockpos], zmin = zcoords[gridblockpos];
@@ -409,20 +412,109 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         for (int32_t g = 0; g < npoints; g++)
         {
-            if (xmin > xcoords[gridblockpos + g]) xmin = xcoords[gridblockpos + g];
+            xmin = std::min(xmin, xcoords[gridblockpos + g]);
 
-            if (ymin > ycoords[gridblockpos + g]) ymin = ycoords[gridblockpos + g];
+            ymin = std::min(ymin, ycoords[gridblockpos + g]);
 
-            if (zmin > zcoords[gridblockpos + g]) zmin = zcoords[gridblockpos + g];
+            zmin = std::min(zmin, zcoords[gridblockpos + g]);
 
-            if (xmax < xcoords[gridblockpos + g]) xmax = xcoords[gridblockpos + g];
+            xmax = std::max(xmax, xcoords[gridblockpos + g]);
 
-            if (ymax < ycoords[gridblockpos + g]) ymax = ycoords[gridblockpos + g];
+            ymax = std::max(ymax, ycoords[gridblockpos + g]);
 
-            if (zmax < zcoords[gridblockpos + g]) zmax = zcoords[gridblockpos + g];
+            zmax = std::max(zmax, zcoords[gridblockpos + g]);
         }
 
         std::array<double, 6> boxdim({xmin, ymin, zmin, xmax, ymax, zmax});
+
+        auto numgtoblocks = gtovec->getNumberOfGtoBlocks();
+
+        CMemBlock<int32_t> skip_block_ids(numgtoblocks);
+
+        for (int32_t i = 0; i < numgtoblocks; i++)
+        {
+            skip_block_ids.data()[i] = 0;
+
+            auto bgtos = gtovec->getGtoBlock(i);
+
+            auto bang = bgtos.getAngularMomentum();
+
+            auto bfnorms = bgtos.getNormFactors();
+
+            auto bfexps = bgtos.getExponents();
+
+            auto bfx = bgtos.getCoordinatesX();
+
+            auto bfy = bgtos.getCoordinatesY();
+
+            auto bfz = bgtos.getCoordinatesZ();
+
+            auto spos = bgtos.getStartPositions();
+
+            auto epos = bgtos.getEndPositions();
+
+            auto firstprim = spos[0];
+
+            double rx = std::max({xmin - bfx[firstprim], bfx[firstprim] - xmax, 0.0});
+
+            double ry = std::max({ymin - bfy[firstprim], bfy[firstprim] - ymax, 0.0});
+
+            double rz = std::max({zmin - bfz[firstprim], bfz[firstprim] - zmax, 0.0});
+
+            auto r2 = rx * rx + ry * ry + rz * rz;
+
+            if (r2 > 1.0)
+            {
+                auto minexp = bfexps[firstprim];
+
+                auto maxexp = bfexps[firstprim];
+
+                auto maxcoef = std::fabs(bfnorms[firstprim]);
+
+                for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+                {
+                    for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
+                    {
+                        auto bexp = bfexps[iprim];
+
+                        auto bnorm = std::fabs(bfnorms[iprim]);
+
+                        if (minexp > bexp) minexp = bexp;
+
+                        if (maxexp < bexp) maxexp = bexp;
+
+                        if (maxcoef < bnorm) maxcoef = bnorm;
+                    }
+                }
+
+                // gto  :           r^{ang}   |C| exp(-alpha r^2)
+                // gto_m:           r^{ang-1} |C| exp(-alpha r^2)
+                // gto_p: (2 alpha) r^{ang+1} |C| exp(-alpha r^2)
+
+                // Note that gto_m < gto (r > 1)
+
+                auto r = std::sqrt(r2);
+
+                auto gtolimit = maxcoef * std::exp(-minexp * r2);
+
+                for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
+
+                auto gtolimit_p = 2.0 * maxexp * r * gtolimit;
+
+                if (std::max(gtolimit, gtolimit_p) < _screeningThresholdForGTOValues)
+                {
+                    skip_block_ids.data()[i] = 1;
+
+                    ++skip_count_total;
+                }
+            }
+
+            ++num_blocks_total;
+        }
+
+        timer.stop("AO pre-selection");
+
+        timer.start("GTO evaluation");
 
         // GTO values on grid points
 
@@ -434,7 +526,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         CMemBlock2D<double> gaoz(npoints, naos);
 
-        #pragma omp parallel
+        #pragma omp parallel shared(npoints, naos, gtovec, xcoords, ycoords, zcoords, gridblockpos, skip_block_ids, gaos, gaox, gaoy, gaoz)
         {
             auto nthreads = omp_get_max_threads();
 
@@ -461,7 +553,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             local_gaoz.zero();
 
             gtoeval::computeGtosValuesForGGA(local_gaos, local_gaox, local_gaoy, local_gaoz, gtovec, xcoords, ycoords, zcoords,
-                                             gridblockpos, grid_batch_offset, grid_batch_size, boxdim, _screeningThresholdForGTOValues);
+
+                                             gridblockpos, grid_batch_offset, grid_batch_size, skip_block_ids);
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
@@ -638,6 +731,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.stop("XC energy");
     }
+
+    std::cout << "Total skip count: " << skip_count_total << " / " << num_blocks_total << std::endl;
 
     // destroy GTOs container
 
