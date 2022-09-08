@@ -364,6 +364,10 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 {
     CMultiTimer timer;
 
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<CMultiTimer> omptimers(nthreads);
+
     // create GTOs container
 
     CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
@@ -535,6 +539,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             auto thread_id = omp_get_thread_num();
 
+            omptimers[thread_id].start("gtoprep");
+
             auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
@@ -555,9 +561,17 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             local_gaoz.zero();
 
+            omptimers[thread_id].stop("gtoprep");
+
+            omptimers[thread_id].start("gtoeval");
+
             gtoeval::computeGtosValuesForGGA(local_gaos, local_gaox, local_gaoy, local_gaoz, gtovec, xcoords, ycoords, zcoords,
 
                                              gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+
+            omptimers[thread_id].stop("gtoeval");
+
+            omptimers[thread_id].start("gtocopy");
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
@@ -569,6 +583,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
                 std::memcpy(gaoz.data(nu) + grid_batch_offset, local_gaoz.data(nu), grid_batch_size * sizeof(double));
             }
+
+            omptimers[thread_id].stop("gtocopy");
         }
 
         timer.stop("GTO evaluation");
@@ -748,6 +764,15 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     std::cout << "------------------------" << std::endl;
 
     std::cout << timer.getSummary() << std::endl;
+
+    std::cout << "OpenMP timing" << std::endl;
+
+    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    {
+        std::cout << "Thread " << thread_id << std::endl;
+
+        std::cout << omptimers[thread_id].getSummary() << std::endl;
+    }
 
     mat_Vxc.setNumberOfElectrons(nele);
 
