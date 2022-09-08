@@ -8,6 +8,7 @@ target_sources(vlxobjs
     GridBox.cpp
     GridDriver.cpp
     GridPartitioner.cpp
+    GtoEvaluator.cpp
     GtoFunc.cpp
     GtoFuncForGGA.cpp
     GtoFuncForLDA.cpp

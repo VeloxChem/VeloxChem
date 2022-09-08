@@ -37,6 +37,7 @@
 #include "DensityGridGenerator.hpp"
 #include "DensityGridType.hpp"
 #include "FunctionalParser.hpp"
+#include "GtoEvaluator.hpp"
 #include "GtoFunc.hpp"
 #include "XCFuncType.hpp"
 #include "XCVarsType.hpp"
@@ -461,8 +462,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             local_gaoz.zero();
 
-            gtorec::computeGtosValuesForGGA(local_gaos, local_gaox, local_gaoy, local_gaoz, gtovec, xcoords, ycoords, zcoords,
-                                            batch_offset, batch_size, boxdim, _screeningThresholdForGTOValues);
+            gtoeval::computeGtosValuesForGGA(local_gaos, local_gaox, local_gaoy, local_gaoz, gtovec, xcoords, ycoords, zcoords,
+                                             batch_offset, batch_size);
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
