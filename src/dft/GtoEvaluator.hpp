@@ -32,17 +32,19 @@
 
 namespace gtoeval {  // gtoeval namespace
 
-void computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
-                             CMemBlock2D<double>& gtoValuesX,
-                             CMemBlock2D<double>& gtoValuesY,
-                             CMemBlock2D<double>& gtoValuesZ,
-                             const CGtoContainer* gtoContainer,
-                             const double*        gridCoordinatesX,
-                             const double*        gridCoordinatesY,
-                             const double*        gridCoordinatesZ,
-                             const int32_t        gridBlockPosition,
-                             const int32_t        gridOffset,
-                             const int32_t        nGridPoints);
+void computeGtosValuesForGGA(CMemBlock2D<double>&         gtoValues,
+                             CMemBlock2D<double>&         gtoValuesX,
+                             CMemBlock2D<double>&         gtoValuesY,
+                             CMemBlock2D<double>&         gtoValuesZ,
+                             const CGtoContainer*         gtoContainer,
+                             const double*                gridCoordinatesX,
+                             const double*                gridCoordinatesY,
+                             const double*                gridCoordinatesZ,
+                             const int32_t                gridBlockPosition,
+                             const int32_t                gridOffset,
+                             const int32_t                nGridPoints,
+                             const std::array<double, 6>& boxDimension,
+                             const double                 gtoThreshold);
 
 }  // namespace gtoeval
 

@@ -447,7 +447,6 @@ CAOKohnShamMatrix::addMatrixContribution(const CDenseMatrix& matrix, const bool 
 
     auto ndim = getNumberOfElements();
 
-#pragma omp simd aligned(ksptr, matptr : VLX_ALIGN)
     for (int32_t i = 0; i < ndim; i++)
     {
         ksptr[i] += matptr[i];

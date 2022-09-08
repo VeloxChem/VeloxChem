@@ -365,7 +365,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // create GTOs container
 
-    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis, "ATOMGTOS");
 
     // number of AOs
 
@@ -461,7 +461,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             local_gaoz.zero();
 
             gtoeval::computeGtosValuesForGGA(local_gaos, local_gaox, local_gaoy, local_gaoz, gtovec, xcoords, ycoords, zcoords,
-                                             gridblockpos, grid_batch_offset, grid_batch_size);
+                                             gridblockpos, grid_batch_offset, grid_batch_size, boxdim, _screeningThresholdForGTOValues);
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
@@ -628,7 +628,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto efunc = vxcgrid.xcFunctionalValues();
 
-        #pragma omp parallel for reduction(+ : nele, xcene) aligned(weights, rhoa, efunc : VLX_ALIGN)
+        #pragma omp parallel for simd reduction(+ : nele, xcene)
         for (int32_t g = 0; g < npoints; g++)
         {
             nele += weights[gridblockpos + g] * rhoa[g];

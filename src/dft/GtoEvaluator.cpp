@@ -31,18 +31,34 @@
 namespace gtoeval {  // gtoeval namespace
 
 void
-computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
-                        CMemBlock2D<double>& gtoValuesX,
-                        CMemBlock2D<double>& gtoValuesY,
-                        CMemBlock2D<double>& gtoValuesZ,
-                        const CGtoContainer* gtoContainer,
-                        const double*        gridCoordinatesX,
-                        const double*        gridCoordinatesY,
-                        const double*        gridCoordinatesZ,
-                        const int32_t        gridBlockPosition,
-                        const int32_t        gridOffset,
-                        const int32_t        nGridPoints)
+computeGtosValuesForGGA(CMemBlock2D<double>&         gtoValues,
+                        CMemBlock2D<double>&         gtoValuesX,
+                        CMemBlock2D<double>&         gtoValuesY,
+                        CMemBlock2D<double>&         gtoValuesZ,
+                        const CGtoContainer*         gtoContainer,
+                        const double*                gridCoordinatesX,
+                        const double*                gridCoordinatesY,
+                        const double*                gridCoordinatesZ,
+                        const int32_t                gridBlockPosition,
+                        const int32_t                gridOffset,
+                        const int32_t                nGridPoints,
+                        const std::array<double, 6>& boxDimension,
+                        const double                 gtoThreshold)
 {
+    // spatial extent of grid box
+
+    auto xmin = boxDimension[0];
+
+    auto ymin = boxDimension[1];
+
+    auto zmin = boxDimension[2];
+
+    auto xmax = boxDimension[3];
+
+    auto ymax = boxDimension[4];
+
+    auto zmax = boxDimension[5];
+
     // local copy of GTOs containers
 
     auto gtovec = CGtoContainer(*gtoContainer);
@@ -90,6 +106,65 @@ computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
         auto spos = bgtos.getStartPositions();
 
         auto epos = bgtos.getEndPositions();
+
+        // contracted GTO screening
+
+        double rx = 0.0, ry = 0.0, rz = 0.0;
+
+        if      (bfx[spos[0]] < xmin) rx = xmin - bfx[spos[0]];
+
+        else if (bfx[spos[0]] > xmax) rx = bfx[spos[0]] - xmax;
+
+        if      (bfy[spos[0]] < ymin) ry = ymin - bfy[spos[0]];
+
+        else if (bfy[spos[0]] > ymax) ry = bfy[spos[0]] - ymax;
+
+        if      (bfz[spos[0]] < zmin) rz = zmin - bfz[spos[0]];
+
+        else if (bfz[spos[0]] > zmax) rz = bfz[spos[0]] - zmax;
+
+        auto r2 = rx * rx + ry * ry + rz * rz;
+
+        if (r2 > 1.0)
+        {
+            auto minexp = bfexps[spos[0]];
+
+            auto maxexp = bfexps[spos[0]];
+
+            auto maxcoef = std::fabs(bfnorms[spos[0]]);
+
+            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+            {
+                for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
+                {
+                    auto bexp = bfexps[iprim];
+
+                    auto bnorm = std::fabs(bfnorms[iprim]);
+
+                    if (minexp > bexp) minexp = bexp;
+
+                    if (maxexp < bexp) maxexp = bexp;
+
+                    if (maxcoef < bnorm) maxcoef = bnorm;
+                }
+            }
+
+            // gto  :           r^{ang}   |C| exp(-alpha r^2)
+            // gto_m:           r^{ang-1} |C| exp(-alpha r^2)
+            // gto_p: (2 alpha) r^{ang+1} |C| exp(-alpha r^2)
+
+            // Note that gto_m < gto (r > 1)
+
+            auto r = std::sqrt(r2);
+
+            auto gtolimit = maxcoef * std::exp(-minexp * r2);
+
+            for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
+
+            auto gtolimit_p = 2.0 * maxexp * r * gtolimit;
+
+            if ((gtolimit < gtoThreshold) && (gtolimit_p < gtoThreshold)) continue;
+        }
 
         // loop over contracted GTOs
 
