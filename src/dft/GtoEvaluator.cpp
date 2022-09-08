@@ -428,13 +428,13 @@ computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
                 #pragma omp simd aligned(bgaos, bgaox, bgaoy, bgaoz, gvals, gvalx, gvaly, gvalz : VLX_ALIGN)
                 for (int32_t g = 0; g < nGridPoints; g++)
                 {
-                    gvals[g] = bgaos[g];
+                    gvals[gridOffset + g] = bgaos[g];
 
-                    gvalx[g] = bgaox[g];
+                    gvalx[gridOffset + g] = bgaox[g];
 
-                    gvaly[g] = bgaoy[g];
+                    gvaly[gridOffset + g] = bgaoy[g];
 
-                    gvalz[g] = bgaoz[g];
+                    gvalz[gridOffset + g] = bgaoz[g];
                 }
             }
         }

@@ -390,6 +390,14 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     int32_t skip_count_total = 0, num_blocks_total = 0;
 
+    auto xcoords = molecularGrid.getCoordinatesX();
+
+    auto ycoords = molecularGrid.getCoordinatesY();
+
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    auto weights = molecularGrid.getWeights();
+
     for (int32_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
@@ -397,14 +405,6 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
         auto npoints = counts.data()[box_id];
 
         auto gridblockpos = displacements.data()[box_id];
-
-        auto xcoords = molecularGrid.getCoordinatesX();
-
-        auto ycoords = molecularGrid.getCoordinatesY();
-
-        auto zcoords = molecularGrid.getCoordinatesZ();
-
-        auto weights = molecularGrid.getWeights();
 
         timer.start("AO pre-selection");
 
@@ -520,9 +520,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.stop("AO pre-selection");
 
-        timer.start("GTO evaluation");
-
         // GTO values on grid points
+
+        timer.start("GTO prep.");
 
         CMemBlock2D<double> gaos(npoints, naos);
 
@@ -532,91 +532,36 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         CMemBlock2D<double> gaoz(npoints, naos);
 
-        timer.start("gtoprep");
+        gaos.zero();
 
-        std::vector<CMemBlock2D<double>> omp_gaos, omp_gaox, omp_gaoy, omp_gaoz;
+        gaox.zero();
 
-        std::vector<int32_t> grid_batch_sizes, grid_batch_offsets;
+        gaoy.zero();
 
-        for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-        {
-            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+        gaoz.zero();
 
-            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+        timer.stop("GTO prep.");
 
-            grid_batch_sizes.push_back(grid_batch_size);
-
-            grid_batch_offsets.push_back(grid_batch_offset);
-
-            omp_gaos.push_back(CMemBlock2D<double>(grid_batch_size, naos));
-
-            omp_gaox.push_back(CMemBlock2D<double>(grid_batch_size, naos));
-
-            omp_gaoy.push_back(CMemBlock2D<double>(grid_batch_size, naos));
-
-            omp_gaoz.push_back(CMemBlock2D<double>(grid_batch_size, naos));
-
-            omp_gaos[thread_id].zero();
-
-            omp_gaox[thread_id].zero();
-
-            omp_gaoy[thread_id].zero();
-
-            omp_gaoz[thread_id].zero();
-        }
-
-        timer.stop("gtoprep");
+        timer.start("OMP GTO eval");
 
         #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
-            auto grid_batch_size = grid_batch_sizes[thread_id];
-
-            auto grid_batch_offset = grid_batch_offsets[thread_id];
-
             omptimers[thread_id].start("gtoeval");
 
-            gtoeval::computeGtosValuesForGGA(omp_gaos[thread_id], omp_gaox[thread_id], omp_gaoy[thread_id], omp_gaoz[thread_id],
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-                                             gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size,
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
 
-        timer.start("gtocopy");
-
-        for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-        {
-            auto grid_batch_size = grid_batch_sizes[thread_id];
-
-            auto grid_batch_offset = grid_batch_offsets[thread_id];
-
-            for (int32_t nu = 0; nu < naos; nu++)
-            {
-                std::memcpy(gaos.data(nu) + grid_batch_offset, omp_gaos[thread_id].data(nu), grid_batch_size * sizeof(double));
-
-                std::memcpy(gaox.data(nu) + grid_batch_offset, omp_gaox[thread_id].data(nu), grid_batch_size * sizeof(double));
-
-                std::memcpy(gaoy.data(nu) + grid_batch_offset, omp_gaoy[thread_id].data(nu), grid_batch_size * sizeof(double));
-
-                std::memcpy(gaoz.data(nu) + grid_batch_offset, omp_gaoz[thread_id].data(nu), grid_batch_size * sizeof(double));
-            }
-        }
-
-        omp_gaos.clear();
-
-        omp_gaox.clear();
-
-        omp_gaoy.clear();
-
-        omp_gaoz.clear();
-
-        timer.stop("gtocopy");
-
-        timer.stop("GTO evaluation");
+        timer.stop("OMP GTO eval");
 
         timer.start("GTO screening");
 
