@@ -43,7 +43,7 @@ void computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
                              const int32_t             gridBlockPosition,
                              const int32_t             gridOffset,
                              const int32_t             nGridPoints,
-                             const CMemBlock<int32_t>& skipBlockIds);
+                             const CMemBlock<int32_t>& skipCgtoIds);
 
 }  // namespace gtoeval
 

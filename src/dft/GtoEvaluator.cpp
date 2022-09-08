@@ -42,7 +42,7 @@ computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
                         const int32_t             gridBlockPosition,
                         const int32_t             gridOffset,
                         const int32_t             nGridPoints,
-                        const CMemBlock<int32_t>& skipBlockIds)
+                        const CMemBlock<int32_t>& skipCgtoIds)
 {
     // local copy of GTOs containers
 
@@ -50,10 +50,8 @@ computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
 
     // loop over GTOs container data
 
-    for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+    for (int32_t i = 0, cgto_count = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
     {
-        if (skipBlockIds.data()[i] == 1) continue;
-
         auto bgtos = gtovec.getGtoBlock(i);
 
         // angular momentum data for bra and ket
@@ -96,8 +94,10 @@ computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
 
         // loop over contracted GTOs
 
-        for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+        for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++, cgto_count++)
         {
+            if (skipCgtoIds.data()[cgto_count] == 1) continue;
+
             if (bang == 0)
             {
                 // s-type GTOs on grid
