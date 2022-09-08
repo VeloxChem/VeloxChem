@@ -39,6 +39,7 @@ computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
                         const double*        gridCoordinatesX,
                         const double*        gridCoordinatesY,
                         const double*        gridCoordinatesZ,
+                        const int32_t        gridBlockPosition,
                         const int32_t        gridOffset,
                         const int32_t        nGridPoints)
 {
@@ -129,11 +130,11 @@ computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
                     #pragma omp simd aligned(gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, f0_0, fx_0, fy_0, fz_0 : VLX_ALIGN)
                     for (int32_t g = 0; g < nGridPoints; g++)
                     {
-                        double dx = gridCoordinatesX[gridOffset + g] - rx;
+                        double dx = gridCoordinatesX[gridBlockPosition + gridOffset + g] - rx;
 
-                        double dy = gridCoordinatesY[gridOffset + g] - ry;
+                        double dy = gridCoordinatesY[gridBlockPosition + gridOffset + g] - ry;
 
-                        double dz = gridCoordinatesZ[gridOffset + g] - rz;
+                        double dz = gridCoordinatesZ[gridBlockPosition + gridOffset + g] - rz;
 
                         double g0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
 
@@ -199,11 +200,11 @@ computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
                                              f0_z, fx_z, fy_z, fz_z : VLX_ALIGN)
                     for (int32_t g = 0; g < nGridPoints; g++)
                     {
-                        double dx = gridCoordinatesX[gridOffset + g] - rx;
+                        double dx = gridCoordinatesX[gridBlockPosition + gridOffset + g] - rx;
 
-                        double dy = gridCoordinatesY[gridOffset + g] - ry;
+                        double dy = gridCoordinatesY[gridBlockPosition + gridOffset + g] - ry;
 
-                        double dz = gridCoordinatesZ[gridOffset + g] - rz;
+                        double dz = gridCoordinatesZ[gridBlockPosition + gridOffset + g] - rz;
 
                         double f0_0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
 
@@ -320,11 +321,11 @@ computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
                                              f0_zz, fx_zz, fy_zz, fz_zz : VLX_ALIGN)
                     for (int32_t g = 0; g < nGridPoints; g++)
                     {
-                        double dx = gridCoordinatesX[gridOffset + g] - rx;
+                        double dx = gridCoordinatesX[gridBlockPosition + gridOffset + g] - rx;
 
-                        double dy = gridCoordinatesY[gridOffset + g] - ry;
+                        double dy = gridCoordinatesY[gridBlockPosition + gridOffset + g] - ry;
 
-                        double dz = gridCoordinatesZ[gridOffset + g] - rz;
+                        double dz = gridCoordinatesZ[gridBlockPosition + gridOffset + g] - rz;
 
                         double f0_0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
 

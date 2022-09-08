@@ -385,43 +385,41 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     for (int32_t box_id = 0; box_id < counts.size(); box_id++)
     {
-        auto count = counts.data()[box_id];
-
-        auto displ = displacements.data()[box_id];
-
         timer.start("GTO evaluation");
 
         // grid points in box
 
-        auto npoints = count;
+        auto npoints = counts.data()[box_id];
 
-        auto xcoords = molecularGrid.getCoordinatesX() + displ;
+        auto gridblockpos = displacements.data()[box_id];
 
-        auto ycoords = molecularGrid.getCoordinatesY() + displ;
+        auto xcoords = molecularGrid.getCoordinatesX();
 
-        auto zcoords = molecularGrid.getCoordinatesZ() + displ;
+        auto ycoords = molecularGrid.getCoordinatesY();
 
-        auto weights = molecularGrid.getWeights() + displ;
+        auto zcoords = molecularGrid.getCoordinatesZ();
+
+        auto weights = molecularGrid.getWeights();
 
         // determine spatial extent of grid points
 
-        double xmin = xcoords[0], ymin = ycoords[0], zmin = zcoords[0];
+        double xmin = xcoords[gridblockpos], ymin = ycoords[gridblockpos], zmin = zcoords[gridblockpos];
 
-        double xmax = xcoords[0], ymax = ycoords[0], zmax = zcoords[0];
+        double xmax = xcoords[gridblockpos], ymax = ycoords[gridblockpos], zmax = zcoords[gridblockpos];
 
         for (int32_t g = 0; g < npoints; g++)
         {
-            if (xmin > xcoords[g]) xmin = xcoords[g];
+            if (xmin > xcoords[gridblockpos + g]) xmin = xcoords[gridblockpos + g];
 
-            if (ymin > ycoords[g]) ymin = ycoords[g];
+            if (ymin > ycoords[gridblockpos + g]) ymin = ycoords[gridblockpos + g];
 
-            if (zmin > zcoords[g]) zmin = zcoords[g];
+            if (zmin > zcoords[gridblockpos + g]) zmin = zcoords[gridblockpos + g];
 
-            if (xmax < xcoords[g]) xmax = xcoords[g];
+            if (xmax < xcoords[gridblockpos + g]) xmax = xcoords[gridblockpos + g];
 
-            if (ymax < ycoords[g]) ymax = ycoords[g];
+            if (ymax < ycoords[gridblockpos + g]) ymax = ycoords[gridblockpos + g];
 
-            if (zmax < zcoords[g]) zmax = zcoords[g];
+            if (zmax < zcoords[gridblockpos + g]) zmax = zcoords[gridblockpos + g];
         }
 
         std::array<double, 6> boxdim({xmin, ymin, zmin, xmax, ymax, zmax});
@@ -442,17 +440,17 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             auto thread_id = omp_get_thread_num();
 
-            auto batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            CMemBlock2D<double> local_gaos(batch_size, naos);
+            CMemBlock2D<double> local_gaos(grid_batch_size, naos);
 
-            CMemBlock2D<double> local_gaox(batch_size, naos);
+            CMemBlock2D<double> local_gaox(grid_batch_size, naos);
 
-            CMemBlock2D<double> local_gaoy(batch_size, naos);
+            CMemBlock2D<double> local_gaoy(grid_batch_size, naos);
 
-            CMemBlock2D<double> local_gaoz(batch_size, naos);
+            CMemBlock2D<double> local_gaoz(grid_batch_size, naos);
 
             local_gaos.zero();
 
@@ -463,17 +461,17 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             local_gaoz.zero();
 
             gtoeval::computeGtosValuesForGGA(local_gaos, local_gaox, local_gaoy, local_gaoz, gtovec, xcoords, ycoords, zcoords,
-                                             batch_offset, batch_size);
+                                             gridblockpos, grid_batch_offset, grid_batch_size);
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
-                std::memcpy(gaos.data(nu) + batch_offset, local_gaos.data(nu), batch_size * sizeof(double));
+                std::memcpy(gaos.data(nu) + grid_batch_offset, local_gaos.data(nu), grid_batch_size * sizeof(double));
 
-                std::memcpy(gaox.data(nu) + batch_offset, local_gaox.data(nu), batch_size * sizeof(double));
+                std::memcpy(gaox.data(nu) + grid_batch_offset, local_gaox.data(nu), grid_batch_size * sizeof(double));
 
-                std::memcpy(gaoy.data(nu) + batch_offset, local_gaoy.data(nu), batch_size * sizeof(double));
+                std::memcpy(gaoy.data(nu) + grid_batch_offset, local_gaoy.data(nu), grid_batch_size * sizeof(double));
 
-                std::memcpy(gaoz.data(nu) + batch_offset, local_gaoz.data(nu), batch_size * sizeof(double));
+                std::memcpy(gaoz.data(nu) + grid_batch_offset, local_gaoz.data(nu), grid_batch_size * sizeof(double));
             }
         }
 
@@ -592,8 +590,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         // compute partial contribution to Vxc matrix
 
-        auto partial_mat_Vxc = _integratePartialVxcFockForGGA(npoints, xcoords, ycoords, zcoords, weights,
-                                                              mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+        auto partial_mat_Vxc = _integratePartialVxcFockForGGA(gridblockpos, npoints, weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
                                                               vxcgrid, dengrid, timer);
 
         timer.start("Vxc matrix dist.");
@@ -631,11 +628,12 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto efunc = vxcgrid.xcFunctionalValues();
 
-        for (int32_t i = 0; i < npoints; i++)
+        #pragma omp parallel for reduction(+ : nele, xcene) aligned(weights, rhoa, efunc : VLX_ALIGN)
+        for (int32_t g = 0; g < npoints; g++)
         {
-            nele += weights[i] * rhoa[i];
+            nele += weights[gridblockpos + g] * rhoa[g];
 
-            xcene += weights[i] * efunc[i];
+            xcene += weights[gridblockpos + g] * efunc[g];
         }
 
         timer.stop("XC energy");
@@ -714,10 +712,8 @@ CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t          npoints,
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t          npoints,
-                                                 const double*          xcoords,
-                                                 const double*          ycoords,
-                                                 const double*          zcoords,
+CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t          gridblockpos,
+                                                 const int32_t          npoints,
                                                  const double*          weights,
                                                  const CDenseMatrix&    gtoValues,
                                                  const CDenseMatrix&    gtoValuesX,
@@ -785,11 +781,11 @@ CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t          npoints,
 
         for (int32_t g = 0; g < npoints; g++)
         {
-            G_nu[g] = weights[g] * grhoa[g] * chi_nu[g];
+            G_nu[g] = weights[gridblockpos + g] * grhoa[g] * chi_nu[g];
 
-            G_gga_nu[g] = weights[g] * (ggrada[g] / ngrada[g] + ggradab[g]) * (
+            G_gga_nu[g] = weights[gridblockpos + g] * (ggrada[g] / ngrada[g] + ggradab[g]) *
 
-                            gradax[g] * chi_x_nu[g] + graday[g] * chi_y_nu[g] + gradaz[g] * chi_z_nu[g]);
+                          (gradax[g] * chi_x_nu[g] + graday[g] * chi_y_nu[g] + gradaz[g] * chi_z_nu[g]);
         }
     }
 

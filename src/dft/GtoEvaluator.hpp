@@ -40,6 +40,7 @@ void computeGtosValuesForGGA(CMemBlock2D<double>& gtoValues,
                              const double*        gridCoordinatesX,
                              const double*        gridCoordinatesY,
                              const double*        gridCoordinatesZ,
+                             const int32_t        gridBlockPosition,
                              const int32_t        gridOffset,
                              const int32_t        nGridPoints);
 

@@ -134,10 +134,8 @@ class CXCNewIntegrator
     /**
      Integrates GGA contribution to AO Kohn-Sham matrix.
 
+     @param gridblockpos the starting position of the grid box.
      @param npoints the number of grid points.
-     @param xcoords the X coordinates of grid points.
-     @param ycoords the Y coordinates of grid points.
-     @param zcoords the Z coordinates of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
      @param gtoValuesX the GTO gradient X values on grid points.
@@ -147,10 +145,8 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialVxcFockForGGA(const int32_t          npoints,
-                                                const double*          xcoords,
-                                                const double*          ycoords,
-                                                const double*          zcoords,
+    CDenseMatrix _integratePartialVxcFockForGGA(const int32_t          gridblockpos,
+                                                const int32_t          npoints,
                                                 const double*          weights,
                                                 const CDenseMatrix&    gtoValues,
                                                 const CDenseMatrix&    gtoValuesX,
