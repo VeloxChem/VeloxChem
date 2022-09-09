@@ -364,6 +364,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 {
     CMultiTimer timer;
 
+    timer.start("Total timing");
+
     timer.start("Preparation");
 
     auto nthreads = omp_get_max_threads();
@@ -414,19 +416,17 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    timer.start("Total timing");
-
     for (int32_t box_id = 0; box_id < counts.size(); box_id++)
     {
+        timer.start("GTO pre-selection");
+
         // grid points in box
 
         auto npoints = counts.data()[box_id];
 
         auto gridblockpos = displacements.data()[box_id];
 
-        timer.start("GTO pre-selection");
-
-        // determine spatial extent of grid points
+        // dimension of grid box
 
         double xmin = xcoords[gridblockpos], ymin = ycoords[gridblockpos], zmin = zcoords[gridblockpos];
 
@@ -448,6 +448,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
         }
 
         std::array<double, 6> boxdim({xmin, ymin, zmin, xmax, ymax, zmax});
+
+        // pre-screening of GTOs
 
         skip_cgto_ids.zero();
 
@@ -549,19 +551,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         // GTO values on grid points
 
-        timer.start("GTO preparation");
-
-        gaos.zero();
-
-        gaox.zero();
-
-        gaoy.zero();
-
-        gaoz.zero();
-
-        timer.stop("GTO preparation");
-
-        timer.start("OMP GTO eval");
+        timer.start("OMP GTO evaluation");
 
         #pragma omp parallel
         {
@@ -580,7 +570,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             omptimers[thread_id].stop("gtoeval");
         }
 
-        timer.stop("OMP GTO eval");
+        timer.stop("OMP GTO evaluation");
 
         timer.start("GTO screening 1");
 
@@ -588,7 +578,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         for (int32_t nu = 0; nu < naos; nu++)
         {
-            if (skip_ao_ids.data()[nu] == 1) continue;
+            if (skip_ao_ids.data()[nu]) continue;
 
             bool skip = true;
 
@@ -624,8 +614,6 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
         timer.stop("GTO screening 1");
 
         timer.start("GTO screening 2");
-
-        //aoinds.resize(aocount);
 
         CDenseMatrix mat_chi(aocount, npoints);
 

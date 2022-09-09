@@ -96,7 +96,7 @@ computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
 
         for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++, cgto_count++)
         {
-            if (skipCgtoIds.data()[cgto_count] == 1) continue;
+            if (skipCgtoIds.data()[cgto_count]) continue;
 
             if (bang == 0)
             {
@@ -415,7 +415,7 @@ computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
 
                 auto bgaoz = bspherbuff.data(4 * k + 3);
 
-                auto idx = (bgtos.getIdentifiers(k))[j];
+                auto idx = bgtos.getIdentifiers(k)[j];
 
                 auto gvals = gtoValues.data(idx);
 
