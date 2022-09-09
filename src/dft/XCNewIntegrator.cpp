@@ -372,17 +372,20 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     std::vector<CMultiTimer> omptimers(nthreads);
 
-    // create GTOs container
+    // GTOs container and number of AOs
 
     CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
 
-    // number of AOs
-
     auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // Kohn-Sham matrix
 
     CAOKohnShamMatrix mat_Vxc(densityMatrix.getNumberOfRows(0), densityMatrix.getNumberOfColumns(0), true);
 
     mat_Vxc.zero();
+
+    // memory blocks for GTOs on grid points
+    // TODO: use _numberOfPointsThreshold
 
     CMemBlock2D<double> gaos(1024, naos);
 
@@ -392,19 +395,23 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     CMemBlock2D<double> gaoz(1024, naos);
 
-    CMemBlock<int32_t> skip_cgto_ids(naos); // note that ncgtos is smaller than naos...
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
     std::vector<int32_t> aoinds(naos);
 
+    // initial values for XC energy and number of electrons
+
     double nele = 0.0, xcene = 0.0;
 
-    auto counts = molecularGrid.getGridPointCounts();
-
-    auto displacements = molecularGrid.getGridPointDisplacements();
-
-    int32_t skip_count_total = 0, num_blocks_total = 0;
+    // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
 
@@ -414,12 +421,16 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     auto weights = molecularGrid.getWeights();
 
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
     timer.stop("Preparation");
 
     for (int32_t box_id = 0; box_id < counts.size(); box_id++)
     {
-        timer.start("GTO pre-selection");
-
         // grid points in box
 
         auto npoints = counts.data()[box_id];
@@ -428,126 +439,15 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         // dimension of grid box
 
-        double xmin = xcoords[gridblockpos], ymin = ycoords[gridblockpos], zmin = zcoords[gridblockpos];
-
-        double xmax = xcoords[gridblockpos], ymax = ycoords[gridblockpos], zmax = zcoords[gridblockpos];
-
-        for (int32_t g = 0; g < npoints; g++)
-        {
-            xmin = std::min(xmin, xcoords[gridblockpos + g]);
-
-            ymin = std::min(ymin, ycoords[gridblockpos + g]);
-
-            zmin = std::min(zmin, zcoords[gridblockpos + g]);
-
-            xmax = std::max(xmax, xcoords[gridblockpos + g]);
-
-            ymax = std::max(ymax, ycoords[gridblockpos + g]);
-
-            zmax = std::max(zmax, zcoords[gridblockpos + g]);
-        }
-
-        std::array<double, 6> boxdim({xmin, ymin, zmin, xmax, ymax, zmax});
+        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // pre-screening of GTOs
 
-        skip_cgto_ids.zero();
+        timer.start("GTO pre-screening");
 
-        skip_ao_ids.zero();
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);
 
-        for (int32_t i = 0, cgto_count = 0; i < gtovec->getNumberOfGtoBlocks(); i++)
-        {
-            auto bgtos = gtovec->getGtoBlock(i);
-
-            auto bang = bgtos.getAngularMomentum();
-
-            auto bfnorms = bgtos.getNormFactors();
-
-            auto bfexps = bgtos.getExponents();
-
-            auto bfx = bgtos.getCoordinatesX();
-
-            auto bfy = bgtos.getCoordinatesY();
-
-            auto bfz = bgtos.getCoordinatesZ();
-
-            auto spos = bgtos.getStartPositions();
-
-            auto epos = bgtos.getEndPositions();
-
-            // loop over contracted GTOs
-
-            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++, cgto_count++)
-            {
-                // contracted GTO screening
-
-                auto firstprim = spos[j];
-
-                double rx = std::max({xmin - bfx[firstprim], bfx[firstprim] - xmax, 0.0});
-
-                double ry = std::max({ymin - bfy[firstprim], bfy[firstprim] - ymax, 0.0});
-
-                double rz = std::max({zmin - bfz[firstprim], bfz[firstprim] - zmax, 0.0});
-
-                auto r2 = rx * rx + ry * ry + rz * rz;
-
-                if (r2 > 1.0)
-                {
-                    auto minexp = bfexps[firstprim];
-
-                    auto maxexp = bfexps[firstprim];
-
-                    auto maxcoef = std::fabs(bfnorms[firstprim]);
-
-                    for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
-                    {
-                        auto bexp = bfexps[iprim];
-
-                        auto bnorm = std::fabs(bfnorms[iprim]);
-
-                        minexp = std::min(minexp, bexp);
-
-                        maxexp = std::max(maxexp, bexp);
-
-                        maxcoef = std::max(maxcoef, bnorm);
-                    }
-
-                    // gto  :           r^{ang}   |C| exp(-alpha r^2)
-                    // gto_m:           r^{ang-1} |C| exp(-alpha r^2)
-                    // gto_p: (2 alpha) r^{ang+1} |C| exp(-alpha r^2)
-
-                    // Note that gto_m < gto (r > 1)
-
-                    auto r = std::sqrt(r2);
-
-                    auto gtolimit = maxcoef * std::exp(-minexp * r2);
-
-                    for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
-
-                    auto gtolimit_p = 2.0 * maxexp * r * gtolimit;
-
-                    if (std::max(gtolimit, gtolimit_p) < _screeningThresholdForGTOValues)
-                    {
-                        skip_cgto_ids.data()[cgto_count] = 1;
-
-                        ++skip_count_total;
-
-                        auto bnspher = angmom::to_SphericalComponents(bang);
-
-                        for (int32_t k = 0; k < bnspher; k++)
-                        {
-                            auto ao_idx = (bgtos.getIdentifiers(k))[j];
-
-                            skip_ao_ids.data()[ao_idx] = 1;
-                        }
-                    }
-                }
-
-                ++num_blocks_total;
-            }
-        }
-
-        timer.stop("GTO pre-selection");
+        timer.stop("GTO pre-screening");
 
         // GTO values on grid points
 
@@ -572,7 +472,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.stop("OMP GTO evaluation");
 
-        timer.start("GTO screening 1");
+        timer.start("GTO screening");
 
         int32_t aocount = 0;
 
@@ -611,10 +511,6 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             }
         }
 
-        timer.stop("GTO screening 1");
-
-        timer.start("GTO screening 2");
-
         CDenseMatrix mat_chi(aocount, npoints);
 
         CDenseMatrix mat_chi_x(aocount, npoints);
@@ -634,40 +530,15 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
         }
 
-        timer.stop("GTO screening 2");
-
-        timer.start("Density matrix");
+        timer.stop("GTO screening");
 
         // generate sub density matrix
 
-        CAODensityMatrix sub_dens_mat;
+        timer.start("Density matrix slicing");
 
-        if (aocount < naos)
-        {
-            CDenseMatrix sub_dens(aocount, aocount);
+        auto sub_dens_mat = _getSubDensityMatrix(densityMatrix, aoinds, aocount, naos);
 
-            const CDenseMatrix& dens = densityMatrix.getReferenceToDensity(0);
-
-            for (int32_t i = 0; i < aocount; i++)
-            {
-                auto sub_dens_row = sub_dens.row(i);
-
-                auto dens_row = dens.row(aoinds[i]);
-
-                for (int32_t j = 0; j < aocount; j++)
-                {
-                    sub_dens_row[j] = dens_row[aoinds[j]];
-                }
-            }
-
-            sub_dens_mat = CAODensityMatrix({sub_dens}, denmat::rest);
-        }
-        else
-        {
-            sub_dens_mat = densityMatrix;
-        }
-
-        timer.stop("Density matrix");
+        timer.stop("Density matrix slicing");
 
         // generate density grid
 
@@ -675,7 +546,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, xcfuntype, timer);
 
-        timer.start("XC functional");
+        timer.start("XC functional eval.");
 
         // compute exchange-correlation functional derivative
 
@@ -683,49 +554,29 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         xcFunctional.compute(vxcgrid, dengrid);
 
-        timer.stop("XC functional");
+        timer.stop("XC functional eval.");
 
         // compute partial contribution to Vxc matrix
 
         auto partial_mat_Vxc = _integratePartialVxcFockForGGA(gridblockpos, npoints, weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
                                                               vxcgrid, dengrid, timer);
 
+        // distribute partial Vxc to full Vxc
+
         timer.start("Vxc matrix dist.");
 
-        if (aocount < naos)
-        {
-            for (int32_t row = 0; row < partial_mat_Vxc.getNumberOfRows(); row++)
-            {
-                auto row_orig = aoinds[row];
-
-                auto mat_Vxc_row_orig = mat_Vxc.getMatrix(0) + row_orig * naos;
-
-                auto partial_mat_Vxc_row = partial_mat_Vxc.row(row);
-
-                for (int32_t col = 0; col < partial_mat_Vxc.getNumberOfColumns(); col++)
-                {
-                    auto col_orig = aoinds[col];
-
-                    mat_Vxc_row_orig[col_orig] += partial_mat_Vxc_row[col];
-                }
-            }
-        }
-        else
-        {
-            mat_Vxc.addMatrixContribution(partial_mat_Vxc);
-        }
+        _distributeVxcMatrix(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
 
-        timer.start("XC energy");
-
         // compute partial contribution to XC energy
+
+        timer.start("XC energy");
 
         auto rhoa = dengrid.alphaDensity(0);
 
         auto efunc = vxcgrid.xcFunctionalValues();
 
-        #pragma omp parallel for simd reduction(+ : nele, xcene)
         for (int32_t g = 0; g < npoints; g++)
         {
             nele += weights[gridblockpos + g] * rhoa[g];
@@ -735,8 +586,6 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.stop("XC energy");
     }
-
-    std::cout << "Total skip count: " << skip_count_total << " / " << num_blocks_total << std::endl;
 
     // destroy GTOs container
 
@@ -764,6 +613,169 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
     return mat_Vxc;
+}
+
+std::array<double, 6>
+CXCNewIntegrator::_getGridBoxDimension(const int32_t gridBlockPosition,
+                                       const int32_t nGridPoints,
+                                       const double* xcoords,
+                                       const double* ycoords,
+                                       const double* zcoords) const
+{
+    double xmin = xcoords[gridBlockPosition], ymin = ycoords[gridBlockPosition], zmin = zcoords[gridBlockPosition];
+
+    double xmax = xcoords[gridBlockPosition], ymax = ycoords[gridBlockPosition], zmax = zcoords[gridBlockPosition];
+
+    for (int32_t g = 0; g < nGridPoints; g++)
+    {
+        xmin = std::min(xmin, xcoords[gridBlockPosition + g]);
+
+        ymin = std::min(ymin, ycoords[gridBlockPosition + g]);
+
+        zmin = std::min(zmin, zcoords[gridBlockPosition + g]);
+
+        xmax = std::max(xmax, xcoords[gridBlockPosition + g]);
+
+        ymax = std::max(ymax, ycoords[gridBlockPosition + g]);
+
+        zmax = std::max(zmax, zcoords[gridBlockPosition + g]);
+    }
+
+    return std::array<double, 6>({xmin, ymin, zmin, xmax, ymax, zmax});
+}
+
+void
+CXCNewIntegrator::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
+                                 CMemBlock<int32_t>&          skipAOIds,
+                                 const CGtoContainer*         gtoContainer,
+                                 const int32_t                gtoDeriv,
+                                 const std::array<double, 6>& boxDimension) const
+{
+    skipCgtoIds.zero();
+
+    skipAOIds.zero();
+
+    double xmin = boxDimension[0], ymin = boxDimension[1], zmin = boxDimension[2];
+
+    double xmax = boxDimension[3], ymax = boxDimension[4], zmax = boxDimension[5];
+
+    for (int32_t i = 0, cgto_count = 0; i < gtoContainer->getNumberOfGtoBlocks(); i++)
+    {
+        auto bgtos = gtoContainer->getGtoBlock(i);
+
+        auto bang = bgtos.getAngularMomentum();
+
+        auto bfnorms = bgtos.getNormFactors();
+
+        auto bfexps = bgtos.getExponents();
+
+        auto bfx = bgtos.getCoordinatesX();
+
+        auto bfy = bgtos.getCoordinatesY();
+
+        auto bfz = bgtos.getCoordinatesZ();
+
+        auto spos = bgtos.getStartPositions();
+
+        auto epos = bgtos.getEndPositions();
+
+        // loop over contracted GTOs
+
+        for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++, cgto_count++)
+        {
+            // contracted GTO screening
+
+            auto firstprim = spos[j];
+
+            double rx = std::max({xmin - bfx[firstprim], bfx[firstprim] - xmax, 0.0});
+
+            double ry = std::max({ymin - bfy[firstprim], bfy[firstprim] - ymax, 0.0});
+
+            double rz = std::max({zmin - bfz[firstprim], bfz[firstprim] - zmax, 0.0});
+
+            auto r2 = rx * rx + ry * ry + rz * rz;
+
+            if (r2 > 1.0)
+            {
+                auto minexp = bfexps[firstprim];
+
+                auto maxexp = bfexps[firstprim];
+
+                auto maxcoef = std::fabs(bfnorms[firstprim]);
+
+                for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
+                {
+                    auto bexp = bfexps[iprim];
+
+                    auto bnorm = std::fabs(bfnorms[iprim]);
+
+                    minexp = std::min(minexp, bexp);
+
+                    maxexp = std::max(maxexp, bexp);
+
+                    maxcoef = std::max(maxcoef, bnorm);
+                }
+
+                // gto  :           r^{ang}   |C| exp(-alpha r^2)
+                // gto_m:           r^{ang-1} |C| exp(-alpha r^2)
+                // gto_p: (2 alpha) r^{ang+1} |C| exp(-alpha r^2)
+
+                auto gtolimit = maxcoef * std::exp(-minexp * r2);
+
+                auto r = std::sqrt(r2);
+
+                for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
+
+                if (gtoDeriv == 1) gtolimit = std::max(gtolimit, 2.0 * maxexp * r * gtolimit);
+
+                if (gtolimit < _screeningThresholdForGTOValues)
+                {
+                    skipCgtoIds.data()[cgto_count] = 1;
+
+                    auto bnspher = angmom::to_SphericalComponents(bang);
+
+                    for (int32_t k = 0; k < bnspher; k++)
+                    {
+                        auto ao_idx = (bgtos.getIdentifiers(k))[j];
+
+                        skipAOIds.data()[ao_idx] = 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+CAODensityMatrix
+CXCNewIntegrator::_getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
+                                       const std::vector<int32_t>& aoIndices,
+                                       const int32_t               aoCount,
+                                       const int32_t               nAOs) const
+{
+    if (aoCount < nAOs)
+    {
+        CDenseMatrix sub_dens(aoCount, aoCount);
+
+        const CDenseMatrix& dens = densityMatrix.getReferenceToDensity(0);
+
+        for (int32_t i = 0; i < aoCount; i++)
+        {
+            auto sub_dens_row = sub_dens.row(i);
+
+            auto dens_row = dens.row(aoIndices[i]);
+
+            for (int32_t j = 0; j < aoCount; j++)
+            {
+                sub_dens_row[j] = dens_row[aoIndices[j]];
+            }
+        }
+
+        return CAODensityMatrix({sub_dens}, denmat::rest);
+    }
+    else
+    {
+        return densityMatrix;
+    }
 }
 
 CDenseMatrix
@@ -910,4 +922,35 @@ CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t          gridbloc
     timer.stop("Vxc matrix matmul");
 
     return mat_Vxc;
+}
+
+void
+CXCNewIntegrator::_distributeVxcMatrix(CAOKohnShamMatrix&          matVxc,
+                                       const CDenseMatrix&         partialMatVxc,
+                                       const std::vector<int32_t>& aoIndices,
+                                       const int32_t               aoCount,
+                                       const int32_t               nAOs) const
+{
+    if (aoCount < nAOs)
+    {
+        for (int32_t row = 0; row < partialMatVxc.getNumberOfRows(); row++)
+        {
+            auto row_orig = aoIndices[row];
+
+            auto matVxc_row_orig = matVxc.getMatrix(0) + row_orig * nAOs;
+
+            auto partialMatVxc_row = partialMatVxc.row(row);
+
+            for (int32_t col = 0; col < partialMatVxc.getNumberOfColumns(); col++)
+            {
+                auto col_orig = aoIndices[col];
+
+                matVxc_row_orig[col_orig] += partialMatVxc_row[col];
+            }
+        }
+    }
+    else
+    {
+        matVxc.addMatrixContribution(partialMatVxc);
+    }
 }

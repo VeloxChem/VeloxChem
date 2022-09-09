@@ -71,11 +71,6 @@ class CXCNewIntegrator
     double _screeningThresholdForGTOValues;
 
     /**
-     Timers for DFT integration.
-     */
-    std::list<CTimer> _timers;
-
-    /**
      Integrates first-order LDA exchnage-correlation functional contribution to
      AO Kohn-Sham matrix.
 
@@ -108,6 +103,50 @@ class CXCNewIntegrator
                                               const CAODensityMatrix& densityMatrix,
                                               const CMolecularGrid&   molecularGrid,
                                               const CXCFunctional&    xcFunctional) const;
+
+    /**
+     Gets grid box dimension.
+
+     @param gridBlockPosition the displacement of grid points in this box.
+     @param nGridPoints the number of grid points in this box.
+     @param xcoords the X coordinates of grid points.
+     @param ycoords the Y coordinates of grid points.
+     @param zcoords the Z coordinates of grid points.
+     @return grid box dimension as (xmin, ymin, zmin, xmax, ymax, zmax).
+     */
+    std::array<double, 6> _getGridBoxDimension(const int32_t gridBlockPosition,
+                                               const int32_t nGridPoints,
+                                               const double* xcoords,
+                                               const double* ycoords,
+                                               const double* zcoords) const;
+
+    /**
+     Prescreens GTOs for a grid box.
+
+     @param skipCgtoIds the array to store whether a CGTO should be skipped.
+     @param skipAOIds the array to store whether an AO should be skipped.
+     @param gtoContainer the pointer to the GTO container.
+     @param gtoDeriv the level of GTO derivative.
+     @param boxDimension the dimension of the grid box.
+     */
+    void _preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
+                        CMemBlock<int32_t>&          skipAOIds,
+                        const CGtoContainer*         gtoContainer,
+                        const int32_t                gtoDeriv,
+                        const std::array<double, 6>& boxDimension) const;
+
+    /**
+     Gets submatrix from AO density matrix.
+
+     @param densityMatrix the AO density matrix.
+     @param aoIndices the index mapping from submatrix to full matrix.
+     @param aoCount the number of indices in submatrix.
+     @param nAOs the number of indices in full matrix.
+     */
+    CAODensityMatrix _getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
+                                          const std::vector<int32_t>& aoIndices,
+                                          const int32_t               aoCount,
+                                          const int32_t               nAOs) const;
 
     /**
      Integrates LDA contribution to AO Kohn-Sham matrix.
@@ -155,6 +194,21 @@ class CXCNewIntegrator
                                                 const CXCGradientGrid& xcGradientGrid,
                                                 const CDensityGrid&    densityGrid,
                                                 CMultiTimer&           timer) const;
+
+    /**
+     Distributes partial Vxc matrix to full Vxc matrix.
+
+     @param matVxc the full Vxc matrix.
+     @param partialMatVxc the partial Vxc matrix.
+     @param aoIndices the index mapping from partial Vxc to full Vxc.
+     @param aoCount the number of indices in partial Vxc.
+     @param nAOs the number of indices in full Vxc.
+     */
+    void _distributeVxcMatrix(CAOKohnShamMatrix&          matVxc,
+                              const CDenseMatrix&         partialMatVxc,
+                              const std::vector<int32_t>& aoIndices,
+                              const int32_t               aoCount,
+                              const int32_t               nAOs) const;
 
    public:
     /**
