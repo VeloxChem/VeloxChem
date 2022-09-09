@@ -31,6 +31,245 @@
 namespace gtoeval {  // gtoeval namespace
 
 void
+computeGtosValuesForLDA(CMemBlock2D<double>&      gtoValues,
+                        const CGtoContainer*      gtoContainer,
+                        const double*             gridCoordinatesX,
+                        const double*             gridCoordinatesY,
+                        const double*             gridCoordinatesZ,
+                        const int32_t             gridBlockPosition,
+                        const int32_t             gridOffset,
+                        const int32_t             nGridPoints,
+                        const CMemBlock<int32_t>& skipCgtoIds)
+{
+    // local copy of GTOs containers
+
+    auto gtovec = CGtoContainer(*gtoContainer);
+
+    // loop over GTOs container data
+
+    for (int32_t i = 0, cgto_count = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+    {
+        auto bgtos = gtovec.getGtoBlock(i);
+
+        // angular momentum data for bra and ket
+
+        auto bang = bgtos.getAngularMomentum();
+
+        // set up Cartesian GTOs buffer
+
+        auto nvcomp = xcfun_components(xcfun::lda);
+
+        auto bncart = angmom::to_CartesianComponents(bang);
+
+        auto bcartbuff = (bang > 0) ? CMemBlock2D<double>(nGridPoints, nvcomp * bncart) : CMemBlock2D<double>();
+
+        // set up spherical GTOs buffer
+
+        auto bnspher = angmom::to_SphericalComponents(bang);
+
+        CMemBlock2D<double> bspherbuff(nGridPoints, nvcomp * bnspher);
+
+        // set up pointers to primitives data
+
+        auto bfnorms = bgtos.getNormFactors();
+
+        auto bfexps = bgtos.getExponents();
+
+        // set up pointers to primitives coordinates
+
+        auto bfx = bgtos.getCoordinatesX();
+
+        auto bfy = bgtos.getCoordinatesY();
+
+        auto bfz = bgtos.getCoordinatesZ();
+
+        // set up coordinates to primitives positions
+
+        auto spos = bgtos.getStartPositions();
+
+        auto epos = bgtos.getEndPositions();
+
+        // loop over contracted GTOs
+
+        for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++, cgto_count++)
+        {
+            if (skipCgtoIds.data()[cgto_count]) continue;
+
+            if (bang == 0)
+            {
+                // s-type GTOs on grid
+
+                bspherbuff.zero();
+
+                auto f0_0 = bspherbuff.data(0);
+
+                for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
+                {
+                    auto bexp = bfexps[iprim];
+
+                    auto bnorm = bfnorms[iprim];
+
+                    auto rx = bfx[iprim];
+
+                    auto ry = bfy[iprim];
+
+                    auto rz = bfz[iprim];
+
+                    #pragma omp simd aligned(gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, f0_0 : VLX_ALIGN)
+                    for (int32_t g = 0; g < nGridPoints; g++)
+                    {
+                        double dx = gridCoordinatesX[gridBlockPosition + gridOffset + g] - rx;
+
+                        double dy = gridCoordinatesY[gridBlockPosition + gridOffset + g] - ry;
+
+                        double dz = gridCoordinatesZ[gridBlockPosition + gridOffset + g] - rz;
+
+                        double g0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
+
+                        f0_0[g] += g0;
+                    }
+                }
+            }
+            else if (bang == 1)
+            {
+                // p-type GTOs on grid
+
+                bspherbuff.zero();
+
+                bcartbuff.zero();
+
+                auto f0_x = bcartbuff.data(0);
+
+                auto f0_y = bcartbuff.data(1);
+
+                auto f0_z = bcartbuff.data(2);
+
+                for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
+                {
+                    auto bexp = bfexps[iprim];
+
+                    auto bnorm = bfnorms[iprim];
+
+                    auto rx = bfx[iprim];
+
+                    auto ry = bfy[iprim];
+
+                    auto rz = bfz[iprim];
+
+                    #pragma omp simd aligned(gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, \
+                                             f0_x, f0_y, f0_z : VLX_ALIGN)
+                    for (int32_t g = 0; g < nGridPoints; g++)
+                    {
+                        double dx = gridCoordinatesX[gridBlockPosition + gridOffset + g] - rx;
+
+                        double dy = gridCoordinatesY[gridBlockPosition + gridOffset + g] - ry;
+
+                        double dz = gridCoordinatesZ[gridBlockPosition + gridOffset + g] - rz;
+
+                        double f0_0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
+
+                        f0_x[g] += f0_0 * dx;
+
+                        f0_y[g] += f0_0 * dy;
+
+                        f0_z[g] += f0_0 * dz;
+                    }
+                }
+
+                genfunc::transform(bspherbuff, bcartbuff, CSphericalMomentum(1), 0, 0, nGridPoints, 1);
+            }
+            else if (bang == 2)
+            {
+                // d-type GTOs on grid
+
+                bspherbuff.zero();
+
+                bcartbuff.zero();
+
+                auto f0_xx = bcartbuff.data(0);
+
+                auto f0_xy = bcartbuff.data(1);
+
+                auto f0_xz = bcartbuff.data(2);
+
+                auto f0_yy = bcartbuff.data(3);
+
+                auto f0_yz = bcartbuff.data(4);
+
+                auto f0_zz = bcartbuff.data(5);
+
+                for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
+                {
+                    auto bexp = bfexps[iprim];
+
+                    auto bnorm = bfnorms[iprim];
+
+                    auto rx = bfx[iprim];
+
+                    auto ry = bfy[iprim];
+
+                    auto rz = bfz[iprim];
+
+                    #pragma omp simd aligned(gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, \
+                                             f0_xx, f0_xy, f0_xz, f0_yy, f0_yz, f0_zz: VLX_ALIGN)
+                    for (int32_t g = 0; g < nGridPoints; g++)
+                    {
+                        double dx = gridCoordinatesX[gridBlockPosition + gridOffset + g] - rx;
+
+                        double dy = gridCoordinatesY[gridBlockPosition + gridOffset + g] - ry;
+
+                        double dz = gridCoordinatesZ[gridBlockPosition + gridOffset + g] - rz;
+
+                        double f0_0 = bnorm * std::exp(-bexp * (dx * dx + dy * dy + dz * dz));
+
+                        double f0_x = dx * f0_0;
+
+                        double f0_y = dy * f0_0;
+
+                        double f0_z = dz * f0_0;
+
+                        f0_xx[g] += f0_x * dx;
+
+                        f0_xy[g] += f0_x * dy;
+
+                        f0_xz[g] += f0_x * dz;
+
+                        f0_yy[g] += f0_y * dy;
+
+                        f0_yz[g] += f0_y * dz;
+
+                        f0_zz[g] += f0_z * dz;
+                    }
+                }
+
+                genfunc::transform(bspherbuff, bcartbuff, CSphericalMomentum(2), 0, 0, nGridPoints, 1);
+            }
+            else
+            {
+                // FIX ME: implement l > 2 cases
+            }
+
+            // distribute j-th GTO values into grid values matrix
+
+            for (int32_t k = 0; k < bnspher; k++)
+            {
+                auto bgaos = bspherbuff.data(k);
+
+                auto idx = bgtos.getIdentifiers(k)[j];
+
+                auto gvals = gtoValues.data(idx);
+
+                #pragma omp simd aligned(bgaos, gvals : VLX_ALIGN)
+                for (int32_t g = 0; g < nGridPoints; g++)
+                {
+                    gvals[gridOffset + g] = bgaos[g];
+                }
+            }
+        }
+    }
+}
+
+void
 computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
                         CMemBlock2D<double>&      gtoValuesX,
                         CMemBlock2D<double>&      gtoValuesY,

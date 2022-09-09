@@ -43,10 +43,11 @@ namespace gtorec {  // gtorec namespace
                             const double*                gridCoordinatesX,
                             const double*                gridCoordinatesY,
                             const double*                gridCoordinatesZ,
+                            const int32_t                gridBlockPosition,
                             const int32_t                gridOffset,
                             const int32_t                nGridPoints,
                             const std::array<double, 6>& boxDimension,
-                            const double                 gtoThreshold);
+                            const CMemBlock<int32_t>&    skipCgtoIds);
 
     void
     computeGtosValuesForGGA(CMemBlock2D<double>&         gtoValues,

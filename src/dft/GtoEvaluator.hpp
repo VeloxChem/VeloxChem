@@ -32,6 +32,16 @@
 
 namespace gtoeval {  // gtoeval namespace
 
+void computeGtosValuesForLDA(CMemBlock2D<double>&      gtoValues,
+                             const CGtoContainer*      gtoContainer,
+                             const double*             gridCoordinatesX,
+                             const double*             gridCoordinatesY,
+                             const double*             gridCoordinatesZ,
+                             const int32_t             gridBlockPosition,
+                             const int32_t             gridOffset,
+                             const int32_t             nGridPoints,
+                             const CMemBlock<int32_t>& skipCgtoIds);
+
 void computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
                              CMemBlock2D<double>&      gtoValuesX,
                              CMemBlock2D<double>&      gtoValuesY,

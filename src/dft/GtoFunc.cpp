@@ -39,32 +39,19 @@ namespace gtorec {  // gtorec namespace
                             const double*                gridCoordinatesX,
                             const double*                gridCoordinatesY,
                             const double*                gridCoordinatesZ,
+                            const int32_t                gridBlockPosition,
                             const int32_t                gridOffset,
                             const int32_t                nGridPoints,
                             const std::array<double, 6>& boxDimension,
-                            const double                 gtoThreshold)
+                            const CMemBlock<int32_t>&    skipCgtoIds)
     {
-        // spatial extent of grid box
-
-        auto xmin = boxDimension[0];
-
-        auto ymin = boxDimension[1];
-
-        auto zmin = boxDimension[2];
-
-        auto xmax = boxDimension[3];
-
-        auto ymax = boxDimension[4];
-
-        auto zmax = boxDimension[5];
-
         // local copy of GTOs containers
 
         auto gtovec = CGtoContainer(*gtoContainer);
 
         // loop over GTOs container data
 
-        for (int32_t i = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
+        for (int32_t i = 0, cgto_count = 0; i < gtovec.getNumberOfGtoBlocks(); i++)
         {
             auto bgtos = gtovec.getGtoBlock(i);
 
@@ -106,61 +93,14 @@ namespace gtorec {  // gtorec namespace
 
             // loop over contracted GTOs
 
-            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++)
+            for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++, cgto_count++)
             {
-                // contracted GTO screening
-
-                double rx = 0.0, ry = 0.0, rz = 0.0;
-
-                if      (bfx[spos[j]] < xmin) rx = xmin - bfx[spos[j]];
-
-                else if (bfx[spos[j]] > xmax) rx = bfx[spos[j]] - xmax;
-
-                if      (bfy[spos[j]] < ymin) ry = ymin - bfy[spos[j]];
-
-                else if (bfy[spos[j]] > ymax) ry = bfy[spos[j]] - ymax;
-
-                if      (bfz[spos[j]] < zmin) rz = zmin - bfz[spos[j]];
-
-                else if (bfz[spos[j]] > zmax) rz = bfz[spos[j]] - zmax;
-
-                auto r2 = rx * rx + ry * ry + rz * rz;
-
-                if (r2 > 1.0)
-                {
-                    auto minexp = bfexps[spos[j]];
-
-                    auto maxcoef = std::fabs(bfnorms[spos[j]]);
-
-                    for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
-                    {
-                        auto bexp = bfexps[iprim];
-
-                        auto bnorm = std::fabs(bfnorms[iprim]);
-
-                        if (minexp > bexp) minexp = bexp;
-
-                        if (maxcoef < bnorm) maxcoef = bnorm;
-                    }
-
-                    // gto: r^{ang} |C| exp(-alpha r^2)
-
-                    auto gtolimit = maxcoef * std::exp(-minexp * r2);
-
-                    if (bang > 0)
-                    {
-                        auto r = std::sqrt(r2);
-
-                        for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
-                    }
-
-                    if (gtolimit < gtoThreshold) continue;
-                }
+                if (skipCgtoIds.data()[cgto_count]) continue;
 
                 // compute j-th GTO values on batch of grid points
 
                 gtorec::computeGtoValuesOnGrid(
-                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, bgtos, j, xcfun::lda);
+                    bspherbuff, bcartbuff, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridBlockPosition + gridOffset, bgtos, j, xcfun::lda);
 
                 // distribute j-th GTO values into grid values matrix
 
@@ -173,7 +113,7 @@ namespace gtorec {  // gtorec namespace
                     #pragma omp simd aligned(bgaos, gvals : VLX_ALIGN)
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
-                        gvals[l] = bgaos[l];
+                        gvals[l + gridOffset] = bgaos[l];
                     }
                 }
             }

@@ -151,20 +151,16 @@ class CXCNewIntegrator
     /**
      Integrates LDA contribution to AO Kohn-Sham matrix.
 
+     @param gridBlockPosition the starting position of the grid box.
      @param npoints the number of grid points.
-     @param xcoords the X coordinates of grid points.
-     @param ycoords the Y coordinates of grid points.
-     @param zcoords the Z coordinates of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
      @param xcGradientGrid the exchange-correlation gradient grid.
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialVxcFockForLDA(const int32_t          npoints,
-                                                const double*          xcoords,
-                                                const double*          ycoords,
-                                                const double*          zcoords,
+    CDenseMatrix _integratePartialVxcFockForLDA(const int32_t          gridBlockPosition,
+                                                const int32_t          npoints,
                                                 const double*          weights,
                                                 const CDenseMatrix&    gtoValues,
                                                 const CXCGradientGrid& xcGradientGrid,
