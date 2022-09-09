@@ -364,6 +364,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 {
     CMultiTimer timer;
 
+    timer.start("Preparation");
+
     auto nthreads = omp_get_max_threads();
 
     std::vector<CMultiTimer> omptimers(nthreads);
@@ -380,13 +382,25 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     mat_Vxc.zero();
 
+    CMemBlock2D<double> gaos(1024, naos);
+
+    CMemBlock2D<double> gaox(1024, naos);
+
+    CMemBlock2D<double> gaoy(1024, naos);
+
+    CMemBlock2D<double> gaoz(1024, naos);
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note that ncgtos is smaller than naos...
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
     double nele = 0.0, xcene = 0.0;
 
     auto counts = molecularGrid.getGridPointCounts();
 
     auto displacements = molecularGrid.getGridPointDisplacements();
-
-    timer.start("Total timing");
 
     int32_t skip_count_total = 0, num_blocks_total = 0;
 
@@ -398,6 +412,10 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     auto weights = molecularGrid.getWeights();
 
+    timer.stop("Preparation");
+
+    timer.start("Total timing");
+
     for (int32_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
@@ -406,7 +424,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto gridblockpos = displacements.data()[box_id];
 
-        timer.start("AO pre-selection");
+        timer.start("GTO pre-selection");
 
         // determine spatial extent of grid points
 
@@ -431,7 +449,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         std::array<double, 6> boxdim({xmin, ymin, zmin, xmax, ymax, zmax});
 
-        CMemBlock<int32_t> skip_cgto_ids(naos);
+        skip_cgto_ids.zero();
+
+        skip_ao_ids.zero();
 
         for (int32_t i = 0, cgto_count = 0; i < gtovec->getNumberOfGtoBlocks(); i++)
         {
@@ -457,8 +477,6 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++, cgto_count++)
             {
-                skip_cgto_ids.data()[cgto_count] = 0;
-
                 // contracted GTO screening
 
                 auto firstprim = spos[j];
@@ -511,6 +529,15 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
                         skip_cgto_ids.data()[cgto_count] = 1;
 
                         ++skip_count_total;
+
+                        auto bnspher = angmom::to_SphericalComponents(bang);
+
+                        for (int32_t k = 0; k < bnspher; k++)
+                        {
+                            auto ao_idx = (bgtos.getIdentifiers(k))[j];
+
+                            skip_ao_ids.data()[ao_idx] = 1;
+                        }
                     }
                 }
 
@@ -518,19 +545,11 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             }
         }
 
-        timer.stop("AO pre-selection");
+        timer.stop("GTO pre-selection");
 
         // GTO values on grid points
 
-        timer.start("GTO prep.");
-
-        CMemBlock2D<double> gaos(npoints, naos);
-
-        CMemBlock2D<double> gaox(npoints, naos);
-
-        CMemBlock2D<double> gaoy(npoints, naos);
-
-        CMemBlock2D<double> gaoz(npoints, naos);
+        timer.start("GTO preparation");
 
         gaos.zero();
 
@@ -540,7 +559,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         gaoz.zero();
 
-        timer.stop("GTO prep.");
+        timer.stop("GTO preparation");
 
         timer.start("OMP GTO eval");
 
@@ -563,14 +582,14 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.stop("OMP GTO eval");
 
-        timer.start("GTO screening");
-
-        std::vector<int32_t> aoinds(naos);
+        timer.start("GTO screening 1");
 
         int32_t aocount = 0;
 
         for (int32_t nu = 0; nu < naos; nu++)
         {
+            if (skip_ao_ids.data()[nu] == 1) continue;
+
             bool skip = true;
 
             auto gaos_nu = gaos.data(nu);
@@ -602,7 +621,11 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             }
         }
 
-        aoinds.resize(aocount);
+        timer.stop("GTO screening 1");
+
+        timer.start("GTO screening 2");
+
+        //aoinds.resize(aocount);
 
         CDenseMatrix mat_chi(aocount, npoints);
 
@@ -623,7 +646,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
         }
 
-        timer.stop("GTO screening");
+        timer.stop("GTO screening 2");
 
         timer.start("Density matrix");
 
