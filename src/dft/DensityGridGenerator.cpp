@@ -52,7 +52,9 @@ generateDensityGridForLDA(const int32_t           npoints,
 
     const CDenseMatrix& mat_chi = gtoValues;
 
-    auto mat_F = denblas::multAB(densityMatrix.getReferenceToDensity(0), mat_chi);
+    auto den_mat = densityMatrix.getReferenceToDensity(0);
+
+    auto mat_F = denblas::multAB(den_mat, mat_chi);
 
     timer.stop("Density grid matmul");
 
@@ -133,12 +135,6 @@ generateDensityGridForGGA(const int32_t           npoints,
 
     auto mat_F = denblas::multAB(den_mat, mat_chi);
 
-    auto mat_F_x = denblas::multAB(den_mat, mat_chi_x);
-
-    auto mat_F_y = denblas::multAB(den_mat, mat_chi_y);
-
-    auto mat_F_z = denblas::multAB(den_mat, mat_chi_z);
-
     timer.stop("Density grid matmul");
 
     // eq.(27), JCTC 2021, 17, 1512-1521
@@ -150,12 +146,6 @@ generateDensityGridForGGA(const int32_t           npoints,
     for (int32_t nu = 0; nu < naos; nu++)
     {
         auto F_nu = mat_F.row(nu);
-
-        auto F_x_nu = mat_F_x.row(nu);
-
-        auto F_y_nu = mat_F_y.row(nu);
-
-        auto F_z_nu = mat_F_z.row(nu);
 
         auto chi_nu = mat_chi.row(nu);
 
@@ -169,11 +159,11 @@ generateDensityGridForGGA(const int32_t           npoints,
         {
             rhoa[g] += F_nu[g] * chi_nu[g];
 
-            gradax[g] += F_nu[g] * chi_x_nu[g] + F_x_nu[g] * chi_nu[g];
+            gradax[g] += 2.0 * F_nu[g] * chi_x_nu[g];
 
-            graday[g] += F_nu[g] * chi_y_nu[g] + F_y_nu[g] * chi_nu[g];
+            graday[g] += 2.0 * F_nu[g] * chi_y_nu[g];
 
-            gradaz[g] += F_nu[g] * chi_z_nu[g] + F_z_nu[g] * chi_nu[g];
+            gradaz[g] += 2.0 * F_nu[g] * chi_z_nu[g];
         }
     }
 
