@@ -125,9 +125,8 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
     mat_Vxc.zero();
 
     // memory blocks for GTOs on grid points
-    // TODO: use _numberOfPointsThreshold
 
-    CMemBlock2D<double> gaos(1024, naos);
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
 
@@ -358,15 +357,14 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     mat_Vxc.zero();
 
     // memory blocks for GTOs on grid points
-    // TODO: use _numberOfPointsThreshold
 
-    CMemBlock2D<double> gaos(1024, naos);
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
-    CMemBlock2D<double> gaox(1024, naos);
+    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
-    CMemBlock2D<double> gaoy(1024, naos);
+    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
-    CMemBlock2D<double> gaoz(1024, naos);
+    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
 

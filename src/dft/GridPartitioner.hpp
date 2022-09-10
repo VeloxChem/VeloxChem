@@ -54,7 +54,7 @@ class CGridPartitioner
     /**
      Creates a grid partitioner object.
      */
-    CGridPartitioner(const CGridBox& box);
+    CGridPartitioner(const CGridBox& box, const int32_t numGridPointsThreshold);
 
     /**
      Destroys a grid partitioner object.
@@ -92,13 +92,13 @@ class CGridPartitioner
     double findCenter(const double* ptr, const int32_t num) const;
 
     /**
-     Finds one-dimensional median.
+     Finds the position for dividing the box.
 
      @param ptr the pointer to data.
      @param num the number of data points.
      @return the one-dimensional median.
      */
-    double findMedian(const double* ptr, const int32_t num) const;
+    double findDividingPosition(const double* ptr, const int32_t num) const;
 
     /**
      Estimates one-dimensional median using the P2 algorithm.

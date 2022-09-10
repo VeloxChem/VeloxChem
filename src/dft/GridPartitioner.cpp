@@ -29,9 +29,9 @@
 #include <iomanip>
 #include <sstream>
 
-CGridPartitioner::CGridPartitioner(const CGridBox& box)
+CGridPartitioner::CGridPartitioner(const CGridBox& box, const int32_t numGridPointsThreshold)
 
-    : _numberOfPointsThreshold(1024)
+    : _numberOfPointsThreshold(numGridPointsThreshold)
 {
     _boxes.clear();
 
@@ -227,9 +227,9 @@ CGridPartitioner::divideBoxIntoTwo(const CGridBox& box) const
 
     std::vector<const double*> coords({xcoords, ycoords, zcoords});
 
-    // find the center for dividing the box
+    // find the position for dividing the box
 
-    auto center = findMedian(coords[icart], npoints);
+    auto center = findDividingPosition(coords[icart], npoints);
 
     // sub boxes and grid points
 
@@ -313,7 +313,7 @@ CGridPartitioner::findCenter(const double* ptr, const int32_t num) const
 }
 
 double
-CGridPartitioner::findMedian(const double* ptr, const int32_t num) const
+CGridPartitioner::findDividingPosition(const double* ptr, const int32_t num) const
 {
     // Note: ptr and num are not checked
     // Assuming ptr is a valid pointer and num > 0

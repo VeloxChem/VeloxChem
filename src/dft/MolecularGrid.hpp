@@ -72,6 +72,11 @@ class CMolecularGrid
      */
     CMemBlock<int32_t> _gridPointDisplacements;
 
+    /**
+     The maximum number of grid points in a grid box.
+     */
+    int32_t _maxNumberOfGridPointsPerBox;
+
    public:
     /**
      Creates an empty molecular grid object.
@@ -291,6 +296,13 @@ class CMolecularGrid
      @return the grid point displacements.
      */
     CMemBlock<int32_t> getGridPointDisplacements() const;
+
+    /**
+     Gets the maximum number of grid points in a grid box.
+
+     @return the maximum number of grid points in a grid box.
+     */
+    int32_t getMaxNumberOfGridPointsPerBox() const;
 
     /**
      Converts molecular grid object to text and insert it into output text

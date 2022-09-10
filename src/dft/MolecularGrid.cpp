@@ -48,6 +48,8 @@ CMolecularGrid::CMolecularGrid()
     : _isDistributed(false)
 
     , _isPartitioned(false)
+
+    , _maxNumberOfGridPointsPerBox(1024)
 {
 }
 
@@ -58,6 +60,8 @@ CMolecularGrid::CMolecularGrid(const CMemBlock2D<double>& gridPoints)
     , _gridPoints(gridPoints)
 
     , _isPartitioned(false)
+
+    , _maxNumberOfGridPointsPerBox(1024)
 {
 }
 
@@ -72,6 +76,8 @@ CMolecularGrid::CMolecularGrid(const CMolecularGrid& source)
     , _gridPointCounts(source._gridPointCounts)
 
     , _gridPointDisplacements(source._gridPointDisplacements)
+
+    , _maxNumberOfGridPointsPerBox(source._maxNumberOfGridPointsPerBox)
 {
 }
 
@@ -86,6 +92,8 @@ CMolecularGrid::CMolecularGrid(CMolecularGrid&& source) noexcept
     , _gridPointCounts(std::move(source._gridPointCounts))
 
     , _gridPointDisplacements(std::move(source._gridPointDisplacements))
+
+    , _maxNumberOfGridPointsPerBox(std::move(source._maxNumberOfGridPointsPerBox))
 {
 }
 
@@ -108,6 +116,8 @@ CMolecularGrid::operator=(const CMolecularGrid& source)
 
     _gridPointDisplacements = source._gridPointDisplacements;
 
+    _maxNumberOfGridPointsPerBox = source._maxNumberOfGridPointsPerBox;
+
     return *this;
 }
 
@@ -126,6 +136,8 @@ CMolecularGrid::operator=(CMolecularGrid&& source) noexcept
 
     _gridPointDisplacements = std::move(source._gridPointDisplacements);
 
+    _maxNumberOfGridPointsPerBox = std::move(source._maxNumberOfGridPointsPerBox);
+
     return *this;
 }
 
@@ -141,6 +153,8 @@ CMolecularGrid::operator==(const CMolecularGrid& other) const
     if (_gridPointCounts != other._gridPointCounts) return false;
 
     if (_gridPointDisplacements != other._gridPointDisplacements) return false;
+
+    if (_maxNumberOfGridPointsPerBox != other._maxNumberOfGridPointsPerBox) return false;
 
     return true;
 }
@@ -464,7 +478,7 @@ CMolecularGrid::partitionGridPoints()
 
         for (int32_t i = 3; i < 6; i++) boxdim[i] += 0.0001;
 
-        CGridPartitioner partitioner(CGridBox(boxdim, _gridPoints));
+        CGridPartitioner partitioner(CGridBox(boxdim, _gridPoints), _maxNumberOfGridPointsPerBox);
 
         partitioner.partitionGridPoints();
 
@@ -550,6 +564,12 @@ CMemBlock<int32_t>
 CMolecularGrid::getGridPointDisplacements() const
 {
     return _gridPointDisplacements;
+}
+
+int32_t
+CMolecularGrid::getMaxNumberOfGridPointsPerBox() const
+{
+    return _maxNumberOfGridPointsPerBox;
 }
 
 std::ostream&
