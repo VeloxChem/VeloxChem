@@ -31,6 +31,7 @@
 #include <string>
 
 #include "AODensityMatrix.hpp"
+#include "AOFockMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "GridBox.hpp"
@@ -105,6 +106,26 @@ class CXCNewIntegrator
                                               const CXCFunctional&    xcFunctional) const;
 
     /**
+     Integrates second-order LDA exchnage-correlation functional contribution
+     to AO Fock matrix.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed density matrix.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     */
+    void _integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& rwDensityMatrix,
+                                 const CAODensityMatrix& gsDensityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CXCFunctional&    xcFunctional) const;
+
+    /**
      Gets grid box dimension.
 
      @param gridBlockPosition the displacement of grid points in this box.
@@ -139,17 +160,19 @@ class CXCNewIntegrator
      Gets submatrix from AO density matrix.
 
      @param densityMatrix the AO density matrix.
+     @param densityIndex the density index.
      @param aoIndices the index mapping from submatrix to full matrix.
      @param aoCount the number of indices in submatrix.
      @param nAOs the number of indices in full matrix.
      */
     CAODensityMatrix _getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
+                                          const int32_t               densityIndex,
                                           const std::vector<int32_t>& aoIndices,
                                           const int32_t               aoCount,
                                           const int32_t               nAOs) const;
 
     /**
-     Integrates LDA contribution to AO Kohn-Sham matrix.
+     Integrates LDA contribution to (first-order) Vxc matrix.
 
      @param gridBlockPosition the starting position of the grid box.
      @param npoints the number of grid points.
@@ -177,6 +200,7 @@ class CXCNewIntegrator
      @param gtoValuesY the GTO gradient Y values on grid points.
      @param gtoValuesZ the GTO gradient Z values on grid points.
      @param xcGradientGrid the exchange-correlation gradient grid.
+     @param densityGrid the density grid.
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
@@ -192,6 +216,26 @@ class CXCNewIntegrator
                                                 CMultiTimer&           timer) const;
 
     /**
+     Integrates LDA contribution to (second-order) Fxc matrix.
+
+     @param gridBlockPosition the starting position of the grid box.
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param rwDensityGrid the perturbed density grid.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
+    CDenseMatrix _integratePartialFxcFockForLDA(const int32_t          gridBlockPosition,
+                                                const int32_t          npoints,
+                                                const double*          weights,
+                                                const CDenseMatrix&    gtoValues,
+                                                const CXCHessianGrid&  xcHessianGrid,
+                                                const CDensityGrid&    rwDensityGrid,
+                                                CMultiTimer&           timer) const;
+
+    /**
      Distributes partial Vxc matrix to full Vxc matrix.
 
      @param matVxc the full Vxc matrix.
@@ -202,6 +246,23 @@ class CXCNewIntegrator
      */
     void _distributeVxcMatrix(CAOKohnShamMatrix&          matVxc,
                               const CDenseMatrix&         partialMatVxc,
+                              const std::vector<int32_t>& aoIndices,
+                              const int32_t               aoCount,
+                              const int32_t               nAOs) const;
+
+    /**
+     Distributes partial Fxc matrix to full AO Fock matrix.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param fockIndex the index of Fock matrix.
+     @param partialMatFxc the partial Fxc matrix.
+     @param aoIndices the index mapping from partial Vxc to full Vxc.
+     @param aoCount the number of indices in partial Vxc.
+     @param nAOs the number of indices in full Vxc.
+     */
+    void _distributeFxcMatrix(CAOFockMatrix&              aoFockMatrix,
+                              const int32_t               fockIndex,
+                              const CDenseMatrix&         partialMatFxc,
                               const std::vector<int32_t>& aoIndices,
                               const int32_t               aoCount,
                               const int32_t               nAOs) const;
@@ -235,6 +296,26 @@ class CXCNewIntegrator
                                        const CAODensityMatrix& densityMatrix,
                                        const CMolecularGrid&   molecularGrid,
                                        const std::string&      xcFuncLabel) const;
+
+    /**
+     Integrates second-order exchnage-correlation functional contribution to AO
+     Fock matrix.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed density matrix.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     */
+    void integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
+                          const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& rwDensityMatrix,
+                          const CAODensityMatrix& gsDensityMatrix,
+                          const CMolecularGrid&   molecularGrid,
+                          const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCNewIntegrator_hpp */

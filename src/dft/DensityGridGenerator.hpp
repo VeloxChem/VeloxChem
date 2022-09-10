@@ -40,16 +40,16 @@ namespace dengridgen {  // dengridgen namespace
 
  @param npoints the number of grid points.
  @param gtoValues the GTO values on grid points.
- @param densityMatrix the AO density matrix.
+ @param densityMatrix the density matrix.
  @param xcFunType the type of exchange-correlation functional.
  @param timer the timer.
  @return the density grid.
  */
-CDensityGrid generateDensityGridForLDA(const int32_t           npoints,
-                                       const CDenseMatrix&     gtoValues,
-                                       const CAODensityMatrix& densityMatrix,
-                                       const xcfun             xcFunType,
-                                       CMultiTimer&            timer);
+CDensityGrid generateDensityGridForLDA(const int32_t       npoints,
+                                       const CDenseMatrix& gtoValues,
+                                       const CDenseMatrix& densityMatrix,
+                                       const xcfun         xcFunType,
+                                       CMultiTimer&        timer);
 
 /**
  Generates density grid for GGA.

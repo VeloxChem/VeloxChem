@@ -32,13 +32,13 @@
 namespace dengridgen {  // dengridgen namespace
 
 CDensityGrid
-generateDensityGridForLDA(const int32_t           npoints,
-                          const CDenseMatrix&     gtoValues,
-                          const CAODensityMatrix& densityMatrix,
-                          const xcfun             xcFunType,
-                          CMultiTimer&            timer)
+generateDensityGridForLDA(const int32_t       npoints,
+                          const CDenseMatrix& gtoValues,
+                          const CDenseMatrix& densityMatrix,
+                          const xcfun         xcFunType,
+                          CMultiTimer&        timer)
 {
-    CDensityGrid dengrid(npoints, densityMatrix.getNumberOfDensityMatrices(), xcFunType, dengrid::ab);
+    CDensityGrid dengrid(npoints, 1, xcFunType, dengrid::ab);
 
     dengrid.zero();
 
@@ -50,11 +50,7 @@ generateDensityGridForLDA(const int32_t           npoints,
 
     timer.start("Density grid matmul");
 
-    const CDenseMatrix& mat_chi = gtoValues;
-
-    auto den_mat = densityMatrix.getReferenceToDensity(0);
-
-    auto mat_F = denblas::multAB(den_mat, mat_chi);
+    auto mat_F = denblas::multAB(densityMatrix, gtoValues);
 
     timer.stop("Density grid matmul");
 
@@ -62,13 +58,13 @@ generateDensityGridForLDA(const int32_t           npoints,
 
     timer.start("Density grid rho");
 
-    auto naos = mat_chi.getNumberOfRows();
+    auto naos = gtoValues.getNumberOfRows();
 
     for (int32_t nu = 0; nu < naos; nu++)
     {
         auto F_nu = mat_F.row(nu);
 
-        auto chi_nu = mat_chi.row(nu);
+        auto chi_nu = gtoValues.row(nu);
 
         for (int32_t g = 0; g < npoints; g++)
         {
