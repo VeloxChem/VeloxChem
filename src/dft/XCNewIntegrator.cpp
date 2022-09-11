@@ -230,12 +230,13 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
             omptimers[thread_id].start("gtoeval");
 
-            auto batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
             gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
-                                             batch_offset, batch_size, skip_cgto_ids);
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -719,12 +720,13 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             omptimers[thread_id].start("gtoeval");
 
-            auto batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
             gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
-                                             batch_offset, batch_size, skip_cgto_ids);
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -1498,13 +1500,13 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          gridbloc
 {
     // GTO values on grid points
 
-    const CDenseMatrix& mat_chi = gtoValues;
+    auto chi_val = gtoValues.values();
 
-    const CDenseMatrix& mat_chi_x = gtoValuesX;
+    auto chi_x_val = gtoValuesX.values();
 
-    const CDenseMatrix& mat_chi_y = gtoValuesY;
+    auto chi_y_val = gtoValuesY.values();
 
-    const CDenseMatrix& mat_chi_z = gtoValuesZ;
+    auto chi_z_val = gtoValuesZ.values();
 
     // pointers to exchange-correlation functional derrivatives
 
@@ -1552,7 +1554,7 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          gridbloc
 
     auto gradb_z = gsDensityGrid.betaDensityGradientZ(0);
 
-    // set up pointers to perturbed density gradient norms
+    // pointers to perturbed density gradient norms
 
     auto rhowa = rwDensityGrid.alphaDensity(0);
 
@@ -1574,7 +1576,7 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          gridbloc
 
     timer.start("Fxc matrix G");
 
-    auto naos = mat_chi.getNumberOfRows();
+    auto naos = gtoValues.getNumberOfRows();
 
     CDenseMatrix mat_G(naos, npoints);
 
@@ -1584,117 +1586,127 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          gridbloc
 
     mat_G_gga.zero();
 
-    for (int32_t nu = 0; nu < naos; nu++)
+    auto G_val = mat_G.values();
+
+    auto G_gga_val = mat_G_gga.values();
+
+    #pragma omp parallel
     {
-        auto G_nu = mat_G.row(nu);
+        auto thread_id = omp_get_thread_num();
 
-        auto G_gga_nu = mat_G_gga.row(nu);
+        auto nthreads = omp_get_max_threads();
 
-        auto chi_nu = mat_chi.row(nu);
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-        auto chi_x_nu = mat_chi_x.row(nu);
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-        auto chi_y_nu = mat_chi_y.row(nu);
-
-        auto chi_z_nu = mat_chi_z.row(nu);
-
-        #pragma omp parallel for simd aligned(weights, ggrad_a, ggrad_c, grho_aa, grho_ab, \
-                gmix_aa, gmix_ab, gmix_ac, gmix_bc, ggrad_aa, ggrad_ab, ggrad_ac, ggrad_bc, ggrad_cc, \
-                ngrada, ngradb, grada_x, grada_y, grada_z, gradb_x, gradb_y, gradb_z, rhowa, rhowb, \
-                gradwa_x, gradwa_y, gradwa_z, gradwb_x, gradwb_y, gradwb_z : VLX_ALIGN)
-        for (int32_t g = 0; g < npoints; g++)
+        for (int32_t nu = 0; nu < naos; nu++)
         {
-            double w = weights[gridblockpos + g];
+            auto nu_offset = nu * npoints;
 
-            double znva = 1.0 / ngrada[g];
+            #pragma omp simd aligned(weights, ggrad_a, ggrad_c, grho_aa, grho_ab, \
+                    gmix_aa, gmix_ab, gmix_ac, gmix_bc, ggrad_aa, ggrad_ab, ggrad_ac, ggrad_bc, ggrad_cc, \
+                    ngrada, ngradb, grada_x, grada_y, grada_z, gradb_x, gradb_y, gradb_z, rhowa, rhowb, \
+                    gradwa_x, gradwa_y, gradwa_z, gradwb_x, gradwb_y, gradwb_z, \
+                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                double w = weights[gridblockpos + g];
 
-            double znvb = 1.0 / ngradb[g];
+                double znva = 1.0 / ngrada[g];
 
-            double rxa = znva * grada_x[g];
+                double znvb = 1.0 / ngradb[g];
 
-            double rya = znva * grada_y[g];
+                double rxa = znva * grada_x[g];
 
-            double rza = znva * grada_z[g];
+                double rya = znva * grada_y[g];
 
-            double rxb = znvb * gradb_x[g];
+                double rza = znva * grada_z[g];
 
-            double ryb = znvb * gradb_y[g];
+                double rxb = znvb * gradb_x[g];
 
-            double rzb = znvb * gradb_z[g];
+                double ryb = znvb * gradb_y[g];
 
-            double rxwa = gradwa_x[g];
+                double rzb = znvb * gradb_z[g];
 
-            double rywa = gradwa_y[g];
+                double rxwa = gradwa_x[g];
 
-            double rzwa = gradwa_z[g];
+                double rywa = gradwa_y[g];
 
-            double rxwb = gradwb_x[g];
+                double rzwa = gradwa_z[g];
 
-            double rywb = gradwb_y[g];
+                double rxwb = gradwb_x[g];
 
-            double rzwb = gradwb_z[g];
+                double rywb = gradwb_y[g];
 
-            //  variations of functionals variables
+                double rzwb = gradwb_z[g];
 
-            double zetaa = rxwa * rxa + rywa * rya + rzwa * rza;
+                //  variations of functionals variables
 
-            double zetab = rxwb * rxb + rywb * ryb + rzwb * rzb;
+                double zetaa = rxwa * rxa + rywa * rya + rzwa * rza;
 
-            double zetac = grada_x[g] * rxwb + grada_y[g] * rywb + grada_z[g] * rzwb +
+                double zetab = rxwb * rxb + rywb * ryb + rzwb * rzb;
 
-                           gradb_x[g] * rxwa + gradb_y[g] * rywa + gradb_z[g] * rzwa;
+                double zetac = grada_x[g] * rxwb + grada_y[g] * rywb + grada_z[g] * rzwb +
 
-            // first contribution
+                               gradb_x[g] * rxwa + gradb_y[g] * rywa + gradb_z[g] * rzwa;
 
-            double fac0 = gmix_aa[g] * zetaa + gmix_ab[g] * zetab + gmix_ac[g] * zetac +
+                // first contribution
 
-                          grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g];
+                double fac0 = gmix_aa[g] * zetaa + gmix_ab[g] * zetab + gmix_ac[g] * zetac +
 
-            G_nu[g] = w * fac0 * chi_nu[g];
+                              grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g];
 
-            double xcomp = 0.0, ycomp = 0.0, zcomp = 0.0;
+                G_val[nu_offset + g] = w * fac0 * chi_val[nu_offset + g];
 
-            // second contribution
+                double xcomp = 0.0, ycomp = 0.0, zcomp = 0.0;
 
-            double facr = gmix_aa[g] * rhowa[g] + gmix_ab[g] * rhowb[g] +
+                // second contribution
 
-                          ggrad_aa[g] * zetaa + ggrad_ab[g] * zetab + ggrad_ac[g] * zetac;
+                double facr = gmix_aa[g] * rhowa[g] + gmix_ab[g] * rhowb[g] +
 
-            xcomp += facr * rxa;
+                              ggrad_aa[g] * zetaa + ggrad_ab[g] * zetab + ggrad_ac[g] * zetac;
 
-            ycomp += facr * rya;
+                xcomp += facr * rxa;
 
-            zcomp += facr * rza;
+                ycomp += facr * rya;
 
-            // third contribution
+                zcomp += facr * rza;
 
-            double facz = gmix_ac[g] * rhowa[g] + gmix_bc[g] * rhowb[g] +
+                // third contribution
 
-                          ggrad_ac[g] * zetaa + ggrad_bc[g] * zetab + ggrad_cc[g] * zetac;
+                double facz = gmix_ac[g] * rhowa[g] + gmix_bc[g] * rhowb[g] +
 
-            xcomp += facz * grada_x[g];
+                              ggrad_ac[g] * zetaa + ggrad_bc[g] * zetab + ggrad_cc[g] * zetac;
 
-            ycomp += facz * grada_y[g];
+                xcomp += facz * grada_x[g];
 
-            zcomp += facz * grada_z[g];
+                ycomp += facz * grada_y[g];
 
-            // fourth contribution
+                zcomp += facz * grada_z[g];
 
-            xcomp += znva * ggrad_a[g] * (rxwa - rxa * zetaa);
+                // fourth contribution
 
-            ycomp += znva * ggrad_a[g] * (rywa - rya * zetaa);
+                xcomp += znva * ggrad_a[g] * (rxwa - rxa * zetaa);
 
-            zcomp += znva * ggrad_a[g] * (rzwa - rza * zetaa);
+                ycomp += znva * ggrad_a[g] * (rywa - rya * zetaa);
 
-            // fifth contribution
+                zcomp += znva * ggrad_a[g] * (rzwa - rza * zetaa);
 
-            xcomp += ggrad_c[g] * rxwa;
+                // fifth contribution
 
-            ycomp += ggrad_c[g] * rywa;
+                xcomp += ggrad_c[g] * rxwa;
 
-            zcomp += ggrad_c[g] * rzwa;
+                ycomp += ggrad_c[g] * rywa;
 
-            G_gga_nu[g] = w * (xcomp * chi_x_nu[g] + ycomp * chi_y_nu[g] + zcomp * chi_z_nu[g]);
+                zcomp += ggrad_c[g] * rzwa;
+
+                G_gga_val[nu_offset + g] = w * (xcomp * chi_x_val[nu_offset + g] +
+
+                                                ycomp * chi_y_val[nu_offset + g] +
+
+                                                zcomp * chi_z_val[nu_offset + g]);
+            }
         }
     }
 
@@ -1704,9 +1716,9 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          gridbloc
 
     timer.start("Fxc matrix matmul");
 
-    auto mat_Fxc = denblas::multABt(mat_chi, mat_G);
+    auto mat_Fxc = denblas::multABt(gtoValues, mat_G);
 
-    auto mat_Fxc_gga = denblas::multABt(mat_chi, mat_G_gga);
+    auto mat_Fxc_gga = denblas::multABt(gtoValues, mat_G_gga);
 
     mat_Fxc_gga.symmetrize();  // matrix + matrix.T
 
