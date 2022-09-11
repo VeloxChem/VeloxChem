@@ -294,9 +294,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat.getReferenceToDensity(0),
-
-                                                             xcfuntype, timer);
+        auto dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat, xcfuntype, timer);
 
         // compute exchange-correlation functional derivative
 
@@ -558,7 +556,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
 
-                                                             sub_dens_mat.getReferenceToDensity(0), xcfuntype, timer);
+                                                             sub_dens_mat, xcfuntype, timer);
 
         // compute exchange-correlation functional derivative
 
@@ -773,7 +771,6 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
         timer.stop("GTO screening");
 
         // generate sub density matrix
-        // TODO: return CDenseMatrix from _getSubDensityMatrix
 
         timer.start("Density matrix slicing");
 
@@ -785,9 +782,7 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto gsdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat.getReferenceToDensity(0),
-
-                                                               xcfuntype, timer);
+        auto gsdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat, xcfuntype, timer);
 
         // compute exchange-correlation functional derivative
 
@@ -815,9 +810,7 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             auto xcfuntype = xcFunctional.getFunctionalType();
 
-            auto rwdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat.getReferenceToDensity(0),
-
-                                                                   xcfuntype, timer);
+            auto rwdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, sub_dens_mat, xcfuntype, timer);
 
             // compute partial contribution to Fxc matrix
 
@@ -1026,7 +1019,6 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
         timer.stop("GTO screening");
 
         // generate sub density matrix
-        // TODO: return CDenseMatrix from _getSubDensityMatrix
 
         timer.start("Density matrix slicing");
 
@@ -1040,7 +1032,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         auto gsdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
 
-                                                               sub_dens_mat.getReferenceToDensity(0), xcfuntype, timer);
+                                                               sub_dens_mat, xcfuntype, timer);
 
         // compute exchange-correlation functional derivative
 
@@ -1074,7 +1066,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
 
-                                                                   sub_dens_mat.getReferenceToDensity(0), xcfuntype, timer);
+                                                                   sub_dens_mat, xcfuntype, timer);
 
             // compute partial contribution to Fxc matrix
 
@@ -1247,7 +1239,7 @@ CXCNewIntegrator::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
     }
 }
 
-CAODensityMatrix
+CDenseMatrix
 CXCNewIntegrator::_getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
                                        const int32_t               densityIndex,
                                        const std::vector<int32_t>& aoIndices,
@@ -1272,10 +1264,10 @@ CXCNewIntegrator::_getSubDensityMatrix(const CAODensityMatrix&     densityMatrix
             }
         }
 
-        return CAODensityMatrix({sub_dens}, denmat::rest);
+        return sub_dens;
     }
 
-    return CAODensityMatrix();
+    return CDenseMatrix();
 }
 
 CDenseMatrix
