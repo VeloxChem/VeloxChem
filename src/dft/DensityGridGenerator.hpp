@@ -59,19 +59,19 @@ CDensityGrid generateDensityGridForLDA(const int32_t       npoints,
  @param gtoValuesX the GTO gradient X values on grid points.
  @param gtoValuesY the GTO gradient Y values on grid points.
  @param gtoValuesZ the GTO gradient Z values on grid points.
- @param densityMatrix the AO density matrix.
+ @param densityMatrix the density matrix.
  @param xcFunType the type of exchange-correlation functional.
  @param timer the timer.
  @return the density grid.
  */
-CDensityGrid generateDensityGridForGGA(const int32_t           npoints,
-                                       const CDenseMatrix&     gtoValues,
-                                       const CDenseMatrix&     gtoValuesX,
-                                       const CDenseMatrix&     gtoValuesY,
-                                       const CDenseMatrix&     gtoValuesZ,
-                                       const CAODensityMatrix& densityMatrix,
-                                       const xcfun             xcFunType,
-                                       CMultiTimer&            timer);
+CDensityGrid generateDensityGridForGGA(const int32_t       npoints,
+                                       const CDenseMatrix& gtoValues,
+                                       const CDenseMatrix& gtoValuesX,
+                                       const CDenseMatrix& gtoValuesY,
+                                       const CDenseMatrix& gtoValuesZ,
+                                       const CDenseMatrix& densityMatrix,
+                                       const xcfun         xcFunType,
+                                       CMultiTimer&        timer);
 
 }  // namespace dengridgen
 

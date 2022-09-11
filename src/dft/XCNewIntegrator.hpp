@@ -316,6 +316,27 @@ class CXCNewIntegrator
                           const CAODensityMatrix& gsDensityMatrix,
                           const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel) const;
+
+    void _integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& rwDensityMatrix,
+                                 const CAODensityMatrix& gsDensityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CXCFunctional&    xcFunctional) const;
+
+    CDenseMatrix _integratePartialFxcFockForGGA(const int32_t          gridblockpos,
+                                                const int32_t          npoints,
+                                                const double*          weights,
+                                                const CDenseMatrix&    gtoValues,
+                                                const CDenseMatrix&    gtoValuesX,
+                                                const CDenseMatrix&    gtoValuesY,
+                                                const CDenseMatrix&    gtoValuesZ,
+                                                const CXCGradientGrid& xcGradientGrid,
+                                                const CXCHessianGrid&  xcHessianGrid,
+                                                const CDensityGrid&    rwDensityGrid,
+                                                const CDensityGrid&    gsDensityGrid,
+                                                CMultiTimer&           timer) const;
 };
 
 #endif /* XCNewIntegrator_hpp */

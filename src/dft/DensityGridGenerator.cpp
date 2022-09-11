@@ -58,9 +58,7 @@ generateDensityGridForLDA(const int32_t       npoints,
 
     timer.start("Density grid rho");
 
-    auto naos = gtoValues.getNumberOfRows();
-
-    for (int32_t nu = 0; nu < naos; nu++)
+    for (int32_t nu = 0; nu < gtoValues.getNumberOfRows(); nu++)
     {
         auto F_nu = mat_F.row(nu);
 
@@ -80,16 +78,16 @@ generateDensityGridForLDA(const int32_t       npoints,
 }
 
 CDensityGrid
-generateDensityGridForGGA(const int32_t           npoints,
-                          const CDenseMatrix&     gtoValues,
-                          const CDenseMatrix&     gtoValuesX,
-                          const CDenseMatrix&     gtoValuesY,
-                          const CDenseMatrix&     gtoValuesZ,
-                          const CAODensityMatrix& densityMatrix,
-                          const xcfun             xcFunType,
-                          CMultiTimer&            timer)
+generateDensityGridForGGA(const int32_t       npoints,
+                          const CDenseMatrix& gtoValues,
+                          const CDenseMatrix& gtoValuesX,
+                          const CDenseMatrix& gtoValuesY,
+                          const CDenseMatrix& gtoValuesZ,
+                          const CDenseMatrix& densityMatrix,
+                          const xcfun         xcFunType,
+                          CMultiTimer&        timer)
 {
-    CDensityGrid dengrid(npoints, densityMatrix.getNumberOfDensityMatrices(), xcFunType, dengrid::ab);
+    CDensityGrid dengrid(npoints, 1, xcFunType, dengrid::ab);
 
     dengrid.zero();
 
@@ -119,17 +117,11 @@ generateDensityGridForGGA(const int32_t           npoints,
 
     timer.start("Density grid matmul");
 
-    const CDenseMatrix& mat_chi = gtoValues;
+    CDenseMatrix symmetricDensityMatrix(densityMatrix); 
 
-    const CDenseMatrix& mat_chi_x = gtoValuesX;
+    symmetricDensityMatrix.symmetrizeAndScale(0.5);
 
-    const CDenseMatrix& mat_chi_y = gtoValuesY;
-
-    const CDenseMatrix& mat_chi_z = gtoValuesZ;
-
-    auto den_mat = densityMatrix.getReferenceToDensity(0);
-
-    auto mat_F = denblas::multAB(den_mat, mat_chi);
+    auto mat_F = denblas::multAB(symmetricDensityMatrix, gtoValues);
 
     timer.stop("Density grid matmul");
 
@@ -137,19 +129,17 @@ generateDensityGridForGGA(const int32_t           npoints,
 
     timer.start("Density grid rho");
 
-    auto naos = mat_chi.getNumberOfRows();
-
-    for (int32_t nu = 0; nu < naos; nu++)
+    for (int32_t nu = 0; nu < gtoValues.getNumberOfRows(); nu++)
     {
         auto F_nu = mat_F.row(nu);
 
-        auto chi_nu = mat_chi.row(nu);
+        auto chi_nu = gtoValues.row(nu);
 
-        auto chi_x_nu = mat_chi_x.row(nu);
+        auto chi_x_nu = gtoValuesX.row(nu);
 
-        auto chi_y_nu = mat_chi_y.row(nu);
+        auto chi_y_nu = gtoValuesY.row(nu);
 
-        auto chi_z_nu = mat_chi_z.row(nu);
+        auto chi_z_nu = gtoValuesZ.row(nu);
 
         for (int32_t g = 0; g < npoints; g++)
         {
