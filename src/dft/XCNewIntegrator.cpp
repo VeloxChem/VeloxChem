@@ -1351,7 +1351,7 @@ CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t          gridbloc
 
     auto ggradab = xcGradientGrid.xcGradientValues(xcvars::gradab);
 
-    // set up pointers to density gradient norms
+    // pointers to density gradient norms
 
     auto ngrada = densityGrid.alphaDensityGradient(0);
 

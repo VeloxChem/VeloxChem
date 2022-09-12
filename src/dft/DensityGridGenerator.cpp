@@ -170,23 +170,25 @@ generateDensityGridForGGA(const int32_t       npoints,
                 gradaz[g] += 2.0 * F_val[nu_offset + g] * chi_z_val[nu_offset + g];
             }
         }
-    }
 
-    std::memcpy(rhob, rhoa, npoints * sizeof(double));
+        #pragma omp simd aligned(rhoa, rhob, gradax, graday, gradaz, gradbx, gradby, gradbz, \
+                                 grada, gradb, gradab : VLX_ALIGN)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            rhob[g] = rhoa[g];
 
-    std::memcpy(gradbx, gradax, npoints * sizeof(double));
+            gradbx[g] = gradax[g];
 
-    std::memcpy(gradby, graday, npoints * sizeof(double));
+            gradby[g] = graday[g];
 
-    std::memcpy(gradbz, gradaz, npoints * sizeof(double));
+            gradbz[g] = gradaz[g];
 
-    for (int32_t g = 0; g < npoints; g++)
-    {
-        grada[g] = std::sqrt(gradax[g] * gradax[g] + graday[g] * graday[g] + gradaz[g] * gradaz[g]);
+            grada[g] = std::sqrt(gradax[g] * gradax[g] + graday[g] * graday[g] + gradaz[g] * gradaz[g]);
 
-        gradb[g] = std::sqrt(gradbx[g] * gradbx[g] + gradby[g] * gradby[g] + gradbz[g] * gradbz[g]);
+            gradb[g] = std::sqrt(gradbx[g] * gradbx[g] + gradby[g] * gradby[g] + gradbz[g] * gradbz[g]);
 
-        gradab[g] = gradax[g] * gradbx[g] + graday[g] * gradby[g] + gradaz[g] * gradbz[g];
+            gradab[g] = gradax[g] * gradbx[g] + graday[g] * gradby[g] + gradaz[g] * gradbz[g];
+        }
     }
 
     timer.stop("Density grid rho");
