@@ -34,6 +34,7 @@
 #include "AOFockMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
+#include "DensityGridQuad.hpp"
 #include "GridBox.hpp"
 #include "GtoContainer.hpp"
 #include "MemBlock2D.hpp"
@@ -43,6 +44,8 @@
 #include "MultiTimer.hpp"
 #include "XCFunctional.hpp"
 #include "XCGradientGrid.hpp"
+#include "XCHessianGrid.hpp"
+#include "XCCubicHessianGrid.hpp"
 
 /**
  Class CXCNewIntegrator implements XC integrator.
@@ -338,6 +341,41 @@ class CXCNewIntegrator
                                                 const CDensityGrid&    rwDensityGrid,
                                                 const CDensityGrid&    gsDensityGrid,
                                                 CMultiTimer&           timer) const;
+
+    void integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
+                          const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& rwDensityMatrix,
+                          const CAODensityMatrix& rw2DensityMatrix,
+                          const CAODensityMatrix& gsDensityMatrix,
+                          const CMolecularGrid&   molecularGrid,
+                          const std::string&      xcFuncLabel,
+                          const std::string&      quadMode) const;
+
+    void _integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& rwDensityMatrix,
+                                 const CAODensityMatrix& rw2DensityMatrix,
+                                 const CAODensityMatrix& gsDensityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CXCFunctional&    xcFunctional,
+                                 const std::string&      quadMode) const;
+
+    CAODensityMatrix _getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
+                                          const std::vector<int32_t>& aoIndices,
+                                          const int32_t               aoCount) const;
+
+    CDenseMatrix _integratePartialKxcFockForLDA(const int32_t              gridBlockPosition,
+                                                const int32_t              npoints,
+                                                const double*              weights,
+                                                const CDenseMatrix&        gtoValues,
+                                                const CXCHessianGrid&      xcHessianGrid,
+                                                const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                const CDensityGridQuad&    rwDensityGridQuad,
+                                                const CDensityGrid&        rw2DensityGrid,
+                                                const int32_t              iFock,
+                                                CMultiTimer&               timer) const;
 };
 
 #endif /* XCNewIntegrator_hpp */

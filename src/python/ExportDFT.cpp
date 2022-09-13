@@ -320,7 +320,8 @@ export_dft(py::module& m)
     PyClass<CXCNewIntegrator>(m, "XCNewIntegrator")
         .def(py::init(&vlx_general::create<CXCNewIntegrator>), "comm"_a = py::none())
         .def("integrate_vxc_fock", &CXCNewIntegrator::integrateVxcFock)
-        .def("integrate_fxc_fock", &CXCNewIntegrator::integrateFxcFock);
+        .def("integrate_fxc_fock", &CXCNewIntegrator::integrateFxcFock)
+        .def("integrate_kxc_fock", &CXCNewIntegrator::integrateKxcFock);
 
     // CXCMolecularGradient class
 

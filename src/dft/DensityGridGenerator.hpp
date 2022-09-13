@@ -51,6 +51,12 @@ CDensityGrid generateDensityGridForLDA(const int32_t       npoints,
                                        const xcfun         xcFunType,
                                        CMultiTimer&        timer);
 
+CDensityGrid generateDensityGridForLDA(const int32_t           npoints,
+                                       const CDenseMatrix&     gtoValues,
+                                       const CAODensityMatrix& densityMatrix,
+                                       const xcfun             xcFunType,
+                                       CMultiTimer&            timer);
+
 /**
  Generates density grid for GGA.
 

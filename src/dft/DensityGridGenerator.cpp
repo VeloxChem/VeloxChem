@@ -80,6 +80,58 @@ generateDensityGridForLDA(const int32_t       npoints,
 }
 
 CDensityGrid
+generateDensityGridForLDA(const int32_t           npoints,
+                          const CDenseMatrix&     gtoValues,
+                          const CAODensityMatrix& densityMatrix,
+                          const xcfun             xcFunType,
+                          CMultiTimer&            timer)
+{
+    auto numdens = densityMatrix.getNumberOfDensityMatrices();
+
+    CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
+
+    // TODO: double check if zero() is needed
+    dengrid.zero();
+
+    for (int32_t idens = 0; idens < numdens; idens++)
+    {
+        auto rhoa = dengrid.alphaDensity(idens);
+
+        auto rhob = dengrid.betaDensity(idens);
+
+        // eq.(26), JCTC 2021, 17, 1512-1521
+
+        timer.start("Density grid matmul");
+
+        auto mat_F = denblas::multAB(densityMatrix.getReferenceToDensity(idens), gtoValues);
+
+        timer.stop("Density grid matmul");
+
+        // eq.(27), JCTC 2021, 17, 1512-1521
+
+        timer.start("Density grid rho");
+
+        for (int32_t nu = 0; nu < gtoValues.getNumberOfRows(); nu++)
+        {
+            auto F_nu = mat_F.row(nu);
+
+            auto chi_nu = gtoValues.row(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                rhoa[g] += F_nu[g] * chi_nu[g];
+            }
+        }
+
+        std::memcpy(rhob, rhoa, npoints * sizeof(double));
+
+        timer.stop("Density grid rho");
+    }
+
+    return dengrid;
+}
+
+CDensityGrid
 generateDensityGridForGGA(const int32_t       npoints,
                           const CDenseMatrix& gtoValues,
                           const CDenseMatrix& gtoValuesX,
