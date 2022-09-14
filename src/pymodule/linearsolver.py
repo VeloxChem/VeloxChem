@@ -37,7 +37,7 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCIntegrator, XCNewIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
@@ -868,10 +868,15 @@ class LinearSolver:
                 if not self.xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
                         fock.scale(2.0, ifock)
-                xc_drv = XCIntegrator(self.comm)
-                molgrid.distribute(self.rank, self.nodes, self.comm)
-                xc_drv.integrate(fock, dens, gs_density, molecule, basis,
-                                 molgrid, self.xcfun.get_func_label())
+
+                xc_drv = XCNewIntegrator(self.comm)
+                molgrid.partition_grid_points()
+                molgrid.distribute_counts_and_displacements(
+                    self.rank, self.nodes, self.comm)
+                xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label())
+
                 if profiler is not None:
                     profiler.add_timing_info('FockXC', tm.time() - t0)
 

@@ -389,20 +389,15 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-
-    std::cout << "------------------------" << std::endl;
-
-    std::cout << timer.getSummary() << std::endl;
-
-    std::cout << "OpenMP timing" << std::endl;
-
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 
     mat_Vxc.setNumberOfElectrons(nele);
 
@@ -652,20 +647,15 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-
-    std::cout << "------------------------" << std::endl;
-
-    std::cout << timer.getSummary() << std::endl;
-
-    std::cout << "OpenMP timing" << std::endl;
-
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 
     mat_Vxc.setNumberOfElectrons(nele);
 
@@ -879,20 +869,15 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-
-    std::cout << "------------------------" << std::endl;
-
-    std::cout << timer.getSummary() << std::endl;
-
-    std::cout << "OpenMP timing" << std::endl;
-
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 }
 
 void
@@ -1137,20 +1122,15 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-
-    std::cout << "------------------------" << std::endl;
-
-    std::cout << timer.getSummary() << std::endl;
-
-    std::cout << "OpenMP timing" << std::endl;
-
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 }
 
 void
@@ -1372,20 +1352,15 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-
-    std::cout << "------------------------" << std::endl;
-
-    std::cout << timer.getSummary() << std::endl;
-
-    std::cout << "OpenMP timing" << std::endl;
-
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 }
 
 void
@@ -1648,20 +1623,15 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-
-    std::cout << "------------------------" << std::endl;
-
-    std::cout << timer.getSummary() << std::endl;
-
-    std::cout << "OpenMP timing" << std::endl;
-
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 }
 
 std::array<double, 6>

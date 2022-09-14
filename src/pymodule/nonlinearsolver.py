@@ -43,7 +43,7 @@ from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCNewIntegrator
 
 
 class NonLinearSolver:
@@ -368,8 +368,15 @@ class NonLinearSolver:
 
         return None
 
-    def _comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict,
-                       first_order_dens, second_order_dens, mode,
+    def _comp_nlr_fock(self,
+                       mo,
+                       molecule,
+                       ao_basis,
+                       fock_flag,
+                       dft_dict,
+                       first_order_dens,
+                       second_order_dens,
+                       mode,
                        profiler=None):
         """
         Computes and returns a list of Fock matrices.
@@ -450,7 +457,7 @@ class NonLinearSolver:
         """
 
         if profiler is not None:
-            profiler.set_timing_key(f'Nonlinear Fock')
+            profiler.set_timing_key('Nonlinear Fock')
 
         eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_driver.compute(get_qq_scheme(self.qq_type),
@@ -590,14 +597,16 @@ class NonLinearSolver:
             if self._dft:
                 t0 = tm.time()
 
-                xc_drv = XCIntegrator(self.comm)
+                xc_drv = XCNewIntegrator(self.comm)
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
-                molgrid.distribute(self.rank, self.nodes, self.comm)
-                xc_drv.integrate(fock, dens1, dens2, gs_density,
-                                 molecule, ao_basis, molgrid,
-                                 self.xcfun.get_func_label(), mode)
+                molgrid.partition_grid_points()
+                molgrid.distribute_counts_and_displacements(
+                    self.rank, self.nodes, self.comm)
+                xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
+                                          dens2, gs_density, molgrid,
+                                          self.xcfun.get_func_label(), mode)
 
                 if profiler is not None:
                     profiler.add_timing_info('FockXC', tm.time() - t0)

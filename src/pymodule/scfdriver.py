@@ -39,12 +39,12 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCIntegrator, XCNewIntegrator
 from .veloxchemlib import AOKohnShamMatrix
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import molorb
+from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .aofockmatrix import AOFockMatrix
@@ -1281,9 +1281,7 @@ class ScfDriver:
 
         if self.qq_dyn and e_grad is not None:
             screening.set_threshold(self._get_dyn_threshold(e_grad))
-
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        xc_drv = XCIntegrator(self.comm)
 
         eri_t0 = tm.time()
 
@@ -1299,9 +1297,21 @@ class ScfDriver:
                 if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
-            self._mol_grid.distribute(self.rank, self.nodes, self.comm)
-            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self._mol_grid,
-                                       self.xcfun.get_func_label())
+            if (self.scf_type == 'restricted' and
+                    self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]):
+                xc_drv = XCNewIntegrator(self.comm)
+                self._mol_grid.partition_grid_points()
+                self._mol_grid.distribute_counts_and_displacements(
+                    self.rank, self.nodes, self.comm)
+                vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
+                                                    self._mol_grid,
+                                                    self.xcfun.get_func_label())
+            else:
+                xc_drv = XCIntegrator(self.comm)
+                self._mol_grid.distribute(self.rank, self.nodes, self.comm)
+                vxc_mat = xc_drv.integrate(den_mat, molecule, basis,
+                                           self._mol_grid,
+                                           self.xcfun.get_func_label())
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
         else:
             vxc_mat = None
