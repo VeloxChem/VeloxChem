@@ -79,6 +79,15 @@ CDensityGrid generateDensityGridForGGA(const int32_t       npoints,
                                        const xcfun         xcFunType,
                                        CMultiTimer&        timer);
 
+CDensityGrid generateDensityGridForGGA(const int32_t           npoints,
+                                       const CDenseMatrix&     gtoValues,
+                                       const CDenseMatrix&     gtoValuesX,
+                                       const CDenseMatrix&     gtoValuesY,
+                                       const CDenseMatrix&     gtoValuesZ,
+                                       const CAODensityMatrix& densityMatrix,
+                                       const xcfun             xcFunType,
+                                       CMultiTimer&            timer);
+
 }  // namespace dengridgen
 
 #endif /* DensityGridGenerator_hpp */

@@ -376,6 +376,32 @@ class CXCNewIntegrator
                                                 const CDensityGrid&        rw2DensityGrid,
                                                 const int32_t              iFock,
                                                 CMultiTimer&               timer) const;
+
+    void _integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& rwDensityMatrix,
+                                 const CAODensityMatrix& rw2DensityMatrix,
+                                 const CAODensityMatrix& gsDensityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CXCFunctional&    xcFunctional,
+                                 const std::string&      quadMode) const;
+
+    CDenseMatrix _integratePartialKxcFockForGGA(const int32_t              gridblockpos,
+                                                const int32_t              npoints,
+                                                const double*              weights,
+                                                const CDenseMatrix&        gtoValues,
+                                                const CDenseMatrix&        gtoValuesX,
+                                                const CDenseMatrix&        gtoValuesY,
+                                                const CDenseMatrix&        gtoValuesZ,
+                                                const CXCGradientGrid&     xcGradientGrid,
+                                                const CXCHessianGrid&      xcHessianGrid,
+                                                const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                const CDensityGridQuad&    rwDensityGridQuad,
+                                                const CDensityGrid&        rw2DensityGrid,
+                                                const CDensityGrid&        gsDensityGrid,
+                                                const int32_t              iFock,
+                                                CMultiTimer&               timer) const;
 };
 
 #endif /* XCNewIntegrator_hpp */

@@ -159,9 +159,9 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
         }
         else if (xcfuntype == xcfun::gga)
         {
-           //_integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+           _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
 
-           //                        molecularGrid, fvxc, quadMode);
+                                   molecularGrid, fvxc, quadMode);
         }
         else
         {
@@ -1346,23 +1346,297 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         // go through Fock matrices
 
-        auto numfocks = aoFockMatrix.getNumberOfFockMatrices();
-
-        for (int32_t ifock = 0; ifock < numfocks; ifock++)
+        for (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
         {
-            // compute partial contribution to Fxc matrix
+            // compute partial contribution to Kxc matrix
 
             auto partial_mat_Kxc = _integratePartialKxcFockForLDA(gridblockpos, npoints, weights, mat_chi,
 
                                                                   vxc2grid, vxc3grid, rwdengridquad, rw2dengrid,
 
-                                                                  ifock, timer);
+                                                                  idensity, timer);
 
-            // distribute partial Fxc to full Fxc
+            // distribute partial Kxc to full Kxc
 
             timer.start("Kxc matrix dist.");
 
-            _distributeFxcMatrix(aoFockMatrix, ifock, partial_mat_Kxc, aoinds, aocount, naos);
+            _distributeFxcMatrix(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
+
+            timer.stop("Kxc matrix dist.");
+        }
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    timer.stop("Total timing");
+
+    std::cout << "Timing of new integrator" << std::endl;
+
+    std::cout << "------------------------" << std::endl;
+
+    std::cout << timer.getSummary() << std::endl;
+
+    std::cout << "OpenMP timing" << std::endl;
+
+    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    {
+        std::cout << "Thread " << thread_id << std::endl;
+
+        std::cout << omptimers[thread_id].getSummary() << std::endl;
+    }
+}
+
+void
+CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& rwDensityMatrix,
+                                          const CAODensityMatrix& rw2DensityMatrix,
+                                          const CAODensityMatrix& gsDensityMatrix,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCFunctional&    xcFunctional,
+                                          const std::string&      quadMode) const
+{
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Preparation");
+
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<CMultiTimer> omptimers(nthreads);
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // memory blocks for GTOs on grid points
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+
+    auto ycoords = molecularGrid.getCoordinatesY();
+
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    auto weights = molecularGrid.getWeights();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    timer.stop("Preparation");
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        timer.start("GTO pre-screening");
+
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);
+
+        timer.stop("GTO pre-screening");
+
+        // GTO values on grid points
+
+        timer.start("OMP GTO evaluation");
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            omptimers[thread_id].start("gtoeval");
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+
+            omptimers[thread_id].stop("gtoeval");
+        }
+
+        timer.stop("OMP GTO evaluation");
+
+        timer.start("GTO screening");
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            auto gaox_nu = gaox.data(nu);
+
+            auto gaoy_nu = gaoy.data(nu);
+
+            auto gaoz_nu = gaoz.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        CDenseMatrix mat_chi(aocount, npoints);
+
+        CDenseMatrix mat_chi_x(aocount, npoints);
+
+        CDenseMatrix mat_chi_y(aocount, npoints);
+
+        CDenseMatrix mat_chi_z(aocount, npoints);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
+        }
+
+        timer.stop("GTO screening");
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+
+        auto rw_sub_dens_mat = _getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+
+        auto rw2_sub_dens_mat = _getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        auto xcfuntype = xcFunctional.getFunctionalType();
+
+        auto gsdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+
+                                                               gs_sub_dens_mat, xcfuntype, timer);
+
+        auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+
+                                                               rw_sub_dens_mat, xcfuntype, timer);
+
+        auto rw2dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+
+                                                                rw2_sub_dens_mat, xcfuntype, timer);
+
+        // compute perturbed density
+
+        timer.start("Density grid quad");
+
+        auto numdens_rw2 = rw2DensityMatrix.getNumberOfDensityMatrices();
+
+        CDensityGridQuad rwdengridquad(npoints, numdens_rw2, xcfuntype, dengrid::ab);
+
+        rwdengridquad.DensityProd(rwdengrid, xcfuntype, numdens_rw2, quadMode);
+
+        timer.stop("Density grid quad");
+
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        CXCGradientGrid vxcgrid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+
+        CXCHessianGrid vxc2grid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+
+        CXCCubicHessianGrid vxc3grid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+
+        xcFunctional.compute(vxcgrid, gsdengrid);
+
+        xcFunctional.compute(vxc2grid, gsdengrid);
+
+        xcFunctional.compute(vxc3grid, gsdengrid);
+
+        timer.stop("XC functional eval.");
+
+        // go through rhow density matrices
+
+        for (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
+        {
+            // compute partial contribution to Kxc matrix
+
+            auto partial_mat_Kxc = _integratePartialKxcFockForGGA(gridblockpos, npoints, weights, mat_chi,
+
+                                                                  mat_chi_x, mat_chi_y, mat_chi_z,
+
+                                                                  vxcgrid, vxc2grid, vxc3grid,
+
+                                                                  rwdengridquad, rw2dengrid, gsdengrid,
+
+                                                                  idensity, timer);
+
+            // distribute partial Fxc to full Fock matrix
+
+            timer.start("Kxc matrix dist.");
+
+            _distributeFxcMatrix(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
 
             timer.stop("Kxc matrix dist.");
         }
@@ -2074,7 +2348,7 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              grid
 
     // eq.(30), JCTC 2021, 17, 1512-1521
 
-    timer.start("Fxc matrix G");
+    timer.start("Kxc matrix G");
 
     auto naos = gtoValues.getNumberOfRows();
 
@@ -2098,17 +2372,616 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              grid
         }
     }
 
-    timer.stop("Fxc matrix G");
+    timer.stop("Kxc matrix G");
 
     // eq.(31), JCTC 2021, 17, 1512-1521
 
-    timer.start("Fxc matrix matmul");
+    timer.start("Kxc matrix matmul");
 
-    auto mat_Fxc = denblas::multABt(gtoValues, mat_G);
+    auto mat_Kxc = denblas::multABt(gtoValues, mat_G);
 
-    timer.stop("Fxc matrix matmul");
+    timer.stop("Kxc matrix matmul");
 
-    return mat_Fxc;
+    return mat_Kxc;
+}
+
+CDenseMatrix
+CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              gridblockpos,
+                                                 const int32_t              npoints,
+                                                 const double*              weights,
+                                                 const CDenseMatrix&        gtoValues,
+                                                 const CDenseMatrix&        gtoValuesX,
+                                                 const CDenseMatrix&        gtoValuesY,
+                                                 const CDenseMatrix&        gtoValuesZ,
+                                                 const CXCGradientGrid&     xcGradientGrid,
+                                                 const CXCHessianGrid&      xcHessianGrid,
+                                                 const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                 const CDensityGridQuad&    rwDensityGridQuad,
+                                                 const CDensityGrid&        rw2DensityGrid,
+                                                 const CDensityGrid&        gsDensityGrid,
+                                                 const int32_t              iFock,
+                                                 CMultiTimer&               timer) const
+{
+    // GTO values on grid points
+
+    auto chi_val = gtoValues.values();
+
+    auto chi_x_val = gtoValuesX.values();
+
+    auto chi_y_val = gtoValuesY.values();
+
+    auto chi_z_val = gtoValuesZ.values();
+
+    // pointers to exchange-correlation functional derrivatives
+
+    auto df2000 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+
+    auto df1100 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
+
+    auto df1010 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::grada);
+
+    auto df1001 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::gradb);
+
+    auto df10001 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::gradab);
+
+    auto df0020 = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::grada);
+
+    auto df0011 = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::gradb);
+
+    auto df00101 = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::gradab);
+
+    auto df00002 = xcHessianGrid.xcHessianValues(xcvars::gradab, xcvars::gradab);
+
+    auto df0010 = xcGradientGrid.xcGradientValues(xcvars::grada);
+
+    auto df00001 = xcGradientGrid.xcGradientValues(xcvars::gradab);
+
+    auto df00011 = xcHessianGrid.xcHessianValues(xcvars::gradb, xcvars::gradab);
+
+    auto df01001 = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::gradab);
+
+    auto df0110 = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::grada);
+
+    auto df3000 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhoa);
+
+    auto df2100 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhob);
+
+    auto df1200 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::rhob);
+
+    auto df2010 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::grada);
+
+    auto df0030 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::grada, xcvars::grada);
+
+    auto df0021 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::grada, xcvars::gradb);
+
+    auto df0012 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::gradb, xcvars::gradb);
+
+    auto df00201 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::grada, xcvars::gradab);
+
+    auto df00111 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::gradb, xcvars::gradab);
+
+    auto df00102 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::gradab, xcvars::gradab);
+
+    auto df00003 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::gradab, xcvars::gradab, xcvars::gradab);
+
+    auto df2001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::gradb);
+
+    auto df1110 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::grada);
+
+    auto df1101 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::gradb);
+
+    auto df20001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::gradab);
+
+    auto df11001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::gradab);
+
+    auto df1020 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::grada, xcvars::grada);
+
+    auto df1011 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::grada, xcvars::gradb);
+
+    auto df1002 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::gradb, xcvars::gradb);
+
+    auto df10101 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::grada, xcvars::gradab);
+
+    auto df10002 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::gradab, xcvars::gradab);
+
+    auto df01002 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::gradab, xcvars::gradab);
+
+    auto df0120 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::grada, xcvars::grada);
+
+    auto df0111 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::grada, xcvars::gradb);
+
+    auto df01101 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::grada, xcvars::gradab);
+
+    auto df10011 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::gradb, xcvars::gradab);
+
+    auto df01011 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::gradb, xcvars::gradab);
+
+    auto df0210 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::rhob, xcvars::grada);
+
+    auto df02001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::rhob, xcvars::gradab);
+
+    auto df00021 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::gradb, xcvars::gradb, xcvars::gradab);
+
+    // pointers to ground state density gradient norms
+
+    auto ngrada = gsDensityGrid.alphaDensityGradient(0);
+
+    auto grada_x = gsDensityGrid.alphaDensityGradientX(0);
+
+    auto grada_y = gsDensityGrid.alphaDensityGradientY(0);
+
+    auto grada_z = gsDensityGrid.alphaDensityGradientZ(0);
+
+    // pointers to perturbed density gradient norms
+
+    auto rhow1rhow2 = rwDensityGridQuad.rhow1rhow2(iFock);
+
+    auto rxw1rhow2 = rwDensityGridQuad.rxw1rhow2(iFock);
+
+    auto ryw1rhow2 = rwDensityGridQuad.ryw1rhow2(iFock);
+
+    auto rzw1rhow2 = rwDensityGridQuad.rzw1rhow2(iFock);
+
+    auto rxw1rxw2 = rwDensityGridQuad.rxw1rxw2(iFock);
+
+    auto rxw1ryw2 = rwDensityGridQuad.rxw1ryw2(iFock);
+
+    auto rxw1rzw2 = rwDensityGridQuad.rxw1rzw2(iFock);
+
+    auto ryw1rxw2 = rwDensityGridQuad.ryw1rxw2(iFock);
+
+    auto ryw1ryw2 = rwDensityGridQuad.ryw1ryw2(iFock);
+
+    auto ryw1rzw2 = rwDensityGridQuad.ryw1rzw2(iFock);
+
+    auto rzw1rxw2 = rwDensityGridQuad.rzw1rxw2(iFock);
+
+    auto rzw1ryw2 = rwDensityGridQuad.rzw1ryw2(iFock);
+
+    auto rzw1rzw2 = rwDensityGridQuad.rzw1rzw2(iFock);
+
+    auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
+
+    auto gradw12a_x = rw2DensityGrid.alphaDensityGradientX(iFock);
+
+    auto gradw12a_y = rw2DensityGrid.alphaDensityGradientY(iFock);
+
+    auto gradw12a_z = rw2DensityGrid.alphaDensityGradientZ(iFock);
+
+    // eq.(30), JCTC 2021, 17, 1512-1521
+
+    timer.start("Kxc matrix G");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    CDenseMatrix mat_G(naos, npoints);
+
+    CDenseMatrix mat_G_gga(naos, npoints);
+
+    mat_G.zero();
+
+    mat_G_gga.zero();
+
+    auto G_val = mat_G.values();
+
+    auto G_gga_val = mat_G_gga.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(weights, \
+                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                double w = weights[gridblockpos + g];
+
+                double znva = 1.0 / ngrada[g];
+
+                double znva3 = 1.0 / std::pow(ngrada[g], 3.0);
+
+                double znva5 = 1.0 / std::pow(ngrada[g], 5.0);
+
+                double rxw12a = gradw12a_x[g];
+
+                double ryw12a = gradw12a_y[g];
+
+                double rzw12a = gradw12a_z[g];
+
+                double xigrad_x = znva * grada_x[g];
+
+                double xigrad_y = znva * grada_y[g];
+
+                double xigrad_z = znva * grada_z[g];
+
+                double xigrad_xx = (znva - grada_x[g] * grada_x[g] * znva3);
+
+                double xigrad_yy = (znva - grada_y[g] * grada_y[g] * znva3);
+
+                double xigrad_zz = (znva - grada_z[g] * grada_z[g] * znva3);
+
+                double xigrad_xy = -grada_x[g] * grada_y[g] * znva3;
+
+                double xigrad_xz = -grada_x[g] * grada_z[g] * znva3;
+
+                double xigrad_yz = -grada_y[g] * grada_z[g] * znva3;
+
+                double xigrad_xxy = 3.0 * grada_x[g] * grada_x[g] * grada_y[g] * znva5 - grada_y[g] * znva3;
+
+                double xigrad_xxz = 3.0 * grada_x[g] * grada_x[g] * grada_z[g] * znva5 - grada_z[g] * znva3;
+
+                double xigrad_xyy = 3.0 * grada_x[g] * grada_y[g] * grada_y[g] * znva5 - grada_x[g] * znva3;
+
+                double xigrad_xzz = 3.0 * grada_x[g] * grada_z[g] * grada_z[g] * znva5 - grada_x[g] * znva3;
+
+                double xigrad_yzz = 3.0 * grada_y[g] * grada_z[g] * grada_z[g] * znva5 - grada_y[g] * znva3;
+
+                double xigrad_yyz = 3.0 * grada_y[g] * grada_y[g] * grada_z[g] * znva5 - grada_z[g] * znva3;
+
+                double xigrad_xyz = 3.0 * grada_x[g] * grada_y[g] * grada_z[g] * znva5;
+
+                double xigrad_xxx = 3.0 * grada_x[g] * grada_x[g] * grada_x[g] * znva5 - 3.0 * grada_x[g] * znva3;
+
+                double xigrad_yyy = 3.0 * grada_y[g] * grada_y[g] * grada_y[g] * znva5 - 3.0 * grada_y[g] * znva3;
+
+                double xigrad_zzz = 3.0 * grada_z[g] * grada_z[g] * grada_z[g] * znva5 - 3.0 * grada_z[g] * znva3;
+
+                // Various required quantities
+
+                double xigrad_dot_rw12a = (xigrad_x * rxw12a + xigrad_y * ryw12a + xigrad_z * rzw12a);
+
+                double xigrad_dot_rw1rw2 = xigrad_x * rxw1rhow2[g] + xigrad_y * ryw1rhow2[g] + xigrad_z * rzw1rhow2[g];
+
+                double rw1_dot_rw2 = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
+
+                double xigrad_dot_rw1rhow2 = xigrad_x * rxw1rhow2[g] + xigrad_y * ryw1rhow2[g] + xigrad_z * rzw1rhow2[g];
+
+                double grad_dot_rw12 = grada_x[g] * rxw12a + grada_y[g] * ryw12a + grada_z[g] * rzw12a;
+
+                double grad_dot_rw1rw2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] +
+                                         grada_z[g] * rzw1rhow2[g];
+
+                double grad_dot_rw1rhow2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] +
+                                           grada_z[g] * rzw1rhow2[g];
+
+                double xigrad_dot_rw1_xigrad_dot_rw2 = xigrad_x * xigrad_x * rxw1rxw2[g] + xigrad_x * xigrad_y * rxw1ryw2[g] +
+                                                       xigrad_x * xigrad_z * rxw1rzw2[g] + xigrad_y * xigrad_x * ryw1rxw2[g] +
+                                                       xigrad_y * xigrad_y * ryw1ryw2[g] + xigrad_y * xigrad_z * ryw1rzw2[g] +
+                                                       xigrad_z * xigrad_x * rzw1rxw2[g] + xigrad_z * xigrad_y * rzw1ryw2[g] +
+                                                       xigrad_z * xigrad_z * rzw1rzw2[g];
+
+                // scalar contribution
+
+                double prefac = 0.0;
+
+                // first, second
+
+                prefac += (df2000[g] * rhow12a[g] + df1100[g] * rhow12a[g]) +
+
+                          (df1010[g] + df1001[g]) * xigrad_dot_rw12a +
+
+                          df10001[g] * 2.0 * grad_dot_rw12;
+
+                // fifth
+
+                prefac += (df3000[g] + 2.0 * df2100[g] + df1200[g]) * rhow1rhow2[g];
+
+                // seventh
+
+                prefac += (df2010[g] + df2001[g]) * xigrad_dot_rw1rw2 +
+
+                          (df1110[g] + df1101[g]) * xigrad_dot_rw1rw2 +
+
+                          2.0 * (df20001[g] + df11001[g]) * grad_dot_rw1rw2;
+
+                // eighth
+
+                prefac += (df1020[g] + 2.0 * df1011[g] + df1002[g]) * xigrad_dot_rw1_xigrad_dot_rw2;
+
+                prefac += (df1010[g] + df1001[g]) *
+
+                          (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
+
+                           xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
+
+                           xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
+
+                prefac += 2.0 * (df10101[g] + df10101[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2;
+
+                prefac += 4.0 * df10002[g] * ngrada[g] * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2;
+
+                prefac += 2.0 * df10001[g] * rw1_dot_rw2;
+
+                G_val[nu_offset + g] = w * prefac * chi_val[nu_offset + g];
+
+                // vector contribution
+
+                double xcomp = 0.0, ycomp = 0.0, zcomp = 0.0;
+
+                // third
+
+                prefac = (df1010[g] + df0110[g]) * rhow12a[g];
+
+                xcomp += prefac * xigrad_x;
+
+                ycomp += prefac * xigrad_y;
+
+                zcomp += prefac * xigrad_z;
+
+                prefac = (df10001[g] + df01001[g]) * rhow12a[g];
+
+                xcomp += prefac * grada_x[g];
+
+                ycomp += prefac * grada_y[g];
+
+                zcomp += prefac * grada_z[g];
+
+                // fourth
+
+                xcomp += df0010[g] * (xigrad_xx * rxw12a + xigrad_xy * ryw12a + xigrad_xz * rzw12a);
+
+                ycomp += df0010[g] * (xigrad_xy * rxw12a + xigrad_yy * ryw12a + xigrad_yz * rzw12a);
+
+                zcomp += df0010[g] * (xigrad_xz * rxw12a + xigrad_yz * ryw12a + xigrad_zz * rzw12a);
+
+                xcomp += df00001[g] * rxw12a;
+
+                ycomp += df00001[g] * ryw12a;
+
+                zcomp += df00001[g] * rzw12a;
+
+                // tenth
+
+                prefac = (df1010[g] + df0110[g]);
+
+                xcomp += prefac * (xigrad_xx * rxw1rhow2[g] + xigrad_xy * ryw1rhow2[g] + xigrad_xz * rzw1rhow2[g]);
+
+                ycomp += prefac * (xigrad_xy * rxw1rhow2[g] + xigrad_yy * ryw1rhow2[g] + xigrad_yz * rzw1rhow2[g]);
+
+                zcomp += prefac * (xigrad_xz * rxw1rhow2[g] + xigrad_yz * ryw1rhow2[g] + xigrad_zz * rzw1rhow2[g]);
+
+                // twelfth first
+
+                prefac = df0010[g];
+
+                xcomp += prefac * (xigrad_xxx * rxw1rxw2[g] + xigrad_xxy * rxw1ryw2[g] + xigrad_xxz * rxw1rzw2[g] +
+
+                                   xigrad_xxy * ryw1rxw2[g] + xigrad_xyy * ryw1ryw2[g] + xigrad_xyz * ryw1rzw2[g] +
+
+                                   xigrad_xxz * rzw1rxw2[g] + xigrad_xyz * rzw1ryw2[g] + xigrad_xzz * rzw1rzw2[g]);
+
+                ycomp += prefac * (xigrad_xxy * rxw1rxw2[g] + xigrad_xyy * rxw1ryw2[g] + xigrad_xyz * rxw1rzw2[g] +
+
+                                   xigrad_xyy * ryw1rxw2[g] + xigrad_yyy * ryw1ryw2[g] + xigrad_yyz * ryw1rzw2[g] +
+
+                                   xigrad_xyz * rzw1rxw2[g] + xigrad_yyz * rzw1ryw2[g] + xigrad_yzz * rzw1rzw2[g]);
+
+                zcomp += prefac * (xigrad_xxz * rxw1rxw2[g] + xigrad_xyz * rxw1ryw2[g] + xigrad_xzz * rxw1rzw2[g] +
+
+                                   xigrad_xyz * ryw1rxw2[g] + xigrad_yyz * ryw1ryw2[g] + xigrad_yzz * ryw1rzw2[g] +
+
+                                   xigrad_xzz * rzw1rxw2[g] + xigrad_yzz * rzw1ryw2[g] + xigrad_zzz * rzw1rzw2[g]);
+
+                // twelfth second
+
+                prefac = (df00101[g] + df00011[g]) * ngrada[g];
+
+                prefac += (df0020[g] + df0011[g]);
+
+                xcomp += prefac * xigrad_x * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
+
+                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
+
+                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
+
+                ycomp += prefac * xigrad_y * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
+
+                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
+
+                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
+
+                zcomp += prefac * xigrad_z * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
+
+                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
+
+                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
+
+                // twelfth third
+
+                prefac = (df0020[g] + df0011[g]);
+
+                prefac += df00101[g] * ngrada[g];
+
+                xcomp += prefac * (xigrad_xx * xigrad_x * (rxw1rxw2[g] + rxw1rxw2[g]) +
+
+                                   xigrad_xx * xigrad_y * (ryw1rxw2[g] + rxw1ryw2[g]) +
+
+                                   xigrad_xx * xigrad_z * (rzw1rxw2[g] + rxw1rzw2[g]) +
+
+                                   xigrad_xy * xigrad_x * (rxw1ryw2[g] + ryw1rxw2[g]) +
+
+                                   xigrad_xy * xigrad_y * (ryw1ryw2[g] + ryw1ryw2[g]) +
+
+                                   xigrad_xy * xigrad_z * (rzw1ryw2[g] + ryw1rzw2[g]) +
+
+                                   xigrad_xz * xigrad_x * (rxw1rzw2[g] + rzw1rxw2[g]) +
+
+                                   xigrad_xz * xigrad_y * (ryw1rzw2[g] + rzw1ryw2[g]) +
+
+                                   xigrad_xz * xigrad_z * (rzw1rzw2[g] + rzw1rzw2[g]));
+
+                ycomp += prefac * (xigrad_xy * xigrad_x * (rxw1rxw2[g] + rxw1rxw2[g]) +
+
+                                   xigrad_xy * xigrad_y * (ryw1rxw2[g] + rxw1ryw2[g]) +
+
+                                   xigrad_xy * xigrad_z * (rzw1rxw2[g] + rxw1rzw2[g]) +
+
+                                   xigrad_yy * xigrad_x * (rxw1ryw2[g] + ryw1rxw2[g]) +
+
+                                   xigrad_yy * xigrad_y * (ryw1ryw2[g] + ryw1ryw2[g]) +
+
+                                   xigrad_yy * xigrad_z * (rzw1ryw2[g] + ryw1rzw2[g]) +
+
+                                   xigrad_yz * xigrad_x * (rxw1rzw2[g] + rzw1rxw2[g]) +
+
+                                   xigrad_yz * xigrad_y * (ryw1rzw2[g] + rzw1ryw2[g]) +
+
+                                   xigrad_yz * xigrad_z * (rzw1rzw2[g] + rzw1rzw2[g]));
+
+                zcomp += prefac * (xigrad_xz * xigrad_x * (rxw1rxw2[g] + rxw1rxw2[g]) +
+
+                                   xigrad_xz * xigrad_y * (ryw1rxw2[g] + rxw1ryw2[g]) +
+
+                                   xigrad_xz * xigrad_z * (rzw1rxw2[g] + rxw1rzw2[g]) +
+
+                                   xigrad_yz * xigrad_x * (rxw1ryw2[g] + ryw1rxw2[g]) +
+
+                                   xigrad_yz * xigrad_y * (ryw1ryw2[g] + ryw1ryw2[g]) +
+
+                                   xigrad_yz * xigrad_z * (rzw1ryw2[g] + ryw1rzw2[g]) +
+
+                                   xigrad_zz * xigrad_x * (rxw1rzw2[g] + rzw1rxw2[g]) +
+
+                                   xigrad_zz * xigrad_y * (ryw1rzw2[g] + rzw1ryw2[g]) +
+
+                                   xigrad_zz * xigrad_z * (rzw1rzw2[g] + rzw1rzw2[g]));
+
+                // twelfth fourth gam
+
+                prefac = (df00101[g] + df00011[g]);
+
+                prefac += df00002[g] * ngrada[g];
+
+                xcomp += prefac * (xigrad_x * rxw1rxw2[g] + xigrad_y * ryw1rxw2[g] + xigrad_z * rzw1rxw2[g]);
+
+                ycomp += prefac * (xigrad_x * rxw1ryw2[g] + xigrad_y * ryw1ryw2[g] + xigrad_z * rzw1ryw2[g]);
+
+                zcomp += prefac * (xigrad_x * rxw1rzw2[g] + xigrad_y * ryw1rzw2[g] + xigrad_z * rzw1rzw2[g]);
+
+                // twelfth fifth gam
+
+                double twelfthfifth_gam = (xigrad_x * grada_x[g] + grada_x[g] * xigrad_x) * rxw1rxw2[g] +
+
+                                          (xigrad_x * grada_y[g] + grada_x[g] * xigrad_y) * rxw1ryw2[g] +
+
+                                          (xigrad_x * grada_z[g] + grada_x[g] * xigrad_z) * rxw1rzw2[g] +
+
+                                          (xigrad_y * grada_x[g] + grada_y[g] * xigrad_x) * rxw1rxw2[g] +
+
+                                          (xigrad_y * grada_y[g] + grada_y[g] * xigrad_y) * rxw1ryw2[g] +
+
+                                          (xigrad_y * grada_z[g] + grada_y[g] * xigrad_z) * rxw1rzw2[g] +
+
+                                          (xigrad_z * grada_x[g] + grada_z[g] * xigrad_x) * rxw1rxw2[g] +
+
+                                          (xigrad_z * grada_y[g] + grada_z[g] * xigrad_y) * rxw1ryw2[g] +
+
+                                          (xigrad_z * grada_z[g] + grada_z[g] * xigrad_z) * rxw1rzw2[g];
+
+                // fourth, ninth, tenth
+
+                // xigrad_dot_omega == (xigrad_x * xomega + xigrad_y * yomega + xigrad_z * zomega);
+
+                prefac = df00101[g] * (2.0 * grad_dot_rw12);
+
+                prefac += (df0020[g] + df0011[g]) * xigrad_dot_rw12a;
+
+                prefac += (df2010[g] + 2.0 * df1110[g] + df0210[g]) * rhow1rhow2[g];
+
+                prefac += (df1020[g] + df1011[g] + df0120[g] + df0111[g]) * xigrad_dot_rw1rhow2;
+
+                prefac += (df10101[g] + df10011[g] + df01101[g] + df0111[g]) * grad_dot_rw1rhow2;
+
+                prefac += (df0030[g] + 2.0 * df0021[g] + df0012[g]) * xigrad_dot_rw1_xigrad_dot_rw2;
+
+                prefac += (df00101[g] + df00011[g]) * rw1_dot_rw2;
+
+                prefac += (df00201[g] + df00111[g]) * twelfthfifth_gam;
+
+                prefac += df00102[g] * xigrad_dot_rw1_xigrad_dot_rw2;
+
+                xcomp += prefac * xigrad_x;
+
+                ycomp += prefac * xigrad_y;
+
+                zcomp += prefac * xigrad_z;
+
+                // fourth, ninth, tenth
+
+                // grad_dot_omega == grada_x[g] * xomega + grada_y[g] * yomega + grada_z[g] * zomega;
+
+                prefac = (df00101[g] * xigrad_dot_rw12a + df00011[g] * xigrad_dot_rw12a);
+
+                prefac += df00002[g] * (2.0 * grad_dot_rw12);
+
+                prefac += (df20001[g] + 2.0 * df11001[g] + df02001[g]) * rhow1rhow2[g];
+
+                prefac += (df10101[g] + df10011[g] + df01101[g] + df0111[g] + df01011[g]) * xigrad_dot_rw1rhow2;
+
+                prefac += (df10002[g] + df01002[g]) * grad_dot_rw1rhow2;
+
+                prefac += df00002[g] * rw1_dot_rw2;
+
+                prefac += (df00201[g] + 2 * df00111[g] + df00021[g]) * xigrad_dot_rw1_xigrad_dot_rw2;
+
+                prefac += (df00102[g] + df00011[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2;
+
+                prefac += df00003[g] * ngrada[g] * ngrada[g];
+
+                xcomp += prefac * grada_x[g];
+
+                ycomp += prefac * grada_y[g];
+
+                zcomp += prefac * grada_z[g];
+
+                // tenth
+
+                // omega_dot_rw1rhow2 == xomega * rxw1rhow2[g] + yomega * ryw1rhow2[g] + zomega * rzw1rhow2[g];
+
+                prefac = (df10001[g] + df01001[g]);
+
+                xcomp += prefac * rxw1rhow2[g];
+
+                ycomp += prefac * ryw1rhow2[g];
+
+                zcomp += prefac * rzw1rhow2[g];
+
+                G_gga_val[nu_offset + g] = w * (xcomp * chi_x_val[nu_offset + g] +
+
+                                                ycomp * chi_y_val[nu_offset + g] +
+
+                                                zcomp * chi_z_val[nu_offset + g]);
+            }
+        }
+    }
+
+    timer.stop("Kxc matrix G");
+
+    // eq.(31), JCTC 2021, 17, 1512-1521
+
+    timer.start("Kxc matrix matmul");
+
+    auto mat_Kxc = denblas::multABt(gtoValues, mat_G);
+
+    auto mat_Kxc_gga = denblas::multABt(gtoValues, mat_G_gga);
+
+    mat_Kxc_gga.symmetrize();  // matrix + matrix.T
+
+    mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_gga, 1.0);
+
+    timer.stop("Kxc matrix matmul");
+
+    return mat_Kxc;
 }
 
 void
