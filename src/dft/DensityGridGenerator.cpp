@@ -90,7 +90,6 @@ generateDensityGridForLDA(const int32_t           npoints,
 
     CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
 
-    // TODO: double check if zero() is needed
     dengrid.zero();
 
     for (int32_t idens = 0; idens < numdens; idens++)

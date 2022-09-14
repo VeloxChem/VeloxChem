@@ -129,6 +129,74 @@ class CXCNewIntegrator
                                  const CXCFunctional&    xcFunctional) const;
 
     /**
+     Integrates second-order GGA exchnage-correlation functional contribution
+     to AO Fock matrix.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed density matrix.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     */
+    void _integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& rwDensityMatrix,
+                                 const CAODensityMatrix& gsDensityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CXCFunctional&    xcFunctional) const;
+
+    /**
+     Integrates third-order LDA exchnage-correlation functional contribution
+     to AO Fock matrix.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
+     */
+    void _integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& rwDensityMatrix,
+                                 const CAODensityMatrix& rw2DensityMatrix,
+                                 const CAODensityMatrix& gsDensityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CXCFunctional&    xcFunctional,
+                                 const std::string&      quadMode) const;
+
+    /**
+     Integrates third-order GGA exchnage-correlation functional contribution
+     to AO Fock matrix.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
+     */
+    void _integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& rwDensityMatrix,
+                                 const CAODensityMatrix& rw2DensityMatrix,
+                                 const CAODensityMatrix& gsDensityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CXCFunctional&    xcFunctional,
+                                 const std::string&      quadMode) const;
+
+    /**
      Gets grid box dimension.
 
      @param gridBlockPosition the displacement of grid points in this box.
@@ -174,6 +242,19 @@ class CXCNewIntegrator
                                       const std::vector<int32_t>& aoIndices,
                                       const int32_t               aoCount,
                                       const int32_t               nAOs) const;
+
+    /**
+     Gets sub AO density matrices from AO density matrices.
+
+     @param densityMatrix the AO density matrix.
+     @param aoIndices the index mapping from submatrix to full matrix.
+     @param aoCount the number of indices in submatrix.
+     @return the sub AO density matrices.
+     */
+    CAODensityMatrix _getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
+                                          const std::vector<int32_t>& aoIndices,
+                                          const int32_t               aoCount) const;
+
 
     /**
      Integrates LDA contribution to (first-order) Vxc matrix.
@@ -238,6 +319,98 @@ class CXCNewIntegrator
                                                 const CXCHessianGrid&  xcHessianGrid,
                                                 const CDensityGrid&    rwDensityGrid,
                                                 CMultiTimer&           timer) const;
+
+    /**
+     Integrates GGA contribution to (second-order) Fxc matrix.
+
+     @param gridblockpos the starting position of the grid box.
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param gtoValuesX the GTO gradient X values on grid points.
+     @param gtoValuesY the GTO gradient Y values on grid points.
+     @param gtoValuesZ the GTO gradient Z values on grid points.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param rwDensityGrid the perturbed density grid.
+     @param gsDensityGrid the ground-state density grid.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
+    CDenseMatrix _integratePartialFxcFockForGGA(const int32_t          gridblockpos,
+                                                const int32_t          npoints,
+                                                const double*          weights,
+                                                const CDenseMatrix&    gtoValues,
+                                                const CDenseMatrix&    gtoValuesX,
+                                                const CDenseMatrix&    gtoValuesY,
+                                                const CDenseMatrix&    gtoValuesZ,
+                                                const CXCGradientGrid& xcGradientGrid,
+                                                const CXCHessianGrid&  xcHessianGrid,
+                                                const CDensityGrid&    rwDensityGrid,
+                                                const CDensityGrid&    gsDensityGrid,
+                                                CMultiTimer&           timer) const;
+
+    /**
+     Integrates LDA contribution to (third-order) Kxc matrix.
+
+     @param gridBlockPosition the starting position of the grid box.
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param rwDensityGridQuad the products of one-time transformed densities on grid points.
+     @param rw2DensityMatrix the two-time transformed densities on grid points.
+     @param iFock the index of the AO Fock matrix.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
+    CDenseMatrix _integratePartialKxcFockForLDA(const int32_t              gridBlockPosition,
+                                                const int32_t              npoints,
+                                                const double*              weights,
+                                                const CDenseMatrix&        gtoValues,
+                                                const CXCHessianGrid&      xcHessianGrid,
+                                                const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                const CDensityGridQuad&    rwDensityGridQuad,
+                                                const CDensityGrid&        rw2DensityGrid,
+                                                const int32_t              iFock,
+                                                CMultiTimer&               timer) const;
+
+    /**
+     Integrates GGA contribution to (third-order) Kxc matrix.
+
+     @param gridblockpos the starting position of the grid box.
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param gtoValuesX the GTO gradient X values on grid points.
+     @param gtoValuesY the GTO gradient Y values on grid points.
+     @param gtoValuesZ the GTO gradient Z values on grid points.
+     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param xcHessianGrid the exchange-correlation hessian grid.
+     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param rwDensityGridQuad the products of one-time transformed densities on grid points.
+     @param rw2DensityMatrix the two-time transformed densities on grid points.
+     @param gsDensityGrid the ground-state density grid.
+     @param iFock the index of the AO Fock matrix.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
+    CDenseMatrix _integratePartialKxcFockForGGA(const int32_t              gridblockpos,
+                                                const int32_t              npoints,
+                                                const double*              weights,
+                                                const CDenseMatrix&        gtoValues,
+                                                const CDenseMatrix&        gtoValuesX,
+                                                const CDenseMatrix&        gtoValuesY,
+                                                const CDenseMatrix&        gtoValuesZ,
+                                                const CXCGradientGrid&     xcGradientGrid,
+                                                const CXCHessianGrid&      xcHessianGrid,
+                                                const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                const CDensityGridQuad&    rwDensityGridQuad,
+                                                const CDensityGrid&        rw2DensityGrid,
+                                                const CDensityGrid&        gsDensityGrid,
+                                                const int32_t              iFock,
+                                                CMultiTimer&               timer) const;
 
     /**
      Distributes partial Vxc matrix to full Vxc matrix.
@@ -321,27 +494,20 @@ class CXCNewIntegrator
                           const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel) const;
 
-    void _integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
-                                 const CMolecule&        molecule,
-                                 const CMolecularBasis&  basis,
-                                 const CAODensityMatrix& rwDensityMatrix,
-                                 const CAODensityMatrix& gsDensityMatrix,
-                                 const CMolecularGrid&   molecularGrid,
-                                 const CXCFunctional&    xcFunctional) const;
+    /**
+     Integrates third-order exchnage-correlation functional contribution to AO
+     Fock matrix in quadratic response.
 
-    CDenseMatrix _integratePartialFxcFockForGGA(const int32_t          gridblockpos,
-                                                const int32_t          npoints,
-                                                const double*          weights,
-                                                const CDenseMatrix&    gtoValues,
-                                                const CDenseMatrix&    gtoValuesX,
-                                                const CDenseMatrix&    gtoValuesY,
-                                                const CDenseMatrix&    gtoValuesZ,
-                                                const CXCGradientGrid& xcGradientGrid,
-                                                const CXCHessianGrid&  xcHessianGrid,
-                                                const CDensityGrid&    rwDensityGrid,
-                                                const CDensityGrid&    gsDensityGrid,
-                                                CMultiTimer&           timer) const;
-
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
+     */
     void integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
                           const CMolecule&        molecule,
                           const CMolecularBasis&  basis,
@@ -352,56 +518,6 @@ class CXCNewIntegrator
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const;
 
-    void _integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
-                                 const CMolecule&        molecule,
-                                 const CMolecularBasis&  basis,
-                                 const CAODensityMatrix& rwDensityMatrix,
-                                 const CAODensityMatrix& rw2DensityMatrix,
-                                 const CAODensityMatrix& gsDensityMatrix,
-                                 const CMolecularGrid&   molecularGrid,
-                                 const CXCFunctional&    xcFunctional,
-                                 const std::string&      quadMode) const;
-
-    CAODensityMatrix _getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                                          const std::vector<int32_t>& aoIndices,
-                                          const int32_t               aoCount) const;
-
-    CDenseMatrix _integratePartialKxcFockForLDA(const int32_t              gridBlockPosition,
-                                                const int32_t              npoints,
-                                                const double*              weights,
-                                                const CDenseMatrix&        gtoValues,
-                                                const CXCHessianGrid&      xcHessianGrid,
-                                                const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                                const CDensityGridQuad&    rwDensityGridQuad,
-                                                const CDensityGrid&        rw2DensityGrid,
-                                                const int32_t              iFock,
-                                                CMultiTimer&               timer) const;
-
-    void _integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
-                                 const CMolecule&        molecule,
-                                 const CMolecularBasis&  basis,
-                                 const CAODensityMatrix& rwDensityMatrix,
-                                 const CAODensityMatrix& rw2DensityMatrix,
-                                 const CAODensityMatrix& gsDensityMatrix,
-                                 const CMolecularGrid&   molecularGrid,
-                                 const CXCFunctional&    xcFunctional,
-                                 const std::string&      quadMode) const;
-
-    CDenseMatrix _integratePartialKxcFockForGGA(const int32_t              gridblockpos,
-                                                const int32_t              npoints,
-                                                const double*              weights,
-                                                const CDenseMatrix&        gtoValues,
-                                                const CDenseMatrix&        gtoValuesX,
-                                                const CDenseMatrix&        gtoValuesY,
-                                                const CDenseMatrix&        gtoValuesZ,
-                                                const CXCGradientGrid&     xcGradientGrid,
-                                                const CXCHessianGrid&      xcHessianGrid,
-                                                const CXCCubicHessianGrid& xcCubicHessianGrid,
-                                                const CDensityGridQuad&    rwDensityGridQuad,
-                                                const CDensityGrid&        rw2DensityGrid,
-                                                const CDensityGrid&        gsDensityGrid,
-                                                const int32_t              iFock,
-                                                CMultiTimer&               timer) const;
 };
 
 #endif /* XCNewIntegrator_hpp */

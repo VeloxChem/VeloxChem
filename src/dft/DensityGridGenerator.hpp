@@ -36,7 +36,7 @@
 namespace dengridgen {  // dengridgen namespace
 
 /**
- Generates density grid for LDA.
+ Generates density grid (single density matrix) for LDA.
 
  @param npoints the number of grid points.
  @param gtoValues the GTO values on grid points.
@@ -51,6 +51,16 @@ CDensityGrid generateDensityGridForLDA(const int32_t       npoints,
                                        const xcfun         xcFunType,
                                        CMultiTimer&        timer);
 
+/**
+ Generates density grid (multiple density matrices) for LDA.
+
+ @param npoints the number of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param densityMatrix the AO density matrices.
+ @param xcFunType the type of exchange-correlation functional.
+ @param timer the timer.
+ @return the density grid.
+ */
 CDensityGrid generateDensityGridForLDA(const int32_t           npoints,
                                        const CDenseMatrix&     gtoValues,
                                        const CAODensityMatrix& densityMatrix,
@@ -58,7 +68,7 @@ CDensityGrid generateDensityGridForLDA(const int32_t           npoints,
                                        CMultiTimer&            timer);
 
 /**
- Generates density grid for GGA.
+ Generates density grid (single density matrix) for GGA.
 
  @param npoints the number of grid points.
  @param gtoValues the GTO values on grid points.
@@ -79,6 +89,19 @@ CDensityGrid generateDensityGridForGGA(const int32_t       npoints,
                                        const xcfun         xcFunType,
                                        CMultiTimer&        timer);
 
+/**
+ Generates density grid (multiple density matrices) for GGA.
+
+ @param npoints the number of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param gtoValuesX the GTO gradient X values on grid points.
+ @param gtoValuesY the GTO gradient Y values on grid points.
+ @param gtoValuesZ the GTO gradient Z values on grid points.
+ @param densityMatrix the AO density matrices.
+ @param xcFunType the type of exchange-correlation functional.
+ @param timer the timer.
+ @return the density grid.
+ */
 CDensityGrid generateDensityGridForGGA(const int32_t           npoints,
                                        const CDenseMatrix&     gtoValues,
                                        const CDenseMatrix&     gtoValuesX,
