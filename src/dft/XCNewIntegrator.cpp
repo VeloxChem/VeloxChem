@@ -2402,6 +2402,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              grid
                                                  const int32_t              iFock,
                                                  CMultiTimer&               timer) const
 {
+    timer.start("Kxc matrix prep.");
+
     // GTO values on grid points
 
     auto chi_val = gtoValues.values();
@@ -2548,6 +2550,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              grid
 
     auto gradw12a_z = rw2DensityGrid.alphaDensityGradientZ(iFock);
 
+    timer.stop("Kxc matrix prep.");
+
     // eq.(30), JCTC 2021, 17, 1512-1521
 
     timer.start("Kxc matrix G");
@@ -2581,6 +2585,14 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              grid
             auto nu_offset = nu * npoints;
 
             #pragma omp simd aligned(weights, \
+                    df2000, df1100, df1010, df1001, df10001, df0020, df0011, df00101, df00002, \
+                    df0010, df00001, df00011, df01001, df0110, df3000, df2100, df1200, df2010, \
+                    df0030, df0021, df0012, df00201, df00111, df00102, df00003, df2001, df1110, \
+                    df1101, df20001, df11001, df1020, df1011, df1002, df10101, df10002, df01002, \
+                    df0120, df0111, df01101, df10011, df01011, df0210, df02001, df00021, \
+                    ngrada, grada_x, grada_y, grada_z, rhow1rhow2, rxw1rhow2, ryw1rhow2, rzw1rhow2, \
+                    rxw1rxw2, rxw1ryw2, rxw1rzw2, ryw1rxw2, ryw1ryw2, ryw1rzw2, rzw1rxw2, rzw1ryw2, rzw1rzw2, \
+                    rhow12a, gradw12a_x, gradw12a_y, gradw12a_z, \
                     G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
