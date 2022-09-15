@@ -413,36 +413,36 @@ class CXCNewIntegrator
                                                 CMultiTimer&               timer) const;
 
     /**
-     Distributes partial Vxc matrix to full Vxc matrix.
+     Distributes partial Vxc matrix to full AO Kohn-Sham matrix.
 
-     @param matVxc the full Vxc matrix.
+     @param matVxc the AO Kohn-Sham matrix.
      @param partialMatVxc the partial Vxc matrix.
-     @param aoIndices the index mapping from partial Vxc to full Vxc.
-     @param aoCount the number of indices in partial Vxc.
-     @param nAOs the number of indices in full Vxc.
+     @param aoIndices the index mapping from partial matrix to full matrix.
+     @param aoCount the number of indices in partial matrix.
+     @param nAOs the number of indices in full matrix.
      */
-    void _distributeVxcMatrix(CAOKohnShamMatrix&          matVxc,
-                              const CDenseMatrix&         partialMatVxc,
-                              const std::vector<int32_t>& aoIndices,
-                              const int32_t               aoCount,
-                              const int32_t               nAOs) const;
+    void _distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          matVxc,
+                                        const CDenseMatrix&         partialMatVxc,
+                                        const std::vector<int32_t>& aoIndices,
+                                        const int32_t               aoCount,
+                                        const int32_t               nAOs) const;
 
     /**
-     Distributes partial Fxc matrix to full AO Fock matrix.
+     Distributes partial Fxc or Kxc matrix to full AO Fock matrix.
 
      @param aoFockMatrix the AO Fock matrix.
      @param fockIndex the index of Fock matrix.
-     @param partialMatFxc the partial Fxc matrix.
-     @param aoIndices the index mapping from partial Vxc to full Vxc.
-     @param aoCount the number of indices in partial Vxc.
-     @param nAOs the number of indices in full Vxc.
+     @param partialMatFxc the partial Fxc or Kxc matrix.
+     @param aoIndices the index mapping from partial matrix to full matrix.
+     @param aoCount the number of indices in partial matrix.
+     @param nAOs the number of indices in full matrix.
      */
-    void _distributeFxcMatrix(CAOFockMatrix&              aoFockMatrix,
-                              const int32_t               fockIndex,
-                              const CDenseMatrix&         partialMatFxc,
-                              const std::vector<int32_t>& aoIndices,
-                              const int32_t               aoCount,
-                              const int32_t               nAOs) const;
+    void _distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
+                                    const int32_t               fockIndex,
+                                    const CDenseMatrix&         partialMatFxc,
+                                    const std::vector<int32_t>& aoIndices,
+                                    const int32_t               aoCount,
+                                    const int32_t               nAOs) const;
 
    public:
     /**

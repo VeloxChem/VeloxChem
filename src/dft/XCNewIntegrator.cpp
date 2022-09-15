@@ -355,11 +355,11 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         auto partial_mat_Vxc = _integratePartialVxcFockForLDA(gridblockpos, npoints, weights, mat_chi, vxcgrid, timer);
 
-        // distribute partial Vxc to full Vxc
+        // distribute partial Vxc to full Kohn-Sham matrix
 
         timer.start("Vxc matrix dist.");
 
-        _distributeVxcMatrix(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
+        _distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
 
@@ -611,13 +611,14 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
         // compute partial contribution to Vxc matrix
 
         auto partial_mat_Vxc = _integratePartialVxcFockForGGA(gridblockpos, npoints, weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+
                                                               vxcgrid, dengrid, timer);
 
-        // distribute partial Vxc to full Vxc
+        // distribute partial Vxc to full Kohn-Sham matrix
 
         timer.start("Vxc matrix dist.");
 
-        _distributeVxcMatrix(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
+        _distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
 
@@ -853,11 +854,11 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
                                                                   vxc2grid, rwdengrid, timer);
 
-            // distribute partial Fxc to full Fxc
+            // distribute partial Fxc to full Fock matrix
 
             timer.start("Fxc matrix dist.");
 
-            _distributeFxcMatrix(aoFockMatrix, idensity, partial_mat_Fxc, aoinds, aocount, naos);
+            _distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Fxc, aoinds, aocount, naos);
 
             timer.stop("Fxc matrix dist.");
         }
@@ -1110,7 +1111,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Fxc matrix dist.");
 
-            _distributeFxcMatrix(aoFockMatrix, idensity, partial_mat_Fxc, aoinds, aocount, naos);
+            _distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Fxc, aoinds, aocount, naos);
 
             timer.stop("Fxc matrix dist.");
         }
@@ -1324,7 +1325,7 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.stop("XC functional eval.");
 
-        // go through Fock matrices
+        // go through density matrices
 
         for (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
         {
@@ -1336,11 +1337,11 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
                                                                   idensity, timer);
 
-            // distribute partial Kxc to full Kxc
+            // distribute partial Kxc to full Fock matrix
 
             timer.start("Kxc matrix dist.");
 
-            _distributeFxcMatrix(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
+            _distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
 
             timer.stop("Kxc matrix dist.");
         }
@@ -1591,7 +1592,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.stop("XC functional eval.");
 
-        // go through rhow density matrices
+        // go through density matrices
 
         for (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
         {
@@ -1607,11 +1608,11 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
                                                                   idensity, timer);
 
-            // distribute partial Fxc to full Fock matrix
+            // distribute partial Kxc to full Fock matrix
 
             timer.start("Kxc matrix dist.");
 
-            _distributeFxcMatrix(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
+            _distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
 
             timer.stop("Kxc matrix dist.");
         }
@@ -1857,8 +1858,6 @@ CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t          gridBloc
 
     CDenseMatrix mat_G(naos, npoints);
 
-    mat_G.zero();
-
     for (int32_t nu = 0; nu < naos; nu++)
     {
         auto G_nu = mat_G.row(nu);
@@ -1934,10 +1933,6 @@ CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t          gridbloc
 
     CDenseMatrix mat_G_gga(naos, npoints);
 
-    mat_G.zero();
-
-    mat_G_gga.zero();
-
     for (int32_t nu = 0; nu < naos; nu++)
     {
         auto G_nu = mat_G.row(nu);
@@ -1988,7 +1983,7 @@ CXCNewIntegrator::_integratePartialFxcFockForLDA(const int32_t         gridBlock
 {
     // GTO values on grid points
 
-    const CDenseMatrix& mat_chi = gtoValues;
+    auto chi_val = gtoValues.values();
 
     // pointers to exchange-correlation functional derivative
 
@@ -2006,23 +2001,35 @@ CXCNewIntegrator::_integratePartialFxcFockForLDA(const int32_t         gridBlock
 
     timer.start("Fxc matrix G");
 
-    auto naos = mat_chi.getNumberOfRows();
+    auto naos = gtoValues.getNumberOfRows();
 
     CDenseMatrix mat_G(naos, npoints);
 
-    mat_G.zero();
+    auto G_val = mat_G.values();
 
-    for (int32_t nu = 0; nu < naos; nu++)
+    #pragma omp parallel
     {
-        auto G_nu = mat_G.row(nu);
+        auto thread_id = omp_get_thread_num();
 
-        auto chi_nu = mat_chi.row(nu);
+        auto nthreads = omp_get_max_threads();
 
-        for (int32_t g = 0; g < npoints; g++)
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
         {
-            G_nu[g] = weights[gridBlockPosition + g] *
+            auto nu_offset = nu * npoints;
 
-                      (grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g]) * chi_nu[g];
+            #pragma omp simd aligned(weights, \
+                    grho_aa, grho_ab, rhowa, rhowb, \
+                    G_val, chi_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                G_val[nu_offset + g] = weights[gridBlockPosition + g] *
+
+                          (grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g]) * chi_val[nu_offset + g];
+            }
         }
     }
 
@@ -2032,7 +2039,7 @@ CXCNewIntegrator::_integratePartialFxcFockForLDA(const int32_t         gridBlock
 
     timer.start("Fxc matrix matmul");
 
-    auto mat_Fxc = denblas::multABt(mat_chi, mat_G);
+    auto mat_Fxc = denblas::multABt(gtoValues, mat_G);
 
     timer.stop("Fxc matrix matmul");
 
@@ -2136,10 +2143,6 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          gridbloc
     CDenseMatrix mat_G(naos, npoints);
 
     CDenseMatrix mat_G_gga(naos, npoints);
-
-    mat_G.zero();
-
-    mat_G_gga.zero();
 
     auto G_val = mat_G.values();
 
@@ -2296,6 +2299,12 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              grid
                                                  const int32_t              iFock,
                                                  CMultiTimer&               timer) const
 {
+    timer.start("Kxc matrix prep.");
+
+    // GTO values on grid points
+
+    auto chi_val = gtoValues.values();
+
     // pointers to exchange-correlation functional derrivatives
 
     auto grho_aa = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
@@ -2316,6 +2325,8 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              grid
 
     auto rhow12b = rw2DensityGrid.betaDensity(iFock);
 
+    timer.stop("Kxc matrix prep.");
+
     // eq.(30), JCTC 2021, 17, 1512-1521
 
     timer.start("Kxc matrix G");
@@ -2324,21 +2335,36 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              grid
 
     CDenseMatrix mat_G(naos, npoints);
 
-    for (int32_t nu = 0; nu < naos; nu++)
+    auto G_val = mat_G.values();
+
+    #pragma omp parallel
     {
-        auto G_nu = mat_G.row(nu);
+        auto thread_id = omp_get_thread_num();
 
-        auto chi_nu = gtoValues.row(nu);
+        auto nthreads = omp_get_max_threads();
 
-        for (int32_t g = 0; g < npoints; g++)
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
         {
-            G_nu[g] = weights[gridBlockPosition + g] *
+            auto nu_offset = nu * npoints;
 
-                      ((grho_aaa[g] + grho_aab[g] + grho_aab[g] + grho_abb[g]) * rhow1a[g] +
+            #pragma omp simd aligned(weights, \
+                    grho_aa, grho_ab, grho_aaa, grho_aab, grho_abb, \
+                    rhow1a, rhow12a, rhow12b, \
+                    G_val, chi_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                G_val[nu_offset + g] = weights[gridBlockPosition + g] *
 
-                       grho_aa[g] * rhow12a[g] + grho_ab[g] * rhow12b[g]) *
+                          ((grho_aaa[g] + grho_aab[g] + grho_aab[g] + grho_abb[g]) * rhow1a[g] +
 
-                      chi_nu[g];
+                           grho_aa[g] * rhow12a[g] + grho_ab[g] * rhow12b[g]) *
+
+                          chi_val[nu_offset + g];
+            }
         }
     }
 
@@ -2531,10 +2557,6 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              grid
     CDenseMatrix mat_G(naos, npoints);
 
     CDenseMatrix mat_G_gga(naos, npoints);
-
-    mat_G.zero();
-
-    mat_G_gga.zero();
 
     auto G_val = mat_G.values();
 
@@ -2967,11 +2989,11 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              grid
 }
 
 void
-CXCNewIntegrator::_distributeVxcMatrix(CAOKohnShamMatrix&          matVxc,
-                                       const CDenseMatrix&         partialMatVxc,
-                                       const std::vector<int32_t>& aoIndices,
-                                       const int32_t               aoCount,
-                                       const int32_t               nAOs) const
+CXCNewIntegrator::_distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          matVxc,
+                                                 const CDenseMatrix&         partialMatVxc,
+                                                 const std::vector<int32_t>& aoIndices,
+                                                 const int32_t               aoCount,
+                                                 const int32_t               nAOs) const
 {
     if (aoCount <= nAOs)
     {
@@ -2994,12 +3016,12 @@ CXCNewIntegrator::_distributeVxcMatrix(CAOKohnShamMatrix&          matVxc,
 }
 
 void
-CXCNewIntegrator::_distributeFxcMatrix(CAOFockMatrix&              aoFockMatrix,
-                                       const int32_t               fockIndex,
-                                       const CDenseMatrix&         partialMatFxc,
-                                       const std::vector<int32_t>& aoIndices,
-                                       const int32_t               aoCount,
-                                       const int32_t               nAOs) const
+CXCNewIntegrator::_distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
+                                             const int32_t               fockIndex,
+                                             const CDenseMatrix&         partialMatFxc,
+                                             const std::vector<int32_t>& aoIndices,
+                                             const int32_t               aoCount,
+                                             const int32_t               nAOs) const
 {
     if (aoCount <= nAOs)
     {

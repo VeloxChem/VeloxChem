@@ -60,19 +60,39 @@ generateDensityGridForLDA(const int32_t       npoints,
 
     timer.start("Density grid rho");
 
-    for (int32_t nu = 0; nu < gtoValues.getNumberOfRows(); nu++)
+    auto naos = gtoValues.getNumberOfRows();
+
+    auto nthreads = omp_get_max_threads();
+
+    auto F_val = mat_F.values();
+
+    auto chi_val = gtoValues.values();
+
+    #pragma omp parallel
     {
-        auto F_nu = mat_F.row(nu);
+        auto thread_id = omp_get_thread_num();
 
-        auto chi_nu = gtoValues.row(nu);
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-        for (int32_t g = 0; g < npoints; g++)
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
         {
-            rhoa[g] += F_nu[g] * chi_nu[g];
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(rhoa, F_val, chi_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                rhoa[g] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+            }
+        }
+
+        #pragma omp simd aligned(rhoa, rhob : VLX_ALIGN)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            rhob[g] = rhoa[g];
         }
     }
-
-    std::memcpy(rhob, rhoa, npoints * sizeof(double));
 
     timer.stop("Density grid rho");
 
@@ -110,19 +130,39 @@ generateDensityGridForLDA(const int32_t           npoints,
 
         timer.start("Density grid rho");
 
-        for (int32_t nu = 0; nu < gtoValues.getNumberOfRows(); nu++)
+        auto naos = gtoValues.getNumberOfRows();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto F_val = mat_F.values();
+
+        auto chi_val = gtoValues.values();
+
+        #pragma omp parallel
         {
-            auto F_nu = mat_F.row(nu);
+            auto thread_id = omp_get_thread_num();
 
-            auto chi_nu = gtoValues.row(nu);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            for (int32_t g = 0; g < npoints; g++)
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            for (int32_t nu = 0; nu < naos; nu++)
             {
-                rhoa[g] += F_nu[g] * chi_nu[g];
+                auto nu_offset = nu * npoints;
+
+                #pragma omp simd aligned(rhoa, F_val, chi_val : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                {
+                    rhoa[g] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+                }
+            }
+
+            #pragma omp simd aligned(rhoa, rhob : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                rhob[g] = rhoa[g];
             }
         }
-
-        std::memcpy(rhob, rhoa, npoints * sizeof(double));
 
         timer.stop("Density grid rho");
     }
