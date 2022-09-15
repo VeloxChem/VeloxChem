@@ -66,7 +66,7 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
             avail_mem //= int(os.environ['SLURM_NTASKS_PER_NODE'])
         mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
         nthreads = int(os.environ['OMP_NUM_THREADS'])
-        max_batch_size = int(avail_mem / mem_per_mat / (0.625 * nthreads))
+        max_batch_size = int(avail_mem / (mem_per_mat * nthreads))
         max_batch_size = max(1, max_batch_size)
 
         # note: batch_size will be zero if n_total is zero
