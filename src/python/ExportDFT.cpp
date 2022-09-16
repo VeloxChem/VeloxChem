@@ -45,6 +45,7 @@
 #include "XCIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
 #include "XCNewIntegrator.hpp"
+#include "XCNewMolecularGradient.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -322,6 +323,12 @@ export_dft(py::module& m)
         .def("integrate_vxc_fock", &CXCNewIntegrator::integrateVxcFock)
         .def("integrate_fxc_fock", &CXCNewIntegrator::integrateFxcFock)
         .def("integrate_kxc_fock", &CXCNewIntegrator::integrateKxcFock);
+
+    // CXCNewMolecularGradient class
+
+    PyClass<CXCNewMolecularGradient>(m, "XCNewMolecularGradient")
+        .def(py::init(&vlx_general::create<CXCNewMolecularGradient>), "comm"_a = py::none())
+        .def("integrate_vxc_gradient", &CXCNewMolecularGradient::integrateVxcGradient);
 
     // CXCMolecularGradient class
 

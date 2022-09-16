@@ -25,6 +25,7 @@ target_sources(vlxobjs
     XCIntegrator.cpp
     XCMolecularGradient.cpp
     XCNewIntegrator.cpp
+    XCNewMolecularGradient.cpp
   )
 
 target_include_directories(vlxobjs
