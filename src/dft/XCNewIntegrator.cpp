@@ -1736,9 +1736,17 @@ CXCNewIntegrator::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
                     maxcoef = std::max(maxcoef, bnorm);
                 }
 
-                // gto  :           r^{ang}   |C| exp(-alpha r^2)
-                // gto_m:           r^{ang-1} |C| exp(-alpha r^2)
-                // gto_p: (2 alpha) r^{ang+1} |C| exp(-alpha r^2)
+                // 0th-order derivative
+                // gto:                    r^{ang}   |C| exp(-alpha r^2)
+
+                // 1st-order derivative
+                // gto_m:              ang r^{ang-1} |C| exp(-alpha r^2)
+                // gto_p:           2alpha r^{ang+1} |C| exp(-alpha r^2)
+
+                // 2nd-order derivative
+                // gto_m2:     ang (ang-1) r^{ang-2} |C| exp(-alpha r^2)
+                // gto   : 2alpha (2ang+1) r^{ang}   |C| exp(-alpha r^2)
+                // gto_p2:        4alpha^2 r^{ang+2} |C| exp(-alpha r^2)
 
                 auto gtolimit = maxcoef * std::exp(-minexp * r2);
 
@@ -1746,9 +1754,21 @@ CXCNewIntegrator::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
 
                 for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
 
-                if (gtoDeriv == 1) gtolimit = std::max(gtolimit, 2.0 * maxexp * r * gtolimit);
+                if (gtoDeriv > 0)
+                {
+                    gtolimit = std::max(gtolimit, 2.0 * maxexp * r * gtolimit);
 
-                // TODO: add 2nd order GTO derivative
+                    if (bang > 0) gtolimit = std::max(gtolimit, gtolimit / r * bang);
+                }
+
+                if (gtoDeriv > 1)
+                {
+                    gtolimit = std::max({gtolimit, 4.0 * maxexp * maxexp * r2 * gtolimit,
+
+                                         2.0 * maxexp * (2 * bang + 1) * gtolimit});
+
+                    if (bang > 1) gtolimit = std::max(gtolimit, gtolimit / r2 * bang * (bang - 1));
+                }
 
                 if (gtolimit < _screeningThresholdForGTOValues)
                 {
