@@ -94,26 +94,23 @@ class TestTddftXCgrad:
             molecule, basis, rhow_den_sym, gs_density, molgrid, xcfun_label)
         vxc_grad_new = scf_drv.comm.reduce(vxc_grad_new, root=mpi_master())
 
-        if xcfun_label == 'slater':
-            fxc_grad_new = xcgrad_drv_new.integrate_fxc_gradient(
-                molecule, basis, rhow_den_sym, gs_density, gs_density, molgrid,
-                xcfun_label)
-            fxc_grad_new = scf_drv.comm.reduce(fxc_grad_new, root=mpi_master())
+        fxc_grad_new = xcgrad_drv_new.integrate_fxc_gradient(
+            molecule, basis, rhow_den_sym, gs_density, gs_density, molgrid,
+            xcfun_label)
+        fxc_grad_new = scf_drv.comm.reduce(fxc_grad_new, root=mpi_master())
 
-            fxc_grad_new_2 = xcgrad_drv_new.integrate_fxc_gradient(
-                molecule, basis, xmy_den_sym, xmy_den_sym, gs_density, molgrid,
-                xcfun_label)
-            fxc_grad_new_2 = scf_drv.comm.reduce(fxc_grad_new_2,
-                                                 root=mpi_master())
+        fxc_grad_new_2 = xcgrad_drv_new.integrate_fxc_gradient(
+            molecule, basis, xmy_den_sym, xmy_den_sym, gs_density, molgrid,
+            xcfun_label)
+        fxc_grad_new_2 = scf_drv.comm.reduce(fxc_grad_new_2, root=mpi_master())
 
         if is_mpi_master():
             assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
             xcgrad2 = vxc_contrib + vxc_contrib_2 + vxc2_contrib + vxc2_contrib_2
             assert np.max(np.abs(xcgrad2 - ref_xcgrad)) < 1.0e-5
             assert np.max(np.abs(vxc_grad_new - vxc_contrib)) < 1.0e-5
-            if xcfun_label == 'slater':
-                assert np.max(np.abs(fxc_grad_new - vxc_contrib_2)) < 1.0e-5
-                assert np.max(np.abs(fxc_grad_new_2 - vxc2_contrib)) < 1.0e-5
+            assert np.max(np.abs(fxc_grad_new - vxc_contrib_2)) < 1.0e-5
+            assert np.max(np.abs(fxc_grad_new_2 - vxc2_contrib)) < 1.0e-5
 
     def test_tda_xcgrad_slater(self):
 
