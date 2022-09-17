@@ -261,7 +261,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, boxdim);
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, boxdim);  // 0th order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -495,7 +495,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);  // 1st order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -740,7 +740,7 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, boxdim);
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, boxdim);  // 0th order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -962,7 +962,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);  // 1st order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -1211,7 +1211,7 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, boxdim);
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, boxdim);  // 0th order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -1447,7 +1447,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);  // 1st order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -1747,6 +1747,8 @@ CXCNewIntegrator::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
                 for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
 
                 if (gtoDeriv == 1) gtolimit = std::max(gtolimit, 2.0 * maxexp * r * gtolimit);
+
+                // TODO: add 2nd order GTO derivative
 
                 if (gtolimit < _screeningThresholdForGTOValues)
                 {

@@ -84,6 +84,47 @@ void computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
                              const int32_t             nGridPoints,
                              const CMemBlock<int32_t>& skipCgtoIds);
 
+/**
+ Computes GTOs values, 1st- and 2nd-order derivatives for batch of grid points.
+
+ @param gtoValues the GTOs values buffer.
+ @param gtoValueX the GTOs X derivative values buffer.
+ @param gtoValueY the GTOs Y derivative values buffer.
+ @param gtoValueZ the GTOs Z derivative values buffer.
+ @param gtoValueXX the GTOs XX derivative values buffer.
+ @param gtoValueXY the GTOs XY derivative values buffer.
+ @param gtoValueXZ the GTOs XZ derivative values buffer.
+ @param gtoValueYY the GTOs YY derivative values buffer.
+ @param gtoValueYZ the GTOs YZ derivative values buffer.
+ @param gtoValueZZ the GTOs ZZ derivative values buffer.
+ @param gtoContainer the poitner to GTO container.
+ @param gridCoordinatesX the vector of Cartesian X coordinates of grid points.
+ @param gridCoordinatesY the vector of Cartesian Y coordinates of grid points.
+ @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid points.
+ @param gridBlockPosition the starting position of grid box.
+ @param gridOffset the offset of grid points in grid box.
+ @param nGridPoints the number of grid points in grid points batch.
+ @param skipCgtoids whether a CGTO should be skipped.
+ */
+void computeGtosValuesForMetaGGA(CMemBlock2D<double>&      gtoValues,
+                                 CMemBlock2D<double>&      gtoValuesX,
+                                 CMemBlock2D<double>&      gtoValuesY,
+                                 CMemBlock2D<double>&      gtoValuesZ,
+                                 CMemBlock2D<double>&      gtoValuesXX,
+                                 CMemBlock2D<double>&      gtoValuesXY,
+                                 CMemBlock2D<double>&      gtoValuesXZ,
+                                 CMemBlock2D<double>&      gtoValuesYY,
+                                 CMemBlock2D<double>&      gtoValuesYZ,
+                                 CMemBlock2D<double>&      gtoValuesZZ,
+                                 const CGtoContainer*      gtoContainer,
+                                 const double*             gridCoordinatesX,
+                                 const double*             gridCoordinatesY,
+                                 const double*             gridCoordinatesZ,
+                                 const int32_t             gridBlockPosition,
+                                 const int32_t             gridOffset,
+                                 const int32_t             nGridPoints,
+                                 const CMemBlock<int32_t>& skipCgtoIds);
+
 }  // namespace gtoeval
 
 #endif /* GtoEvaluator_hpp */

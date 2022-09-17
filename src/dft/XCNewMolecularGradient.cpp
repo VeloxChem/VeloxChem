@@ -189,7 +189,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);  // 1st order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -573,6 +573,8 @@ CXCNewMolecularGradient::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds
                     gtolimit *= r;
 
                 if (gtoDeriv == 1) gtolimit = std::max(gtolimit, 2.0 * maxexp * r * gtolimit);
+
+                // TODO: add 2nd order GTO derivative
 
                 if (gtolimit < _screeningThresholdForGTOValues)
                 {
