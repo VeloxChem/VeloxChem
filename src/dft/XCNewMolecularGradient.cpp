@@ -77,7 +77,7 @@ CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
         }
         else if (xcfuntype == xcfun::gga)
         {
-            //return _integrateVxcGradientForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc);
+            return _integrateVxcGradientForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -403,6 +403,569 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
                 gatmy[iatom] += 2.0 * prefac * rhoay[g];
 
                 gatmz[iatom] += 2.0 * prefac * rhoaz[g];
+            }
+        }
+
+        timer.stop("Accumulate gradient");
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    timer.stop("Total timing");
+
+    std::cout << "Timing of new integrator" << std::endl;
+    std::cout << "------------------------" << std::endl;
+    std::cout << timer.getSummary() << std::endl;
+    std::cout << "OpenMP timing" << std::endl;
+    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    {
+        std::cout << "Thread " << thread_id << std::endl;
+        std::cout << omptimers[thread_id].getSummary() << std::endl;
+    }
+
+    return molgrad.transpose();
+}
+
+CDenseMatrix
+CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecule,
+                                                     const CMolecularBasis&  basis,
+                                                     const CAODensityMatrix& densityMatrix,
+                                                     const CMolecularGrid&   molecularGrid,
+                                                     const CXCFunctional&    xcFunctional) const
+{
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Preparation");
+
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<CMultiTimer> omptimers(nthreads);
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // AO-to-atom mapping
+
+    std::vector<int32_t> ao_to_atom_ids(naos);
+
+    _computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+
+    // molecular gradient
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    CDenseMatrix molgrad(3, natoms);
+
+    molgrad.zero();
+
+    // memory blocks for GTOs on grid points
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoxx(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoxy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoxz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoyy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoyz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaozz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+
+    auto ycoords = molecularGrid.getCoordinatesY();
+
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    auto weights = molecularGrid.getWeights();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    timer.stop("Preparation");
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        timer.start("GTO pre-screening");
+
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 2, boxdim);  // 2nd order GTO derivative
+
+        timer.stop("GTO pre-screening");
+
+        // GTO values on grid points
+
+        timer.start("OMP GTO evaluation");
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            omptimers[thread_id].start("gtoeval");
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForMetaGGA(gaos, gaox, gaoy, gaoz, gaoxx, gaoxy, gaoxz, gaoyy, gaoyz, gaozz,
+
+                                                 gtovec, xcoords, ycoords, zcoords,
+
+                                                 gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+
+            omptimers[thread_id].stop("gtoeval");
+        }
+
+        timer.stop("OMP GTO evaluation");
+
+        timer.start("GTO screening");
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            auto gaox_nu = gaox.data(nu);
+
+            auto gaoy_nu = gaoy.data(nu);
+
+            auto gaoz_nu = gaoz.data(nu);
+
+            auto gaoxx_nu = gaoxx.data(nu);
+
+            auto gaoxy_nu = gaoxy.data(nu);
+
+            auto gaoxz_nu = gaoxz.data(nu);
+
+            auto gaoyy_nu = gaoyy.data(nu);
+
+            auto gaoyz_nu = gaoyz.data(nu);
+
+            auto gaozz_nu = gaozz.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        CDenseMatrix mat_chi(aocount, npoints);
+
+        CDenseMatrix mat_chi_x(aocount, npoints);
+
+        CDenseMatrix mat_chi_y(aocount, npoints);
+
+        CDenseMatrix mat_chi_z(aocount, npoints);
+
+        CDenseMatrix mat_chi_xx(aocount, npoints);
+
+        CDenseMatrix mat_chi_xy(aocount, npoints);
+
+        CDenseMatrix mat_chi_xz(aocount, npoints);
+
+        CDenseMatrix mat_chi_yy(aocount, npoints);
+
+        CDenseMatrix mat_chi_yz(aocount, npoints);
+
+        CDenseMatrix mat_chi_zz(aocount, npoints);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_xx.row(i), gaoxx.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_xy.row(i), gaoxy.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_xz.row(i), gaoxz.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_yy.row(i), gaoyy.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_yz.row(i), gaoyz.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_zz.row(i), gaozz.data(aoinds[i]), npoints * sizeof(double));
+        }
+
+        timer.stop("GTO screening");
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto sub_dens_mat = _getSubDensityMatrix(densityMatrix, 0, aoinds, aocount, naos);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        timer.start("Density grid prep.");
+
+        auto xcfuntype = xcFunctional.getFunctionalType();
+
+        CDensityGrid dengrid(npoints, 1, xcfuntype, dengrid::ab);
+
+        dengrid.zero();
+
+        auto rhoa = dengrid.alphaDensity(0);
+
+        auto rhob = dengrid.betaDensity(0);
+
+        auto grada = dengrid.alphaDensityGradient(0);
+
+        auto gradb = dengrid.betaDensityGradient(0);
+
+        auto gradab = dengrid.mixedDensityGradient(0);
+
+        auto gradax = dengrid.alphaDensityGradientX(0);
+
+        auto graday = dengrid.alphaDensityGradientY(0);
+
+        auto gradaz = dengrid.alphaDensityGradientZ(0);
+
+        auto gradbx = dengrid.betaDensityGradientX(0);
+
+        auto gradby = dengrid.betaDensityGradientY(0);
+
+        auto gradbz = dengrid.betaDensityGradientZ(0);
+
+        CDenseMatrix dengradx(natoms, npoints);
+
+        CDenseMatrix dengrady(natoms, npoints);
+
+        CDenseMatrix dengradz(natoms, npoints);
+
+        CDenseMatrix dengradxx(natoms, npoints);
+
+        CDenseMatrix dengradxy(natoms, npoints);
+
+        CDenseMatrix dengradxz(natoms, npoints);
+
+        CDenseMatrix dengradyx(natoms, npoints);
+
+        CDenseMatrix dengradyy(natoms, npoints);
+
+        CDenseMatrix dengradyz(natoms, npoints);
+
+        CDenseMatrix dengradzx(natoms, npoints);
+
+        CDenseMatrix dengradzy(natoms, npoints);
+
+        CDenseMatrix dengradzz(natoms, npoints);
+
+        dengradx.zero();
+
+        dengrady.zero();
+
+        dengradz.zero();
+
+        dengradxx.zero();
+
+        dengradxy.zero();
+
+        dengradxz.zero();
+
+        dengradyx.zero();
+
+        dengradyy.zero();
+
+        dengradyz.zero();
+
+        dengradzx.zero();
+
+        dengradzy.zero();
+
+        dengradzz.zero();
+
+        timer.stop("Density grid prep.");
+
+        // eq.(26), JCTC 2021, 17, 1512-1521
+
+        timer.start("Density grid matmul");
+
+        auto mat_F = denblas::multAB(sub_dens_mat, mat_chi);
+
+        auto mat_F_x = denblas::multAB(sub_dens_mat, mat_chi_x);
+
+        auto mat_F_y = denblas::multAB(sub_dens_mat, mat_chi_y);
+
+        auto mat_F_z = denblas::multAB(sub_dens_mat, mat_chi_z);
+
+        timer.stop("Density grid matmul");
+
+        // eq.(34), JCTC 2021, 17, 1512-1521
+
+        timer.start("Density grid rho");
+
+        auto naos = mat_chi.getNumberOfRows();
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto atomidx = ao_to_atom_ids[aoinds[nu]];
+
+            auto rhoax = dengradx.row(atomidx);
+
+            auto rhoay = dengrady.row(atomidx);
+
+            auto rhoaz = dengradz.row(atomidx);
+
+            auto rhoaxx = dengradxx.row(atomidx);
+
+            auto rhoaxy = dengradxy.row(atomidx);
+
+            auto rhoaxz = dengradxz.row(atomidx);
+
+            auto rhoayx = dengradyx.row(atomidx);
+
+            auto rhoayy = dengradyy.row(atomidx);
+
+            auto rhoayz = dengradyz.row(atomidx);
+
+            auto rhoazx = dengradzx.row(atomidx);
+
+            auto rhoazy = dengradzy.row(atomidx);
+
+            auto rhoazz = dengradzz.row(atomidx);
+
+            auto F_nu = mat_F.row(nu);
+
+            auto F_x_nu = mat_F_x.row(nu);
+
+            auto F_y_nu = mat_F_y.row(nu);
+
+            auto F_z_nu = mat_F_z.row(nu);
+
+            auto chi_nu = mat_chi.row(nu);
+
+            auto chi_x_nu = mat_chi_x.row(nu);
+
+            auto chi_y_nu = mat_chi_y.row(nu);
+
+            auto chi_z_nu = mat_chi_z.row(nu);
+
+            auto chi_xx_nu = mat_chi_xx.row(nu);
+
+            auto chi_xy_nu = mat_chi_xy.row(nu);
+
+            auto chi_xz_nu = mat_chi_xz.row(nu);
+
+            auto chi_yy_nu = mat_chi_yy.row(nu);
+
+            auto chi_yz_nu = mat_chi_yz.row(nu);
+
+            auto chi_zz_nu = mat_chi_zz.row(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                rhoa[g] += F_nu[g] * chi_nu[g];
+
+                gradax[g] += 2.0 * F_nu[g] * chi_x_nu[g];
+
+                graday[g] += 2.0 * F_nu[g] * chi_y_nu[g];
+
+                gradaz[g] += 2.0 * F_nu[g] * chi_z_nu[g];
+
+                rhoax[g] -= 2.0 * F_nu[g] * chi_x_nu[g];
+
+                rhoay[g] -= 2.0 * F_nu[g] * chi_y_nu[g];
+
+                rhoaz[g] -= 2.0 * F_nu[g] * chi_z_nu[g];
+
+                rhoaxx[g] -= 2.0 * (F_x_nu[g] * chi_x_nu[g] + F_nu[g] * chi_xx_nu[g]);
+
+                rhoaxy[g] -= 2.0 * (F_x_nu[g] * chi_y_nu[g] + F_nu[g] * chi_xy_nu[g]);
+
+                rhoaxz[g] -= 2.0 * (F_x_nu[g] * chi_z_nu[g] + F_nu[g] * chi_xz_nu[g]);
+
+                rhoayx[g] -= 2.0 * (F_y_nu[g] * chi_x_nu[g] + F_nu[g] * chi_xy_nu[g]);
+
+                rhoayy[g] -= 2.0 * (F_y_nu[g] * chi_y_nu[g] + F_nu[g] * chi_yy_nu[g]);
+
+                rhoayz[g] -= 2.0 * (F_y_nu[g] * chi_z_nu[g] + F_nu[g] * chi_yz_nu[g]);
+
+                rhoazx[g] -= 2.0 * (F_z_nu[g] * chi_x_nu[g] + F_nu[g] * chi_xz_nu[g]);
+
+                rhoazy[g] -= 2.0 * (F_z_nu[g] * chi_y_nu[g] + F_nu[g] * chi_yz_nu[g]);
+
+                rhoazz[g] -= 2.0 * (F_z_nu[g] * chi_z_nu[g] + F_nu[g] * chi_zz_nu[g]);
+            }
+        }
+
+        for (int32_t g = 0; g < npoints; g++)
+        {
+            rhob[g] = rhoa[g];
+
+            gradbx[g] = gradax[g];
+
+            gradby[g] = graday[g];
+
+            gradbz[g] = gradaz[g];
+
+            grada[g] = std::sqrt(gradax[g] * gradax[g] + graday[g] * graday[g] + gradaz[g] * gradaz[g]);
+
+            gradb[g] = std::sqrt(gradbx[g] * gradbx[g] + gradby[g] * gradby[g] + gradbz[g] * gradbz[g]);
+
+            gradab[g] = gradax[g] * gradbx[g] + graday[g] * gradby[g] + gradaz[g] * gradbz[g];
+        }
+
+        timer.stop("Density grid rho");
+
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        CXCGradientGrid vxcgrid(npoints, dengrid.getDensityGridType(), xcfuntype);
+
+        xcFunctional.compute(vxcgrid, dengrid);
+
+        timer.stop("XC functional eval.");
+
+        // pointers to exchange-correlation functional derrivatives
+
+        auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
+
+        auto ggrada = vxcgrid.xcGradientValues(xcvars::grada);
+
+        auto ggradab = vxcgrid.xcGradientValues(xcvars::gradab);
+
+        // pointers to density gradient norms
+
+        auto ngrada = dengrid.alphaDensityGradient(0);
+
+        gradax = dengrid.alphaDensityGradientX(0);
+
+        graday = dengrid.alphaDensityGradientY(0);
+
+        gradaz = dengrid.alphaDensityGradientZ(0);
+
+        // eq.(32), JCTC 2021, 17, 1512-1521
+
+        timer.start("Accumulate gradient");
+
+        auto gatmx = molgrad.row(0);
+
+        auto gatmy = molgrad.row(1);
+
+        auto gatmz = molgrad.row(2);
+
+        for (int32_t iatom = 0; iatom < natoms; iatom++)
+        {
+            auto rhoax = dengradx.row(iatom);
+
+            auto rhoay = dengrady.row(iatom);
+
+            auto rhoaz = dengradz.row(iatom);
+
+            auto rhoaxx = dengradxx.row(iatom);
+
+            auto rhoaxy = dengradxy.row(iatom);
+
+            auto rhoaxz = dengradxz.row(iatom);
+
+            auto rhoayx = dengradyx.row(iatom);
+
+            auto rhoayy = dengradyy.row(iatom);
+
+            auto rhoayz = dengradyz.row(iatom);
+
+            auto rhoazx = dengradzx.row(iatom);
+
+            auto rhoazy = dengradzy.row(iatom);
+
+            auto rhoazz = dengradzz.row(iatom);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                double prefac = weights[gridblockpos + g] * grhoa[g];
+
+                gatmx[iatom] += 2.0 * prefac * rhoax[g];
+
+                gatmy[iatom] += 2.0 * prefac * rhoay[g];
+
+                gatmz[iatom] += 2.0 * prefac * rhoaz[g];
+
+                prefac =  weights[gridblockpos + g] * (ggrada[g] / ngrada[g] + ggradab[g]);
+
+                gatmx[iatom] += 2.0 * prefac * (gradax[g] * rhoaxx[g] + graday[g] * rhoayx[g] + gradaz[g] * rhoazx[g]);
+
+                gatmy[iatom] += 2.0 * prefac * (gradax[g] * rhoaxy[g] + graday[g] * rhoayy[g] + gradaz[g] * rhoazy[g]);
+
+                gatmz[iatom] += 2.0 * prefac * (gradax[g] * rhoaxz[g] + graday[g] * rhoayz[g] + gradaz[g] * rhoazz[g]);
             }
         }
 
