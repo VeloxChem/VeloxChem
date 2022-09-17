@@ -328,7 +328,42 @@ export_dft(py::module& m)
 
     PyClass<CXCNewMolecularGradient>(m, "XCNewMolecularGradient")
         .def(py::init(&vlx_general::create<CXCNewMolecularGradient>), "comm"_a = py::none())
-        .def("integrate_vxc_gradient", &CXCNewMolecularGradient::integrateVxcGradient);
+        .def(
+            "integrate_vxc_gradient",
+            [](CXCNewMolecularGradient& self,
+               const CMolecule&         molecule,
+               const CMolecularBasis&   basis,
+               const CAODensityMatrix&  gsDensityMatrix,
+               const CMolecularGrid&    molecularGrid,
+               const std::string&       xcFuncLabel) -> py::array_t<double> {
+                auto molgrad = self.integrateVxcGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates exchange-correlation contribution to molecular gradient.",
+            "molecule"_a,
+            "basis"_a,
+            "gsDensityMatrix"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a)
+        .def(
+            "integrate_vxc_gradient",
+            [](CXCNewMolecularGradient& self,
+               const CMolecule&         molecule,
+               const CMolecularBasis&   basis,
+               const CAODensityMatrix&  rwDensityMatrix,
+               const CAODensityMatrix&  gsDensityMatrix,
+               const CMolecularGrid&    molecularGrid,
+               const std::string&       xcFuncLabel) -> py::array_t<double> {
+                auto molgrad = self.integrateVxcGradient(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates exchange-correlation contribution to molecular gradient.",
+            "molecule"_a,
+            "basis"_a,
+            "rwDensityMatrix"_a,
+            "gsDensityMatrix"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a);
 
     // CXCMolecularGradient class
 

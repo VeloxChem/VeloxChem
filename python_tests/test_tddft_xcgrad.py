@@ -3,10 +3,12 @@ import numpy as np
 import h5py
 
 from veloxchem.veloxchemlib import denmat
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import is_mpi_master, mpi_master
+from veloxchem.veloxchemlib import GridDriver, XCNewMolecularGradient
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.aodensitymatrix import AODensityMatrix
+from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.gradientdriver import GradientDriver
 
 
@@ -80,10 +82,23 @@ class TestTddftXCgrad:
                                                 xmy_den_sym, gs_density,
                                                 xcfun_label)
 
+        grid_drv = GridDriver()
+        scf_drv = ScfRestrictedDriver()
+        molgrid = grid_drv.generate(molecule)
+        molgrid.partition_grid_points()
+        molgrid.distribute_counts_and_displacements(scf_drv.rank, scf_drv.nodes,
+                                                    scf_drv.comm)
+
+        xcgrad_drv_new = XCNewMolecularGradient()
+        vxc_grad_new = xcgrad_drv_new.integrate_vxc_gradient(
+            molecule, basis, rhow_den_sym, gs_density, molgrid, xcfun_label)
+        vxc_grad_new = scf_drv.comm.reduce(vxc_grad_new, root=mpi_master())
+
         if is_mpi_master():
             assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
             xcgrad2 = vxc_contrib + vxc_contrib_2 + vxc2_contrib + vxc2_contrib_2
             assert np.max(np.abs(xcgrad2 - ref_xcgrad)) < 1.0e-5
+            assert np.max(np.abs(vxc_grad_new - vxc_contrib)) < 1.0e-5
 
     def test_tda_xcgrad_slater(self):
 

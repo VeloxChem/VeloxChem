@@ -40,7 +40,6 @@ class TestXCMolGrad:
         grad_drv_new = XCNewMolecularGradient(scf_drv.comm)
         mol_grad_new = grad_drv_new.integrate_vxc_gradient(
             molecule, basis, density, mol_grid_new, xcfun)
-        mol_grad_new = mol_grad_new.to_numpy()
         mol_grad_new = scf_drv.comm.reduce(mol_grad_new, root=mpi_master())
 
         if scf_drv.rank == mpi_master():
