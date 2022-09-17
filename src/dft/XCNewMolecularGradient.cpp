@@ -504,9 +504,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CDenseMatrix molgrad(3, natoms);
+    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
 
-    molgrad.zero();
+    molgrad_threads.zero();
 
     // memory blocks for GTOs on grid points
 
@@ -817,113 +817,137 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         auto naos = mat_chi.getNumberOfRows();
 
-        for (int32_t nu = 0; nu < naos; nu++)
+        auto nthreads = omp_get_max_threads();
+
+        auto F_val = mat_F.values();
+
+        auto F_x_val = mat_F_x.values();
+
+        auto F_y_val = mat_F_y.values();
+
+        auto F_z_val = mat_F_z.values();
+
+        auto chi_val = mat_chi.values();
+
+        auto chi_x_val = mat_chi_x.values();
+
+        auto chi_y_val = mat_chi_y.values();
+
+        auto chi_z_val = mat_chi_z.values();
+
+        auto chi_xx_val = mat_chi_xx.values();
+
+        auto chi_xy_val = mat_chi_xy.values();
+
+        auto chi_xz_val = mat_chi_xz.values();
+
+        auto chi_yy_val = mat_chi_yy.values();
+
+        auto chi_yz_val = mat_chi_yz.values();
+
+        auto chi_zz_val = mat_chi_zz.values();
+
+        auto gdenx = dengradx.values();
+
+        auto gdeny = dengrady.values();
+
+        auto gdenz = dengradz.values();
+
+        auto gdenxx = dengradxx.values();
+
+        auto gdenxy = dengradxy.values();
+
+        auto gdenxz = dengradxz.values();
+
+        auto gdenyx = dengradyx.values();
+
+        auto gdenyy = dengradyy.values();
+
+        auto gdenyz = dengradyz.values();
+
+        auto gdenzx = dengradzx.values();
+
+        auto gdenzy = dengradzy.values();
+
+        auto gdenzz = dengradzz.values();
+
+        #pragma omp parallel
         {
-            auto atomidx = ao_to_atom_ids[aoinds[nu]];
+            auto thread_id = omp_get_thread_num();
 
-            auto rhoax = dengradx.row(atomidx);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto rhoay = dengrady.row(atomidx);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            auto rhoaz = dengradz.row(atomidx);
-
-            auto rhoaxx = dengradxx.row(atomidx);
-
-            auto rhoaxy = dengradxy.row(atomidx);
-
-            auto rhoaxz = dengradxz.row(atomidx);
-
-            auto rhoayx = dengradyx.row(atomidx);
-
-            auto rhoayy = dengradyy.row(atomidx);
-
-            auto rhoayz = dengradyz.row(atomidx);
-
-            auto rhoazx = dengradzx.row(atomidx);
-
-            auto rhoazy = dengradzy.row(atomidx);
-
-            auto rhoazz = dengradzz.row(atomidx);
-
-            auto F_nu = mat_F.row(nu);
-
-            auto F_x_nu = mat_F_x.row(nu);
-
-            auto F_y_nu = mat_F_y.row(nu);
-
-            auto F_z_nu = mat_F_z.row(nu);
-
-            auto chi_nu = mat_chi.row(nu);
-
-            auto chi_x_nu = mat_chi_x.row(nu);
-
-            auto chi_y_nu = mat_chi_y.row(nu);
-
-            auto chi_z_nu = mat_chi_z.row(nu);
-
-            auto chi_xx_nu = mat_chi_xx.row(nu);
-
-            auto chi_xy_nu = mat_chi_xy.row(nu);
-
-            auto chi_xz_nu = mat_chi_xz.row(nu);
-
-            auto chi_yy_nu = mat_chi_yy.row(nu);
-
-            auto chi_yz_nu = mat_chi_yz.row(nu);
-
-            auto chi_zz_nu = mat_chi_zz.row(nu);
-
-            for (int32_t g = 0; g < npoints; g++)
+            for (int32_t nu = 0; nu < naos; nu++)
             {
-                rhoa[g] += F_nu[g] * chi_nu[g];
+                auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
-                gradax[g] += 2.0 * F_nu[g] * chi_x_nu[g];
+                auto atom_offset = atomidx * npoints;
 
-                graday[g] += 2.0 * F_nu[g] * chi_y_nu[g];
+                auto nu_offset = nu * npoints;
 
-                gradaz[g] += 2.0 * F_nu[g] * chi_z_nu[g];
+                #pragma omp simd aligned(rhoa, gradax, graday, gradaz, gdenx, gdeny, gdenz, \
+                        gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz, \
+                        F_val, F_x_val, F_y_val, F_z_val, chi_val, chi_x_val, chi_y_val, chi_z_val, \
+                        chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                {
+                    auto nu_g = nu_offset + g;
 
-                rhoax[g] -= 2.0 * F_nu[g] * chi_x_nu[g];
+                    auto atom_g = atom_offset + g;
 
-                rhoay[g] -= 2.0 * F_nu[g] * chi_y_nu[g];
+                    rhoa[g] += F_val[nu_g] * chi_val[nu_g];
 
-                rhoaz[g] -= 2.0 * F_nu[g] * chi_z_nu[g];
+                    gradax[g] += 2.0 * F_val[nu_g] * chi_x_val[nu_g];
 
-                rhoaxx[g] -= 2.0 * (F_x_nu[g] * chi_x_nu[g] + F_nu[g] * chi_xx_nu[g]);
+                    graday[g] += 2.0 * F_val[nu_g] * chi_y_val[nu_g];
 
-                rhoaxy[g] -= 2.0 * (F_x_nu[g] * chi_y_nu[g] + F_nu[g] * chi_xy_nu[g]);
+                    gradaz[g] += 2.0 * F_val[nu_g] * chi_z_val[nu_g];
 
-                rhoaxz[g] -= 2.0 * (F_x_nu[g] * chi_z_nu[g] + F_nu[g] * chi_xz_nu[g]);
+                    gdenx[atom_g] -= 2.0 * F_val[nu_g] * chi_x_val[nu_g];
 
-                rhoayx[g] -= 2.0 * (F_y_nu[g] * chi_x_nu[g] + F_nu[g] * chi_xy_nu[g]);
+                    gdeny[atom_g] -= 2.0 * F_val[nu_g] * chi_y_val[nu_g];
 
-                rhoayy[g] -= 2.0 * (F_y_nu[g] * chi_y_nu[g] + F_nu[g] * chi_yy_nu[g]);
+                    gdenz[atom_g] -= 2.0 * F_val[nu_g] * chi_z_val[nu_g];
 
-                rhoayz[g] -= 2.0 * (F_y_nu[g] * chi_z_nu[g] + F_nu[g] * chi_yz_nu[g]);
+                    gdenxx[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xx_val[nu_g]);
 
-                rhoazx[g] -= 2.0 * (F_z_nu[g] * chi_x_nu[g] + F_nu[g] * chi_xz_nu[g]);
+                    gdenxy[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
 
-                rhoazy[g] -= 2.0 * (F_z_nu[g] * chi_y_nu[g] + F_nu[g] * chi_yz_nu[g]);
+                    gdenxz[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
 
-                rhoazz[g] -= 2.0 * (F_z_nu[g] * chi_z_nu[g] + F_nu[g] * chi_zz_nu[g]);
+                    gdenyx[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
+
+                    gdenyy[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yy_val[nu_g]);
+
+                    gdenyz[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
+
+                    gdenzx[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
+
+                    gdenzy[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
+
+                    gdenzz[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_zz_val[nu_g]);
+                }
             }
-        }
 
-        for (int32_t g = 0; g < npoints; g++)
-        {
-            rhob[g] = rhoa[g];
+            #pragma omp simd aligned(rhoa, rhob, gradax, graday, gradaz, gradbx, gradby, gradbz, grada, gradb, gradab : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                rhob[g] = rhoa[g];
 
-            gradbx[g] = gradax[g];
+                gradbx[g] = gradax[g];
 
-            gradby[g] = graday[g];
+                gradby[g] = graday[g];
 
-            gradbz[g] = gradaz[g];
+                gradbz[g] = gradaz[g];
 
-            grada[g] = std::sqrt(gradax[g] * gradax[g] + graday[g] * graday[g] + gradaz[g] * gradaz[g]);
+                grada[g] = std::sqrt(gradax[g] * gradax[g] + graday[g] * graday[g] + gradaz[g] * gradaz[g]);
 
-            gradb[g] = std::sqrt(gradbx[g] * gradbx[g] + gradby[g] * gradby[g] + gradbz[g] * gradbz[g]);
+                gradb[g] = std::sqrt(gradbx[g] * gradbx[g] + gradby[g] * gradby[g] + gradbz[g] * gradbz[g]);
 
-            gradab[g] = gradax[g] * gradbx[g] + graday[g] * gradby[g] + gradaz[g] * gradbz[g];
+                gradab[g] = gradax[g] * gradbx[g] + graday[g] * gradby[g] + gradaz[g] * gradbz[g];
+            }
         }
 
         timer.stop("Density grid rho");
@@ -950,65 +974,59 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         auto ngrada = dengrid.alphaDensityGradient(0);
 
-        gradax = dengrid.alphaDensityGradientX(0);
-
-        graday = dengrid.alphaDensityGradientY(0);
-
-        gradaz = dengrid.alphaDensityGradientZ(0);
+        // gradax = dengrid.alphaDensityGradientX(0);
+        // graday = dengrid.alphaDensityGradientY(0);
+        // gradaz = dengrid.alphaDensityGradientZ(0);
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
         timer.start("Accumulate gradient");
 
-        auto gatmx = molgrad.row(0);
-
-        auto gatmy = molgrad.row(1);
-
-        auto gatmz = molgrad.row(2);
-
-        for (int32_t iatom = 0; iatom < natoms; iatom++)
+        #pragma omp parallel
         {
-            auto rhoax = dengradx.row(iatom);
+            auto thread_id = omp_get_thread_num();
 
-            auto rhoay = dengrady.row(iatom);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto rhoaz = dengradz.row(iatom);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            auto rhoaxx = dengradxx.row(iatom);
+            auto gatm = molgrad_threads.data(thread_id);
 
-            auto rhoaxy = dengradxy.row(iatom);
-
-            auto rhoaxz = dengradxz.row(iatom);
-
-            auto rhoayx = dengradyx.row(iatom);
-
-            auto rhoayy = dengradyy.row(iatom);
-
-            auto rhoayz = dengradyz.row(iatom);
-
-            auto rhoazx = dengradzx.row(iatom);
-
-            auto rhoazy = dengradzy.row(iatom);
-
-            auto rhoazz = dengradzz.row(iatom);
-
-            for (int32_t g = 0; g < npoints; g++)
+            for (int32_t iatom = 0; iatom < natoms; iatom++)
             {
-                double prefac = weights[gridblockpos + g] * grhoa[g];
+                auto atom_offset = iatom * npoints;
 
-                gatmx[iatom] += 2.0 * prefac * rhoax[g];
+                double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
 
-                gatmy[iatom] += 2.0 * prefac * rhoay[g];
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(weights, \
+                        grhoa, ggrada, ggradab, ngrada, gradax, graday, gradaz, gdenx, gdeny, gdenz, \
+                        gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                {
+                    auto atom_g = atom_offset + g;
 
-                gatmz[iatom] += 2.0 * prefac * rhoaz[g];
+                    auto prefac = weights[gridblockpos + g] * grhoa[g];
 
-                prefac =  weights[gridblockpos + g] * (ggrada[g] / ngrada[g] + ggradab[g]);
+                    gatmx += 2.0 * prefac * gdenx[atom_g];
 
-                gatmx[iatom] += 2.0 * prefac * (gradax[g] * rhoaxx[g] + graday[g] * rhoayx[g] + gradaz[g] * rhoazx[g]);
+                    gatmy += 2.0 * prefac * gdeny[atom_g];
 
-                gatmy[iatom] += 2.0 * prefac * (gradax[g] * rhoaxy[g] + graday[g] * rhoayy[g] + gradaz[g] * rhoazy[g]);
+                    gatmz += 2.0 * prefac * gdenz[atom_g];
 
-                gatmz[iatom] += 2.0 * prefac * (gradax[g] * rhoaxz[g] + graday[g] * rhoayz[g] + gradaz[g] * rhoazz[g]);
+                    prefac =  weights[gridblockpos + g] * (ggrada[g] / ngrada[g] + ggradab[g]);
+
+                    gatmx += 2.0 * prefac * (gradax[g] * gdenxx[atom_g] + graday[g] * gdenyx[atom_g] + gradaz[g] * gdenzx[atom_g]);
+
+                    gatmy += 2.0 * prefac * (gradax[g] * gdenxy[atom_g] + graday[g] * gdenyy[atom_g] + gradaz[g] * gdenzy[atom_g]);
+
+                    gatmz += 2.0 * prefac * (gradax[g] * gdenxz[atom_g] + graday[g] * gdenyz[atom_g] + gradaz[g] * gdenzz[atom_g]);
+                }
+
+                gatm[iatom * 3 + 0] += gatmx;
+
+                gatm[iatom * 3 + 1] += gatmy;
+
+                gatm[iatom * 3 + 2] += gatmz;
             }
         }
 
@@ -1031,7 +1049,23 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         std::cout << omptimers[thread_id].getSummary() << std::endl;
     }
 
-    return molgrad.transpose();
+    CDenseMatrix molgrad(natoms, 3);
+
+    molgrad.zero();
+
+    for (int32_t iatom = 0; iatom < natoms; iatom++)
+    {
+        for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+        {
+            molgrad.row(iatom)[0] += molgrad_threads.data(thread_id)[iatom * 3 + 0];
+
+            molgrad.row(iatom)[1] += molgrad_threads.data(thread_id)[iatom * 3 + 1];
+
+            molgrad.row(iatom)[2] += molgrad_threads.data(thread_id)[iatom * 3 + 2];
+        }
+    }
+
+    return molgrad;
 }
 
 void
