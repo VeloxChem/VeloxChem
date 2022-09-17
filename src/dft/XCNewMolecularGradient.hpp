@@ -136,6 +136,14 @@ class CXCNewMolecularGradient
                                              const CMolecularGrid&   molecularGrid,
                                              const CXCFunctional&    xcFunctional) const;
 
+    CDenseMatrix _integrateKxcGradientForGGA(const CMolecule&        molecule,
+                                             const CMolecularBasis&  basis,
+                                             const CAODensityMatrix& rwDensityMatrixOne,
+                                             const CAODensityMatrix& rwDensityMatrixTwo,
+                                             const CAODensityMatrix& gsDensityMatrix,
+                                             const CMolecularGrid&   molecularGrid,
+                                             const CXCFunctional&    xcFunctional) const;
+
     /**
      Computes AO-to-atom mapping.
 
