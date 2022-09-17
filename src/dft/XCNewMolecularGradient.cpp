@@ -509,18 +509,20 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
                     double prefac = weights[gridblockpos + g] * grhoa[g];
 
-                    gatmx += 2.0 * prefac * gdenx[atom_g];
+                    gatmx += prefac * gdenx[atom_g];
 
-                    gatmy += 2.0 * prefac * gdeny[atom_g];
+                    gatmy += prefac * gdeny[atom_g];
 
-                    gatmz += 2.0 * prefac * gdenz[atom_g];
+                    gatmz += prefac * gdenz[atom_g];
                 }
 
-                gatm[iatom * 3 + 0] += gatmx;
+                // factor of 2 from sum of alpha and beta contributions
 
-                gatm[iatom * 3 + 1] += gatmy;
+                gatm[iatom * 3 + 0] += 2.0 * gatmx;
 
-                gatm[iatom * 3 + 2] += gatmz;
+                gatm[iatom * 3 + 1] += 2.0 * gatmy;
+
+                gatm[iatom * 3 + 2] += 2.0 * gatmz;
             }
         }
 
@@ -1041,26 +1043,28 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
                     auto prefac = weights[gridblockpos + g] * grhoa[g];
 
-                    gatmx += 2.0 * prefac * gdenx[atom_g];
+                    gatmx += prefac * gdenx[atom_g];
 
-                    gatmy += 2.0 * prefac * gdeny[atom_g];
+                    gatmy += prefac * gdeny[atom_g];
 
-                    gatmz += 2.0 * prefac * gdenz[atom_g];
+                    gatmz += prefac * gdenz[atom_g];
 
-                    prefac =  weights[gridblockpos + g] * (ggrada[g] / ngrada[g] + ggradab[g]);
+                    prefac = weights[gridblockpos + g] * (ggrada[g] / ngrada[g] + ggradab[g]);
 
-                    gatmx += 2.0 * prefac * (gradax[g] * gdenxx[atom_g] + graday[g] * gdenyx[atom_g] + gradaz[g] * gdenzx[atom_g]);
+                    gatmx += prefac * (gradax[g] * gdenxx[atom_g] + graday[g] * gdenyx[atom_g] + gradaz[g] * gdenzx[atom_g]);
 
-                    gatmy += 2.0 * prefac * (gradax[g] * gdenxy[atom_g] + graday[g] * gdenyy[atom_g] + gradaz[g] * gdenzy[atom_g]);
+                    gatmy += prefac * (gradax[g] * gdenxy[atom_g] + graday[g] * gdenyy[atom_g] + gradaz[g] * gdenzy[atom_g]);
 
-                    gatmz += 2.0 * prefac * (gradax[g] * gdenxz[atom_g] + graday[g] * gdenyz[atom_g] + gradaz[g] * gdenzz[atom_g]);
+                    gatmz += prefac * (gradax[g] * gdenxz[atom_g] + graday[g] * gdenyz[atom_g] + gradaz[g] * gdenzz[atom_g]);
                 }
 
-                gatm[iatom * 3 + 0] += gatmx;
+                // factor of 2 from sum of alpha and beta contributions
 
-                gatm[iatom * 3 + 1] += gatmy;
+                gatm[iatom * 3 + 0] += 2.0 * gatmx;
 
-                gatm[iatom * 3 + 2] += gatmz;
+                gatm[iatom * 3 + 1] += 2.0 * gatmy;
+
+                gatm[iatom * 3 + 2] += 2.0 * gatmz;
             }
         }
 
@@ -1423,18 +1427,20 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
                     double prefac = weights[gridblockpos + g] * (grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g]);
 
-                    gatmx += 2.0 * prefac * gdenx[atom_g];
+                    gatmx += prefac * gdenx[atom_g];
 
-                    gatmy += 2.0 * prefac * gdeny[atom_g];
+                    gatmy += prefac * gdeny[atom_g];
 
-                    gatmz += 2.0 * prefac * gdenz[atom_g];
+                    gatmz += prefac * gdenz[atom_g];
                 }
 
-                gatm[iatom * 3 + 0] += gatmx;
+                // factor of 2 from sum of alpha and beta contributions
 
-                gatm[iatom * 3 + 1] += gatmy;
+                gatm[iatom * 3 + 0] += 2.0 * gatmx;
 
-                gatm[iatom * 3 + 2] += gatmz;
+                gatm[iatom * 3 + 1] += 2.0 * gatmy;
+
+                gatm[iatom * 3 + 2] += 2.0 * gatmz;
             }
         }
 
@@ -2148,6 +2154,8 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
                     gatmz += (xcomp * gdenxz[atom_g] + ycomp * gdenyz[atom_g] + zcomp * gdenzz[atom_g]);
                 }
+
+                // factor of 2 from sum of alpha and beta contributions
 
                 gatm[iatom * 3 + 0] += 2.0 * gatmx;
 
