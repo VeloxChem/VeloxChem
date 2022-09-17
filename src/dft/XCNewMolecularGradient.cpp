@@ -80,7 +80,7 @@ CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
 
     auto xcfuntype = fvxc.getFunctionalType();
 
-    if (rwDensityMatrix.isClosedShell())
+    if (rwDensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
@@ -108,6 +108,50 @@ CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
 }
 
 CDenseMatrix
+CXCNewMolecularGradient::integrateFxcGradient(const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const CAODensityMatrix& rwDensityMatrixOne,
+                                              const CAODensityMatrix& rwDensityMatrixTwo,
+                                              const CAODensityMatrix& gsDensityMatrix,
+                                              const CMolecularGrid&   molecularGrid,
+                                              const std::string&      xcFuncLabel) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (rwDensityMatrixOne.isClosedShell() && rwDensityMatrixTwo.isClosedShell() && gsDensityMatrix.isClosedShell())
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            return _integrateFxcGradientForLDA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo,
+
+                                               gsDensityMatrix, molecularGrid, fvxc);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            //return _integrateFxcGradientForGGA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo,
+
+            //                                   gsDensityMatrix, molecularGrid, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCNewMolecularGradient.integrateFxcGradient: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCNewMolecularGradient.integrateFxcGradient: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+
+    return CDenseMatrix();
+}
+
+CDenseMatrix
 CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecule,
                                                      const CMolecularBasis&  basis,
                                                      const CAODensityMatrix& rwDensityMatrix,
@@ -122,8 +166,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
     timer.start("Preparation");
 
     auto nthreads = omp_get_max_threads();
-
-    std::vector<CMultiTimer> omptimers(nthreads);
 
     // GTOs container and number of AOs
 
@@ -213,8 +255,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
         {
             auto thread_id = omp_get_thread_num();
 
-            omptimers[thread_id].start("gtoeval");
-
             auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
@@ -222,8 +262,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
             gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords,
 
                                              gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
-
-            omptimers[thread_id].stop("gtoeval");
         }
 
         timer.stop("OMP GTO evaluation");
@@ -306,7 +344,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         // generate density grid
 
-        timer.start("Density gradient grid prep.");
+        timer.start("Density grad. grid prep.");
 
         CDenseMatrix dengradx(natoms, npoints);
 
@@ -320,23 +358,21 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         dengradz.zero();
 
-        timer.stop("Density gradient grid prep.");
+        timer.stop("Density grad. grid prep.");
 
         // eq.(26), JCTC 2021, 17, 1512-1521
 
-        timer.start("Density gradient grid matmul");
+        timer.start("Density grad. grid matmul");
 
         auto mat_F = denblas::multAB(rw_sub_dens_mat, mat_chi);
 
-        timer.stop("Density gradient grid matmul");
+        timer.stop("Density grad. grid matmul");
 
         // eq.(34), JCTC 2021, 17, 1512-1521
 
-        timer.start("Density gradient grid rho");
+        timer.start("Density grad. grid rho");
 
         auto naos = mat_chi.getNumberOfRows();
-
-        auto nthreads = omp_get_max_threads();
 
         auto F_val = mat_F.values();
 
@@ -385,7 +421,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
             }
         }
 
-        timer.stop("Density gradient grid rho");
+        timer.stop("Density grad. grid rho");
 
         // compute exchange-correlation functional derivative
 
@@ -421,7 +457,8 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
 
-                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(weights, gdenx, gdeny, gdenz, gatm : VLX_ALIGN)
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(weights, grhoa, \
+                        gdenx, gdeny, gdenz : VLX_ALIGN)
                 for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
@@ -455,12 +492,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
     std::cout << "Timing of new integrator" << std::endl;
     std::cout << "------------------------" << std::endl;
     std::cout << timer.getSummary() << std::endl;
-    std::cout << "OpenMP timing" << std::endl;
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
 
     CDenseMatrix molgrad(natoms, 3);
 
@@ -496,8 +527,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
     timer.start("Preparation");
 
     auto nthreads = omp_get_max_threads();
-
-    std::vector<CMultiTimer> omptimers(nthreads);
 
     // GTOs container and number of AOs
 
@@ -599,8 +628,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         {
             auto thread_id = omp_get_thread_num();
 
-            omptimers[thread_id].start("gtoeval");
-
             auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
@@ -610,8 +637,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
                                                  gtovec, xcoords, ycoords, zcoords,
 
                                                  gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
-
-            omptimers[thread_id].stop("gtoeval");
         }
 
         timer.stop("OMP GTO evaluation");
@@ -738,7 +763,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         // generate density grid
 
-        timer.start("Density gradient grid prep.");
+        timer.start("Density grad. grid prep.");
 
         CDenseMatrix dengradx(natoms, npoints);
 
@@ -788,11 +813,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         dengradzz.zero();
 
-        timer.stop("Density gradient grid prep.");
+        timer.stop("Density grad. grid prep.");
 
         // eq.(26), JCTC 2021, 17, 1512-1521
 
-        timer.start("Density gradient grid matmul");
+        timer.start("Density grad. grid matmul");
 
         auto mat_F = denblas::multAB(rw_sub_dens_mat, mat_chi);
 
@@ -802,15 +827,13 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         auto mat_F_z = denblas::multAB(rw_sub_dens_mat, mat_chi_z);
 
-        timer.stop("Density gradient grid matmul");
+        timer.stop("Density grad. grid matmul");
 
         // eq.(34), JCTC 2021, 17, 1512-1521
 
-        timer.start("Density gradient grid rho");
+        timer.start("Density grad. grid rho");
 
         auto naos = mat_chi.getNumberOfRows();
-
-        auto nthreads = omp_get_max_threads();
 
         auto F_val = mat_F.values();
 
@@ -915,7 +938,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
             }
         }
 
-        timer.stop("Density gradient grid rho");
+        timer.stop("Density grad. grid rho");
 
         // compute exchange-correlation functional derivative
 
@@ -1009,12 +1032,380 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
     std::cout << "Timing of new integrator" << std::endl;
     std::cout << "------------------------" << std::endl;
     std::cout << timer.getSummary() << std::endl;
-    std::cout << "OpenMP timing" << std::endl;
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+
+    CDenseMatrix molgrad(natoms, 3);
+
+    molgrad.zero();
+
+    for (int32_t iatom = 0; iatom < natoms; iatom++)
     {
-        std::cout << "Thread " << thread_id << std::endl;
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
+        for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+        {
+            molgrad.row(iatom)[0] += molgrad_threads.data(thread_id)[iatom * 3 + 0];
+
+            molgrad.row(iatom)[1] += molgrad_threads.data(thread_id)[iatom * 3 + 1];
+
+            molgrad.row(iatom)[2] += molgrad_threads.data(thread_id)[iatom * 3 + 2];
+        }
     }
+
+    return molgrad;
+}
+
+CDenseMatrix
+CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecule,
+                                                     const CMolecularBasis&  basis,
+                                                     const CAODensityMatrix& rwDensityMatrixOne,
+                                                     const CAODensityMatrix& rwDensityMatrixTwo,
+                                                     const CAODensityMatrix& gsDensityMatrix,
+                                                     const CMolecularGrid&   molecularGrid,
+                                                     const CXCFunctional&    xcFunctional) const
+{
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Preparation");
+
+    auto nthreads = omp_get_max_threads();
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // AO-to-atom mapping
+
+    std::vector<int32_t> ao_to_atom_ids(naos);
+
+    _computeAOtoAtomMapping(ao_to_atom_ids, molecule, basis);
+
+    // molecular gradient
+
+    auto natoms = molecule.getNumberOfAtoms();
+
+    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+
+    molgrad_threads.zero();
+
+    // memory blocks for GTOs on grid points
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+
+    auto ycoords = molecularGrid.getCoordinatesY();
+
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    auto weights = molecularGrid.getWeights();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    timer.stop("Preparation");
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        timer.start("GTO pre-screening");
+
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);  // 1st order GTO derivative
+
+        timer.stop("GTO pre-screening");
+
+        // GTO values on grid points
+
+        timer.start("OMP GTO evaluation");
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords,
+
+                                             gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+        }
+
+        timer.stop("OMP GTO evaluation");
+
+        timer.start("GTO screening");
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            auto gaox_nu = gaox.data(nu);
+
+            auto gaoy_nu = gaoy.data(nu);
+
+            auto gaoz_nu = gaoz.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        CDenseMatrix mat_chi(aocount, npoints);
+
+        CDenseMatrix mat_chi_x(aocount, npoints);
+
+        CDenseMatrix mat_chi_y(aocount, npoints);
+
+        CDenseMatrix mat_chi_z(aocount, npoints);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
+        }
+
+        timer.stop("GTO screening");
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+
+        auto rw_sub_dens_mat_one = _getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+
+        auto rw_sub_dens_mat_two = _getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        auto xcfuntype = xcFunctional.getFunctionalType();
+
+        auto gsdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, gs_sub_dens_mat, xcfuntype, timer);
+
+        auto rwdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw_sub_dens_mat_one, xcfuntype, timer);
+
+        // generate density grid
+
+        timer.start("Density grad. grid prep.");
+
+        CDenseMatrix dengradx(natoms, npoints);
+
+        CDenseMatrix dengrady(natoms, npoints);
+
+        CDenseMatrix dengradz(natoms, npoints);
+
+        dengradx.zero();
+
+        dengrady.zero();
+
+        dengradz.zero();
+
+        timer.stop("Density grad. grid prep.");
+
+        // eq.(26), JCTC 2021, 17, 1512-1521
+
+        timer.start("Density grad. grid matmul");
+
+        auto mat_F = denblas::multAB(rw_sub_dens_mat_two, mat_chi);
+
+        timer.stop("Density grad. grid matmul");
+
+        // eq.(34), JCTC 2021, 17, 1512-1521
+
+        timer.start("Density grad. grid rho");
+
+        auto naos = mat_chi.getNumberOfRows();
+
+        auto F_val = mat_F.values();
+
+        auto chi_x_val = mat_chi_x.values();
+
+        auto chi_y_val = mat_chi_y.values();
+
+        auto chi_z_val = mat_chi_z.values();
+
+        auto gdenx = dengradx.values();
+
+        auto gdeny = dengrady.values();
+
+        auto gdenz = dengradz.values();
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            for (int32_t nu = 0; nu < naos; nu++)
+            {
+                auto atomidx = ao_to_atom_ids[aoinds[nu]];
+
+                auto atom_offset = atomidx * npoints;
+
+                auto nu_offset = nu * npoints;
+
+                #pragma omp simd aligned(gdenx, gdeny, gdenz, \
+                        F_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                {
+                    auto atom_g = atom_offset + g;
+
+                    auto nu_g = nu_offset + g;
+
+                    gdenx[atom_g] -= 2.0 * F_val[nu_g] * chi_x_val[nu_g];
+
+                    gdeny[atom_g] -= 2.0 * F_val[nu_g] * chi_y_val[nu_g];
+
+                    gdenz[atom_g] -= 2.0 * F_val[nu_g] * chi_z_val[nu_g];
+                }
+            }
+        }
+
+        timer.stop("Density grad. grid rho");
+
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        CXCHessianGrid vxc2grid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+
+        xcFunctional.compute(vxc2grid, gsdengrid);
+
+        timer.stop("XC functional eval.");
+
+        // pointers to exchange-correlation functional derivative
+
+        auto grho_aa = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+
+        auto grho_ab = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
+
+        // pointers to perturbed density gradient norms
+
+        auto rhowa = rwdengrid.alphaDensity(0);
+
+        auto rhowb = rwdengrid.betaDensity(0);
+
+        // eq.(32), JCTC 2021, 17, 1512-1521
+
+        timer.start("Accumulate gradient");
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            auto gatm = molgrad_threads.data(thread_id);
+
+            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            {
+                auto atom_offset = iatom * npoints;
+
+                double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
+
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(weights, \
+                        grho_aa, grho_ab, rhowa, rhowb, gdenx, gdeny, gdenz : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                {
+                    auto atom_g = atom_offset + g;
+
+                    double prefac = weights[gridblockpos + g] * (grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g]);
+
+                    gatmx += 2.0 * prefac * gdenx[atom_g];
+
+                    gatmy += 2.0 * prefac * gdeny[atom_g];
+
+                    gatmz += 2.0 * prefac * gdenz[atom_g];
+                }
+
+                gatm[iatom * 3 + 0] += gatmx;
+
+                gatm[iatom * 3 + 1] += gatmy;
+
+                gatm[iatom * 3 + 2] += gatmz;
+            }
+        }
+
+        timer.stop("Accumulate gradient");
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    timer.stop("Total timing");
+
+    std::cout << "Timing of new integrator" << std::endl;
+    std::cout << "------------------------" << std::endl;
+    std::cout << timer.getSummary() << std::endl;
 
     CDenseMatrix molgrad(natoms, 3);
 

@@ -109,7 +109,7 @@ CXCNewIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
 
     auto xcfuntype = fvxc.getFunctionalType();
 
-    if (rwDensityMatrix.isClosedShell())
+    if (rwDensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
@@ -149,7 +149,7 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
 
     auto xcfuntype = fvxc.getFunctionalType();
 
-    if (rwDensityMatrix.isClosedShell())
+    if (rwDensityMatrix.isClosedShell() && rw2DensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
