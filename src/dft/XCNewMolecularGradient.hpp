@@ -128,6 +128,14 @@ class CXCNewMolecularGradient
                                              const CMolecularGrid&   molecularGrid,
                                              const CXCFunctional&    xcFunctional) const;
 
+    CDenseMatrix _integrateKxcGradientForLDA(const CMolecule&        molecule,
+                                             const CMolecularBasis&  basis,
+                                             const CAODensityMatrix& rwDensityMatrixOne,
+                                             const CAODensityMatrix& rwDensityMatrixTwo,
+                                             const CAODensityMatrix& gsDensityMatrix,
+                                             const CMolecularGrid&   molecularGrid,
+                                             const CXCFunctional&    xcFunctional) const;
+
     /**
      Computes AO-to-atom mapping.
 
@@ -236,6 +244,14 @@ class CXCNewMolecularGradient
                                       const std::string&      xcFuncLabel) const;
 
     CDenseMatrix integrateFxcGradient(const CMolecule&        molecule,
+                                      const CMolecularBasis&  basis,
+                                      const CAODensityMatrix& rwDensityMatrixOne,
+                                      const CAODensityMatrix& rwDensityMatrixTwo,
+                                      const CAODensityMatrix& gsDensityMatrix,
+                                      const CMolecularGrid&   molecularGrid,
+                                      const std::string&      xcFuncLabel) const;
+
+    CDenseMatrix integrateKxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& rwDensityMatrixOne,
                                       const CAODensityMatrix& rwDensityMatrixTwo,
