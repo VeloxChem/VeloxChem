@@ -2071,15 +2071,11 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
                                   + grho_ab[g] * rhowb[g];
 
-                    // w * a0 * fac0;   a0 = bgaos[m] * kgaos[m];
+                    gatmx += w * fac0 * gdenx[atom_g];
 
-                    double prefac = w * fac0;
+                    gatmy += w * fac0 * gdeny[atom_g];
 
-                    gatmx += prefac * gdenx[atom_g];
-
-                    gatmy += prefac * gdeny[atom_g];
-
-                    gatmz += prefac * gdenz[atom_g];
+                    gatmz += w * fac0 * gdenz[atom_g];
 
                     // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
 
@@ -2095,15 +2091,11 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
                                   + ggrad_aa[g] * zetaa + ggrad_ab[g] * zetab + ggrad_ac[g] * zetac;
 
-                    // w * facr * ar;   ar = ax * rxa + ay * rya + az * rza;
+                    xcomp += facr * rxa;
 
-                    prefac = w * facr;
+                    ycomp += facr * rya;
 
-                    xcomp += prefac * rxa;
-
-                    ycomp += prefac * rya;
-
-                    zcomp += prefac * rza;
+                    zcomp += facr * rza;
 
                     // third contribution
 
@@ -2111,23 +2103,15 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
                                   + ggrad_ac[g] * zetaa + ggrad_bc[g] * zetab + ggrad_cc[g] * zetac;
 
-                    // w * facz * arb;   arb = ax * grada_x[g] + ay * grada_y[g] + az * grada_z[g];
+                    xcomp += facz * grada_x[g];
 
-                    prefac = w * facz;
+                    ycomp += facz * grada_y[g];
 
-                    xcomp += prefac * grada_x[g];
-
-                    ycomp += prefac * grada_y[g];
-
-                    zcomp += prefac * grada_z[g];
+                    zcomp += facz * grada_z[g];
 
                     // fourth contribution
 
-                    // w * znva * ggrad_a[g] * ab;
-                    // ab = ax * rxwa + ay * rywa + az * rzwa - ar * zetaa;
-                    // ar = ax * rxa + ay * rya + az * rza;
-
-                    prefac = w * znva * ggrad_a[g];
+                    double prefac = znva * ggrad_a[g];
 
                     xcomp += prefac * (rxwa - rxa * zetaa);
 
@@ -2137,22 +2121,17 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
                     // fifth contribution
 
-                    // w * ggrad_c[g] * abw;
-                    // abw = ax * rxwa + ay * rywa + az * rzwa;
+                    xcomp += ggrad_c[g] * rxwa;
 
-                    prefac = w * ggrad_c[g];
+                    ycomp += ggrad_c[g] * rywa;
 
-                    xcomp += prefac * rxwa;
+                    zcomp += ggrad_c[g] * rzwa;
 
-                    ycomp += prefac * rywa;
+                    gatmx += w * (xcomp * gdenxx[atom_g] + ycomp * gdenyx[atom_g] + zcomp * gdenzx[atom_g]);
 
-                    zcomp += prefac * rzwa;
+                    gatmy += w * (xcomp * gdenxy[atom_g] + ycomp * gdenyy[atom_g] + zcomp * gdenzy[atom_g]);
 
-                    gatmx += (xcomp * gdenxx[atom_g] + ycomp * gdenyx[atom_g] + zcomp * gdenzx[atom_g]);
-
-                    gatmy += (xcomp * gdenxy[atom_g] + ycomp * gdenyy[atom_g] + zcomp * gdenzy[atom_g]);
-
-                    gatmz += (xcomp * gdenxz[atom_g] + ycomp * gdenyz[atom_g] + zcomp * gdenzz[atom_g]);
+                    gatmz += w * (xcomp * gdenxz[atom_g] + ycomp * gdenyz[atom_g] + zcomp * gdenzz[atom_g]);
                 }
 
                 // factor of 2 from sum of alpha and beta contributions
@@ -3303,19 +3282,13 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                     // Various required quantities
 
-                    // xigrad_dot_omega = (xigrad_x * xomega + xigrad_y * yomega + xigrad_z * zomega);
-
                     double xigrad_dot_rw1rw2 = xigrad_x * rxw1rhow2[g] + xigrad_y * ryw1rhow2[g] + xigrad_z * rzw1rhow2[g];
 
                     double rw1_dot_rw2 = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
 
                     double xigrad_dot_rw1rhow2 = xigrad_x * rxw1rhow2[g] + xigrad_y * ryw1rhow2[g] + xigrad_z * rzw1rhow2[g];
 
-                    // grad_dot_omega = grada_x[g] * xomega + grada_y[g] * yomega + grada_z[g] * zomega;
-
                     double grad_dot_rw1rw2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] + grada_z[g] * rzw1rhow2[g];
-
-                    // omega_dot_rw1rhow2 = xomega * rxw1rhow2[g] + yomega * ryw1rhow2[g] + zomega * rzw1rhow2[g];
 
                     double grad_dot_rw1rhow2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] + grada_z[g] * rzw1rhow2[g];
 
@@ -3324,70 +3297,54 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
                         xigrad_y * xigrad_x * ryw1rxw2[g] + xigrad_y * xigrad_y * ryw1ryw2[g] + xigrad_y * xigrad_z * ryw1rzw2[g] +
                         xigrad_z * xigrad_x * rzw1rxw2[g] + xigrad_z * xigrad_y * rzw1ryw2[g] + xigrad_z * xigrad_z * rzw1rzw2[g];
 
-                    // twelthfifth_gam = (xigrad_x * grada_x[g] + grada_x[g] * xigrad_x) * rxw1rxw2[g] +
-                    //                   (xigrad_x * grada_y[g] + grada_x[g] * xigrad_y) * rxw1ryw2[g] +
-                    //                   (xigrad_x * grada_z[g] + grada_x[g] * xigrad_z) * rxw1rzw2[g] +
-                    //                   (xigrad_y * grada_x[g] + grada_y[g] * xigrad_x) * rxw1rxw2[g] +
-                    //                   (xigrad_y * grada_y[g] + grada_y[g] * xigrad_y) * rxw1ryw2[g] +
-                    //                   (xigrad_y * grada_z[g] + grada_y[g] * xigrad_z) * rxw1rzw2[g] +
-                    //                   (xigrad_z * grada_x[g] + grada_z[g] * xigrad_x) * rxw1rxw2[g] +
-                    //                   (xigrad_z * grada_y[g] + grada_z[g] * xigrad_y) * rxw1ryw2[g] +
-                    //                   (xigrad_z * grada_z[g] + grada_z[g] * xigrad_z) * rxw1rzw2[g];
-
                     double twelthfifth_gam =
-                        (xigrad_x * grada_x[g] + grada_x[g] * xigrad_x) * rxw1rxw2[g] + (xigrad_x * grada_y[g] + grada_x[g] * xigrad_y) * rxw1ryw2[g] +
-                        (xigrad_x * grada_z[g] + grada_x[g] * xigrad_z) * rxw1rzw2[g] + (xigrad_y * grada_x[g] + grada_y[g] * xigrad_x) * rxw1rxw2[g] +
-                        (xigrad_y * grada_y[g] + grada_y[g] * xigrad_y) * rxw1ryw2[g] + (xigrad_y * grada_z[g] + grada_y[g] * xigrad_z) * rxw1rzw2[g] +
-                        (xigrad_z * grada_x[g] + grada_z[g] * xigrad_x) * rxw1rxw2[g] + (xigrad_z * grada_y[g] + grada_z[g] * xigrad_y) * rxw1ryw2[g] +
+                        (xigrad_x * grada_x[g] + grada_x[g] * xigrad_x) * rxw1rxw2[g] +
+                        (xigrad_x * grada_y[g] + grada_x[g] * xigrad_y) * rxw1ryw2[g] +
+                        (xigrad_x * grada_z[g] + grada_x[g] * xigrad_z) * rxw1rzw2[g] +
+                        (xigrad_y * grada_x[g] + grada_y[g] * xigrad_x) * rxw1rxw2[g] +
+                        (xigrad_y * grada_y[g] + grada_y[g] * xigrad_y) * rxw1ryw2[g] +
+                        (xigrad_y * grada_z[g] + grada_y[g] * xigrad_z) * rxw1rzw2[g] +
+                        (xigrad_z * grada_x[g] + grada_z[g] * xigrad_x) * rxw1rxw2[g] +
+                        (xigrad_z * grada_y[g] + grada_z[g] * xigrad_y) * rxw1ryw2[g] +
                         (xigrad_z * grada_z[g] + grada_z[g] * xigrad_z) * rxw1rzw2[g];
 
                     // contribution from \nabla_A (\phi_mu \phi_nu)
 
                     double prefac;
 
-                    // fifth = w * (df3000[g] + 2.0 * df2100[g] + df1200[g]) * rhow1rhow2[g] * omega;
-                    // seventh = w * (df2010[g] + df2001[g]) * xigrad_dot_rw1rw2 * omega;
-                    // seventh += w * (df1110[g] + df1101[g]) * xigrad_dot_rw1rw2 * omega;
-                    // seventh += w * 2.0 * (df20001[g] + df11001[g]) * grad_dot_rw1rw2 * omega;
+                    // fifth
+                    // seventh
+                    // eighth
 
-                    // eighth = w * (df1020[g] + 2.0 * df1011[g] + df1002[g]) * xigrad_dot_rw1_xigrad_dot_rw2 * omega;
-                    // eighth += w * (df1010[g] + df1001[g]) *
-                    //           (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g]
-                    //          + xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g]
-                    //          + xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]) * omega;
-                    // eighth += w * 2.0 * (df10101[g] + df10101[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2 * omega;
-                    // eighth += w * 4.0 * df10002[g] * ngrada[g] * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2 * omega;
-                    // eighth += w * 2.0 * df10001[g] * rw1_dot_rw2 * omega;
+                    prefac = (df3000[g] + 2.0 * df2100[g] + df1200[g]) * rhow1rhow2[g]
 
-                    prefac = w * (df3000[g] + 2.0 * df2100[g] + df1200[g]) * rhow1rhow2[g]
+                             + (df2010[g] + df2001[g]) * xigrad_dot_rw1rw2
 
-                             + w * (df2010[g] + df2001[g]) * xigrad_dot_rw1rw2
+                             + (df1110[g] + df1101[g]) * xigrad_dot_rw1rw2
 
-                             + w * (df1110[g] + df1101[g]) * xigrad_dot_rw1rw2
+                             + 2.0 * (df20001[g] + df11001[g]) * grad_dot_rw1rw2
 
-                             + w * 2.0 * (df20001[g] + df11001[g]) * grad_dot_rw1rw2
+                             + (df1020[g] + 2.0 * df1011[g] + df1002[g]) * xigrad_dot_rw1_xigrad_dot_rw2
 
-                             + w * (df1020[g] + 2.0 * df1011[g] + df1002[g]) * xigrad_dot_rw1_xigrad_dot_rw2
+                             + (df1010[g] + df1001[g]) *
 
-                             + w * (df1010[g] + df1001[g]) *
+                               (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g]
 
-                                   (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g]
+                                + xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g]
 
-                                    + xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g]
+                                + xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g])
 
-                                    + xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g])
+                             + 2.0 * (df10101[g] + df10101[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2
 
-                             + w * 2.0 * (df10101[g] + df10101[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2
+                             + 4.0 * df10002[g] * ngrada[g] * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2
 
-                             + w * 4.0 * df10002[g] * ngrada[g] * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2
+                             + 2.0 * df10001[g] * rw1_dot_rw2;
 
-                             + w * 2.0 * df10001[g] * rw1_dot_rw2;
+                    gatmx += w * prefac * gdenx[atom_g];
 
-                    gatmx += prefac * gdenx[atom_g];
+                    gatmy += w * prefac * gdeny[atom_g];
 
-                    gatmy += prefac * gdeny[atom_g];
-
-                    gatmz += prefac * gdenz[atom_g];
+                    gatmz += w * prefac * gdenz[atom_g];
 
                     // contribution from \nabla_A (\nabla (\phi_mu \phi_nu))
 
@@ -3397,31 +3354,23 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                     double zcomp = 0.0;
 
-                    // ninth = w * (df2010[g] + 2.0 * df1110[g] + df0210[g]) * rhow1rhow2[g] * xigrad_dot_omega;
+                    // ninth
+                    // tenth
+                    // twelfth
 
-                    // tenth += w * (df1020[g] + df1011[g] + df0120[g] + df0111[g]) * xigrad_dot_rw1rhow2 * xigrad_dot_omega;
-                    // tenth += w * (df10101[g] + df10011[g] + df01101[g] + df0111[g]) * grad_dot_rw1rhow2 * xigrad_dot_omega;
+                    prefac = (df2010[g] + 2.0 * df1110[g] + df0210[g]) * rhow1rhow2[g]
 
-                    // twelfth += w * (df0030[g] + 2.0 * df0021[g] + df0012[g]) * xigrad_dot_rw1_xigrad_dot_rw2 * xigrad_dot_omega;
-                    // twelfth += w * (df00101[g] + df00011[g]) * xigrad_dot_omega * rw1_dot_rw2;
-                    // twelfth += w * (df00201[g] + df00111[g]) * twelthfifth_gam * xigrad_dot_omega;
-                    // twelfth += w * df00102[g] * xigrad_dot_rw1_xigrad_dot_rw2 * xigrad_dot_omega;
+                             + (df1020[g] + df1011[g] + df0120[g] + df0111[g]) * xigrad_dot_rw1rhow2
 
-                    // xigrad_dot_omega = (xigrad_x * xomega + xigrad_y * yomega + xigrad_z * zomega);
+                             + (df10101[g] + df10011[g] + df01101[g] + df0111[g]) * grad_dot_rw1rhow2
 
-                    prefac = w * (df2010[g] + 2.0 * df1110[g] + df0210[g]) * rhow1rhow2[g]
+                             + (df0030[g] + 2.0 * df0021[g] + df0012[g]) * xigrad_dot_rw1_xigrad_dot_rw2
 
-                             + w * (df1020[g] + df1011[g] + df0120[g] + df0111[g]) * xigrad_dot_rw1rhow2
+                             + (df00101[g] + df00011[g]) * rw1_dot_rw2
 
-                             + w * (df10101[g] + df10011[g] + df01101[g] + df0111[g]) * grad_dot_rw1rhow2
+                             + (df00201[g] + df00111[g]) * twelthfifth_gam
 
-                             + w * (df0030[g] + 2.0 * df0021[g] + df0012[g]) * xigrad_dot_rw1_xigrad_dot_rw2
-
-                             + w * (df00101[g] + df00011[g]) * rw1_dot_rw2
-
-                             + w * (df00201[g] + df00111[g]) * twelthfifth_gam
-
-                             + w * df00102[g] * xigrad_dot_rw1_xigrad_dot_rw2;
+                             + df00102[g] * xigrad_dot_rw1_xigrad_dot_rw2;
 
                     xcomp += prefac * xigrad_x;
 
@@ -3429,31 +3378,23 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                     zcomp += prefac * xigrad_z;
 
-                    // ninth += w * (df20001[g] + 2.0 * df11001[g] + df02001[g]) * grad_dot_omega * rhow1rhow2[g];
+                    // ninth
+                    // tenth
+                    // twelfth
 
-                    // tenth += w * (df10101[g] + df10011[g] + df01101[g] + df0111[g] + df01011[g]) * xigrad_dot_rw1rhow2 * grad_dot_omega;
-                    // tenth += w * (df10002[g] + df01002[g]) * grad_dot_rw1rhow2 * grad_dot_omega;
+                    prefac = (df20001[g] + 2.0 * df11001[g] + df02001[g]) * rhow1rhow2[g]
 
-                    // twelfth += w * df00002[g] * grad_dot_omega * rw1_dot_rw2;
-                    // twelfth += w * (df00201[g] + 2 * df00111[g] + df00021[g]) * xigrad_dot_rw1_xigrad_dot_rw2 * grad_dot_omega;
-                    // twelfth += w * (df00102[g] + df00011[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2 * grad_dot_omega;
-                    // twelfth += w * df00003[g] * ngrada[g] * ngrada[g] * grad_dot_omega;
+                             + (df10101[g] + df10011[g] + df01101[g] + df0111[g] + df01011[g]) * xigrad_dot_rw1rhow2
 
-                    // grad_dot_omega = grada_x[g] * xomega + grada_y[g] * yomega + grada_z[g] * zomega;
+                             + (df10002[g] + df01002[g]) * grad_dot_rw1rhow2
 
-                    prefac = w * (df20001[g] + 2.0 * df11001[g] + df02001[g]) * rhow1rhow2[g]
+                             + df00002[g] * rw1_dot_rw2
 
-                             + w * (df10101[g] + df10011[g] + df01101[g] + df0111[g] + df01011[g]) * xigrad_dot_rw1rhow2
+                             + (df00201[g] + 2 * df00111[g] + df00021[g]) * xigrad_dot_rw1_xigrad_dot_rw2
 
-                             + w * (df10002[g] + df01002[g]) * grad_dot_rw1rhow2
+                             + (df00102[g] + df00011[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2
 
-                             + w * df00002[g] * rw1_dot_rw2
-
-                             + w * (df00201[g] + 2 * df00111[g] + df00021[g]) * xigrad_dot_rw1_xigrad_dot_rw2
-
-                             + w * (df00102[g] + df00011[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2
-
-                             + w * df00003[g] * ngrada[g] * ngrada[g];
+                             + df00003[g] * ngrada[g] * ngrada[g];
 
                     xcomp += prefac * grada_x[g];
 
@@ -3461,11 +3402,9 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                     zcomp += prefac * grada_z[g];
 
-                    // tenth += w * (df10001[g] + df01001[g]) * omega_dot_rw1rhow2;
+                    // tenth
 
-                    // omega_dot_rw1rhow2 = xomega * rxw1rhow2[g] + yomega * ryw1rhow2[g] + zomega * rzw1rhow2[g];
-
-                    prefac = w * (df10001[g] + df01001[g]);
+                    prefac = (df10001[g] + df01001[g]);
 
                     xcomp += prefac * rxw1rhow2[g];
 
@@ -3473,12 +3412,9 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                     zcomp += prefac * rzw1rhow2[g];
 
-                    // tenth = w * (df1010[g] + df0110[g]) *
-                    //          ((xigrad_xx * rxw1rhow2[g] + xigrad_xy * ryw1rhow2[g] + xigrad_xz * rzw1rhow2[g]) * xomega
-                    //         + (xigrad_xy * rxw1rhow2[g] + xigrad_yy * ryw1rhow2[g] + xigrad_yz * rzw1rhow2[g]) * yomega
-                    //         + (xigrad_xz * rxw1rhow2[g] + xigrad_yz * ryw1rhow2[g] + xigrad_zz * rzw1rhow2[g]) * zomega);
+                    // tenth
 
-                    prefac = w * (df1010[g] + df0110[g]);
+                    prefac = (df1010[g] + df0110[g]);
 
                     xcomp += prefac * (xigrad_xx * rxw1rhow2[g] + xigrad_xy * ryw1rhow2[g] + xigrad_xz * rzw1rhow2[g]);
 
@@ -3486,23 +3422,10 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                     zcomp += prefac * (xigrad_xz * rxw1rhow2[g] + xigrad_yz * ryw1rhow2[g] + xigrad_zz * rzw1rhow2[g]);
 
-                    // twelfth = w * df0010[g] * twelthfirst;
-                    // twelthfirst = xigrad_xxx * xomega * rxw1rxw2[g] + xigrad_xxy * xomega * rxw1ryw2[g] +
-                    //               xigrad_xxz * xomega * rxw1rzw2[g] + xigrad_xxy * xomega * ryw1rxw2[g] +
-                    //               xigrad_xyy * xomega * ryw1ryw2[g] + xigrad_xyz * xomega * ryw1rzw2[g] +
-                    //               xigrad_xxz * xomega * rzw1rxw2[g] + xigrad_xyz * xomega * rzw1ryw2[g] +
-                    //               xigrad_xzz * xomega * rzw1rzw2[g] + xigrad_xxy * yomega * rxw1rxw2[g] +
-                    //               xigrad_xyy * yomega * rxw1ryw2[g] + xigrad_xyz * yomega * rxw1rzw2[g] +
-                    //               xigrad_xyy * yomega * ryw1rxw2[g] + xigrad_yyy * yomega * ryw1ryw2[g] +
-                    //               xigrad_yyz * yomega * ryw1rzw2[g] + xigrad_xyz * yomega * rzw1rxw2[g] +
-                    //               xigrad_yyz * yomega * rzw1ryw2[g] + xigrad_yzz * yomega * rzw1rzw2[g] +
-                    //               xigrad_xxz * zomega * rxw1rxw2[g] + xigrad_xyz * zomega * rxw1ryw2[g] +
-                    //               xigrad_xzz * zomega * rxw1rzw2[g] + xigrad_xyz * zomega * ryw1rxw2[g] +
-                    //               xigrad_yyz * zomega * ryw1ryw2[g] + xigrad_yzz * zomega * ryw1rzw2[g] +
-                    //               xigrad_xzz * zomega * rzw1rxw2[g] + xigrad_yzz * zomega * rzw1ryw2[g] +
-                    //               xigrad_zzz * zomega * rzw1rzw2[g];
+                    // twelfth
+                    // twelthfirst
 
-                    prefac = w * df0010[g];
+                    prefac = df0010[g];
 
                     xcomp += prefac * (xigrad_xxx * rxw1rxw2[g] + xigrad_xxy * rxw1ryw2[g] + xigrad_xxz * rxw1rzw2[g]
 
@@ -3522,40 +3445,10 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                                        + xigrad_xzz * rzw1rxw2[g] + xigrad_yzz * rzw1ryw2[g] + xigrad_zzz * rzw1rzw2[g]);
 
-                    // twelfth += w * (df0020[g] + df0011[g]) * twelthsecond;
-                    // twelfth += w * (df00101[g] + df00011[g]) * ngrada[g] * twelthsecond;
+                    // twelfth
+                    // twelthsecond
 
-                    // twelthsecond = xigrad_xx * xigrad_x * xomega * rxw1rxw2[g]
-                    //              + xigrad_xx * xigrad_y * yomega * rxw1rxw2[g]
-                    //              + xigrad_xx * xigrad_z * zomega * rxw1rxw2[g]
-                    //              + xigrad_xy * xigrad_x * xomega * rxw1ryw2[g]
-                    //              + xigrad_xy * xigrad_y * yomega * rxw1ryw2[g]
-                    //              + xigrad_xy * xigrad_z * zomega * rxw1ryw2[g]
-                    //              + xigrad_xz * xigrad_x * xomega * rxw1rzw2[g]
-                    //              + xigrad_xz * xigrad_y * yomega * rxw1rzw2[g]
-                    //              + xigrad_xz * xigrad_z * zomega * rxw1rzw2[g]
-                    //              + xigrad_xy * xigrad_x * xomega * ryw1rxw2[g]
-                    //              + xigrad_xy * xigrad_y * yomega * ryw1rxw2[g]
-                    //              + xigrad_xy * xigrad_z * zomega * ryw1rxw2[g]
-                    //              + xigrad_yy * xigrad_x * xomega * ryw1ryw2[g]
-                    //              + xigrad_yy * xigrad_y * yomega * ryw1ryw2[g]
-                    //              + xigrad_yy * xigrad_z * zomega * ryw1ryw2[g]
-                    //              + xigrad_yz * xigrad_x * xomega * ryw1rzw2[g]
-                    //              + xigrad_yz * xigrad_y * yomega * ryw1rzw2[g]
-                    //              + xigrad_yz * xigrad_z * zomega * ryw1rzw2[g]
-                    //              + xigrad_xz * xigrad_x * xomega * rzw1rxw2[g]
-                    //              + xigrad_xz * xigrad_y * yomega * rzw1rxw2[g]
-                    //              + xigrad_xz * xigrad_z * zomega * rzw1rxw2[g]
-                    //              + xigrad_yz * xigrad_x * xomega * rzw1ryw2[g]
-                    //              + xigrad_yz * xigrad_y * yomega * rzw1ryw2[g]
-                    //              + xigrad_yz * xigrad_z * zomega * rzw1ryw2[g]
-                    //              + xigrad_zz * xigrad_x * xomega * rzw1rzw2[g]
-                    //              + xigrad_zz * xigrad_y * yomega * rzw1rzw2[g]
-                    //              + xigrad_zz * xigrad_z * zomega * rzw1rzw2[g];
-
-                    prefac = w * (df0020[g] + df0011[g])
-
-                             + w * (df00101[g] + df00011[g]) * ngrada[g];
+                    prefac = (df0020[g] + df0011[g]) + (df00101[g] + df00011[g]) * ngrada[g];
 
                     xcomp += prefac * (xigrad_xx * xigrad_x * rxw1rxw2[g]
 
@@ -3611,40 +3504,10 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                                        + xigrad_zz * xigrad_z * rzw1rzw2[g]);
 
-                    // twelfth += w * (df0020[g] + df0011[g]) * twelththird;
-                    // twelfth += w * df00101[g] * ngrada[g] * twelththird;
+                    // twelfth
+                    // twelththird
 
-                    // twelththird = xigrad_xx * xigrad_x * xomega * (rxw1rxw2[g] + rxw1rxw2[g]) +
-                    //               xigrad_xx * xigrad_y * xomega * (ryw1rxw2[g] + rxw1ryw2[g]) +
-                    //               xigrad_xx * xigrad_z * xomega * (rzw1rxw2[g] + rxw1rzw2[g]) +
-                    //               xigrad_xy * xigrad_x * xomega * (rxw1ryw2[g] + ryw1rxw2[g]) +
-                    //               xigrad_xy * xigrad_y * xomega * (ryw1ryw2[g] + ryw1ryw2[g]) +
-                    //               xigrad_xy * xigrad_z * xomega * (rzw1ryw2[g] + ryw1rzw2[g]) +
-                    //               xigrad_xz * xigrad_x * xomega * (rxw1rzw2[g] + rzw1rxw2[g]) +
-                    //               xigrad_xz * xigrad_y * xomega * (ryw1rzw2[g] + rzw1ryw2[g]) +
-                    //               xigrad_xz * xigrad_z * xomega * (rzw1rzw2[g] + rzw1rzw2[g]) +
-                    //               xigrad_xy * xigrad_x * yomega * (rxw1rxw2[g] + rxw1rxw2[g]) +
-                    //               xigrad_xy * xigrad_y * yomega * (ryw1rxw2[g] + rxw1ryw2[g]) +
-                    //               xigrad_xy * xigrad_z * yomega * (rzw1rxw2[g] + rxw1rzw2[g]) +
-                    //               xigrad_yy * xigrad_x * yomega * (rxw1ryw2[g] + ryw1rxw2[g]) +
-                    //               xigrad_yy * xigrad_y * yomega * (ryw1ryw2[g] + ryw1ryw2[g]) +
-                    //               xigrad_yy * xigrad_z * yomega * (rzw1ryw2[g] + ryw1rzw2[g]) +
-                    //               xigrad_yz * xigrad_x * yomega * (rxw1rzw2[g] + rzw1rxw2[g]) +
-                    //               xigrad_yz * xigrad_y * yomega * (ryw1rzw2[g] + rzw1ryw2[g]) +
-                    //               xigrad_yz * xigrad_z * yomega * (rzw1rzw2[g] + rzw1rzw2[g]) +
-                    //               xigrad_xz * xigrad_x * zomega * (rxw1rxw2[g] + rxw1rxw2[g]) +
-                    //               xigrad_xz * xigrad_y * zomega * (ryw1rxw2[g] + rxw1ryw2[g]) +
-                    //               xigrad_xz * xigrad_z * zomega * (rzw1rxw2[g] + rxw1rzw2[g]) +
-                    //               xigrad_yz * xigrad_x * zomega * (rxw1ryw2[g] + ryw1rxw2[g]) +
-                    //               xigrad_yz * xigrad_y * zomega * (ryw1ryw2[g] + ryw1ryw2[g]) +
-                    //               xigrad_yz * xigrad_z * zomega * (rzw1ryw2[g] + ryw1rzw2[g]) +
-                    //               xigrad_zz * xigrad_x * zomega * (rxw1rzw2[g] + rzw1rxw2[g]) +
-                    //               xigrad_zz * xigrad_y * zomega * (ryw1rzw2[g] + rzw1ryw2[g]) +
-                    //               xigrad_zz * xigrad_z * zomega * (rzw1rzw2[g] + rzw1rzw2[g]);
-
-                    prefac = w * (df0020[g] + df0011[g])
-
-                             + w * df00101[g] * ngrada[g];
+                    prefac = (df0020[g] + df0011[g]) + df00101[g] * ngrada[g];
 
                     xcomp += prefac * (xigrad_xx * xigrad_x * (rxw1rxw2[g] + rxw1rxw2[g])
 
@@ -3700,40 +3563,22 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                                        + xigrad_zz * xigrad_z * (rzw1rzw2[g] + rzw1rzw2[g]));
 
-                    // twelfth += w * (df00101[g] + df00011[g]) * twelthfourth_gam;
-                    // twelfth += w * df00002[g] * ngrada[g] * twelthfourth_gam;
+                    // twelfth
                     // twelthfourth_gam =
-                    //   xigrad_x * xomega * rxw1rxw2[g] + xigrad_x * yomega * rxw1ryw2[g] + xigrad_x * zomega * rxw1rzw2[g] +
-                    //   xigrad_y * xomega * ryw1rxw2[g] + xigrad_y * yomega * ryw1ryw2[g] + xigrad_y * zomega * ryw1rzw2[g] +
-                    //   xigrad_z * xomega * rzw1rxw2[g] + xigrad_z * yomega * rzw1ryw2[g] + xigrad_z * zomega * rzw1rzw2[g];
 
-                    prefac = w * (df00101[g] + df00011[g])
+                    prefac = (df00101[g] + df00011[g]) + df00002[g] * ngrada[g];
 
-                             + w * df00002[g] * ngrada[g];
+                    xcomp += prefac * (xigrad_x * rxw1rxw2[g] + xigrad_y * ryw1rxw2[g] + xigrad_z * rzw1rxw2[g]);
 
-                    xcomp += prefac * (xigrad_x * rxw1rxw2[g]
+                    ycomp += prefac * (xigrad_x * rxw1ryw2[g] + xigrad_y * ryw1ryw2[g] + xigrad_z * rzw1ryw2[g]);
 
-                                       + xigrad_y * ryw1rxw2[g]
+                    zcomp += prefac * (xigrad_x * rxw1rzw2[g] + xigrad_y * ryw1rzw2[g] + xigrad_z * rzw1rzw2[g]);
 
-                                       + xigrad_z * rzw1rxw2[g]);
+                    gatmx += w * (xcomp * gdenxx[atom_g] + ycomp * gdenyx[atom_g] + zcomp * gdenzx[atom_g]);
 
-                    ycomp += prefac * (xigrad_x * rxw1ryw2[g]
+                    gatmy += w * (xcomp * gdenxy[atom_g] + ycomp * gdenyy[atom_g] + zcomp * gdenzy[atom_g]);
 
-                                       + xigrad_y * ryw1ryw2[g]
-
-                                       + xigrad_z * rzw1ryw2[g]);
-
-                    zcomp += prefac * (xigrad_x * rxw1rzw2[g]
-
-                                       + xigrad_y * ryw1rzw2[g]
-
-                                       + xigrad_z * rzw1rzw2[g]);
-
-                    gatmx += (xcomp * gdenxx[atom_g] + ycomp * gdenyx[atom_g] + zcomp * gdenzx[atom_g]);
-
-                    gatmy += (xcomp * gdenxy[atom_g] + ycomp * gdenyy[atom_g] + zcomp * gdenzy[atom_g]);
-
-                    gatmz += (xcomp * gdenxz[atom_g] + ycomp * gdenyz[atom_g] + zcomp * gdenzz[atom_g]);
+                    gatmz += w * (xcomp * gdenxz[atom_g] + ycomp * gdenyz[atom_g] + zcomp * gdenzz[atom_g]);
                 }
 
                 // factor of 2 from sum of alpha and beta contributions
