@@ -3064,3 +3064,139 @@ CXCNewIntegrator::_distributeSubMatrixToFock(CAOFockMatrix&              aoFockM
         }
     }
 }
+
+CDenseMatrix
+CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule&       molecule,
+                                               const CMolecularBasis& basis,
+                                               const CMolecularGrid&  molecularGrid) const
+{
+    std::string errnotpartitioned("CXCNewIntegrator.computeGtoValuesOnGridPoints: Cannot use unpartitioned molecular grid");
+
+    errors::assertMsgCritical(molecularGrid.isPartitioned(), errnotpartitioned);
+
+    auto nthreads = omp_get_max_threads();
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // memory blocks for GTOs on grid points
+
+    CDenseMatrix allgtovalues(naos, molecularGrid.getNumberOfGridPoints());
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+
+    auto ycoords = molecularGrid.getCoordinatesY();
+
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, boxdim);  // 0th order GTO derivative
+
+        // GTO values on grid points
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+        }
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if (std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues)
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            auto aoidx = aoinds[i];
+
+            std::memcpy(allgtovalues.row(aoidx) + gridblockpos, gaos.data(aoidx), npoints * sizeof(double));
+        }
+    }
+
+    // auto npoints = molecularGrid.getNumberOfGridPoints();
+    // CMemBlock2D<double> refgaos(npoints, naos);
+    // gtorec::computeGtosValuesForLDA(refgaos, gtovec, xcoords, ycoords, zcoords, 0, 0, npoints);
+    // double maxdiff = 0.0;
+    // for (int32_t i = 0; i < naos; i++)
+    // {
+    //     for (int32_t g = 0; g < npoints; g++)
+    //     {
+    //         maxdiff = std::max(maxdiff, std::fabs(refgaos.data(i)[g] - allgtovalues.row(i)[g]));
+    //     }
+    // }
+    // std::cout << "maxdiff: " << maxdiff << std::endl;
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    return allgtovalues;
+}

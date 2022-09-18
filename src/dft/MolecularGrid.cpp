@@ -554,6 +554,12 @@ CMolecularGrid::distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MP
     }
 }
 
+bool
+CMolecularGrid::isPartitioned() const
+{
+    return _isPartitioned;
+}
+
 CMemBlock<int32_t>
 CMolecularGrid::getGridPointCounts() const
 {

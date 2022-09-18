@@ -284,6 +284,13 @@ class CMolecularGrid
     void distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm);
 
     /**
+     Checks whether the molecular grid has been partitioned.
+
+     @return whether the molecular grid has been partitioned.
+     */
+    bool isPartitioned() const;
+
+    /**
      Gets the grid point counts.
 
      @return the grid point counts.

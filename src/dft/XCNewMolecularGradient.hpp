@@ -80,7 +80,8 @@ class CXCNewMolecularGradient
 
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param rwDensityMatrix the perturbed AO density matrix.
+     @param rwDensityMatrix the perturbed AO density matrix (to be contracted
+            with GTO gradient).
      @param gsDensityMatrix the ground state AO density matrix.
      @param molecularGrid the molecular grid.
      @param xcFunctional the exchange-correlation functional.
@@ -112,6 +113,20 @@ class CXCNewMolecularGradient
                                              const CMolecularGrid&   molecularGrid,
                                              const CXCFunctional&    xcFunctional) const;
 
+    /**
+     Integrates second-order LDA exchnage-correlation functional contribution
+     to molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrixOne the perturbed AO density matrix.
+     @param rwDensityMatrixTwo the perturbed AO density matrix (to be
+            contracted with GTO gradient).
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular gradient.
+     */
     CDenseMatrix _integrateFxcGradientForLDA(const CMolecule&        molecule,
                                              const CMolecularBasis&  basis,
                                              const CAODensityMatrix& rwDensityMatrixOne,
@@ -120,6 +135,20 @@ class CXCNewMolecularGradient
                                              const CMolecularGrid&   molecularGrid,
                                              const CXCFunctional&    xcFunctional) const;
 
+    /**
+     Integrates second-order GGA exchnage-correlation functional contribution
+     to molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrixOne the perturbed AO density matrix.
+     @param rwDensityMatrixTwo the perturbed AO density matrix (to be
+            contracted with GTO gradient).
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular gradient.
+     */
     CDenseMatrix _integrateFxcGradientForGGA(const CMolecule&        molecule,
                                              const CMolecularBasis&  basis,
                                              const CAODensityMatrix& rwDensityMatrixOne,
@@ -128,6 +157,20 @@ class CXCNewMolecularGradient
                                              const CMolecularGrid&   molecularGrid,
                                              const CXCFunctional&    xcFunctional) const;
 
+    /**
+     Integrates third-order LDA exchnage-correlation functional contribution to
+     molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrixOne the perturbed AO density matrix.
+     @param rwDensityMatrixTwo the perturbed AO density matrix.
+     @param gsDensityMatrix the ground state AO density matrix (to be
+            contracted with GTO gradient).
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular gradient.
+     */
     CDenseMatrix _integrateKxcGradientForLDA(const CMolecule&        molecule,
                                              const CMolecularBasis&  basis,
                                              const CAODensityMatrix& rwDensityMatrixOne,
@@ -136,6 +179,20 @@ class CXCNewMolecularGradient
                                              const CMolecularGrid&   molecularGrid,
                                              const CXCFunctional&    xcFunctional) const;
 
+    /**
+     Integrates third-order GGA exchnage-correlation functional contribution to
+     molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrixOne the perturbed AO density matrix.
+     @param rwDensityMatrixTwo the perturbed AO density matrix.
+     @param gsDensityMatrix the ground state AO density matrix (to be
+            contracted with GTO gradient).
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular gradient.
+     */
     CDenseMatrix _integrateKxcGradientForGGA(const CMolecule&        molecule,
                                              const CMolecularBasis&  basis,
                                              const CAODensityMatrix& rwDensityMatrixOne,
@@ -238,7 +295,8 @@ class CXCNewMolecularGradient
 
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param rwDensityMatrix the perturbed AO density matrix.
+     @param rwDensityMatrix the perturbed AO density matrix (to be contracted
+            with GTO gradient).
      @param gsDensityMatrix the ground state AO density matrix.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
@@ -251,6 +309,20 @@ class CXCNewMolecularGradient
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
+    /**
+     Integrates second-order exchnage-correlation functional contribution to
+     molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrixOne the perturbed AO density matrix.
+     @param rwDensityMatrixTwo the perturbed AO density matrix (to be
+            contracted with GTO gradient).
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the molecular gradient.
+     */
     CDenseMatrix integrateFxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& rwDensityMatrixOne,
@@ -259,6 +331,20 @@ class CXCNewMolecularGradient
                                       const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
+    /**
+     Integrates third-order exchnage-correlation functional contribution to
+     molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrixOne the perturbed AO density matrix.
+     @param rwDensityMatrixTwo the perturbed AO density matrix.
+     @param gsDensityMatrix the ground state AO density matrix (to be
+            contracted with GTO gradient).
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @return the molecular gradient.
+     */
     CDenseMatrix integrateKxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& rwDensityMatrixOne,

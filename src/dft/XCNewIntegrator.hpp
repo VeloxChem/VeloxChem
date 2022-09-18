@@ -518,6 +518,9 @@ class CXCNewIntegrator
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const;
 
+    CDenseMatrix computeGtoValuesOnGridPoints(const CMolecule&        molecule,
+                                              const CMolecularBasis&  basis,
+                                              const CMolecularGrid&   molecularGrid) const;
 };
 
 #endif /* XCNewIntegrator_hpp */
