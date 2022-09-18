@@ -229,8 +229,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
     CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
 
-    molgrad_threads.zero();
-
     // memory blocks for GTOs on grid points
 
     CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
@@ -396,12 +394,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         CDenseMatrix dengradz(natoms, npoints);
 
-        dengradx.zero();
-
-        dengrady.zero();
-
-        dengradz.zero();
-
         timer.stop("Density grad. grid prep.");
 
         // eq.(26), JCTC 2021, 17, 1512-1521
@@ -541,8 +533,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
     CDenseMatrix molgrad(natoms, 3);
 
-    molgrad.zero();
-
     for (int32_t iatom = 0; iatom < natoms; iatom++)
     {
         for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
@@ -591,8 +581,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
     auto natoms = molecule.getNumberOfAtoms();
 
     CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
-
-    molgrad_threads.zero();
 
     // memory blocks for GTOs on grid points
 
@@ -835,30 +823,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         CDenseMatrix dengradzz(natoms, npoints);
 
-        dengradx.zero();
-
-        dengrady.zero();
-
-        dengradz.zero();
-
-        dengradxx.zero();
-
-        dengradxy.zero();
-
-        dengradxz.zero();
-
-        dengradyx.zero();
-
-        dengradyy.zero();
-
-        dengradyz.zero();
-
-        dengradzx.zero();
-
-        dengradzy.zero();
-
-        dengradzz.zero();
-
         timer.stop("Density grad. grid prep.");
 
         // eq.(26), JCTC 2021, 17, 1512-1521
@@ -1083,8 +1047,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
     CDenseMatrix molgrad(natoms, 3);
 
-    molgrad.zero();
-
     for (int32_t iatom = 0; iatom < natoms; iatom++)
     {
         for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
@@ -1134,8 +1096,6 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
     auto natoms = molecule.getNumberOfAtoms();
 
     CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
-
-    molgrad_threads.zero();
 
     // memory blocks for GTOs on grid points
 
@@ -1306,12 +1266,6 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
         CDenseMatrix dengradz(natoms, npoints);
 
-        dengradx.zero();
-
-        dengrady.zero();
-
-        dengradz.zero();
-
         timer.stop("Density grad. grid prep.");
 
         // eq.(26), JCTC 2021, 17, 1512-1521
@@ -1459,8 +1413,6 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
     CDenseMatrix molgrad(natoms, 3);
 
-    molgrad.zero();
-
     for (int32_t iatom = 0; iatom < natoms; iatom++)
     {
         for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
@@ -1510,8 +1462,6 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
     auto natoms = molecule.getNumberOfAtoms();
 
     CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
-
-    molgrad_threads.zero();
 
     // memory blocks for GTOs on grid points
 
@@ -1759,30 +1709,6 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
         CDenseMatrix dengradzy(natoms, npoints);
 
         CDenseMatrix dengradzz(natoms, npoints);
-
-        dengradx.zero();
-
-        dengrady.zero();
-
-        dengradz.zero();
-
-        dengradxx.zero();
-
-        dengradxy.zero();
-
-        dengradxz.zero();
-
-        dengradyx.zero();
-
-        dengradyy.zero();
-
-        dengradyz.zero();
-
-        dengradzx.zero();
-
-        dengradzy.zero();
-
-        dengradzz.zero();
 
         timer.stop("Density grad. grid prep.");
 
@@ -2159,8 +2085,6 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
     CDenseMatrix molgrad(natoms, 3);
 
-    molgrad.zero();
-
     for (int32_t iatom = 0; iatom < natoms; iatom++)
     {
         for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
@@ -2210,8 +2134,6 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
     auto natoms = molecule.getNumberOfAtoms();
 
     CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
-
-    molgrad_threads.zero();
 
     // memory blocks for GTOs on grid points
 
@@ -2418,12 +2340,6 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
         CDenseMatrix dengradz(natoms, npoints);
 
-        dengradx.zero();
-
-        dengrady.zero();
-
-        dengradz.zero();
-
         timer.stop("Density grad. grid prep.");
 
         // eq.(26), JCTC 2021, 17, 1512-1521
@@ -2572,8 +2488,6 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
     CDenseMatrix molgrad(natoms, 3);
 
-    molgrad.zero();
-
     for (int32_t iatom = 0; iatom < natoms; iatom++)
     {
         for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
@@ -2623,8 +2537,6 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
     auto natoms = molecule.getNumberOfAtoms();
 
     CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
-
-    molgrad_threads.zero();
 
     // memory blocks for GTOs on grid points
 
@@ -2908,30 +2820,6 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
         CDenseMatrix dengradzy(natoms, npoints);
 
         CDenseMatrix dengradzz(natoms, npoints);
-
-        dengradx.zero();
-
-        dengrady.zero();
-
-        dengradz.zero();
-
-        dengradxx.zero();
-
-        dengradxy.zero();
-
-        dengradxz.zero();
-
-        dengradyx.zero();
-
-        dengradyy.zero();
-
-        dengradyz.zero();
-
-        dengradzx.zero();
-
-        dengradzy.zero();
-
-        dengradzz.zero();
 
         timer.stop("Density grad. grid prep.");
 
@@ -3606,8 +3494,6 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
     std::cout << timer.getSummary() << std::endl;
 
     CDenseMatrix molgrad(natoms, 3);
-
-    molgrad.zero();
 
     for (int32_t iatom = 0; iatom < natoms; iatom++)
     {

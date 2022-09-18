@@ -42,8 +42,6 @@ generateDensityGridForLDA(const int32_t       npoints,
 {
     CDensityGrid dengrid(npoints, 1, xcFunType, dengrid::ab);
 
-    dengrid.zero();
-
     auto rhoa = dengrid.alphaDensity(0);
 
     auto rhob = dengrid.betaDensity(0);
@@ -109,8 +107,6 @@ generateDensityGridForLDA(const int32_t           npoints,
     auto numdens = densityMatrix.getNumberOfDensityMatrices();
 
     CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
-
-    dengrid.zero();
 
     for (int32_t idens = 0; idens < numdens; idens++)
     {
@@ -181,8 +177,6 @@ generateDensityGridForGGA(const int32_t       npoints,
                           CMultiTimer&        timer)
 {
     CDensityGrid dengrid(npoints, 1, xcFunType, dengrid::ab);
-
-    dengrid.zero();
 
     auto rhoa = dengrid.alphaDensity(0);
 
@@ -300,8 +294,6 @@ generateDensityGridForGGA(const int32_t           npoints,
     auto numdens = densityMatrix.getNumberOfDensityMatrices();
 
     CDensityGrid dengrid(npoints, numdens, xcFunType, dengrid::ab);
-
-    dengrid.zero();
 
     for (int32_t idens = 0; idens < numdens; idens++)
     {
