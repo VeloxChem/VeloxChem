@@ -346,7 +346,7 @@ def main():
             scf_drv.update_settings(scf_dict, method_dict)
             scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-            mol_orbs = scf_drv.mol_orbs
+            mol_orbs = scf_drv.molecular_orbitals
             density = scf_drv.density
             scf_tensors = scf_drv.scf_tensors
 
@@ -464,11 +464,9 @@ def main():
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
-        if not rsp_prop.converged():
-            return
 
-        if task.mpi_rank == mpi_master():
-            rsp_prop.print_property(task.ostream)
+        if not rsp_prop.is_converged:
+            return
 
         # Calculate the excited-state gradient
 

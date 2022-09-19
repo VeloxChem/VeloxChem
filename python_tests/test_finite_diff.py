@@ -54,8 +54,8 @@ class TestFiniteDifference:
                               scf_drv_minus.scf_tensors)
 
         if is_mpi_master(task.mpi_comm):
-            e_scf_plus = scf_drv_plus.get_scf_energy()
-            e_scf_minus = scf_drv_minus.get_scf_energy()
+            e_scf_plus = scf_drv_plus.scf_energy
+            e_scf_minus = scf_drv_minus.scf_energy
             mu_z_fd = -(e_scf_plus - e_scf_minus) / (2.0 * delta_ef)
             mu_z = scf_prop.get_property('dipole moment')[cart]
             assert abs(mu_z_fd - mu_z) < 1.0e-6

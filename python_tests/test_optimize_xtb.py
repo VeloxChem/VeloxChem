@@ -1,15 +1,17 @@
 from pathlib import Path
+
 import numpy as np
 import pytest
-
-from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import bohr_in_angstroms
 from veloxchem.mpitask import MpiTask
+from veloxchem.optimizationdriver import OptimizationDriver
+from veloxchem.veloxchemlib import bohr_in_angstroms, is_mpi_master
 from veloxchem.xtbdriver import XTBDriver
 from veloxchem.xtbgradientdriver import XTBGradientDriver
-from veloxchem.optimizationdriver import OptimizationDriver
+
+from .addons import using_xtb
 
 
+@using_xtb
 @pytest.mark.filterwarnings(
     'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestOptimizeXTB:
@@ -27,6 +29,7 @@ class TestOptimizeXTB:
         opt_drv.update_settings({
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
+            'keep_files': 'no',
         })
         opt_mol = opt_drv.compute(task.molecule)
 
@@ -42,8 +45,6 @@ class TestOptimizeXTB:
             if logfile.is_file():
                 logfile.unlink()
 
-    @pytest.mark.skipif(not XTBDriver().is_available(),
-                        reason='xtb not available')
     def test_nh3(self):
 
         here = Path(__file__).parent

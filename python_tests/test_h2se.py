@@ -60,8 +60,7 @@ class TestH2Se:
 
         if is_mpi_master(task.mpi_comm):
             s2 = scf_unrest_drv.compute_s2(task.molecule,
-                                           scf_unrest_drv.scf_tensors['S'],
-                                           scf_unrest_drv.mol_orbs)
+                                           scf_unrest_drv.scf_tensors)
             assert abs(0.7619 - s2) < 1.0e-4
 
         task.finish()

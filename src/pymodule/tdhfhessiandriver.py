@@ -209,7 +209,7 @@ class TdhfHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_drv._is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
@@ -221,7 +221,7 @@ class TdhfHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_drv._is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
@@ -245,7 +245,7 @@ class TdhfHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_drv._is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
@@ -256,7 +256,7 @@ class TdhfHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_drv._is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
@@ -267,7 +267,7 @@ class TdhfHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_drv._is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
@@ -278,7 +278,7 @@ class TdhfHessianDriver(HessianDriver):
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
                     scf_tensors = self.scf_drv.scf_tensors
-                    rsp_drv.is_converged = False  # only needed for RPA
+                    rsp_drv._is_converged = False  # only needed for RPA
                     rsp_results = rsp_drv.compute(new_mol, ao_basis,
                                                        scf_tensors)
                     grad_drv.compute(new_mol, ao_basis, rsp_drv, rsp_results)
@@ -299,7 +299,7 @@ class TdhfHessianDriver(HessianDriver):
         #self.ostream.print_blank()
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
-        rsp_drv.is_converged = False
+        rsp_drv._is_converged = False
         rsp_results = rsp_drv.compute(molecule, ao_basis, self.scf_drv.scf_tensors)
         self.elec_energy = (self.scf_drv.get_scf_energy()
                            + rsp_results['eigenvalues'][self.state_deriv_index])

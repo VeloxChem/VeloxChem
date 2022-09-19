@@ -89,7 +89,7 @@ class GradientDriver:
         self.numerical = False
         self.do_four_point = False
 
-        self.dft = False
+        self._dft = False
         self.grid_level = 4
         self.xcfun = None
 
@@ -115,12 +115,12 @@ class GradientDriver:
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = (key in ['yes', 'y'])
+            self._dft = (key in ['yes', 'y'])
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
-                self.dft = True
+                self._dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Gradient driver: Undefined XC functional')

@@ -81,7 +81,7 @@ class Absorption(ResponseProperty):
             The absorption property.
         """
 
-        return self.rsp_property[key]
+        return self._rsp_property[key]
 
     def print_property(self, ostream):
         """
@@ -93,24 +93,25 @@ class Absorption(ResponseProperty):
 
         spin_str = 'S'
 
-        self.print_transition_dipoles(
+        self._print_transition_dipoles(
             ostream, spin_str,
             'Electric Transition Dipole Moments (dipole length, a.u.)',
-            self.rsp_property['electric_transition_dipoles'])
+            self._rsp_property['electric_transition_dipoles'])
 
-        self.print_transition_dipoles(
+        self._print_transition_dipoles(
             ostream, spin_str,
             'Electric Transition Dipole Moments (dipole velocity, a.u.)',
-            self.rsp_property['velocity_transition_dipoles'])
+            self._rsp_property['velocity_transition_dipoles'])
 
-        self.print_transition_dipoles(
+        self._print_transition_dipoles(
             ostream, spin_str, 'Magnetic Transition Dipole Moments (a.u.)',
-            self.rsp_property['magnetic_transition_dipoles'])
+            self._rsp_property['magnetic_transition_dipoles'])
 
-        self.print_absorption(ostream, spin_str, 'One-Photon Absorption')
-        self.print_ecd(ostream, spin_str, 'Electronic Circular Dichroism')
+        self._print_absorption(ostream, spin_str, 'One-Photon Absorption')
+        self._print_ecd(ostream, spin_str, 'Electronic Circular Dichroism')
 
-    def print_transition_dipoles(self, ostream, spin_str, title, trans_dipoles):
+    def _print_transition_dipoles(self, ostream, spin_str, title,
+                                  trans_dipoles):
         """
         Prints transition dipole moments to output stream.
 
@@ -136,7 +137,7 @@ class Absorption(ResponseProperty):
             ostream.print_header(valstr.ljust(92))
         ostream.print_blank()
 
-    def print_absorption(self, ostream, spin_str, title):
+    def _print_absorption(self, ostream, spin_str, title):
         """
         Prints absorption to output stream.
 
@@ -151,16 +152,16 @@ class Absorption(ResponseProperty):
         valstr = title
         ostream.print_header(valstr.ljust(92))
         ostream.print_header(('-' * len(valstr)).ljust(92))
-        for s, e in enumerate(self.rsp_property['eigenvalues']):
+        for s, e in enumerate(self._rsp_property['eigenvalues']):
             valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
             valstr += '{:15.8f} a.u. '.format(e)
             valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
-            f = self.rsp_property['oscillator_strengths'][s]
+            f = self._rsp_property['oscillator_strengths'][s]
             valstr += '    Osc.Str. {:9.4f}'.format(f)
             ostream.print_header(valstr.ljust(92))
         ostream.print_blank()
 
-    def print_ecd(self, ostream, spin_str, title):
+    def _print_ecd(self, ostream, spin_str, title):
         """
         Prints electronic circular dichroism to output stream.
 
@@ -175,7 +176,7 @@ class Absorption(ResponseProperty):
         valstr = title
         ostream.print_header(valstr.ljust(92))
         ostream.print_header(('-' * len(valstr)).ljust(92))
-        for s, R in enumerate(self.rsp_property['rotatory_strengths']):
+        for s, R in enumerate(self._rsp_property['rotatory_strengths']):
             valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
             valstr += '    Rot.Str. '
             valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'

@@ -150,7 +150,7 @@ class ScfGradientDriver(GradientDriver):
                     2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_hcore) +
                     2.0 * np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp))
 
-                if self.dft:
+                if self._dft:
                     if self.xcfun.is_hybrid():
                         frac_K = self.xcfun.get_frac_exact_exchange()
                     else:
@@ -164,7 +164,7 @@ class ScfGradientDriver(GradientDriver):
                     'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
 
         # Add the xc contribution
-        if self.dft:
+        if self._dft:
             density = self.scf_drv.density
             xcfun_label = self.scf_drv.xcfun.get_func_label()
 

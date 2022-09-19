@@ -156,15 +156,6 @@ CXTBDriver::isMasterNode() const
     return _locRank == mpi::master(); 
 }
 
-bool 
-CXTBDriver::isAvailable() const 
-{
-#ifdef ENABLE_XTB
-    return true;
-#endif
-    return false; 
-}
-
 bool
 CXTBDriver::getState() const
 {

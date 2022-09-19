@@ -23,7 +23,8 @@ class TestOptimizeSCF:
 
         if is_mpi_master(task.mpi_comm):
             task.ao_basis = MolecularBasis.read(task.molecule,
-                                                basis_label.upper())
+                                                basis_label.upper(),
+                                                ostream=None)
         else:
             task.ao_basis = MolecularBasis()
         task.ao_basis.broadcast(task.mpi_rank, task.mpi_comm)
@@ -41,6 +42,7 @@ class TestOptimizeSCF:
         opt_drv.update_settings({
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
+            'keep_files': 'no',
         })
         opt_mol = opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 

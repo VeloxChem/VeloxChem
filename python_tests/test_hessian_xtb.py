@@ -1,18 +1,18 @@
 from pathlib import Path
-import numpy as np
-import h5py
-import pytest
 
-from veloxchem.veloxchemlib import is_mpi_master
+import h5py
+import numpy as np
 from veloxchem.mpitask import MpiTask
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.xtbdriver import XTBDriver
 from veloxchem.xtbhessiandriver import XTBHessianDriver
+
+from .addons import using_xtb
 
 
 class TestXTBHessianDriver:
 
-    @pytest.mark.skipif(not XTBDriver().is_available(),
-                        reason='xtb not available')
+    @using_xtb
     def test_xtb_hessian_driver(self):
 
         here = Path(__file__).parent
@@ -28,6 +28,7 @@ class TestXTBHessianDriver:
         xtb_drv.compute(task.molecule, task.ostream)
 
         xtb_hessian_drv = XTBHessianDriver(xtb_drv)
+        xtb_hessian_drv.ostream.state = False
         xtb_hessian_drv.compute(task.molecule)
 
         if is_mpi_master(task.mpi_comm):

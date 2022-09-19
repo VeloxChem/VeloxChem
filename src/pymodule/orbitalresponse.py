@@ -75,7 +75,7 @@ class OrbitalResponse:
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
         self.iter_count = 0
-        self.is_converged = False
+        self._is_converged = False
 
         # MPI information
         self.comm = comm
@@ -83,7 +83,7 @@ class OrbitalResponse:
         self.nodes = self.comm.Get_size()
 
         # DFT information
-        self.dft = False
+        self._dft = False
         self.grid_level = 4
         self.xcfun = XCFunctional()
 
@@ -153,12 +153,12 @@ class OrbitalResponse:
         # DFT
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key in ['yes', 'y'] else False
+            self._dft = True if key in ['yes', 'y'] else False
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
-                self.dft = True
+                self._dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Orbital response solver: Undefined XC functional')
@@ -191,7 +191,7 @@ class OrbitalResponse:
         """
 
         # generate integration grid
-        if self.dft:
+        if self._dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
@@ -251,7 +251,7 @@ class OrbitalResponse:
 
         # DFT information
 
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # set start time
 
@@ -352,7 +352,7 @@ class OrbitalResponse:
 
         fock_lambda = AOFockMatrix(ao_density_lambda)
         fock_flag = fockmat.rgenjk
-        if self.dft:
+        if self._dft:
             if self.xcfun.is_hybrid():
                 fock_flag = fockmat.rgenjkx
                 fact_xc = self.xcfun.get_frac_exact_exchange()
@@ -367,7 +367,7 @@ class OrbitalResponse:
                                     self.eri_thresh, molecule, basis)
         eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
                         screening)
-        if self.dft:
+        if self._dft:
             if not self.xcfun.is_hybrid():
                 fock_lambda.scale(2.0, 0)
             xc_drv = XCIntegrator(self.comm)
@@ -526,7 +526,7 @@ class OrbitalResponse:
         # Create a Fock Matrix Object (initialized with zeros)
         fock_lambda = AOFockMatrix(ao_density_lambda)
         fock_flag = fockmat.rgenjk
-        if self.dft:
+        if self._dft:
             if self.xcfun.is_hybrid():
                 fock_flag = fockmat.rgenjkx
                 fact_xc = self.xcfun.get_frac_exact_exchange()
@@ -556,7 +556,7 @@ class OrbitalResponse:
 
             eri_drv.compute(fock_lambda, ao_density_lambda, molecule, basis,
                             screening)
-            if self.dft:
+            if self._dft:
                 #t0 = tm.time()
                 if not self.xcfun.is_hybrid():
                     fock_lambda.scale(2.0, 0)
@@ -625,7 +625,7 @@ class OrbitalResponse:
                                                 atol=0,
                                                 maxiter=self.max_iter)
 
-        self.is_converged = (cg_conv == 0)
+        self._is_converged = (cg_conv == 0)
 
         return lambda_multipliers.reshape(nocc, nvir)
 

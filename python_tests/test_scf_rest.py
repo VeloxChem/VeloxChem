@@ -1,24 +1,19 @@
-from mpi4py import MPI
 from pathlib import Path
-import numpy as np
-import pytest
-import sys
-try:
-    import cppe
-except ImportError:
-    pass
 
-from veloxchem.veloxchemlib import ElectronRepulsionIntegralsDriver
-from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import denmat
-from veloxchem.outputstream import OutputStream
-from veloxchem.mpitask import MpiTask
+import numpy as np
+from mpi4py import MPI
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.aofockmatrix import AOFockMatrix
+from veloxchem.firstorderprop import FirstOrderProperties
+from veloxchem.mpitask import MpiTask
+from veloxchem.outputstream import OutputStream
+from veloxchem.qqscheme import get_qq_scheme
 from veloxchem.scfdriver import ScfDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.firstorderprop import FirstOrderProperties
-from veloxchem.qqscheme import get_qq_scheme
+from veloxchem.veloxchemlib import (ElectronRepulsionIntegralsDriver, denmat,
+                                    is_mpi_master)
+
+from .addons import using_cppe
 
 
 class TestScfRestricted:
@@ -144,7 +139,7 @@ class TestScfRestricted:
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_scf_hf_pe(self):
 
         here = Path(__file__).parent
@@ -160,7 +155,7 @@ class TestScfRestricted:
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
-    @pytest.mark.skipif('cppe' not in sys.modules, reason='cppe not available')
+    @using_cppe
     def test_scf_dft_pe(self):
 
         here = Path(__file__).parent
@@ -194,7 +189,7 @@ class TestScfRestricted:
         screening = eri_drv.compute(get_qq_scheme('QQ_DEN'), 1.0e-12, mol, bas)
 
         solver = ScfDriver(task.mpi_comm, task.ostream)
-        solver.comp_2e_fock_split_comm(fock, dens, mol, bas, screening)
+        solver._comp_2e_fock_split_comm(fock, dens, mol, bas, screening)
 
         assert fock.alpha_to_numpy(0).shape == dmat.shape
 
@@ -216,7 +211,6 @@ class TestScfRestricted:
 
         method_dict = {
             'dispersion': True,
-            'dft': True,
             'grid_level': 5,
             'electric_field': (0, -0.002, 0.001),
             'use_split_comm': True,

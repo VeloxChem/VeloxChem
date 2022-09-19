@@ -52,20 +52,6 @@ compHostDistancesPQ(      BufferHostMY<T, 3>&                rDistancesPQ,
                     const int32_t                            braPrimGto,
                     const int32_t                            ketPrimGto) -> void
 {
-    // set up dimentsions
-    
-    const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
-    
-    const auto ncpairs = ePosition - bPosition;
-    
-    // set up pointers to R(PQ) = P - Q distances
-           
-    auto pqx = rDistancesPQ.data(0);
-           
-    auto pqy = rDistancesPQ.data(1);
-           
-    auto pqz = rDistancesPQ.data(2);
-
     // compute R(PQ) distances
     
     if (braPrimGto == ketPrimGto)
@@ -74,6 +60,20 @@ compHostDistancesPQ(      BufferHostMY<T, 3>&                rDistancesPQ,
     }
     else
     {
+        // set up dimentsions
+        
+        const auto nppairs = gtoPairBlock->getNumberOfPrimPairs();
+        
+        const auto ncpairs = ePosition - bPosition;
+        
+        // set up pointers to R(PQ) = P - Q distances
+               
+        auto pqx = rDistancesPQ.data(0);
+               
+        auto pqy = rDistancesPQ.data(1);
+               
+        auto pqz = rDistancesPQ.data(2);
+        
         // set up pointers to P center coordinates
             
         auto rpx = gtoPairBlock->getCoordinatesPX();

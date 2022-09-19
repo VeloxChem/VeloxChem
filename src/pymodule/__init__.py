@@ -41,6 +41,7 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
+from .veloxchemlib import XCIntegrator
 
 # C++ functions
 from .veloxchemlib import available_functionals
@@ -58,6 +59,7 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import extinction_coefficient_from_beta
 from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import mathconst_pi
+from .veloxchemlib import parse_xc_func
 
 # C++ enums
 from .veloxchemlib import denmat
@@ -133,16 +135,17 @@ from .numerovdriver import NumerovDriver
 from .errorhandler import assert_msg_critical
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+from .features import print_features
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
 from .import_from_pyscf import eri_deriv
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
-from .environ import set_vlxbasispath, set_omp_num_threads, get_basis_path, configure_mkl_rt
+from .environ import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
+                      configure_mkl_rt)
 
 set_vlxbasispath()
 set_omp_num_threads()
 configure_mkl_rt()
-
 
 __version__ = "1.0rc2"

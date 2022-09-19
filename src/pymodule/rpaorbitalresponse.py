@@ -115,7 +115,7 @@ class RpaOrbitalResponse(OrbitalResponse):
             # 2) Construct the right-hand side
             dm_ao_rhs = AODensityMatrix([unrel_dm_ao, xpy_ao, xmy_ao],
                                         denmat.rest)
-            if self.dft:
+            if self._dft:
                 # 3) Construct density matrices for E[3] term:
                 # XCIntegrator expects a DM with real and imaginary part,
                 # so we set the imaginary part to zero.
@@ -128,7 +128,7 @@ class RpaOrbitalResponse(OrbitalResponse):
                                               denmat.rest)
         else:
             dm_ao_rhs = AODensityMatrix()
-            if self.dft:
+            if self._dft:
                 perturbed_dm_ao = AODensityMatrix()
                 zero_dm_ao =  AODensityMatrix()
 
@@ -141,7 +141,7 @@ class RpaOrbitalResponse(OrbitalResponse):
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 1)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 2)
-        if self.dft:
+        if self._dft:
             perturbed_dm_ao.broadcast(self.rank, self.comm)
             zero_dm_ao.broadcast(self.rank, self.comm)
             # Fock matrix for computing the TDDFT E[3] term g^xc
@@ -171,7 +171,7 @@ class RpaOrbitalResponse(OrbitalResponse):
                                     self.eri_thresh, molecule, basis)
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
-        if self.dft:
+        if self._dft:
             if not self.xcfun.is_hybrid():
                 for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
                     fock_ao_rhs.scale(2.0, ifock)
@@ -215,7 +215,7 @@ class RpaOrbitalResponse(OrbitalResponse):
                 [mo_occ.T, sdp_pds, mo_vir])
 
             # Add TDDFT E[3] contribution to the RHS:
-            if self.dft:
+            if self._dft:
                 gxc_ao = fock_gxc_ao.alpha_to_numpy(0)
                 gxc_mo = np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
                 rhs_mo += 0.25 * gxc_mo

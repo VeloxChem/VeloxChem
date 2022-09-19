@@ -43,7 +43,7 @@ class TestXCMolGrad:
         """
 
         molecule = Molecule.read_str(mol_str, units='angstrom')
-        basis = MolecularBasis.read(molecule, 'def2-svp')
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         xcfun = 'slater'
 
         ref_grad = np.array([
@@ -63,7 +63,7 @@ class TestXCMolGrad:
         """
 
         molecule = Molecule.read_str(mol_str, units='angstrom')
-        basis = MolecularBasis.read(molecule, 'def2-svp')
+        basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         xcfun = 'blyp'
 
         ref_grad = np.array([

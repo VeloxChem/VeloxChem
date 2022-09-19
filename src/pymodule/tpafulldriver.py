@@ -261,7 +261,7 @@ class TPAFullDriver(TPADriver):
         """
 
         if self.rank == mpi_master():
-            self.print_fock_header()
+            self._print_fock_header()
 
         keys = [
             'f_sig_xx',
@@ -299,12 +299,13 @@ class TPAFullDriver(TPADriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        None, None, density_list, 'tpa')
+        dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                         'real_and_imag', None, None,
+                                         density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
-        self.print_fock_time(total_time_fock)
+        self._print_fock_time(total_time_fock)
 
         focks = {'F0': F0_a}
         for key in keys:
@@ -372,7 +373,7 @@ class TPAFullDriver(TPADriver):
                 fo['F123_z'][w].data,
             ]).T.copy()
 
-            vec_pack = self.collect_vectors_in_columns(vec_pack)
+            vec_pack = self._collect_vectors_in_columns(vec_pack)
 
             if self.rank != mpi_master():
                 continue
@@ -564,6 +565,8 @@ class TPAFullDriver(TPADriver):
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
 
+        self._is_converged = (self._is_converged and N_total_drv.is_converged)
+
         kXY_dict = N_total_results['kappas']
         FXY_2_dict = N_total_results['focks']
 
@@ -615,7 +618,7 @@ class TPAFullDriver(TPADriver):
                 Fock['f_lamtau_yz'][w].data,
             ]).T.copy()
 
-            vec_pack = self.collect_vectors_in_columns(vec_pack)
+            vec_pack = self._collect_vectors_in_columns(vec_pack)
 
             if self.rank != mpi_master():
                 continue
@@ -646,13 +649,13 @@ class TPAFullDriver(TPADriver):
 
             # BD σ gradients #
 
-            xi_xx = self.xi(kx, kx, f_x, f_x, F0)
-            xi_yy = self.xi(ky, ky, f_y, f_y, F0)
-            xi_zz = self.xi(kz, kz, f_z, f_z, F0)
+            xi_xx = self._xi(kx, kx, f_x, f_x, F0)
+            xi_yy = self._xi(ky, ky, f_y, f_y, F0)
+            xi_zz = self._xi(kz, kz, f_z, f_z, F0)
 
-            x2_xx = self.x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
-            x2_yy = self.x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
-            x2_zz = self.x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
+            x2_xx = self._x2_contract(kx.T, mu_x, d_a_mo, nocc, norb)
+            x2_yy = self._x2_contract(ky.T, mu_y, d_a_mo, nocc, norb)
+            x2_zz = self._x2_contract(kz.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_sig_xx', w), 2 * w)
             mat = (3 * xi_xx + xi_yy + xi_zz + 0.5 * f_sig_xx).T
@@ -673,38 +676,38 @@ class TPAFullDriver(TPADriver):
             xy_dict[key] -= (x2_xx + x2_yy + 3 * x2_zz)
 
             key = (('N_sig_xy', w), 2 * w)
-            mat = (self.xi(ky, kx, f_y, f_x, F0) +
-                   self.xi(kx, ky, f_x, f_y, F0) + 0.5 * f_sig_xy).T
+            mat = (self._xi(ky, kx, f_y, f_x, F0) +
+                   self._xi(kx, ky, f_x, f_y, F0) + 0.5 * f_sig_xy).T
             xy_dict[key] = self.anti_sym(
                 -LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
 
             key = (('N_sig_xz', w), 2 * w)
-            mat = (self.xi(kz, kx, f_z, f_x, F0) +
-                   self.xi(kx, kz, f_x, f_z, F0) + 0.5 * f_sig_xz).T
+            mat = (self._xi(kz, kx, f_z, f_x, F0) +
+                   self._xi(kx, kz, f_x, f_z, F0) + 0.5 * f_sig_xz).T
             xy_dict[key] = self.anti_sym(
                 -LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_sig_yz', w), 2 * w)
-            mat = (self.xi(kz, ky, f_z, f_y, F0) +
-                   self.xi(ky, kz, f_y, f_z, F0) + 0.5 * f_sig_yz).T
+            mat = (self._xi(kz, ky, f_z, f_y, F0) +
+                   self._xi(ky, kz, f_y, f_z, F0) + 0.5 * f_sig_yz).T
             xy_dict[key] = self.anti_sym(
                 -LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
 
             # BC CD λ+τ gradients #
 
-            xi_xx = self.xi(kx_, kx, f_x_, f_x, F0)
-            xi_yy = self.xi(ky_, ky, f_y_, f_y, F0)
-            xi_zz = self.xi(kz_, kz, f_z_, f_z, F0)
+            xi_xx = self._xi(kx_, kx, f_x_, f_x, F0)
+            xi_yy = self._xi(ky_, ky, f_y_, f_y, F0)
+            xi_zz = self._xi(kz_, kz, f_z_, f_z, F0)
 
-            x2_xx_ = self.x2_contract(kx_.T, mu_x, d_a_mo, nocc, norb)
-            x2_yy_ = self.x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb)
-            x2_zz_ = self.x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb)
+            x2_xx_ = self._x2_contract(kx_.T, mu_x, d_a_mo, nocc, norb)
+            x2_yy_ = self._x2_contract(ky_.T, mu_y, d_a_mo, nocc, norb)
+            x2_zz_ = self._x2_contract(kz_.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_lamtau_xx', w), 0)
             mat = (6 * xi_xx + 2 * xi_yy + 2 * xi_zz + 0.5 * f_lamtau_xx).T
@@ -728,34 +731,34 @@ class TPAFullDriver(TPADriver):
             xy_dict[key] -= (x2_xx + x2_yy + 3 * x2_zz)
 
             key = (('N_lamtau_xy', w), 0)
-            mat = (2 * self.xi(ky_, kx, f_y_, f_x, F0) +
-                   2 * self.xi(kx_, ky, f_x_, f_y, F0) + 0.5 * f_lamtau_xy).T
+            mat = (2 * self._xi(ky_, kx, f_y_, f_x, F0) +
+                   2 * self._xi(kx_, ky, f_x_, f_y, F0) + 0.5 * f_lamtau_xy).T
             xy_dict[key] = self.anti_sym(
                 -LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= self.x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(ky_.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(kx_.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(ky.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kx.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(ky_.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kx_.T, mu_y, d_a_mo, nocc, norb)
 
             key = (('N_lamtau_xz', w), 0)
-            mat = (2 * self.xi(kz_, kx, f_z_, f_x, F0) +
-                   2 * self.xi(kx_, kz, f_x_, f_z, F0) + 0.5 * f_lamtau_xz).T
+            mat = (2 * self._xi(kz_, kx, f_z_, f_x, F0) +
+                   2 * self._xi(kx_, kz, f_x_, f_z, F0) + 0.5 * f_lamtau_xz).T
             xy_dict[key] = self.anti_sym(
                 -LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= self.x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(kz_.T, mu_x, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(kx_.T, mu_z, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kz.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kx.T, mu_z, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kz_.T, mu_x, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kx_.T, mu_z, d_a_mo, nocc, norb)
 
             key = (('N_lamtau_yz', w), 0)
-            mat = (2 * self.xi(kz_, ky, f_z_, f_y, F0) +
-                   2 * self.xi(ky_, kz, f_y_, f_z, F0) + 0.5 * f_lamtau_yz).T
+            mat = (2 * self._xi(kz_, ky, f_z_, f_y, F0) +
+                   2 * self._xi(ky_, kz, f_y_, f_z, F0) + 0.5 * f_lamtau_yz).T
             xy_dict[key] = self.anti_sym(
                 -LinearSolver.lrmat2vec(mat, nocc, norb))
-            xy_dict[key] -= self.x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(kz_.T, mu_y, d_a_mo, nocc, norb)
-            xy_dict[key] -= self.x2_contract(ky_.T, mu_z, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kz.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(ky.T, mu_z, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(kz_.T, mu_y, d_a_mo, nocc, norb)
+            xy_dict[key] -= self._x2_contract(ky_.T, mu_z, d_a_mo, nocc, norb)
 
         return xy_dict
 
@@ -925,7 +928,7 @@ class TPAFullDriver(TPADriver):
         """
 
         if self.rank == mpi_master():
-            self.print_fock_header()
+            self._print_fock_header()
 
         keys = ['F123_x', 'F123_y', 'F123_z']
 
@@ -945,12 +948,13 @@ class TPAFullDriver(TPADriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self.comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        None, None, density_list, 'tpa')
+        dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                         'real_and_imag', None, None,
+                                         density_list, 'tpa')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
-        self.print_fock_time(total_time_fock)
+        self._print_fock_time(total_time_fock)
 
         focks = {}
         for key in keys:
@@ -1020,7 +1024,7 @@ class TPAFullDriver(TPADriver):
                 fo2['F123_z'][w].data,
             ]).T.copy()
 
-            vec_pack = self.collect_vectors_in_columns(vec_pack)
+            vec_pack = self._collect_vectors_in_columns(vec_pack)
 
             if self.rank != mpi_master():
                 continue
@@ -1083,19 +1087,19 @@ class TPAFullDriver(TPADriver):
 
             # x
 
-            zeta_sig_xx = self.xi(k_x_, k_sig_xx, f_x_, f_sig_xx, F0_a)
-            zeta_sig_yy = self.xi(k_x_, k_sig_yy, f_x_, f_sig_yy, F0_a)
-            zeta_sig_zz = self.xi(k_x_, k_sig_zz, f_x_, f_sig_zz, F0_a)
+            zeta_sig_xx = self._xi(k_x_, k_sig_xx, f_x_, f_sig_xx, F0_a)
+            zeta_sig_yy = self._xi(k_x_, k_sig_yy, f_x_, f_sig_yy, F0_a)
+            zeta_sig_zz = self._xi(k_x_, k_sig_zz, f_x_, f_sig_zz, F0_a)
 
-            zeta_sig_xy = self.xi(k_y_, k_sig_xy, f_y_, f_sig_xy, F0_a)
-            zeta_sig_xz = self.xi(k_z_, k_sig_xz, f_z_, f_sig_xz, F0_a)
+            zeta_sig_xy = self._xi(k_y_, k_sig_xy, f_y_, f_sig_xy, F0_a)
+            zeta_sig_xz = self._xi(k_z_, k_sig_xz, f_z_, f_sig_xz, F0_a)
 
-            zeta_lamtau_xx = self.xi(k_x, k_lamtau_xx, f_x, f_lamtau_xx, F0_a)
-            zeta_lamtau_yy = self.xi(k_x, k_lamtau_yy, f_x, f_lamtau_yy, F0_a)
-            zeta_lamtau_zz = self.xi(k_x, k_lamtau_zz, f_x, f_lamtau_zz, F0_a)
+            zeta_lamtau_xx = self._xi(k_x, k_lamtau_xx, f_x, f_lamtau_xx, F0_a)
+            zeta_lamtau_yy = self._xi(k_x, k_lamtau_yy, f_x, f_lamtau_yy, F0_a)
+            zeta_lamtau_zz = self._xi(k_x, k_lamtau_zz, f_x, f_lamtau_zz, F0_a)
 
-            zeta_lamtau_xy = self.xi(k_y, k_lamtau_xy, f_y, f_lamtau_xy, F0_a)
-            zeta_lamtau_xz = self.xi(k_z, k_lamtau_xz, f_z, f_lamtau_xz, F0_a)
+            zeta_lamtau_xy = self._xi(k_y, k_lamtau_xy, f_y, f_lamtau_xy, F0_a)
+            zeta_lamtau_xz = self._xi(k_z, k_lamtau_xz, f_z, f_lamtau_xz, F0_a)
 
             X_terms = (zeta_sig_xx + zeta_sig_xy +
                        zeta_sig_xz).T + (zeta_lamtau_xx + zeta_lamtau_xy +
@@ -1106,13 +1110,13 @@ class TPAFullDriver(TPADriver):
 
             # y
 
-            zeta_sig_yx = self.xi(k_x_, k_sig_xy, f_x_, f_sig_xy, F0_a)
-            zeta_sig_yy = self.xi(k_y_, k_sig_yy, f_y_, f_sig_yy, F0_a)
-            zeta_sig_yz = self.xi(k_z_, k_sig_yz, f_z_, f_sig_yz, F0_a)
+            zeta_sig_yx = self._xi(k_x_, k_sig_xy, f_x_, f_sig_xy, F0_a)
+            zeta_sig_yy = self._xi(k_y_, k_sig_yy, f_y_, f_sig_yy, F0_a)
+            zeta_sig_yz = self._xi(k_z_, k_sig_yz, f_z_, f_sig_yz, F0_a)
 
-            zeta_lamtau_yx = self.xi(k_x, k_lamtau_xy, f_x, f_lamtau_xy, F0_a)
-            zeta_lamtau_yy = self.xi(k_y, k_lamtau_yy, f_y, f_lamtau_yy, F0_a)
-            zeta_lamtau_yz = self.xi(k_z, k_lamtau_yz, f_z, f_lamtau_yz, F0_a)
+            zeta_lamtau_yx = self._xi(k_x, k_lamtau_xy, f_x, f_lamtau_xy, F0_a)
+            zeta_lamtau_yy = self._xi(k_y, k_lamtau_yy, f_y, f_lamtau_yy, F0_a)
+            zeta_lamtau_yz = self._xi(k_z, k_lamtau_yz, f_z, f_lamtau_yz, F0_a)
 
             Y_terms = (zeta_sig_yx + zeta_sig_yy +
                        zeta_sig_yz).T + (zeta_lamtau_yx + zeta_lamtau_yy +
@@ -1123,13 +1127,13 @@ class TPAFullDriver(TPADriver):
 
             # z
 
-            zeta_sig_zx = self.xi(k_x_, k_sig_xz, f_x_, f_sig_xz, F0_a)
-            zeta_sig_zy = self.xi(k_y_, k_sig_yz, f_y_, f_sig_yz, F0_a)
-            zeta_sig_zz = self.xi(k_z_, k_sig_zz, f_z_, f_sig_zz, F0_a)
+            zeta_sig_zx = self._xi(k_x_, k_sig_xz, f_x_, f_sig_xz, F0_a)
+            zeta_sig_zy = self._xi(k_y_, k_sig_yz, f_y_, f_sig_yz, F0_a)
+            zeta_sig_zz = self._xi(k_z_, k_sig_zz, f_z_, f_sig_zz, F0_a)
 
-            zeta_lamtau_zx = self.xi(k_x, k_lamtau_xz, f_x, f_lamtau_xz, F0_a)
-            zeta_lamtau_zy = self.xi(k_y, k_lamtau_yz, f_y, f_lamtau_yz, F0_a)
-            zeta_lamtau_zz = self.xi(k_z, k_lamtau_zz, f_z, f_lamtau_zz, F0_a)
+            zeta_lamtau_zx = self._xi(k_x, k_lamtau_xz, f_x, f_lamtau_xz, F0_a)
+            zeta_lamtau_zy = self._xi(k_y, k_lamtau_yz, f_y, f_lamtau_yz, F0_a)
+            zeta_lamtau_zz = self._xi(k_z, k_lamtau_zz, f_z, f_lamtau_zz, F0_a)
 
             Z_terms = (zeta_sig_zx + zeta_sig_zy +
                        zeta_sig_zz).T + (zeta_lamtau_zx + zeta_lamtau_zy +
@@ -1355,21 +1359,27 @@ class TPAFullDriver(TPADriver):
 
         # Na X[3]NyNz
 
-        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kc, kd, B, da, nocc, norb))
-        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kd, kc, B, da, nocc, norb))
-        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kd, kb, C, da, nocc, norb))
-        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kb, kd, C, da, nocc, norb))
-        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kb, kc, D, da, nocc, norb))
-        na_x3_ny_nz -= np.dot(Na.T, self.x3_contract(kc, kb, D, da, nocc, norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kc, kd, B, da, nocc,
+                                                      norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kd, kc, B, da, nocc,
+                                                      norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kd, kb, C, da, nocc,
+                                                      norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kb, kd, C, da, nocc,
+                                                      norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kb, kc, D, da, nocc,
+                                                      norb))
+        na_x3_ny_nz -= np.dot(Na.T, self._x3_contract(kc, kb, D, da, nocc,
+                                                      norb))
 
         # NaA[3]NxNy
 
-        na_a3_nx_ny += np.dot(self.a3_contract(kb, kc, A, da, nocc, norb), Nd)
-        na_a3_nx_ny += np.dot(self.a3_contract(kb, kd, A, da, nocc, norb), Nc)
-        na_a3_nx_ny += np.dot(self.a3_contract(kc, kb, A, da, nocc, norb), Nd)
-        na_a3_nx_ny += np.dot(self.a3_contract(kc, kd, A, da, nocc, norb), Nb)
-        na_a3_nx_ny += np.dot(self.a3_contract(kd, kb, A, da, nocc, norb), Nc)
-        na_a3_nx_ny += np.dot(self.a3_contract(kd, kc, A, da, nocc, norb), Nb)
+        na_a3_nx_ny += np.dot(self._a3_contract(kb, kc, A, da, nocc, norb), Nd)
+        na_a3_nx_ny += np.dot(self._a3_contract(kb, kd, A, da, nocc, norb), Nc)
+        na_a3_nx_ny += np.dot(self._a3_contract(kc, kb, A, da, nocc, norb), Nd)
+        na_a3_nx_ny += np.dot(self._a3_contract(kc, kd, A, da, nocc, norb), Nb)
+        na_a3_nx_ny += np.dot(self._a3_contract(kd, kb, A, da, nocc, norb), Nc)
+        na_a3_nx_ny += np.dot(self._a3_contract(kd, kc, A, da, nocc, norb), Nb)
 
         return {
             'key': (w, -w, w),
@@ -1578,9 +1588,9 @@ class TPAFullDriver(TPADriver):
         kC = -inp_dict['kC_kB'].T.conj()  # gets kC from kB
         kD = inp_dict['kD']
 
-        s4_term -= w1 * self.s4(kB, kC, kD, D0, nocc, norb)
-        s4_term -= w2 * self.s4(kC, kB, kD, D0, nocc, norb)
-        s4_term -= w3 * self.s4(kD, kB, kC, D0, nocc, norb)
+        s4_term -= w1 * self._s4(kB, kC, kD, D0, nocc, norb)
+        s4_term -= w2 * self._s4(kC, kB, kD, D0, nocc, norb)
+        s4_term -= w3 * self._s4(kD, kB, kC, D0, nocc, norb)
 
         if self.damping > 0:
             kA = inp_dict['kA']
@@ -1600,17 +1610,17 @@ class TPAFullDriver(TPADriver):
             Nd_h = self.flip_xy(Nd)
 
             r4_term += 1j * self.damping * np.dot(
-                Nd_h, self.s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
+                Nd_h, self._s4_for_r4(kA.T, kB, kC, D0, nocc, norb))
             r4_term += 1j * self.damping * np.dot(
-                Nc_h, self.s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
+                Nc_h, self._s4_for_r4(kA.T, kB, kD, D0, nocc, norb))
             r4_term += 1j * self.damping * np.dot(
-                Nd_h, self.s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
+                Nd_h, self._s4_for_r4(kA.T, kC, kB, D0, nocc, norb))
             r4_term += 1j * self.damping * np.dot(
-                Nb_h, self.s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
+                Nb_h, self._s4_for_r4(kA.T, kC, kD, D0, nocc, norb))
             r4_term += 1j * self.damping * np.dot(
-                Nc_h, self.s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
+                Nc_h, self._s4_for_r4(kA.T, kD, kB, D0, nocc, norb))
             r4_term += 1j * self.damping * np.dot(
-                Nb_h, self.s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
+                Nb_h, self._s4_for_r4(kA.T, kD, kC, D0, nocc, norb))
 
         return {
             's4_key': s4_key,
@@ -1660,13 +1670,13 @@ class TPAFullDriver(TPADriver):
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_header(('-' * len(title)).ljust(width))
 
-            self.print_component('T3', w, t3_dict[w, -w, w], width)
-            self.print_component('T4', w, t4_dict[w, -w, w], width)
-            self.print_component('X2', w, NaX2Nyz[w, -w, w], width)
-            self.print_component('X3', w, NaX3NyNz[w, -w, w], width)
-            self.print_component('A2', w, NxA2Nyz[w, -w, w], width)
-            self.print_component('A3', w, NaA3NxNy[w, -w, w], width)
-            self.print_component('gamma', w, gamma[w, -w, w], width)
+            self._print_component('T3', w, t3_dict[w, -w, w], width)
+            self._print_component('T4', w, t4_dict[w, -w, w], width)
+            self._print_component('X2', w, NaX2Nyz[w, -w, w], width)
+            self._print_component('X3', w, NaX3NyNz[w, -w, w], width)
+            self._print_component('A2', w, NxA2Nyz[w, -w, w], width)
+            self._print_component('A3', w, NaA3NxNy[w, -w, w], width)
+            self._print_component('gamma', w, gamma[w, -w, w], width)
 
             self.ostream.print_blank()
 

@@ -2016,7 +2016,7 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
                                  charge=molecule.get_charge())
 
     if scfdrv is not None:
-        if scfdrv.dft:
+        if scfdrv._dft:
             pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
             # set functional, convergence threshold and grid level 
             pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
@@ -2071,7 +2071,7 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
     x_frac = 1.0
 
     if scfdrv is not None:
-        if scfdrv.dft:
+        if scfdrv._dft:
             ## import vxc derivative for partial derivative of Kohn-Sham matrix
             ## This version does not work!
             ## vxc_deriv_2 corresponds to:

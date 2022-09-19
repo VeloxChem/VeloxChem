@@ -37,7 +37,7 @@
 #
 #   CXXFLAGS
 
-option(ENABLE_ARCH_FLAGS "Enable architecture-specific compiler flags" ON)
+option_with_print(ENABLE_ARCH_FLAGS "Enable architecture-specific compiler flags" ON)
 
 # code needs C++17 at least
 set(CMAKE_CXX_STANDARD 17)
@@ -46,6 +46,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS FALSE)
 # generate a JSON database of compiler commands (useful for LSP IDEs)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
+# position-independent code
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+# visibility levels
+set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
+set(CMAKE_VISIBILITY_INLINES_HIDDEN TRUE)
 
 set(ARCH_FLAG "")
 if(ENABLE_ARCH_FLAGS)

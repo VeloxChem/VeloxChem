@@ -299,7 +299,7 @@ namespace gtorec {  // gtorec namespace
                              const int32_t        gridBlockPosition,
                              const int32_t        nGridPoints)
     {
-        int idx = 0;
+        int32_t idx = 0;
 
         // local copy of GTOs containers
 

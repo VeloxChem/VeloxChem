@@ -89,10 +89,9 @@ class C6(ResponseProperty):
             The C6 property.
         """
 
-        return self.rsp_property[key]
+        return self._rsp_property[key]
 
-    @staticmethod
-    def integrate(rsp_property, imagfreqs, points, weights, w0):
+    def integrate(self, imagfreqs, points, weights, w0):
         """
         Calculates the C6 value with a Gauss-Legendre quadrature for the
         integral in the Casimir-Polder relation using integration by
@@ -115,12 +114,12 @@ class C6(ResponseProperty):
 
         for iw in range(len(imagfreqs)):
 
-            Gxx = rsp_property['response_functions'][('x', 'x',
-                                                      imagfreqs[iw])].real
-            Gyy = rsp_property['response_functions'][('y', 'y',
-                                                      imagfreqs[iw])].real
-            Gzz = rsp_property['response_functions'][('z', 'z',
-                                                      imagfreqs[iw])].real
+            Gxx = self._rsp_property['response_functions'][('x', 'x',
+                                                            imagfreqs[iw])].real
+            Gyy = self._rsp_property['response_functions'][('y', 'y',
+                                                            imagfreqs[iw])].real
+            Gzz = self._rsp_property['response_functions'][('z', 'z',
+                                                            imagfreqs[iw])].real
 
             alpha = -(Gxx + Gyy + Gzz) / 3.0
             point = points[iw]
@@ -149,11 +148,11 @@ class C6(ResponseProperty):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        w0 = float(self.rsp_dict['w0'])
+        w0 = float(self._rsp_dict['w0'])
         points = np.polynomial.legendre.leggauss(int(
-            self.rsp_dict['n_points']))[0]
-        weights = np.polynomial.legendre.leggauss(int(
-            self.rsp_dict['n_points']))[1]
+            self._rsp_dict['n_points']))[0]
+        weights = np.polynomial.legendre.leggauss(
+            int(self._rsp_dict['n_points']))[1]
         imagfreqs = [w0 * (1 - t) / (1 + t) for t in points]
         printfreqs = np.append(imagfreqs, 0.0)
 
@@ -163,9 +162,9 @@ class C6(ResponseProperty):
             ostream.print_header(title.ljust(width))
             ostream.print_header(('-' * len(title)).ljust(width))
 
-            for a in self.rsp_dict['a_components']:
-                for b in self.rsp_dict['b_components']:
-                    prop = self.rsp_property['response_functions'][(a, b, iw)]
+            for a in self._rsp_dict['a_components']:
+                for b in self._rsp_dict['b_components']:
+                    prop = self._rsp_property['response_functions'][(a, b, iw)]
                     ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
                         a.lower(), b.lower(), iw)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
@@ -173,7 +172,7 @@ class C6(ResponseProperty):
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
 
-        title = self.rsp_driver.prop_str()
+        title = self._rsp_driver.get_prop_str()
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
@@ -184,13 +183,13 @@ class C6(ResponseProperty):
         ostream.print_header(title.ljust(width))
         ostream.print_blank()
 
-        c6 = self.integrate(self.rsp_property, imagfreqs, points, weights, w0)
+        c6 = self.integrate(imagfreqs, points, weights, w0)
 
         # Static polarizability
 
-        Gxx_i0 = self.rsp_property['response_functions'][('x', 'x', 0.0)].real
-        Gyy_i0 = self.rsp_property['response_functions'][('y', 'y', 0.0)].real
-        Gzz_i0 = self.rsp_property['response_functions'][('z', 'z', 0.0)].real
+        Gxx_i0 = self._rsp_property['response_functions'][('x', 'x', 0.0)].real
+        Gyy_i0 = self._rsp_property['response_functions'][('y', 'y', 0.0)].real
+        Gzz_i0 = self._rsp_property['response_functions'][('z', 'z', 0.0)].real
 
         alpha_i0 = -(Gxx_i0 + Gyy_i0 + Gzz_i0) / 3.0
 

@@ -84,6 +84,12 @@ struct type_to_mpi_datatype<std::size_t>
 };
 
 template <>
+struct type_to_mpi_datatype<float>
+{
+    inline const static MPI_Datatype value{MPI_FLOAT};
+};
+
+template <>
 struct type_to_mpi_datatype<double>
 {
     inline const static MPI_Datatype value{MPI_DOUBLE};
@@ -122,6 +128,12 @@ template <>
 struct type_to_string<std::size_t>
 {
     inline const static std::string name{"std::size_t"};
+};
+
+template <>
+struct type_to_string<float>
+{
+    inline const static std::string name{"float"};
 };
 
 template <>

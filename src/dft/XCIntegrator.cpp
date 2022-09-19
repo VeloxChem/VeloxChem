@@ -7445,3 +7445,87 @@ CXCIntegrator::_getReducedRestrictedGradient(const CXCGradientGrid* xcGradientGr
 
     return ggrid;
 }
+
+double CXCIntegrator::integratePdft(const CAODensityMatrix& aoDensityMatrix,
+                                    double*                 twoDM,
+                                    double*                 activeMOs,
+                                    int32_t                 nActive,
+                                    const CMolecule&        molecule,
+                                    const CMolecularBasis&  basis,
+                                    const CMolecularGrid&   molecularGrid,
+                                    const std::string&      xcFuncLabel) const
+{
+    CAOKohnShamMatrix ksmat;
+
+    // integrator handles single AO density only
+
+    double xc_energy=0.0;
+
+    if (aoDensityMatrix.getNumberOfDensityMatrices() == 1)
+    {   
+        // parse exchange-correlation functional data
+
+        auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+        
+        // create GTOs container
+        
+        CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+        
+        // generate reference density grid
+        
+        CDensityGridDriver dgdrv(_locComm);
+        
+	    auto refdengrid = dgdrv.generatePdftGrid(aoDensityMatrix, twoDM, activeMOs, nActive, molecule, basis, molecularGrid, fvxc.getFunctionalType());
+
+        // generate screened molecular and density grids
+
+        CMolecularGrid mgridab(molecularGrid);
+
+        CMolecularGrid mgrida(molecularGrid);
+
+        CMolecularGrid mgridb(molecularGrid);
+
+        CDensityGrid dgridab;
+
+        CDensityGrid dgrida;
+
+        CDensityGrid dgridb;
+
+        // screen the molecular and density grids 
+
+        refdengrid.getScreenedGridPairUnrestricted(dgridab, dgrida, dgridb, mgridab, mgrida, mgridb,
+                                                   0, _thresholdOfDensity, fvxc.getFunctionalType());
+
+        // allocate XC gradient grid
+
+        CXCGradientGrid vxcgridab(mgridab.getNumberOfGridPoints(), dgridab.getDensityGridType(), fvxc.getFunctionalType());
+
+        CXCGradientGrid vxcgrida(mgrida.getNumberOfGridPoints(), dgrida.getDensityGridType(), fvxc.getFunctionalType());
+
+        CXCGradientGrid vxcgridb(mgridb.getNumberOfGridPoints(), dgridb.getDensityGridType(), fvxc.getFunctionalType());
+
+        // compute exchange-correlation functional first derrivatives
+
+        fvxc.compute(vxcgridab, dgridab);
+
+        fvxc.compute(vxcgrida, dgrida);
+
+        fvxc.compute(vxcgridb, dgridb);
+
+        // Compute correlation energy
+
+        auto xcdata = _compEnergyAndDensityUnrestricted(vxcgrida, dgrida, mgrida);
+
+        auto xcdatb = _compEnergyAndDensityUnrestricted(vxcgridb, dgridb, mgridb);
+
+        auto xcdatab = _compEnergyAndDensityUnrestricted(vxcgridab, dgridab, mgridab);
+
+        xc_energy = std::get<0>(xcdata) + std::get<0>(xcdatb) + std::get<0>(xcdatab);
+
+        // delete GTOs container
+        
+        delete gtovec;
+    }
+
+    return xc_energy;
+}

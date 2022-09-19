@@ -1,7 +1,7 @@
 monkey:deploy:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f51f706
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-0a3283e
   stage: deploy
   variables:
     TARBALL: "veloxchem.tar.bz2"

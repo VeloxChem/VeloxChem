@@ -4,7 +4,6 @@ add_library(vlxobjs OBJECT)
 
 target_compile_definitions(vlxobjs
   PUBLIC
-    # TODO should probably be namespaced, like VLX_HAS_MPI or similar
     $<BUILD_INTERFACE:ENABLE_MPI=$<BOOL:$<TARGET_EXISTS:MPI::MPI_CXX>>>
     $<BUILD_INTERFACE:VLX_ALIGN=${VLX_ALIGN}>
   )
@@ -49,11 +48,6 @@ target_link_libraries(vlxobjs
     Math::LA
   )
 
-set_target_properties(vlxobjs
-  PROPERTIES
-    POSITION_INDEPENDENT_CODE 1
-  )
-
 add_subdirectory(device)
 add_subdirectory(dft)
 add_subdirectory(dftfuncs)
@@ -70,10 +64,10 @@ add_subdirectory(oneints_lmom)
 add_subdirectory(oneints_npot)
 add_subdirectory(oneints_ovl)
 add_subdirectory(orbdata)
+add_subdirectory(pymodule)
+add_subdirectory(python)
 add_subdirectory(response)
 add_subdirectory(specfunc)
 add_subdirectory(twoints)
 add_subdirectory(visualization)
 add_subdirectory(xtb)
-add_subdirectory(pymodule)
-add_subdirectory(python)

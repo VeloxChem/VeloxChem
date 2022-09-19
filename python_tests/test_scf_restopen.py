@@ -14,7 +14,9 @@ class TestScfRestrictedOpenShell:
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
-        task.ao_basis = MolecularBasis.read(task.molecule, basis_label)
+        task.ao_basis = MolecularBasis.read(task.molecule,
+                                            basis_label,
+                                            ostream=None)
 
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
@@ -43,15 +45,18 @@ class TestScfRestrictedOpenShell:
             ('heh.inp', None, 'def2-svp', -3.34847190869),
             ('heh.inp', 'slater', 'def2-svp', -3.166481549682),
             ('heh.inp', 'b3lyp', 'def2-svp', -3.404225946805),
+            ('water_triplet.inp', None, 'def2-svp', -75.701357737185),
+            ('water_triplet.inp', 'slater', 'def2-svp', -74.8660271496),
+            ('water_triplet.inp', 'slda', 'def2-svp', -75.6935516775),
             ('water_triplet.inp', 'blyp', 'def2-svp', -76.055256325587),
             ('water_triplet.inp', 'b3lyp', 'def2-svp', -76.074465451578),
             ('water_triplet.inp', 'b3lyp', 'aug-cc-pvdz', -76.176630915242),
         ],
         ids=[
             'Li', 'ClH2', 'H3O', 'CH5', 'HeH', 'HeH-Slater', 'HeH-B3LYP',
-            'H2O-BLYP', 'H2O-B3LYP', 'H2O-B3LYP-aDZ'
+            'H2O-HF', 'H2O-SLATER', 'H2O-SLDA', 'H2O-BLYP', 'H2O-B3LYP',
+            'H2O-B3LYP-aDZ'
         ],
-        # TODO: add H2O-SLDA test
     )
     def test_scf(self, inpfile, xcfun_label, basis_label, ref_e_scf):
 

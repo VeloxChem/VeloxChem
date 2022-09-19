@@ -89,7 +89,7 @@ class CircularDichroismSpectrum(ResponseProperty):
             The response functions or solutions.
         """
 
-        return self.rsp_property[key]
+        return self._rsp_property[key]
 
     def get_spectrum(self):
         """
@@ -102,15 +102,15 @@ class CircularDichroismSpectrum(ResponseProperty):
 
         spectrum = []
 
-        freqs = parse_seq_range(self.rsp_dict['frequencies'])
+        freqs = parse_seq_range(self._rsp_dict['frequencies'])
 
         for w in freqs:
             if w == 0.0:
                 continue
 
-            Gxx = -self.rsp_property['response_functions'][('x', 'x', w)].imag
-            Gyy = -self.rsp_property['response_functions'][('y', 'y', w)].imag
-            Gzz = -self.rsp_property['response_functions'][('z', 'z', w)].imag
+            Gxx = -self._rsp_property['response_functions'][('x', 'x', w)].imag
+            Gyy = -self._rsp_property['response_functions'][('y', 'y', w)].imag
+            Gzz = -self._rsp_property['response_functions'][('z', 'z', w)].imag
 
             Gxx /= w
             Gyy /= w
@@ -138,7 +138,7 @@ class CircularDichroismSpectrum(ResponseProperty):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        freqs = parse_seq_range(self.rsp_dict['frequencies'])
+        freqs = parse_seq_range(self._rsp_dict['frequencies'])
 
         for w in freqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
@@ -146,9 +146,9 @@ class CircularDichroismSpectrum(ResponseProperty):
             ostream.print_header(title.ljust(width))
             ostream.print_header(('-' * len(title)).ljust(width))
 
-            for a in self.rsp_dict['a_components']:
-                for b in self.rsp_dict['b_components']:
-                    prop = self.rsp_property['response_functions'][(a, b, w)]
+            for a in self._rsp_dict['a_components']:
+                for b in self._rsp_dict['b_components']:
+                    prop = self._rsp_property['response_functions'][(a, b, w)]
                     ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
                         a.lower(), b.lower(), w)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
@@ -156,7 +156,7 @@ class CircularDichroismSpectrum(ResponseProperty):
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
 
-        title = self.rsp_driver.prop_str()
+        title = self._rsp_driver.get_prop_str()
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()

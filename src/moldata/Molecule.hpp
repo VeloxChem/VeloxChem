@@ -395,7 +395,7 @@ class CMolecule
      Gets coordination number of specific atom in molecule.
 
      @param iAtom the index of requested atom.
-     @param raddius the effective coordination radius.
+     @param radius the effective coordination radius.
      @return the coordination number of atom.
     */
     int32_t getCoordinationNummber(const int32_t iAtom,

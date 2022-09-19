@@ -82,4 +82,4 @@ class SHG(ResponseProperty):
             The response functions or solutions.
         """
 
-        return self.rsp_property[key]
+        return self._rsp_property[key]

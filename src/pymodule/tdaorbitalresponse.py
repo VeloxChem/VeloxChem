@@ -106,7 +106,7 @@ class TdaOrbitalResponse(OrbitalResponse):
             # 2) Construct the right-hand side
             dm_ao_rhs = AODensityMatrix([unrel_dm_ao, exc_vec_ao], denmat.rest)
 
-            if self.dft:
+            if self._dft:
                 # 3) Construct density matrices for E[3] term:
                 # XCIntegrator expects a DM with real and imaginary part,
                 # so we set the imaginary part to zero.
@@ -119,7 +119,7 @@ class TdaOrbitalResponse(OrbitalResponse):
                                               denmat.rest)
         else:
             dm_ao_rhs = AODensityMatrix()
-            if self.dft:
+            if self._dft:
                 perturbed_dm_ao = AODensityMatrix()
                 zero_dm_ao =  AODensityMatrix()
 
@@ -132,7 +132,7 @@ class TdaOrbitalResponse(OrbitalResponse):
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
         fock_ao_rhs.set_fock_type(fockmat.rgenjk, 1)
 
-        if self.dft:
+        if self._dft:
             perturbed_dm_ao.broadcast(self.rank, self.comm)
             zero_dm_ao.broadcast(self.rank, self.comm)
             # Fock matrix for computing gxc
@@ -162,7 +162,7 @@ class TdaOrbitalResponse(OrbitalResponse):
                                     self.eri_thresh, molecule, basis)
 
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
-        if self.dft:
+        if self._dft:
             if not self.xcfun.is_hybrid():
                 fock_ao_rhs.scale(2.0, 0)
                 fock_ao_rhs.scale(2.0, 1)
@@ -198,7 +198,7 @@ class TdaOrbitalResponse(OrbitalResponse):
                 [mo_occ.T, sdp_pds, mo_vir])
 
             # Add DFT E[3] contribution to the RHS:
-            if self.dft:
+            if self._dft:
                 gxc_ao = fock_gxc_ao.alpha_to_numpy(0)
                 gxc_mo = np.linalg.multi_dot([mo_occ.T, gxc_ao, mo_vir])
                 rhs_mo += 0.25 * gxc_mo

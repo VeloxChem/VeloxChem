@@ -25,7 +25,7 @@ class TestTddftXCgrad:
         basis_set_label = 'def2-svp'
 
         molecule = Molecule.read_str(molecule_string, units='au')
-        basis = MolecularBasis.read(molecule, basis_set_label)
+        basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         # SCF
 

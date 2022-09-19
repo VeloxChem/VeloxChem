@@ -138,7 +138,7 @@ class HessianDriver:
         self.memory_tracing = False
 
         # DFT
-        self.dft = False
+        self._dft = False
 
 
     def update_settings(self, method_dict, freq_dict=None):
@@ -181,14 +181,14 @@ class HessianDriver:
         if 'xcfun' in method_dict:
             if method_dict['xcfun'] is not None:
                 #self.numerical = True
-                self.dft = True
+                self._dft = True
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = True if key in ['yes', 'y'] else False
+            self._dft = True if key in ['yes', 'y'] else False
             #if key in ['yes', 'y']:
                 #self.numerical = True
 
-        if self.dft:
+        if self._dft:
             self.ostream.print_blank()
             warn_msg = '*** Warning: Analytical Hessian is '
             warn_msg += 'not yet fully implemented for DFT methods.'

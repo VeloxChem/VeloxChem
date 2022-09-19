@@ -93,7 +93,7 @@ class ScfHessianDriver(HessianDriver):
         self.conv_thresh = 1.0e-4
         self.max_iter = 50
         self.iter_count = 0
-        self.is_converged = False
+        self._is_converged = False
 
         self.frequency = 0.0
 
@@ -259,7 +259,6 @@ class ScfHessianDriver(HessianDriver):
                     mu_plus = prop.get_property('dipole moment')
 
                 if self.do_raman:
-                    lr_drv.is_converged = False
                     lr_results_p = lr_drv.compute(new_mol, ao_basis,
                                                   self.scf_drv.scf_tensors)
 
@@ -275,7 +274,6 @@ class ScfHessianDriver(HessianDriver):
                     mu_minus = prop.get_property('dipole moment')
 
                 if self.do_raman:
-                    lr_drv.is_converged = False
                     lr_results_m = lr_drv.compute(new_mol, ao_basis,
                                                   self.scf_drv.scf_tensors)
                     if self.rank == mpi_master():
@@ -418,7 +416,7 @@ class ScfHessianDriver(HessianDriver):
         frac_K = 1.0
 
         # DFT:
-        if self.dft:
+        if self._dft:
             if self.scf_drv.xcfun.is_hybrid():
                 frac_K = self.scf_drv.xcfun.get_frac_exact_exchange()
             else:
@@ -458,7 +456,7 @@ class ScfHessianDriver(HessianDriver):
         self.hessian = ( hessian_first_order_derivatives + hessian_2nd_order_derivatives
                        + hessian_nuclear_nuclear ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
-        if self.dft:
+        if self._dft:
             self.hessian += hessian_dft_xc.transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
         # Calculate the gradient of the dipole moment, needed for IR intensities
@@ -833,7 +831,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_plus = prop.get_property('dipole moment')
 
                     if self.do_raman:
-                        lr_drv.is_converged = False
+                        lr_drv._is_converged = False
                         lr_results_p = lr_drv.compute(new_mol, ao_basis,
                                                       self.scf_drv.scf_tensors)
 
@@ -848,7 +846,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_minus = prop.get_property('dipole moment')
 
                     if self.do_raman:
-                        lr_drv.is_converged = False
+                        lr_drv._is_converged = False
                         lr_results_m = lr_drv.compute(new_mol, ao_basis,
                                                            self.scf_drv.scf_tensors)
                         for aop in range(3):
@@ -881,7 +879,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_plus1 = prop.get_property('dipole moment')
 
                     if self.do_raman:
-                        lr_drv.is_converged = False
+                        lr_drv._is_converged = False
                         lr_results_p1 = lr_drv.compute(new_mol, ao_basis,
                                                            self.scf_drv.scf_tensors)
 
@@ -895,7 +893,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_plus2 = prop.get_property('dipole moment')
 
                     if self.do_raman:
-                        lr_drv.is_converged = False
+                        lr_drv._is_converged = False
                         lr_results_p2 = lr_drv.compute(new_mol, ao_basis,
                                                            self.scf_drv.scf_tensors)
 
@@ -909,7 +907,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_minus1 = prop.get_property('dipole moment')
 
                     if self.do_raman:
-                        lr_drv.is_converged = False
+                        lr_drv._is_converged = False
                         lr_results_m1 = lr_drv.compute(new_mol, ao_basis,
                                                            self.scf_drv.scf_tensors)
 
@@ -923,7 +921,7 @@ class ScfHessianDriver(HessianDriver):
                     mu_minus2 = prop.get_property('dipole moment')
 
                     if self.do_raman:
-                        lr_drv.is_converged = False
+                        lr_drv._is_converged = False
                         lr_results_m2 = lr_drv.compute(new_mol, ao_basis,
                                                            self.scf_drv.scf_tensors)
 

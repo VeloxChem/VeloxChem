@@ -230,7 +230,7 @@ class TdhfGradientDriver(GradientDriver):
                 self.gradient[i] += 1.0 * np.einsum('mn,xmn->x', 2.0 * omega_ao,
                                                     d_ovlp)
 
-                if self.dft:
+                if self._dft:
                     if self.xcfun.is_hybrid():
                         frac_K = self.xcfun.get_frac_exact_exchange()
                     else:
@@ -253,7 +253,7 @@ class TdhfGradientDriver(GradientDriver):
                 self.gradient[i] += -0.5 * frac_K * np.einsum(
                     'mn,pt,xtnmp->x', xmy, xmy + xmy.T, d_eri)
 
-        if self.dft:
+        if self._dft:
             xcfun_label = self.scf_drv.xcfun.get_func_label()
 
             if self.rank == mpi_master():
@@ -346,7 +346,7 @@ class TdhfGradientDriver(GradientDriver):
         self.scf_drv.compute(molecule, basis, min_basis)
         scf_tensors = self.scf_drv.scf_tensors
 
-        rsp_drv.is_converged = False  # needed by RPA
+        rsp_drv._is_converged = False  # needed by RPA
         rsp_results = rsp_drv.compute(molecule, basis, scf_tensors)
 
         if self.rank == mpi_master():
@@ -392,14 +392,14 @@ class TdhfGradientDriver(GradientDriver):
             self.scf_drv.electric_field = field
             self.scf_drv.compute(molecule, ao_basis, min_basis)
             scf_tensors = self.scf_drv.scf_tensors
-            rsp_drv.is_converged = False  # only needed for RPA
+            rsp_drv._is_converged = False  # only needed for RPA
             rsp_results = rsp_drv.compute(molecule, ao_basis, scf_tensors)
             exc_en_plus = rsp_results['eigenvalues'][self.state_deriv_index]
             e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
 
             field[i] = -field_strength
             self.scf_drv.compute(molecule, ao_basis, min_basis)
-            rsp_drv.is_converged = False
+            rsp_drv._is_converged = False
             rsp_results = rsp_drv.compute(molecule, ao_basis,
                                           self.scf_drv.scf_tensors)
             exc_en_minus = rsp_results['eigenvalues'][self.state_deriv_index]
@@ -454,14 +454,14 @@ class TdhfGradientDriver(GradientDriver):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    lr_drv.is_converged = False
+                    lr_drv._is_converged = False
                     lr_results_p = lr_drv.compute(new_mol, ao_basis,
                                                   self.scf_drv.scf_tensors)
 
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    lr_drv.is_converged = False
+                    lr_drv._is_converged = False
                     lr_results_m = lr_drv.compute(new_mol, ao_basis,
                                                   self.scf_drv.scf_tensors)
 
@@ -483,28 +483,28 @@ class TdhfGradientDriver(GradientDriver):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    lr_drv.is_converged = False
+                    lr_drv._is_converged = False
                     lr_results_p1 = lr_drv.compute(new_mol, ao_basis,
                                                    self.scf_drv.scf_tensors)
 
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    lr_drv.is_converged = False
+                    lr_drv._is_converged = False
                     lr_results_p2 = lr_drv.compute(new_mol, ao_basis,
                                                    self.scf_drv.scf_tensors)
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    lr_drv.is_converged = False
+                    lr_drv._is_converged = False
                     lr_results_m1 = lr_drv.compute(new_mol, ao_basis,
                                                    self.scf_drv.scf_tensors)
 
                     coords[i, d] -= 1.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     self.scf_drv.compute(new_mol, ao_basis, min_basis)
-                    lr_drv.is_converged = False
+                    lr_drv._is_converged = False
                     lr_results_m2 = lr_drv.compute(new_mol, ao_basis,
                                                    self.scf_drv.scf_tensors)
 

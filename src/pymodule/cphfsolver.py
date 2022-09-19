@@ -260,7 +260,7 @@ class CphfSolver(LinearSolver):
             # Orbital Hessian in reduced subspace
             orbhess_red = self.dist_trials.matmul_AtB(self.dist_sigmas)
 
-            self.cur_iter = iteration
+            self._cur_iter = iteration
             num_vecs = self.dist_trials.shape(1)
 
             for x in range(dof):
@@ -362,7 +362,7 @@ class CphfSolver(LinearSolver):
 
         # converged?
         if self.rank == mpi_master():
-            self.print_convergence('Coupled-Perturbed Hartree-Fock')
+            self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
         # transform Distributed arrays into numpy arrays
         # TODO: decide whether using Distributed arrays in
@@ -422,11 +422,11 @@ class CphfSolver(LinearSolver):
             nao = None
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
         # Timing information
         timing_dict = {}
 
@@ -470,7 +470,7 @@ class CphfSolver(LinearSolver):
             # create Fock matrices and contract with two-electron integrals
             fock = AOFockMatrix(dens)
 
-            self.comp_lr_fock(fock, dens, molecule, basis, eri_dict,
+            self._comp_lr_fock(fock, dens, molecule, basis, eri_dict,
                               dft_dict, pe_dict, self.profiler)
 
             sigmas = None
@@ -595,9 +595,9 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             max_residual = max(relative_residual_norm)
             if max_residual < self.conv_thresh:
-                self.is_converged = True
+                self._is_converged = True
 
-        self.is_converged = self.comm.bcast(self.is_converged,
+        self._is_converged = self.comm.bcast(self.is_converged,
                                             root=mpi_master())
 
 
@@ -624,11 +624,11 @@ class CphfSolver(LinearSolver):
         self.start_time = tm.time()
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
         # Timing information
         timing_dict = {}
 
@@ -689,7 +689,7 @@ class CphfSolver(LinearSolver):
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
-            self.print_convergence('Coupled-Perturbed Hartree-Fock')
+            self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
             # merge the rhs dict with the solution
             cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}
@@ -724,11 +724,11 @@ class CphfSolver(LinearSolver):
         """
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
         # Timing information
         timing_dict = {}
 
@@ -780,7 +780,7 @@ class CphfSolver(LinearSolver):
             vector with orbital Hessian matrix.
             """
 
-            self.profiler.start_timer('Iter ' + str(self.cur_iter) + 'CG')
+            self.profiler.start_timer('Iter ' + str(self._cur_iter) + 'CG')
 
             # Create AODensityMatrix object from lambda in AO
             if self.rank == mpi_master():
@@ -792,7 +792,7 @@ class CphfSolver(LinearSolver):
                 ao_density_cphf = AODensityMatrix()
             ao_density_cphf.broadcast(self.rank, self.comm)
 
-            self.comp_lr_fock(fock_cphf, ao_density_cphf, molecule,
+            self._comp_lr_fock(fock_cphf, ao_density_cphf, molecule,
                               basis, eri_dict, dft_dict, pe_dict, self.profiler)
 
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
@@ -812,15 +812,15 @@ class CphfSolver(LinearSolver):
 
             cphf_mo = self.comm.bcast(cphf_mo, root=mpi_master())
 
-            self.profiler.stop_timer('Iter ' + str(self.cur_iter) + 'CG')
+            self.profiler.stop_timer('Iter ' + str(self._cur_iter) + 'CG')
 
             self.profiler.check_memory_usage(
-                'CG Iteration {:d}'.format(self.cur_iter + 1))
+                'CG Iteration {:d}'.format(self._cur_iter + 1))
 
             self.profiler.print_memory_tracing(self.ostream)
 
             # increase iteration counter every time this function is called
-            self.cur_iter += 1
+            self._cur_iter += 1
 
             if self.rank == mpi_master():
                 if self.print_residuals:
@@ -863,7 +863,7 @@ class CphfSolver(LinearSolver):
                                                 atol=0,
                                                 maxiter=self.max_iter)
 
-        self.is_converged = (cg_conv == 0)
+        self._is_converged = (cg_conv == 0)
 
         return cphf_coefficients_ov.reshape(dof, nocc, nvir)
 
@@ -953,15 +953,15 @@ class CphfSolver(LinearSolver):
         #fock_flag = fockmat.rgenjk
         #fock_uij.set_fock_type(fock_flag, 1)
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
         # Timing information
         timing_dict = {}
 
-        self.comp_lr_fock(fock_uij, ao_density_uij, molecule,
+        self._comp_lr_fock(fock_uij, ao_density_uij, molecule,
                           basis, eri_dict, dft_dict, pe_dict, self.profiler)
 
         if self.rank == mpi_master():
@@ -995,7 +995,7 @@ class CphfSolver(LinearSolver):
             Residual norm.
         """
         width = 92
-        output_header = '*** Iteration:   {:2d} '.format(self.cur_iter)
+        output_header = '*** Iteration:   {:2d} '.format(self._cur_iter)
         output_header += '  * Residual Norm: '
         output_header += '{:.5e}'.format(residual_norm)
         self.ostream.print_header(output_header.ljust(width))
@@ -1016,7 +1016,7 @@ class CphfSolver(LinearSolver):
         atom_symbols = molecule.get_labels()
 
         width = 92
-        output_header = '*** Iteration:   {} '.format(self.cur_iter + 1)
+        output_header = '*** Iteration:   {} '.format(self._cur_iter + 1)
         output_header += '* Residuals (Max,Min): '
         output_header += '{:.2e} and {:.2e}'.format(
             max(relative_residual_norm),

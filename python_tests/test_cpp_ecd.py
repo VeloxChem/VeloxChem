@@ -43,7 +43,7 @@ class TestCppEcd:
         cpp_prop.init_driver(task.mpi_comm, task.ostream)
         cpp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        assert cpp_prop.rsp_driver.is_converged
+        assert cpp_prop.is_converged
 
         if is_mpi_master(task.mpi_comm):
             self.check_printout(cpp_prop)

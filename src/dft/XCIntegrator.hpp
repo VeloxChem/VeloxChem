@@ -1465,7 +1465,7 @@ class CXCIntegrator
     ~CXCIntegrator();
 
     /**
-     Integrates exchnage-correlation functional contribution to zero order Kohn-Sham matrix.
+     Integrates exchange-correlation functional contribution to zero order Kohn-Sham matrix.
 
      @param aoDensityMatrix the AO density matrix object.
      @param molecule the molecule.
@@ -1481,7 +1481,7 @@ class CXCIntegrator
                                 const std::string&      xcFuncLabel) const;
 
     /**
-     Integrates exchnage-correlation functional contribution to first order Fock matrices and adds it to AO Fock matrix.
+     Integrates exchange-correlation functional contribution to first order Fock matrices and adds it to AO Fock matrix.
 
      @param aoFockMatrix the AO Fock matrix.
      @param rwDensityMatrix the perturbed AO density matrix object.
@@ -1500,7 +1500,7 @@ class CXCIntegrator
                    const std::string&      xcFuncLabel) const;
 
     /**
-    Integrates exchnage-correlation functional contribution to second-order Fock matrices and adds it to AO Fock matrix.
+    Integrates exchange-correlation functional contribution to second-order Fock matrices and adds it to AO Fock matrix.
 
     @param aoFockMatrix the AO Fock matrix.
     @param rwDensityMatrix the perturbed AO density matrix object.
@@ -1520,6 +1520,28 @@ class CXCIntegrator
                    const CMolecularGrid&   molecularGrid,
                    const std::string&      xcFuncLabel,
                    const std::string&      quadMode) const;
+
+    /**
+    Integrates exchange-correlation pair-density functional contribution to energy.
+
+    @param aoDensityMatrix the AO density matrix object.
+    @param twoDM the "active" MO two-body density matrix.
+    @param activeMOs the active MO coefficients.
+    @param nActive the number of active orbitals.
+    @param molecule the molecule.
+    @param basis the molecular basis.
+    @param molecularGrid the molecular grid.
+    @param xcFuncLabel the label of exchange-correlation functional.
+    @return the XC energy.
+    */
+    double integratePdft(const CAODensityMatrix& aoDensityMatrix,
+                         double*                 twoDM,
+                         double*                 activeMOs,
+                         int32_t                 nActive,
+                         const CMolecule&        molecule,
+                         const CMolecularBasis&  basis,
+                         const CMolecularGrid&   molecularGrid,
+                         const std::string&      xcFuncLabel) const;
 };
 
 #endif /* XCIntegrator_hpp */

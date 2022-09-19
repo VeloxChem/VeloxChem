@@ -244,7 +244,10 @@ class RespChargesDriver:
                     if 'basis_path' in self.method_dict:
                         basis_path = self.method_dict['basis_path']
                     basis_name = self.method_dict['basis'].upper()
-                    bas = MolecularBasis.read(mol, basis_name, basis_path)
+                    bas = MolecularBasis.read(mol,
+                                              basis_name,
+                                              basis_path,
+                                              ostream=None)
                 else:
                     mol = Molecule()
                     bas = MolecularBasis()

@@ -63,7 +63,7 @@ class PolarizabilityGradient():
         # self.do_four_point = False
 
         # DFT information
-        self.dft = False
+        self._dft = False
         self.grid_level = 4
         self.xcfun = XCFunctional()
 
@@ -91,12 +91,12 @@ class PolarizabilityGradient():
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self.dft = (key in ['yes', 'y'])
+            self._dft = (key in ['yes', 'y'])
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
-                self.dft = True
+                self._dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'PolarizabilityGradient: Undefined XC functional')
@@ -170,7 +170,7 @@ class PolarizabilityGradient():
             # dictionary to translate from numbers to operator components 'xyz'
             component_dict = {0: 'x', 1: 'y', 2: 'z'}
 
-            if self.dft:
+            if self._dft:
                 if self.xcfun.is_hybrid():
                     frac_K = self.xcfun.get_frac_exact_exchange()
                 else:
@@ -223,7 +223,7 @@ class PolarizabilityGradient():
 
             # Add exchange-correlation contributions to the gradient
             # for now by looping over each component of the polarizability
-            if self.dft:
+            if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
                 for i in range(dof):
                     #for j in range(dof): # include as soon as non-diagonal terms are available
@@ -314,7 +314,7 @@ class PolarizabilityGradient():
         """
 
         # generate integration grid
-        if self.dft:
+        if self._dft:
             grid_drv = GridDriver(self.comm)
             grid_drv.set_level(self.grid_level)
 
@@ -416,7 +416,7 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         self.profiler.start_timer('RHS')
 
@@ -483,7 +483,7 @@ class PolOrbitalResponse(CphfSolver):
             # 2) Construct the right-hand side
             dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list, denmat.rest)
 
-            if self.dft:
+            if self._dft:
                 # 3) Construct density matrices for E[3] term:
                 # XCIntegrator expects a DM with real and imaginary part,
                 # so we set the imaginary part to zero.
@@ -502,7 +502,7 @@ class PolOrbitalResponse(CphfSolver):
                 zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
         else:
             dm_ao_rhs = AODensityMatrix()
-            if self.dft:
+            if self._dft:
                 perturbed_dm_ao = AODensityMatrix()
                 zero_dm_ao =  AODensityMatrix()
 
@@ -516,7 +516,7 @@ class PolOrbitalResponse(CphfSolver):
         # Set the vector-related components to general Fock matrix (not 1PDM part)
         for ifock in range(dof**2, dof**2 + 2 * dof):
             fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
-        if self.dft:
+        if self._dft:
             perturbed_dm_ao.broadcast(self.rank, self.comm)
             zero_dm_ao.broadcast(self.rank, self.comm)
             # Fock matrix for computing the DFT E[3] term g^xc
@@ -549,7 +549,7 @@ class PolOrbitalResponse(CphfSolver):
         # TODO: replace by comp_lr_fock?
         eri_drv.compute(fock_ao_rhs, dm_ao_rhs, molecule, basis, screening)
 
-        if self.dft:
+        if self._dft:
             if not self.xcfun.is_hybrid():
                 for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
                     fock_ao_rhs.scale(2.0, ifock)
@@ -657,7 +657,7 @@ class PolOrbitalResponse(CphfSolver):
             rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
 
             # Add DFT E[3] contribution to the RHS:
-            if self.dft:
+            if self._dft:
                 gxc_ao = np.zeros((dof**2, nao, nao))
 
                 for i in range(dof**2):
@@ -706,11 +706,11 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         # ERI information
-        eri_dict = self.init_eri(molecule, basis)
+        eri_dict = self._init_eri(molecule, basis)
         # DFT information
-        dft_dict = self.init_dft(molecule, scf_tensors)
+        dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
-        pe_dict = self.init_pe(molecule, basis)
+        pe_dict = self._init_pe(molecule, basis)
 
         if self.rank == mpi_master():
 
@@ -845,7 +845,7 @@ class PolOrbitalResponse(CphfSolver):
             fock_cphf = AOFockMatrix(ao_density_cphf)
 
         # TODO: what has to be on MPI master and what not?
-        self.comp_lr_fock(fock_cphf, ao_density_cphf, molecule,
+        self._comp_lr_fock(fock_cphf, ao_density_cphf, molecule,
                           basis, eri_dict, dft_dict, pe_dict, self.profiler)
 
         # TODO: replace for-loops with np.einsum
@@ -943,7 +943,7 @@ class PolOrbitalResponse(CphfSolver):
 
                 omega[m*dof+n] = epsilon_dm_ao[m,n] + omega_1pdm_2pdm_contribs + dipole_ints_contrib_ao[m,n] #+ freq_contrib_ao[m,n]
 
-                if self.dft:
+                if self._dft:
                     factor = -0.5
                     omega[m*dof+n] += factor * np.linalg.multi_dot([D_occ,
                                               fock_gxc_ao.alpha_to_numpy(2*(m*dof+n)), D_occ])
