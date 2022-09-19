@@ -103,6 +103,14 @@ class OrbitalResponse:
         self.memory_profiling = False
         self.memory_tracing = False
 
+    @property
+    def is_converged(self):
+        """
+        Returns whether linear solver is converged.
+        """
+
+        return self._is_converged
+
     def update_settings(self, orbrsp_dict=None, rsp_dict=None,
                         method_dict=None, mp2_dict=None):
         """
@@ -177,7 +185,7 @@ class OrbitalResponse:
             key = rsp_dict['memory_tracing'].lower()
             self.memory_tracing = True if key in ['yes', 'y'] else False
 
-    def init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_tensors):
         """
         Initializes DFT.
 

@@ -300,7 +300,7 @@ class PolarizabilityGradient():
 
         return polgrad_xcgrad
 
-    def init_dft(self, molecule, scf_tensors):
+    def _init_dft(self, molecule, scf_tensors):
         """
         Initializes DFT.
 
