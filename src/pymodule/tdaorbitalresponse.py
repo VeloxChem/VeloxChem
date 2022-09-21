@@ -45,7 +45,8 @@ class TdaOrbitalResponse(OrbitalResponse):
 
         super().update_settings(orbrsp_dict, rsp_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, tda_results, dft_dict, profiler):
+    def compute_rhs(self, molecule, basis, scf_tensors,
+                    tda_results, dft_dict, profiler):
         """
         Computes the right-hand side (RHS) of the TDA orbital response equation
         including the necessary density matrices using molecular data.
@@ -74,7 +75,8 @@ class TdaOrbitalResponse(OrbitalResponse):
         # 1) Construct the necessary density matrices
         # 2) Construct the RHS
         # 3) Construct the initial guess => in parent class
-        # 4) Write the linear operator for matrix-vector product => in parent class
+        # 4) Write the linear operator for matrix-vector product
+        #    => in parent class
         # 5) Run the conjugate gradient => in parent class
 
         if self.rank == mpi_master():

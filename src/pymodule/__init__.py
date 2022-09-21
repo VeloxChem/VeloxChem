@@ -118,6 +118,7 @@ from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
 from .orbitalresponse import OrbitalResponse
+from .tdacphfsolver import TdaCphfSolver
 from .tdhfgradientdriver import TdhfGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver

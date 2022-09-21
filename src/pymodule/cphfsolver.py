@@ -677,7 +677,7 @@ class CphfSolver(LinearSolver):
 
         # Solve the CPHF equations using conjugate gradient (cg)
         cphf_ov = self.solve_cphf_cg(molecule, basis, scf_tensors,
-                                  cphf_rhs #.reshape(3*natm, nocc, nvir), # TODO: possibly change the shape
+                                  cphf_rhs # TODO: possibly change the shape
                                   )
 
         self.profiler.stop_timer('Total CG')
