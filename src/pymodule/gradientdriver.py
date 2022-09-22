@@ -402,7 +402,7 @@ class GradientDriver:
 
         self.ostream.print_block(molecule.get_string())
 
-    def print_gradient(self, molecule):
+    def print_gradient(self, molecule, state_deriv_index=None):
         """
         Prints the gradient.
 
@@ -422,19 +422,36 @@ class GradientDriver:
         self.ostream.print_header('-' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = '  Atom '
-        valstr += '{:>20s}  '.format('Gradient X')
-        valstr += '{:>20s}  '.format('Gradient Y')
-        valstr += '{:>20s}  '.format('Gradient Z')
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-
-        for i in range(molecule.number_of_atoms()):
-            valstr = '  {:<4s}'.format(labels[i])
-            for d in range(3):
-                valstr += '{:22.12f}'.format(self.gradient[i, d])
+        if (state_deriv_index is None) or (type(state_deriv_index) is int):
+            valstr = '  Atom '
+            valstr += '{:>20s}  '.format('Gradient X')
+            valstr += '{:>20s}  '.format('Gradient Y')
+            valstr += '{:>20s}  '.format('Gradient Z')
             self.ostream.print_header(valstr)
-
+            self.ostream.print_blank()
+            for i in range(molecule.number_of_atoms()):
+                valstr = '  {:<4s}'.format(labels[i])
+                for d in range(3):
+                    valstr += '{:22.12f}'.format(self.gradient[i, d])
+                self.ostream.print_header(valstr)
+        else:
+            for s in state_deriv_index:
+                self.ostream.print_blank()
+                state = 'Excited State %d' % s
+                self.ostream.print_header(state)
+                self.ostream.print_blank()
+                valstr = '  Atom '
+                valstr += '{:>20s}  '.format('Gradient X')
+                valstr += '{:>20s}  '.format('Gradient Y')
+                valstr += '{:>20s}  '.format('Gradient Z')
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                for i in range(molecule.number_of_atoms()):
+                    valstr = '  {:<4s}'.format(labels[i])
+                    for d in range(3):
+                        valstr += '{:22.12f}'.format(self.gradient[s-1, i, d])
+                    self.ostream.print_header(valstr)
+    
         self.ostream.print_blank()
         self.ostream.flush()
 
@@ -464,17 +481,29 @@ class GradientDriver:
         else:
             cur_str += 'Analytical'
 
-        if self.numerical or state_deriv_index is not None:
-            self.ostream.print_blank()
-            self.ostream.print_header(cur_str.ljust(str_width))
+        # Not sure why we have this if-statement...
+        #if self.numerical or state_deriv_index is not None:
+        self.ostream.print_blank()
+        self.ostream.print_header(cur_str.ljust(str_width))
         if self.numerical:
             self.ostream.print_header(cur_str2.ljust(str_width))
             self.ostream.print_header(cur_str3.ljust(str_width))
 
         if state_deriv_index is not None:
-            cur_str = 'Excited State of Interest   : ' + str(state_deriv_index +
-                                                             1)
-            self.ostream.print_header(cur_str.ljust(str_width))
+            if type(state_deriv_index) is int:
+                cur_str = ( 'Excited State of Interest   : ' 
+                            + str(state_deriv_index + 1) )
+                self.ostream.print_header(cur_str.ljust(str_width))
+            elif type(state_deriv_index) is tuple:
+                states_txt = ""
+                for i in range(len(state_deriv_index)):
+                    s = state_deriv_index[i]
+                    if i == len(state_deriv_index) - 1:
+                        states_txt += "%d." % s
+                    else:
+                        states_txt += "%d, " % s
+                cur_str = 'Excited States of Interest  : ' + states_txt
+                self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
         self.ostream.flush()

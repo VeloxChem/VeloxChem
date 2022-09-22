@@ -111,7 +111,7 @@ class TdaCphfSolver(CphfSolver):
                 # if no states are selected, calculate all
                 # first excitd state is S1 (index starts at 1)
                 self.state_deriv_index = list(np.arange(1, 
-                                            len(tda_results['eigenvalues']+1)))
+                                            len(tda_results['eigenvalues'])+1))
 
             # number of degrees of freedon:
             dof = len(self.state_deriv_index)

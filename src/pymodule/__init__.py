@@ -121,6 +121,7 @@ from .orbitalresponse import OrbitalResponse
 from .tdacphfsolver import TdaCphfSolver
 from .rpacphfsolver import RpaCphfSolver
 from .tdhfgradientdriver import TdhfGradientDriver
+from .tdscfgradientdriver import TdscfGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .cphfsolver import CphfSolver

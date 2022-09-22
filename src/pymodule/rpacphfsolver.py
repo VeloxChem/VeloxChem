@@ -11,7 +11,8 @@ from .cphfsolver import CphfSolver
 from .qqscheme import get_qq_scheme
 from .inputparser import parse_seq_fixed
 
-# TODO: unify RpaCphfSolver with TdaCphfSolver?
+# TODO: unify RpaCphfSolver with TdaCphfSolver into TddftOrbitalResponse
+# and include into tddftgradientdriver file
 class RpaCphfSolver(CphfSolver):
     """
     Implements orbital response Lagrange multipliers computation using a
@@ -111,7 +112,7 @@ class RpaCphfSolver(CphfSolver):
                 # if no states are selected, calculate all
                 # first excitd state is S1 (index starts at 1)
                 self.state_deriv_index = list(np.arange(1, 
-                                            len(rpa_results['eigenvalues']+1)))
+                                            len(rpa_results['eigenvalues'])+1))
 
             # number of degrees of freedon:
             dof = len(self.state_deriv_index)
