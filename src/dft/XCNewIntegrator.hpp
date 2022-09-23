@@ -228,35 +228,6 @@ class CXCNewIntegrator
                         const std::array<double, 6>& boxDimension) const;
 
     /**
-     Gets submatrix from AO density matrix.
-
-     @param densityMatrix the AO density matrix.
-     @param densityIndex the density index.
-     @param aoIndices the index mapping from submatrix to full matrix.
-     @param aoCount the number of indices in submatrix.
-     @param nAOs the number of indices in full matrix.
-     @return the submatrix.
-     */
-    CDenseMatrix _getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                                      const int32_t               densityIndex,
-                                      const std::vector<int32_t>& aoIndices,
-                                      const int32_t               aoCount,
-                                      const int32_t               nAOs) const;
-
-    /**
-     Gets sub AO density matrices from AO density matrices.
-
-     @param densityMatrix the AO density matrix.
-     @param aoIndices the index mapping from submatrix to full matrix.
-     @param aoCount the number of indices in submatrix.
-     @return the sub AO density matrices.
-     */
-    CAODensityMatrix _getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                                          const std::vector<int32_t>& aoIndices,
-                                          const int32_t               aoCount) const;
-
-
-    /**
      Integrates LDA contribution to (first-order) Vxc matrix.
 
      @param gridBlockPosition the starting position of the grid box.
@@ -411,38 +382,6 @@ class CXCNewIntegrator
                                                 const CDensityGrid&        gsDensityGrid,
                                                 const int32_t              iFock,
                                                 CMultiTimer&               timer) const;
-
-    /**
-     Distributes partial Vxc matrix to full AO Kohn-Sham matrix.
-
-     @param matVxc the AO Kohn-Sham matrix.
-     @param partialMatVxc the partial Vxc matrix.
-     @param aoIndices the index mapping from partial matrix to full matrix.
-     @param aoCount the number of indices in partial matrix.
-     @param nAOs the number of indices in full matrix.
-     */
-    void _distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          matVxc,
-                                        const CDenseMatrix&         partialMatVxc,
-                                        const std::vector<int32_t>& aoIndices,
-                                        const int32_t               aoCount,
-                                        const int32_t               nAOs) const;
-
-    /**
-     Distributes partial Fxc or Kxc matrix to full AO Fock matrix.
-
-     @param aoFockMatrix the AO Fock matrix.
-     @param fockIndex the index of Fock matrix.
-     @param partialMatFxc the partial Fxc or Kxc matrix.
-     @param aoIndices the index mapping from partial matrix to full matrix.
-     @param aoCount the number of indices in partial matrix.
-     @param nAOs the number of indices in full matrix.
-     */
-    void _distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
-                                    const int32_t               fockIndex,
-                                    const CDenseMatrix&         partialMatFxc,
-                                    const std::vector<int32_t>& aoIndices,
-                                    const int32_t               aoCount,
-                                    const int32_t               nAOs) const;
 
    public:
     /**

@@ -243,22 +243,6 @@ class CXCNewMolecularGradient
                         const int32_t                gtoDeriv,
                         const std::array<double, 6>& boxDimension) const;
 
-    /**
-     Gets submatrix from AO density matrix.
-
-     @param densityMatrix the AO density matrix.
-     @param densityIndex the density index.
-     @param aoIndices the index mapping from submatrix to full matrix.
-     @param aoCount the number of indices in submatrix.
-     @param nAOs the number of indices in full matrix.
-     @return the submatrix.
-     */
-    CDenseMatrix _getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                                      const int32_t               densityIndex,
-                                      const std::vector<int32_t>& aoIndices,
-                                      const int32_t               aoCount,
-                                      const int32_t               nAOs) const;
-
    public:
     /**
      Creates an XC integrator object using MPI info.

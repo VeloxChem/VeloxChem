@@ -40,6 +40,7 @@
 #include "DensityGridType.hpp"
 #include "FunctionalParser.hpp"
 #include "GtoEvaluator.hpp"
+#include "SubMatrix.hpp"
 #include "XCFuncType.hpp"
 #include "XCVarsType.hpp"
 
@@ -372,9 +373,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat = _getSubDensityMatrix(rwDensityMatrix, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -781,9 +782,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat = _getSubDensityMatrix(rwDensityMatrix, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1240,11 +1241,11 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_one = _getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_two = _getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1662,11 +1663,11 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_one = _getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_two = _getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2278,11 +2279,11 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_one = _getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_two = _getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2737,11 +2738,11 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_one = _getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_two = _getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -3693,35 +3694,4 @@ CXCNewMolecularGradient::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds
             }
         }
     }
-}
-
-CDenseMatrix
-CXCNewMolecularGradient::_getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                                              const int32_t               densityIndex,
-                                              const std::vector<int32_t>& aoIndices,
-                                              const int32_t               aoCount,
-                                              const int32_t               nAOs) const
-{
-    if (aoCount <= nAOs)
-    {
-        CDenseMatrix sub_dens(aoCount, aoCount);
-
-        const CDenseMatrix& dens = densityMatrix.getReferenceToDensity(densityIndex);
-
-        for (int32_t i = 0; i < aoCount; i++)
-        {
-            auto sub_dens_row = sub_dens.row(i);
-
-            auto dens_row = dens.row(aoIndices[i]);
-
-            for (int32_t j = 0; j < aoCount; j++)
-            {
-                sub_dens_row[j] = dens_row[aoIndices[j]];
-            }
-        }
-
-        return sub_dens;
-    }
-
-    return CDenseMatrix();
 }

@@ -40,6 +40,7 @@
 #include "DensityGridType.hpp"
 #include "FunctionalParser.hpp"
 #include "GtoEvaluator.hpp"
+#include "SubMatrix.hpp"
 #include "XCFuncType.hpp"
 #include "XCVarsType.hpp"
 
@@ -331,7 +332,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = _getSubDensityMatrix(densityMatrix, 0, aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -359,7 +360,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("Vxc matrix dist.");
 
-        _distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
+        submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
 
@@ -586,7 +587,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = _getSubDensityMatrix(densityMatrix, 0, aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -618,7 +619,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.start("Vxc matrix dist.");
 
-        _distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
+        submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
 
@@ -810,7 +811,7 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -838,7 +839,7 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat = _getSubDensityMatrix(rwDensityMatrix, idensity, aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, idensity, aoinds, aocount, naos);
 
             timer.stop("Density matrix slicing");
 
@@ -858,7 +859,7 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Fxc matrix dist.");
 
-            _distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Fxc, aoinds, aocount, naos);
+            submat::distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Fxc, aoinds, aocount, naos);
 
             timer.stop("Fxc matrix dist.");
         }
@@ -1053,7 +1054,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1087,7 +1088,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat = _getSubDensityMatrix(rwDensityMatrix, idensity, aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, idensity, aoinds, aocount, naos);
 
             timer.stop("Density matrix slicing");
 
@@ -1111,7 +1112,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Fxc matrix dist.");
 
-            _distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Fxc, aoinds, aocount, naos);
+            submat::distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Fxc, aoinds, aocount, naos);
 
             timer.stop("Fxc matrix dist.");
         }
@@ -1281,11 +1282,11 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat = _getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
 
-        auto rw2_sub_dens_mat = _getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
 
         timer.stop("Density matrix slicing");
 
@@ -1341,7 +1342,7 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Kxc matrix dist.");
 
-            _distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
+            submat::distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
 
             timer.stop("Kxc matrix dist.");
         }
@@ -1538,11 +1539,11 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = _getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat = _getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
 
-        auto rw2_sub_dens_mat = _getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
 
         timer.stop("Density matrix slicing");
 
@@ -1612,7 +1613,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Kxc matrix dist.");
 
-            _distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
+            submat::distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
 
             timer.stop("Kxc matrix dist.");
         }
@@ -1786,74 +1787,6 @@ CXCNewIntegrator::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
             }
         }
     }
-}
-
-CDenseMatrix
-CXCNewIntegrator::_getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                                       const int32_t               densityIndex,
-                                       const std::vector<int32_t>& aoIndices,
-                                       const int32_t               aoCount,
-                                       const int32_t               nAOs) const
-{
-    if (aoCount <= nAOs)
-    {
-        CDenseMatrix sub_dens(aoCount, aoCount);
-
-        const CDenseMatrix& dens = densityMatrix.getReferenceToDensity(densityIndex);
-
-        for (int32_t i = 0; i < aoCount; i++)
-        {
-            auto sub_dens_row = sub_dens.row(i);
-
-            auto dens_row = dens.row(aoIndices[i]);
-
-            for (int32_t j = 0; j < aoCount; j++)
-            {
-                sub_dens_row[j] = dens_row[aoIndices[j]];
-            }
-        }
-
-        return sub_dens;
-    }
-
-    return CDenseMatrix();
-}
-
-CAODensityMatrix
-CXCNewIntegrator::_getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                                       const std::vector<int32_t>& aoIndices,
-                                       const int32_t               aoCount) const
-{
-    auto naos = densityMatrix.getNumberOfRows(0);
-
-    if (aoCount > naos) return CAODensityMatrix();
-
-    std::vector<CDenseMatrix> submatrices;
-
-    auto numdens = densityMatrix.getNumberOfDensityMatrices();
-
-    for (int32_t idens = 0; idens < numdens; idens++)
-    {
-        CDenseMatrix sub_dens(aoCount, aoCount);
-
-        auto dens = densityMatrix.getReferenceToDensity(idens);
-
-        for (int32_t i = 0; i < aoCount; i++)
-        {
-            auto sub_dens_row = sub_dens.row(i);
-
-            auto dens_row = dens.row(aoIndices[i]);
-
-            for (int32_t j = 0; j < aoCount; j++)
-            {
-                sub_dens_row[j] = dens_row[aoIndices[j]];
-            }
-        }
-
-        submatrices.push_back(sub_dens);
-    }
-
-    return CAODensityMatrix(submatrices, denmat::rest);
 }
 
 CDenseMatrix
@@ -3008,61 +2941,6 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              grid
     timer.stop("Kxc matrix matmul");
 
     return mat_Kxc;
-}
-
-void
-CXCNewIntegrator::_distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          matVxc,
-                                                 const CDenseMatrix&         partialMatVxc,
-                                                 const std::vector<int32_t>& aoIndices,
-                                                 const int32_t               aoCount,
-                                                 const int32_t               nAOs) const
-{
-    if (aoCount <= nAOs)
-    {
-        for (int32_t row = 0; row < partialMatVxc.getNumberOfRows(); row++)
-        {
-            auto row_orig = aoIndices[row];
-
-            auto matVxc_row_orig = matVxc.getMatrix(0) + row_orig * nAOs;
-
-            auto partialMatVxc_row = partialMatVxc.row(row);
-
-            for (int32_t col = 0; col < partialMatVxc.getNumberOfColumns(); col++)
-            {
-                auto col_orig = aoIndices[col];
-
-                matVxc_row_orig[col_orig] += partialMatVxc_row[col];
-            }
-        }
-    }
-}
-
-void
-CXCNewIntegrator::_distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
-                                             const int32_t               fockIndex,
-                                             const CDenseMatrix&         partialMatFxc,
-                                             const std::vector<int32_t>& aoIndices,
-                                             const int32_t               aoCount,
-                                             const int32_t               nAOs) const
-{
-    if (aoCount <= nAOs)
-    {
-        for (int32_t row = 0; row < partialMatFxc.getNumberOfRows(); row++)
-        {
-            auto row_orig = aoIndices[row];
-
-            auto fock_row_orig = aoFockMatrix.getFock(fockIndex, "ALPHA") + row_orig * nAOs;
-
-            auto partialMatFxc_row = partialMatFxc.row(row);
-
-            for (int32_t col = 0; col < partialMatFxc.getNumberOfColumns(); col++)
-            {
-                auto col_orig = aoIndices[col];
-
-                fock_row_orig[col_orig] += partialMatFxc_row[col];
-            }
-        }
-    }
 }
 
 CDenseMatrix

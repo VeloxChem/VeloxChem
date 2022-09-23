@@ -18,6 +18,7 @@ target_sources(vlxobjs
     MolecularGrid.cpp
     PartitionFunc.cpp
     PrimitiveFunctional.cpp
+    SubMatrix.cpp
     XCCubicHessianGrid.cpp
     XCFunctional.cpp
     XCGradientGrid.cpp
