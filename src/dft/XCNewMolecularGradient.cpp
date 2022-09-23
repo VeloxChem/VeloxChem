@@ -280,13 +280,13 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         // dimension of grid box
 
-        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // pre-screening of GTOs
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);  // 1st order GTO derivative
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, _screeningThresholdForGTOValues, boxdim);  // 1st order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -645,13 +645,13 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         // dimension of grid box
 
-        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // pre-screening of GTOs
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 2, boxdim);  // 2nd order GTO derivative
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 2, _screeningThresholdForGTOValues, boxdim);  // 2nd order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -1148,13 +1148,13 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
         // dimension of grid box
 
-        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // pre-screening of GTOs
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);  // 1st order GTO derivative
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, _screeningThresholdForGTOValues, boxdim);  // 1st order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -1526,13 +1526,13 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
         // dimension of grid box
 
-        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // pre-screening of GTOs
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 2, boxdim);  // 2nd order GTO derivative
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 2, _screeningThresholdForGTOValues, boxdim);  // 2nd order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -2186,13 +2186,13 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
         // dimension of grid box
 
-        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // pre-screening of GTOs
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, boxdim);  // 1st order GTO derivative
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, _screeningThresholdForGTOValues, boxdim);  // 1st order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -2601,13 +2601,13 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         // dimension of grid box
 
-        auto boxdim = _getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // pre-screening of GTOs
 
         timer.start("GTO pre-screening");
 
-        _preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 2, boxdim);  // 2nd order GTO derivative
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 2, _screeningThresholdForGTOValues, boxdim);  // 2nd order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -3540,158 +3540,5 @@ CXCNewMolecularGradient::_computeAOtoAtomMapping(std::vector<int32_t>&  ao_to_at
         }
 
         delete atomgtovec;
-    }
-}
-
-std::array<double, 6>
-CXCNewMolecularGradient::_getGridBoxDimension(const int32_t gridBlockPosition,
-                                              const int32_t nGridPoints,
-                                              const double* xcoords,
-                                              const double* ycoords,
-                                              const double* zcoords) const
-{
-    double xmin = xcoords[gridBlockPosition], ymin = ycoords[gridBlockPosition], zmin = zcoords[gridBlockPosition];
-
-    double xmax = xcoords[gridBlockPosition], ymax = ycoords[gridBlockPosition], zmax = zcoords[gridBlockPosition];
-
-    for (int32_t g = 0; g < nGridPoints; g++)
-    {
-        xmin = std::min(xmin, xcoords[gridBlockPosition + g]);
-
-        ymin = std::min(ymin, ycoords[gridBlockPosition + g]);
-
-        zmin = std::min(zmin, zcoords[gridBlockPosition + g]);
-
-        xmax = std::max(xmax, xcoords[gridBlockPosition + g]);
-
-        ymax = std::max(ymax, ycoords[gridBlockPosition + g]);
-
-        zmax = std::max(zmax, zcoords[gridBlockPosition + g]);
-    }
-
-    return std::array<double, 6>({xmin, ymin, zmin, xmax, ymax, zmax});
-}
-
-void
-CXCNewMolecularGradient::_preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
-                                        CMemBlock<int32_t>&          skipAOIds,
-                                        const CGtoContainer*         gtoContainer,
-                                        const int32_t                gtoDeriv,
-                                        const std::array<double, 6>& boxDimension) const
-{
-    skipCgtoIds.zero();
-
-    skipAOIds.zero();
-
-    double xmin = boxDimension[0], ymin = boxDimension[1], zmin = boxDimension[2];
-
-    double xmax = boxDimension[3], ymax = boxDimension[4], zmax = boxDimension[5];
-
-    for (int32_t i = 0, cgto_count = 0; i < gtoContainer->getNumberOfGtoBlocks(); i++)
-    {
-        auto bgtos = gtoContainer->getGtoBlock(i);
-
-        auto bang = bgtos.getAngularMomentum();
-
-        auto bfnorms = bgtos.getNormFactors();
-
-        auto bfexps = bgtos.getExponents();
-
-        auto bfx = bgtos.getCoordinatesX();
-
-        auto bfy = bgtos.getCoordinatesY();
-
-        auto bfz = bgtos.getCoordinatesZ();
-
-        auto spos = bgtos.getStartPositions();
-
-        auto epos = bgtos.getEndPositions();
-
-        // loop over contracted GTOs
-
-        for (int32_t j = 0; j < bgtos.getNumberOfContrGtos(); j++, cgto_count++)
-        {
-            // contracted GTO screening
-
-            auto firstprim = spos[j];
-
-            double rx = std::max({xmin - bfx[firstprim], bfx[firstprim] - xmax, 0.0});
-
-            double ry = std::max({ymin - bfy[firstprim], bfy[firstprim] - ymax, 0.0});
-
-            double rz = std::max({zmin - bfz[firstprim], bfz[firstprim] - zmax, 0.0});
-
-            auto r2 = rx * rx + ry * ry + rz * rz;
-
-            if (r2 > 1.0)
-            {
-                auto minexp = bfexps[firstprim];
-
-                auto maxexp = bfexps[firstprim];
-
-                auto maxcoef = std::fabs(bfnorms[firstprim]);
-
-                for (int32_t iprim = spos[j]; iprim < epos[j]; iprim++)
-                {
-                    auto bexp = bfexps[iprim];
-
-                    auto bnorm = std::fabs(bfnorms[iprim]);
-
-                    minexp = std::min(minexp, bexp);
-
-                    maxexp = std::max(maxexp, bexp);
-
-                    maxcoef = std::max(maxcoef, bnorm);
-                }
-
-                // 0th-order derivative
-                // gto:                    r^{ang}   |C| exp(-alpha r^2)
-
-                // 1st-order derivative
-                // gto_m:              ang r^{ang-1} |C| exp(-alpha r^2)
-                // gto_p:           2alpha r^{ang+1} |C| exp(-alpha r^2)
-
-                // 2nd-order derivative
-                // gto_m2:     ang (ang-1) r^{ang-2} |C| exp(-alpha r^2)
-                // gto   : 2alpha (2ang+1) r^{ang}   |C| exp(-alpha r^2)
-                // gto_p2:        4alpha^2 r^{ang+2} |C| exp(-alpha r^2)
-
-                auto gtolimit = maxcoef * std::exp(-minexp * r2);
-
-                auto r = std::sqrt(r2);
-
-                for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
-
-                if (gtoDeriv > 0)
-                {
-                    gtolimit = std::max(gtolimit, 2.0 * maxexp * r * gtolimit);
-
-                    if (bang > 0) gtolimit = std::max(gtolimit, gtolimit / r * bang);
-                }
-
-                if (gtoDeriv > 1)
-                {
-                    gtolimit = std::max({gtolimit, 4.0 * maxexp * maxexp * r2 * gtolimit,
-
-                                         2.0 * maxexp * (2 * bang + 1) * gtolimit});
-
-                    if (bang > 1) gtolimit = std::max(gtolimit, gtolimit / r2 * bang * (bang - 1));
-                }
-
-                if (gtolimit < _screeningThresholdForGTOValues)
-                {
-                    skipCgtoIds.data()[cgto_count] = 1;
-
-                    auto bnspher = angmom::to_SphericalComponents(bang);
-
-                    for (int32_t k = 0; k < bnspher; k++)
-                    {
-                        auto ao_idx = (bgtos.getIdentifiers(k))[j];
-
-                        skipAOIds.data()[ao_idx] = 1;
-                    }
-                }
-            }
-        }
     }
 }

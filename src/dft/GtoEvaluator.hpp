@@ -26,11 +26,47 @@
 #ifndef GtoEvaluator_hpp
 #define GtoEvaluator_hpp
 
+#include <array>
+
 #include "GtoContainer.hpp"
+#include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "XCFuncType.hpp"
 
 namespace gtoeval {  // gtoeval namespace
+
+/**
+ Gets grid box dimension.
+
+ @param gridBlockPosition the displacement of grid points in this box.
+ @param nGridPoints the number of grid points in this box.
+ @param xcoords the X coordinates of grid points.
+ @param ycoords the Y coordinates of grid points.
+ @param zcoords the Z coordinates of grid points.
+ @return grid box dimension as (xmin, ymin, zmin, xmax, ymax, zmax).
+ */
+std::array<double, 6> getGridBoxDimension(const int32_t gridBlockPosition,
+                                          const int32_t nGridPoints,
+                                          const double* xcoords,
+                                          const double* ycoords,
+                                          const double* zcoords);
+
+/**
+ Prescreens GTOs for a grid box.
+
+ @param skipCgtoIds the array to store whether a CGTO should be skipped.
+ @param skipAOIds the array to store whether an AO should be skipped.
+ @param gtoContainer the pointer to the GTO container.
+ @param gtoDeriv the level of GTO derivative.
+ @param gtoThreshold the screening threshold for GTO.
+ @param boxDimension the dimension of the grid box.
+ */
+void preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
+                   CMemBlock<int32_t>&          skipAOIds,
+                   const CGtoContainer*         gtoContainer,
+                   const int32_t                gtoDeriv,
+                   const double                 gtoThreshold,
+                   const std::array<double, 6>& boxDimension);
 
 /**
  Computes GTOs values for batch of grid points.

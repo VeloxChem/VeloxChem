@@ -197,37 +197,6 @@ class CXCNewIntegrator
                                  const std::string&      quadMode) const;
 
     /**
-     Gets grid box dimension.
-
-     @param gridBlockPosition the displacement of grid points in this box.
-     @param nGridPoints the number of grid points in this box.
-     @param xcoords the X coordinates of grid points.
-     @param ycoords the Y coordinates of grid points.
-     @param zcoords the Z coordinates of grid points.
-     @return grid box dimension as (xmin, ymin, zmin, xmax, ymax, zmax).
-     */
-    std::array<double, 6> _getGridBoxDimension(const int32_t gridBlockPosition,
-                                               const int32_t nGridPoints,
-                                               const double* xcoords,
-                                               const double* ycoords,
-                                               const double* zcoords) const;
-
-    /**
-     Prescreens GTOs for a grid box.
-
-     @param skipCgtoIds the array to store whether a CGTO should be skipped.
-     @param skipAOIds the array to store whether an AO should be skipped.
-     @param gtoContainer the pointer to the GTO container.
-     @param gtoDeriv the level of GTO derivative.
-     @param boxDimension the dimension of the grid box.
-     */
-    void _preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
-                        CMemBlock<int32_t>&          skipAOIds,
-                        const CGtoContainer*         gtoContainer,
-                        const int32_t                gtoDeriv,
-                        const std::array<double, 6>& boxDimension) const;
-
-    /**
      Integrates LDA contribution to (first-order) Vxc matrix.
 
      @param gridBlockPosition the starting position of the grid box.
@@ -457,6 +426,14 @@ class CXCNewIntegrator
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const;
 
+    /**
+     Computes GTOs values on grid points.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @return the GTO values on grid points.
+     */
     CDenseMatrix computeGtoValuesOnGridPoints(const CMolecule&        molecule,
                                               const CMolecularBasis&  basis,
                                               const CMolecularGrid&   molecularGrid) const;
