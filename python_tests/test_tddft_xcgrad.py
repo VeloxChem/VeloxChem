@@ -83,6 +83,8 @@ class TestTddftXCgrad:
                                                 xcfun_label)
 
         grid_drv = GridDriver()
+        grid_drv.set_level(4)
+
         scf_drv = ScfRestrictedDriver()
         molgrid = grid_drv.generate(molecule)
         molgrid.partition_grid_points()
@@ -111,12 +113,17 @@ class TestTddftXCgrad:
 
         if is_mpi_master():
             assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
+
             xcgrad2 = vxc_contrib + vxc_contrib_2 + vxc2_contrib + vxc2_contrib_2
             assert np.max(np.abs(xcgrad2 - ref_xcgrad)) < 1.0e-5
-            assert np.max(np.abs(vxc_grad_new - vxc_contrib)) < 1.0e-5
-            assert np.max(np.abs(fxc_grad_new - vxc_contrib_2)) < 1.0e-5
-            assert np.max(np.abs(fxc_grad_new_2 - vxc2_contrib)) < 1.0e-5
-            assert np.max(np.abs(kxc_grad_new - vxc2_contrib_2)) < 1.0e-5
+
+            xcgrad3 = vxc_grad_new + fxc_grad_new + fxc_grad_new_2 + kxc_grad_new
+            assert np.max(np.abs(xcgrad3 - ref_xcgrad)) < 1.0e-5
+
+            assert np.max(np.abs(vxc_grad_new - vxc_contrib)) < 1.0e-9
+            assert np.max(np.abs(fxc_grad_new - vxc_contrib_2)) < 1.0e-9
+            assert np.max(np.abs(fxc_grad_new_2 - vxc2_contrib)) < 1.0e-9
+            assert np.max(np.abs(kxc_grad_new - vxc2_contrib_2)) < 1.0e-9
 
     def test_tda_xcgrad_slater(self):
 
