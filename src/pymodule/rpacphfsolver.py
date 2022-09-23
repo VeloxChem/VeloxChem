@@ -13,7 +13,8 @@ from .inputparser import parse_seq_fixed
 
 # TODO: unify RpaCphfSolver with TdaCphfSolver into TddftOrbitalResponse
 # and include into tddftgradientdriver file
-class RpaCphfSolver(CphfSolver):
+# TODO: rename variable; rename rpa_results to rsp results
+class TddftOrbitalResponse(CphfSolver):
     """
     Implements orbital response Lagrange multipliers computation using a
     conjugate gradient scheme for the random phase approximation (RPA)
@@ -56,9 +57,14 @@ class RpaCphfSolver(CphfSolver):
             self.state_deriv_index = parse_seq_fixed(
                     orbrsp_dict['state_deriv_index'], flag='int')
 
+        # Use TDA or not
+        if 'tamm_dancoff' in rsp_dict:
+            key = rsp_dict['tamm_dancoff'].lower()
+            self.tamm_dancoff = True if key in ['yes', 'y'] else False
+
         super().update_settings(orbrsp_dict, method_dict)
 
-    def compute_rhs(self, molecule, basis, scf_tensors, rpa_results):
+    def compute_rhs(self, molecule, basis, scf_tensors, rsp_results):
         """
         Computes the right-hand side (RHS) of the RPA orbital response equation
         including the necessary density matrices using molecular data.
@@ -69,7 +75,7 @@ class RpaCphfSolver(CphfSolver):
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from the converged SCF calculation.
-        :param rpa_results:
+        :param rsp_results:
             The results from a converged linear response calculation.
 
         :return:
@@ -125,9 +131,11 @@ class RpaCphfSolver(CphfSolver):
                         rpa_results['eigenvectors'][:nocc * nvir,
                                                     ivec].reshape(nocc, nvir)
                                 )
-                deexc_vec[i] = (
-                        rpa_results['eigenvectors'][nocc * nvir:,
-                                                    ivec].reshape(nocc, nvir)
+
+                if not self.tamm_dancoff:
+                    deexc_vec[i] = (
+                            rpa_results['eigenvectors'][nocc * nvir:,
+                                                        ivec].reshape(nocc, nvir)
                                 )
 
             # Construct plus/minus combinations of excitation
@@ -181,23 +189,6 @@ class RpaCphfSolver(CphfSolver):
                 # corresponds to rho^{omega_b,omega_c} in quadratic response,
                 # which is zero for TDDFT orbital response
                 zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
-        #else:
-        #    dm_ao_rhs = AODensityMatrix()
-        #    if self._dft:
-        #        perturbed_dm_ao = AODensityMatrix()
-        #        zero_dm_ao =  AODensityMatrix()
-
-        #    if self._dft:
-        #        # 3) Construct density matrices for E[3] term:
-        #        # XCIntegrator expects a DM with real and imaginary part,
-        #        # so we set the imaginary part to zero.
-        #        perturbed_dm_ao = AODensityMatrix([xmy_ao, 0*xmy_ao, xmy_ao, 0*xmy_ao],
-        #                                           denmat.rest)
-
-        #        # corresponds to rho^{omega_b,omega_c} in quadratic response,
-        #        # which is zero for TDDFT orbital response
-        #        zero_dm_ao = AODensityMatrix([0*xmy_ao, 0*xmy_ao],
-        #                                      denmat.rest)
         else:
             dm_ao_rhs = AODensityMatrix()
             if self._dft:
@@ -253,7 +244,7 @@ class RpaCphfSolver(CphfSolver):
             # Quadratic response routine for TDDFT E[3] term g^xc
             xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
                              gs_density, molecule, basis, molgrid,
-                             self.xcfun.get_func_label(), "qrf") #"quadratic")
+                             self.xcfun.get_func_label(), "qrf")
 
             fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
 
@@ -307,11 +298,11 @@ class RpaCphfSolver(CphfSolver):
         if self.rank == mpi_master():
             return {
                 'cphf_rhs': rhs_mo,
-                'dm_oo': dm_oo,
-                'dm_vv': dm_vv,
-                'xpy_ao': xpy_ao,
-                'xmy_ao': xmy_ao,
-                'unrel_dm_ao': unrel_dm_ao,
+                'density_occ_occ': dm_oo,
+                'density_vir_vir': dm_vv,
+                'x_plus_y_ao': xpy_ao,
+                'x_minus_y_ao': xmy_ao,
+                'unrelaxed_density_ao': unrel_dm_ao,
                 'fock_ao_rhs': fock_ao_rhs,
                 'fock_gxc_ao': fock_gxc_ao, # None if not DFT
             }
@@ -320,7 +311,7 @@ class RpaCphfSolver(CphfSolver):
 
     def compute_omega(self, molecule, basis, scf_tensors):
         """
-        Calculates the RPA Lagrange multipliers for the overlap matrix.
+        Calculates the omega Lagrange multipliers for the overlap matrix.
 
         :param molecule:
             The molecule.
@@ -358,8 +349,8 @@ class RpaCphfSolver(CphfSolver):
             eo_diag = np.diag(eocc)
             ev_diag = np.diag(evir)
 
-            xpy_ao = self.cphf_results['xpy_ao']
-            xmy_ao = self.cphf_results['xmy_ao']
+            xpy_ao = self.cphf_results['x_plus_y_ao']
+            xmy_ao = self.cphf_results['x_minus_y_ao']
             dof = xpy_ao.shape[0]
 
             fock_ao_rhs = self.cphf_results['fock_ao_rhs']
@@ -441,8 +432,8 @@ class RpaCphfSolver(CphfSolver):
                                                )
 
             # Construct the energy-weighted one particle density matrix
-            dm_oo = 0.5 * self.cphf_results['dm_oo']
-            dm_vv = 0.5 * self.cphf_results['dm_vv']
+            dm_oo = 0.5 * self.cphf_results['density_occ_occ']
+            dm_vv = 0.5 * self.cphf_results['density_vir_vir']
             epsilon_dm_ao = np.einsum('mi,ii,sij,nj->smn', mo_occ,
                                        eo_diag, dm_oo, mo_occ)
             epsilon_dm_ao += np.einsum('ma,aa,sab,nb->smn', mo_vir,

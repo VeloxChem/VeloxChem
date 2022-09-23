@@ -14,7 +14,6 @@ from .veloxchemlib import XCFunctional
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import GridDriver, XCMolecularGradient
-#from .orbitalresponse import OrbitalResponse
 from .cphfsolver import CphfSolver
 from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
@@ -101,7 +100,7 @@ class PolarizabilityGradient():
                 self._dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'PolarizabilityGradient: Undefined XC functional')
+                            'PolarizabilityGradient: Undefined XC functional')
 
         if 'frequency' in grad_dict:
             self.frequency = float(grad_dict['frequency'])
@@ -150,7 +149,6 @@ class PolarizabilityGradient():
             nvir = mo_vir.shape[1]
             natm = molecule.number_of_atoms()
 
-            # TODO: the following is available on the master node only
             # only alpha part:
             gs_dm = scf_tensors['D_alpha']
             lambda_mo = orbrsp_results['cphf_ov']
@@ -181,47 +179,43 @@ class PolarizabilityGradient():
             else:
                 frac_K = 1.0
 
-            # TODO: remove this member variable once the freq-dependent gradient is correct.
-            freq_dep_contrib = np.zeros((dof, dof, natm, 3))
 
-            # loop over atoms and contract integral derivatives with density matrices
+            # loop over atoms and contract integral derivatives
+			# with density matrices
             # add the corresponding contribution to the gradient
             for i in range(natm):
                 # taking integral derivatives from pyscf
                 d_ovlp = overlap_deriv(molecule, basis, i)
-                #d_fock = fock_deriv(molecule, basis, gs_dm, i)
                 d_hcore = hcore_deriv(molecule, basis, i)
                 d_eri = eri_deriv(molecule, basis, i)
                 d_dipole = dipole_deriv(molecule, basis, i)
 
-                # TODO: remove freq_dep_contrib
-                freq_dep_contrib[:, :, i] += -0.5 * self.frequency * ( np.einsum('amk,nl,xmn,ykl->xya', d_ovlp, ovlp, xpy, xmy)
-                                                         + np.einsum('amk,nl,xmn,ykl->xya', d_ovlp, ovlp, xmy, xpy)
-                                                         + np.einsum('mk,anl,xmn,ykl->xya', ovlp, d_ovlp, xpy, xmy)
-                                                         + np.einsum('mk,anl,xmn,ykl->xya', ovlp, d_ovlp, xmy, xpy)
-                                                          )
                 # Calculate the analytic polarizability gradient
-                pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_hcore)
-                                 +1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
-                                 #-0.5 * self.frequency * ( np.einsum('amk,nl,xmn,ykl->xya', d_ovlp, ovlp, xpy, xmy)
-                                 #                        + np.einsum('amk,nl,xmn,ykl->xya', d_ovlp, ovlp, xmy, xpy)
-                                 #                        + np.einsum('mk,anl,xmn,ykl->xya', ovlp, d_ovlp, xpy, xmy)
-                                 #                        + np.einsum('mk,anl,xmn,ykl->xya', ovlp, d_ovlp, xmy, xpy)
-                                 #                         )
-                                 +1.0 * (
-                                 +2.0 * np.einsum('mt,xynp,amtnp->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
-                                 -1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
-                                 +1.0 * np.einsum('xmn,ypt,atpmn->xya', xpy, xpy - xpy.transpose(0,2,1), d_eri)
-                                 -0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya', xpy, xpy - xpy.transpose(0,2,1), d_eri)
-                                 +1.0 * np.einsum('xmn,ypt,atpmn->xya', xmy, xmy + xmy.transpose(0,2,1), d_eri)
-                                 -0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya', xmy, xmy + xmy.transpose(0,2,1), d_eri)
-                                 +1.0 * np.einsum('xmn,ypt,atpmn->yxa', xpy, xpy - xpy.transpose(0,2,1), d_eri)
-                                 -0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa', xpy, xpy - xpy.transpose(0,2,1), d_eri)
-                                 +1.0 * np.einsum('xmn,ypt,atpmn->yxa', xmy, xmy + xmy.transpose(0,2,1), d_eri)
-                                 -0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa', xmy, xmy + xmy.transpose(0,2,1), d_eri)
-                                 )
-                                 -2.0 * np.einsum('xmn,yamn->xya', xmy, d_dipole)
-                                 -2.0 * np.einsum('xmn,yamn->yxa', xmy, d_dipole)
+                pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya',
+												      2.0 * rel_dm_ao, d_hcore)
+                    + 1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
+            		+ 2.0 * np.einsum('mt,xynp,amtnp->xya',
+									   gs_dm, 2.0 * rel_dm_ao, d_eri)
+                    - 1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya',
+											    gs_dm, 2.0 * rel_dm_ao, d_eri)
+                    + 1.0 * np.einsum('xmn,ypt,atpmn->xya',
+									   xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                    - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya',
+										xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                    + 1.0 * np.einsum('xmn,ypt,atpmn->xya',
+									   xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                    - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya',
+										xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                    + 1.0 * np.einsum('xmn,ypt,atpmn->yxa',
+									xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                    - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa',
+										xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                    + 1.0 * np.einsum('xmn,ypt,atpmn->yxa',
+									   xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                    - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa',
+									xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                    - 2.0 * np.einsum('xmn,yamn->xya', xmy, d_dipole)
+                    - 2.0 * np.einsum('xmn,yamn->yxa', xmy, d_dipole)
                                 )
 
             # Add exchange-correlation contributions to the gradient
@@ -229,19 +223,23 @@ class PolarizabilityGradient():
             if self._dft:
                 xcfun_label = self.xcfun.get_func_label()
                 for i in range(dof):
-                    #for j in range(dof): # include as soon as non-diagonal terms are available
+                    # for j in range(dof): 
+					# TODO:  include as soon as non-diagonal terms are available
                     if self.rank == mpi_master():
                         gs_density = AODensityMatrix([gs_dm], denmat.rest)
 
                         rhow_dm = 1.0 * rel_dm_ao[i,i]
                         rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
-                        rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
+                        rhow_den_sym = AODensityMatrix([rhow_dm_sym],
+													   denmat.rest)
 
-                        # Takes only one vector type, but two are needed to account for
-                        # the different {x,y,z} components of the response vectors
-                        # doing only diagonal components for now.
+                        # Takes only one vector type, but two are needed
+						# to account for the different {x,y,z} components
+						# of the response vectors so we are doing only
+						# diagonal components for now.
                         # The sqrt2 takes into account the fact that we need to
-                        # symmetrize with respect to the polarizability components.
+                        # symmetrize with respect to the polarizability
+						# components.
                         # (see contraction with two-electron integrals above).
                         xmy_sym = np.sqrt(2) * 0.5 * (xmy[i] + xmy[i].T)
                         xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
@@ -255,9 +253,9 @@ class PolarizabilityGradient():
                     rhow_den_sym.broadcast(self.rank, self.comm)
                     xmy_den_sym.broadcast(self.rank, self.comm)
 
-                    polgrad_xcgrad = self.grad_polgrad_xc_contrib(molecule, basis,
-                                                                  rhow_den_sym, xmy_den_sym,
-                                                                  gs_density, xcfun_label)
+                    polgrad_xcgrad = self.grad_polgrad_xc_contrib(molecule,
+											basis, rhow_den_sym, xmy_den_sym,
+                                                     gs_density, xcfun_label)
 
                     if self.rank == mpi_master():
                         pol_gradient[i,i] += polgrad_xcgrad

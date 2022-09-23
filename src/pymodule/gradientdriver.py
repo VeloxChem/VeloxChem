@@ -435,6 +435,7 @@ class GradientDriver:
                     valstr += '{:22.12f}'.format(self.gradient[i, d])
                 self.ostream.print_header(valstr)
         else:
+            index = 0
             for s in state_deriv_index:
                 self.ostream.print_blank()
                 state = 'Excited State %d' % s
@@ -449,9 +450,9 @@ class GradientDriver:
                 for i in range(molecule.number_of_atoms()):
                     valstr = '  {:<4s}'.format(labels[i])
                     for d in range(3):
-                        valstr += '{:22.12f}'.format(self.gradient[s-1, i, d])
+                        valstr += '{:22.12f}'.format(self.gradient[index, i, d])
                     self.ostream.print_header(valstr)
-    
+                index += 1
         self.ostream.print_blank()
         self.ostream.flush()
 

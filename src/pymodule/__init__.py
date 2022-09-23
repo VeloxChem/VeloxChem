@@ -117,11 +117,11 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
-from .orbitalresponse import OrbitalResponse
-from .tdacphfsolver import TdaCphfSolver
-from .rpacphfsolver import RpaCphfSolver
-from .tdhfgradientdriver import TdhfGradientDriver
-from .tdscfgradientdriver import TdscfGradientDriver
+from .orbitalresponse import OrbitalResponse # TODO: remove
+from .tdacphfsolver import TdaCphfSolver # TODO: remove
+from .tddftgradientdriver import TddftOrbitalResponse
+from .tdhfgradientdriver import TdhfGradientDriver # TODO: remove
+from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .cphfsolver import CphfSolver
