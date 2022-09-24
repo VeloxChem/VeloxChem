@@ -224,7 +224,7 @@ class OrbitalViewer:
         # In some cases (for example NTOs) the number of orbitals is less than
         # the number of electrons. In this case, print the middle orbital
         if self.mo_coefs.shape[1] < self.molecule.number_of_alpha_electrons():
-            self.i_orb = self.mo_coefs.shape[1]/2
+            self.i_orb = self.mo_coefs.shape[1] // 2
         if self.is_uhf:
             self.mo_coefs_beta = mo_object.beta_to_numpy()
         else:
@@ -265,13 +265,9 @@ class OrbitalViewer:
             orblist.insert(0, ('', -1))
             # Add widget
             self.orbital_selector = widgets.Dropdown(
-                options=orblist, value=self.i_orb,
-                description='Alpha orbital:'
-            )
+                options=orblist, value=self.i_orb, description='Alpha orbital:')
             self.orbital_selector_beta = widgets.Dropdown(
-                options=orblist_beta, value=-1,
-                description='Beta orbital:'
-            )
+                options=orblist_beta, value=-1, description='Beta orbital:')
             hbox = widgets.HBox(
                 [self.orbital_selector, self.orbital_selector_beta])
             display(hbox)
@@ -298,7 +294,7 @@ class OrbitalViewer:
 
         i_orb = change['new']
 
-        # Do not do anything if "blank index" is chosen
+        # Do not do anything if 'blank index' is chosen
         if i_orb < 0:
             return
 
@@ -429,8 +425,7 @@ class OrbitalViewer:
                         colors=[color_i, color_i],
                         shader='mesh',
                         radial_segments=16,
-                        group='Molecule'
-                    ))
+                        group='Molecule'))
                 plt_bonds.append(
                     k3d.line(
                         [0.5 * (coords[i, :] + coords[j, :]), coords[j, :]],
@@ -438,8 +433,7 @@ class OrbitalViewer:
                         colors=[color_j, color_j],
                         shader='mesh',
                         radial_segments=16,
-                        group='Molecule'
-                    ))
+                        group='Molecule'))
 
         return plt_atoms, plt_bonds
 
@@ -479,6 +473,7 @@ class OrbitalViewer:
         opacity = 1.0
         wireframe = False
         color = 0x0000ff
+
         # Find if the user changed the defaults
         if self.plt_iso_one:
             isovalue = self.plt_iso_one.level
@@ -486,18 +481,16 @@ class OrbitalViewer:
             wireframe = self.plt_iso_one.wireframe
             color = self.plt_iso_one.color
 
-        plt_iso_one = k3d.marching_cubes(
-            orbital_k3d,
-            compression_level=9,
-            bounds=bounds,
-            level=isovalue,
-            flat_shading=False,
-            opacity=opacity,
-            wireframe=wireframe,
-            color=color,
-            name="Positive isosurface",
-            group="Orbitals"
-        )
+        plt_iso_one = k3d.marching_cubes(orbital_k3d,
+                                         compression_level=9,
+                                         bounds=bounds,
+                                         level=isovalue,
+                                         flat_shading=False,
+                                         opacity=opacity,
+                                         wireframe=wireframe,
+                                         color=color,
+                                         name='Positive isosurface',
+                                         group='Orbitals')
 
         # Find if the user changed the defaults
         isovalue = -isovalue
@@ -508,17 +501,15 @@ class OrbitalViewer:
             wireframe = self.plt_iso_two.wireframe
             color = self.plt_iso_two.color
 
-        plt_iso_two = k3d.marching_cubes(
-            orbital_k3d,
-            compression_level=9,
-            bounds=bounds,
-            level=isovalue,
-            flat_shading=False,
-            opacity=opacity,
-            wireframe=wireframe,
-            color=color,
-            name="Negative isosurface",
-            group="Orbitals"
-        )
+        plt_iso_two = k3d.marching_cubes(orbital_k3d,
+                                         compression_level=9,
+                                         bounds=bounds,
+                                         level=isovalue,
+                                         flat_shading=False,
+                                         opacity=opacity,
+                                         wireframe=wireframe,
+                                         color=color,
+                                         name='Negative isosurface',
+                                         group='Orbitals')
 
         return plt_iso_one, plt_iso_two
