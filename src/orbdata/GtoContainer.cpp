@@ -26,6 +26,7 @@
 #include "GtoContainer.hpp"
 
 #include "AngularMomentum.hpp"
+#include "StringFormat.hpp"
 
 CGtoContainer::CGtoContainer()
 
@@ -76,6 +77,31 @@ CGtoContainer::CGtoContainer(const CMolecule& molecule, const CMolecularBasis& b
             _gtoBlocks.push_back(gtoblock);
 
             if (_maxAngularMomentum < i) _maxAngularMomentum = i;
+        }
+    }
+}
+
+CGtoContainer::CGtoContainer(const CMolecule&       molecule,
+                             const CMolecularBasis& basis,
+                             const std::string&     flag)
+
+    : _maxAngularMomentum(-1)
+{
+    if (fstr::upcase(flag) == "ATOMGTOS")
+    {
+        for (int32_t iang = 0; iang <= basis.getMaxAngularMomentum(); iang++)
+        {
+            for (int32_t iatom = 0; iatom < molecule.getNumberOfAtoms(); iatom++)
+            {
+                CGtoBlock gtoblock(molecule, basis, iatom, 1, iang);
+
+                if (!gtoblock.empty())
+                {
+                    _gtoBlocks.push_back(gtoblock);
+
+                    if (_maxAngularMomentum < iang) _maxAngularMomentum = iang;
+                }
+            }
         }
     }
 }

@@ -44,6 +44,8 @@
 #include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
+#include "XCNewIntegrator.hpp"
+#include "XCNewMolecularGradient.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -195,6 +197,17 @@ export_dft(py::module& m)
             "Broadcasts MolecularGrid object.",
             "rank"_a,
             "py_comm"_a)
+        .def("partition_grid_points", &CMolecularGrid::partitionGridPoints)
+        .def(
+            "distribute_counts_and_displacements",
+            [](CMolecularGrid& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.distributeCountsAndDisplacements(rank, nodes, *comm);
+            },
+            "Distributes MolecularGrid counts and displacements.",
+            "rank"_a,
+            "nodes"_a,
+            "py_comm"_a)
         .def(py::self == py::self);
 
     // CGridDriver class
@@ -283,6 +296,137 @@ export_dft(py::module& m)
              "xcFuncLabel"_a,
              "quadMode"_a)
         .def("integrate_pdft", &integrate_pdft);
+
+    // CXCNewIntegrator class
+
+    PyClass<CXCNewIntegrator>(m, "XCNewIntegrator")
+        .def(py::init(&vlx_general::create<CXCNewIntegrator>), "comm"_a = py::none())
+        .def("integrate_vxc_fock",
+             &CXCNewIntegrator::integrateVxcFock,
+             "Integrates 1st-order exchange-correlation contribution to Kohn-Sham matrix.",
+             "molecule"_a,
+             "basis"_a,
+             "densityMatrix"_a,
+             "molecularGrid"_a,
+             "xcFuncLabel"_a)
+        .def("integrate_fxc_fock",
+             &CXCNewIntegrator::integrateFxcFock,
+             "Integrates 2nd-order exchange-correlation contribution to Fock matrix.",
+             "aoFockMatrix"_a,
+             "molecule"_a,
+             "basis"_a,
+             "rwDensityMatrix"_a,
+             "gsDensityMatrix"_a,
+             "molecularGrid"_a,
+             "xcFuncLabel"_a)
+        .def("integrate_kxc_fock",
+             &CXCNewIntegrator::integrateKxcFock,
+             "Integrates 3rd-order exchange-correlation contribution to Fock matrix.",
+             "aoFockMatrix"_a,
+             "molecule"_a,
+             "basis"_a,
+             "rwDensityMatrix"_a,
+             "rw2DensityMatrix"_a,
+             "gsDensityMatrix"_a,
+             "molecularGrid"_a,
+             "xcFuncLabel"_a,
+             "quadMode"_a)
+        .def(
+            "compute_gto_values",
+            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
+                -> py::array_t<double> {
+                auto gtovalues = self.computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
+                return vlx_general::pointer_to_numpy(gtovalues.values(), gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns());
+            },
+            "Computes GTO values on grid points.",
+            "molecule"_a,
+            "basis"_a,
+            "molecularGrid"_a);
+
+    // CXCNewMolecularGradient class
+
+    PyClass<CXCNewMolecularGradient>(m, "XCNewMolecularGradient")
+        .def(py::init(&vlx_general::create<CXCNewMolecularGradient>), "comm"_a = py::none())
+        .def(
+            "integrate_vxc_gradient",
+            [](CXCNewMolecularGradient& self,
+               const CMolecule&         molecule,
+               const CMolecularBasis&   basis,
+               const CAODensityMatrix&  gsDensityMatrix,
+               const CMolecularGrid&    molecularGrid,
+               const std::string&       xcFuncLabel) -> py::array_t<double> {
+                auto molgrad = self.integrateVxcGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates 1st-order exchange-correlation contribution to molecular gradient.",
+            "molecule"_a,
+            "basis"_a,
+            "gsDensityMatrix"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a)
+        .def(
+            "integrate_vxc_gradient",
+            [](CXCNewMolecularGradient& self,
+               const CMolecule&         molecule,
+               const CMolecularBasis&   basis,
+               const CAODensityMatrix&  rwDensityMatrix,
+               const CAODensityMatrix&  gsDensityMatrix,
+               const CMolecularGrid&    molecularGrid,
+               const std::string&       xcFuncLabel) -> py::array_t<double> {
+                auto molgrad = self.integrateVxcGradient(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates 1st-order exchange-correlation contribution to molecular gradient.",
+            "molecule"_a,
+            "basis"_a,
+            "rwDensityMatrix"_a,
+            "gsDensityMatrix"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a)
+        .def(
+            "integrate_fxc_gradient",
+            [](CXCNewMolecularGradient& self,
+               const CMolecule&         molecule,
+               const CMolecularBasis&   basis,
+               const CAODensityMatrix&  rwDensityMatrixOne,
+               const CAODensityMatrix&  rwDensityMatrixTwo,
+               const CAODensityMatrix&  gsDensityMatrix,
+               const CMolecularGrid&    molecularGrid,
+               const std::string&       xcFuncLabel) -> py::array_t<double> {
+                auto molgrad =
+                    self.integrateFxcGradient(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates 2nd-order exchange-correlation contribution to molecular gradient.",
+            "molecule"_a,
+            "basis"_a,
+            "rwDensityMatrixOne"_a,
+            "rwDensityMatrixTwo"_a,
+            "gsDensityMatrix"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a)
+        .def(
+            "integrate_kxc_gradient",
+            [](CXCNewMolecularGradient& self,
+               const CMolecule&         molecule,
+               const CMolecularBasis&   basis,
+               const CAODensityMatrix&  rwDensityMatrixOne,
+               const CAODensityMatrix&  rwDensityMatrixTwo,
+               const CAODensityMatrix&  gsDensityMatrix,
+               const CMolecularGrid&    molecularGrid,
+               const std::string&       xcFuncLabel) -> py::array_t<double> {
+                auto molgrad =
+                    self.integrateKxcGradient(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates 3rd-order exchange-correlation contribution to molecular gradient.",
+            "molecule"_a,
+            "basis"_a,
+            "rwDensityMatrixOne"_a,
+            "rwDensityMatrixTwo"_a,
+            "gsDensityMatrix"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a);
 
     // CXCMolecularGradient class
 

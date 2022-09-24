@@ -21,8 +21,10 @@ class TestForceField:
 
         from urllib.request import urlopen
 
-        gaff_url = ('https://raw.githubusercontent.com/openmm/' +
-                    'openmmforcefields/master/amber/gaff/dat/' + gaff_name)
+        openmmff_commit = '73a0707dc6411f05cac0365828eae017d05adfae'
+        gaff_url = (
+            'https://raw.githubusercontent.com/openmm/openmmforcefields/' +
+            openmmff_commit + '/amber/gaff/dat/' + gaff_name)
 
         with urlopen(gaff_url) as f_gaff:
             content = f_gaff.read().decode('utf-8')

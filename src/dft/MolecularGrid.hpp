@@ -32,7 +32,13 @@
 
 #include <mpi.h>
 
+#include "AODensityMatrix.hpp"
+#include "DenseMatrix.hpp"
+#include "DensityGridDriver.hpp"
+#include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
 
 /**
  Class CMolecularGrid class generates molecular grid.
@@ -50,6 +56,26 @@ class CMolecularGrid
      The grid points (coordinates, weights).
      */
     CMemBlock2D<double> _gridPoints;
+
+    /**
+     The parition status of molecular grid object.
+     */
+    bool _isPartitioned;
+
+    /**
+     The number of grid points in the partitioned grid boxes.
+     */
+    CMemBlock<int32_t> _gridPointCounts;
+
+    /**
+     The displacement of grid points in the partitioned grid boxes.
+     */
+    CMemBlock<int32_t> _gridPointDisplacements;
+
+    /**
+     The maximum number of grid points in a grid box.
+     */
+    int32_t _maxNumberOfGridPointsPerBox;
 
    public:
     /**
@@ -112,14 +138,20 @@ class CMolecularGrid
      @return true if molecular grid objects are not equal, false otherwise.
      */
     bool operator!=(const CMolecularGrid& other) const;
-    
-    
+
     /**
      Reduces size of molecular grid by slicing all grid points beoynd given number of grid points.
 
      @param nGridPoints the number of grid points.
      */
     void slice(const int32_t nGridPoints);
+
+    /**
+     Gets grid points in molecular grid object.
+
+     @return the grid points.
+     */
+    CMemBlock2D<double> getGridPoints() const;
 
     /**
      Gets number of grid points in molecular grid object.
@@ -233,6 +265,51 @@ class CMolecularGrid
      @return the spatial extent (min x, min y, min z, max x, max y, max z).
      */
     std::array<double, 6> getSpatialExtent() const;
+
+    /**
+     Partitions grid points into boxes.
+
+     @return summary of grid points partitioning as a string.
+     */
+    std::string partitionGridPoints();
+
+    /**
+     Distributes grid point counts and displacements within domain of MPI
+     communacator and sets distribution flag to true.
+
+     @param rank the rank of MPI process.
+     @param nodes the number of nodes in MPI domain.
+     @param comm he MPI communicator.
+     */
+    void distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm);
+
+    /**
+     Checks whether the molecular grid has been partitioned.
+
+     @return whether the molecular grid has been partitioned.
+     */
+    bool isPartitioned() const;
+
+    /**
+     Gets the grid point counts.
+
+     @return the grid point counts.
+     */
+    CMemBlock<int32_t> getGridPointCounts() const;
+
+    /**
+     Gets the grid point displacements.
+
+     @return the grid point displacements.
+     */
+    CMemBlock<int32_t> getGridPointDisplacements() const;
+
+    /**
+     Gets the maximum number of grid points in a grid box.
+
+     @return the maximum number of grid points in a grid box.
+     */
+    int32_t getMaxNumberOfGridPointsPerBox() const;
 
     /**
      Converts molecular grid object to text and insert it into output text
