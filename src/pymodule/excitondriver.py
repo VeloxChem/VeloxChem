@@ -37,7 +37,7 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCNewIntegrator
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import mpi_master
@@ -1098,7 +1098,6 @@ class ExcitonModelDriver:
             grid_t0 = tm.time()
             dimer_molgrid = grid_drv.generate(dimer)
             n_grid_points = dimer_molgrid.number_of_points()
-            dimer_molgrid.distribute(self.rank, self.nodes, self.comm)
             self.ostream.print_info(
                 'Molecular grid with {} points generated in {:.2f} sec.'.format(
                     n_grid_points,
@@ -1142,9 +1141,13 @@ class ExcitonModelDriver:
             if not xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
-            xc_drv = XCIntegrator(self.comm)
-            vxc_mat = xc_drv.integrate(dens_mat, dimer, basis, dimer_molgrid,
-                                       self.xcfun_label)
+            dimer_molgrid.partition_grid_points()
+            dimer_molgrid.distribute_counts_and_displacements(
+                self.rank, self.nodes, self.comm)
+
+            xc_drv = XCNewIntegrator(self.comm)
+            vxc_mat = xc_drv.integrate_vxc_fock(dimer, basis, dens_mat,
+                                                dimer_molgrid, self.xcfun_label)
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.rank == mpi_master():
@@ -1427,11 +1430,18 @@ class ExcitonModelDriver:
             if not xcfun.is_hybrid():
                 for s in range(tfock_mat.number_of_fock_matrices()):
                     tfock_mat.scale(2.0, s)
-            xc_drv = XCIntegrator(self.comm)
+
             dens_mat = dimer_prop['density']
             dimer_molgrid = dimer_prop['molgrid']
-            xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer, basis,
-                             dimer_molgrid, self.xcfun_label)
+
+            dimer_molgrid.partition_grid_points()
+            dimer_molgrid.distribute_counts_and_displacements(
+                self.rank, self.nodes, self.comm)
+
+            xc_drv = XCNewIntegrator(self.comm)
+            xc_drv.integrate_fxc_fock(tfock_mat, dimer, basis, tdens_mat,
+                                      dens_mat, dimer_molgrid, self.xcfun_label)
+
         tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.rank == mpi_master():
