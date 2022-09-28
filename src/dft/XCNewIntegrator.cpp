@@ -692,9 +692,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.start("XC functional eval.");
 
-        CXCGradientGrid vxcgrid(screened_npoints, screened_dengrid.getDensityGridType(), xcfuntype);
+        CXCGradientGrid vxcgrid(npoints, dengrid.getDensityGridType(), xcfuntype);
 
-        xcFunctional.compute(vxcgrid, screened_dengrid);
+        xcFunctional.compute(vxcgrid, dengrid);
 
         timer.stop("XC functional eval.");
 
