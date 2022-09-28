@@ -6,6 +6,7 @@ target_sources(vlxobjs
     DensityGridGenerator.cpp
     DensityGridQuad.cpp
     GridBox.cpp
+    GridScreener.cpp
     GridDriver.cpp
     GridPartitioner.cpp
     GtoEvaluator.cpp

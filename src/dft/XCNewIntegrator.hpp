@@ -75,6 +75,11 @@ class CXCNewIntegrator
     double _screeningThresholdForGTOValues;
 
     /**
+     Screening threshold for density values on grid points.
+     */
+    double _screeningThresholdForDensityValues;
+
+    /**
      Integrates first-order LDA exchnage-correlation functional contribution to
      AO Kohn-Sham matrix.
 
@@ -199,7 +204,6 @@ class CXCNewIntegrator
     /**
      Integrates LDA contribution to (first-order) Vxc matrix.
 
-     @param gridBlockPosition the starting position of the grid box.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -207,8 +211,7 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialVxcFockForLDA(const int32_t          gridBlockPosition,
-                                                const int32_t          npoints,
+    CDenseMatrix _integratePartialVxcFockForLDA(const int32_t          npoints,
                                                 const double*          weights,
                                                 const CDenseMatrix&    gtoValues,
                                                 const CXCGradientGrid& xcGradientGrid,
@@ -217,7 +220,6 @@ class CXCNewIntegrator
     /**
      Integrates GGA contribution to AO Kohn-Sham matrix.
 
-     @param gridblockpos the starting position of the grid box.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -229,8 +231,7 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialVxcFockForGGA(const int32_t          gridblockpos,
-                                                const int32_t          npoints,
+    CDenseMatrix _integratePartialVxcFockForGGA(const int32_t          npoints,
                                                 const double*          weights,
                                                 const CDenseMatrix&    gtoValues,
                                                 const CDenseMatrix&    gtoValuesX,
