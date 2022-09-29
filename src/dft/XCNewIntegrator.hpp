@@ -244,7 +244,6 @@ class CXCNewIntegrator
     /**
      Integrates LDA contribution to (second-order) Fxc matrix.
 
-     @param gridBlockPosition the starting position of the grid box.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -253,8 +252,7 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForLDA(const int32_t          gridBlockPosition,
-                                                const int32_t          npoints,
+    CDenseMatrix _integratePartialFxcFockForLDA(const int32_t          npoints,
                                                 const double*          weights,
                                                 const CDenseMatrix&    gtoValues,
                                                 const CXCHessianGrid&  xcHessianGrid,
@@ -264,7 +262,6 @@ class CXCNewIntegrator
     /**
      Integrates GGA contribution to (second-order) Fxc matrix.
 
-     @param gridblockpos the starting position of the grid box.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -278,8 +275,7 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForGGA(const int32_t          gridblockpos,
-                                                const int32_t          npoints,
+    CDenseMatrix _integratePartialFxcFockForGGA(const int32_t          npoints,
                                                 const double*          weights,
                                                 const CDenseMatrix&    gtoValues,
                                                 const CDenseMatrix&    gtoValuesX,
