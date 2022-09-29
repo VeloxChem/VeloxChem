@@ -1219,7 +1219,6 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         if (screened_npoints == 0) continue;
 
-
         // compute exchange-correlation functional derivative
 
         timer.start("XC functional eval.");
@@ -1334,6 +1333,14 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     std::vector<int32_t> aoinds(naos);
 
+    // indices for keeping track of valid grid points
+
+    std::vector<int32_t> screened_point_inds(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> screened_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto screened_weights = screened_weights_data.data();
+
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
@@ -1434,15 +1441,13 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.stop("GTO screening");
 
+        if (aocount == 0) continue;
+
         // generate sub density matrix
 
         timer.start("Density matrix slicing");
 
         auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
-
-        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
-
-        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
 
         timer.stop("Density matrix slicing");
 
@@ -1452,9 +1457,47 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         auto gsdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, gs_sub_dens_mat, xcfuntype, timer);
 
-        auto rwdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw_sub_dens_mat, xcfuntype, timer);
+        // screen density grid, weights and GTO matrix
 
-        auto rw2dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw2_sub_dens_mat, xcfuntype, timer);
+        timer.start("Density screening");
+
+        CDensityGrid screened_gsdengrid(gsdengrid);
+
+        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_gsdengrid, gsdengrid,
+
+                                            _screeningThresholdForDensityValues);
+
+        auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
+
+        gridscreen::screenWeights(screened_weights, gridblockpos, weights, screened_point_inds, screened_npoints);
+
+        CDenseMatrix screened_mat_chi(mat_chi.getNumberOfRows(), screened_npoints);
+
+        gridscreen::screenGtoMatrixForLDA(screened_mat_chi, mat_chi, screened_point_inds, screened_npoints);
+
+        timer.stop("Density screening");
+
+        if (screened_npoints == 0) continue;
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+
+        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        auto rwdengrid = dengridgen::generateDensityGridForLDA(screened_npoints, screened_mat_chi,
+
+                                                               rw_sub_dens_mat, xcfuntype, timer);
+
+        auto rw2dengrid = dengridgen::generateDensityGridForLDA(screened_npoints, screened_mat_chi,
+
+                                                                rw2_sub_dens_mat, xcfuntype, timer);
 
         // compute perturbed density
 
@@ -1462,7 +1505,7 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         auto numdens_rw2 = rw2DensityMatrix.getNumberOfDensityMatrices();
 
-        CDensityGridQuad rwdengridquad(npoints, numdens_rw2, xcfuntype, dengrid::ab);
+        CDensityGridQuad rwdengridquad(screened_npoints, numdens_rw2, xcfuntype, dengrid::ab);
 
         rwdengridquad.DensityProd(rwdengrid, xcfuntype, numdens_rw2, quadMode);
 
@@ -1472,13 +1515,13 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("XC functional eval.");
 
-        CXCHessianGrid vxc2grid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+        CXCHessianGrid vxc2grid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
 
-        CXCCubicHessianGrid vxc3grid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+        CXCCubicHessianGrid vxc3grid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
 
-        xcFunctional.compute(vxc2grid, gsdengrid);
+        xcFunctional.compute(vxc2grid, screened_gsdengrid);
 
-        xcFunctional.compute(vxc3grid, gsdengrid);
+        xcFunctional.compute(vxc3grid, screened_gsdengrid);
 
         timer.stop("XC functional eval.");
 
@@ -1488,7 +1531,7 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
         {
             // compute partial contribution to Kxc matrix
 
-            auto partial_mat_Kxc = _integratePartialKxcFockForLDA(gridblockpos, npoints, weights, mat_chi,
+            auto partial_mat_Kxc = _integratePartialKxcFockForLDA(screened_npoints, screened_weights, screened_mat_chi,
 
                                                                   vxc2grid, vxc3grid, rwdengridquad, rw2dengrid,
 
@@ -1569,6 +1612,14 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     CMemBlock<int32_t> skip_ao_ids(naos);
 
     std::vector<int32_t> aoinds(naos);
+
+    // indices for keeping track of valid grid points
+
+    std::vector<int32_t> screened_point_inds(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> screened_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto screened_weights = screened_weights_data.data();
 
     // coordinates and weights of grid points
 
@@ -1691,15 +1742,13 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.stop("GTO screening");
 
+        if (aocount == 0) continue;
+
         // generate sub density matrix
 
         timer.start("Density matrix slicing");
 
         auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
-
-        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
-
-        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
 
         timer.stop("Density matrix slicing");
 
@@ -1711,11 +1760,57 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
                                                                gs_sub_dens_mat, xcfuntype, timer);
 
-        auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+        // screen density grid, weights and GTO matrix
+
+        timer.start("Density screening");
+
+        CDensityGrid screened_gsdengrid(gsdengrid);
+
+        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_gsdengrid, gsdengrid,
+
+                                            _screeningThresholdForDensityValues);
+
+        auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
+
+        gridscreen::screenWeights(screened_weights, gridblockpos, weights, screened_point_inds, screened_npoints);
+
+        CDenseMatrix screened_mat_chi(mat_chi.getNumberOfRows(), screened_npoints);
+
+        CDenseMatrix screened_mat_chi_x(mat_chi.getNumberOfRows(), screened_npoints);
+
+        CDenseMatrix screened_mat_chi_y(mat_chi.getNumberOfRows(), screened_npoints);
+
+        CDenseMatrix screened_mat_chi_z(mat_chi.getNumberOfRows(), screened_npoints);
+
+        gridscreen::screenGtoMatrixForGGA(screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                          mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, screened_point_inds, screened_npoints);
+
+        timer.stop("Density screening");
+
+        if (screened_npoints == 0) continue;
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+
+        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        auto rwdengrid = dengridgen::generateDensityGridForGGA(screened_npoints, screened_mat_chi,
+
+                                                               screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
 
                                                                rw_sub_dens_mat, xcfuntype, timer);
 
-        auto rw2dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+        auto rw2dengrid = dengridgen::generateDensityGridForGGA(screened_npoints, screened_mat_chi,
+
+                                                                screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
 
                                                                 rw2_sub_dens_mat, xcfuntype, timer);
 
@@ -1725,7 +1820,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         auto numdens_rw2 = rw2DensityMatrix.getNumberOfDensityMatrices();
 
-        CDensityGridQuad rwdengridquad(npoints, numdens_rw2, xcfuntype, dengrid::ab);
+        CDensityGridQuad rwdengridquad(screened_npoints, numdens_rw2, xcfuntype, dengrid::ab);
 
         rwdengridquad.DensityProd(rwdengrid, xcfuntype, numdens_rw2, quadMode);
 
@@ -1735,17 +1830,17 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("XC functional eval.");
 
-        CXCGradientGrid vxcgrid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+        CXCGradientGrid vxcgrid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
 
-        CXCHessianGrid vxc2grid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+        CXCHessianGrid vxc2grid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
 
-        CXCCubicHessianGrid vxc3grid(npoints, gsdengrid.getDensityGridType(), xcfuntype);
+        CXCCubicHessianGrid vxc3grid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
 
-        xcFunctional.compute(vxcgrid, gsdengrid);
+        xcFunctional.compute(vxcgrid, screened_gsdengrid);
 
-        xcFunctional.compute(vxc2grid, gsdengrid);
+        xcFunctional.compute(vxc2grid, screened_gsdengrid);
 
-        xcFunctional.compute(vxc3grid, gsdengrid);
+        xcFunctional.compute(vxc3grid, screened_gsdengrid);
 
         timer.stop("XC functional eval.");
 
@@ -1755,13 +1850,13 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
         {
             // compute partial contribution to Kxc matrix
 
-            auto partial_mat_Kxc = _integratePartialKxcFockForGGA(gridblockpos, npoints, weights, mat_chi,
+            auto partial_mat_Kxc = _integratePartialKxcFockForGGA(screened_npoints, screened_weights, screened_mat_chi,
 
-                                                                  mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                  screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
 
                                                                   vxcgrid, vxc2grid, vxc3grid,
 
-                                                                  rwdengridquad, rw2dengrid, gsdengrid,
+                                                                  rwdengridquad, rw2dengrid, screened_gsdengrid,
 
                                                                   idensity, timer);
 
@@ -2242,8 +2337,7 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          npoints,
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              gridBlockPosition,
-                                                 const int32_t              npoints,
+CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              npoints,
                                                  const double*              weights,
                                                  const CDenseMatrix&        gtoValues,
                                                  const CXCHessianGrid&      xcHessianGrid,
@@ -2311,7 +2405,7 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              grid
                     G_val, chi_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-                G_val[nu_offset + g] = weights[gridBlockPosition + g] *
+                G_val[nu_offset + g] = weights[g] *
 
                           ((grho_aaa[g] + grho_aab[g] + grho_aab[g] + grho_abb[g]) * rhow1a[g] +
 
@@ -2336,8 +2430,7 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              grid
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              gridblockpos,
-                                                 const int32_t              npoints,
+CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoints,
                                                  const double*              weights,
                                                  const CDenseMatrix&        gtoValues,
                                                  const CDenseMatrix&        gtoValuesX,
@@ -2542,7 +2635,7 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              grid
                     G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-                double w = weights[gridblockpos + g];
+                double w = weights[g];
 
                 double znva = 1.0 / ngrada[g];
 
