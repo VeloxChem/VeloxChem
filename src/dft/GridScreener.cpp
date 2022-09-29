@@ -64,44 +64,6 @@ screenDensityGridForLDA(std::vector<int32_t>& gridPointInds,
 }
 
 void
-screenWeights(double*                     screenedWeights,
-              const int32_t               gridBlockPosition,
-              const double*               weights,
-              const std::vector<int32_t>& gridPointInds,
-              const int32_t               nScreenedGridPoints)
-{
-    for (int32_t g = 0; g < nScreenedGridPoints; g++)
-    {
-        auto g_orig = gridPointInds[g];
-
-        screenedWeights[g] = weights[gridBlockPosition + g_orig];
-    }
-}
-
-void
-screenGtoMatrixForLDA(CDenseMatrix&               screenedGtoValues,
-                      const CDenseMatrix&         originalGtoValues,
-                      const std::vector<int32_t>& gridPointInds,
-                      const int32_t               nScreenedGridPoints)
-{
-    auto naos = originalGtoValues.getNumberOfRows();
-
-    for (int32_t nu = 0; nu < naos; nu++)
-    {
-        auto screened_row = screenedGtoValues.row(nu);
-
-        auto original_row = originalGtoValues.row(nu);
-
-        for (int32_t g = 0; g < nScreenedGridPoints; g++)
-        {
-            auto g_orig = gridPointInds[g];
-
-            screened_row[g] = original_row[g_orig];
-        }
-    }
-}
-
-void
 screenDensityGridForGGA(std::vector<int32_t>& gridPointInds,
                         CDensityGrid&         destDensityGrid,
                         const CDensityGrid&   srcDensityGrid,
@@ -191,6 +153,44 @@ screenDensityGridForGGA(std::vector<int32_t>& gridPointInds,
     }
 
     destDensityGrid.slice(gpcount);
+}
+
+void
+screenWeights(double*                     screenedWeights,
+              const int32_t               gridBlockPosition,
+              const double*               weights,
+              const std::vector<int32_t>& gridPointInds,
+              const int32_t               nScreenedGridPoints)
+{
+    for (int32_t g = 0; g < nScreenedGridPoints; g++)
+    {
+        auto g_orig = gridPointInds[g];
+
+        screenedWeights[g] = weights[gridBlockPosition + g_orig];
+    }
+}
+
+void
+screenGtoMatrixForLDA(CDenseMatrix&               screenedGtoValues,
+                      const CDenseMatrix&         originalGtoValues,
+                      const std::vector<int32_t>& gridPointInds,
+                      const int32_t               nScreenedGridPoints)
+{
+    auto naos = originalGtoValues.getNumberOfRows();
+
+    for (int32_t nu = 0; nu < naos; nu++)
+    {
+        auto screened_row = screenedGtoValues.row(nu);
+
+        auto original_row = originalGtoValues.row(nu);
+
+        for (int32_t g = 0; g < nScreenedGridPoints; g++)
+        {
+            auto g_orig = gridPointInds[g];
+
+            screened_row[g] = original_row[g_orig];
+        }
+    }
 }
 
 void
