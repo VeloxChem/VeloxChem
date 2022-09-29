@@ -339,6 +339,8 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.stop("GTO screening");
 
+        if (aocount == 0) continue;
+
         // generate sub density matrix
 
         timer.start("Density matrix slicing");
@@ -372,6 +374,8 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
         gridscreen::screenGtoMatrixForLDA(screened_mat_chi, mat_chi, screened_point_inds, screened_npoints);
 
         timer.stop("Density screening");
+
+        if (screened_npoints == 0) continue;
 
         // compute exchange-correlation functional derivative
 
@@ -624,6 +628,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.stop("GTO screening");
 
+        if (aocount == 0) continue;
+
         // generate sub density matrix
 
         timer.start("Density matrix slicing");
@@ -667,6 +673,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
                                           mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, screened_point_inds, screened_npoints);
 
         timer.stop("Density screening");
+
+        if (screened_npoints == 0) continue;
 
         // compute exchange-correlation functional derivative
 
