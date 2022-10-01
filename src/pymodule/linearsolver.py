@@ -37,7 +37,7 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCIntegrator, XCNewIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
@@ -861,19 +861,24 @@ class LinearSolver:
             eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
             eri_drv.compute(fock, dens, molecule, basis, screening)
             if profiler is not None:
-                profiler.add_timing_info('ERI', tm.time() - t0)
+                profiler.add_timing_info('FockERI', tm.time() - t0)
 
             if self._dft:
                 t0 = tm.time()
                 if not self.xcfun.is_hybrid():
                     for ifock in range(fock.number_of_fock_matrices()):
                         fock.scale(2.0, ifock)
-                xc_drv = XCIntegrator(self.comm)
-                molgrid.distribute(self.rank, self.nodes, self.comm)
-                xc_drv.integrate(fock, dens, gs_density, molecule, basis,
-                                 molgrid, self.xcfun.get_func_label())
+
+                xc_drv = XCNewIntegrator(self.comm)
+                molgrid.partition_grid_points()
+                molgrid.distribute_counts_and_displacements(
+                    self.rank, self.nodes, self.comm)
+                xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label())
+
                 if profiler is not None:
-                    profiler.add_timing_info('DFT', tm.time() - t0)
+                    profiler.add_timing_info('FockXC', tm.time() - t0)
 
             if self._pe:
                 t0 = tm.time()
@@ -884,7 +889,7 @@ class LinearSolver:
                     if self.rank == mpi_master():
                         fock.add_matrix(DenseMatrix(V_pe), ifock)
                 if profiler is not None:
-                    profiler.add_timing_info('PE', tm.time() - t0)
+                    profiler.add_timing_info('FockPE', tm.time() - t0)
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 

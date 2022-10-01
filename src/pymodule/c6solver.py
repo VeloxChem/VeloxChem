@@ -556,8 +556,6 @@ class C6Solver(LinearSolver):
                     self._graceful_exit(molecule, basis, dft_dict, pe_dict,
                                         rsp_vector_labels)
 
-            profiler.start_timer('FockBuild')
-
             # creating new sigma and rho linear transformations
 
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
@@ -566,8 +564,6 @@ class C6Solver(LinearSolver):
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
-
-            profiler.stop_timer('FockBuild')
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))

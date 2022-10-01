@@ -91,6 +91,18 @@ class CGtoContainer
     CGtoContainer(const CMolecule& molecule, const CMolecularBasis& basis, const int32_t iAtom, const int32_t nAtoms);
 
     /**
+     Creates a GTOs container object with atom and angular momentum specific
+     GTO blocks.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param flag the flag.
+     */
+    CGtoContainer(const CMolecule&       molecule,
+                  const CMolecularBasis& basis,
+                  const std::string&     flag);
+
+    /**
      Creates a GTOs container object according to given pattern of atomic batches
      in molecule.
 

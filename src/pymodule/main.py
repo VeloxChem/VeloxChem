@@ -52,7 +52,10 @@ from .rspc6 import C6
 from .rspshg import SHG
 from .rsptpa import TPA
 from .scfgradientdriver import ScfGradientDriver
+# TODO: remove old orbital response and tdhfgradient drivers.
 from .tdhfgradientdriver import TdhfGradientDriver
+from .tddftgradientdriver import TddftGradientDriver
+from .tddftgradientdriver import TddftOrbitalResponse
 from .scfhessiandriver import ScfHessianDriver
 from .tdhfhessiandriver import TdhfHessianDriver
 from .cphfsolver import CphfSolver
@@ -479,6 +482,11 @@ def main():
 
             if 'orbital_response' in task.input_dict:
                 orbrsp_dict = task.input_dict['orbital_response']
+                orbrsp_drv = TddftOrbitalResponse()
+                orbrsp_drv.update_settings(orbrsp_dict, rsp_dict, method_dict)
+                orbrsp_drv.compute(task.molecule, task.ao_basis,
+                                   scf_drv.scf_tensors, rsp_prop.rsp_property)
+
             else:
                 orbrsp_dict = {}
 

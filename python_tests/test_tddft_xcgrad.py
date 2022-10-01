@@ -1,160 +1,170 @@
+from pathlib import Path
 import numpy as np
+import h5py
 
 from veloxchem.veloxchemlib import denmat
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import is_mpi_master, mpi_master
+from veloxchem.veloxchemlib import GridDriver, XCNewMolecularGradient
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.aodensitymatrix import AODensityMatrix
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tdaexcidriver import TDAExciDriver
-from veloxchem.lreigensolver import LinearResponseEigenSolver
-from veloxchem.tdaorbitalresponse import TdaOrbitalResponse
-from veloxchem.rpaorbitalresponse import RpaOrbitalResponse
 from veloxchem.gradientdriver import GradientDriver
 
 
 class TestTddftXCgrad:
-    pass
 
-    # TODO: This test fails, even though the dft and tddft gradients
-    # themselves are correct (compared to numerical and pyscf gradients)
-    # IB: I commented out everything for now;
-   # def run_tddft_xcgrad(self, xcfun_label, tamm_dancoff, ref_xcgrad):
+    def run_tddft_xcgrad(self, xcfun_label, tamm_dancoff, ref_xcgrad):
 
-   #     molecule_string = """
-   #         O   0.0   0.0   0.0
-   #         H   0.0   1.4   1.1
-   #         H   0.0  -1.4   1.1
-   #     """
-   #     basis_set_label = 'def2-svp'
+        molecule_string = """
+            O   0.0   0.0   0.0
+            H   0.0   1.4   1.1
+            H   0.0  -1.4   1.1
+        """
+        basis_set_label = 'def2-svp'
 
-   #     molecule = Molecule.read_str(molecule_string, units='au')
-   #     basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
+        molecule = Molecule.read_str(molecule_string, units='au')
+        basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
-   #     # SCF
+        if is_mpi_master():
 
-   #     scf_drv = ScfRestrictedDriver()
+            here = Path(__file__).parent
+            h5file = here / 'inputs' / 'tddft_xcgrad.dens.h5'
 
-   #     scf_drv.dft = True
-   #     scf_drv.xcfun = xcfun_label
-   #     scf_drv.conv_thresh = 1e-8
-   #     scf_drv.checkpoint_file = None
+            hf = h5py.File(h5file, 'r')
 
-   #     scf_drv.compute(molecule, basis)
+            td_name = 'tda' if tamm_dancoff else 'rpa'
+            dset_name = f'{xcfun_label}_{td_name}'
 
-   #     # linear response and orbital response
+            gs_dm = np.array(hf.get(f'{dset_name}_D_alpha'))
 
-   #     if tamm_dancoff:
-   #         rsp_solver = TDAExciDriver()
-   #         orbrsp_solver = TdaOrbitalResponse()
-   #     else:
-   #         rsp_solver = LinearResponseEigenSolver()
-   #         orbrsp_solver = RpaOrbitalResponse()
+            rhow_dm = 0.5 * np.array(hf.get(f'{dset_name}_relaxed_density_ao'))
+            rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
 
-   #     rsp_solver.dft = True
-   #     rsp_solver.xcfun = scf_drv.xcfun
-   #     rsp_solver.conv_thresh = 1e-5
-   #     rsp_solver.nstates = 3
-   #     rsp_solver.checkpoint_file = None
+            xmy = np.array(hf.get(f'{dset_name}_x_minus_y_ao'))
+            xmy_sym = 0.5 * (xmy + xmy.T)
 
-   #     rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_tensors)
+            hf.close()
 
-   #     orbrsp_solver.dft = True
-   #     orbrsp_solver.xcfun = rsp_solver.xcfun
-   #     orbrsp_solver.nstates = 3
+        # XC contribution to molecular gradient
 
-   #     orbrsp_results = orbrsp_solver.compute(molecule, basis,
-   #                                            scf_drv.scf_tensors, rsp_results)
+        grad_drv = GradientDriver(None)
 
-   #     # XC contribution to molecular gradient
+        if is_mpi_master():
+            gs_density = AODensityMatrix([gs_dm], denmat.rest)
+            rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
+            xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
+        else:
+            gs_density = AODensityMatrix()
+            rhow_den_sym = AODensityMatrix()
+            xmy_den_sym = AODensityMatrix()
 
-   #     grad_drv = GradientDriver(scf_drv)
+        gs_density.broadcast(grad_drv.rank, grad_drv.comm)
+        rhow_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
+        xmy_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
 
-   #     if is_mpi_master():
-   #         gs_dm = scf_drv.scf_tensors['D_alpha']
-   #         gs_density = AODensityMatrix([gs_dm], denmat.rest)
+        vxc_contrib = grad_drv.grad_vxc_contrib(molecule, basis, rhow_den_sym,
+                                                gs_density, xcfun_label)
 
-   #         rhow_dm = 0.5 * orbrsp_results['relaxed_density_ao']
-   #         rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
-   #         rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
+        vxc_contrib_2 = grad_drv.grad_vxc2_contrib(molecule, basis,
+                                                   rhow_den_sym, gs_density,
+                                                   gs_density, xcfun_label)
 
-   #         xmy = orbrsp_results['x_minus_y_ao']
-   #         xmy_sym = 0.5 * (xmy + xmy.T)
-   #         xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
+        vxc2_contrib = grad_drv.grad_vxc2_contrib(molecule, basis, xmy_den_sym,
+                                                  xmy_den_sym, gs_density,
+                                                  xcfun_label)
 
-   #     else:
-   #         gs_density = AODensityMatrix()
-   #         rhow_den_sym = AODensityMatrix()
-   #         xmy_den_sym = AODensityMatrix()
+        vxc2_contrib_2 = grad_drv.grad_vxc3_contrib(molecule, basis,
+                                                    xmy_den_sym, xmy_den_sym,
+                                                    gs_density, xcfun_label)
 
-   #     gs_density.broadcast(grad_drv.rank, grad_drv.comm)
-   #     rhow_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
-   #     xmy_den_sym.broadcast(grad_drv.rank, grad_drv.comm)
+        xcgrad = grad_drv.grad_tddft_xc_contrib(molecule, basis, rhow_den_sym,
+                                                xmy_den_sym, gs_density,
+                                                xcfun_label)
 
-   #     vxc_contrib = grad_drv.grad_vxc_contrib(molecule, basis, rhow_den_sym,
-   #                                             gs_density, xcfun_label)
+        grid_drv = GridDriver()
+        grid_drv.set_level(4)
 
-   #     vxc_contrib_2 = grad_drv.grad_vxc2_contrib(molecule, basis,
-   #                                                rhow_den_sym, gs_density,
-   #                                                gs_density, xcfun_label)
+        scf_drv = ScfRestrictedDriver()
+        molgrid = grid_drv.generate(molecule)
+        molgrid.partition_grid_points()
+        molgrid.distribute_counts_and_displacements(scf_drv.rank, scf_drv.nodes,
+                                                    scf_drv.comm)
 
-   #     vxc2_contrib = grad_drv.grad_vxc2_contrib(molecule, basis, xmy_den_sym,
-   #                                               xmy_den_sym, gs_density,
-   #                                               xcfun_label)
+        xcgrad_drv_new = XCNewMolecularGradient()
+        vxc_grad_new = xcgrad_drv_new.integrate_vxc_gradient(
+            molecule, basis, rhow_den_sym, gs_density, molgrid, xcfun_label)
+        vxc_grad_new = scf_drv.comm.reduce(vxc_grad_new, root=mpi_master())
 
-   #     vxc2_contrib_2 = grad_drv.grad_vxc3_contrib(molecule, basis,
-   #                                                 xmy_den_sym, xmy_den_sym,
-   #                                                 gs_density, xcfun_label)
+        fxc_grad_new = xcgrad_drv_new.integrate_fxc_gradient(
+            molecule, basis, rhow_den_sym, gs_density, gs_density, molgrid,
+            xcfun_label)
+        fxc_grad_new = scf_drv.comm.reduce(fxc_grad_new, root=mpi_master())
 
-   #     xcgrad = grad_drv.grad_tddft_xc_contrib(molecule, basis, rhow_den_sym,
-   #                                             xmy_den_sym, gs_density,
-   #                                             xcfun_label)
+        fxc_grad_new_2 = xcgrad_drv_new.integrate_fxc_gradient(
+            molecule, basis, xmy_den_sym, xmy_den_sym, gs_density, molgrid,
+            xcfun_label)
+        fxc_grad_new_2 = scf_drv.comm.reduce(fxc_grad_new_2, root=mpi_master())
 
-   #     if is_mpi_master():
-   #         assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
-   #         xcgrad2 = vxc_contrib + vxc_contrib_2 + vxc2_contrib + vxc2_contrib_2
-   #         assert np.max(np.abs(xcgrad2 - ref_xcgrad)) < 1.0e-5
+        kxc_grad_new = xcgrad_drv_new.integrate_kxc_gradient(
+            molecule, basis, xmy_den_sym, xmy_den_sym, gs_density, molgrid,
+            xcfun_label)
+        kxc_grad_new = scf_drv.comm.reduce(kxc_grad_new, root=mpi_master())
 
-   # def test_tda_xcgrad_slater(self):
+        if is_mpi_master():
+            assert np.max(np.abs(xcgrad - ref_xcgrad)) < 1.0e-5
 
-   #     xcfun_label = 'slater'
-   #     tamm_dancoff = True
-   #     ref_xcgrad = np.array(
-   #         [[-7.35271097e-17, -7.30008259e-15, 1.10204564e-01],
-   #          [2.66183372e-16, -5.78669206e-02, -5.51022819e-02],
-   #          [-3.50947203e-16, 5.78669206e-02, -5.51022819e-02]])
+            xcgrad2 = vxc_contrib + vxc_contrib_2 + vxc2_contrib + vxc2_contrib_2
+            assert np.max(np.abs(xcgrad2 - ref_xcgrad)) < 1.0e-5
 
-   #     self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
+            xcgrad3 = vxc_grad_new + fxc_grad_new + fxc_grad_new_2 + kxc_grad_new
+            assert np.max(np.abs(xcgrad3 - ref_xcgrad)) < 1.0e-5
 
-   # def test_rpa_xcgrad_slater(self):
+            assert np.max(np.abs(vxc_grad_new - vxc_contrib)) < 1.0e-9
+            assert np.max(np.abs(fxc_grad_new - vxc_contrib_2)) < 1.0e-9
+            assert np.max(np.abs(fxc_grad_new_2 - vxc2_contrib)) < 1.0e-9
+            assert np.max(np.abs(kxc_grad_new - vxc2_contrib_2)) < 1.0e-9
 
-   #     xcfun_label = 'slater'
-   #     tamm_dancoff = False
-   #     ref_xcgrad = np.array(
-   #         [[-4.57598797e-17, 1.16411472e-14, 1.08924175e-01],
-   #          [2.37772515e-16, -5.77605000e-02, -5.44620872e-02],
-   #          [-2.69921252e-16, 5.77605000e-02, -5.44620872e-02]])
+    def test_tda_xcgrad_slater(self):
 
-   #     self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
+        xcfun_label = 'slater'
+        tamm_dancoff = True
+        ref_xcgrad = np.array(
+            [[-7.35271097e-17, -7.30008259e-15, 1.10204564e-01],
+             [2.66183372e-16, -5.78669206e-02, -5.51022819e-02],
+             [-3.50947203e-16, 5.78669206e-02, -5.51022819e-02]])
 
-   # def test_tda_xcgrad_blyp(self):
+        self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
 
-   #     xcfun_label = 'blyp'
-   #     tamm_dancoff = True
-   #     ref_xcgrad = np.array(
-   #         [[-1.48234494e-16, 2.59450523e-14, 1.11233752e-01],
-   #          [-1.60015912e-16, -5.75591566e-02, -5.56168761e-02],
-   #          [2.13936447e-16, 5.75591566e-02, -5.56168761e-02]])
+    def test_rpa_xcgrad_slater(self):
 
-   #     self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
+        xcfun_label = 'slater'
+        tamm_dancoff = False
+        ref_xcgrad = np.array(
+            [[-4.57598797e-17, 1.16411472e-14, 1.08924175e-01],
+             [2.37772515e-16, -5.77605000e-02, -5.44620872e-02],
+             [-2.69921252e-16, 5.77605000e-02, -5.44620872e-02]])
 
-   # def test_rpa_xcgrad_blyp(self):
+        self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
 
-   #     xcfun_label = 'blyp'
-   #     tamm_dancoff = False
-   #     ref_xcgrad = np.array(
-   #         [[-1.27004678e-16, 1.68531512e-14, 1.09730988e-01],
-   #          [-1.45607378e-16, -5.74167800e-02, -5.48654938e-02],
-   #          [2.04927911e-16, 5.74167800e-02, -5.48654938e-02]])
+    def test_tda_xcgrad_blyp(self):
 
-   #     self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
+        xcfun_label = 'blyp'
+        tamm_dancoff = True
+        ref_xcgrad = np.array(
+            [[-1.48234494e-16, 2.59450523e-14, 1.11233752e-01],
+             [-1.60015912e-16, -5.75591566e-02, -5.56168761e-02],
+             [2.13936447e-16, 5.75591566e-02, -5.56168761e-02]])
+
+        self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)
+
+    def test_rpa_xcgrad_blyp(self):
+
+        xcfun_label = 'blyp'
+        tamm_dancoff = False
+        ref_xcgrad = np.array(
+            [[-1.27004678e-16, 1.68531512e-14, 1.09730988e-01],
+             [-1.45607378e-16, -5.74167800e-02, -5.48654938e-02],
+             [2.04927911e-16, 5.74167800e-02, -5.48654938e-02]])
+
+        self.run_tddft_xcgrad(xcfun_label, tamm_dancoff, ref_xcgrad)

@@ -37,14 +37,11 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCIntegrator
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
-from .veloxchemlib import mpi_master
-from .veloxchemlib import hartree_in_ev
-from .veloxchemlib import rotatory_strength_in_cgs
-from .veloxchemlib import get_dimer_ao_indices
-from .veloxchemlib import parse_xc_func
+from .veloxchemlib import XCNewIntegrator
+from .veloxchemlib import denmat, fockmat, mpi_master
+from .veloxchemlib import (hartree_in_ev, bohr_in_angstroms,
+                           rotatory_strength_in_cgs)
+from .veloxchemlib import get_dimer_ao_indices, parse_xc_func
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .aodensitymatrix import AODensityMatrix
@@ -148,6 +145,9 @@ class ExcitonModelDriver:
         self.tda_conv_thresh = 1.0e-4
         self.tda_max_iter = 100
 
+        # dimer cutoff radius
+        self.dimer_cutoff_radius = None
+
         # mpi information
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -169,6 +169,7 @@ class ExcitonModelDriver:
                 'nstates': ('int', 'number of locally excited (LE) states'),
                 'ct_nocc': ('int', 'number of occupied MOs for CT states'),
                 'ct_nvir': ('int', 'number of unoccupied MOs for CT states'),
+                'dimer_cutoff_radius': ('float', 'cutoff radius for dimer'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
             },
@@ -257,6 +258,36 @@ class ExcitonModelDriver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
+    @staticmethod
+    def get_minimal_distance(mol_1, mol_2):
+        """
+        Gets the minimal distance between two molecules.
+
+        :param mol_1:
+            The first molecule.
+        :param mol_2:
+            The second molecule.
+
+        :return:
+            The minimal distance between two molecules.
+        """
+
+        natoms_1 = mol_1.number_of_atoms()
+        natoms_2 = mol_2.number_of_atoms()
+
+        coords_1 = mol_1.get_coordinates()
+        coords_2 = mol_2.get_coordinates()
+
+        min_dist_2 = None
+        for atom_ind_1 in range(natoms_1):
+            for atom_ind_2 in range(natoms_2):
+                dist_2 = np.sum(
+                    (coords_1[atom_ind_1] - coords_2[atom_ind_2])**2)
+                if (min_dist_2 is None) or (min_dist_2 > dist_2):
+                    min_dist_2 = dist_2
+
+        return math.sqrt(min_dist_2)
+
     def compute(self, molecule, basis, min_basis=None):
         """
         Executes exciton model calculation and writes checkpoint file.
@@ -284,12 +315,35 @@ class ExcitonModelDriver:
         nfragments = len(self.natoms)
         start_indices = [sum(self.natoms[:i]) for i in range(nfragments)]
 
-        npairs = nfragments * (nfragments - 1) // 2
+        # prepare list of monomer molecules
+        monomer_molecules = []
+        for ind in range(nfragments):
+            mol = molecule.get_sub_molecule(start_indices[ind],
+                                            self.natoms[ind])
+            mol.set_charge(self.charges[ind])
+            mol.check_multiplicity()
+            monomer_molecules.append(mol)
+
+        # prepare list of dimer pair indices
+        dimer_pairs = []
+        for ind_A in range(nfragments):
+            mol_A = monomer_molecules[ind_A]
+            for ind_B in range(ind_A + 1, nfragments):
+                mol_B = monomer_molecules[ind_B]
+                min_dist_AB = self.get_minimal_distance(mol_A, mol_B)
+                if (self.dimer_cutoff_radius is None or min_dist_AB <
+                        self.dimer_cutoff_radius / bohr_in_angstroms()):
+                    dimer_pairs.append((ind_A, ind_B))
+
+        npairs = len(dimer_pairs)
         ct_states = self.ct_nocc * self.ct_nvir
 
         total_LE_states = nfragments * self.nstates
         total_CT_states = npairs * ct_states * 2
         total_num_states = total_LE_states + total_CT_states
+
+        # indices of diabatic excited states
+        excitation_ids = self.get_excitation_ids(dimer_pairs)
 
         self.H = np.zeros((total_num_states, total_num_states))
         self.elec_trans_dipoles = np.zeros((total_num_states, 3))
@@ -307,9 +361,6 @@ class ExcitonModelDriver:
 
         if self.rank == mpi_master():
             self.print_title(total_LE_states, total_CT_states)
-
-        # indices of diabatic excited states
-        excitation_ids = self.get_excitation_ids()
 
         if self.dft:
             dft_func_label = self.xcfun_label
@@ -342,10 +393,7 @@ class ExcitonModelDriver:
             self.print_banner(monomer_name)
 
             # monomer molecule
-            monomer = molecule.get_sub_molecule(start_indices[ind],
-                                                self.natoms[ind])
-            monomer.set_charge(self.charges[ind])
-            monomer.check_multiplicity()
+            monomer = monomer_molecules[ind]
 
             one_elec_ints = self.get_one_elec_integrals(monomer, basis)
 
@@ -379,8 +427,6 @@ class ExcitonModelDriver:
         # Dimers
 
         dimer_indices = None
-        dimer_index_A = 0
-
         potfile_text = ''
 
         # read checkpoint file
@@ -412,7 +458,6 @@ class ExcitonModelDriver:
 
         if self.restart:
             dimer_indices = self.comm.bcast(dimer_indices, root=mpi_master())
-            dimer_index_A = dimer_indices[0]
 
             if self.rank == mpi_master():
                 self.H = H.copy()
@@ -428,22 +473,20 @@ class ExcitonModelDriver:
                         self.state_info[state_id]['frag'] = info[2]
                         self.state_info[state_id]['name'] = info[3]
 
-        for ind_A in range(dimer_index_A, nfragments):
-            monomer_a = molecule.get_sub_molecule(start_indices[ind_A],
-                                                  self.natoms[ind_A])
-            monomer_a.set_charge(self.charges[ind_A])
-            monomer_a.check_multiplicity()
+        if dimer_indices is not None:
+            dimer_starting_index = dimer_pairs.index(tuple(dimer_indices)) + 1
+        else:
+            dimer_starting_index = 0
 
-            if self.restart and ind_A == dimer_index_A:
-                dimer_index_B = dimer_indices[1] + 1
-            else:
-                dimer_index_B = ind_A + 1
+        if True:  # keep indentation for now
 
-            for ind_B in range(dimer_index_B, nfragments):
-                monomer_b = molecule.get_sub_molecule(start_indices[ind_B],
-                                                      self.natoms[ind_B])
-                monomer_b.set_charge(self.charges[ind_B])
-                monomer_b.check_multiplicity()
+            for dimer_index in range(dimer_starting_index, npairs):
+
+                ind_A = dimer_pairs[dimer_index][0]
+                ind_B = dimer_pairs[dimer_index][1]
+
+                monomer_a = monomer_molecules[ind_A]
+                monomer_b = monomer_molecules[ind_B]
 
                 dimer_start_time = tm.time()
 
@@ -759,9 +802,12 @@ class ExcitonModelDriver:
 
             self.ostream.flush()
 
-    def get_excitation_ids(self):
+    def get_excitation_ids(self, dimer_pairs):
         """
         Gets excitation indices.
+
+        :param dimer_pairs:
+            The list of dimer pair indicies.
 
         :return:
             A 2d numpy array containing indices of the LE and CT excitations.
@@ -770,28 +816,19 @@ class ExcitonModelDriver:
         nfragments = len(self.natoms)
         ct_states = self.ct_nocc * self.ct_nvir
 
-        # dimer indices
-        dimer_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
-        dimer_count = 0
-        for ind_A in range(nfragments):
-            dimer_ids[ind_A, ind_A] = -1
-            for ind_B in range(ind_A + 1, nfragments):
-                dimer_ids[ind_A, ind_B] = dimer_count
-                dimer_ids[ind_B, ind_A] = dimer_count
-                dimer_count += 1
-
         # indices of diabatic excited states
-        excitation_ids = np.zeros((nfragments, nfragments), dtype=np.int32)
-        for ind_A in range(nfragments):
+        excitation_ids = np.full((nfragments, nfragments), -1, dtype=np.int32)
+
+        for ind in range(nfragments):
             # LE
-            excitation_ids[ind_A, ind_A] = ind_A * self.nstates
-            for ind_B in range(ind_A + 1, nfragments):
-                ct_id = (nfragments * self.nstates +
-                         dimer_ids[ind_A, ind_B] * ct_states * 2)
-                # CT(A->B)
-                excitation_ids[ind_A, ind_B] = ct_id
-                # CT(B->A)
-                excitation_ids[ind_B, ind_A] = ct_id + ct_states
+            excitation_ids[ind, ind] = ind * self.nstates
+
+        for dimer_index, (ind_A, ind_B) in enumerate(dimer_pairs):
+            ct_id = (nfragments * self.nstates + dimer_index * ct_states * 2)
+            # CT(A->B)
+            excitation_ids[ind_A, ind_B] = ct_id
+            # CT(B->A)
+            excitation_ids[ind_B, ind_A] = ct_id + ct_states
 
         return excitation_ids
 
@@ -1098,7 +1135,6 @@ class ExcitonModelDriver:
             grid_t0 = tm.time()
             dimer_molgrid = grid_drv.generate(dimer)
             n_grid_points = dimer_molgrid.number_of_points()
-            dimer_molgrid.distribute(self.rank, self.nodes, self.comm)
             self.ostream.print_info(
                 'Molecular grid with {} points generated in {:.2f} sec.'.format(
                     n_grid_points,
@@ -1142,9 +1178,13 @@ class ExcitonModelDriver:
             if not xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
-            xc_drv = XCIntegrator(self.comm)
-            vxc_mat = xc_drv.integrate(dens_mat, dimer, basis, dimer_molgrid,
-                                       self.xcfun_label)
+            dimer_molgrid.partition_grid_points()
+            dimer_molgrid.distribute_counts_and_displacements(
+                self.rank, self.nodes, self.comm)
+
+            xc_drv = XCNewIntegrator(self.comm)
+            vxc_mat = xc_drv.integrate_vxc_fock(dimer, basis, dens_mat,
+                                                dimer_molgrid, self.xcfun_label)
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.rank == mpi_master():
@@ -1427,11 +1467,18 @@ class ExcitonModelDriver:
             if not xcfun.is_hybrid():
                 for s in range(tfock_mat.number_of_fock_matrices()):
                     tfock_mat.scale(2.0, s)
-            xc_drv = XCIntegrator(self.comm)
+
             dens_mat = dimer_prop['density']
             dimer_molgrid = dimer_prop['molgrid']
-            xc_drv.integrate(tfock_mat, tdens_mat, dens_mat, dimer, basis,
-                             dimer_molgrid, self.xcfun_label)
+
+            dimer_molgrid.partition_grid_points()
+            dimer_molgrid.distribute_counts_and_displacements(
+                self.rank, self.nodes, self.comm)
+
+            xc_drv = XCNewIntegrator(self.comm)
+            xc_drv.integrate_fxc_fock(tfock_mat, dimer, basis, tdens_mat,
+                                      dens_mat, dimer_molgrid, self.xcfun_label)
+
         tfock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.rank == mpi_master():

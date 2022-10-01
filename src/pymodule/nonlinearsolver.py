@@ -43,7 +43,7 @@ from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCNewIntegrator
 
 
 class NonLinearSolver:
@@ -368,8 +368,16 @@ class NonLinearSolver:
 
         return None
 
-    def _comp_nlr_fock(self, mo, molecule, ao_basis, fock_flag, dft_dict,
-                       first_order_dens, second_order_dens, mode):
+    def _comp_nlr_fock(self,
+                       mo,
+                       molecule,
+                       ao_basis,
+                       fock_flag,
+                       dft_dict,
+                       first_order_dens,
+                       second_order_dens,
+                       mode,
+                       profiler=None):
         """
         Computes and returns a list of Fock matrices.
 
@@ -390,7 +398,9 @@ class NonLinearSolver:
         :param second_order_dens:
             A list of second order densitiy matrices
         :param mode:
-            A list of second order densitiy matrices
+            The mode for densities in quadratic response
+        :param profiler:
+            The profiler
 
         :return:
             A list of Fock matrices
@@ -398,7 +408,7 @@ class NonLinearSolver:
 
         f_total = self._comp_two_el_int(mo, molecule, ao_basis, dft_dict,
                                         first_order_dens, second_order_dens,
-                                        mode)
+                                        mode, profiler)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
         ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
@@ -412,8 +422,15 @@ class NonLinearSolver:
         else:
             return None
 
-    def _comp_two_el_int(self, mo, molecule, ao_basis, dft_dict,
-                         first_order_dens, second_order_dens, mode):
+    def _comp_two_el_int(self,
+                         mo,
+                         molecule,
+                         ao_basis,
+                         dft_dict,
+                         first_order_dens,
+                         second_order_dens,
+                         mode,
+                         profiler=None):
         """
         Computes the two-electron part of the Fock matix in MO basis.
 
@@ -430,12 +447,17 @@ class NonLinearSolver:
         :param second_order_dens:
             A list of second order densitiy matrices
         :param mode:
-            A list of second order densitiy matrices
+            The mode for densities in quadratic response
+        :param profiler:
+            The profiler.
 
         :return:
             A tuple containing the two-electron part of the Fock matix (in MO
             basis)
         """
+
+        if profiler is not None:
+            profiler.set_timing_key('Nonlinear Fock')
 
         eri_driver = ElectronRepulsionIntegralsDriver(self.comm)
         screening = eri_driver.compute(get_qq_scheme(self.qq_type),
@@ -562,21 +584,36 @@ class NonLinearSolver:
             for i in range(fock.number_of_fock_matrices()):
                 fock.set_fock_type(fock_flag, i)
 
+            t0 = tm.time()
+
             eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
             if self._dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
+
+            if profiler is not None:
+                profiler.add_timing_info('FockERI', tm.time() - t0)
+
             if self._dft:
-                xc_drv = XCIntegrator(self.comm)
+                t0 = tm.time()
+
+                xc_drv = XCNewIntegrator(self.comm)
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
-                molgrid.distribute(self.rank, self.nodes, self.comm)
-                xc_drv.integrate(fock, dens1, dens2, gs_density,
-                                 molecule, ao_basis, molgrid,
-                                 self.xcfun.get_func_label(), mode)
+                molgrid.partition_grid_points()
+                molgrid.distribute_counts_and_displacements(
+                    self.rank, self.nodes, self.comm)
+                xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
+                                          dens2, gs_density, molgrid,
+                                          self.xcfun.get_func_label(), mode)
+
+                if profiler is not None:
+                    profiler.add_timing_info('FockXC', tm.time() - t0)
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+            t0 = tm.time()
 
             if self.rank == mpi_master():
                 nfocks = fock.number_of_fock_matrices()
@@ -586,6 +623,9 @@ class NonLinearSolver:
                                                fock.to_numpy(i).T).reshape(-1)
             else:
                 fock_mo = None
+
+            if profiler is not None:
+                profiler.add_timing_info('AOtoMO', tm.time() - t0)
 
             dist_fock_mo = DistributedArray(fock_mo, self.comm)
 

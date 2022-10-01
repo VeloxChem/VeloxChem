@@ -8,7 +8,7 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCIntegrator, XCNewIntegrator
 from .cphfsolver import CphfSolver
 from .qqscheme import get_qq_scheme
 from .molecule import Molecule
@@ -780,12 +780,22 @@ class TddftOrbitalResponse(CphfSolver):
             if not self.xcfun.is_hybrid():
                 for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
                     fock_gxc_ao.scale(2.0, ifock)
-            xc_drv = XCIntegrator(self.comm)
-            molgrid.distribute(self.rank, self.nodes, self.comm)
             # Quadratic response routine for TDDFT E[3] term g^xc
-            xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
-                             gs_density, molecule, basis, molgrid,
-                             self.xcfun.get_func_label(), "qrf")
+            # TODO: remove commented out code.
+            # xc_drv = XCIntegrator(self.comm)
+            # molgrid.distribute(self.rank, self.nodes, self.comm)
+            # # Quadratic response routine for TDDFT E[3] term g^xc
+            # xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
+            #                  gs_density, molecule, basis, molgrid,
+            #                  self.xcfun.get_func_label(), "qrf")
+            xc_drv = XCNewIntegrator()
+            molgrid.partition_grid_points()
+            molgrid.distribute_counts_and_displacements(self.rank,
+                                                self.nodes, self.comm)
+            xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis, 
+                                      perturbed_dm_ao, zero_dm_ao,
+                                      gs_density, molgrid,
+                                      self.xcfun.get_func_label(), "qrf")
 
             fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
 

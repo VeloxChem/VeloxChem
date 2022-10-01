@@ -400,16 +400,12 @@ class LinearResponseSolver(LinearSolver):
                     self._graceful_exit(molecule, basis, dft_dict, pe_dict,
                                         rsp_vector_labels)
 
-            profiler.start_timer('FockBuild')
-
             self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
                                 scf_tensors, eri_dict, dft_dict, pe_dict,
                                 profiler)
 
             iter_in_hours = (tm.time() - iter_start_time) / 3600
             iter_per_trial_in_hours = iter_in_hours / n_new_trials
-
-            profiler.stop_timer('FockBuild')
 
             profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))

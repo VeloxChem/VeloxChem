@@ -39,12 +39,12 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCIntegrator, XCNewIntegrator
 from .veloxchemlib import AOKohnShamMatrix
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import molorb
+from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .aofockmatrix import AOFockMatrix
@@ -856,13 +856,10 @@ class ScfDriver:
 
             iter_start_time = tm.time()
 
-            profiler.start_timer('FockBuild')
-
             vxc_mat, e_pe, V_pe = self._comp_2e_fock(fock_mat, den_mat,
                                                      molecule, ao_basis,
                                                      qq_data, e_grad, profiler)
 
-            profiler.stop_timer('FockBuild')
             profiler.start_timer('CompEnergy')
 
             e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
@@ -1295,9 +1292,7 @@ class ScfDriver:
 
         if self.qq_dyn and e_grad is not None:
             screening.set_threshold(self._get_dyn_threshold(e_grad))
-
         eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        xc_drv = XCIntegrator(self.comm)
 
         eri_t0 = tm.time()
 
@@ -1305,7 +1300,7 @@ class ScfDriver:
         fock_mat.reduce_sum(self.rank, self.nodes, self.comm)
 
         if self.timing:
-            profiler.add_timing_info('ERI', tm.time() - eri_t0)
+            profiler.add_timing_info('FockERI', tm.time() - eri_t0)
         vxc_t0 = tm.time()
 
         if self._dft and not self._first_step:
@@ -1313,15 +1308,27 @@ class ScfDriver:
                 if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
-            self._mol_grid.distribute(self.rank, self.nodes, self.comm)
-            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self._mol_grid,
-                                       self.xcfun.get_func_label())
+            if (self.scf_type == 'restricted' and
+                    self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]):
+                xc_drv = XCNewIntegrator(self.comm)
+                self._mol_grid.partition_grid_points()
+                self._mol_grid.distribute_counts_and_displacements(
+                    self.rank, self.nodes, self.comm)
+                vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
+                                                    self._mol_grid,
+                                                    self.xcfun.get_func_label())
+            else:
+                xc_drv = XCIntegrator(self.comm)
+                self._mol_grid.distribute(self.rank, self.nodes, self.comm)
+                vxc_mat = xc_drv.integrate(den_mat, molecule, basis,
+                                           self._mol_grid,
+                                           self.xcfun.get_func_label())
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
         else:
             vxc_mat = None
 
         if self.timing and self._dft:
-            profiler.add_timing_info('DFT', tm.time() - vxc_t0)
+            profiler.add_timing_info('FockXC', tm.time() - vxc_t0)
         pe_t0 = tm.time()
 
         if self._pe and not self._first_step:
@@ -1333,7 +1340,7 @@ class ScfDriver:
             e_pe, V_pe = 0.0, None
 
         if self.timing and self._pe:
-            profiler.add_timing_info('PE', tm.time() - pe_t0)
+            profiler.add_timing_info('FockPE', tm.time() - pe_t0)
 
         return vxc_mat, e_pe, V_pe
 

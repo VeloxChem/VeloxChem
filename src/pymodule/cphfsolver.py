@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+# TODO: remove commented out code;
 from mpi4py import MPI
 #from pathlib import Path
 import numpy as np
@@ -913,7 +914,8 @@ class CphfSolver(LinearSolver):
             self.profiler.start_timer('derivs')
             for i in range(natm):
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
-                fock_deriv_ao[i] = fock_deriv(molecule, basis, density, i, self.scfdrv)
+                fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
+                                              i, self.scfdrv)
             self.profiler.stop_timer('derivs')
 
             # transform integral derivatives to MO basis
