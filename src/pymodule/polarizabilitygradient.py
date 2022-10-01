@@ -263,7 +263,6 @@ class PolarizabilityGradient():
 
 
             self.pol_gradient = pol_gradient.reshape(dof, dof, 3 * natm)
-            self.freq_dep_contrib = freq_dep_contrib.reshape(dof, dof, 3 * natm)
             self.orbrsp_results = dict(orbrsp_results)
 
     def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, xmy_den,

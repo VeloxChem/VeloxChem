@@ -37,6 +37,7 @@ from .firstorderprop import FirstOrderProperties
 from .orbitalresponse import OrbitalResponse
 from .cphfsolver import CphfSolver
 from .lrsolver import LinearResponseSolver
+from .polarizabilitygradient import PolarizabilityGradient
 from .profiler import Profiler
 from .qqscheme import get_qq_scheme
 from .veloxchemlib import mpi_master
@@ -462,6 +463,21 @@ class ScfHessianDriver(HessianDriver):
         # Calculate the gradient of the dipole moment, needed for IR intensities
         self.compute_dipole_gradient(molecule, ao_basis, perturbed_density)
 
+        # Calculate the polarizability gradient, needed for the Raman intensities
+        if self.do_raman:
+            # Perform a linear response calculation to determine the static polarizability
+            lr_drv = LinearResponseSolver()
+            lr_drv.update_settings(self.rsp_dict, self.method_dict)
+            lr_drv.ostream.state = False
+            lr_results = lr_drv.compute(molecule, ao_basis, self.scf_drv.scf_tensors)
+
+            # Set up the polarizability gradient driver
+            polgrad_drv = PolarizabilityGradient()
+            self.cphf_dict['frequency'] = 0
+            polgrad_drv.update_settings(self.rsp_dict, orbrsp_dict = self.cphf_dict,
+                                        method_dict = self.method_dict)
+            polgrad_drv.compute(molecule, ao_basis, self.scf_drv.scf_tensors, lr_results)
+            self.polarizability_gradient = polgrad_drv.pol_gradient
 
     def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
                       fock_deriv_oo, orben_ovlp_deriv_oo, perturbed_density,
@@ -553,13 +569,13 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv) # TODO: remove scf_drv
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         # ERI information
-        eri_dict = cphf_solver.init_eri(molecule, ao_basis)
+        eri_dict = cphf_solver._init_eri(molecule, ao_basis)
         # DFT information
-        dft_dict = cphf_solver.init_dft(molecule, self.scf_drv.scf_tensors)
+        dft_dict = cphf_solver._init_dft(molecule, self.scf_drv.scf_tensors)
         # PE information
-        pe_dict = cphf_solver.init_pe(molecule, ao_basis)
+        pe_dict = cphf_solver._init_pe(molecule, ao_basis)
 
-        cphf_solver.comp_lr_fock(fock_uia, ao_density_uia, molecule, ao_basis,
+        cphf_solver._comp_lr_fock(fock_uia, ao_density_uia, molecule, ao_basis,
                                  eri_dict, dft_dict, pe_dict, profiler)
 
         # TODO: can this be done in a different way?
@@ -649,11 +665,11 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv) # TODO: remove scf_drv
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         # ERI information
-        eri_dict = cphf_solver.init_eri(molecule, ao_basis)
+        eri_dict = cphf_solver._init_eri(molecule, ao_basis)
         # DFT information
-        dft_dict = cphf_solver.init_dft(molecule, self.scf_drv.scf_tensors)
+        dft_dict = cphf_solver._init_dft(molecule, self.scf_drv.scf_tensors)
         # PE information
-        pe_dict = cphf_solver.init_pe(molecule, ao_basis)
+        pe_dict = cphf_solver._init_pe(molecule, ao_basis)
 
         # RHS contracted with CPHF coefficients (ov)
         #hessian_cphf_coeff_rhs = np.zeros((natm, natm, 3, 3))
@@ -718,7 +734,7 @@ class ScfHessianDriver(HessianDriver):
 
                 # TODO: remove commented out code
                 #eri_drv.compute(P_P_Six_fock_ao, P_P_Six_dm_ao, molecule, ao_basis, screening)
-                cphf_solver.comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao, molecule, ao_basis,
+                cphf_solver._comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao, molecule, ao_basis,
                                          eri_dict, dft_dict, pe_dict, profiler)
 
                 # Convert the auxiliary Fock matrices to numpy arrays for further use
