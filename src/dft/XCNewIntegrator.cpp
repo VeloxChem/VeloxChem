@@ -2012,6 +2012,11 @@ CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t          npoints,
 
     // eq.(31), JCTC 2021, 17, 1512-1521
 
+    // Note that we use matrix-matrix multiplication only once, and symmetrize
+    // the result. This is because the density matrix is symmetric, and the
+    // Kohn-Sham matrix from mat_G is also symmetric. Formally only the
+    // mat_G_gga contribution should be symmetrized.
+
     timer.start("Vxc matrix matmul");
 
     auto mat_Vxc = denblas::multABt(mat_chi, denblas::addAB(mat_G, mat_G_gga, 2.0));
@@ -3151,22 +3156,285 @@ CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule&       molecule,
         }
     }
 
-    // auto npoints = molecularGrid.getNumberOfGridPoints();
-    // CMemBlock2D<double> refgaos(npoints, naos);
-    // gtorec::computeGtosValuesForLDA(refgaos, gtovec, xcoords, ycoords, zcoords, 0, 0, npoints);
-    // double maxdiff = 0.0;
-    // for (int32_t i = 0; i < naos; i++)
-    // {
-    //     for (int32_t g = 0; g < npoints; g++)
-    //     {
-    //         maxdiff = std::max(maxdiff, std::fabs(refgaos.data(i)[g] - allgtovalues.row(i)[g]));
-    //     }
-    // }
-    // std::cout << "maxdiff: " << maxdiff << std::endl;
-
     // destroy GTOs container
 
     delete gtovec;
 
     return allgtovalues;
+}
+
+std::vector<CDenseMatrix>
+CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                             const CMolecularBasis& basis,
+                                                             const CMolecularGrid&  molecularGrid) const
+{
+    std::string errnotpartitioned("CXCNewIntegrator.computeGtoValuesAndDerivativesOnGridPoints: Cannot use unpartitioned molecular grid");
+
+    errors::assertMsgCritical(molecularGrid.isPartitioned(), errnotpartitioned);
+
+    auto nthreads = omp_get_max_threads();
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // memory blocks for GTOs on grid points
+
+    CDenseMatrix allgtovalues(naos, molecularGrid.getNumberOfGridPoints());
+
+    CDenseMatrix allgtoderivx(naos, molecularGrid.getNumberOfGridPoints());
+
+    CDenseMatrix allgtoderivy(naos, molecularGrid.getNumberOfGridPoints());
+
+    CDenseMatrix allgtoderivz(naos, molecularGrid.getNumberOfGridPoints());
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+
+    auto ycoords = molecularGrid.getCoordinatesY();
+
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, _screeningThresholdForGTOValues, boxdim);  // 1st order GTO derivative
+
+        // GTO values on grid points
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+        }
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            auto gaox_nu = gaox.data(nu);
+
+            auto gaoy_nu = gaoy.data(nu);
+
+            auto gaoz_nu = gaoz.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            auto aoidx = aoinds[i];
+
+            std::memcpy(allgtovalues.row(aoidx) + gridblockpos, gaos.data(aoidx), npoints * sizeof(double));
+
+            std::memcpy(allgtoderivx.row(aoidx) + gridblockpos, gaox.data(aoidx), npoints * sizeof(double));
+
+            std::memcpy(allgtoderivy.row(aoidx) + gridblockpos, gaoy.data(aoidx), npoints * sizeof(double));
+
+            std::memcpy(allgtoderivz.row(aoidx) + gridblockpos, gaoz.data(aoidx), npoints * sizeof(double));
+        }
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    return std::vector<CDenseMatrix>({allgtovalues, allgtoderivx, allgtoderivy, allgtoderivz});
+}
+
+void
+CXCNewIntegrator::computeExcVxcForLDA(const std::string& xcFuncLabel,
+                                      const int32_t      npoints,
+                                      const double*      rho,
+                                      double*            exc,
+                                      double*            vrho)
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    // form density grid
+
+    CDensityGrid dgrid(npoints, 1, xcfuntype, dengrid::ab);
+
+    auto rhoa = dgrid.alphaDensity(0);
+
+    auto rhob = dgrid.betaDensity(0);
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        rhoa[g] = rho[2 * g + 0];
+
+        rhob[g] = rho[2 * g + 1];
+    }
+
+    // compute functional derivative
+
+    CXCGradientGrid vxcgrid(npoints, dengrid::ab, xcfuntype);
+
+    fvxc.compute(vxcgrid, dgrid);
+
+    auto efunc = vxcgrid.xcFunctionalValues();
+
+    auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
+
+    auto grhob = vxcgrid.xcGradientValues(xcvars::rhob);
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        exc[g] = efunc[g] / (rho[2 * g + 0] + rho[2 * g + 1]);
+
+        vrho[2 * g + 0] = grhoa[g];
+
+        vrho[2 * g + 1] = grhob[g];
+    }
+}
+
+void
+CXCNewIntegrator::computeExcVxcForGGA(const std::string& xcFuncLabel,
+                                      const int32_t      npoints,
+                                      const double*      rho,
+                                      const double*      sigma,
+                                      double*            exc,
+                                      double*            vrho,
+                                      double*            vsigma)
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    // form density grid
+
+    CDensityGrid dgrid(npoints, 1, xcfuntype, dengrid::ab);
+
+    auto rhoa = dgrid.alphaDensity(0);
+
+    auto rhob = dgrid.betaDensity(0);
+
+    auto grada = dgrid.alphaDensityGradient(0);
+
+    auto gradb = dgrid.betaDensityGradient(0);
+
+    auto gradab = dgrid.mixedDensityGradient(0);
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        rhoa[g] = rho[2 * g + 0];
+
+        rhob[g] = rho[2 * g + 1];
+
+        grada[g] = std::sqrt(sigma[3 * g + 0]);
+
+        gradab[g] = sigma[3 * g + 1];
+
+        gradb[g] = std::sqrt(sigma[3 * g + 2]);
+    }
+
+    // compute functional derivative
+
+    CXCGradientGrid vxcgrid(npoints, dengrid::ab, xcfuntype);
+
+    fvxc.compute(vxcgrid, dgrid);
+
+    auto efunc = vxcgrid.xcFunctionalValues();
+
+    auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
+
+    auto grhob = vxcgrid.xcGradientValues(xcvars::rhob);
+
+    auto ggrada = vxcgrid.xcGradientValues(xcvars::grada);
+
+    auto ggradab = vxcgrid.xcGradientValues(xcvars::gradab);
+
+    auto ggradb = vxcgrid.xcGradientValues(xcvars::gradb);
+
+    auto ngrada = grada;
+
+    auto ngradb = gradb;
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        exc[g] = efunc[g] / (rho[2 * g + 0] + rho[2 * g + 1]);
+
+        vrho[2 * g + 0] = grhoa[g];
+
+        vrho[2 * g + 1] = grhob[g];
+
+        vsigma[3 * g + 0] = 0.5 * ggrada[g] / ngrada[g];
+
+        vsigma[3 * g + 1] = ggradab[g];
+
+        vsigma[3 * g + 2] = 0.5 * ggradb[g] / ngradb[g];
+    }
 }

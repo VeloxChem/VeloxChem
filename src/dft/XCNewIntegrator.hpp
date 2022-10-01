@@ -430,6 +430,53 @@ class CXCNewIntegrator
     CDenseMatrix computeGtoValuesOnGridPoints(const CMolecule&        molecule,
                                               const CMolecularBasis&  basis,
                                               const CMolecularGrid&   molecularGrid) const;
+
+    /**
+     Computes GTOs values and derivatives on grid points.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @return the GTO values and derivatives on grid points.
+     */
+    std::vector<CDenseMatrix> computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                                         const CMolecularBasis& basis,
+                                                                         const CMolecularGrid&  molecularGrid) const;
+
+    /**
+     Computes fucntional derivatives for LDA.
+
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param npoints the number of grid points.
+     @param rho the constant pointer to densities.
+     @param exc the pointer to functional values.
+     @param vrho the pointer to functional derivative w.r.t. densities.
+     */
+    void computeExcVxcForLDA(const std::string& xcFuncLabel,
+                             const int32_t      npoints,
+                             const double*      rho,
+                             double*            exc,
+                             double*            vrho);
+
+    /**
+     Computes fucntional derivatives for GGA.
+
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param npoints the number of grid points.
+     @param rho the constant pointer to densities.
+     @param sigma the constant pointer to density gradients.
+     @param exc the pointer to functional values.
+     @param vrho the pointer to functional derivative w.r.t. densities.
+     @param vsigma the pointer to functional derivative w.r.t. density
+            gradients.
+     */
+    void computeExcVxcForGGA(const std::string& xcFuncLabel,
+                             const int32_t      npoints,
+                             const double*      rho,
+                             const double*      sigma,
+                             double*            exc,
+                             double*            vrho,
+                             double*            vsigma);
 };
 
 #endif /* XCNewIntegrator_hpp */
