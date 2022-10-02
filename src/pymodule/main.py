@@ -482,7 +482,7 @@ def main():
 
             if 'orbital_response' in task.input_dict:
                 orbrsp_dict = task.input_dict['orbital_response']
-                orbrsp_drv = TddftOrbitalResponse()
+                orbrsp_drv = TddftOrbitalResponse(task.mpi_comm, task.ostream)
                 orbrsp_drv.update_settings(orbrsp_dict, rsp_dict, method_dict)
                 orbrsp_drv.compute(task.molecule, task.ao_basis,
                                    scf_drv.scf_tensors, rsp_prop.rsp_property)
