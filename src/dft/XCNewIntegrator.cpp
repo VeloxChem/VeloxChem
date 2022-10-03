@@ -3485,3 +3485,131 @@ CXCNewIntegrator::computeFxcForLDA(const std::string& xcFuncLabel,
         v2rho2[3 * g + 2] = grho_bb[g];
     }
 }
+
+void
+CXCNewIntegrator::computeFxcForGGA(const std::string& xcFuncLabel,
+                                   const int32_t      npoints,
+                                   const double*      rho,
+                                   const double*      sigma,
+                                   double*            v2rho2,
+                                   double*            v2rhosigma,
+                                   double*            v2sigma2) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    // form density grid
+
+    CDensityGrid dgrid(npoints, 1, xcfuntype, dengrid::ab);
+
+    auto rhoa = dgrid.alphaDensity(0);
+
+    auto rhob = dgrid.betaDensity(0);
+
+    auto grada = dgrid.alphaDensityGradient(0);
+
+    auto gradb = dgrid.betaDensityGradient(0);
+
+    auto gradab = dgrid.mixedDensityGradient(0);
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        rhoa[g] = rho[2 * g + 0];
+
+        rhob[g] = rho[2 * g + 1];
+
+        grada[g] = std::sqrt(sigma[3 * g + 0]);
+
+        gradab[g] = sigma[3 * g + 1];
+
+        gradb[g] = std::sqrt(sigma[3 * g + 2]);
+    }
+
+    // compute functional derivative
+
+    CXCGradientGrid vxcgrid(npoints, dengrid::ab, xcfuntype);
+
+    CXCHessianGrid vxc2grid(npoints, dengrid::ab, xcfuntype);
+
+    fvxc.compute(vxcgrid, dgrid);
+
+    fvxc.compute(vxc2grid, dgrid);
+
+    auto ngrad_a = grada;
+
+    auto ngrad_b = gradb;
+
+    auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
+
+    auto grhob = vxcgrid.xcGradientValues(xcvars::rhob);
+
+    auto ggrad_a = vxcgrid.xcGradientValues(xcvars::grada);
+
+    auto ggrad_b = vxcgrid.xcGradientValues(xcvars::gradb);
+
+    auto ggrad_c = vxcgrid.xcGradientValues(xcvars::gradab);
+
+    auto grho_aa = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+
+    auto grho_ab = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
+
+    auto grho_bb = vxc2grid.xcHessianValues(xcvars::rhob, xcvars::rhob);
+
+    auto gmix_aa = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::grada);
+
+    auto gmix_ab = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::gradb);
+
+    auto gmix_ba = vxc2grid.xcHessianValues(xcvars::rhob, xcvars::grada);
+
+    auto gmix_bb = vxc2grid.xcHessianValues(xcvars::rhob, xcvars::gradb);
+
+    auto gmix_ac = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::gradab);
+
+    auto gmix_bc = vxc2grid.xcHessianValues(xcvars::rhob, xcvars::gradab);
+
+    auto ggrad_aa = vxc2grid.xcHessianValues(xcvars::grada, xcvars::grada);
+
+    auto ggrad_ab = vxc2grid.xcHessianValues(xcvars::grada, xcvars::gradb);
+
+    auto ggrad_bb = vxc2grid.xcHessianValues(xcvars::gradb, xcvars::gradb);
+
+    auto ggrad_ac = vxc2grid.xcHessianValues(xcvars::grada, xcvars::gradab);
+
+    auto ggrad_bc = vxc2grid.xcHessianValues(xcvars::gradb, xcvars::gradab);
+
+    auto ggrad_cc = vxc2grid.xcHessianValues(xcvars::gradab, xcvars::gradab);
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        v2rho2[3 * g + 0] = grho_aa[g];
+
+        v2rho2[3 * g + 1] = grho_ab[g];
+
+        v2rho2[3 * g + 2] = grho_bb[g];
+
+        v2rhosigma[6 * g + 0] = 0.5 * gmix_aa[g] / ngrad_a[g];
+
+        v2rhosigma[6 * g + 1] = gmix_ac[g];
+
+        v2rhosigma[6 * g + 2] = 0.5 * gmix_ab[g] / ngrad_b[g];
+
+        v2rhosigma[6 * g + 3] = 0.5 * gmix_ba[g] / ngrad_a[g];
+
+        v2rhosigma[6 * g + 4] = gmix_bc[g];
+
+        v2rhosigma[6 * g + 5] = 0.5 * gmix_bb[g] / ngrad_b[g];
+
+        v2sigma2[6 * g + 0] = 0.25 * (ggrad_aa[g] - ggrad_a[g] / ngrad_a[g]) / (ngrad_a[g] * ngrad_a[g]);
+
+        v2sigma2[6 * g + 1] = 0.5 * ggrad_ac[g] / ngrad_a[g];
+
+        v2sigma2[6 * g + 2] = 0.25 * ggrad_ab[g] / (ngrad_a[g] * ngrad_b[g]);
+
+        v2sigma2[6 * g + 3] = ggrad_cc[g];
+
+        v2sigma2[6 * g + 4] = 0.5 * ggrad_bc[g] / ngrad_b[g];
+
+        v2sigma2[6 * g + 5] = 0.25 * (ggrad_bb[g] - ggrad_b[g] / ngrad_b[g]) / (ngrad_b[g] * ngrad_b[g]);
+    }
+}

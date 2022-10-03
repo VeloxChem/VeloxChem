@@ -407,17 +407,42 @@ export_dft(py::module& m)
             "compute_fxc_for_lda",
             [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::array_t<double> {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
-                errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc_for_lda: Expecting C-style contiguous numpy array"));
+                errors::assertMsgCritical(rho_c_style, std::string("compute_fxc_for_lda: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
                 auto npoints  = rho_size / 2;
-                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
+                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_fxc_for_lda: Inconsistent array size"));
                 CDenseMatrix v2rho2(npoints, 3);
                 self.computeFxcForLDA(xcFuncLabel, npoints, rho.data(), v2rho2.values());
                 return vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfElements());
             },
-            "Computes Exc and Vxc for LDA.",
+            "Computes Fxc for LDA.",
             "xcFuncLabel"_a,
-            "rho"_a);
+            "rho"_a)
+        .def(
+            "compute_fxc_for_gga",
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
+                auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style && sigma_c_style, std::string("compute_fxc_for_gga: Expecting C-style contiguous numpy array"));
+                auto rho_size   = static_cast<int32_t>(rho.size());
+                auto sigma_size = static_cast<int32_t>(sigma.size());
+                auto npoints    = rho_size / 2;
+                errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
+                                          std::string("compute_fxc_for_gga: Inconsistent array size"));
+                CDenseMatrix v2rho2(npoints, 3);
+                CDenseMatrix v2rhosigma(npoints, 6);
+                CDenseMatrix v2sigma2(npoints, 6);
+                self.computeFxcForGGA(xcFuncLabel, npoints, rho.data(), sigma.data(), v2rho2.values(), v2rhosigma.values(), v2sigma2.values());
+                py::list ret;
+                ret.append(vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfElements()));
+                ret.append(vlx_general::pointer_to_numpy(v2rhosigma.values(), v2rhosigma.getNumberOfElements()));
+                ret.append(vlx_general::pointer_to_numpy(v2sigma2.values(), v2sigma2.getNumberOfElements()));
+                return ret;
+            },
+            "Computes Fxc for GGA.",
+            "xcFuncLabel"_a,
+            "rho"_a,
+            "sigma"_a);
 
     // CXCNewMolecularGradient class
 
