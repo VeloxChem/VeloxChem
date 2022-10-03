@@ -3318,7 +3318,7 @@ CXCNewIntegrator::computeExcVxcForLDA(const std::string& xcFuncLabel,
                                       const int32_t      npoints,
                                       const double*      rho,
                                       double*            exc,
-                                      double*            vrho)
+                                      double*            vrho) const
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
@@ -3368,7 +3368,7 @@ CXCNewIntegrator::computeExcVxcForGGA(const std::string& xcFuncLabel,
                                       const double*      sigma,
                                       double*            exc,
                                       double*            vrho,
-                                      double*            vsigma)
+                                      double*            vsigma) const
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
@@ -3436,5 +3436,52 @@ CXCNewIntegrator::computeExcVxcForGGA(const std::string& xcFuncLabel,
         vsigma[3 * g + 1] = ggradab[g];
 
         vsigma[3 * g + 2] = 0.5 * ggradb[g] / ngradb[g];
+    }
+}
+
+void
+CXCNewIntegrator::computeFxcForLDA(const std::string& xcFuncLabel,
+                                   const int32_t      npoints,
+                                   const double*      rho,
+                                   double*            v2rho2) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    // form density grid
+
+    CDensityGrid dgrid(npoints, 1, xcfuntype, dengrid::ab);
+
+    auto rhoa = dgrid.alphaDensity(0);
+
+    auto rhob = dgrid.betaDensity(0);
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        rhoa[g] = rho[2 * g + 0];
+
+        rhob[g] = rho[2 * g + 1];
+    }
+
+    // compute functional derivative
+
+    CXCHessianGrid vxc2grid(npoints, dengrid::ab, xcfuntype);
+
+    fvxc.compute(vxc2grid, dgrid);
+
+    auto grho_aa = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
+
+    auto grho_ab = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
+
+    auto grho_bb = vxc2grid.xcHessianValues(xcvars::rhob, xcvars::rhob);
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        v2rho2[3 * g + 0] = grho_aa[g];
+
+        v2rho2[3 * g + 1] = grho_ab[g];
+
+        v2rho2[3 * g + 2] = grho_bb[g];
     }
 }

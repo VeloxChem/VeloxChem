@@ -456,7 +456,7 @@ class CXCNewIntegrator
                              const int32_t      npoints,
                              const double*      rho,
                              double*            exc,
-                             double*            vrho);
+                             double*            vrho) const;
 
     /**
      Computes fucntional derivatives for GGA.
@@ -476,7 +476,21 @@ class CXCNewIntegrator
                              const double*      sigma,
                              double*            exc,
                              double*            vrho,
-                             double*            vsigma);
+                             double*            vsigma) const;
+
+    /**
+     Computes 2nd-order fucntional derivatives for LDA.
+
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param npoints the number of grid points.
+     @param rho the constant pointer to densities.
+     @param v2rho2 the pointer to 2nd-order functional derivative w.r.t.
+            densities.
+     */
+    void computeFxcForLDA(const std::string& xcFuncLabel,
+                          const int32_t      npoints,
+                          const double*      rho,
+                          double*            v2rho2) const;
 };
 
 #endif /* XCNewIntegrator_hpp */

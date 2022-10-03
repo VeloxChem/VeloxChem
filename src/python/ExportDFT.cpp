@@ -402,7 +402,22 @@ export_dft(py::module& m)
             "Computes Exc and Vxc for GGA.",
             "xcFuncLabel"_a,
             "rho"_a,
-            "sigma"_a);
+            "sigma"_a)
+        .def(
+            "compute_fxc_for_lda",
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::array_t<double> {
+                auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc_for_lda: Expecting C-style contiguous numpy array"));
+                auto rho_size = static_cast<int32_t>(rho.size());
+                auto npoints  = rho_size / 2;
+                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
+                CDenseMatrix v2rho2(npoints, 3);
+                self.computeFxcForLDA(xcFuncLabel, npoints, rho.data(), v2rho2.values());
+                return vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfElements());
+            },
+            "Computes Exc and Vxc for LDA.",
+            "xcFuncLabel"_a,
+            "rho"_a);
 
     // CXCNewMolecularGradient class
 

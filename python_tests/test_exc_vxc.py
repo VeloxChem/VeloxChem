@@ -2,7 +2,9 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import GridDriver, XCNewIntegrator
-from veloxchem.veloxchemlib import is_single_node, mpi_master
+from veloxchem.veloxchemlib import is_single_node, mpi_master, denmat
+from veloxchem.aodensitymatrix import AODensityMatrix
+from veloxchem.aofockmatrix import AOFockMatrix
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -33,7 +35,26 @@ class TestExcVxc:
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.compute(molecule, basis)
-        density = scf_drv.density
+        gs_density = scf_drv.density
+
+        if scf_drv.rank == 0:
+            mo = scf_drv.scf_tensors['C_alpha']
+            nocc = molecule.number_of_alpha_electrons()
+            nvir = mo.shape[1] - nocc
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            matrices = [np.zeros((nocc, nvir)) for i in range(4)]
+            matrices[0][nocc - 1, 1] = 1.0
+            matrices[1][nocc - 2, 0] = 1.0
+            matrices[2][nocc - 2, 1] = 1.0
+            matrices[3][nocc - 1, 0] = 1.0
+            ao_matrices = [
+                np.linalg.multi_dot([mo_occ, m, mo_vir.T]) for m in matrices
+            ]
+            rhow_density = AODensityMatrix(ao_matrices, denmat.rest)
+        else:
+            rhow_density = AODensityMatrix()
+        rhow_density.broadcast(scf_drv.rank, scf_drv.comm)
 
         grid_drv = GridDriver()
         grid_drv.set_level(grid_level)
@@ -43,13 +64,18 @@ class TestExcVxc:
                                                     scf_drv.comm)
 
         xc_drv = XCNewIntegrator()
-        vxc = xc_drv.integrate_vxc_fock(molecule, basis, density, molgrid,
+        vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
+        fock = AOFockMatrix(rhow_density)
+        xc_drv.integrate_fxc_fock(fock, molecule, basis, rhow_density,
+                                  gs_density, molgrid, xcfun_label)
+        fock.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
+
         if scf_drv.rank == mpi_master():
             gto = xc_drv.compute_gto_values(molecule, basis, molgrid)
-            Fmat = np.matmul(density.alpha_to_numpy(0), gto)
+            Fmat = np.matmul(gs_density.alpha_to_numpy(0), gto)
             rhoa = np.diag(np.matmul(gto.T, Fmat))
             rhob = rhoa.copy()
 
@@ -58,9 +84,8 @@ class TestExcVxc:
             rho[0::2] = rhoa[:]
             rho[1::2] = rhob[:]
 
-            exc = np.zeros(npoints)
-            vrho = np.zeros(npoints * 2)
             exc, vrho = xc_drv.compute_exc_vxc_for_lda(xcfun_label, rho)
+            vrhoa = vrho[0::2]
 
             gw = molgrid.w_to_numpy()
             n_ene = np.sum(gw * (rhoa + rhob))
@@ -69,10 +94,22 @@ class TestExcVxc:
             xc_ene = np.sum(gw * exc * (rhoa + rhob))
             assert np.abs(xc_ene - vxc.get_energy()) < tol
 
-            vrhoa = vrho[0::2]
             Gmat = gto * gw * vrhoa
             Vxcmat = np.matmul(gto, Gmat.T)
             assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
+
+            v2rho2 = xc_drv.compute_fxc_for_lda(xcfun_label, rho)
+            v2rho2_aa = v2rho2[0::3]
+            v2rho2_ab = v2rho2[1::3]
+
+            for i in range(rhow_density.number_of_density_matrices()):
+                Fmat = np.matmul(rhow_density.alpha_to_numpy(i), gto)
+                rhowa = np.diag(np.matmul(gto.T, Fmat))
+                rhowb = rhoa.copy()
+
+                Gmat = gto * gw * (v2rho2_aa * rhowa + v2rho2_ab * rhowb)
+                Fxcmat = np.matmul(gto, Gmat.T)
+                assert np.max(np.abs(Fxcmat - fock.alpha_to_numpy(i))) < tol
 
     @pytest.mark.skipif(not is_single_node(), reason='single node only')
     def test_b3lyp(self):
@@ -97,7 +134,26 @@ class TestExcVxc:
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.compute(molecule, basis)
-        density = scf_drv.density
+        gs_density = scf_drv.density
+
+        if scf_drv.rank == 0:
+            mo = scf_drv.scf_tensors['C_alpha']
+            nocc = molecule.number_of_alpha_electrons()
+            nvir = mo.shape[1] - nocc
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            matrices = [np.zeros((nocc, nvir)) for i in range(4)]
+            matrices[0][nocc - 1, 1] = 1.0
+            matrices[1][nocc - 2, 0] = 1.0
+            matrices[2][nocc - 2, 1] = 1.0
+            matrices[3][nocc - 1, 0] = 1.0
+            ao_matrices = [
+                np.linalg.multi_dot([mo_occ, m, mo_vir.T]) for m in matrices
+            ]
+            rhow_density = AODensityMatrix(ao_matrices, denmat.rest)
+        else:
+            rhow_density = AODensityMatrix()
+        rhow_density.broadcast(scf_drv.rank, scf_drv.comm)
 
         grid_drv = GridDriver()
         grid_drv.set_level(grid_level)
@@ -107,16 +163,21 @@ class TestExcVxc:
                                                     scf_drv.comm)
 
         xc_drv = XCNewIntegrator()
-        vxc = xc_drv.integrate_vxc_fock(molecule, basis, density, molgrid,
+        vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
+
+        fock = AOFockMatrix(rhow_density)
+        xc_drv.integrate_fxc_fock(fock, molecule, basis, rhow_density,
+                                  gs_density, molgrid, xcfun_label)
+        fock.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
         if scf_drv.rank == mpi_master():
             gto, gtox, gtoy, gtoz = xc_drv.compute_gto_values_and_derivatives(
                 molecule, basis, molgrid)
             npoints = gto.shape[1]
 
-            Dmat = density.alpha_to_numpy(0)
+            Dmat = gs_density.alpha_to_numpy(0)
             sym_Dmat = 0.5 * (Dmat + Dmat.T)
             Fmat = np.matmul(sym_Dmat, gto)
             rhoa = np.diag(np.matmul(gto.T, Fmat))
@@ -142,9 +203,6 @@ class TestExcVxc:
             sigma[1::3] = sigma_ab[:]
             sigma[2::3] = sigma_bb[:]
 
-            exc = np.zeros(npoints)
-            vrho = np.zeros(npoints * 2)
-            vsigma = np.zeros(npoints * 3)
             exc, vrho, vsigma = xc_drv.compute_exc_vxc_for_gga(
                 xcfun_label, rho, sigma)
 
