@@ -237,6 +237,10 @@ class TddftGradientDriver(GradientDriver):
             rel_dm_ao = ( unrel_dm_ao + 2.0 * lambda_ao
                         + 2.0 * lambda_ao.transpose(0,2,1) )
             dof = xpy.shape[0]
+        else:
+            dof = None
+
+        dof = self.comm.bcast(dof, root=mpi_master())
 
         # ground state gradient
         gs_grad_drv = ScfGradientDriver(self.scf_drv)
@@ -772,11 +776,13 @@ class TddftOrbitalResponse(CphfSolver):
                 # which is zero for TDDFT orbital response
                 zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
         else:
+            dof = None
             dm_ao_rhs = AODensityMatrix()
             if self._dft:
                 perturbed_dm_ao = AODensityMatrix()
                 zero_dm_ao =  AODensityMatrix()
 
+        dof = self.comm.bcast(dof, root=mpi_master())
         dm_ao_rhs.broadcast(self.rank, self.comm)
 
         molgrid = dft_dict['molgrid']
