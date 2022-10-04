@@ -3540,15 +3540,9 @@ CXCNewIntegrator::computeFxcForGGA(const std::string& xcFuncLabel,
 
     auto ngrad_b = gradb;
 
-    auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
-
-    auto grhob = vxcgrid.xcGradientValues(xcvars::rhob);
-
     auto ggrad_a = vxcgrid.xcGradientValues(xcvars::grada);
 
     auto ggrad_b = vxcgrid.xcGradientValues(xcvars::gradb);
-
-    auto ggrad_c = vxcgrid.xcGradientValues(xcvars::gradab);
 
     auto grho_aa = vxc2grid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
 

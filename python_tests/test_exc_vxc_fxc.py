@@ -232,6 +232,7 @@ class TestExcVxc:
             v2rhosigma_aa = v2rhosigma[0::6]
             v2rhosigma_ac = v2rhosigma[1::6]
             v2rhosigma_ab = v2rhosigma[2::6]
+            v2rhosigma_ba = v2rhosigma[3::6]
             v2rhosigma_bc = v2rhosigma[4::6]
             v2sigma2_aa = v2sigma2[0::6]
             v2sigma2_ac = v2sigma2[1::6]
@@ -253,24 +254,26 @@ class TestExcVxc:
                 rhowby = rhoway.copy()
                 rhowbz = rhowaz.copy()
 
-                grhow_grho_aa = rhowax * rhoax + rhoway * rhoay + rhowaz * rhoaz
-                grhow_grho_ab = rhowax * rhobx + rhoway * rhoby + rhowaz * rhobz
-                grhow_grho_ba = rhowbx * rhoax + rhowby * rhoay + rhowbz * rhoaz
-                grhow_grho_bb = rhowbx * rhobx + rhowby * rhoby + rhowbz * rhobz
+                grhow_grho_a = rhowax * rhoax + rhoway * rhoay + rhowaz * rhoaz
+                grhow_grho_a *= 2
 
-                grhow_grho_ab_ba = grhow_grho_ab + grhow_grho_ba
+                grhow_grho_c = rhowax * rhobx + rhoway * rhoby + rhowaz * rhobz
+                grhow_grho_c += rhowbx * rhoax + rhowby * rhoay + rhowbz * rhoaz
+
+                grhow_grho_b = rhowbx * rhobx + rhowby * rhoby + rhowbz * rhobz
+                grhow_grho_b *= 2
 
                 Gmat = gto * gw * (v2rho2_aa * rhowa + v2rho2_ab * rhowb +
-                                   2 * v2rhosigma_aa * grhow_grho_aa +
-                                   v2rhosigma_ac * grhow_grho_ab_ba +
-                                   2 * v2rhosigma_ab * grhow_grho_bb)
+                                   v2rhosigma_aa * grhow_grho_a +
+                                   v2rhosigma_ac * grhow_grho_c +
+                                   v2rhosigma_ab * grhow_grho_b)
                 Fxcmat = np.matmul(gto, Gmat.T)
 
                 fac_1 = ((2 * v2rhosigma_aa + v2rhosigma_ac) * rhowa +
-                         (2 * v2rhosigma_ab + v2rhosigma_bc) * rhowb +
-                         (4 * v2sigma2_aa + 2 * v2sigma2_ac) * grhow_grho_aa +
-                         (4 * v2sigma2_ab + 2 * v2sigma2_cb) * grhow_grho_bb +
-                         (2 * v2sigma2_ac + v2sigma2_cc) * grhow_grho_ab_ba)
+                         (2 * v2rhosigma_ba + v2rhosigma_bc) * rhowb +
+                         (2 * v2sigma2_aa + v2sigma2_ac) * grhow_grho_a +
+                         (2 * v2sigma2_ab + v2sigma2_cb) * grhow_grho_b +
+                         (2 * v2sigma2_ac + v2sigma2_cc) * grhow_grho_c)
 
                 fac_2 = 2 * vsigma_aa + vsigma_ab
 
