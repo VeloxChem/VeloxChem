@@ -766,7 +766,11 @@ class CphfSolver(LinearSolver):
 
         if self.rank == mpi_master():
             # Create AODensityMatrix object from CPHF guess in AO
-            cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_guess, mo_vir)
+            cphf_ao = np.zeros((dof, nao, nao))
+            for i in range(dof):
+                cphf_ao[i] = np.linalg.multi_dot([mo_occ, cphf_guess[i], mo_vir.T])
+
+            #cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_guess, mo_vir)
             cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
             # create AODensityMatrix object
             ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
@@ -790,8 +794,13 @@ class CphfSolver(LinearSolver):
 
             # Create AODensityMatrix object from lambda in AO
             if self.rank == mpi_master():
-                cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ,
-                                    v.reshape(dof, nocc, nvir), mo_vir)
+                cphf_ao = np.zeros((dof, nao, nao))
+                for i in range(dof):
+                    cphf_ao[i] = np.linalg.multi_dot([mo_occ,
+                                                      v.reshape(dof,nocc,nvir)[i],
+                                                      mo_vir.T])
+#                cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ,
+#                                    v.reshape(dof, nocc, nvir), mo_vir)
                 cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
                 ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
             else:
@@ -804,15 +813,23 @@ class CphfSolver(LinearSolver):
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
             # and add diagonal part
             if self.rank == mpi_master():
-                fock_cphf_numpy = np.zeros((dof,nao,nao))
+                #fock_cphf_numpy = np.zeros((dof,nao,nao))
+                cphf_mo = np.zeros((dof, nocc, nvir))
                 for i in range(dof):
-                    fock_cphf_numpy[i] = fock_cphf.to_numpy(i)
-
-                cphf_mo = (-np.einsum('mi,xmn,na->xia', mo_occ,
-                                      fock_cphf_numpy, mo_vir)
-                          - np.einsum('ma,xmn,ni->xia', mo_vir,
-                                      fock_cphf_numpy, mo_occ)
-                          + v.reshape(dof, nocc, nvir) * eov)
+                    fock_cphf_numpy = fock_cphf.to_numpy(i)
+                    cphf_mo[i] = ( - np.linalg.multi_dot([mo_occ.T,
+                                                        fock_cphf_numpy,
+                                                        mo_vir])
+                                  - np.linalg.multi_dot([mo_vir.T,
+                                                        fock_cphf_numpy,
+                                                        mo_occ]).T
+                                    )
+                cphf_mo +=  v.reshape(dof, nocc, nvir) * eov
+                #cphf_mo = (-np.einsum('mi,xmn,na->xia', mo_occ,
+                #                      fock_cphf_numpy, mo_vir)
+                #          - np.einsum('ma,xmn,ni->xia', mo_vir,
+                #                      fock_cphf_numpy, mo_occ)
+                #          + v.reshape(dof, nocc, nvir) * eov)
             else:
                 cphf_mo = None
 

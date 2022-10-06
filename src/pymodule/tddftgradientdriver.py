@@ -730,21 +730,39 @@ class TddftOrbitalResponse(CphfSolver):
             xmy = exc_vec - deexc_vec
 
             # Transform the vectors to the AO basis
-            xpy_ao = np.einsum('mi,sia,na->smn', mo_occ, xpy, mo_vir)
-            xmy_ao = np.einsum('mi,sia,na->smn', mo_occ, xmy, mo_vir)
+            xpy_ao = np.zeros((dof, nao, nao))
+            xmy_ao = np.zeros((dof, nao, nao))
+            dm_oo = np.zeros((dof, nocc, nocc))
+            dm_vv = np.zeros((dof, nvir, nvir))
+            unrel_dm_ao = np.zeros((dof, nao, nao))
+            for i in range(dof):
+                xpy_ao[i] = np.linalg.multi_dot([mo_occ, xpy[i], mo_vir.T])
+                xmy_ao[i] = np.linalg.multi_dot([mo_occ, xmy[i], mo_vir.T])
+                dm_oo[i] = -0.5 * ( np.linalg.multi_dot([xpy[i], xpy[i].T])
+                                   +np.linalg.multi_dot([xmy[i], xmy[i].T])
+                                    )
+                dm_vv[i] = 0.5 * ( np.linalg.multi_dot([xpy[i].T, xpy[i]])
+                                  +np.linalg.multi_dot([xmy[i].T, xmy[i]])
+                                    )
+                unrel_dm_ao[i] = ( np.linalg.multi_dot([mo_occ, dm_oo[i], mo_occ.T])
+                                  +np.linalg.multi_dot([mo_vir, dm_vv[i], mo_vir.T])
+                                    )
+
+            #xpy_ao = np.einsum('mi,sia,na->smn', mo_occ, xpy, mo_vir)
+            #xmy_ao = np.einsum('mi,sia,na->smn', mo_occ, xmy, mo_vir)
 
             # Calcuate the unrelaxed one-particle density matrix in MO basis
-            dm_oo = -0.5 * (  np.einsum('sia,sja->sij', xpy, xpy)
-                            + np.einsum('sia,sja->sij', xmy, xmy)
-                            )
-            dm_vv = 0.5 * (  np.einsum('sia,sib->sab', xpy, xpy)
-                           + np.einsum('sia,sib->sab', xmy, xmy)
-                            )
+            #dm_oo = -0.5 * (  np.einsum('sia,sja->sij', xpy, xpy)
+            #                + np.einsum('sia,sja->sij', xmy, xmy)
+            #                )
+            #dm_vv = 0.5 * (  np.einsum('sia,sib->sab', xpy, xpy)
+            #               + np.einsum('sia,sib->sab', xmy, xmy)
+            #                )
 
             # Transform unrelaxed one-particle density matrix to the AO basis
-            unrel_dm_ao = ( np.einsum('mi,sij,nj->smn', mo_occ, dm_oo, mo_occ)
-                          + np.einsum('ma,sab,nb->smn', mo_vir, dm_vv, mo_vir)
-                            )
+            #unrel_dm_ao = ( np.einsum('mi,sij,nj->smn', mo_occ, dm_oo, mo_occ)
+            #              + np.einsum('ma,sab,nb->smn', mo_vir, dm_vv, mo_vir)
+            #                )
 
             # Make a list of unrel. DMs and excittion vectors:
             dm_ao_list = list(unrel_dm_ao) + list(xpy_ao) + list(xmy_ao)
@@ -864,31 +882,51 @@ class TddftOrbitalResponse(CphfSolver):
                 fock_ao_rhs_xmy[ifock] = fock_ao_rhs.alpha_to_numpy(2*dof+ifock)
 
             # Transform to MO basis:
-            fmo_rhs_1pdm = np.einsum('mi,smn,na->sia', mo_occ,
-                                      0.5 * fock_ao_rhs_1pdm, mo_vir)
+            rhs_mo = np.zeros((dof, nocc, nvir))
+            for i in range(dof):
+                fmo_rhs_1pdm = 0.5 * np.linalg.multi_dot([mo_occ.T,
+                                                          fock_ao_rhs_1pdm[i], 
+                                                          mo_vir])
+                #fmo_rhs_1pdm = np.einsum('mi,smn,na->sia', mo_occ,
+                #                      0.5 * fock_ao_rhs_1pdm, mo_vir)
 
+                sdp_pds = 0.25 * (
+                    np.linalg.multi_dot([ovlp, xpy_ao[i], fock_ao_rhs_xpy[i].T])
+                  + np.linalg.multi_dot([ovlp, xmy_ao[i], fock_ao_rhs_xmy[i].T])
+                  - np.linalg.multi_dot([fock_ao_rhs_xpy[i].T, xpy_ao[i], ovlp])
+                  - np.linalg.multi_dot([fock_ao_rhs_xmy[i].T, xmy_ao[i], ovlp])
+                  - np.linalg.multi_dot([ovlp, xpy_ao[i], fock_ao_rhs_xpy[i]])
+                  + np.linalg.multi_dot([ovlp, xmy_ao[i], fock_ao_rhs_xmy[i]])
+                  + np.linalg.multi_dot([fock_ao_rhs_xpy[i], xpy_ao[i], ovlp])
+                  - np.linalg.multi_dot([fock_ao_rhs_xmy[i], xmy_ao[i], ovlp])
+                                  )
             # TODO: factor out overlap matrix?
-            sdp_pds = 0.25 * (
-                np.einsum('mn,snt,spt->smp', ovlp, xpy_ao, fock_ao_rhs_xpy)
-              + np.einsum('mn,snt,spt->smp', ovlp, xmy_ao, fock_ao_rhs_xmy)
-              - np.einsum('smn,smt,tp->snp', fock_ao_rhs_xpy, xpy_ao, ovlp)
-              - np.einsum('smn,smt,tp->snp', fock_ao_rhs_xmy, xmy_ao, ovlp)
-              - np.einsum('mn,snt,stp->smp', ovlp, xpy_ao, fock_ao_rhs_xpy)
-              + np.einsum('mn,snt,stp->smp', ovlp, xmy_ao, fock_ao_rhs_xmy)
-              + np.einsum('smn,snt,tp->smp', fock_ao_rhs_xpy, xpy_ao, ovlp)
-              - np.einsum('smn,snt,tp->smp', fock_ao_rhs_xmy, xmy_ao, ovlp)
-            )   
+           #     sdp_pds = 0.25 * (
+           #     np.einsum('mn,snt,spt->smp', ovlp, xpy_ao, fock_ao_rhs_xpy)
+           #   + np.einsum('mn,snt,spt->smp', ovlp, xmy_ao, fock_ao_rhs_xmy)
+           #   - np.einsum('smn,smt,tp->snp', fock_ao_rhs_xpy, xpy_ao, ovlp)
+           #   - np.einsum('smn,smt,tp->snp', fock_ao_rhs_xmy, xmy_ao, ovlp)
+           #   - np.einsum('mn,snt,stp->smp', ovlp, xpy_ao, fock_ao_rhs_xpy)
+           #   + np.einsum('mn,snt,stp->smp', ovlp, xmy_ao, fock_ao_rhs_xmy)
+           #   + np.einsum('smn,snt,tp->smp', fock_ao_rhs_xpy, xpy_ao, ovlp)
+           #   - np.einsum('smn,snt,tp->smp', fock_ao_rhs_xmy, xmy_ao, ovlp)
+           #     )   
 
-            rhs_mo = ( fmo_rhs_1pdm 
-                     + np.einsum('mi,smn,na->sia', mo_occ, sdp_pds, mo_vir)
+                rhs_mo[i] = ( fmo_rhs_1pdm 
+                     + np.linalg.multi_dot([mo_occ.T, sdp_pds, mo_vir])
                         )
+                #rhs_mo[i] = ( fmo_rhs_1pdm 
+                #     + np.einsum('mi,smn,na->sia', mo_occ, sdp_pds, mo_vir)
+                #        )
 
             # Add DFT E[3] contribution to the RHS:
             if self._dft:
                 gxc_ao = np.zeros((dof, nao, nao))
+                gxc_mo = np.zeros((dof, nocc, nvir))
                 for ifock in range(dof):
                     gxc_ao[ifock] = fock_gxc_ao.alpha_to_numpy(2*ifock)
-                gxc_mo = np.einsum('mi,smn,na->sia', mo_occ, gxc_ao, mo_vir)
+                    gxc_mo[ifock] = np.linalg.multi_dot([mo_occ.T, gxc_ao[ifock], mo_vir])
+                #gxc_mo = np.einsum('mi,smn,na->sia', mo_occ, gxc_ao, mo_vir)
                 rhs_mo += 0.25 * gxc_mo
 
         self.profiler.stop_timer('RHS')
