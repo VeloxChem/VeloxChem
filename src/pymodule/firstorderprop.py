@@ -109,14 +109,19 @@ class FirstOrderProperties:
         dipole_mats = dipole_drv.compute(molecule, basis)
 
         if self.rank == mpi_master():
-            dipole_ints = np.array([dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
+            dipole_ints = np.array([dipole_mats.x_to_numpy(),
+                                    dipole_mats.y_to_numpy(),
                                    dipole_mats.z_to_numpy()])
 
             # electronic contribution
             # multiple states:
             if len(total_density.shape) > 2:
-                electronic_dipole = -1.0 * np.einsum('smn,xmn->sx',
-                                                      total_density, dipole_ints)
+                dof = total_density.shape[0]
+                electronic_dipole = np.zeros((dof, 3))
+                for i in range(dof):
+                    electronic_dipole[i] = -1.0 * np.array(
+                  [np.sum(dipole_ints[d] * total_density[i]) for d in range(3)])
+
             # or single state:
             else:
                 electronic_dipole = -1.0 * np.array(
