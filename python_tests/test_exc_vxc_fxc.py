@@ -77,38 +77,42 @@ class TestExcVxc:
         if scf_drv.rank == mpi_master():
             gto = xc_drv.compute_gto_values(molecule, basis, molgrid)
             Fmat = np.matmul(gs_density.alpha_to_numpy(0), gto)
-            rhoa = np.diag(np.matmul(gto.T, Fmat))
-            rhob = rhoa.copy()
+            rho_a = np.diag(np.matmul(gto.T, Fmat))
+            rho_b = rho_a.copy()
 
             npoints = gto.shape[1]
             rho = np.zeros(npoints * 2)
-            rho[0::2] = rhoa[:]
-            rho[1::2] = rhob[:]
+            rho[0::2] = rho_a[:]
+            rho[1::2] = rho_b[:]
 
             exc, vrho = xc_drv.compute_exc_vxc_for_lda(xcfun_label, rho)
-            vrhoa = vrho[0::2]
+            vrho_a = vrho[0::2]
 
             gw = molgrid.w_to_numpy()
-            n_ene = np.sum(gw * (rhoa + rhob))
+            rho_total = rho_a + rho_b
+
+            n_ene = np.sum(gw * rho_total)
             assert np.abs(n_ene - vxc.get_electrons()) < tol
 
-            xc_ene = np.sum(gw * exc * (rhoa + rhob))
+            xc_ene = np.sum(gw * exc * rho_total)
             assert np.abs(xc_ene - vxc.get_energy()) < tol
 
-            Gmat = gto * gw * vrhoa
+            Gmat = gto * gw * vrho_a
+
             Vxcmat = np.matmul(gto, Gmat.T)
             assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
 
             v2rho2 = xc_drv.compute_fxc_for_lda(xcfun_label, rho)
-            v2rho2_aa = v2rho2[0::3]
-            v2rho2_ab = v2rho2[1::3]
+            v2rho2_a_a = v2rho2[0::3]
+            v2rho2_a_b = v2rho2[1::3]
 
             for i in range(rhow_density.number_of_density_matrices()):
                 Fmat = np.matmul(rhow_density.alpha_to_numpy(i), gto)
-                rhowa = np.diag(np.matmul(gto.T, Fmat))
-                rhowb = rhowa.copy()
+                rhow_a = np.diag(np.matmul(gto.T, Fmat))
+                rhow_b = rhow_a.copy()
 
-                Gmat = gto * gw * (v2rho2_aa * rhowa + v2rho2_ab * rhowb)
+                Gmat = gto * gw * (v2rho2_a_a * rhow_a + v2rho2_a_b * rhow_b)
+
                 Fxcmat = np.matmul(gto, Gmat.T)
                 assert np.max(np.abs(Fxcmat - fock.alpha_to_numpy(i))) < tol
 
@@ -175,113 +179,126 @@ class TestExcVxc:
         fock.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
         if scf_drv.rank == mpi_master():
-            gto, gtox, gtoy, gtoz = xc_drv.compute_gto_values_and_derivatives(
+            gto, gto_x, gto_y, gto_z = xc_drv.compute_gto_values_and_derivatives(
                 molecule, basis, molgrid)
             npoints = gto.shape[1]
 
             Dmat = gs_density.alpha_to_numpy(0)
             sym_Dmat = 0.5 * (Dmat + Dmat.T)
             Fmat = np.matmul(sym_Dmat, gto)
-            rhoa = np.diag(np.matmul(gto.T, Fmat))
-            rhob = rhoa.copy()
+            rho_a = np.diag(np.matmul(gto.T, Fmat))
+            rho_b = rho_a.copy()
 
-            rhoax = 2.0 * np.diag(np.matmul(gtox.T, Fmat))
-            rhoay = 2.0 * np.diag(np.matmul(gtoy.T, Fmat))
-            rhoaz = 2.0 * np.diag(np.matmul(gtoz.T, Fmat))
-            rhobx = rhoax.copy()
-            rhoby = rhoay.copy()
-            rhobz = rhoaz.copy()
+            rho_a_x = 2.0 * np.diag(np.matmul(gto_x.T, Fmat))
+            rho_a_y = 2.0 * np.diag(np.matmul(gto_y.T, Fmat))
+            rho_a_z = 2.0 * np.diag(np.matmul(gto_z.T, Fmat))
+            rho_b_x = rho_a_x.copy()
+            rho_b_y = rho_a_y.copy()
+            rho_b_z = rho_a_z.copy()
 
-            sigma_aa = rhoax * rhoax + rhoay * rhoay + rhoaz * rhoaz
-            sigma_ab = rhoax * rhobx + rhoay * rhoby + rhoaz * rhobz
-            sigma_bb = rhobx * rhobx + rhoby * rhoby + rhobz * rhobz
+            sigma_a_a = rho_a_x * rho_a_x + rho_a_y * rho_a_y + rho_a_z * rho_a_z
+            sigma_a_b = rho_a_x * rho_b_x + rho_a_y * rho_b_y + rho_a_z * rho_b_z
+            sigma_b_b = rho_b_x * rho_b_x + rho_b_y * rho_b_y + rho_b_z * rho_b_z
 
             rho = np.zeros(npoints * 2)
-            rho[0::2] = rhoa[:]
-            rho[1::2] = rhob[:]
+            rho[0::2] = rho_a[:]
+            rho[1::2] = rho_b[:]
 
             sigma = np.zeros(npoints * 3)
-            sigma[0::3] = sigma_aa[:]
-            sigma[1::3] = sigma_ab[:]
-            sigma[2::3] = sigma_bb[:]
+            sigma[0::3] = sigma_a_a[:]
+            sigma[1::3] = sigma_a_b[:]
+            sigma[2::3] = sigma_b_b[:]
 
             exc, vrho, vsigma = xc_drv.compute_exc_vxc_for_gga(
                 xcfun_label, rho, sigma)
-            vrhoa = vrho[0::2]
+            vrho_a = vrho[0::2]
             vsigma_aa = vsigma[0::3]
             vsigma_ab = vsigma[1::3]
 
             gw = molgrid.w_to_numpy()
-            n_ene = np.sum(gw * (rhoa + rhob))
+            rho_total = rho_a + rho_b
+
+            n_ene = np.sum(gw * rho_total)
             assert np.abs(n_ene - vxc.get_electrons()) < tol
 
-            xc_ene = np.sum(gw * exc * (rhoa + rhob))
+            xc_ene = np.sum(gw * exc * rho_total)
             assert np.abs(xc_ene - vxc.get_energy()) < tol
 
-            Gmat = gto * gw * vrhoa
-            Gmat_gga = (gtox * rhoax + gtoy * rhoay +
-                        gtoz * rhoaz) * gw * (2.0 * vsigma_aa + vsigma_ab)
+            Gmat = gto * gw * vrho_a
+
+            v_x = 2 * vsigma_aa * rho_a_x + vsigma_ab * rho_b_x
+            v_y = 2 * vsigma_aa * rho_a_y + vsigma_ab * rho_b_y
+            v_z = 2 * vsigma_aa * rho_a_z + vsigma_ab * rho_b_z
+
+            Gmat_gga = (gto_x * v_x + gto_y * v_y + gto_z * v_z) * gw
+
             Vxcmat_gga = np.matmul(gto, Gmat_gga.T)
             Vxcmat = np.matmul(gto, Gmat.T) + Vxcmat_gga + Vxcmat_gga.T
             assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
 
             v2rho2, v2rhosigma, v2sigma2 = xc_drv.compute_fxc_for_gga(
                 xcfun_label, rho, sigma)
-            v2rho2_aa = v2rho2[0::3]
-            v2rho2_ab = v2rho2[1::3]
-            v2rhosigma_aa = v2rhosigma[0::6]
-            v2rhosigma_ac = v2rhosigma[1::6]
-            v2rhosigma_ab = v2rhosigma[2::6]
-            v2rhosigma_ba = v2rhosigma[3::6]
-            v2rhosigma_bc = v2rhosigma[4::6]
-            v2sigma2_aa = v2sigma2[0::6]
-            v2sigma2_ac = v2sigma2[1::6]
-            v2sigma2_ab = v2sigma2[2::6]
-            v2sigma2_cc = v2sigma2[3::6]
-            v2sigma2_cb = v2sigma2[4::6]
+            v2rho2_a_a = v2rho2[0::3]
+            v2rho2_a_b = v2rho2[1::3]
+            v2rhosigma_a_aa = v2rhosigma[0::6]
+            v2rhosigma_a_ab = v2rhosigma[1::6]
+            v2rhosigma_a_bb = v2rhosigma[2::6]
+            v2rhosigma_b_aa = v2rhosigma[3::6]
+            v2rhosigma_b_ab = v2rhosigma[4::6]
+            v2sigma2_aa_aa = v2sigma2[0::6]
+            v2sigma2_aa_ab = v2sigma2[1::6]
+            v2sigma2_aa_bb = v2sigma2[2::6]
+            v2sigma2_ab_ab = v2sigma2[3::6]
+            v2sigma2_ab_bb = v2sigma2[4::6]
 
             for i in range(rhow_density.number_of_density_matrices()):
                 Dmat = rhow_density.alpha_to_numpy(i)
                 sym_Dmat = 0.5 * (Dmat + Dmat.T)
                 Fmat = np.matmul(sym_Dmat, gto)
-                rhowa = np.diag(np.matmul(gto.T, Fmat))
-                rhowb = rhowa.copy()
+                rhow_a = np.diag(np.matmul(gto.T, Fmat))
+                rhow_b = rhow_a.copy()
 
-                rhowax = 2.0 * np.diag(np.matmul(gtox.T, Fmat))
-                rhoway = 2.0 * np.diag(np.matmul(gtoy.T, Fmat))
-                rhowaz = 2.0 * np.diag(np.matmul(gtoz.T, Fmat))
-                rhowbx = rhowax.copy()
-                rhowby = rhoway.copy()
-                rhowbz = rhowaz.copy()
+                rhow_a_x = 2.0 * np.diag(np.matmul(gto_x.T, Fmat))
+                rhow_a_y = 2.0 * np.diag(np.matmul(gto_y.T, Fmat))
+                rhow_a_z = 2.0 * np.diag(np.matmul(gto_z.T, Fmat))
+                rhow_b_x = rhow_a_x.copy()
+                rhow_b_y = rhow_a_y.copy()
+                rhow_b_z = rhow_a_z.copy()
 
-                grhow_grho_a = rhowax * rhoax + rhoway * rhoay + rhowaz * rhoaz
-                grhow_grho_a *= 2
+                grhow_grho_aa = 2 * (rhow_a_x * rho_a_x + rhow_a_y * rho_a_y +
+                                     rhow_a_z * rho_a_z)
 
-                grhow_grho_c = rhowax * rhobx + rhoway * rhoby + rhowaz * rhobz
-                grhow_grho_c += rhowbx * rhoax + rhowby * rhoay + rhowbz * rhoaz
+                grhow_grho_ab = (rhow_a_x * rho_b_x + rhow_a_y * rho_b_y +
+                                 rhow_a_z * rho_b_z + rhow_b_x * rho_a_x +
+                                 rhow_b_y * rho_a_y + rhow_b_z * rho_a_z)
 
-                grhow_grho_b = rhowbx * rhobx + rhowby * rhoby + rhowbz * rhobz
-                grhow_grho_b *= 2
+                grhow_grho_bb = 2 * (rhow_b_x * rho_b_x + rhow_b_y * rho_b_y +
+                                     rhow_b_z * rho_b_z)
 
-                Gmat = gto * gw * (v2rho2_aa * rhowa + v2rho2_ab * rhowb +
-                                   v2rhosigma_aa * grhow_grho_a +
-                                   v2rhosigma_ac * grhow_grho_c +
-                                   v2rhosigma_ab * grhow_grho_b)
-                Fxcmat = np.matmul(gto, Gmat.T)
+                Gmat = gto * gw * (v2rho2_a_a * rhow_a + v2rho2_a_b * rhow_b +
+                                   v2rhosigma_a_aa * grhow_grho_aa +
+                                   v2rhosigma_a_ab * grhow_grho_ab +
+                                   v2rhosigma_a_bb * grhow_grho_bb)
 
-                fac_1 = ((2 * v2rhosigma_aa + v2rhosigma_ac) * rhowa +
-                         (2 * v2rhosigma_ba + v2rhosigma_bc) * rhowb +
-                         (2 * v2sigma2_aa + v2sigma2_ac) * grhow_grho_a +
-                         (2 * v2sigma2_ab + v2sigma2_cb) * grhow_grho_b +
-                         (2 * v2sigma2_ac + v2sigma2_cc) * grhow_grho_c)
+                f_aa = (v2rhosigma_a_aa * rhow_a + v2rhosigma_b_aa * rhow_b +
+                        v2sigma2_aa_aa * grhow_grho_aa +
+                        v2sigma2_aa_ab * grhow_grho_ab +
+                        v2sigma2_aa_bb * grhow_grho_bb)
 
-                fac_2 = 2 * vsigma_aa + vsigma_ab
+                f_ab = (v2rhosigma_a_ab * rhow_a + v2rhosigma_b_ab * rhow_b +
+                        v2sigma2_aa_ab * grhow_grho_aa +
+                        v2sigma2_ab_ab * grhow_grho_ab +
+                        v2sigma2_ab_bb * grhow_grho_bb)
 
-                xcomp = fac_1 * rhoax + fac_2 * rhowax
-                ycomp = fac_1 * rhoay + fac_2 * rhoway
-                zcomp = fac_1 * rhoaz + fac_2 * rhowaz
+                f_x = 2 * f_aa * rho_a_x + f_ab * rho_b_x
+                f_y = 2 * f_aa * rho_a_y + f_ab * rho_b_y
+                f_z = 2 * f_aa * rho_a_z + f_ab * rho_b_z
 
-                Gmat_gga = (gtox * xcomp + gtoy * ycomp + gtoz * zcomp) * gw
+                f_x += 2 * vsigma_aa * rhow_a_x + vsigma_ab * rhow_b_x
+                f_y += 2 * vsigma_aa * rhow_a_y + vsigma_ab * rhow_b_y
+                f_z += 2 * vsigma_aa * rhow_a_z + vsigma_ab * rhow_b_z
+
+                Gmat_gga = (gto_x * f_x + gto_y * f_y + gto_z * f_z) * gw
 
                 Fxcmat_gga = np.matmul(gto, Gmat_gga.T)
                 Fxcmat = np.matmul(gto, Gmat.T) + Fxcmat_gga + Fxcmat_gga.T
