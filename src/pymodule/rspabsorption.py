@@ -109,6 +109,7 @@ class Absorption(ResponseProperty):
 
         self._print_absorption(ostream, spin_str, 'One-Photon Absorption')
         self._print_ecd(ostream, spin_str, 'Electronic Circular Dichroism')
+        self._print_excitation_details(ostream, 'Character of excitations:')
 
     def _print_transition_dipoles(self, ostream, spin_str, title,
                                   trans_dipoles):
@@ -183,3 +184,22 @@ class Absorption(ResponseProperty):
             valstr += f'{R:11.4f} [10**(-40) cgs]'
             ostream.print_header(valstr.ljust(92))
         ostream.print_blank()
+
+    def _print_excitation_details(self, ostream, title):
+
+        ostream.print_header(title.ljust(92))
+        ostream.print_blank()
+
+        nstates = self._rsp_property['eigenvalues'].size
+        excitation_details = self._rsp_property['excitation_details']
+
+        for s in range(nstates):
+            valstr = 'Excited state {}'.format(s + 1)
+            ostream.print_header(valstr.ljust(92))
+            ostream.print_header(('-' * len(valstr)).ljust(92))
+
+            for exc_str in excitation_details[s]:
+                ostream.print_header(exc_str.ljust(92))
+            ostream.print_blank()
+
+        ostream.flush()

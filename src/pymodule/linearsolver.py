@@ -2006,3 +2006,44 @@ class LinearSolver:
         self.ostream.print_blank()
 
         return filenames
+
+    def get_excitation_details(self, eigvec, nocc, nvir, coef_thresh=0.2):
+
+        n_ov = nocc * nvir
+        assert_msg_critical(
+            eigvec.size == n_ov or eigvec.size == n_ov * 2,
+            'LinearSolver.get_excitation_details: Inconsistent size')
+
+        excitations = []
+        de_excitations = []
+
+        for i in range(nocc):
+            homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc-1-i}'
+
+            for a in range(nvir):
+                lumo_str = 'LUMO' if a == 0 else f'LUMO+{a}'
+
+                ia = i * nvir + a
+
+                exc_coef = eigvec[ia]
+                if abs(exc_coef) > coef_thresh:
+                    excitations.append((
+                        abs(exc_coef),
+                        f'{homo_str:<8s} -> {lumo_str:<8s} {exc_coef:10.4f}',
+                    ))
+
+                if eigvec.size == n_ov * 2:
+                    de_exc_coef = eigvec[n_ov + ia]
+                    if abs(de_exc_coef) > coef_thresh:
+                        de_excitations.append((
+                            abs(de_exc_coef),
+                            f'{homo_str:<8s} <- {lumo_str:<8s} {de_exc_coef:10.4f}',
+                        ))
+
+        excitation_details = []
+        for exc in sorted(excitations, reverse=True):
+            excitation_details.append(exc[1])
+        for de_exc in sorted(de_excitations, reverse=True):
+            excitation_details.append(de_exc[1])
+
+        return excitation_details

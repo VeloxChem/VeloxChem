@@ -356,9 +356,16 @@ class TDAExciDriver(LinearSolver):
         nto_cube_files = []
         dens_cube_files = []
 
+        excitation_details = []
+
         for s in range(self.nstates):
             if self.rank == mpi_master():
                 t_mat = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+
+                # save excitation details
+                excitation_details.append(
+                    self.get_excitation_details(eigvecs[:, s], mo_occ.shape[1],
+                                                mo_vir.shape[1]))
 
             if self.nto or self.detach_attach:
                 vis_drv = VisualizationDriver(self.comm)
@@ -422,6 +429,7 @@ class TDAExciDriver(LinearSolver):
                 'magnetic_transition_dipoles': trans_dipoles['magnetic'],
                 'oscillator_strengths': oscillator_strengths,
                 'rotatory_strengths': rotatory_strengths,
+                'excitation_details': excitation_details,
             }
 
             if self.nto:
