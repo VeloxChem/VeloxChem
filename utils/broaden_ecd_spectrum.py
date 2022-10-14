@@ -3,24 +3,24 @@ import numpy as np
 import sys
 
 
-def lorentzian_ecd_ev(x,
-                      y,
-                      xmin=None,
-                      xmax=None,
-                      xstep=0.0002,
+def lorentzian_ecd_ev(exc_ene,
+                      rot_str,
+                      e_min=None,
+                      e_max=None,
+                      e_step=0.0002,
                       gamma=0.0045563353):
     """
     Broadens ECD stick spectrum.
 
-    :param x:
+    :param exc_ene:
         Excitation energies in a.u.
-    :param y:
+    :param rot_str:
         Rotatory strengths in a.u.
-    :param xmin:
+    :param e_min:
         Minimal excitation energy in a.u.
-    :param xmax:
+    :param e_max:
         Maximum excitation energy in a.u.
-    :param xstep:
+    :param e_step:
         Step size of excitation energy in a.u.
     :param gamma:
         The broadening parameter in a.u.
@@ -29,22 +29,22 @@ def lorentzian_ecd_ev(x,
         The excitation energies in eV and Delta_epsilon in L mol^-1 cm^-1
     """
 
-    if xmin is None:
-        xmin = max(np.min(x) - 0.01, 0.01)
+    if e_min is None:
+        e_min = max(np.min(exc_ene) - 0.01, e_step)
 
-    if xmax is None:
-        xmax = np.max(x) + 0.01
+    if e_max is None:
+        e_max = np.max(exc_ene) + 0.01
 
-    x_i = np.arange(xmin, xmax + xstep / 100.0, xstep, dtype=np.float64)
+    x_i = np.arange(e_min, e_max + e_step / 100.0, e_step, dtype=np.float64)
     y_i = np.zeros_like(x_i)
 
     extinction_coefficient_from_beta = 19.6036975758
     factor = extinction_coefficient_from_beta / 3
 
     for i in range(x_i.size):
-        for j in range(y.size):
+        for s in range(exc_ene.size):
             y_i[i] += factor * gamma / (
-                (x_i[i] - x[j])**2 + gamma**2) * x[j] * y[j]
+                (x_i[i] - exc_ene[s])**2 + gamma**2) * exc_ene[s] * rot_str[s]
 
     hartree_in_ev = 27.211386246
     x_i *= hartree_in_ev
@@ -52,18 +52,18 @@ def lorentzian_ecd_ev(x,
     return x_i, y_i
 
 
-def lorentzian_ecd_nm(x,
-                      y,
-                      wmin=None,
-                      wmax=None,
-                      wstep=0.5,
+def lorentzian_ecd_nm(exc_ene,
+                      rot_str,
+                      w_min=None,
+                      w_max=None,
+                      w_step=0.5,
                       gamma=0.0045563353):
     """
     Broadens ECD stick spectrum.
 
-    :param x:
+    :param exc_ene:
         Excitation energies in a.u.
-    :param y:
+    :param rot_str:
         Rotatory strengths in a.u.
     :param xmin:
         Minimal wavelength in nm.
@@ -81,13 +81,13 @@ def lorentzian_ecd_nm(x,
     hartree_in_inverse_nm = 0.0219474631
     hartree_nm = 1.0 / hartree_in_inverse_nm
 
-    if wmin is None:
-        wmin = max(int(hartree_nm / np.max(x)) - 50, 1)
+    if w_min is None:
+        w_min = max(int(hartree_nm / np.max(exc_ene)) - 50, w_step)
 
-    if wmax is None:
-        wmax = int(hartree_nm / np.min(x)) + 75
+    if w_max is None:
+        w_max = int(hartree_nm / np.min(exc_ene)) + 75
 
-    w_i = np.arange(wmin, wmax + wstep / 100.0, wstep, dtype=np.float64)
+    w_i = np.arange(w_min, w_max + w_step / 100.0, w_step, dtype=np.float64)
     x_i = hartree_nm / w_i
     y_i = np.zeros_like(x_i)
 
@@ -95,9 +95,9 @@ def lorentzian_ecd_nm(x,
     factor = extinction_coefficient_from_beta / 3
 
     for i in range(x_i.size):
-        for j in range(y.size):
+        for s in range(exc_ene.size):
             y_i[i] += factor * gamma / (
-                (x_i[i] - x[j])**2 + gamma**2) * x[j] * y[j]
+                (x_i[i] - exc_ene[s])**2 + gamma**2) * exc_ene[s] * rot_str[s]
 
     return w_i, y_i
 
