@@ -110,7 +110,7 @@ class TestInputPolarizability:
 
     def test_input_rhf_lr_polarizability(self, capsys):
 
-        # vlxtag: RHF, LR, Polarizability
+        # vlxtag: RHF, Polarizability, LR
 
         xcfun = None
 
@@ -128,7 +128,7 @@ class TestInputPolarizability:
 
     def test_input_rks_lr_polarizability(self, capsys):
 
-        # vlxtag: RKS, LR, Polarizability
+        # vlxtag: RKS, Polarizability, LR
 
         xcfun = 'b3lyp'
 

@@ -32,6 +32,8 @@ class TestLoProp:
 
     def test_loprop_water(self):
 
+        # vlxtag: RHF, LoProp
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'loprop_water.inp')
 

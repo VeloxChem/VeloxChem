@@ -56,7 +56,9 @@ def _print_list_of_features(list_of_features):
     Prints a list of features.
     """
 
-    for feature in list_of_features:
+    sorted_features = sorted(list_of_features, key=lambda f: f[1])
+
+    for feature in sorted_features:
         for tag in feature:
             print(f'  {tag.upper()}', end='')
         print()
@@ -76,14 +78,23 @@ def _known_aliases_for_keywords():
     return {
         'hf': ('rhf', 'uhf', 'rohf'),
         'dft': ('rks', 'uks', 'roks'),
-        'rsp': ('lr',),
-        'response': ('lr',),
+        'rsp': ('lr', 'qr', 'cr'),
+        'response': ('lr', 'qr', 'cr'),
+        'linear response': 'lr',
+        'linear-response': 'lr',
+        'quadratic response': 'qr',
+        'quadratic-response': 'qr',
+        'cubic response': 'cr',
+        'cubic-response': 'cr',
         'td': ('cis', 'tdhf', 'tda', 'tddft'),
         'rpa': 'tdhf',
-        'absorption': 'uv-vis',
+        'uv-vis': 'absorption',
         'cd': ('ecd',),
-        'uvvis': 'uv-vis',
-        'spectrum': ('uv-vis', 'ecd'),
+        'spectrum': ('absorption', 'ecd'),
+        'force field': 'force_field_generation',
+        'force-field': 'force_field_generation',
+        'resp': 'resp_charges',
+        'esp': ('esp_charges', 'esp_on_points'),
     }
 
 

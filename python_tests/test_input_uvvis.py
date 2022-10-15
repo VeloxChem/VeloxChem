@@ -119,7 +119,7 @@ class TestInputUVVis:
 
     def test_input_rhf_cis_uvvis(self, capsys):
 
-        # vlxtag: RHF, CIS, UV-Vis
+        # vlxtag: RHF, Absorption, ECD, CIS
 
         xcfun = None
         tamm_dancoff = True
@@ -140,7 +140,7 @@ class TestInputUVVis:
 
     def test_input_rhf_tdhf_uvvis(self, capsys):
 
-        # vlxtag: RHF, TDHF, UV-Vis
+        # vlxtag: RHF, Absorption, ECD, TDHF
 
         xcfun = None
         tamm_dancoff = False
@@ -161,7 +161,7 @@ class TestInputUVVis:
 
     def test_input_rks_tda_uvvis(self, capsys):
 
-        # vlxtag: RKS, TDA, UV-Vis
+        # vlxtag: RKS, Absorption, ECD, TDA
 
         xcfun = 'b3lyp'
         tamm_dancoff = True
@@ -182,7 +182,7 @@ class TestInputUVVis:
 
     def test_input_rks_tddft_uvvis(self, capsys):
 
-        # vlxtag: RKS, TDDFT, UV-Vis
+        # vlxtag: RKS, Absorption, ECD, TDDFT
 
         xcfun = 'b3lyp'
         tamm_dancoff = False

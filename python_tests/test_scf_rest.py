@@ -51,6 +51,8 @@ class TestScfRestricted:
 
     def test_scf_hf(self):
 
+        # vlxtag: RHF, Energy
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
         potfile = None
@@ -80,6 +82,8 @@ class TestScfRestricted:
                      ref_dip)
 
     def test_scf_dft(self):
+
+        # vlxtag: RKS, Energy
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
@@ -142,6 +146,8 @@ class TestScfRestricted:
     @using_cppe
     def test_scf_hf_pe(self):
 
+        # vlxtag: RHF, Energy, PE
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')
         potfile = str(here / 'inputs' / 'pe_water.pot')
@@ -157,6 +163,8 @@ class TestScfRestricted:
 
     @using_cppe
     def test_scf_dft_pe(self):
+
+        # vlxtag: RKS, Energy, PE
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')

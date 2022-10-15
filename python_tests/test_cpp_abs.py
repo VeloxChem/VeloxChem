@@ -106,6 +106,8 @@ class TestCppAbs:
 
     def test_cpp_hf(self):
 
+        # vlxtag: RHF, Absorption, CPP
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
 
@@ -147,6 +149,8 @@ class TestCppAbs:
 
     def test_cpp_dft(self):
 
+        # vlxtag: RKS, Absorption, CPP
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
 
@@ -187,6 +191,8 @@ class TestCppAbs:
         self.run_cpp(inpfile, potfile, xcfun_label, data_lines, ref_spectrum)
 
     def test_cpp_dft_slda(self):
+
+        # vlxtag: RKS, Absorption, CPP
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
@@ -230,6 +236,8 @@ class TestCppAbs:
     @using_cppe
     def test_cpp_hf_pe(self):
 
+        # vlxtag: RHF, Absorption, CPP, PE
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')
 
@@ -271,6 +279,8 @@ class TestCppAbs:
 
     @using_cppe
     def test_cpp_dft_pe(self):
+
+        # vlxtag: RKS, Absorption, CPP, PE
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')

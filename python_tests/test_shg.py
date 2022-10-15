@@ -54,6 +54,8 @@ class TestSHG:
 
     def test_shg_hf(self):
 
+        # vlxtag: RHF, SHG, QR
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'methanol_shg.inp')
 
@@ -70,6 +72,8 @@ class TestSHG:
         self.run_shg(inpfile, xcfun_label, shg_type, ref_result)
 
     def test_shg_b3lyp(self):
+
+        # vlxtag: RKS, SHG, QR
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'methanol_shg.inp')
@@ -88,6 +92,8 @@ class TestSHG:
 
     def test_shg_reduced_hf(self):
 
+        # vlxtag: RHF, SHG, QR
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'methanol_shg.inp')
 
@@ -104,6 +110,8 @@ class TestSHG:
         self.run_shg(inpfile, xcfun_label, shg_type, ref_result)
 
     def test_shg_reduced_b3lyp(self):
+
+        # vlxtag: RKS, SHG, QR
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'methanol_shg.inp')

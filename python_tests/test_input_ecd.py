@@ -134,7 +134,7 @@ class TestInputECD:
 
     def test_input_rhf_cis_ecd(self, capsys):
 
-        # vlxtag: RHF, CIS, ECD
+        # vlxtag: RHF, Absorption, ECD, CIS
 
         xcfun = None
         tamm_dancoff = True
@@ -164,7 +164,7 @@ class TestInputECD:
 
     def test_input_rhf_tdhf_ecd(self, capsys):
 
-        # vlxtag: RHF, TDHF, ECD
+        # vlxtag: RHF, Absorption, ECD, TDHF
 
         xcfun = None
         tamm_dancoff = False
@@ -194,7 +194,7 @@ class TestInputECD:
 
     def test_input_rks_tda_ecd(self, capsys):
 
-        # vlxtag: RKS, TDA, ECD
+        # vlxtag: RKS, Absorption, ECD, TDA
 
         xcfun = 'b3lyp'
         tamm_dancoff = True
@@ -224,7 +224,7 @@ class TestInputECD:
 
     def test_input_rks_tddft_ecd(self, capsys):
 
-        # vlxtag: RKS, TDDFT, ECD
+        # vlxtag: RKS, Absorption, ECD, TDDFT
 
         xcfun = 'b3lyp'
         tamm_dancoff = False

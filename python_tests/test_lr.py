@@ -12,6 +12,7 @@ from veloxchem.rsppolarizability import Polarizability
 
 from .addons import using_cppe
 
+
 @pytest.mark.solvers
 class TestLR:
 

@@ -126,6 +126,8 @@ class TestC6:
 
     def test_c6_hf(self):
 
+        # vlxtag: RHF, C6, LR
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
 
@@ -198,6 +200,8 @@ class TestC6:
 
     def test_c6_dft(self):
 
+        # vlxtag: RKS, C6, LR
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
 
@@ -269,6 +273,8 @@ class TestC6:
         self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
     def test_c6_dft_slda(self):
+
+        # vlxtag: RKS, C6, LR
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')

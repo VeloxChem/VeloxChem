@@ -11,6 +11,7 @@ from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
 from .addons import using_cppe
 
+
 @pytest.mark.solvers
 class TestRPA:
 
@@ -56,6 +57,8 @@ class TestRPA:
 
     def test_rpa_hf(self):
 
+        # vlxtag: RHF, Absorption, ECD, TDHF
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
 
@@ -78,6 +81,8 @@ class TestRPA:
         self.run_rpa(inpfile, potfile, xcfun_label, data_lines)
 
     def test_rpa_dft(self):
+
+        # vlxtag: RKS, Absorption, ECD, TDDFT
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
@@ -126,6 +131,8 @@ class TestRPA:
     @using_cppe
     def test_rpa_hf_pe(self):
 
+        # vlxtag: RHF, Absorption, ECD, TDHF, PE
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')
         potfile = str(here / 'inputs' / 'pe_water.pot')
@@ -148,6 +155,8 @@ class TestRPA:
 
     @using_cppe
     def test_rpa_dft_pe(self):
+
+        # vlxtag: RKS, Absorption, ECD, TDDFT, PE
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')
