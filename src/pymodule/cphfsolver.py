@@ -179,8 +179,8 @@ class CphfSolver(LinearSolver):
         #self.profiler.set_timing_key('TotalSubspace')
         #self.profiler.start_timer('TotalSubspace')
 
-        self.profiler.set_timing_key('CPHF RHS')
-        self.profiler.start_timer('CPHF RHS')
+        #self.profiler.set_timing_key('CPHF RHS')
+        #self.profiler.start_timer('CPHF RHS')
 
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E']
@@ -222,7 +222,7 @@ class CphfSolver(LinearSolver):
 
         dof = self.comm.bcast(dof, root=mpi_master())
 
-        self.profiler.stop_timer('CPHF RHS')
+        #self.profiler.stop_timer('CPHF RHS')
 
         # Initialize trial and sigma vectors
         self.dist_trials = None
@@ -258,8 +258,8 @@ class CphfSolver(LinearSolver):
 
             iter_start_time = tm.time()
 
-            self.profiler.set_timing_key('Iter '+str(iteration)+' ReducedSpace')
-            self.profiler.start_timer('Iter ' + str(iteration) + ' ReducedSpace')
+            self.profiler.set_timing_key(f'Iteration {iteration+1}')
+            self.profiler.start_timer('ReducedSpace')
 
             # Orbital Hessian in reduced subspace
             orbhess_red = self.dist_trials.matmul_AtB(self.dist_sigmas)
@@ -332,7 +332,7 @@ class CphfSolver(LinearSolver):
                 if self.print_residuals:
                     self.print_iteration(relative_residual_norm, molecule)
 
-            self.profiler.stop_timer('Iter ' + str(iteration) + ' ReducedSpace')
+            self.profiler.stop_timer('ReducedSpace')
 
             # check convergence
             self.check_convergence(relative_residual_norm)
@@ -340,22 +340,22 @@ class CphfSolver(LinearSolver):
             if self.is_converged:
                 break
 
-            self.profiler.set_timing_key('Iter '+str(iteration)+' Orthonorm.')
-            self.profiler.start_timer('Iter ' + str(iteration) + ' Orthonorm.')
+            #self.profiler.set_timing_key('Iter '+str(iteration)+' Orthonorm.')
+            self.profiler.start_timer('Orthonorm.')
 
             # update trial vectors
             new_trials = self.setup_trials(molecule, dist_precond,
                                            residuals, self.dist_trials)
 
-            self.profiler.stop_timer('Iter ' + str(iteration) + ' Orthonorm.')
+            self.profiler.stop_timer('Orthonorm.')
 
-            self.profiler.set_timing_key('Iter ' + str(iteration) + ' FockBuild')
-            self.profiler.start_timer('Iter ' + str(iteration) + ' FockBuild')
+            #self.profiler.set_timing_key('Iter ' + str(iteration) + ' FockBuild')
+            self.profiler.start_timer('FockBuild')
 
             # update sigma vectors
             self.build_sigmas(molecule, basis, scf_tensors, new_trials)
 
-            self.profiler.stop_timer('Iter ' + str(iteration) + ' FockBuild')
+            self.profiler.stop_timer('FockBuild')
             self.profiler.check_memory_usage(
                 'Iteration {:d} sigma build'.format(iteration + 1))
 
