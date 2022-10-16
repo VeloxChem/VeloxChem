@@ -182,6 +182,15 @@ class CphfSolver(LinearSolver):
         #self.profiler.set_timing_key('CPHF RHS')
         #self.profiler.start_timer('CPHF RHS')
 
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+        # Timing information
+        timing_dict = {}
+
         if self.rank == mpi_master():
             mo_energies = scf_tensors['E']
             # nmo is sometimes different than nao (because of linear
@@ -246,7 +255,8 @@ class CphfSolver(LinearSolver):
         dist_trials = self.setup_trials(molecule, dist_precond, dist_rhs)
 
         # construct the sigma (E*t) vectors
-        self.build_sigmas(molecule, basis, scf_tensors, dist_trials)
+        self.build_sigmas(molecule, basis, scf_tensors, dist_trials, eri_dict,
+                          dft_dict, pe_dict, timing_dict)
 
         # lists that will hold the solutions and residuals
         solutions = list(np.zeros((dof)))
@@ -353,7 +363,8 @@ class CphfSolver(LinearSolver):
             self.profiler.start_timer('FockBuild')
 
             # update sigma vectors
-            self.build_sigmas(molecule, basis, scf_tensors, new_trials)
+            self.build_sigmas(molecule, basis, scf_tensors, new_trials, eri_dict,
+                              dft_dict, pe_dict, timing_dict)
 
             self.profiler.stop_timer('FockBuild')
             self.profiler.check_memory_usage(
@@ -392,8 +403,10 @@ class CphfSolver(LinearSolver):
             }
         return None
 
-
-    def build_sigmas(self, molecule, basis, scf_tensors, dist_trials):
+    # To avoid init_eri, init_dft at each iteration, we do it once and pass it on to
+    # build_sigmas.
+    def build_sigmas(self, molecule, basis, scf_tensors, dist_trials, eri_dict,
+                    dft_dict, pe_dict, timing_dict):
         """
         Apply orbital Hessian matrix to a set of trial vectors.
         Appends sigma and trial vectors to member variable.
@@ -426,15 +439,6 @@ class CphfSolver(LinearSolver):
             #print("MPI MASTER here ", self.rank)
         else:
             nao = None
-
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
-        # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
-        # PE information
-        pe_dict = self._init_pe(molecule, basis)
-        # Timing information
-        timing_dict = {}
 
         num_vecs = dist_trials.shape(1)
 
