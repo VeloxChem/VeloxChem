@@ -372,7 +372,7 @@ class CXCNewIntegrator
     CAOKohnShamMatrix integrateVxcFock(const CMolecule&        molecule,
                                        const CMolecularBasis&  basis,
                                        const CAODensityMatrix& densityMatrix,
-                                       const CMolecularGrid&   molecularGrid,
+                                       CMolecularGrid&         molecularGrid,
                                        const std::string&      xcFuncLabel) const;
 
     /**
@@ -392,7 +392,7 @@ class CXCNewIntegrator
                           const CMolecularBasis&  basis,
                           const CAODensityMatrix& rwDensityMatrix,
                           const CAODensityMatrix& gsDensityMatrix,
-                          const CMolecularGrid&   molecularGrid,
+                          CMolecularGrid&         molecularGrid,
                           const std::string&      xcFuncLabel) const;
 
     /**
@@ -415,7 +415,7 @@ class CXCNewIntegrator
                           const CAODensityMatrix& rwDensityMatrix,
                           const CAODensityMatrix& rw2DensityMatrix,
                           const CAODensityMatrix& gsDensityMatrix,
-                          const CMolecularGrid&   molecularGrid,
+                          CMolecularGrid&         molecularGrid,
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const;
 
@@ -429,7 +429,7 @@ class CXCNewIntegrator
      */
     CDenseMatrix computeGtoValuesOnGridPoints(const CMolecule&        molecule,
                                               const CMolecularBasis&  basis,
-                                              const CMolecularGrid&   molecularGrid) const;
+                                              CMolecularGrid&         molecularGrid) const;
 
     /**
      Computes GTOs values and derivatives on grid points.
@@ -441,7 +441,7 @@ class CXCNewIntegrator
      */
     std::vector<CDenseMatrix> computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
                                                                          const CMolecularBasis& basis,
-                                                                         const CMolecularGrid&  molecularGrid) const;
+                                                                         CMolecularGrid&        molecularGrid) const;
 
     /**
      Computes fucntional derivatives for LDA.

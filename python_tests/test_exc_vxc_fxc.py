@@ -60,9 +60,6 @@ class TestExcVxc:
         grid_drv = GridDriver()
         grid_drv.set_level(grid_level)
         molgrid = grid_drv.generate(molecule)
-        molgrid.partition_grid_points()
-        molgrid.distribute_counts_and_displacements(scf_drv.rank, scf_drv.nodes,
-                                                    scf_drv.comm)
 
         xc_drv = XCNewIntegrator()
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
@@ -164,9 +161,6 @@ class TestExcVxc:
         grid_drv = GridDriver()
         grid_drv.set_level(grid_level)
         molgrid = grid_drv.generate(molecule)
-        molgrid.partition_grid_points()
-        molgrid.distribute_counts_and_displacements(scf_drv.rank, scf_drv.nodes,
-                                                    scf_drv.comm)
 
         xc_drv = XCNewIntegrator()
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,

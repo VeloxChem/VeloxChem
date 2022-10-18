@@ -333,7 +333,7 @@ export_dft(py::module& m)
              "quadMode"_a)
         .def(
             "compute_gto_values",
-            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
+            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, CMolecularGrid& molecularGrid)
                 -> py::array_t<double> {
                 auto gtovalues = self.computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
                 return vlx_general::pointer_to_numpy(gtovalues.values(), gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns());
@@ -344,7 +344,7 @@ export_dft(py::module& m)
             "molecularGrid"_a)
         .def(
             "compute_gto_values_and_derivatives",
-            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> py::list {
+            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, CMolecularGrid& molecularGrid) -> py::list {
                 auto     gtovaluesderivs = self.computeGtoValuesAndDerivativesOnGridPoints(molecule, basis, molecularGrid);
                 py::list ret;
                 for (int32_t i = 0; i < static_cast<int32_t>(gtovaluesderivs.size()); i++)
