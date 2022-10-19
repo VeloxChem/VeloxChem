@@ -240,4 +240,99 @@ screenGtoMatrixForGGA(CDenseMatrix&               screenedGtoValues,
     }
 }
 
+void
+screenGtoMatrixForMetaGGA(CDenseMatrix&               screenedGtoValues,
+                          CDenseMatrix&               screenedGtoValuesX,
+                          CDenseMatrix&               screenedGtoValuesY,
+                          CDenseMatrix&               screenedGtoValuesZ,
+                          CDenseMatrix&               screenedGtoValuesXX,
+                          CDenseMatrix&               screenedGtoValuesXY,
+                          CDenseMatrix&               screenedGtoValuesXZ,
+                          CDenseMatrix&               screenedGtoValuesYY,
+                          CDenseMatrix&               screenedGtoValuesYZ,
+                          CDenseMatrix&               screenedGtoValuesZZ,
+                          const CDenseMatrix&         originalGtoValues,
+                          const CDenseMatrix&         originalGtoValuesX,
+                          const CDenseMatrix&         originalGtoValuesY,
+                          const CDenseMatrix&         originalGtoValuesZ,
+                          const CDenseMatrix&         originalGtoValuesXX,
+                          const CDenseMatrix&         originalGtoValuesXY,
+                          const CDenseMatrix&         originalGtoValuesXZ,
+                          const CDenseMatrix&         originalGtoValuesYY,
+                          const CDenseMatrix&         originalGtoValuesYZ,
+                          const CDenseMatrix&         originalGtoValuesZZ,
+                          const std::vector<int32_t>& gridPointInds,
+                          const int32_t               nScreenedGridPoints)
+{
+    auto naos = originalGtoValues.getNumberOfRows();
+
+    for (int32_t nu = 0; nu < naos; nu++)
+    {
+        auto screened_row = screenedGtoValues.row(nu);
+
+        auto screened_x_row = screenedGtoValuesX.row(nu);
+
+        auto screened_y_row = screenedGtoValuesY.row(nu);
+
+        auto screened_z_row = screenedGtoValuesZ.row(nu);
+
+        auto screened_xx_row = screenedGtoValuesXX.row(nu);
+
+        auto screened_xy_row = screenedGtoValuesXY.row(nu);
+
+        auto screened_xz_row = screenedGtoValuesXZ.row(nu);
+
+        auto screened_yy_row = screenedGtoValuesYY.row(nu);
+
+        auto screened_yz_row = screenedGtoValuesYZ.row(nu);
+
+        auto screened_zz_row = screenedGtoValuesZZ.row(nu);
+
+        auto original_row = originalGtoValues.row(nu);
+
+        auto original_x_row = originalGtoValuesX.row(nu);
+
+        auto original_y_row = originalGtoValuesY.row(nu);
+
+        auto original_z_row = originalGtoValuesZ.row(nu);
+
+        auto original_xx_row = originalGtoValuesXX.row(nu);
+
+        auto original_xy_row = originalGtoValuesXY.row(nu);
+
+        auto original_xz_row = originalGtoValuesXZ.row(nu);
+
+        auto original_yy_row = originalGtoValuesYY.row(nu);
+
+        auto original_yz_row = originalGtoValuesYZ.row(nu);
+
+        auto original_zz_row = originalGtoValuesZZ.row(nu);
+
+        for (int32_t g = 0; g < nScreenedGridPoints; g++)
+        {
+            auto g_orig = gridPointInds[g];
+
+            screened_row[g] = original_row[g_orig];
+
+            screened_x_row[g] = original_x_row[g_orig];
+
+            screened_y_row[g] = original_y_row[g_orig];
+
+            screened_z_row[g] = original_z_row[g_orig];
+
+            screened_xx_row[g] = original_xx_row[g_orig];
+
+            screened_xy_row[g] = original_xy_row[g_orig];
+
+            screened_xz_row[g] = original_xz_row[g_orig];
+
+            screened_yy_row[g] = original_yy_row[g_orig];
+
+            screened_yz_row[g] = original_yz_row[g_orig];
+
+            screened_zz_row[g] = original_zz_row[g_orig];
+        }
+    }
+}
+
 }  // namespace gridscreen
