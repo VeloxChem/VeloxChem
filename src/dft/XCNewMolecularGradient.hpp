@@ -75,6 +75,11 @@ class CXCNewMolecularGradient
     double _screeningThresholdForGTOValues;
 
     /**
+     Screening threshold for density values on grid points.
+     */
+    double _screeningThresholdForDensityValues;
+
+    /**
      Integrates first-order LDA exchnage-correlation functional contribution to
      molecular gradient.
 
