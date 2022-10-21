@@ -454,7 +454,7 @@ export_dft(py::module& m)
                const CMolecule&         molecule,
                const CMolecularBasis&   basis,
                const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
+               CMolecularGrid&          molecularGrid,
                const std::string&       xcFuncLabel) -> py::array_t<double> {
                 auto molgrad = self.integrateVxcGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
@@ -472,7 +472,7 @@ export_dft(py::module& m)
                const CMolecularBasis&   basis,
                const CAODensityMatrix&  rwDensityMatrix,
                const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
+               CMolecularGrid&          molecularGrid,
                const std::string&       xcFuncLabel) -> py::array_t<double> {
                 auto molgrad = self.integrateVxcGradient(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
@@ -492,7 +492,7 @@ export_dft(py::module& m)
                const CAODensityMatrix&  rwDensityMatrixOne,
                const CAODensityMatrix&  rwDensityMatrixTwo,
                const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
+               CMolecularGrid&          molecularGrid,
                const std::string&       xcFuncLabel) -> py::array_t<double> {
                 auto molgrad =
                     self.integrateFxcGradient(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, xcFuncLabel);
@@ -514,7 +514,7 @@ export_dft(py::module& m)
                const CAODensityMatrix&  rwDensityMatrixOne,
                const CAODensityMatrix&  rwDensityMatrixTwo,
                const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
+               CMolecularGrid&          molecularGrid,
                const std::string&       xcFuncLabel) -> py::array_t<double> {
                 auto molgrad =
                     self.integrateKxcGradient(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, xcFuncLabel);

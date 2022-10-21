@@ -84,12 +84,9 @@ class TestTddftXCgrad:
 
         grid_drv = GridDriver()
         grid_drv.set_level(4)
+        molgrid = grid_drv.generate(molecule)
 
         scf_drv = ScfRestrictedDriver()
-        molgrid = grid_drv.generate(molecule)
-        molgrid.partition_grid_points()
-        molgrid.distribute_counts_and_displacements(scf_drv.rank, scf_drv.nodes,
-                                                    scf_drv.comm)
 
         xcgrad_drv_new = XCNewMolecularGradient()
         vxc_grad_new = xcgrad_drv_new.integrate_vxc_gradient(

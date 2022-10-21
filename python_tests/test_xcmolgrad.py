@@ -33,9 +33,6 @@ class TestXCMolGrad:
         mol_grad = scf_drv.comm.reduce(mol_grad, root=mpi_master())
 
         mol_grid_new = grid_drv.generate(molecule)
-        mol_grid_new.partition_grid_points()
-        mol_grid_new.distribute_counts_and_displacements(
-            scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
         grad_drv_new = XCNewMolecularGradient(scf_drv.comm)
         mol_grad_new = grad_drv_new.integrate_vxc_gradient(

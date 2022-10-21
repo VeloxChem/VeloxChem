@@ -66,7 +66,7 @@ CDenseMatrix
 CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
+                                              CMolecularGrid&         molecularGrid,
                                               const std::string&      xcFuncLabel) const
 {
     return integrateVxcGradient(molecule, basis, gsDensityMatrix, gsDensityMatrix, molecularGrid, xcFuncLabel);
@@ -77,9 +77,13 @@ CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& rwDensityMatrix,
                                               const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
+                                              CMolecularGrid&         molecularGrid,
                                               const std::string&      xcFuncLabel) const
 {
+    molecularGrid.partitionGridPoints();
+
+    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
+
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
@@ -117,9 +121,13 @@ CXCNewMolecularGradient::integrateFxcGradient(const CMolecule&        molecule,
                                               const CAODensityMatrix& rwDensityMatrixOne,
                                               const CAODensityMatrix& rwDensityMatrixTwo,
                                               const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
+                                              CMolecularGrid&         molecularGrid,
                                               const std::string&      xcFuncLabel) const
 {
+    molecularGrid.partitionGridPoints();
+
+    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
+
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
@@ -161,9 +169,13 @@ CXCNewMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
                                               const CAODensityMatrix& rwDensityMatrixOne,
                                               const CAODensityMatrix& rwDensityMatrixTwo,
                                               const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
+                                              CMolecularGrid&         molecularGrid,
                                               const std::string&      xcFuncLabel) const
 {
+    molecularGrid.partitionGridPoints();
+
+    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
+
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
