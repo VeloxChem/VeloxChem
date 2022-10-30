@@ -191,7 +191,7 @@ compGeomForPX(CMemBlock2D<double>&       primBuffer,
                 
                 auto tp_z_j = primBuffer.data(iPrimBuffPX + 3 * kcomps * idx + 2 * kcomps + j);
                 
-                auto td_xy_j = primBuffer.data(iPrimBuffDX + 6 * kcomps * idx + kcomps + j);
+                auto td_yx_j = primBuffer.data(iPrimBuffDX + 6 * kcomps * idx + kcomps + j);
                 
                 auto td_yy_j = primBuffer.data(iPrimBuffDX + 6 * kcomps * idx + 3 * kcomps + j);
                 
@@ -202,7 +202,7 @@ compGeomForPX(CMemBlock2D<double>&       primBuffer,
                 #pragma omp simd aligned(ts_0_j, tp_x_j, tp_y_j, tp_z_j, td_yx_j, td_yy_j, td_yz_j, fe: VLX_ALIGN)
                 for (int32_t k = 0; k < nprim; k++)
                 {
-                    tp_x_j[k] = td_xy_j[k] * fe[k];
+                    tp_x_j[k] = td_yx_j[k] * fe[k];
                     
                     tp_y_j[k] = td_yy_j[k] * fe[k] - ts_0_j[k];
                     
@@ -318,7 +318,7 @@ compGeomForDX(CMemBlock2D<double>&       primBuffer,
                 
                 #pragma omp simd aligned(tp_x_j, tp_y_j, tp_z_j, td_xx_j, td_xy_j, td_xz_j,\
                                          td_yy_j, td_yz_j, td_zz_j, tf_xxx_j, tf_xxy_j,\
-                                         tf_xxz_j, tf_xyy_j, tf_xyz_j, tf_xzz, fe: VLX_ALIGN)
+                                         tf_xxz_j, tf_xyy_j, tf_xyz_j, tf_xzz_j, fe: VLX_ALIGN)
                 for (int32_t k = 0; k < nprim; k++)
                 {
                     td_xx_j[k] = tf_xxx_j[k] * fe[k] - 4.0 * tp_x_j[k];
@@ -369,7 +369,7 @@ compGeomForDX(CMemBlock2D<double>&       primBuffer,
                 
                 #pragma omp simd aligned(tp_x_j, tp_y_j, tp_z_j, td_xx_j, td_xy_j, td_xz_j,\
                                          td_yy_j, td_yz_j, td_zz_j, tf_yxx_j, tf_yxy_j,\
-                                         tf_yxz_j, tf_yyy_j, tf_yyz_j, tf_yzz, fe: VLX_ALIGN)
+                                         tf_yxz_j, tf_yyy_j, tf_yyz_j, tf_yzz_j, fe: VLX_ALIGN)
                 for (int32_t k = 0; k < nprim; k++)
                 {
                     td_xx_j[k] = tf_yxx_j[k] * fe[k];
@@ -420,7 +420,7 @@ compGeomForDX(CMemBlock2D<double>&       primBuffer,
                 
                 #pragma omp simd aligned(tp_x_j, tp_y_j, tp_z_j, td_xx_j, td_xy_j, td_xz_j,\
                                          td_yy_j, td_yz_j, td_zz_j, tf_zxx_j, tf_zxy_j,\
-                                         tf_zxz_j, tf_zyy_j, tf_zyz_j, tf_zzz, fe: VLX_ALIGN)
+                                         tf_zxz_j, tf_zyy_j, tf_zyz_j, tf_zzz_j, fe: VLX_ALIGN)
                 for (int32_t k = 0; k < nprim; k++)
                 {
                     td_xx_j[k] = tf_zxx_j[k] * fe[k];
