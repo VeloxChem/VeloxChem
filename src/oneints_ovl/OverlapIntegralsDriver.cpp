@@ -284,7 +284,7 @@ COverlapIntegralsDriver::_compGeomOverlapIntegrals(const CGtoContainer* braGtoCo
 
     // compute overlap integral blocks
 
-    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpat, symbk)
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpat)
     {
         #pragma omp single nowait
         {
