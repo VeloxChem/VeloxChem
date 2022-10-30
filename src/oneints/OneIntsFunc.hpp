@@ -45,7 +45,10 @@ namespace intsfunc {  // intsfunc namespace
  @param ketGtoBlock the GTOs block on ket side.
  @param iContrGto the index of contracted GTO on bra side.
  */
-void compDistancesAB(CMemBlock2D<double>& abDistances, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock, const int32_t iContrGto);
+void compDistancesAB(      CMemBlock2D<double>& abDistances,
+                     const CGtoBlock&           braGtoBlock,
+                     const CGtoBlock&           ketGtoBlock,
+                     const int32_t              iContrGto);
 
 /**
  Computes distances between specific contracted GTO on bra side and arbitrary position vector C.
@@ -89,7 +92,23 @@ void compDistancesBC(CMemBlock2D<double>& acDistances,
  @param ketGtoBlock the GTOs block on ket side.
  @param iContrGto the index of contracted GTO on bra side.
  */
-void compFactorsForOverlap(CMemBlock2D<double>& osFactors, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock, const int32_t iContrGto);
+void compFactorsForOverlap(      CMemBlock2D<double>& osFactors,
+                           const CGtoBlock&           braGtoBlock,
+                           const CGtoBlock&           ketGtoBlock,
+                           const int32_t              iContrGto);
+
+/**
+ Computes Obara-Saika factors for geometrical derivatives of overlap integrals.
+
+ @param osFactors the vector of Obara-Saika factors.
+ @param braGtoBlock the GTOs block on bra side.
+ @param ketGtoBlock the GTOs block on ket side.
+ @param iContrGto the index of contracted GTO on bra side.
+ */
+void compFactorsForGeomOverlap(      CMemBlock2D<double>& osFactors,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto);
 
 /**
  Computes Obara-Saika factors for kinetic energy integrals.
@@ -99,7 +118,23 @@ void compFactorsForOverlap(CMemBlock2D<double>& osFactors, const CGtoBlock& braG
  @param ketGtoBlock the GTOs block on ket side.
  @param iContrGto the index of contracted GTO on bra side.
  */
-void compFactorsForKineticEnergy(CMemBlock2D<double>& osFactors, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock, const int32_t iContrGto);
+void compFactorsForKineticEnergy(      CMemBlock2D<double>& osFactors,
+                                 const CGtoBlock&           braGtoBlock,
+                                 const CGtoBlock&           ketGtoBlock,
+                                 const int32_t              iContrGto);
+
+/**
+ Computes Obara-Saika factors for geometrical derivatives of kinetic energy integrals.
+
+ @param osFactors the vector of Obara-Saika factors.
+ @param braGtoBlock the GTOs block on bra side.
+ @param ketGtoBlock the GTOs block on ket side.
+ @param iContrGto the index of contracted GTO on bra side.
+ */
+void compFactorsForGeomKineticEnergy(      CMemBlock2D<double>& osFactors,
+                                     const CGtoBlock&           braGtoBlock,
+                                     const CGtoBlock&           ketGtoBlock,
+                                     const int32_t              iContrGto);
 
 /**
  Computes Obara-Saika factors for nuclear potential integrals.
@@ -109,10 +144,23 @@ void compFactorsForKineticEnergy(CMemBlock2D<double>& osFactors, const CGtoBlock
  @param ketGtoBlock the GTOs block on ket side.
  @param iContrGto the index of contracted GTO on bra side.
  */
-void compFactorsForNuclearPotential(CMemBlock2D<double>& osFactors,
-                                    const CGtoBlock&     braGtoBlock,
-                                    const CGtoBlock&     ketGtoBlock,
-                                    const int32_t        iContrGto);
+void compFactorsForNuclearPotential(      CMemBlock2D<double>& osFactors,
+                                    const CGtoBlock&           braGtoBlock,
+                                    const CGtoBlock&           ketGtoBlock,
+                                    const int32_t              iContrGto);
+
+/**
+ Computes Obara-Saika factors for geometrical derivative of nuclear potential integrals.
+
+ @param osFactors the vector of Obara-Saika factors.
+ @param braGtoBlock the GTOs block on bra side.
+ @param ketGtoBlock the GTOs block on ket side.
+ @param iContrGto the index of contracted GTO on bra side.
+ */
+void compFactorsForGeomNuclearPotential(      CMemBlock2D<double>& osFactors,
+                                        const CGtoBlock&           braGtoBlock,
+                                        const CGtoBlock&           ketGtoBlock,
+                                        const int32_t              iContrGto);
 
 /**
  Computes Obara-Saika factors for electronic potential integrals.

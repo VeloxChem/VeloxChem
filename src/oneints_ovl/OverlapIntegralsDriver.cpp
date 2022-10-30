@@ -44,6 +44,7 @@
 #include "OverlapRecFuncForGG.hpp"
 #include "OverlapRecFuncForPX.hpp"
 #include "OverlapRecFuncForSX.hpp"
+#include "GeomRecFunc.hpp"
 
 COverlapIntegralsDriver::COverlapIntegralsDriver(MPI_Comm comm)
 {
@@ -59,7 +60,8 @@ COverlapIntegralsDriver::~COverlapIntegralsDriver()
 }
 
 COverlapMatrix
-COverlapIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasis& basis) const
+COverlapIntegralsDriver::compute(const CMolecule&       molecule,
+                                 const CMolecularBasis& basis) const
 {
     COverlapMatrix ovlmat;
 
@@ -78,7 +80,33 @@ COverlapIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasi
 }
 
 COverlapMatrix
-COverlapIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasis& braBasis, const CMolecularBasis& ketBasis) const
+COverlapIntegralsDriver::compute(const CMolecule&       molecule,
+                                 const CMolecularBasis& basis,
+                                 const int32_t          iAtom,
+                                 const char             axis) const
+{
+    COverlapMatrix ovlmat;
+
+    if (_locRank == mpi::master())
+    {
+        // set up GTOs container
+
+        CGtoContainer bracontr(molecule, basis, iAtom, 1);
+        
+        CGtoContainer ketcontr(molecule, basis);
+
+        // compute overlap integrals
+
+        ovlmat = _compGeomOverlapIntegrals(&bracontr, &ketcontr, axis);
+    }
+
+    return ovlmat;
+}
+
+COverlapMatrix
+COverlapIntegralsDriver::compute(const CMolecule&       molecule,
+                                 const CMolecularBasis& braBasis,
+                                 const CMolecularBasis& ketBasis) const
 {
     COverlapMatrix ovlmat;
 
@@ -99,7 +127,9 @@ COverlapIntegralsDriver::compute(const CMolecule& molecule, const CMolecularBasi
 }
 
 COverlapMatrix
-COverlapIntegralsDriver::compute(const CMolecule& braMolecule, const CMolecule& ketMolecule, const CMolecularBasis& basis) const
+COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
+                                 const CMolecule&       ketMolecule,
+                                 const CMolecularBasis& basis) const
 {
     COverlapMatrix ovlmat;
 
@@ -144,7 +174,9 @@ COverlapIntegralsDriver::compute(const CMolecule&       braMolecule,
 }
 
 void
-COverlapIntegralsDriver::compute(double* intsBatch, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock) const
+COverlapIntegralsDriver::compute(      double*    intsBatch,
+                                 const CGtoBlock& braGtoBlock,
+                                 const CGtoBlock& ketGtoBlock) const
 {
     // determine dimensions of integrals batch
 
@@ -166,7 +198,8 @@ COverlapIntegralsDriver::compute(double* intsBatch, const CGtoBlock& braGtoBlock
 }
 
 COverlapMatrix
-COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContainer, const CGtoContainer* ketGtoContainer) const
+COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                                               const CGtoContainer* ketGtoContainer) const
 {
     // check if GTOs containers are same on bra and ket sides
 
@@ -228,8 +261,69 @@ COverlapIntegralsDriver::_compOverlapIntegrals(const CGtoContainer* braGtoContai
     return COverlapMatrix(ovlmat);
 }
 
+COverlapMatrix
+COverlapIntegralsDriver::_compGeomOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                                                   const CGtoContainer* ketGtoContainer,
+                                                   const char           axis) const
+{
+    // determine dimensions of overlap matrix
+
+    auto nrow = ketGtoContainer->getNumberOfAtomicOrbitals();
+    
+    auto ncol = nrow; 
+
+    // allocate dense matrix for overlap integrals
+
+    CDenseMatrix ovlmat(nrow, ncol);
+    
+    ovlmat.zero(); 
+
+    // set up distributio pattern
+
+    COneIntsDistribution* distpat = new COneIntsDistribution(ovlmat.values(), nrow, ncol, dist1e::symsq);
+
+    // compute overlap integral blocks
+
+    #pragma omp parallel shared(braGtoContainer, ketGtoContainer, distpat, symbk)
+    {
+        #pragma omp single nowait
+        {
+            // determine number of GTOs blocks in bra/ket sides
+
+            auto nbra = braGtoContainer->getNumberOfGtoBlocks();
+
+            auto nket = ketGtoContainer->getNumberOfGtoBlocks();
+
+            // loop over pairs of GTOs blocks
+
+            for (int32_t i = 0; i < nbra; i++)
+            {
+                auto bgtos = braGtoContainer->getGtoBlock(i);
+
+                for (int32_t j = 0; j < nket; j++)
+                {
+                    #pragma omp task firstprivate(j)
+                    {
+                        auto kgtos = ketGtoContainer->getGtoBlock(j);
+
+                        _compGeomOverlapForGtoBlocks(distpat, bgtos, kgtos, axis);
+                    }
+                }
+            }
+        }
+    }
+
+    // deallocate distribution pattern
+
+    delete distpat;
+
+    return COverlapMatrix(ovlmat);
+}
+
 void
-COverlapIntegralsDriver::_compOverlapForGtoBlocks(COneIntsDistribution* distPattern, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock) const
+COverlapIntegralsDriver::_compOverlapForGtoBlocks(      COneIntsDistribution* distPattern,
+                                                  const CGtoBlock&            braGtoBlock,
+                                                  const CGtoBlock&            ketGtoBlock) const
 {
     // copy GTOs blocks for bra and ket sides
 
@@ -315,7 +409,7 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(COneIntsDistribution* distPatt
 
         // compite primitive overlap integrals
 
-        _compPrimOverlapInts(primbuffer, recmap, rfacts, rab, rpa, rpb, bragtos, ketgtos, i);
+        _compPrimOverlapInts(primbuffer, recmap, rfacts, 2, rab, rpa, rpb, bragtos, ketgtos, i);
 
         // contract primitive overlap integrals
 
@@ -332,9 +426,125 @@ COverlapIntegralsDriver::_compOverlapForGtoBlocks(COneIntsDistribution* distPatt
 }
 
 void
+COverlapIntegralsDriver::_compGeomOverlapForGtoBlocks(      COneIntsDistribution* distPattern,
+                                                      const CGtoBlock&            braGtoBlock,
+                                                      const CGtoBlock&            ketGtoBlock,
+                                                      const char                  axis) const
+{
+    // copy GTOs blocks for bra and ket sides
+
+    auto bragtos = braGtoBlock;
+
+    auto ketgtos = ketGtoBlock;
+
+    // copy distribution pattern
+
+    auto distpat = *distPattern;
+
+    // set up angular momentum data
+
+    auto bang = bragtos.getAngularMomentum();
+
+    auto kang = ketgtos.getAngularMomentum();
+    
+    auto mang = bang + 1;
+
+    // set up spherical angular momentum for bra and ket sides
+
+    CSphericalMomentum bmom(bang);
+
+    CSphericalMomentum kmom(kang);
+
+    // allocate prefactors used in Obara-Saika recursion
+
+    auto pdim = ketgtos.getNumberOfPrimGtos();
+
+    CMemBlock2D<double> rab(pdim, 3);
+
+    auto pmax = bragtos.getMaxContractionDepth();
+
+    CMemBlock2D<double> rfacts(pdim, 3 * pmax);
+
+    // set up tensors of PA and PB distances
+
+    auto rpa = CMemBlock2D<double>(pdim, 3 * pmax);
+
+    auto rpb = (kang > 0) ? CMemBlock2D<double>(pdim, 3 * pmax) : CMemBlock2D<double>();
+
+    // allocate primitives and auxilary integrals buffer
+
+    auto recmap = _setRecursionMap(mang, kang, pmax);
+
+    auto nblock = recmap.getNumberOfComponents();
+    
+    const auto ridx = recmap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true,
+                                                           {bang, -1, -1, -1},
+                                                           {kang, -1, -1, -1},
+                                                           1, 1, 0));
+    
+//    std::cout << "(" << bang << "," << kang << "): " << pmax << " -> " << nblock  << " :: " << ridx << std::endl;
+
+    CMemBlock2D<double> primbuffer(pdim, nblock);
+
+    // allocate contracted Cartesian integrals buffer
+
+    auto kdim = ketgtos.getNumberOfContrGtos();
+
+    auto ncart = angmom::to_CartesianComponents(bang, kang);
+
+    CMemBlock2D<double> cartbuffer(kdim, ncart);
+
+    // allocate contracted spherical integrals buffer
+
+    auto nspher = angmom::to_SphericalComponents(bang, kang);
+
+    CMemBlock2D<double> spherbuffer(kdim, nspher);
+    
+    for (int32_t i = 0; i < bragtos.getNumberOfContrGtos(); i++)
+    {
+        // compute distances: R(AB) = A - B
+
+        intsfunc::compDistancesAB(rab, bragtos, ketgtos, i);
+
+        // compute Obara-Saika recursion factors
+
+        intsfunc::compFactorsForGeomOverlap(rfacts, bragtos, ketgtos, i);
+
+        // compute tensors of distances: R(PA) = P - A
+
+        intsfunc::compDistancesPA(rpa, rab, rfacts, 3, bragtos, ketgtos, i);
+
+        // compute tensors of distances: R(PB) = P - B
+
+        intsfunc::compDistancesPB(rpb, rab, rfacts, 3, bragtos, ketgtos, i);
+
+        // compite primitive overlap integrals
+
+        _compPrimOverlapInts(primbuffer, recmap, rfacts, 3, rab, rpa, rpb, bragtos, ketgtos, i);
+        
+        // compite primitive overlap integrals
+
+        _compPrimGeomOverlapInts(primbuffer, recmap, rfacts, 3, bragtos, ketgtos, i, axis);
+
+        // contract primitive overlap integrals
+
+        genfunc::contract(cartbuffer, primbuffer, ridx, bragtos, ketgtos, i);
+
+        // transform Cartesian to spherical integrals
+
+        genfunc::transform(spherbuffer, cartbuffer, bmom, kmom, 0, 0, kdim);
+
+        // add batch of integrals to integrals matrix
+
+        distpat.distribute(spherbuffer, bragtos, ketgtos, false, i);
+    }
+}
+
+void
 COverlapIntegralsDriver::_compPrimOverlapInts(CMemBlock2D<double>&       primBuffer,
                                               const CRecursionMap&       recursionMap,
                                               const CMemBlock2D<double>& osFactors,
+                                              const int32_t              nFactors, 
                                               const CMemBlock2D<double>& abDistances,
                                               const CMemBlock2D<double>& paDistances,
                                               const CMemBlock2D<double>& pbDistances,
@@ -342,57 +552,112 @@ COverlapIntegralsDriver::_compPrimOverlapInts(CMemBlock2D<double>&       primBuf
                                               const CGtoBlock&           ketGtoBlock,
                                               const int32_t              iContrGto) const
 {
-    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, 2, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSS(primBuffer, recursionMap, osFactors, nFactors, abDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
     ovlrecfunc::compOverlapForSP(primBuffer, recursionMap, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
     ovlrecfunc::compOverlapForPS(primBuffer, recursionMap, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSD(primBuffer, recursionMap, osFactors, nFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDS(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSF(primBuffer, recursionMap, osFactors, nFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFS(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, 2, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForSG(primBuffer, recursionMap, osFactors, nFactors, pbDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForGS(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGS(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPP(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPD(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDP(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPF(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFP(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForPG(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForGP(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGP(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDD(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDF(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFD(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForDG(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForGD(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGD(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFF(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForFG(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForGF(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGF(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
-    ovlrecfunc::compOverlapForGG(primBuffer, recursionMap, osFactors, 2, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
+    ovlrecfunc::compOverlapForGG(primBuffer, recursionMap, osFactors, nFactors, paDistances, braGtoBlock, ketGtoBlock, iContrGto);
 
     // NOTE: Add l > 4 terms if needed
+}
+
+void
+COverlapIntegralsDriver::_compPrimGeomOverlapInts(CMemBlock2D<double>&       primBuffer,
+                                                  const CRecursionMap&       recursionMap,
+                                                  const CMemBlock2D<double>& osFactors,
+                                                  const int32_t              nFactors,
+                                                  const CGtoBlock&           braGtoBlock,
+                                                  const CGtoBlock&           ketGtoBlock,
+                                                  const int32_t              iContrGto,
+                                                  const char                 axis) const
+{
+    // get angular momentum data
+    
+    const auto bang = braGtoBlock.getAngularMomentum();
+    
+    const auto kang = ketGtoBlock.getAngularMomentum();
+    
+    // get indexes of integrals
+    
+    const auto ridx = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true,
+                                                                 {bang, -1, -1, -1},
+                                                                 {kang, -1, -1, -1},
+                                                                 1, 1, 0));
+    
+    const auto uidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true,
+                                                                 {bang + 1, -1, -1, -1},
+                                                                 {kang, -1, -1, -1},
+                                                                 1, 1, 0));
+    
+    const auto lidx = recursionMap.getIndexOfTerm(CRecursionTerm({"Overlap"}, 0, true,
+                                                                 {bang - 1, -1, -1, -1},
+                                                                 {kang, -1, -1, -1},
+                                                                 1, 1, 0));
+    
+//    std::cout << "bra: " << bang << " ket: " << kang << " indexes: "  << ridx << " : " << uidx << " : " << lidx << std::endl;
+    
+    // compute geometrical derivatives
+    
+    if (bang == 0)
+    {
+        geomrecfunc::compGeomForSX(primBuffer, osFactors, nFactors, ridx, uidx, braGtoBlock, ketGtoBlock, iContrGto, axis);
+    }
+    
+    if (bang == 1)
+    {
+        geomrecfunc::compGeomForPX(primBuffer, osFactors, nFactors, ridx, uidx, lidx, braGtoBlock, ketGtoBlock, iContrGto, axis);
+    }
+    
+    if (bang == 2)
+    {
+        geomrecfunc::compGeomForDX(primBuffer, osFactors, nFactors, ridx, uidx, lidx, braGtoBlock, ketGtoBlock, iContrGto, axis);
+    }
+    
+    // need l > 2 implemented....
 }
 
 CRecursionMap
