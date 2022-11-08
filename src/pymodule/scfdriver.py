@@ -185,6 +185,9 @@ class ScfDriver:
         self.checkpoint_file = None
         self._ref_mol_orbs = None
 
+        # Maximum overlap constraint
+        self._mom = None
+
         # closed shell?
         self._scf_type = 'restricted'
 
@@ -639,6 +642,33 @@ class ScfDriver:
                                                        self.ostream)
             self.ostream.flush()
 
+    def maximum_overlap(self, molecule, orbitals, alpha_list, beta_list):
+        """
+        Constraint the SCF calculation to find orbitals that maximize overlap with a reference set.
+
+        :param molecule:
+            The molecule.
+        :param orbitals:
+            The reference MolecularOrbital object.
+        :param alpha_list:
+            The list of alpha occupied orbitals
+        :param beta_list:
+            The list of beta occupied orbitals
+        """
+
+        N_alpha = molecule.number_of_alpha_electrons()
+        N_beta = molecule.number_of_beta_electrons()
+
+        err_excitations = "ScfDriver.maximum_overlap: incorrect definition of occupation lists"
+        assert_msg_critical(len(alpha_list)==N_alpha, err_excitations)
+        assert_msg_critical(len(beta_list)==N_beta, err_excitations)
+        if self.scf_type == 'restricted':
+            assert_msg_critical(alpha_list==beta_list, err_excitations)
+
+        C_a = orbitals.alpha_to_numpy()[:,alpha_list]
+        C_b = orbitals.beta_to_numpy()[:,beta_list]
+        self._mom = [C_a,C_b]
+
     def set_start_orbitals(self, molecule, basis, array):
         """
         Creates checkpoint file from numpy array containing starting orbitals.
@@ -941,6 +971,9 @@ class ScfDriver:
 
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
+
+            if self._mom is not None:
+                self._apply_mom(molecule, ovl_mat)
 
             self._update_mol_orbs_phase()
 
@@ -1642,6 +1675,54 @@ class ScfDriver:
         """
 
         return MolecularOrbitals()
+
+    def _apply_mom(self, molecule, ovl_mat):
+        """
+        Apply the maximum overlap constraint
+
+        :param molecule:
+            The molecule.
+        :param ovl_mat:
+            The overlap matrix..
+
+        """
+        if self.rank == mpi_master():
+            smat = ovl_mat.to_numpy()
+
+            mo_a = self.molecular_orbitals.alpha_to_numpy()
+            ea = self.molecular_orbitals.ea_to_numpy()
+            occ_a = self.molecular_orbitals.occa_to_numpy()
+            N_alpha = molecule.number_of_alpha_electrons()
+
+            ovl = np.dot(self._mom[0].transpose(),np.dot(smat,mo_a))
+            argsort = np.argsort(np.sum(np.abs(ovl),0))[::-1]
+            #keep energy ordering
+            argsort[:N_alpha] = np.sort(argsort[:N_alpha])
+            argsort[N_alpha:] = np.sort(argsort[N_alpha:])
+            mo_a = mo_a[:,argsort]
+            ea = ea[argsort]
+
+            if self.molecular_orbitals.get_orbitals_type() == molorb.rest:
+                self._molecular_orbitals = MolecularOrbitals([mo], [ea], [occa],
+                                                             molorb.rest)
+            elif self.molecular_orbitals.get_orbitals_type() == molorb.unrest:
+                N_beta = molecule.number_of_beta_electrons()
+                mo_b = self.molecular_orbitals.beta_to_numpy()
+                eb = self.molecular_orbitals.eb_to_numpy()
+                occ_b = self.molecular_orbitals.occb_to_numpy()
+
+                ovl = np.dot(self._mom[1].transpose(),np.dot(smat,mo_b))
+                argsort = np.argsort(np.sum(np.abs(ovl),0))[::-1]
+                #keep energy ordering
+                argsort[:N_beta] = np.sort(argsort[:N_beta])
+                argsort[N_beta:] = np.sort(argsort[N_beta:])
+                mo_b = mo_b[:,argsort]
+                eb = eb[argsort]
+
+                self._molecular_orbitals = MolecularOrbitals([mo_a, mo_b],
+                                                             [ea, eb],
+                                                             [occ_a, occ_b],
+                                                             molorb.unrest)
 
     def _update_mol_orbs_phase(self):
         """
