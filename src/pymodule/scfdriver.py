@@ -1696,33 +1696,43 @@ class ScfDriver:
 
             ovl = np.dot(self._mom[0].transpose(),np.dot(smat,mo_a))
             argsort = np.argsort(np.sum(np.abs(ovl),0))[::-1]
-            #keep energy ordering
+            #restore energy ordering
             argsort[:N_alpha] = np.sort(argsort[:N_alpha])
             argsort[N_alpha:] = np.sort(argsort[N_alpha:])
             mo_a = mo_a[:,argsort]
             ea = ea[argsort]
 
-            if self.molecular_orbitals.get_orbitals_type() == molorb.rest:
-                self._molecular_orbitals = MolecularOrbitals([mo], [ea], [occa],
+            if self.scf_type == 'restricted':
+                self._molecular_orbitals = MolecularOrbitals([mo_a], [ea], [occ_a],
                                                              molorb.rest)
-            elif self.molecular_orbitals.get_orbitals_type() == molorb.unrest:
+            else:
                 N_beta = molecule.number_of_beta_electrons()
-                mo_b = self.molecular_orbitals.beta_to_numpy()
-                eb = self.molecular_orbitals.eb_to_numpy()
-                occ_b = self.molecular_orbitals.occb_to_numpy()
+                if self.scf_type == 'unrestricted':
+                    mo_b = self.molecular_orbitals.beta_to_numpy()
+                    eb = self.molecular_orbitals.eb_to_numpy()
+                    occ_b = self.molecular_orbitals.occb_to_numpy()
+                elif self.scf_type == 'restricted_openshell':
+                    #For ROHF, the beta orbitals have to be a subset of the alpha
+                    mo_b = mo_a[:,:N_alpha]
 
                 ovl = np.dot(self._mom[1].transpose(),np.dot(smat,mo_b))
-                argsort = np.argsort(np.sum(np.abs(ovl),0))[::-1]
-                #keep energy ordering
-                argsort[:N_beta] = np.sort(argsort[:N_beta])
-                argsort[N_beta:] = np.sort(argsort[N_beta:])
-                mo_b = mo_b[:,argsort]
-                eb = eb[argsort]
+                argsort_b = np.argsort(np.sum(np.abs(ovl),0))[::-1]
+                #restore energy ordering
+                argsort_b[:N_beta] = np.sort(argsort_b[:N_beta])
+                argsort_b[N_beta:] = np.sort(argsort_b[N_beta:])
 
-                self._molecular_orbitals = MolecularOrbitals([mo_a, mo_b],
-                                                             [ea, eb],
-                                                             [occ_a, occ_b],
-                                                             molorb.unrest)
+                if self.scf_type == 'unrestricted':
+                    mo_b = mo_b[:,argsort]
+                    eb = eb[argsort]
+                    self._molecular_orbitals = MolecularOrbitals([mo_a, mo_b],
+                                                                 [ea, eb],
+                                                                 [occ_a, occ_b],
+                                                                 molorb.unrest)
+                elif self.scf_type == 'restricted_openshell':
+                    mo_a[:,:N_alpha] = mo_a[:,argsort_b]
+                    ea[:N_alpha] = ea[argsort_b]
+                    self._molecular_orbitals = MolecularOrbitals([mo_a], [ea], [occ_a],
+                                                                 molorb.rest)
 
     def _update_mol_orbs_phase(self):
         """
