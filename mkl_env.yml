@@ -4,6 +4,7 @@ channels:
 dependencies:
   - cmake
   - ninja
+  - scikit-build
   - cxx-compiler
   - mpich
   - blas=*=*mkl*
@@ -12,7 +13,7 @@ dependencies:
   - numpy
   - h5py
   - pip
-  - pybind11>=2.6
+  - pybind11-global
   - python>=3.7
   - psutil
   - pytest
@@ -21,7 +22,6 @@ dependencies:
   - scipy
   - gtest
   - gmock
-  - cmake
   - cppe
   - xtb
-  - veloxchem::geometric
+  - geometric
