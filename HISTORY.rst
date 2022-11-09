@@ -17,5 +17,11 @@ First release candidate
 
 Second release candidate
 
+1.0-rc3_ (2022-11-09)
+---------------------
+
+Third release candidate
+
 .. _1.0-rc: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc
 .. _1.0-rc2: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc2
+.. _1.0-rc3: https://gitlab.com/veloxchem/veloxchem/-/tree/v1.0-rc3
