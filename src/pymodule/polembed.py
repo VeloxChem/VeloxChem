@@ -416,7 +416,7 @@ class PolEmbed:
         # process polarizabilities (a dictionary with residue name as key)
 
         polarizabilities = {}
-        for line in pe_inp['polarizabilities']:
+        for line in pe_inp.get('polarizabilities', ''):
             val = line.split()
             resname = val[7]
             if resname not in polarizabilities:
@@ -477,10 +477,11 @@ class PolEmbed:
                         alpha_num += 1
                 ind += len(residues[resid]['atoms'])
 
-            f_tmp.write('@POLARIZABILITIES\n')
-            f_tmp.write('ORDER 1 1\n')
-            f_tmp.write('{:d}\n'.format(alpha_num))
-            f_tmp.write(alpha_lines)
+            if alpha_num > 0:
+                f_tmp.write('@POLARIZABILITIES\n')
+                f_tmp.write('ORDER 1 1\n')
+                f_tmp.write('{:d}\n'.format(alpha_num))
+                f_tmp.write(alpha_lines)
 
             # exclusions
 
