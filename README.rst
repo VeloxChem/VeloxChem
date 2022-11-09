@@ -2,7 +2,7 @@
 VeloxChem
 =========
 
-.. image:: https://anaconda.org/veloxchem/veloxchem/badges/version.svg
+.. image:: https://img.shields.io/conda/v/veloxchem/veloxchem.svg
         :alt: Install with Conda
         :target: https://anaconda.org/veloxchem/veloxchem
 
