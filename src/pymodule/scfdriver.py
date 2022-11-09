@@ -656,18 +656,19 @@ class ScfDriver:
             The list of beta occupied orbitals
         """
 
-        N_alpha = molecule.number_of_alpha_electrons()
-        N_beta = molecule.number_of_beta_electrons()
+        if self.rank == mpi_master():
+            N_alpha = molecule.number_of_alpha_electrons()
+            N_beta = molecule.number_of_beta_electrons()
 
-        err_excitations = "ScfDriver.maximum_overlap: incorrect definition of occupation lists"
-        assert_msg_critical(len(alpha_list)==N_alpha, err_excitations)
-        assert_msg_critical(len(beta_list)==N_beta, err_excitations)
-        if self.scf_type == 'restricted':
-            assert_msg_critical(alpha_list==beta_list, err_excitations)
+            err_excitations = "ScfDriver.maximum_overlap: incorrect definition of occupation lists"
+            assert_msg_critical(len(alpha_list)==N_alpha, err_excitations)
+            assert_msg_critical(len(beta_list)==N_beta, err_excitations)
+            if self.scf_type == 'restricted':
+                assert_msg_critical(alpha_list==beta_list, err_excitations)
 
-        C_a = orbitals.alpha_to_numpy()[:,alpha_list]
-        C_b = orbitals.beta_to_numpy()[:,beta_list]
-        self._mom = [C_a,C_b]
+            C_a = orbitals.alpha_to_numpy()[:,alpha_list]
+            C_b = orbitals.beta_to_numpy()[:,beta_list]
+            self._mom = [C_a,C_b]
 
     def set_start_orbitals(self, molecule, basis, array):
         """
@@ -1722,8 +1723,8 @@ class ScfDriver:
                 argsort_b[N_beta:] = np.sort(argsort_b[N_beta:])
 
                 if self.scf_type == 'unrestricted':
-                    mo_b = mo_b[:,argsort]
-                    eb = eb[argsort]
+                    mo_b = mo_b[:,argsort_b]
+                    eb = eb[argsort_b]
                     self._molecular_orbitals = MolecularOrbitals([mo_a, mo_b],
                                                                  [ea, eb],
                                                                  [occ_a, occ_b],
