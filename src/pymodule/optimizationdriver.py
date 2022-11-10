@@ -212,7 +212,7 @@ class OptimizationDriver:
         filename = str(temp_path / f'{filename}_{self.rank}')
 
         if self.constraints:
-            constr_filename = Path(filename).with_suffix('.constr.txt')
+            constr_filename = Path(filename).with_suffix('.constr.txt').as_posix()
             with open(str(constr_filename), 'w') as fh:
                 for line in self.constraints:
                     print(line, file=fh)
@@ -233,7 +233,7 @@ class OptimizationDriver:
                     constraints=constr_filename,
                     transition=self.transition,
                     hessian=self.hessian,
-                    input=rf'{filename}.optinp')
+                    input=Path(rf'{filename}.optinp').as_posix())
             except geometric.errors.HessianExit:
                 hessian_exit = True
 
@@ -259,9 +259,8 @@ class OptimizationDriver:
             ]
 
             if constr_filename is not None:
-                src_files.append(constr_filename)
-                dest_files.append(
-                    Path(self.filename).with_suffix('.constr.txt'))
+                src_files.append(Path(constr_filename))
+                dest_files.append(Path(self.filename + '.constr.txt'))
 
             for src_f, dest_f in zip(src_files, dest_files):
                 if src_f.is_file():
