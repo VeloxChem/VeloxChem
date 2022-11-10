@@ -212,12 +212,15 @@ class OptimizationDriver:
         filename = str(temp_path / f'{filename}_{self.rank}')
 
         if self.constraints:
-            constr_filename = Path(filename).with_suffix('.constr.txt').as_posix()
-            with open(str(constr_filename), 'w') as fh:
+            constr_file = Path(filename + '.constr.txt')
+            with constr_file.open('w') as fh:
                 for line in self.constraints:
                     print(line, file=fh)
+            constr_filename = constr_file.as_posix()
         else:
             constr_filename = None
+
+        optinp_filename = Path(filename + '.optinp').as_posix()
 
         # redirect geomeTRIC stdout/stderr
 
@@ -233,7 +236,7 @@ class OptimizationDriver:
                     constraints=constr_filename,
                     transition=self.transition,
                     hessian=self.hessian,
-                    input=Path(rf'{filename}.optinp').as_posix())
+                    input=optinp_filename)
             except geometric.errors.HessianExit:
                 hessian_exit = True
 
@@ -283,9 +286,7 @@ class OptimizationDriver:
             labels = molecule.get_labels()
 
             if self.rank == mpi_master():
-                final_mol = Molecule(labels,
-                                     coords.reshape(-1, 3),
-                                     units='au')
+                final_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
             else:
                 final_mol = Molecule()
             final_mol.broadcast(self.rank, self.comm)
@@ -572,7 +573,7 @@ class OptimizationDriver:
                 str(vdata_file)))
 
         text = []
-        with open(str(vdata_file)) as fh:
+        with vdata_file.open() as fh:
             for line in fh:
                 if line[:2] == '# ':
                     text.append(line[2:].strip())
