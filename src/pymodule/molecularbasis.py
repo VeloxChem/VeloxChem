@@ -250,5 +250,20 @@ def _MolecularBasis_get_avail_basis(element_label):
     return sorted(list(avail_basis))
 
 
+def _MolecularBasis_deepcopy(self, memo):
+    """
+    Implements deepcopy.
+
+    :param memo:
+        The memo dictionary for deepcopy.
+
+    :return:
+        A deepcopy of self.
+    """
+
+    return MolecularBasis(self)
+
+
 MolecularBasis.read = _MolecularBasis_read
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
+MolecularBasis.__deepcopy__ = _MolecularBasis_deepcopy
