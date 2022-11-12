@@ -33,8 +33,6 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver
 from .veloxchemlib import XCIntegrator, XCNewIntegrator
@@ -44,6 +42,8 @@ from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import molorb
 from .veloxchemlib import parse_xc_func
+from .aodensitymatrix import AODensityMatrix
+from .aofockmatrix import AOFockMatrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals

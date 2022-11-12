@@ -137,6 +137,7 @@ export_dft(py::module& m)
 
     PyClass<CXCFunctional>(m, "XCFunctional")
         .def(py::init<>())
+        .def(py::init<const CXCFunctional&>())
         .def("get_frac_exact_exchange",
              &CXCFunctional::getFractionOfExactExchange,
              "Gets fraction of exact Hatree-Fock exchange in exchange-correlation functional.")

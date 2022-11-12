@@ -28,13 +28,13 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .aodensitymatrix import AODensityMatrix
+from .aofockmatrix import AOFockMatrix
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical

@@ -221,6 +221,7 @@ export_orbdata(py::module& m)
 
     PyClass<CMolecularBasis>(m, "MolecularBasis")
         .def(py::init<>())
+        .def(py::init<const CMolecularBasis&>())
         .def("__repr__", &CMolecularBasis::repr)
         .def("get_string",
              py::overload_cast<const std::string&, const CMolecule&>(&CMolecularBasis::printBasis, py::const_),

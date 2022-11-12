@@ -33,13 +33,13 @@ import sys
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import molorb
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .aodensitymatrix import AODensityMatrix
+from .aofockmatrix import AOFockMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .linearsolver import LinearSolver

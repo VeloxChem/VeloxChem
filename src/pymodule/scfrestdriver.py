@@ -24,13 +24,14 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from mpi4py import MPI
+from copy import deepcopy
 import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import MolecularOrbitals
-from .veloxchemlib import molorb
-from .veloxchemlib import fockmat
+from .veloxchemlib import (molorb, fockmat)
+from .veloxchemlib import (XCFunctional, MolecularGrid)
+from .molecularorbitals import MolecularOrbitals
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
 from .c2diis import CTwoDiis
@@ -273,3 +274,28 @@ class ScfRestrictedDriver(ScfDriver):
             fock_mat.set_fock_type(fockmat.restj, 0)
 
         return
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_scf_drv = ScfRestrictedDriver(self.comm, self.ostream)
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                pass
+            elif isinstance(val, XCFunctional):
+                new_scf_drv.key = XCFunctional(val)
+            elif isinstance(val, MolecularGrid):
+                new_scf_drv.key = MolecularGrid(val)
+            else:
+                new_scf_drv.key = deepcopy(val)
+
+        return new_scf_drv
