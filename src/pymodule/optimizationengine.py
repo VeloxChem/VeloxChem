@@ -23,12 +23,16 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
+from copy import deepcopy
 from contextlib import redirect_stderr
 from io import StringIO
 import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import (XCFunctional, MolecularGrid)
+from .outputstream import OutputStream
 from .molecule import Molecule
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -144,3 +148,30 @@ class OptimizationEngine(geometric.engine.Engine):
         """
 
         return
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_engine = OptimizationEngine(deepcopy(self.grad_drv),
+                                        deepcopy(self.molecule),
+                                        deepcopy(self.args))
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                pass
+            elif isinstance(val, XCFunctional):
+                new_engine.key = XCFunctional(val)
+            elif isinstance(val, MolecularGrid):
+                new_engine.key = MolecularGrid(val)
+            else:
+                new_engine.key = deepcopy(val)
+
+        return new_engine
