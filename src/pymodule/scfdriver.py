@@ -311,6 +311,14 @@ class ScfDriver:
         return self._ostream
 
     @property
+    def num_iter(self):
+        """
+        Returns the current number of SCF iterations.
+        """
+
+        return self._num_iter
+
+    @property
     def is_converged(self):
         """
         Returns whether SCF is converged.
