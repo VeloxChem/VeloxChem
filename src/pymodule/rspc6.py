@@ -24,7 +24,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
-from math import pi
 
 from .rspproperty import ResponseProperty
 
@@ -91,48 +90,6 @@ class C6(ResponseProperty):
 
         return self._rsp_property[key]
 
-    def integrate(self, imagfreqs, points, weights, w0):
-        """
-        Calculates the C6 value with a Gauss-Legendre quadrature for the
-        integral in the Casimir-Polder relation using integration by
-        substitution.
-
-        :param imagfreqs:
-            The list of imaginary frequencies.
-        :param points:
-            The list of integration points.
-        :param weights:
-            The list of weights for integration points.
-        :param w0:
-            A constant conversion factor.
-
-        :return:
-            The C6 value.
-        """
-
-        integral = 0
-
-        for iw in range(len(imagfreqs)):
-
-            Gxx = self._rsp_property['response_functions'][('x', 'x',
-                                                            imagfreqs[iw])].real
-            Gyy = self._rsp_property['response_functions'][('y', 'y',
-                                                            imagfreqs[iw])].real
-            Gzz = self._rsp_property['response_functions'][('z', 'z',
-                                                            imagfreqs[iw])].real
-
-            alpha = -(Gxx + Gyy + Gzz) / 3.0
-            point = points[iw]
-            weight = weights[iw]
-            derivative = w0 * 2 / (1 + point)**2
-            integral += alpha * alpha * weight * derivative
-
-        # Casimir-Polder relation
-
-        c6 = 3 * integral / pi
-
-        return c6
-
     def print_property(self, ostream):
         """
         Prints response property to output stream.
@@ -149,10 +106,8 @@ class C6(ResponseProperty):
         ostream.print_blank()
 
         w0 = float(self._rsp_dict['w0'])
-        points = np.polynomial.legendre.leggauss(int(
-            self._rsp_dict['n_points']))[0]
-        weights = np.polynomial.legendre.leggauss(
-            int(self._rsp_dict['n_points']))[1]
+        n_points = int(self._rsp_dict['n_points'])
+        points, weights = np.polynomial.legendre.leggauss(n_points)
         imagfreqs = [w0 * (1 - t) / (1 + t) for t in points]
         printfreqs = np.append(imagfreqs, 0.0)
 
@@ -183,9 +138,7 @@ class C6(ResponseProperty):
         ostream.print_header(title.ljust(width))
         ostream.print_blank()
 
-        c6 = self.integrate(imagfreqs, points, weights, w0)
-
-        # Static polarizability
+        c6 = self._rsp_property['c6']
 
         Gxx_i0 = self._rsp_property['response_functions'][('x', 'x', 0.0)].real
         Gyy_i0 = self._rsp_property['response_functions'][('y', 'y', 0.0)].real

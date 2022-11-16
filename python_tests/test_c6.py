@@ -70,8 +70,7 @@ class TestC6:
             diff_prop = np.max(np.abs(prop - ref_prop))
             assert diff_prop < 1.0e-4
 
-            points, weights = np.polynomial.legendre.leggauss(ref_n_points)
-            c6_value = c6_prop.integrate(freqs, points, weights, 0.3)
+            c6_value = c6_results['c6']
             assert abs(c6_value - ref_c6_value) < 1.0e-4
 
     @staticmethod
