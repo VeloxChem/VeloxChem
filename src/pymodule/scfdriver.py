@@ -650,6 +650,8 @@ class ScfDriver:
                                                        self.ostream)
             self.ostream.flush()
 
+        return self.scf_tensors
+
     def maximum_overlap(self, molecule, orbitals, alpha_list, beta_list):
         """
         Constraint the SCF calculation to find orbitals that maximize overlap
