@@ -40,7 +40,7 @@ from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
 
-class C6Solver(LinearSolver):
+class C6Driver(LinearSolver):
     """
     Implements the C6 value response solver.
 
@@ -267,7 +267,7 @@ class C6Solver(LinearSolver):
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(nalpha == nbeta,
-                            'C6Solver: not implemented for unrestricted case')
+                            'C6Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             orb_ene = scf_tensors['E_alpha']
