@@ -36,11 +36,11 @@ class TestMOIntegralsDriver:
 
         # mp2
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
-        mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
+        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
 
         if is_mpi_master(task.mpi_comm):
             e_ref = -0.28529088
-            e_mp2 = mp2_drv.e_mp2
+            e_mp2 = mp2_result['mp2_energy']
             assert abs(e_ref - e_mp2) < 1.0e-8
 
         mp2_drv.update_settings({'conventional': 'yes'})
