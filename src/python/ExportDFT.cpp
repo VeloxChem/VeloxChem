@@ -37,6 +37,7 @@
 #include "DensityGrid.hpp"
 #include "DensityGridDriver.hpp"
 #include "ExportGeneral.hpp"
+#include "ExportMath.hpp"
 #include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
@@ -62,27 +63,17 @@ integrate_pdft(const CXCIntegrator&    self,
                const CMolecularGrid&   molecularGrid,
                const std::string&      xcFuncLabel)
 {
-    errors::assertMsgCritical(py::detail::check_flags(Active2DM.ptr(), py::array::c_style),
-                              __func__ + std::string(": Expecting C-style contiguous numpy array for Active2DM"));
-
-    auto ptr_Active2DM = new double[Active2DM.size()];
-
-    std::memcpy(ptr_Active2DM, Active2DM.data(), Active2DM.size() * sizeof(double));
-
-    errors::assertMsgCritical(py::detail::check_flags(ActiveMOs.ptr(), py::array::c_style),
-                              __func__ + std::string(": Expecting C-style contiguous numpy array for ActiveMOs"));
-
     auto nActive = Active2DM.shape(0);
 
-    auto ptr_ActiveMOs = new double[ActiveMOs.size()];
+    auto Tensor_2DM = vlx_math::CDense4DTensor_from_numpy(Active2DM);
 
-    std::memcpy(ptr_ActiveMOs, ActiveMOs.data(), ActiveMOs.size() * sizeof(double));
+    auto ptr_Active2DM = Tensor_2DM->values();
+
+    auto Dense_active2DM = vlx_math::CDenseMatrix_from_numpy(ActiveMOs);
+
+    auto ptr_ActiveMOs = Dense_active2DM->values();
 
     auto xcene = self.integratePdft(aoDensityMatrix, ptr_Active2DM, ptr_ActiveMOs, nActive, molecule, basis, molecularGrid, xcFuncLabel);
-
-    delete[] ptr_Active2DM;
-
-    delete[] ptr_ActiveMOs;
 
     return xcene;
 }

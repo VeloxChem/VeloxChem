@@ -1,5 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
+    Dense4DTensor.cpp
     DenseDiagonalizer.cpp
     DenseLinearAlgebra.cpp
     DenseMatrix.cpp
