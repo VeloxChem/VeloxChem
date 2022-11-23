@@ -133,8 +133,8 @@ from .qqscheme import get_qq_scheme
 from .features import print_features
 
 # Environment variable: basis set path, number of OpenMP threads, MKL linking
-from .environ import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
-                      configure_mkl_rt)
+from .environment import (set_vlxbasispath, set_omp_num_threads, get_basis_path,
+                          configure_mkl_rt)
 
 set_vlxbasispath()
 set_omp_num_threads()
