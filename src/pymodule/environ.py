@@ -23,8 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from multiprocessing import cpu_count
-from os import environ
+from os import environ, cpu_count
 from pathlib import Path
 from sys import stdout
 
@@ -64,6 +63,8 @@ def set_omp_num_threads(ncores=None):
     else:
         if 'OMP_NUM_THREADS' not in environ:
             ncores = cpu_count()
+            if ncores is None:
+                ncores = 1
             environ['OMP_NUM_THREADS'] = str(ncores)
             print('* Warning * Environment variable OMP_NUM_THREADS not set.',
                   file=stdout)
