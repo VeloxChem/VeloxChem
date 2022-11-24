@@ -36,6 +36,7 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "MemAlloc.hpp"
 
 CPrimitiveFunctional::CPrimitiveFunctional()
 
@@ -295,7 +296,7 @@ operator<<(std::ostream& output, const CPrimitiveFunctional& source)
     return output;
 }
 
-Functional::Functional(const std::vector<std::string>& labels, const std::vector<double>& coeffs, bool polarized)
+Functional::Functional(const std::vector<std::string>& labels, const std::vector<double>& coeffs)
 {
     errors::assertMsgCritical(labels.size() == coeffs.size(),
                               std::string(__func__) +
@@ -306,13 +307,16 @@ Functional::Functional(const std::vector<std::string>& labels, const std::vector
         return std::any_of(options.begin(), options.end(), [family](auto a) { return a == family; });
     };
 
-    auto nspin = (_polarized ? 2 : 1);
-
+    // sum of coefficients of exchange components
     auto total_x = 0.0;
 
+    // sum of coefficients of correlation components
     auto total_c = 0.0;
 
     std::vector<Component> x_funcs, c_funcs;
+
+    // TODO write function to compute this number based on functional family and order of derivatives available
+    auto n_xc_outputs = 0;
 
     for (auto i = 0; i < labels.size(); ++i)
     {
@@ -322,7 +326,7 @@ Functional::Functional(const std::vector<std::string>& labels, const std::vector
         auto funcID = xc_functional_get_number(label.c_str());
 
         xc_func_type func;
-        if (xc_func_init(&func, funcID, nspin))
+        if (xc_func_init(&func, funcID, XC_POLARIZED))
         {
             errors::msgCritical(std::string("Could not find required LibXC functional ") + label);
         }
@@ -360,17 +364,25 @@ Functional::Functional(const std::vector<std::string>& labels, const std::vector
         // which family does this x-c mixture belong to?
         auto family = func.info->family;
 
+        // LDA?
+        if (is_in_family(std::array{XC_FAMILY_LDA, XC_FAMILY_HYB_LDA}, family))
+        {
+            _isLDA       = true;
+            n_xc_outputs = 15;
+        }
+
         // GGA?
         if (is_in_family(std::array{XC_FAMILY_GGA, XC_FAMILY_HYB_GGA}, family))
         {
-            _isGGA = true;
+            _isGGA       = true;
+            n_xc_outputs = 126;
         }
 
         // metaGGA?
         if (is_in_family(std::array{XC_FAMILY_MGGA, XC_FAMILY_HYB_MGGA}, family))
         {
-            _isGGA     = true;
-            _isMetaGGA = true;
+            _isMetaGGA   = true;
+            n_xc_outputs = 767;
         }
 
         // hybrid?
@@ -405,12 +417,19 @@ Functional::Functional(const std::vector<std::string>& labels, const std::vector
 
     _xcName   = detail::getXCName(x_funcs, c_funcs);
     _citation = detail::getCitation(x_funcs, c_funcs);
+
+    // allocate _stagingBuffer
+    _stagingBuffer = mem::malloc<double>(n_xc_outputs * _ldStaging);
 }
 
 Functional::~Functional()
 {
+    // clean up allocated LibXC objects
     std::for_each(std::begin(_components), std::end(_components), [](Component& c) { xc_func_end(&std::get<1>(c)); });
     _components.clear();
+
+    // clean up staging buffer
+    mem::free(_stagingBuffer);
 }
 
 auto
@@ -469,62 +488,102 @@ Functional::repr() const -> std::string
 }
 
 auto
-Functional::compute(CXCGradientGrid& xcGradientGrid, const CDensityGrid& densityGrid) const -> void
+Functional::compute_exc(int32_t np, const double* rho, double* exc) const -> void
 {
-    xcGradientGrid.zero();
+    errors::assertMsgCritical(_hasExc,
+                              std::string(__func__) +
+                                  ": exchange-correlation functional does not provide an evaluator for Exc on grid");
 
-    auto np = densityGrid.getNumberOfGridPoints();
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
 
-    auto rhoa = densityGrid.alphaDensity(0);
-
-    auto rhob = densityGrid.betaDensity(0);
-
-    auto rho_scratch = mem::malloc<double>(_polarized ? 2 * np : np);
-
-    if (_polarized)
-    {
-#pragma omp simd aligned(rho_scratch, rhoa, rhob : VLX_ALIGN)
-        for (auto i = 0; i < np; ++i)
-        {
-            rho_scratch[2 * i]     = rhoa[i];
-            rho_scratch[2 * i + 1] = rhob[i];
-        }
-    }
-    else
-    {
-#pragma omp simd aligned(rho_scratch, rhoa, rhob : VLX_ALIGN)
-        for (auto i = 0; i < np; ++i)
-        {
-            rho_scratch[i] = rhoa[i] + rhob[i];
-        }
-    }
-
-    auto fexc = xcGradientGrid.xcFunctionalValues();
-
-    auto grhoa = xcGradientGrid.xcGradientValues(xcvars::rhoa);
-
-    auto grhob = xcGradientGrid.xcGradientValues(xcvars::rhob);
-
-    auto vxc_scratch = mem::malloc<double>(_polarized ? 2 * np : np);
+    auto stage_exc  = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
 
     for (const auto& [coeff, func] : _components)
     {
-        xc_lda_exc_vxc(&func, np, rhoa, fexc, vxc_scratch);
+        xc_lda_exc(&func, np, rho, stage_exc);
 
-        auto c = coeff;
+        const auto c = coeff;
 
-// FIXME only valid for unpolarized at the moment
-#pragma omp simd aligned(vxc_scratch, grhoa, grhob : VLX_ALIGN)
-        for (auto i = 0; i < np; ++i)
+#pragma omp simd aligned(exc, stage_exc : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
         {
-            grhoa[i] += c * vxc_scratch[i];
-            grhob[i] += c * vxc_scratch[i];
+            exc[g] += c * stage_exc[g];
         }
     }
 
-    mem::free(vxc_scratch);
+    if (alloc)
+    {
+        mem::free(stage_exc);
+    }
+}
 
-    mem::free(rho_scratch);
+auto
+Functional::compute_vxc(int32_t np, const double* rho, double* vrho) const -> void
+{
+    errors::assertMsgCritical(_hasVxc,
+                              std::string(__func__) +
+                                  ": exchange-correlation functional does not provide evaluators for Vxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+
+    for (const auto& [coeff, func] : _components)
+    {
+        xc_lda_vxc(&func, np, rho, stage_vrho);
+
+        const auto c = coeff;
+
+#pragma omp simd aligned(vrho, stage_vrho : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_vrho);
+    }
+}
+
+auto
+Functional::compute_exc_vxc(int32_t np, const double* rho, double* exc, double* vrho) const -> void
+{
+    errors::assertMsgCritical(_hasExc && _hasVxc,
+                              std::string(__func__) +
+                                  ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    auto stage_exc  = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+    auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+
+    for (const auto& [coeff, func] : _components)
+    {
+        xc_lda_exc_vxc(&func, np, rho, stage_exc, stage_vrho);
+
+        const auto c = coeff;
+
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            exc[g] += c * stage_exc[g];
+
+            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_exc);
+        mem::free(stage_vrho);
+    }
 }
 
 std::ostream&

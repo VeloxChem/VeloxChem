@@ -33,6 +33,7 @@
 #include <tuple>
 #include <vector>
 
+#include "Buffer.hpp"
 #include "DensityGrid.hpp"
 #include "XCCubicHessianGrid.hpp"
 #include "XCFuncType.hpp"
@@ -258,17 +259,21 @@ struct xc_func_type;
 using Component = std::tuple<double, xc_func_type>;
 
 /**
- * Class CPrimitiveFunctional is a wrapper to the C functions and structs provided by LibXC.
+ * Class Functional is a wrapper to the C functions and structs provided by LibXC.
+ *
+ * - The primitive functionals offered by LibXC are **always** initialized as
+ *   spin-polarized.
+ * - The functionals in the mix must be **all** of the same family.
  *
  * @author R. Di Remigio Eikås, Z. Rinkevicius
  */
 class Functional
 {
    private:
-    /** Whether the functional is spin-polarized or not. */
-    bool _polarized{false};
-
     /** @{ Exchange-correlation family. */
+    /** Whether the functional is of local-density approximation type. */
+    bool _isLDA{false};
+
     /** Whether the functional is of generalized-gradient approximation type. */
     bool _isGGA{false};
 
@@ -299,11 +304,22 @@ class Functional
     bool _hasLxc{true};
     /** }@ */
 
+    /** Number of exchange components in the functional object. */
     int32_t _numberOfExchangeFunctionals{0};
+
+    /** Number of correlation components in the functional object. */
     int32_t _numberOfCorrelationFunctionals{0};
 
+    /** Leading dimension for initial allocation of staging buffer. */
+    int32_t _ldStaging{(1 << 10)};
+
+    /** Buffer to stage output results from LibXC invocations. */
+    double* _stagingBuffer{nullptr};
+
+    /** Name of the exchange-correlation functional. */
     std::string _xcName{""};
 
+    /** Literature references for the exchange-correlation functional. */
     std::string _citation{""};
 
     /** The primitive exchange-correlation functionals and their coefficients. */
@@ -314,9 +330,8 @@ class Functional
      *
      * @param[in] labels list of labels of component exchange and correlation functionals.
      * @param[in] coeffs list of coefficients for the components of the functional.
-     * @param[in] polarized whether the functional is spin-polarized.
      */
-    Functional(const std::vector<std::string>& labels, const std::vector<double>& coeffs, bool polarized);
+    Functional(const std::vector<std::string>& labels, const std::vector<double>& coeffs);
 
     /** Copy-constructor.
      *
@@ -363,41 +378,82 @@ class Functional
      *
      * @return the label.
      */
-    auto getXCName() const -> std::string { return _xcName; }
+    auto
+    getXCName() const -> std::string
+    {
+        return _xcName;
+    }
 
     /** Get bibliographic reference of primitive functional.
      *
      * @return the reference.
      */
-    auto getCitation() const -> std::string { return _citation; }
+    auto
+    getCitation() const -> std::string
+    {
+        return _citation;
+    }
 
-    auto getNumberOfExchangeFunctionals() const -> int32_t { return _numberOfExchangeFunctionals; }
+    auto
+    getNumberOfExchangeFunctionals() const -> int32_t
+    {
+        return _numberOfExchangeFunctionals;
+    }
 
-    auto getNumberOfCorrelationFunctionals() const -> int32_t { return _numberOfCorrelationFunctionals; }
+    auto
+    getNumberOfCorrelationFunctionals() const -> int32_t
+    {
+        return _numberOfCorrelationFunctionals;
+    }
 
     /** String representation of primitive functional. */
     auto repr() const -> std::string;
 
-    /** Computes first derivative of exchange-correlation functional for given density grid.
+    /**@{ LDA computational functions. These are wrappers around `xc_lda_*` functions in LibXC. */
+    /** Computes values of LDA exchange-correlation functional on grid.
      *
-     * @param[in,out] xcGradientGrid the exchange-correlation gradient grid object.
-     * @param[in] densityGrid the density grid object.
+     * @param[in] np number of grid points.
+     * @param[in] rho density values at grid points. Order: alpha,beta.
+     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
+     *
+     * @note Wrapper to `xc_lda_exc`
      */
-    auto compute(CXCGradientGrid& xcGradientGrid, const CDensityGrid& densityGrid) const -> void;
+    auto compute_exc(int32_t np, const double* rho, double* exc) const -> void;
 
-    /** Computes second derivative of exchange-correlation functional for given density grid.
+    /** Computes first derivative of LDA exchange-correlation functional on grid.
      *
-     * @param[in,out] xcHessianGrid the exchange-correlation hessian grid object.
-     * @param[in] densityGrid the density grid object.
+     * @param[in] np number of grid points.
+     * @param[in] rho density values at grid points. Order: alpha,beta.
+     * @param[in,out] vrho values of the first derivative of the
+     * exchange-correlation kernel. Size: 2*np, order: alpha, beta.
+     *
+     * @note Wrapper to `xc_lda_vxc`
      */
-    auto compute(CXCHessianGrid& xcHessianGrid, const CDensityGrid& densityGrid) const -> void;
+    auto compute_vxc(int32_t np, const double* rho, double* vrho) const -> void;
 
-    /** Computes third derivative of exchange-correlation functional for given density grid.
+    /** Computes values and first derivative of LDA exchange-correlation functional on grid.
      *
-     * @param[in,out] xcCubicHessianGrid the exchange-correlation third-derivative grid object.
-     * @param[in] densityGrid the density grid object.
+     * @param[in] np number of grid points.
+     * @param[in] rho density values at grid points. Order: alpha,beta.
+     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
+     * @param[in,out] vrho values of the first derivative of the
+     * exchange-correlation kernel. Size: 2*np, order: alpha, beta.
+     *
+     * @note Wrapper to `xc_lda_exc_vxc`
      */
-    auto compute(CXCCubicHessianGrid& xcCubicHessianGrid, const CDensityGrid& densityGrid) const -> void;
+    auto compute_exc_vxc(int32_t np, const double* rho, double* exc, double* vrho) const -> void;
+
+    /** Computes second derivative of LDA exchange-correlation functional on grid.
+     *
+     * @param[in] np number of grid points.
+     * @param[in] rho density values at grid points. Order: alpha,beta.
+     * @param[in,out] v2rho2 values of the first derivative of the
+     * exchange-correlation kernel. Size: 2*np, order: alpha, beta.
+     *
+     * @note Wrapper to `xc_lda_fxc`
+     */
+    auto compute_fxc(int32_t np, const double* rho, double* v2rho2) const -> void;
+    /**}@*/
 };
 
 std::ostream& operator<<(std::ostream& output, const Functional& source);

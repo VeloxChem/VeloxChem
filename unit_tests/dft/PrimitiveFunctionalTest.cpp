@@ -212,3 +212,12 @@ TEST_F(CPrimitiveFunctionalTest, ComputeWithHessian)
 
     ASSERT_EQ(xcgrid, CXCHessianGrid(CMemBlock2D<double>({0.0, 0.0, 0.0, 0.0, 0.0, 0.0}, 2, 3), dengrid::ab, xcfun::lda));
 }
+
+TEST(LibXCFunctionalTest, Constructor)
+{
+    std::cout << getLibXCDescription() << std::endl;
+
+    auto fun = Functional({"LDA_X", "GGA_C_LYP", "MGGA_C_SCAN", "GGA_X_B88"}, {0.5, 0.0323849, 1.3, 0.12});
+
+    std::cout << fun << std::endl;
+}
