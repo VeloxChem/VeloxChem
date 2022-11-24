@@ -34,6 +34,7 @@ from .tdhfgradientdriver import TdhfGradientDriver
 from .hessiandriver import HessianDriver
 from .outputstream import OutputStream
 #from .firstorderprop import FirstOrderProperties
+from .veloxchemlib import mpi_master
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -343,7 +344,7 @@ class TdhfHessianDriver(HessianDriver):
 
             label = "hessian_state_%d" % (self.state_deriv_index + 1)
             h5f.create_dataset(label,
-                               data=self.gradient,
+                               data=self.hessian,
                                compression='gzip')
 
             h5f.close()
