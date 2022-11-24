@@ -2,9 +2,9 @@
 VeloxChem
 =========
 
-.. image:: https://anaconda.org/veloxchem/veloxchem/badges/installer/conda.svg   
+.. image:: https://img.shields.io/conda/v/veloxchem/veloxchem.svg
         :alt: Install with Conda
-        :target: https://conda.anaconda.org/veloxchem
+        :target: https://anaconda.org/veloxchem/veloxchem
 
 .. image:: https://img.shields.io/pypi/v/veloxchem.svg
         :alt: PyPI package   
@@ -30,7 +30,7 @@ License
 
 VeloxChem: an electronic structure code
 
-Copyright (C) 2018-2021 The VeloxChem developers.
+Copyright (C) 2018-2022 The VeloxChem developers.
 
 The copyrights for code used from other parties are included in the
 corresponding files.

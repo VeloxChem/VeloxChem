@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -780,7 +780,7 @@ class ExcitonModelDriver:
             self.print_absorption('One-Photon Absorption', eigvals, osc_str)
             self.print_ecd('Electronic Circular Dichroism', rot_str)
 
-            valstr = 'Characters of excited states:'
+            valstr = 'Character of excitations:'
             self.ostream.print_header(valstr.ljust(80))
             self.ostream.print_blank()
 

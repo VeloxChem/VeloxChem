@@ -31,6 +31,17 @@
 #include "MoleculeSetter.hpp"
 #include "OverlapIntegralsDriver.hpp"
 
+TEST_F(COverlapIntegralsDriverTest, ComputeGeomX)
+{
+    COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);
+
+    auto mlih = vlxmol::getTestLiH();
+
+    auto mbas = vlxbas::getTestBasisForLiH();
+
+    ovldrv.compute(mlih, mbas, 0, 'x');
+}
+
 TEST_F(COverlapIntegralsDriverTest, ComputeSSForLiH)
 {
     COverlapIntegralsDriver ovldrv(MPI_COMM_WORLD);

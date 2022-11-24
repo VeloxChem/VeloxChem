@@ -14,11 +14,12 @@ class TestDftGridPartition:
                                grid_level, tol):
 
         molecule = Molecule.read_str(mol_str, units='angstrom')
-        basis = MolecularBasis.read(molecule, basis_label)
+        basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
+        scf_drv.ostream.state = False
         scf_drv.compute(molecule, basis)
         density = scf_drv.density
 

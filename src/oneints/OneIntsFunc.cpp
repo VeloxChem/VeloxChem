@@ -123,7 +123,10 @@ compDistancesBC(CMemBlock2D<double>& bcDistances,
 }
 
 void
-compFactorsForOverlap(CMemBlock2D<double>& osFactors, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock, const int32_t iContrGto)
+compFactorsForOverlap(      CMemBlock2D<double>& osFactors,
+                      const CGtoBlock&           braGtoBlock,
+                      const CGtoBlock&           ketGtoBlock,
+                      const int32_t              iContrGto)
 {
     // set up pointers to primitives data on bra side
 
@@ -166,7 +169,60 @@ compFactorsForOverlap(CMemBlock2D<double>& osFactors, const CGtoBlock& braGtoBlo
 }
 
 void
-compFactorsForKineticEnergy(CMemBlock2D<double>& osFactors, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock, const int32_t iContrGto)
+compFactorsForGeomOverlap(      CMemBlock2D<double>& osFactors,
+                          const CGtoBlock&           braGtoBlock,
+                          const CGtoBlock&           ketGtoBlock,
+                          const int32_t              iContrGto)
+{
+    // set up pointers to primitives data on bra side
+
+    auto bexp = braGtoBlock.getExponents();
+
+    auto spos = braGtoBlock.getStartPositions();
+
+    auto epos = braGtoBlock.getEndPositions();
+
+    // set up pointers to primitives data on ket side
+
+    auto kexp = ketGtoBlock.getExponents();
+
+    auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+    // loop over contracted GTO on bra side
+
+    int32_t idx = 0;
+
+    for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+    {
+        // set up pointers to Obara-Saika factors
+
+        auto fx = osFactors.data(3 * idx);
+
+        auto fz = osFactors.data(3 * idx + 1);
+        
+        auto fe = osFactors.data(3 * idx + 2);
+
+        const auto fb = bexp[i];
+
+        #pragma omp simd aligned(fx, fz, fe, kexp: VLX_ALIGN)
+        for (int32_t j = 0; j < nprim; j++)
+        {
+            fx[j] = 1.0 / (fb + kexp[j]);
+
+            fz[j] = fb * kexp[j] * fx[j];
+            
+            fe[j] = 2.0 * fb; 
+        }
+
+        idx++;
+    }
+}
+
+void
+compFactorsForKineticEnergy(      CMemBlock2D<double>& osFactors,
+                            const CGtoBlock&           braGtoBlock,
+                            const CGtoBlock&           ketGtoBlock,
+                            const int32_t              iContrGto)
 {
     // set up angular momentum for bra and ket sides
 
@@ -246,7 +302,97 @@ compFactorsForKineticEnergy(CMemBlock2D<double>& osFactors, const CGtoBlock& bra
 }
 
 void
-compFactorsForNuclearPotential(CMemBlock2D<double>& osFactors, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock, const int32_t iContrGto)
+compFactorsForGeomKineticEnergy(      CMemBlock2D<double>& osFactors,
+                                const CGtoBlock&           braGtoBlock,
+                                const CGtoBlock&           ketGtoBlock,
+                                const int32_t              iContrGto)
+{
+    // set up angular momentum for bra and ket sides
+
+    auto bang = braGtoBlock.getAngularMomentum();
+
+    auto kang = ketGtoBlock.getAngularMomentum();
+
+    // set up pointers to primitives data on bra side
+
+    auto bexp = braGtoBlock.getExponents();
+
+    auto spos = braGtoBlock.getStartPositions();
+
+    auto epos = braGtoBlock.getEndPositions();
+
+    // set up pointers to primitives data on ket side
+
+    auto kexp = ketGtoBlock.getExponents();
+
+    auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+    // loop over contracted GTO on bra side
+
+    int32_t idx = 0;
+
+    for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+    {
+        // set up pointers to Obara-Saika factors
+
+        auto fx = osFactors.data(5 * idx);
+
+        auto fz = osFactors.data(5 * idx + 1);
+        
+        auto fe = osFactors.data(5 * idx + 4);
+
+        const auto fb = bexp[i];
+
+        #pragma omp simd aligned(fx, fz, fe, kexp: VLX_ALIGN)
+        for (int32_t j = 0; j < nprim; j++)
+        {
+            fx[j] = 1.0 / (fb + kexp[j]);
+
+            fz[j] = fb * kexp[j] * fx[j];
+            
+            fe[j] = 2.0 * fb;
+        }
+
+        if (bang > 1)
+        {
+            auto ga = osFactors.data(5 * idx + 2);
+
+            auto fga = 1.0 / fb;
+
+            #pragma omp simd aligned(ga: VLX_ALIGN)
+            for (int32_t j = 0; j < nprim; j++)
+                ga[j] = fga;
+        }
+
+        if (kang > 1)
+        {
+            auto gb = osFactors.data(5 * idx + 3);
+
+            if (idx == 0)
+            {
+                #pragma omp simd aligned(gb, kexp: VLX_ALIGN)
+                for (int32_t j = 0; j < nprim; j++)
+                    gb[j] = 1.0 / kexp[j];
+            }
+            else
+            {
+                auto gb0 = osFactors.data(3);
+
+                #pragma omp simd aligned(gb, gb0: VLX_ALIGN)
+                for (int32_t j = 0; j < nprim; j++)
+                    gb[j] = gb0[j];
+            }
+        }
+
+        idx++;
+    }
+}
+
+void
+compFactorsForNuclearPotential(      CMemBlock2D<double>& osFactors,
+                               const CGtoBlock&           braGtoBlock,
+                               const CGtoBlock&           ketGtoBlock,
+                               const int32_t              iContrGto)
 {
     // set up pointers to primitives data on bra side
 
@@ -295,7 +441,66 @@ compFactorsForNuclearPotential(CMemBlock2D<double>& osFactors, const CGtoBlock& 
 }
 
 void
-compFactorsForElectronicPotential(CMemBlock2D<double>& osFactors, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock, const int32_t iContrGto)
+compFactorsForGeomNuclearPotential(      CMemBlock2D<double>& osFactors,
+                                   const CGtoBlock&           braGtoBlock,
+                                   const CGtoBlock&           ketGtoBlock,
+                                   const int32_t              iContrGto)
+{
+    // set up pointers to primitives data on bra side
+
+    auto bexp = braGtoBlock.getExponents();
+
+    auto spos = braGtoBlock.getStartPositions();
+
+    auto epos = braGtoBlock.getEndPositions();
+
+    // set up pointers to primitives data on ket side
+
+    auto kexp = ketGtoBlock.getExponents();
+
+    auto nprim = ketGtoBlock.getNumberOfPrimGtos();
+
+    // loop over contracted GTO on bra side
+
+    int32_t idx = 0;
+
+    for (int32_t i = spos[iContrGto]; i < epos[iContrGto]; i++)
+    {
+        // set up pointers to Obara-Saika factors
+
+        auto fx = osFactors.data(4 * idx);
+
+        auto fz = osFactors.data(4 * idx + 1);
+
+        auto fg = osFactors.data(4 * idx + 2);
+        
+        auto fe = osFactors.data(4 * idx + 3);
+
+        const auto fb = bexp[i];
+
+        #pragma omp simd aligned(fx, fz, fg, fe, kexp: VLX_ALIGN)
+        for (int32_t j = 0; j < nprim; j++)
+        {
+            double fact = fb + kexp[j];
+
+            fg[j] = fact;
+
+            fx[j] = 1.0 / fact;
+
+            fz[j] = fb * kexp[j] * fx[j];
+            
+            fe[j] = 2.0 * fb;
+        }
+
+        idx++;
+    }
+}
+
+void
+compFactorsForElectronicPotential(      CMemBlock2D<double>& osFactors,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto)
 {
     // set up angular momentum for bra and ket sides
 

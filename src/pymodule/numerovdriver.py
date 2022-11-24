@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -33,7 +33,7 @@ from .veloxchemlib import (mpi_master, bohr_in_angstroms,
                            amu_in_electron_masses,
                            boltzmann_in_hartreeperkelvin)
 from .outputstream import OutputStream
-from .scfunrestdriver import ScfUnrestrictedDriver
+from .scfrestdriver import ScfRestrictedDriver
 from .firstorderprop import FirstOrderProperties
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
@@ -389,7 +389,7 @@ class NumerovDriver:
         f_minimum_found = False
 
         # initiate unrestricted SCF driver
-        scf_drv = ScfUnrestrictedDriver(self.comm, OutputStream(None))
+        scf_drv = ScfRestrictedDriver(self.comm, OutputStream(None))
         scf_drv.update_settings(self.scf_dict, self.method_dict)
 
         scf_prop = FirstOrderProperties(self.comm, OutputStream(None))
@@ -846,7 +846,7 @@ class NumerovDriver:
             scf_drv.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        if scf_drv.dft:
+        if scf_drv._dft:
             cur_str = 'DFT Functional                : '
             cur_str += scf_drv.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))

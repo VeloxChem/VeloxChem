@@ -75,6 +75,11 @@ class CXCNewMolecularGradient
     double _screeningThresholdForGTOValues;
 
     /**
+     Screening threshold for density values on grid points.
+     */
+    double _screeningThresholdForDensityValues;
+
+    /**
      Integrates first-order LDA exchnage-correlation functional contribution to
      molecular gradient.
 
@@ -239,7 +244,7 @@ class CXCNewMolecularGradient
     CDenseMatrix integrateVxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      const CMolecularGrid&   molecularGrid,
+                                      CMolecularGrid&         molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -259,7 +264,7 @@ class CXCNewMolecularGradient
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& rwDensityMatrix,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      const CMolecularGrid&   molecularGrid,
+                                      CMolecularGrid&         molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -281,7 +286,7 @@ class CXCNewMolecularGradient
                                       const CAODensityMatrix& rwDensityMatrixOne,
                                       const CAODensityMatrix& rwDensityMatrixTwo,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      const CMolecularGrid&   molecularGrid,
+                                      CMolecularGrid&         molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -303,7 +308,7 @@ class CXCNewMolecularGradient
                                       const CAODensityMatrix& rwDensityMatrixOne,
                                       const CAODensityMatrix& rwDensityMatrixTwo,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      const CMolecularGrid&   molecularGrid,
+                                      CMolecularGrid&         molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 };
 

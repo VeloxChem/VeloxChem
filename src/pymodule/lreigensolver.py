@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -29,10 +29,10 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import denmat
+from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -467,6 +467,8 @@ class LinearResponseEigenSolver(LinearSolver):
             nto_cube_files = []
             dens_cube_files = []
 
+            excitation_details = []
+
             for s in range(self.nstates):
                 eigvec = self._get_full_solution_vector(excitations[s][1])
 
@@ -540,6 +542,11 @@ class LinearResponseEigenSolver(LinearSolver):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}'.format(s + 1), eigvec)
 
+                    # save excitation details
+                    excitation_details.append(
+                        self.get_excitation_details(eigvec, mo_occ.shape[1],
+                                                    mo_vir.shape[1]))
+
             if self.nto or self.detach_attach:
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -558,6 +565,7 @@ class LinearResponseEigenSolver(LinearSolver):
                     'magnetic_transition_dipoles': magn_trans_dipoles,
                     'oscillator_strengths': osc,
                     'rotatory_strengths': rot_vel,
+                    'excitation_details': excitation_details,
                 }
 
                 if self.nto:

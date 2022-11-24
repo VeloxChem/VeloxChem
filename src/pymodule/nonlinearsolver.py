@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -28,13 +28,13 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import GridDriver
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .aodensitymatrix import AODensityMatrix
+from .aofockmatrix import AOFockMatrix
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical

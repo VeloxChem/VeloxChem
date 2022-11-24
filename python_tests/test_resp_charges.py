@@ -50,6 +50,8 @@ class TestRespCharges:
 
     def test_resp_methanol(self):
 
+        # vlxtag: RHF, RESP_charges
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'methanol.inp')
 
@@ -60,6 +62,8 @@ class TestRespCharges:
 
     def test_esp_methanol(self):
 
+        # vlxtag: RHF, ESP_charges
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'methanol.inp')
 
@@ -69,6 +73,8 @@ class TestRespCharges:
         self.run_resp(inpfile, ref_esp_charges, 1, 'esp', None)
 
     def test_esp_points_water(self):
+
+        # vlxtag: RHF, ESP_on_points
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water_esp.inp')

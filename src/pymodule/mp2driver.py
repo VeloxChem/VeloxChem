@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -28,12 +28,12 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .aodensitymatrix import AODensityMatrix
+from .aofockmatrix import AOFockMatrix
 from .outputstream import OutputStream
 from .mointsdriver import MOIntegralsDriver
 from .subcommunicators import SubCommunicators
@@ -160,9 +160,9 @@ class Mp2Driver:
         """
 
         if self.conventional:
-            self.compute_conventional(molecule, ao_basis, mol_orbs)
+            return self.compute_conventional(molecule, ao_basis, mol_orbs)
         else:
-            self.compute_distributed(molecule, ao_basis, mol_orbs)
+            return self.compute_distributed(molecule, ao_basis, mol_orbs)
 
     def compute_conventional(self, molecule, ao_basis, mol_orbs):
         """
@@ -198,6 +198,10 @@ class Mp2Driver:
             mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
             self.ostream.print_header(mp2_str.ljust(92))
             self.ostream.print_blank()
+
+            return {'mp2_energy': self.e_mp2}
+        else:
+            return None
 
     def compute_distributed(self, molecule, basis, mol_orbs):
         """
@@ -341,6 +345,10 @@ class Mp2Driver:
             self.ostream.print_header(mp2_str.ljust(80))
             self.ostream.print_blank()
             self.ostream.flush()
+
+            return {'mp2_energy': self.e_mp2}
+        else:
+            return None
 
     def print_header(self, num_matrices):
         """

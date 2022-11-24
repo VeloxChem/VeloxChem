@@ -36,6 +36,8 @@ class TestForceField:
                         reason='openmm not available')
     def test_force_field(self):
 
+        # vlxtag: RKS, Force_Field_Generation
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'butane.inp')
 

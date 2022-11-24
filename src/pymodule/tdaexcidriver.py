@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -33,13 +33,13 @@ import sys
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import AODensityMatrix
-from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import molorb
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .aodensitymatrix import AODensityMatrix
+from .aofockmatrix import AOFockMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .linearsolver import LinearSolver
@@ -356,9 +356,16 @@ class TDAExciDriver(LinearSolver):
         nto_cube_files = []
         dens_cube_files = []
 
+        excitation_details = []
+
         for s in range(self.nstates):
             if self.rank == mpi_master():
                 t_mat = eigvecs[:, s].reshape(mo_occ.shape[1], mo_vir.shape[1])
+
+                # save excitation details
+                excitation_details.append(
+                    self.get_excitation_details(eigvecs[:, s], mo_occ.shape[1],
+                                                mo_vir.shape[1]))
 
             if self.nto or self.detach_attach:
                 vis_drv = VisualizationDriver(self.comm)
@@ -422,6 +429,7 @@ class TDAExciDriver(LinearSolver):
                 'magnetic_transition_dipoles': trans_dipoles['magnetic'],
                 'oscillator_strengths': oscillator_strengths,
                 'rotatory_strengths': rotatory_strengths,
+                'excitation_details': excitation_details,
             }
 
             if self.nto:

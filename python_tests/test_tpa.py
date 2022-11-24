@@ -70,6 +70,8 @@ class TestTPA:
 
     def test_tpa_full(self):
 
+        # vlxtag: RHF, TPA, CR
+
         w = 0.05
 
         ref_result = {
@@ -88,6 +90,8 @@ class TestTPA:
         self.run_tpa(inpfile, 'full', w, ref_result)
 
     def test_tpa_reduced(self):
+
+        # vlxtag: RHF, TPA, CR
 
         w = 0.05
 

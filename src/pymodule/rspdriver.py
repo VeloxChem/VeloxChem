@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -26,7 +26,7 @@
 from .cppsolver import ComplexResponse
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
-from .c6solver import C6Solver
+from .c6driver import C6Driver
 from .tdaexcidriver import TDAExciDriver
 from .tpafulldriver import TPAFullDriver
 from .tpareddriver import TPAReducedDriver
@@ -154,7 +154,7 @@ class ResponseDriver:
               self._rsp_dict['residue'] == 'none' and
               self._rsp_dict['onlystatic'] == 'yes' and
               self._rsp_dict['complex'] == 'yes'):
-            self._solver = C6Solver(self.comm, self.ostream)
+            self._solver = C6Driver(self.comm, self.ostream)
 
         # SHG
         if (self._rsp_dict['order'] == 'quadratic' and

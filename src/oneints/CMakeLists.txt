@@ -17,6 +17,7 @@ target_sources(vlxobjs
     RecursionMap.cpp
     RecursionTerm.cpp
     TwoCentersRecursionFunctions.cpp
+    GeomRecFunc.cpp
   )
 
 target_include_directories(vlxobjs

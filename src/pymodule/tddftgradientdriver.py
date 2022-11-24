@@ -157,7 +157,11 @@ class TddftGradientDriver(GradientDriver):
                         error_message)
             else:
                 self.state_deriv_index = all_states
-            self.print_header(self.state_deriv_index)
+
+            if self.numerical:
+                self.print_header(self.state_deriv_index[0]-1)
+            else:
+                self.print_header(self.state_deriv_index)
 
         start_time = tm.time()
 
@@ -168,7 +172,7 @@ class TddftGradientDriver(GradientDriver):
             scf_ostream_state = self.scf_drv.ostream.state
             self.scf_drv.ostream.state = False
             self.compute_numerical(molecule, basis, rsp_drv, rsp_results,
-                                   min_basis)
+                                   min_basis, self.state_deriv_index[0]-1)
             self.scf_drv.ostream.state = scf_ostream_state
         else:
             self.compute_analytical(molecule, basis, rsp_results)
@@ -177,7 +181,10 @@ class TddftGradientDriver(GradientDriver):
 
         if self.rank == mpi_master():
             self.print_geometry(molecule)
-            self.print_gradient(molecule, self.state_deriv_index)
+            if self.numerical:
+                self.print_gradient(molecule, self.state_deriv_index[0]-1)
+            else:
+                self.print_gradient(molecule, self.state_deriv_index)
 
             valstr = '*** Time spent in gradient calculation: '
             valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
@@ -227,16 +234,17 @@ class TddftGradientDriver(GradientDriver):
             nvir = mo_vir.shape[1]
             nao = mo_occ.shape[0]
 
-            # TODO: change names to x_plus_y_ao, etc.!
+            # TODO: check variable names and make sure they are consistent
+            # with cphfsolver.
             # spin summation already included
-            xpy = orbrsp_results['x_plus_y_ao']
-            xmy = orbrsp_results['x_minus_y_ao']
+            x_plus_y = orbrsp_results['x_plus_y_ao']
+            x_minus_y = orbrsp_results['x_minus_y_ao']
             lambda_ov = orbrsp_results['cphf_ov']
             unrel_dm_ao = orbrsp_results['unrelaxed_density_ao']
             lambda_ao = np.einsum('mi,sia,na->smn', mo_occ, lambda_ov, mo_vir)
             rel_dm_ao = ( unrel_dm_ao + 2.0 * lambda_ao
                         + 2.0 * lambda_ao.transpose(0,2,1) )
-            dof = xpy.shape[0]
+            dof = x_plus_y.shape[0]
         else:
             dof = None
 
@@ -282,15 +290,15 @@ class TddftGradientDriver(GradientDriver):
                 self.gradient[:,i] += -1.0 * frac_K * np.einsum(
                     'mt,snp,xmnpt->sx', gs_dm, rel_dm_ao, d_eri)
 
-                self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx', xpy,
-                                             xpy - xpy.transpose(0,2,1), d_eri)
+                self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx', x_plus_y,
+                                             x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
                 self.gradient[:,i] += -0.5 * frac_K * np.einsum(
-                    'smn,spt,xtnmp->sx', xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                    'smn,spt,xtnmp->sx', x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
 
-                self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx', xmy,
-                                            xmy + xmy.transpose(0,2,1), d_eri)
+                self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx', x_minus_y,
+                                            x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
                 self.gradient[:,i] += -0.5 * frac_K * np.einsum(
-                    'smn,spt,xtnmp->sx', xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                    'smn,spt,xtnmp->sx', x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
 
         # TODO: use for-loop for now;
         # TODO: ask Xin if he cab enable multiple DMs for DFT.
@@ -306,32 +314,34 @@ class TddftGradientDriver(GradientDriver):
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
                     rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
 
-                    xmy_sym = 0.5 * (xmy[s] + xmy[s].T)
-                    xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
+                    x_minus_y_sym = 0.5 * (x_minus_y[s] + x_minus_y[s].T)
+                    x_minus_y_den_sym = AODensityMatrix([x_minus_y_sym], denmat.rest)
 
                 else:
                     gs_density = AODensityMatrix()
                     rhow_den_sym = AODensityMatrix()
-                    xmy_den_sym = AODensityMatrix()
+                    x_minus_y_den_sym = AODensityMatrix()
 
                 gs_density.broadcast(self.rank, self.comm)
                 rhow_den_sym.broadcast(self.rank, self.comm)
-                xmy_den_sym.broadcast(self.rank, self.comm)
+                x_minus_y_den_sym.broadcast(self.rank, self.comm)
 
                 tddft_xcgrad = self.grad_tddft_xc_contrib(molecule, basis,
-                                                    rhow_den_sym, xmy_den_sym,
+                                                    rhow_den_sym, x_minus_y_den_sym,
                                                     gs_density, xcfun_label)
 
                 if self.rank == mpi_master():
                     self.gradient[s] += tddft_xcgrad
 
 
+    # TODO: remove the parameters which are not used. 
     def compute_energy(self,
                        molecule,
                        basis,
                        rsp_drv,
                        rsp_results=None,
-                       min_basis=None):
+                       min_basis=None,
+                       state_deriv_index=0):
         """
         Computes the energy at the current position.
 
@@ -341,6 +351,12 @@ class TddftGradientDriver(GradientDriver):
             The basis set.
         :param rsp_drv:
             The linear response driver.
+        :param rsp_results:
+            The results of a linear response calculation.
+        :param min_basis:
+            The reduced basis set.
+        :param state_deriv_index:
+            The index of the excited state of interest.
         """
 
         self.scf_drv.compute(molecule, basis, min_basis)
@@ -350,7 +366,7 @@ class TddftGradientDriver(GradientDriver):
         rsp_results = rsp_drv.compute(molecule, basis, scf_tensors)
 
         if self.rank == mpi_master():
-            exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
+            exc_en = rsp_results['eigenvalues'][state_deriv_index]
         else:
             exc_en = None
         exc_en = self.comm.bcast(exc_en, root=mpi_master())
@@ -726,37 +742,37 @@ class TddftOrbitalResponse(CphfSolver):
 
             # Construct plus/minus combinations of excitation
             # and de-excitation part
-            xpy = exc_vec + deexc_vec
-            xmy = exc_vec - deexc_vec
+            x_plus_y = exc_vec + deexc_vec
+            x_minus_y = exc_vec - deexc_vec
 
             # Transform the vectors to the AO basis
-            xpy_ao = np.zeros((dof, nao, nao))
-            xmy_ao = np.zeros((dof, nao, nao))
+            x_plus_y_ao = np.zeros((dof, nao, nao))
+            x_minus_y_ao = np.zeros((dof, nao, nao))
             dm_oo = np.zeros((dof, nocc, nocc))
             dm_vv = np.zeros((dof, nvir, nvir))
             unrel_dm_ao = np.zeros((dof, nao, nao))
             for i in range(dof):
-                xpy_ao[i] = np.linalg.multi_dot([mo_occ, xpy[i], mo_vir.T])
-                xmy_ao[i] = np.linalg.multi_dot([mo_occ, xmy[i], mo_vir.T])
-                dm_oo[i] = -0.5 * ( np.linalg.multi_dot([xpy[i], xpy[i].T])
-                                   +np.linalg.multi_dot([xmy[i], xmy[i].T])
+                x_plus_y_ao[i] = np.linalg.multi_dot([mo_occ, x_plus_y[i], mo_vir.T])
+                x_minus_y_ao[i] = np.linalg.multi_dot([mo_occ, x_minus_y[i], mo_vir.T])
+                dm_oo[i] = -0.5 * ( np.linalg.multi_dot([x_plus_y[i], x_plus_y[i].T])
+                                   +np.linalg.multi_dot([x_minus_y[i], x_minus_y[i].T])
                                     )
-                dm_vv[i] = 0.5 * ( np.linalg.multi_dot([xpy[i].T, xpy[i]])
-                                  +np.linalg.multi_dot([xmy[i].T, xmy[i]])
+                dm_vv[i] = 0.5 * ( np.linalg.multi_dot([x_plus_y[i].T, x_plus_y[i]])
+                                  +np.linalg.multi_dot([x_minus_y[i].T, x_minus_y[i]])
                                     )
                 unrel_dm_ao[i] = ( np.linalg.multi_dot([mo_occ, dm_oo[i], mo_occ.T])
                                   +np.linalg.multi_dot([mo_vir, dm_vv[i], mo_vir.T])
                                     )
 
-            #xpy_ao = np.einsum('mi,sia,na->smn', mo_occ, xpy, mo_vir)
-            #xmy_ao = np.einsum('mi,sia,na->smn', mo_occ, xmy, mo_vir)
+            #x_plus_y_ao = np.einsum('mi,sia,na->smn', mo_occ, x_plus_y, mo_vir)
+            #x_minus_y_ao = np.einsum('mi,sia,na->smn', mo_occ, x_minus_y, mo_vir)
 
             # Calcuate the unrelaxed one-particle density matrix in MO basis
-            #dm_oo = -0.5 * (  np.einsum('sia,sja->sij', xpy, xpy)
-            #                + np.einsum('sia,sja->sij', xmy, xmy)
+            #dm_oo = -0.5 * (  np.einsum('sia,sja->sij', x_plus_y, x_plus_y)
+            #                + np.einsum('sia,sja->sij', x_minus_y, x_minus_y)
             #                )
-            #dm_vv = 0.5 * (  np.einsum('sia,sib->sab', xpy, xpy)
-            #               + np.einsum('sia,sib->sab', xmy, xmy)
+            #dm_vv = 0.5 * (  np.einsum('sia,sib->sab', x_plus_y, x_plus_y)
+            #               + np.einsum('sia,sib->sab', x_minus_y, x_minus_y)
             #                )
 
             # Transform unrelaxed one-particle density matrix to the AO basis
@@ -765,7 +781,7 @@ class TddftOrbitalResponse(CphfSolver):
             #                )
 
             # Make a list of unrel. DMs and excittion vectors:
-            dm_ao_list = list(unrel_dm_ao) + list(xpy_ao) + list(xmy_ao)
+            dm_ao_list = list(unrel_dm_ao) + list(x_plus_y_ao) + list(x_minus_y_ao)
   
             # 2) Construct the right-hand side
             dm_ao_rhs = AODensityMatrix(dm_ao_list, denmat.rest)
@@ -778,14 +794,14 @@ class TddftOrbitalResponse(CphfSolver):
                 zero_dm_ao_list = []
 
                 # for each vector, we need to create a list with these elements:
-                # xmy_ao[i], 0*xmy_ao[i], xmy_ao[i], 0*xmy_ao[i];
+                # x_minus_y_ao[i], 0*x_minus_y_ao[i], x_minus_y_ao[i], 0*x_minus_y_ao[i];
                 # and a list with 2 list of zeros for each 4 elements above.
 
                 for s in range(dof):
-                    perturbed_dm_ao_list.extend([xmy_ao[s], 0*xmy_ao[s],
-                                                 xmy_ao[s], 0*xmy_ao[s]])
+                    perturbed_dm_ao_list.extend([x_minus_y_ao[s], 0*x_minus_y_ao[s],
+                                                 x_minus_y_ao[s], 0*x_minus_y_ao[s]])
 
-                    zero_dm_ao_list.extend([0*xmy_ao[s], 0*xmy_ao[s]])
+                    zero_dm_ao_list.extend([0*x_minus_y_ao[s], 0*x_minus_y_ao[s]])
 
                 perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
                                                   denmat.rest)
@@ -875,11 +891,11 @@ class TddftOrbitalResponse(CphfSolver):
                 fock_ao_rhs_1pdm[ifock] = fock_ao_rhs.alpha_to_numpy(ifock)
 
             # Extract the excitation vector contributions
-            fock_ao_rhs_xpy = np.zeros((dof, nao, nao))
-            fock_ao_rhs_xmy = np.zeros((dof, nao, nao))
+            fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
+            fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
             for ifock in range(dof):
-                fock_ao_rhs_xpy[ifock] = fock_ao_rhs.alpha_to_numpy(dof+ifock)
-                fock_ao_rhs_xmy[ifock] = fock_ao_rhs.alpha_to_numpy(2*dof+ifock)
+                fock_ao_rhs_x_plus_y[ifock] = fock_ao_rhs.alpha_to_numpy(dof+ifock)
+                fock_ao_rhs_x_minus_y[ifock] = fock_ao_rhs.alpha_to_numpy(2*dof+ifock)
 
             # Transform to MO basis:
             rhs_mo = np.zeros((dof, nocc, nvir))
@@ -891,25 +907,25 @@ class TddftOrbitalResponse(CphfSolver):
                 #                      0.5 * fock_ao_rhs_1pdm, mo_vir)
 
                 sdp_pds = 0.25 * (
-                    np.linalg.multi_dot([ovlp, xpy_ao[i], fock_ao_rhs_xpy[i].T])
-                  + np.linalg.multi_dot([ovlp, xmy_ao[i], fock_ao_rhs_xmy[i].T])
-                  - np.linalg.multi_dot([fock_ao_rhs_xpy[i].T, xpy_ao[i], ovlp])
-                  - np.linalg.multi_dot([fock_ao_rhs_xmy[i].T, xmy_ao[i], ovlp])
-                  - np.linalg.multi_dot([ovlp, xpy_ao[i], fock_ao_rhs_xpy[i]])
-                  + np.linalg.multi_dot([ovlp, xmy_ao[i], fock_ao_rhs_xmy[i]])
-                  + np.linalg.multi_dot([fock_ao_rhs_xpy[i], xpy_ao[i], ovlp])
-                  - np.linalg.multi_dot([fock_ao_rhs_xmy[i], xmy_ao[i], ovlp])
+                    np.linalg.multi_dot([ovlp, x_plus_y_ao[i], fock_ao_rhs_x_plus_y[i].T])
+                  + np.linalg.multi_dot([ovlp, x_minus_y_ao[i], fock_ao_rhs_x_minus_y[i].T])
+                  - np.linalg.multi_dot([fock_ao_rhs_x_plus_y[i].T, x_plus_y_ao[i], ovlp])
+                  - np.linalg.multi_dot([fock_ao_rhs_x_minus_y[i].T, x_minus_y_ao[i], ovlp])
+                  - np.linalg.multi_dot([ovlp, x_plus_y_ao[i], fock_ao_rhs_x_plus_y[i]])
+                  + np.linalg.multi_dot([ovlp, x_minus_y_ao[i], fock_ao_rhs_x_minus_y[i]])
+                  + np.linalg.multi_dot([fock_ao_rhs_x_plus_y[i], x_plus_y_ao[i], ovlp])
+                  - np.linalg.multi_dot([fock_ao_rhs_x_minus_y[i], x_minus_y_ao[i], ovlp])
                                   )
             # TODO: factor out overlap matrix?
            #     sdp_pds = 0.25 * (
-           #     np.einsum('mn,snt,spt->smp', ovlp, xpy_ao, fock_ao_rhs_xpy)
-           #   + np.einsum('mn,snt,spt->smp', ovlp, xmy_ao, fock_ao_rhs_xmy)
-           #   - np.einsum('smn,smt,tp->snp', fock_ao_rhs_xpy, xpy_ao, ovlp)
-           #   - np.einsum('smn,smt,tp->snp', fock_ao_rhs_xmy, xmy_ao, ovlp)
-           #   - np.einsum('mn,snt,stp->smp', ovlp, xpy_ao, fock_ao_rhs_xpy)
-           #   + np.einsum('mn,snt,stp->smp', ovlp, xmy_ao, fock_ao_rhs_xmy)
-           #   + np.einsum('smn,snt,tp->smp', fock_ao_rhs_xpy, xpy_ao, ovlp)
-           #   - np.einsum('smn,snt,tp->smp', fock_ao_rhs_xmy, xmy_ao, ovlp)
+           #     np.einsum('mn,snt,spt->smp', ovlp, x_plus_y_ao, fock_ao_rhs_x_plus_y)
+           #   + np.einsum('mn,snt,spt->smp', ovlp, x_minus_y_ao, fock_ao_rhs_x_minus_y)
+           #   - np.einsum('smn,smt,tp->snp', fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
+           #   - np.einsum('smn,smt,tp->snp', fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
+           #   - np.einsum('mn,snt,stp->smp', ovlp, x_plus_y_ao, fock_ao_rhs_x_plus_y)
+           #   + np.einsum('mn,snt,stp->smp', ovlp, x_minus_y_ao, fock_ao_rhs_x_minus_y)
+           #   + np.einsum('smn,snt,tp->smp', fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
+           #   - np.einsum('smn,snt,tp->smp', fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
            #     )   
 
                 rhs_mo[i] = ( fmo_rhs_1pdm 
@@ -936,8 +952,8 @@ class TddftOrbitalResponse(CphfSolver):
                 'cphf_rhs': rhs_mo,
                 'density_occ_occ': dm_oo,
                 'density_vir_vir': dm_vv,
-                'x_plus_y_ao': xpy_ao,
-                'x_minus_y_ao': xmy_ao,
+                'x_plus_y_ao': x_plus_y_ao,
+                'x_minus_y_ao': x_minus_y_ao,
                 'unrelaxed_density_ao': unrel_dm_ao,
                 'fock_ao_rhs': fock_ao_rhs,
                 'fock_gxc_ao': fock_gxc_ao, # None if not DFT
@@ -985,9 +1001,9 @@ class TddftOrbitalResponse(CphfSolver):
             eo_diag = np.diag(eocc)
             ev_diag = np.diag(evir)
 
-            xpy_ao = self.cphf_results['x_plus_y_ao']
-            xmy_ao = self.cphf_results['x_minus_y_ao']
-            dof = xpy_ao.shape[0]
+            x_plus_y_ao = self.cphf_results['x_plus_y_ao']
+            x_minus_y_ao = self.cphf_results['x_minus_y_ao']
+            dof = x_plus_y_ao.shape[0]
 
             fock_ao_rhs = self.cphf_results['fock_ao_rhs']
 
@@ -1001,30 +1017,30 @@ class TddftOrbitalResponse(CphfSolver):
             # and its transpose (for omega_VV and OV).
             # This comes from the transformation of the 2PDM contribution
             # from MO to AO basis
-            fock_ao_rhs_xpy = np.zeros((dof, nao, nao))
-            fock_ao_rhs_xmy = np.zeros((dof, nao, nao))
+            fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
+            fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
             for ifock in range(dof):
-                fock_ao_rhs_xpy[ifock] = (
+                fock_ao_rhs_x_plus_y[ifock] = (
                         fock_ao_rhs.alpha_to_numpy(ifock+dof) )
-                fock_ao_rhs_xmy[ifock] = (
+                fock_ao_rhs_x_minus_y[ifock] = (
                         fock_ao_rhs.alpha_to_numpy(ifock+2*dof) )
 
             Fp1_vv = 0.5 * np.einsum('smn,smt,pt->snp',
-                                      fock_ao_rhs_xpy, xpy_ao, ovlp)
+                                      fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
             Fm1_vv = 0.5 * np.einsum('smn,smt,pt->snp',
-                                      fock_ao_rhs_xmy, xmy_ao, ovlp)
+                                      fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
             Fp2_vv = 0.5 * np.einsum('smn,snt,pt->smp',
-                                      fock_ao_rhs_xpy, xpy_ao, ovlp)
+                                      fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
             Fm2_vv = 0.5 * np.einsum('smn,snt,pt->smp',
-                                      fock_ao_rhs_xmy, xmy_ao, ovlp)
+                                      fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
             Fp1_oo = 0.5 * np.einsum('smn,stn,pt->smp',
-                                      fock_ao_rhs_xpy, xpy_ao, ovlp)
+                                      fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
             Fm1_oo = 0.5 * np.einsum('smn,stn,pt->smp',
-                                      fock_ao_rhs_xmy, xmy_ao, ovlp)
+                                      fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
             Fp2_oo = 0.5 * np.einsum('snm,stn,pt->smp',
-                                      fock_ao_rhs_xpy, xpy_ao, ovlp)
+                                      fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
             Fm2_oo = 0.5 * np.einsum('snm,stn,pt->smp',
-                                      fock_ao_rhs_xmy, xmy_ao, ovlp)
+                                      fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
 
             # Construct fock_lambda (the lambda multipliers/cphf coefficients
             # contracted with the two-electron integrals)

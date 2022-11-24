@@ -93,8 +93,8 @@ class TestVisualization:
             twoe_val_aa = np.array(twoe_val_aa).reshape(2, 3, 3)
             twoe_val_ab = np.array(twoe_val_ab).reshape(2, 3, 3)
 
-            assert np.max(np.abs(twoe_val_aa) < 1.0e-8)
-            assert np.max(np.abs(twoe_val_ab - den_val**2) < 1.0e-8)
+            assert np.max(np.abs(twoe_val_aa)) < 1.0e-8
+            assert np.max(np.abs(twoe_val_ab - den_val**2)) < 1.0e-8
 
         task.finish()
 

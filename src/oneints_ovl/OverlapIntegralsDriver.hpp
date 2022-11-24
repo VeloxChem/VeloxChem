@@ -67,7 +67,20 @@ class COverlapIntegralsDriver
      @param ketGtoContainer the GTOs container for ket side.
      @return the overlap matrix object.
      */
-    COverlapMatrix _compOverlapIntegrals(const CGtoContainer* braGtoContainer, const CGtoContainer* ketGtoContainer) const;
+    COverlapMatrix _compOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                                         const CGtoContainer* ketGtoContainer) const;
+    
+    /**
+     Comutes geometrical derivative of overlap integrals for pair of GTOs containers.
+
+     @param braGtoContainer the GTOs container for bra side.
+     @param ketGtoContainer the GTOs container for ket side.
+     @param axis the Cartesian axis to compute geometrical gradient. 
+     @return the overlap matrix object.
+     */
+    COverlapMatrix _compGeomOverlapIntegrals(const CGtoContainer* braGtoContainer,
+                                             const CGtoContainer* ketGtoContainer,
+                                             const char           axis) const;
 
     /**
      Computes overlap integrals for specific pair of GTOs blocks and stores
@@ -77,7 +90,23 @@ class COverlapIntegralsDriver
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
-    void _compOverlapForGtoBlocks(COneIntsDistribution* distPattern, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock) const;
+    void _compOverlapForGtoBlocks(      COneIntsDistribution* distPattern,
+                                  const CGtoBlock&            braGtoBlock,
+                                  const CGtoBlock&            ketGtoBlock) const;
+    
+    /**
+     Computes geometrical derivative of overlap integrals for specific pair of GTOs blocks and stores
+     integrals in given distribution buffer.
+
+     @param distPattern the pointer to integrals distribution pattern.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param axis the Cartesian axis to compute geometrical gradient.
+     */
+    void _compGeomOverlapForGtoBlocks(      COneIntsDistribution* distPattern,
+                                      const CGtoBlock&            braGtoBlock,
+                                      const CGtoBlock&            ketGtoBlock,
+                                      const char                  axis) const;
 
     /**
      Computes batch of primitive overlap integrals using Obara-Saika recursion
@@ -90,6 +119,7 @@ class COverlapIntegralsDriver
      @param primBuffer the primitive integrals buffer.
      @param recursionMap the recursion map for Obara-Saika recursion.
      @param osFactors the Obara-Saika recursion factors.
+     @param nFactors the number of Obara-Saika recursion factors.
      @param abDistances the vector of distances R(AB) = A - B.
      @param paDistances the vector of distances R(PA) = P - A.
      @param pbDistances the vector of distances R(PB) = P - B.
@@ -100,12 +130,40 @@ class COverlapIntegralsDriver
     void _compPrimOverlapInts(CMemBlock2D<double>&       primBuffer,
                               const CRecursionMap&       recursionMap,
                               const CMemBlock2D<double>& osFactors,
+                              const int32_t              nFactors,
                               const CMemBlock2D<double>& abDistances,
                               const CMemBlock2D<double>& paDistances,
                               const CMemBlock2D<double>& pbDistances,
                               const CGtoBlock&           braGtoBlock,
                               const CGtoBlock&           ketGtoBlock,
                               const int32_t              iContrGto) const;
+    
+    
+    /**
+     Computes batch of geometrical derivatives of primitive overlap integrals using Obara-Saika recursion
+     and stores results in primitives buffer.
+     Reference: S. Obara, A. Saika, J. Chem. Phys. 84, 3963 (1986).
+
+     Batch size: (one contracted GTO on bra side) x (all contracted GTOs on ket
+     side).
+
+     @param primBuffer the primitive integrals buffer.
+     @param recursionMap the recursion map for Obara-Saika recursion.
+     @param osFactors the Obara-Saika recursion factors.
+     @param nFactors the number of Obara-Saika recursion factors.
+     @param braGtoBlock the GTOs block on bra side.
+     @param ketGtoBlock the GTOs block on ket side.
+     @param iContrGto the index of contracted GTO on bra side.
+     @param axis the Cartesian axis to compute geometrical gradient.
+     */
+    void _compPrimGeomOverlapInts(CMemBlock2D<double>&       primBuffer,
+                                  const CRecursionMap&       recursionMap,
+                                  const CMemBlock2D<double>& osFactors,
+                                  const int32_t              nFactors,
+                                  const CGtoBlock&           braGtoBlock,
+                                  const CGtoBlock&           ketGtoBlock,
+                                  const int32_t              iContrGto,
+                                  const char                 axis) const;
 
     /**
      Sets recursion map object for overlap integrals of specified angular
@@ -115,7 +173,9 @@ class COverlapIntegralsDriver
      @param ketAngularMomentum the angular momentum of ket side.
      @return the recursion map for overlap integrals.
      */
-    CRecursionMap _setRecursionMap(const int32_t braAngularMomentum, const int32_t ketAngularMomentum, const int32_t maxNumberOfPrimitives) const;
+    CRecursionMap _setRecursionMap(const int32_t braAngularMomentum,
+                                   const int32_t ketAngularMomentum,
+                                   const int32_t maxNumberOfPrimitives) const;
 
    public:
     /**
@@ -138,7 +198,23 @@ class COverlapIntegralsDriver
      @param basis the molecular basis.
      @return the overlap matrix object.
      */
-    COverlapMatrix compute(const CMolecule& molecule, const CMolecularBasis& basis) const;
+    COverlapMatrix compute(const CMolecule&       molecule,
+                           const CMolecularBasis& basis) const;
+    
+    /**
+     Computes geometrical derivative  of overlap integrals for molecule in specific basis
+     set and stores results in overlap matrix object.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param iAtom the index of atom to compute geometrical gradient.
+     @param axis the Cartesian axis to compute geometrical gradient. 
+     @return the geometrical derivative of overlap matrix object.
+     */
+    COverlapMatrix compute(const CMolecule&       molecule,
+                           const CMolecularBasis& basis,
+                           const int32_t          iAtom,
+                           const char             axis) const;
 
     /**
      Computes overlap integrals for molecule in two basis sets and stores
@@ -149,7 +225,9 @@ class COverlapIntegralsDriver
      @param ketBasis the molecular basis for ket side of overlap matrix.
      @return the overlap matrix object.
      */
-    COverlapMatrix compute(const CMolecule& molecule, const CMolecularBasis& braBasis, const CMolecularBasis& ketBasis) const;
+    COverlapMatrix compute(const CMolecule&       molecule,
+                           const CMolecularBasis& braBasis,
+                           const CMolecularBasis& ketBasis) const;
 
     /**
      Computes overlap integrals for two molecules in basis set and stores
@@ -160,7 +238,9 @@ class COverlapIntegralsDriver
      @param basis the molecular basis.
      @return the overlap matrix object.
      */
-    COverlapMatrix compute(const CMolecule& braMolecule, const CMolecule& ketMolecule, const CMolecularBasis& basis) const;
+    COverlapMatrix compute(const CMolecule&       braMolecule,
+                           const CMolecule&       ketMolecule,
+                           const CMolecularBasis& basis) const;
 
     /**
      Computes overlap integrals for two molecules in different basis sets and
@@ -185,7 +265,9 @@ class COverlapIntegralsDriver
      @param braGtoBlock the GTOs block on bra side.
      @param ketGtoBlock the GTOs block on ket side.
      */
-    void compute(double* intsBatch, const CGtoBlock& braGtoBlock, const CGtoBlock& ketGtoBlock) const;
+    void compute(      double*    intsBatch,
+                 const CGtoBlock& braGtoBlock,
+                 const CGtoBlock& ketGtoBlock) const;
 };
 
 #endif /* OverlapIntegralsDriver_hpp */

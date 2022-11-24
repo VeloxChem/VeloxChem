@@ -70,8 +70,7 @@ class TestC6:
             diff_prop = np.max(np.abs(prop - ref_prop))
             assert diff_prop < 1.0e-4
 
-            points, weights = np.polynomial.legendre.leggauss(ref_n_points)
-            c6_value = c6_prop.integrate(freqs, points, weights, 0.3)
+            c6_value = c6_results['c6']
             assert abs(c6_value - ref_c6_value) < 1.0e-4
 
     @staticmethod
@@ -125,6 +124,8 @@ class TestC6:
                 assert key_found
 
     def test_c6_hf(self):
+
+        # vlxtag: RHF, C6, LR
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
@@ -198,6 +199,8 @@ class TestC6:
 
     def test_c6_dft(self):
 
+        # vlxtag: RKS, C6, LR
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
 
@@ -269,6 +272,8 @@ class TestC6:
         self.run_c6(inpfile, xcfun_label, data_lines, ref_c6_value)
 
     def test_c6_dft_slda(self):
+
+        # vlxtag: RKS, C6, LR
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')

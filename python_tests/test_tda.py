@@ -10,6 +10,7 @@ from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
 from .addons import using_cppe
 
+
 @pytest.mark.solvers
 class TestTDA:
 
@@ -50,6 +51,8 @@ class TestTDA:
 
     def test_tda_hf(self):
 
+        # vlxtag: RHF, Absorption, ECD, CIS
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
 
@@ -72,6 +75,8 @@ class TestTDA:
         self.run_tda(inpfile, potfile, xcfun_label, data_lines)
 
     def test_tda_dft(self):
+
+        # vlxtag: RKS, Absorption, ECD, TDA
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'water.inp')
@@ -120,6 +125,8 @@ class TestTDA:
     @using_cppe
     def test_tda_hf_pe(self):
 
+        # vlxtag: RHF, Absorption, ECD, CIS, PE
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')
         potfile = str(here / 'inputs' / 'pe_water.pot')
@@ -142,6 +149,8 @@ class TestTDA:
 
     @using_cppe
     def test_tda_dft_pe(self):
+
+        # vlxtag: RKS, Absorption, ECD, TDA, PE
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'pe_water.inp')

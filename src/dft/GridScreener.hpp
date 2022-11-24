@@ -112,6 +112,55 @@ void screenGtoMatrixForGGA(CDenseMatrix&               screenedGtoValues,
                            const std::vector<int32_t>& gridPointInds,
                            const int32_t               nScreenedGridPoints);
 
+/**
+ Screens GTO matrix for meta-GGA.
+
+ @param screenedGtoValues the matrix containing screened GTO values.
+ @param screenedGtoValuesX the matrix containing screened GTO X derivatives.
+ @param screenedGtoValuesY the matrix containing screened GTO Y derivatives.
+ @param screenedGtoValuesZ the matrix containing screened GTO Z derivatives.
+ @param screenedGtoValuesXX the matrix containing screened GTO XX derivatives.
+ @param screenedGtoValuesXY the matrix containing screened GTO XY derivatives.
+ @param screenedGtoValuesXZ the matrix containing screened GTO XZ derivatives.
+ @param screenedGtoValuesYY the matrix containing screened GTO YY derivatives.
+ @param screenedGtoValuesYZ the matrix containing screened GTO YZ derivatives.
+ @param screenedGtoValuesZZ the matrix containing screened GTO ZZ derivatives.
+ @param originalGtoValues the matrix containing original GTO values.
+ @param originalGtoValuesX the matrix containing original GTO X derivatives.
+ @param originalGtoValuesY the matrix containing original GTO Y derivatives.
+ @param originalGtoValuesZ the matrix containing original GTO Z derivatives.
+ @param originalGtoValuesXX the matrix containing original GTO XX derivatives.
+ @param originalGtoValuesXY the matrix containing original GTO XY derivatives.
+ @param originalGtoValuesXZ the matrix containing original GTO XZ derivatives.
+ @param originalGtoValuesYY the matrix containing original GTO YY derivatives.
+ @param originalGtoValuesYZ the matrix containing original GTO YZ derivatives.
+ @param originalGtoValuesZZ the matrix containing original GTO ZZ derivatives.
+ @param gridPointInds mapping between grid points before and after screening
+ @param nScreenedGridPoints the number of grid points after screening.
+ */
+void screenGtoMatrixForMetaGGA(CDenseMatrix&               screenedGtoValues,
+                               CDenseMatrix&               screenedGtoValuesX,
+                               CDenseMatrix&               screenedGtoValuesY,
+                               CDenseMatrix&               screenedGtoValuesZ,
+                               CDenseMatrix&               screenedGtoValuesXX,
+                               CDenseMatrix&               screenedGtoValuesXY,
+                               CDenseMatrix&               screenedGtoValuesXZ,
+                               CDenseMatrix&               screenedGtoValuesYY,
+                               CDenseMatrix&               screenedGtoValuesYZ,
+                               CDenseMatrix&               screenedGtoValuesZZ,
+                               const CDenseMatrix&         originalGtoValues,
+                               const CDenseMatrix&         originalGtoValuesX,
+                               const CDenseMatrix&         originalGtoValuesY,
+                               const CDenseMatrix&         originalGtoValuesZ,
+                               const CDenseMatrix&         originalGtoValuesXX,
+                               const CDenseMatrix&         originalGtoValuesXY,
+                               const CDenseMatrix&         originalGtoValuesXZ,
+                               const CDenseMatrix&         originalGtoValuesYY,
+                               const CDenseMatrix&         originalGtoValuesYZ,
+                               const CDenseMatrix&         originalGtoValuesZZ,
+                               const std::vector<int32_t>& gridPointInds,
+                               const int32_t               nScreenedGridPoints);
+
 }  // namespace gridscreen
 
 #endif /* GridScreener_hpp */

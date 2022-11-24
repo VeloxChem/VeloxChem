@@ -169,6 +169,8 @@ class TestExciton:
 
     def test_exciton_model_rhf(self):
 
+        # vlxtag: RHF, Exciton_Model
+
         ref_H = np.array([
             [
                 0.34427707, 0.00000000, 0.01212927, 0.00440677, 0.00045881,
@@ -235,6 +237,8 @@ class TestExciton:
         self.run_exciton_model({}, ref_H, 1.0e-6)
 
     def test_exciton_model_blyp(self):
+
+        # vlxtag: RKS, Exciton_Model
 
         ref_H = np.array([
             [

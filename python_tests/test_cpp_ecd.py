@@ -84,6 +84,8 @@ class TestCppEcd:
 
     def test_cpp_hf(self):
 
+        # vlxtag: RHF, ECD, CPP
+
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'glycol.inp')
 
@@ -101,6 +103,8 @@ class TestCppEcd:
         self.run_cpp(inpfile, potfile, xcfun_label, ref_spectrum)
 
     def test_cpp_dft_slda(self):
+
+        # vlxtag: RKS, ECD, CPP
 
         here = Path(__file__).parent
         inpfile = str(here / 'inputs' / 'glycol.inp')

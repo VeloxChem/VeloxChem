@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -250,5 +250,20 @@ def _MolecularBasis_get_avail_basis(element_label):
     return sorted(list(avail_basis))
 
 
+def _MolecularBasis_deepcopy(self, memo):
+    """
+    Implements deepcopy.
+
+    :param memo:
+        The memo dictionary for deepcopy.
+
+    :return:
+        A deepcopy of self.
+    """
+
+    return MolecularBasis(self)
+
+
 MolecularBasis.read = _MolecularBasis_read
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
+MolecularBasis.__deepcopy__ = _MolecularBasis_deepcopy

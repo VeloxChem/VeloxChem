@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -111,5 +111,20 @@ def _AODensityMatrix_read_hdf5(fname):
     return AODensityMatrix(dens, types[0])
 
 
+def _AODensityMatrix_deepcopy(self, memo):
+    """
+    Implements deepcopy.
+
+    :param memo:
+        The memo dictionary for deepcopy.
+
+    :return:
+        A deepcopy of self.
+    """
+
+    return AODensityMatrix(self)
+
+
 AODensityMatrix.write_hdf5 = _AODensityMatrix_write_hdf5
 AODensityMatrix.read_hdf5 = _AODensityMatrix_read_hdf5
+AODensityMatrix.__deepcopy__ = _AODensityMatrix_deepcopy

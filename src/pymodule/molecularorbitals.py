@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -384,8 +384,23 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set, scf_type):
     return (match_nuclear_charges and match_basis_set and match_restricted)
 
 
+def _MolecularOrbitals_deepcopy(self, memo):
+    """
+    Implements deepcopy.
+
+    :param memo:
+        The memo dictionary for deepcopy.
+
+    :return:
+        A deepcopy of self.
+    """
+
+    return MolecularOrbitals(self)
+
+
 MolecularOrbitals.print_orbitals = _MolecularOrbitals_print_orbitals
 MolecularOrbitals.get_density = _MolecularOrbitals_get_density
 MolecularOrbitals.write_hdf5 = _MolecularOrbitals_write_hdf5
 MolecularOrbitals.read_hdf5 = _MolecularOrbitals_read_hdf5
 MolecularOrbitals.match_hdf5 = _MolecularOrbitals_match_hdf5
+MolecularOrbitals.__deepcopy__ = _MolecularOrbitals_deepcopy

@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -374,6 +374,20 @@ def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
         return occa, occb
 
 
+def _Molecule_deepcopy(self, memo):
+    """
+    Implements deepcopy.
+
+    :param memo:
+        The memo dictionary for deepcopy.
+
+    :return:
+        A deepcopy of self.
+    """
+
+    return Molecule(self)
+
+
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_xyz_string = _Molecule_from_xyz_string
@@ -386,3 +400,4 @@ Molecule.write_xyz = _Molecule_write_xyz
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
 Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
+Molecule.__deepcopy__ = _Molecule_deepcopy

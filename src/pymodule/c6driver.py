@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -27,6 +27,7 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import time as tm
+import math
 import sys
 
 from .veloxchemlib import mpi_master
@@ -39,7 +40,7 @@ from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
 
-class C6Solver(LinearSolver):
+class C6Driver(LinearSolver):
     """
     Implements the C6 value response solver.
 
@@ -266,7 +267,7 @@ class C6Solver(LinearSolver):
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(nalpha == nbeta,
-                            'C6Solver: not implemented for unrestricted case')
+                            'C6Driver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             orb_ene = scf_tensors['E_alpha']
@@ -289,10 +290,8 @@ class C6Solver(LinearSolver):
         b_grad = self.get_complex_prop_grad(self.b_operator, self.b_components,
                                             molecule, basis, scf_tensors)
 
-        imagfreqs = [
-            self.w0 * (1 - t) / (1 + t)
-            for t in np.polynomial.legendre.leggauss(self.n_points)
-        ][0]
+        points, weights = np.polynomial.legendre.leggauss(self.n_points)
+        imagfreqs = [self.w0 * (1 - t) / (1 + t) for t in points]
         imagfreqs = np.append(imagfreqs, 0.0)
 
         v_grad = None
@@ -623,12 +622,58 @@ class C6Solver(LinearSolver):
                     self.ostream.print_info(checkpoint_text)
                     self.ostream.print_blank()
 
+                c6 = self._integrate_c6(self.w0, points, weights, imagfreqs,
+                                        rsp_funcs)
+
                 return {
+                    'c6': c6,
                     'response_functions': rsp_funcs,
-                    'solutions': full_solutions
+                    'solutions': full_solutions,
                 }
 
         return None
+
+    def _integrate_c6(self, w0, points, weights, imagfreqs, rsp_funcs):
+        """
+        Calculates the C6 value with a Gauss-Legendre quadrature for the
+        integral in the Casimir-Polder relation using integration by
+        substitution.
+
+        :param w0:
+            A constant conversion factor.
+        :param points:
+            The list of integration points.
+        :param weights:
+            The list of weights for integration points.
+        :param imagfreqs:
+            The list of imaginary frequencies.
+        :param rsp_funcs:
+            The response functions.
+
+        :return:
+            The C6 value.
+        """
+
+        integral = 0.0
+
+        # note: excluding the last element in imagfreqs (which is 0)
+        for ind, iw in enumerate(imagfreqs[:-1]):
+
+            Gxx = rsp_funcs[('x', 'x', iw)].real
+            Gyy = rsp_funcs[('y', 'y', iw)].real
+            Gzz = rsp_funcs[('z', 'z', iw)].real
+
+            alpha = -(Gxx + Gyy + Gzz) / 3.0
+            point = points[ind]
+            weight = weights[ind]
+            derivative = w0 * 2 / (1 + point)**2
+            integral += alpha * alpha * weight * derivative
+
+        # Casimir-Polder relation
+
+        c6 = 3 * integral / math.pi
+
+        return c6
 
     def _get_full_solution_vector(self, solution):
         """

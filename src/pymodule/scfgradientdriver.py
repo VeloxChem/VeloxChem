@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -23,10 +23,13 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import numpy as np
+from mpi4py import MPI
+from copy import deepcopy
 import time as tm
+import numpy as np
 
-from .veloxchemlib import mpi_master
+from .veloxchemlib import (XCFunctional, MolecularGrid, mpi_master)
+from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
 
 # For PySCF integral derivatives
@@ -195,3 +198,29 @@ class ScfGradientDriver(GradientDriver):
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         return self.scf_drv.get_scf_energy()
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_grad_drv = ScfGradientDriver(deepcopy(self.scf_drv), self.comm,
+                                         self.ostream)
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                pass
+            elif isinstance(val, XCFunctional):
+                new_grad_drv.key = XCFunctional(val)
+            elif isinstance(val, MolecularGrid):
+                new_grad_drv.key = MolecularGrid(val)
+            else:
+                new_grad_drv.key = deepcopy(val)
+
+        return new_grad_drv

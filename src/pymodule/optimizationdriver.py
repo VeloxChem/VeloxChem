@@ -1,9 +1,9 @@
 #
-#                           VELOXCHEM 1.0-RC2
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -212,12 +212,15 @@ class OptimizationDriver:
         filename = str(temp_path / f'{filename}_{self.rank}')
 
         if self.constraints:
-            constr_filename = Path(filename).with_suffix('.constr.txt')
-            with open(str(constr_filename), 'w') as fh:
+            constr_file = Path(filename + '.constr.txt')
+            with constr_file.open('w') as fh:
                 for line in self.constraints:
                     print(line, file=fh)
+            constr_filename = constr_file.as_posix()
         else:
             constr_filename = None
+
+        optinp_filename = Path(filename + '.optinp').as_posix()
 
         # redirect geomeTRIC stdout/stderr
 
@@ -233,7 +236,7 @@ class OptimizationDriver:
                     constraints=constr_filename,
                     transition=self.transition,
                     hessian=self.hessian,
-                    input=rf'{filename}.optinp')
+                    input=optinp_filename)
             except geometric.errors.HessianExit:
                 hessian_exit = True
 
@@ -259,9 +262,8 @@ class OptimizationDriver:
             ]
 
             if constr_filename is not None:
-                src_files.append(constr_filename)
-                dest_files.append(
-                    Path(self.filename).with_suffix('.constr.txt'))
+                src_files.append(Path(constr_filename))
+                dest_files.append(Path(self.filename + '.constr.txt'))
 
             for src_f, dest_f in zip(src_files, dest_files):
                 if src_f.is_file():
@@ -284,9 +286,7 @@ class OptimizationDriver:
             labels = molecule.get_labels()
 
             if self.rank == mpi_master():
-                final_mol = Molecule(labels,
-                                     coords.reshape(-1, 3),
-                                     units='au')
+                final_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
             else:
                 final_mol = Molecule()
             final_mol.broadcast(self.rank, self.comm)
@@ -573,7 +573,7 @@ class OptimizationDriver:
                 str(vdata_file)))
 
         text = []
-        with open(str(vdata_file)) as fh:
+        with vdata_file.open() as fh:
             for line in fh:
                 if line[:2] == '# ':
                     text.append(line[2:].strip())
