@@ -27,6 +27,7 @@ from mpi4py import MPI
 import numpy as np
 import time as tm
 import sys
+import h5py
 
 from .molecule import Molecule
 from .tdhfgradientdriver import TdhfGradientDriver
@@ -68,6 +69,7 @@ class TdhfHessianDriver(HessianDriver):
         self.tamm_dancoff = False
 
         self.checkpoint_file = f'{scf_drv._filename}.tdhessian.h5'
+        self.save_checkpoint = False
 
     def update_settings(self, method_dict, rsp_dict, freq_dict=None,
                         orbrsp_dict=None):
@@ -104,7 +106,11 @@ class TdhfHessianDriver(HessianDriver):
                 self.tamm_dancoff = False
 
         if self.tamm_dancoff:
-            self.flag = 'TDA Hessian Driver'    
+            self.flag = 'TDA Hessian Driver'
+
+        if 'save_checkpoint' in freq_dict:
+            key = freq_dict['save_checkpoint'].lower()
+            self.save_checkpoint = True if key in ['yes', 'y'] else False
 
         self.rsp_dict = dict(rsp_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
@@ -132,6 +138,10 @@ class TdhfHessianDriver(HessianDriver):
         #else:
         #    self.compute_analytical(molecule, ao_basis)
 
+
+        # save Hessian in a checkpoint file
+        if self.save_checkpoint:
+            self.write_checkpoint()
 
         # print Hessian
         if self.do_print_hessian is True:
@@ -170,8 +180,17 @@ class TdhfHessianDriver(HessianDriver):
             The minimal AO basis set.
         """
 
+        # save the ostream state and set to False
+        rsp_ostream_state = rsp_drv.ostream.state
+        rsp_drv.ostream.state = False
+
         # settings dictionary for gradient driver
         grad_dict = dict(self.freq_dict)
+        grad_dict['save_checkpoint'] = 'no'
+
+        # required to compute the relaxed dipole moment
+        grad_dict['do_first_order_prop'] = 'yes'
+
         if self.numerical_grad:
             grad_dict['numerical'] = 'yes'
             warn_msg = '*** Warning: Numerical Hessian will be calculated based on numerical gradient.'
@@ -307,6 +326,7 @@ class TdhfHessianDriver(HessianDriver):
         self.elec_energy = (self.scf_drv.get_scf_energy()
                            + rsp_results['eigenvalues'][self.state_deriv_index])
         self.scf_drv.ostream.state = scf_ostream_state
+        rsp_drv.ostream.state = rsp_ostream_state
 
 
     def write_checkpoint(self):

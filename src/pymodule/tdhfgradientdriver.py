@@ -1,5 +1,6 @@
 import numpy as np
 import time as tm
+import h5py
 
 from .veloxchemlib import denmat
 from .veloxchemlib import mpi_master
@@ -72,6 +73,8 @@ class TdhfGradientDriver(GradientDriver):
 
         self.checkpoint_file = f'{scf_drv._filename}.tdgradient.h5'
 
+        self.save_checkpoint = False
+
     def update_settings(self,
                         grad_dict,
                         rsp_dict,
@@ -105,6 +108,10 @@ class TdhfGradientDriver(GradientDriver):
 
         if self.tamm_dancoff:
             self.flag = 'TDA Gradient Driver'
+
+        if 'save_checkpoint' in grad_dict:
+            key = grad_dict['save_checkpoint'].lower()
+            self.save_checkpoint = True if key in ['yes', 'y'] else False
 
         if 'do_first_order_prop' in grad_dict:
             key = grad_dict['do_first_order_prop'].lower()
@@ -155,6 +162,12 @@ class TdhfGradientDriver(GradientDriver):
             self.scf_drv.ostream.state = scf_ostream_state
         else:
             self.compute_analytical(molecule, basis, rsp_results)
+
+
+        # save gradient to checkpoint file
+
+        if self.save_checkpoint:
+            self.write_checkpoint()
 
         # print gradient
 
