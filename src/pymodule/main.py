@@ -522,7 +522,7 @@ def main():
                                                   task.mpi_comm, task.ostream)
                 tdhfgrad_drv.update_settings(opt_dict, rsp_dict,
                                              orbrsp_dict, method_dict)
-                opt_drv = vlx.OptimizationDriver(tdhfgrad_drv)
+                opt_drv = OptimizationDriver(tdhfgrad_drv)
                 opt_drv.compute(task.molecule, task.ao_basis,
                                 rsp_prop._rsp_driver.solver, rsp_prop._rsp_property)
 
