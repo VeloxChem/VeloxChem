@@ -67,7 +67,10 @@ class TdhfHessianDriver(HessianDriver):
         self.state_deriv_index = 0 # calculate 1st excited state by default
         self.tamm_dancoff = False
 
-    def update_settings(self, method_dict, rsp_dict, freq_dict=None, orbrsp_dict=None):
+        self.checkpoint_file = f'{scf_drv._filename}.tdhessian.h5'
+
+    def update_settings(self, method_dict, rsp_dict, freq_dict=None,
+                        orbrsp_dict=None):
         """
         Updates settings in ScfHessianDriver.
 
@@ -305,3 +308,22 @@ class TdhfHessianDriver(HessianDriver):
                            + rsp_results['eigenvalues'][self.state_deriv_index])
         self.scf_drv.ostream.state = scf_ostream_state
 
+
+    def write_checkpoint(self):
+        """
+        Writes the TDDFT/TDHF Hessian to a checkpoint file.
+
+        """
+
+        if self.rank == mpi_master():
+            if self.checkpoint_file is None:
+                self.checkpoint_file = f'{self.scf_drv._filename}.tdhessian.h5'
+
+            h5f = h5py.File(self.checkpoint_file, 'a')
+
+            label = "hessian_state_%d" % (self.state_deriv_index + 1)
+            h5f.create_dataset(label,
+                               data=self.gradient,
+                               compression='gzip')
+
+            h5f.close()

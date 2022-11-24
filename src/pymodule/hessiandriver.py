@@ -140,6 +140,8 @@ class HessianDriver:
         # DFT
         self._dft = False
 
+        self.checkpoint_file = None
+
 
     def update_settings(self, method_dict, freq_dict=None):
         """

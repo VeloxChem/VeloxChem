@@ -93,6 +93,8 @@ class GradientDriver:
         self.grid_level = 4
         self.xcfun = None
 
+        self.checkpoint_file = None
+
     def update_settings(self, grad_dict, method_dict):
         """
         Updates settings in GradientDriver.

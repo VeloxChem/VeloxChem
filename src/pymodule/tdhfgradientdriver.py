@@ -70,6 +70,8 @@ class TdhfGradientDriver(GradientDriver):
         # for numerical gradient
         self.delta_h = 0.001
 
+        self.checkpoint_file = f'{scf_drv._filename}.tdgradient.h5'
+
     def update_settings(self,
                         grad_dict,
                         rsp_dict,
@@ -347,7 +349,10 @@ class TdhfGradientDriver(GradientDriver):
         scf_tensors = self.scf_drv.scf_tensors
 
         rsp_drv._is_converged = False  # needed by RPA
+        ostream_state = rsp_drv.ostream.state
+        rsp_drv.ostream.state = False
         rsp_results = rsp_drv.compute(molecule, basis, scf_tensors)
+        rsp_drv.ostream.state = ostream_state
 
         if self.rank == mpi_master():
             exc_en = rsp_results['eigenvalues'][self.state_deriv_index]
@@ -523,3 +528,23 @@ class TdhfGradientDriver(GradientDriver):
                                     12.0 * self.delta_h))
 
         self.scf_drv.ostream.state = scf_ostream_state
+
+
+    def write_checkpoint(self):
+        """
+        Writes the TDDFT/TDHF gradient to a checkpoint file
+
+        """
+
+        if self.rank == mpi_master():
+            if self.checkpoint_file is None:
+                self.checkpoint_file = f'{self.scf_drv._filename}.tdgradient.h5'
+
+            h5f = h5py.File(self.checkpoint_file, 'a')
+
+            label = "gradient_state_%d" % (self.state_deriv_index + 1)
+            h5f.create_dataset(label,
+                               data=self.gradient,
+                               compression='gzip')
+
+            h5f.close()

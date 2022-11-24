@@ -485,7 +485,7 @@ def main():
                 orbrsp_drv = TddftOrbitalResponse(task.mpi_comm, task.ostream)
                 orbrsp_drv.update_settings(orbrsp_dict, rsp_dict, method_dict)
                 orbrsp_drv.compute(task.molecule, task.ao_basis,
-                                   scf_drv.scf_tensors, rsp_prop.rsp_property)
+                                   scf_drv.scf_tensors, rsp_prop._rsp_property)
 
             else:
                 orbrsp_dict = {}
@@ -498,7 +498,7 @@ def main():
                 tdhfgrad_drv.update_settings(grad_dict, rsp_dict,
                                              orbrsp_dict, method_dict)
                 tdhfgrad_drv.compute(task.molecule, task.ao_basis,
-                                     rsp_prop.rsp_driver.solver, rsp_prop.rsp_property)
+                                     rsp_prop._rsp_driver.solver, rsp_prop._rsp_property)
                                      # solver is the actual RPA/TDA driver
                                      # with rsp_prop.rsp_driver it works for TDA, but not RPA
 
@@ -511,9 +511,21 @@ def main():
                 tdhfhessian_drv.update_settings(method_dict, rsp_dict,
                                                 freq_dict, orbrsp_dict)
                 tdhfhessian_drv.compute(task.molecule, task.ao_basis,
-                                        rsp_prop.rsp_driver)
+                                        rsp_prop._rsp_driver)
                 tdhfhessian_drv.vibrational_analysis(task.molecule,
                                                      task.ao_basis)
+
+            # Excited state optimization
+            if 'optimize_excited_state' in task.input_dict:
+                opt_dict = task.input_dict['optimize_excited_state']
+                tdhfgrad_drv = TdhfGradientDriver(scf_drv,
+                                                  task.mpi_comm, task.ostream)
+                tdhfgrad_drv.update_settings(opt_dict, rsp_dict,
+                                             orbrsp_dict, method_dict)
+                opt_drv = vlx.OptimizationDriver(tdhfgrad_drv)
+                opt_drv.compute(task.molecule, task.ao_basis,
+                                rsp_prop._rsp_driver.solver, rsp_prop._rsp_property)
+
         else:
             task.ostream.print_blank()
             info_msg = 'The excited state derivatives '
