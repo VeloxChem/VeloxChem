@@ -29,6 +29,7 @@ class TestMOM:
 
         scf_ch.maximum_overlap(
             molecule,
+            basis,
             scf_gs.mol_orbs,
             [0, 1, 2, 3, 4],
             [1, 2, 3, 4],
@@ -61,6 +62,7 @@ class TestMOM:
 
         scf_ch.maximum_overlap(
             molecule,
+            basis,
             scf_gs.mol_orbs,
             [0, 1, 2, 3, 4],
             [1, 2, 3, 4],
