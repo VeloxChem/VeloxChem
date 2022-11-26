@@ -29,7 +29,6 @@ from io import StringIO
 import numpy as np
 import time as tm
 import tempfile
-from platform import system
 
 from .veloxchemlib import CommonNeighbors
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstroms
@@ -196,7 +195,10 @@ class OptimizationDriver:
 
         # run within temp_dir since geomeTRIC will generate intermediate files
 
-        temp_dir = tempfile.TemporaryDirectory()
+        try:
+            temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        except TypeError:
+            temp_dir = tempfile.TemporaryDirectory()
         temp_path = Path(temp_dir.name)
 
         if self.rank == mpi_master():
@@ -322,10 +324,7 @@ class OptimizationDriver:
         try:
             temp_dir.cleanup()
         except (NotADirectoryError, PermissionError):
-            if system() == "Windows":
-                pass
-            else:
-                raise
+            pass
 
         return final_mol
 
