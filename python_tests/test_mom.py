@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -38,6 +41,14 @@ class TestMOM:
 
         assert abs(scf_ch.get_scf_energy() + 56.070929384622) < 1.0e-6
 
+        if is_mpi_master():
+            scf_h5 = Path(scf_ch.checkpoint_file)
+            if scf_h5.is_file():
+                scf_h5.unlink()
+            scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
+            if scf_final_h5.is_file():
+                scf_final_h5.unlink()
+
     def test_MOM_UDFT(self):
 
         water_xyz = """
@@ -70,3 +81,11 @@ class TestMOM:
         scf_ch.compute(molecule, basis)
 
         assert abs(scf_ch.get_scf_energy() + 56.4455719055) < 1.0e-6
+
+        if is_mpi_master():
+            scf_h5 = Path(scf_ch.checkpoint_file)
+            if scf_h5.is_file():
+                scf_h5.unlink()
+            scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
+            if scf_final_h5.is_file():
+                scf_final_h5.unlink()
