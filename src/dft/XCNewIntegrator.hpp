@@ -26,7 +26,6 @@
 #ifndef XCNewIntegrator_hpp
 #define XCNewIntegrator_hpp
 
-#include <list>
 #include <array>
 #include <string>
 
@@ -38,14 +37,14 @@
 #include "GridBox.hpp"
 #include "GtoContainer.hpp"
 #include "MemBlock2D.hpp"
-#include "MolecularGrid.hpp"
 #include "MolecularBasis.hpp"
+#include "MolecularGrid.hpp"
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
+#include "XCCubicHessianGrid.hpp"
 #include "XCFunctional.hpp"
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
-#include "XCCubicHessianGrid.hpp"
 
 /**
  Class CXCNewIntegrator implements XC integrator.
@@ -252,12 +251,12 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForLDA(const int32_t          npoints,
-                                                const double*          weights,
-                                                const CDenseMatrix&    gtoValues,
-                                                const CXCHessianGrid&  xcHessianGrid,
-                                                const CDensityGrid&    rwDensityGrid,
-                                                CMultiTimer&           timer) const;
+    CDenseMatrix _integratePartialFxcFockForLDA(const int32_t         npoints,
+                                                const double*         weights,
+                                                const CDenseMatrix&   gtoValues,
+                                                const CXCHessianGrid& xcHessianGrid,
+                                                const CDensityGrid&   rwDensityGrid,
+                                                CMultiTimer&          timer) const;
 
     /**
      Integrates GGA contribution to (second-order) Fxc matrix.
@@ -427,9 +426,7 @@ class CXCNewIntegrator
      @param molecularGrid the molecular grid.
      @return the GTO values on grid points.
      */
-    CDenseMatrix computeGtoValuesOnGridPoints(const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              CMolecularGrid&         molecularGrid) const;
+    CDenseMatrix computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, CMolecularGrid& molecularGrid) const;
 
     /**
      Computes GTOs values and derivatives on grid points.
@@ -452,11 +449,7 @@ class CXCNewIntegrator
      @param exc the pointer to functional values.
      @param vrho the pointer to functional derivative w.r.t. densities.
      */
-    void computeExcVxcForLDA(const std::string& xcFuncLabel,
-                             const int32_t      npoints,
-                             const double*      rho,
-                             double*            exc,
-                             double*            vrho) const;
+    void computeExcVxcForLDA(const std::string& xcFuncLabel, const int32_t npoints, const double* rho, double* exc, double* vrho) const;
 
     /**
      Computes fucntional derivatives for GGA.
@@ -487,10 +480,7 @@ class CXCNewIntegrator
      @param v2rho2 the pointer to 2nd-order functional derivative w.r.t.
             densities.
      */
-    void computeFxcForLDA(const std::string& xcFuncLabel,
-                          const int32_t      npoints,
-                          const double*      rho,
-                          double*            v2rho2) const;
+    void computeFxcForLDA(const std::string& xcFuncLabel, const int32_t npoints, const double* rho, double* v2rho2) const;
 
     /**
      Computes 2nd-order fucntional derivatives for GGA.
