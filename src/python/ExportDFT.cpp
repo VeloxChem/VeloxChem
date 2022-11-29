@@ -139,8 +139,53 @@ export_dft(py::module& m)
 
     // Functional class
     PyClass<Functional>(m, "Functional")
-        .def(py::init<const std::vector<std::string>&, const std::vector<double> & coeffs>())
-        .def(py::self == py::self);
+        .def(py::init<const std::vector<std::string>&, const std::vector<double>&>(), "labels"_a, "coeffs"_a)
+        .def(py::init([](const std::string& label, double coeff = 1.0) { return std::make_shared<Functional>(std::vector{label}, std::vector{coeff}); }),
+             "label"_a,
+             "coeff"_a = 1.0)
+        .def(
+            "compute_exc_vxc",
+            [](const Functional& self, const py::array_t<double>& rho) -> py::list {
+                auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc: Expecting C-style contiguous numpy array"));
+                auto rho_size = static_cast<int32_t>(rho.size());
+                auto npoints  = rho_size / 2;
+                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
+                CDenseMatrix exc(npoints, 1);
+                CDenseMatrix vrho(npoints, 2);
+                self.compute_exc_vxc(npoints, rho.data(), exc.values(), vrho.values());
+                py::list ret;
+                ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
+                ret.append(vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfElements()));
+                return ret;
+            },
+            "Computes Exc and Vxc for LDA.",
+            "rho"_a)
+        .def(
+            "compute_exc_vxc",
+            [](const Functional& self, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
+                auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style && sigma_c_style,
+                                          std::string("compute_exc_vxc_for_gga: Expecting C-style contiguous numpy array"));
+                auto rho_size   = static_cast<int32_t>(rho.size());
+                auto sigma_size = static_cast<int32_t>(sigma.size());
+                auto npoints    = rho_size / 2;
+                errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
+                                          std::string("compute_exc_vxc_for_gga: Inconsistent array size"));
+                CDenseMatrix exc(npoints, 1);
+                CDenseMatrix vrho(npoints, 2);
+                CDenseMatrix vsigma(npoints, 3);
+                self.compute_exc_vxc(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
+                py::list ret;
+                ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
+                ret.append(vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfElements()));
+                ret.append(vlx_general::pointer_to_numpy(vsigma.values(), vsigma.getNumberOfElements()));
+                return ret;
+            },
+            "Computes Exc and Vxc for GGA.",
+            "rho"_a,
+            "sigma"_a);
 
     // CMolecularGrid class
 
