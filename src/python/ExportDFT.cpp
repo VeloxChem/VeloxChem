@@ -137,6 +137,11 @@ export_dft(py::module& m)
         .def("is_undefined", &CXCFunctional::isUndefined, "Determines if exchange-correlation function is undefined.")
         .def(py::self == py::self);
 
+    // Functional class
+    PyClass<Functional>(m, "Functional")
+        .def(py::init<const std::vector<std::string>&, const std::vector<double> & coeffs>())
+        .def(py::self == py::self);
+
     // CMolecularGrid class
 
     PyClass<CMolecularGrid>(m, "MolecularGrid")

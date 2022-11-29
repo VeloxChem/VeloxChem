@@ -386,7 +386,9 @@ Functional::Functional(const std::vector<std::string>& labels, const std::vector
         }
 
         // hybrid?
-        // FIXME I believe these checks are only relevant if we allow usage of any of the "prebaked" mixes in LibXC
+        // FIXME possibly can be removed: I believe these checks are only
+        // relevant if we allow usage of any of the "prebaked" mixes in LibXC
+        // hybrid-ness should be established from passed coefficients for global/range-separation
         if (is_in_family(std::array{XC_FAMILY_HYB_LDA, XC_FAMILY_HYB_GGA, XC_FAMILY_HYB_MGGA}, family))
         {
             // range separation using the error function or the Yukawa function
@@ -490,14 +492,12 @@ Functional::repr() const -> std::string
 auto
 Functional::compute_exc(int32_t np, const double* rho, double* exc) const -> void
 {
-    errors::assertMsgCritical(_hasExc,
-                              std::string(__func__) +
-                                  ": exchange-correlation functional does not provide an evaluator for Exc on grid");
+    errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
 
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc  = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+    auto stage_exc = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
 
     for (const auto& [coeff, func] : _components)
     {
@@ -521,9 +521,7 @@ Functional::compute_exc(int32_t np, const double* rho, double* exc) const -> voi
 auto
 Functional::compute_vxc(int32_t np, const double* rho, double* vrho) const -> void
 {
-    errors::assertMsgCritical(_hasVxc,
-                              std::string(__func__) +
-                                  ": exchange-correlation functional does not provide evaluators for Vxc on grid");
+    errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
 
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
@@ -554,8 +552,7 @@ auto
 Functional::compute_exc_vxc(int32_t np, const double* rho, double* exc, double* vrho) const -> void
 {
     errors::assertMsgCritical(_hasExc && _hasVxc,
-                              std::string(__func__) +
-                                  ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
 
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
@@ -583,6 +580,255 @@ Functional::compute_exc_vxc(int32_t np, const double* rho, double* exc, double* 
     {
         mem::free(stage_exc);
         mem::free(stage_vrho);
+    }
+}
+
+auto
+Functional::compute_exc(int32_t np, const double* rho, const double* sigma, double* exc) const -> void
+{
+    errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    auto stage_exc = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+
+    for (const auto& [coeff, func] : _components)
+    {
+        xc_gga_exc(&func, np, rho, sigma, stage_exc);
+
+        const auto c = coeff;
+
+#pragma omp simd aligned(exc, stage_exc : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            exc[g] += c * stage_exc[g];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_exc);
+    }
+}
+
+auto
+Functional::compute_vxc(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
+{
+    errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+
+    for (const auto& [coeff, func] : _components)
+    {
+        xc_gga_vxc(&func, np, rho, sigma, stage_vrho, stage_vsigma);
+
+        const auto c = coeff;
+
+#pragma omp simd aligned(vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+
+            vsigma[2 * g + 0] += c * stage_vsigma[2 * g + 0];
+            vsigma[2 * g + 1] += c * stage_vsigma[2 * g + 1];
+            vsigma[2 * g + 2] += c * stage_vsigma[2 * g + 2];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_vrho);
+        mem::free(stage_vsigma);
+    }
+}
+
+auto
+Functional::compute_exc_vxc(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void
+{
+    errors::assertMsgCritical(_hasExc && _hasVxc,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    auto stage_exc    = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+
+    for (const auto& [coeff, func] : _components)
+    {
+        xc_gga_exc_vxc(&func, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
+
+        const auto c = coeff;
+
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            exc[g] += c * stage_exc[g];
+
+            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+
+            vsigma[2 * g + 0] += c * stage_vsigma[2 * g + 0];
+            vsigma[2 * g + 1] += c * stage_vsigma[2 * g + 1];
+            vsigma[2 * g + 2] += c * stage_vsigma[2 * g + 2];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_exc);
+        mem::free(stage_vrho);
+        mem::free(stage_vsigma);
+    }
+}
+
+auto
+Functional::compute_exc(int32_t np, const double* rho, const double* sigma, const double* lapl, const double* tau, double* exc) const -> void
+{
+    errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    auto stage_exc = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+
+    for (const auto& [coeff, func] : _components)
+    {
+        xc_mgga_exc(&func, np, rho, sigma, lapl, tau, stage_exc);
+
+        const auto c = coeff;
+
+#pragma omp simd aligned(exc, stage_exc : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            exc[g] += c * stage_exc[g];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_exc);
+    }
+}
+
+auto
+Functional::compute_vxc(int32_t       np,
+                        const double* rho,
+                        const double* sigma,
+                        const double* lapl,
+                        const double* tau,
+                        double*       vrho,
+                        double*       vsigma,
+                        double*       vlapl,
+                        double*       vtau) const -> void
+{
+    errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto stage_vlapl  = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[6 * _ldStaging];
+    auto stage_vtau   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[8 * _ldStaging];
+
+    for (const auto& [coeff, func] : _components)
+    {
+        xc_mgga_vxc(&func, np, rho, sigma, lapl, tau, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
+
+        const auto c = coeff;
+
+#pragma omp simd aligned(vrho, stage_vrho, vsigma, stage_vsigma, vlapl, stage_vlapl, vtau, stage_vtau : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+
+            vsigma[2 * g + 0] += c * stage_vsigma[2 * g + 0];
+            vsigma[2 * g + 1] += c * stage_vsigma[2 * g + 1];
+            vsigma[2 * g + 2] += c * stage_vsigma[2 * g + 2];
+
+            vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
+            vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
+
+            vtau[2 * g + 0] += c * stage_vtau[2 * g + 0];
+            vtau[2 * g + 1] += c * stage_vtau[2 * g + 1];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_vrho);
+        mem::free(stage_vsigma);
+        mem::free(stage_vlapl);
+        mem::free(stage_vtau);
+    }
+}
+
+auto
+Functional::compute_exc_vxc(int32_t       np,
+                            const double* rho,
+                            const double* sigma,
+                            const double* lapl,
+                            const double* tau,
+                            double*       exc,
+                            double*       vrho,
+                            double*       vsigma,
+                            double*       vlapl,
+                            double*       vtau) const -> void
+{
+    errors::assertMsgCritical(_hasExc && _hasVxc,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    auto stage_exc    = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto stage_vlapl  = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[6 * _ldStaging];
+    auto stage_vtau   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[8 * _ldStaging];
+
+    for (const auto& [coeff, func] : _components)
+    {
+        xc_mgga_exc_vxc(&func, np, rho, sigma, lapl, tau, stage_exc, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
+
+        const auto c = coeff;
+
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma, vlapl, stage_vlapl, vtau, stage_vtau : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            exc[g] += c * stage_exc[g];
+
+            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+
+            vsigma[2 * g + 0] += c * stage_vsigma[2 * g + 0];
+            vsigma[2 * g + 1] += c * stage_vsigma[2 * g + 1];
+            vsigma[2 * g + 2] += c * stage_vsigma[2 * g + 2];
+
+            vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
+            vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
+
+            vtau[2 * g + 0] += c * stage_vtau[2 * g + 0];
+            vtau[2 * g + 1] += c * stage_vtau[2 * g + 1];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_exc);
+        mem::free(stage_vrho);
+        mem::free(stage_vsigma);
+        mem::free(stage_vlapl);
+        mem::free(stage_vtau);
     }
 }
 
