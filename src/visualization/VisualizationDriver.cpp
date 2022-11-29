@@ -41,7 +41,13 @@
 #include "SphericalMomentum.hpp"
 #include "StringFormat.hpp"
 
-CVisualizationDriver::CVisualizationDriver(MPI_Comm comm) : _locRank{mpi::rank(comm)}, _locNodes{mpi::nodes(comm)}, _locComm{comm}
+CVisualizationDriver::CVisualizationDriver(MPI_Comm comm)
+
+    : _locRank(mpi::rank(comm))
+
+    , _locNodes(mpi::nodes(comm))
+
+    , _locComm(comm)
 {
 }
 
@@ -180,320 +186,6 @@ CVisualizationDriver::_compPhiAtomicOrbitals(const CMolecule&       molecule,
     return phi;
 }
 
-void
-CVisualizationDriver::_compute(CCubicGrid&               grid,
-                               const CMolecule&          molecule,
-                               const CMolecularBasis&    basis,
-                               const CMolecularOrbitals& mo,
-                               const int32_t             moidx,
-                               const std::string&        mospin) const
-{
-    // grid information
-    // the ideal way of getting this info is with C++17 structured bindings
-    // this doesn't compile with Clang, unfortunately!
-    // auto [x0, y0, z0] = grid.getOrigin();
-    // auto [dx, dy, dz] = grid.getStepSize();
-    // auto [nx, ny, nz] = grid.getNumPoints();
-
-    auto origin = grid.getOrigin();
-    auto x0     = origin[0];
-    auto y0     = origin[1];
-    auto z0     = origin[2];
-
-    auto stepSize = grid.getStepSize();
-    auto dx       = stepSize[0];
-    auto dy       = stepSize[1];
-    auto dz       = stepSize[2];
-
-    auto numPoints = grid.getNumPoints();
-    auto nx        = numPoints[0];
-    auto ny        = numPoints[1];
-    auto nz        = numPoints[2];
-
-    // sanity check
-
-    std::string erridx("VisualizationDriver.compute: Invalid index of MO");
-
-    std::string errspin("VisualizationDriver.compute: Invalid spin of MO");
-
-    std::string errnao("VisualizationDriver.compute: Inconsistent number of AOs");
-
-    auto morows = mo.getNumberOfRows();
-
-    auto mocols = mo.getNumberOfColumns();
-
-    errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
-
-    bool alphaspin = (fstr::upcase(mospin) == std::string("ALPHA"));
-
-    bool betaspin = (fstr::upcase(mospin) == std::string("BETA"));
-
-    errors::assertMsgCritical(alphaspin || betaspin, errspin);
-
-    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
-
-    auto nao = static_cast<int32_t>(phi0.size());
-
-    errors::assertMsgCritical(morows == nao, errnao);
-
-    // target MO
-
-    auto mocoefs = alphaspin ? mo.alphaOrbitals() : mo.betaOrbitals();
-
-    // calculate psi on grid points
-
-#pragma omp parallel for schedule(dynamic)
-    for (int32_t ix = 0; ix < nx; ix++)
-    {
-        double xp = x0 + dx * ix;
-
-        int32_t xstride = ix * ny * nz;
-
-        for (int32_t iy = 0; iy < ny; iy++)
-        {
-            double yp = y0 + dy * iy;
-
-            int32_t ystride = iy * nz;
-
-            for (int32_t iz = 0; iz < nz; iz++)
-            {
-                double zp = z0 + dz * iz;
-
-                int32_t zstride = iz;
-
-                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
-
-                double psi = 0.0;
-
-                for (int32_t aoidx = 0; aoidx < nao; aoidx++)
-                {
-                    double mocoef = mocoefs[aoidx * mocols + moidx];
-
-                    psi += mocoef * phi[aoidx];
-                }
-
-                int32_t index = xstride + ystride + zstride;
-
-                grid.values()[index] = psi;
-            }
-        }
-    }
-}
-
-void
-CVisualizationDriver::_compute(CCubicGrid&             grid,
-                               const CMolecule&        molecule,
-                               const CMolecularBasis&  basis,
-                               const CAODensityMatrix& density,
-                               const int32_t           denidx,
-                               const std::string&      denspin) const
-{
-    // grid information
-
-    // the ideal way of getting this info is with C++17 structured bindings
-    // this doesn't compile with Clang, unfortunately!
-    // auto [x0, y0, z0] = grid.getOrigin();
-    // auto [dx, dy, dz] = grid.getStepSize();
-    // auto [nx, ny, nz] = grid.getNumPoints();
-    auto origin = grid.getOrigin();
-    auto x0     = origin[0];
-    auto y0     = origin[1];
-    auto z0     = origin[2];
-
-    auto stepSize = grid.getStepSize();
-    auto dx       = stepSize[0];
-    auto dy       = stepSize[1];
-    auto dz       = stepSize[2];
-
-    auto numPoints = grid.getNumPoints();
-    auto nx        = numPoints[0];
-    auto ny        = numPoints[1];
-    auto nz        = numPoints[2];
-
-    // sanity check
-
-    std::string erridx("VisualizationDriver.compute: Invalid index of density matrix");
-
-    std::string errspin("VisualizationDriver.compute: Invalid spin of density matrix");
-
-    std::string errnao("VisualizationDriver.compute: Inconsistent number of AOs");
-
-    auto numdens = density.getNumberOfDensityMatrices();
-
-    errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
-
-    bool alphaspin = (fstr::upcase(denspin) == std::string("ALPHA"));
-
-    bool betaspin = (fstr::upcase(denspin) == std::string("BETA"));
-
-    bool diffspin = (fstr::upcase(denspin) == std::string("SPIN"));
-
-    errors::assertMsgCritical(alphaspin || betaspin || diffspin, errspin);
-
-    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
-
-    const int32_t nao = static_cast<int32_t>(phi0.size());
-
-    auto denrows = density.getNumberOfRows(denidx);
-
-    auto dencols = density.getNumberOfColumns(denidx);
-
-    errors::assertMsgCritical(denrows == nao && dencols == nao, errnao);
-
-    // target density
-
-    CMemBlock<double> rho(nao * nao);
-
-    auto dens_alpha = density.alphaDensity(denidx);
-
-    auto dens_beta = density.betaDensity(denidx);
-
-    if (alphaspin)
-    {
-        std::memcpy(rho.data(), dens_alpha, nao * nao * sizeof(double));
-    }
-    else if (betaspin)
-    {
-        std::memcpy(rho.data(), dens_beta, nao * nao * sizeof(double));
-    }
-    else if (diffspin)
-    {
-        for (int32_t p = 0; p < nao * nao; p++)
-        {
-            rho.data()[p] = dens_alpha[p] - dens_beta[p];
-        }
-    }
-
-    auto rho_data = rho.data();
-
-    // calculate densities on grid points
-
-#pragma omp parallel for schedule(dynamic)
-    for (int32_t ix = 0; ix < nx; ix++)
-    {
-        double xp = x0 + dx * ix;
-
-        int32_t xstride = ix * ny * nz;
-
-        for (int32_t iy = 0; iy < ny; iy++)
-        {
-            double yp = y0 + dy * iy;
-
-            int32_t ystride = iy * nz;
-
-            for (int32_t iz = 0; iz < nz; iz++)
-            {
-                double zp = z0 + dz * iz;
-
-                int32_t zstride = iz;
-
-                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
-
-                double psi = 0.0;
-
-                for (int32_t iao = 0; iao < nao; iao++)
-                {
-                    for (int32_t jao = 0; jao < nao; jao++)
-                    {
-                        psi += phi[iao] * rho_data[iao * nao + jao] * phi[jao];
-                    }
-                }
-
-                int32_t index = xstride + ystride + zstride;
-
-                grid.values()[index] = psi;
-            }
-        }
-    }
-}
-
-void
-CVisualizationDriver::_compute(CCubicGrid&                 grid,
-                               const CMolecule&            molecule,
-                               const CMolecularBasis&      basis,
-                               const BufferHostXYd&        coeffs,
-                               const std::vector<int32_t>& idxs) const
-{
-    // grid information
-
-    // the ideal way of getting this info is with C++17 structured bindings
-    // this doesn't compile with Clang, unfortunately!
-    // auto [x0, y0, z0] = grid.getOrigin();
-    // auto [dx, dy, dz] = grid.getStepSize();
-    // auto [nx, ny, nz] = grid.getNumPoints();
-
-    auto origin = grid.getOrigin();
-    auto x0     = origin[0];
-    auto y0     = origin[1];
-    auto z0     = origin[2];
-
-    auto stepSize = grid.getStepSize();
-    auto dx       = stepSize[0];
-    auto dy       = stepSize[1];
-    auto dz       = stepSize[2];
-
-    auto numPoints = grid.getNumPoints();
-    auto nx        = numPoints[0];
-    auto ny        = numPoints[1];
-    auto nz        = numPoints[2];
-
-    // compute all AOs on the grid
-
-    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
-
-    auto nao = static_cast<int32_t>(phi0.size());
-
-    errors::assertMsgCritical(coeffs.nRows() == nao, "VisualizationDriver.compute: Inconsistent number of AOs");
-
-    // calculate psi on grid points
-
-    // check that the desired columns are within range
-    for (const auto& idx : idxs)
-    {
-        errors::assertMsgCritical(0 <= idx && idx < coeffs.nColumns(), "VisualizationDriver.compute: Invalid index of MO");
-    }
-
-#pragma omp parallel for schedule(dynamic)
-    for (int32_t ix = 0; ix < nx; ix++)
-    {
-        double xp = x0 + dx * ix;
-
-        int32_t xstride = ix * ny * nz;
-
-        for (int32_t iy = 0; iy < ny; iy++)
-        {
-            double yp = y0 + dy * iy;
-
-            int32_t ystride = iy * nz;
-
-            for (int32_t iz = 0; iz < nz; iz++)
-            {
-                double zp = z0 + dz * iz;
-
-                int32_t zstride = iz;
-
-                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
-
-                double psi = 0.0;
-
-                for (const auto& idx : idxs)
-                {
-                    for (int32_t aoidx = 0; aoidx < nao; aoidx++)
-                    {
-                        auto coef = coeffs(aoidx, idx);
-
-                        psi += coef * phi[aoidx];
-                    }
-                }
-
-                int32_t index = xstride + ystride + zstride;
-
-                grid.values()[index] = psi;
-            }
-        }
-    }
-}
-
 std::vector<std::vector<int32_t>>
 CVisualizationDriver::getAtomicOrbitalInformation(const CMolecule& molecule, const CMolecularBasis& basis) const
 {
@@ -616,24 +308,13 @@ CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolec
 
     // calculate atomic orbital on grid points
 
-    // the ideal way of getting this info is with C++17 structured bindings
-    // this doesn't compile with Clang, unfortunately!
-    auto origin = grid.getOrigin();
-    auto x0     = origin[0];
-    auto y0     = origin[1];
-    auto z0     = origin[2];
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
 
-    auto stepSize = grid.getStepSize();
-    auto dx       = stepSize[0];
-    auto dy       = stepSize[1];
-    auto dz       = stepSize[2];
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
 
-    auto numPoints = grid.getNumPoints();
-    auto nx        = numPoints[0];
-    auto ny        = numPoints[1];
-    auto nz        = numPoints[2];
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
-#pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(dynamic)
     for (int32_t ix = 0; ix < nx; ix++)
     {
         double rx = x0 + dx * ix;
@@ -741,9 +422,11 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 {
     // grid information
 
-    auto [x0, y0, z0] = grid.getOrigin();
-    auto [dx, dy, dz] = grid.getStepSize();
-    auto [nx, ny, nz] = grid.getNumPoints();
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
     // compute local grid on this MPI process
 
@@ -761,7 +444,7 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 
     CCubicGrid localgrid(origin, stepsize, npoints);
 
-    _compute(localgrid, molecule, basis, mo, moidx, mospin);
+    _computeLocalGrid(localgrid, molecule, basis, mo, moidx, mospin);
 
     // gather local grids
 
@@ -788,9 +471,11 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
 {
     // grid information
 
-    auto [x0, y0, z0] = grid.getOrigin();
-    auto [dx, dy, dz] = grid.getStepSize();
-    auto [nx, ny, nz] = grid.getNumPoints();
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
     // compute local grid on this MPI process
 
@@ -808,7 +493,7 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
 
     CCubicGrid localgrid(origin, stepsize, npoints);
 
-    _compute(localgrid, molecule, basis, density, denidx, denspin);
+    _computeLocalGrid(localgrid, molecule, basis, density, denidx, denspin);
 
     // gather local grids
 
@@ -826,49 +511,202 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
 }
 
 void
-CVisualizationDriver::compute(CCubicGrid&                 grid,
-                              const CMolecule&            molecule,
-                              const CMolecularBasis&      basis,
-                              const BufferHostXYd&        coeffs,
-                              const std::vector<int32_t>& idxs) const
+CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
+                                        const CMolecule&          molecule,
+                                        const CMolecularBasis&    basis,
+                                        const CMolecularOrbitals& mo,
+                                        const int32_t             moidx,
+                                        const std::string&        mospin) const
 {
     // grid information
 
-    auto [x0, y0, z0] = grid.getOrigin();
-    auto [dx, dy, dz] = grid.getStepSize();
-    auto [nx, ny, nz] = grid.getNumPoints();
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
 
-    // compute local grid on this MPI process
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
 
-    auto xcntdsp = getCountsAndDisplacements(nx);
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
 
-    auto xcounts = xcntdsp[0];
+    // sanity check
 
-    auto xdispls = xcntdsp[1];
+    std::string erridx("VisualizationDriver.compute: Invalid index of MO");
 
-    std::array origin{x0 + dx * xdispls[_locRank], y0, z0};
+    std::string errspin("VisualizationDriver.compute: Invalid spin of MO");
 
-    std::array stepsize{dx, dy, dz};
+    std::string errnao("VisualizationDriver.compute: Inconsistent number of AOs");
 
-    std::array npoints{xcounts[_locRank], ny, nz};
+    auto morows = mo.getNumberOfRows();
 
-    CCubicGrid localgrid(origin, stepsize, npoints);
+    auto mocols = mo.getNumberOfColumns();
 
-    _compute(localgrid, molecule, basis, coeffs, idxs);
+    errors::assertMsgCritical(0 <= moidx && moidx < mocols, erridx);
 
-    // gather local grids
+    bool alphaspin = (fstr::upcase(mospin) == std::string("ALPHA"));
 
-    std::vector<int32_t> yzcounts, yzdispls;
+    bool betaspin = (fstr::upcase(mospin) == std::string("BETA"));
 
-    for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
+    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
+
+    auto nao = static_cast<int32_t>(phi0.size());
+
+    errors::assertMsgCritical(morows == nao, errnao);
+
+    // target MO
+
+    auto mocoefs = alphaspin ? mo.alphaOrbitals() : mo.betaOrbitals();
+
+    // calculate psi on grid points
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int32_t ix = 0; ix < nx; ix++)
     {
-        yzcounts.push_back(xcounts[i] * ny * nz);
+        double xp = x0 + dx * ix;
 
-        yzdispls.push_back(xdispls[i] * ny * nz);
+        int32_t xstride = ix * ny * nz;
+
+        for (int32_t iy = 0; iy < ny; iy++)
+        {
+            double yp = y0 + dy * iy;
+
+            int32_t ystride = iy * nz;
+
+            for (int32_t iz = 0; iz < nz; iz++)
+            {
+                double zp = z0 + dz * iz;
+
+                int32_t zstride = iz;
+
+                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+
+                double psi = 0.0;
+
+                for (int32_t aoidx = 0; aoidx < nao; aoidx++)
+                {
+                    double mocoef = mocoefs[aoidx * mocols + moidx];
+
+                    psi += mocoef * phi[aoidx];
+                }
+
+                int32_t index = xstride + ystride + zstride;
+
+                grid.values()[index] = psi;
+            }
+        }
+    }
+}
+
+void
+CVisualizationDriver::_computeLocalGrid(CCubicGrid&             grid,
+                                        const CMolecule&        molecule,
+                                        const CMolecularBasis&  basis,
+                                        const CAODensityMatrix& density,
+                                        const int32_t           denidx,
+                                        const std::string&      denspin) const
+{
+    // grid information
+
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+
+    // sanity check
+
+    std::string erridx("VisualizationDriver.compute: Invalid index of density matrix");
+
+    std::string errspin("VisualizationDriver.compute: Invalid spin of density matrix");
+
+    std::string errnao("VisualizationDriver.compute: Inconsistent number of AOs");
+
+    auto numdens = density.getNumberOfDensityMatrices();
+
+    errors::assertMsgCritical(0 <= denidx && denidx < numdens, erridx);
+
+    bool alphaspin = (fstr::upcase(denspin) == std::string("ALPHA"));
+
+    bool betaspin = (fstr::upcase(denspin) == std::string("BETA"));
+
+    bool diffspin = (fstr::upcase(denspin) == std::string("SPIN"));
+
+    errors::assertMsgCritical(alphaspin || betaspin || diffspin, errspin);
+
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
+
+    const int32_t nao = static_cast<int32_t>(phi0.size());
+
+    auto denrows = density.getNumberOfRows(denidx);
+
+    auto dencols = density.getNumberOfColumns(denidx);
+
+    errors::assertMsgCritical(denrows == nao && dencols == nao, errnao);
+
+    // target density
+
+    CMemBlock<double> rho(nao * nao);
+
+    auto dens_alpha = density.alphaDensity(denidx);
+
+    auto dens_beta = density.betaDensity(denidx);
+
+    if (alphaspin)
+    {
+        std::memcpy(rho.data(), dens_alpha, nao * nao * sizeof(double));
+    }
+    else if (betaspin)
+    {
+        std::memcpy(rho.data(), dens_beta, nao * nao * sizeof(double));
+    }
+    else if (diffspin)
+    {
+        for (int32_t p = 0; p < nao * nao; p++)
+        {
+            rho.data()[p] = dens_alpha[p] - dens_beta[p];
+        }
     }
 
-    MPI_Gatherv(
-        localgrid.values(), yzcounts[_locRank], MPI_DOUBLE, grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE, mpi::master(), _locComm);
+    auto rho_data = rho.data();
+
+    // calculate densities on grid points
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int32_t ix = 0; ix < nx; ix++)
+    {
+        double xp = x0 + dx * ix;
+
+        int32_t xstride = ix * ny * nz;
+
+        for (int32_t iy = 0; iy < ny; iy++)
+        {
+            double yp = y0 + dy * iy;
+
+            int32_t ystride = iy * nz;
+
+            for (int32_t iz = 0; iz < nz; iz++)
+            {
+                double zp = z0 + dz * iz;
+
+                int32_t zstride = iz;
+
+                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+
+                double psi = 0.0;
+
+                for (int32_t iao = 0; iao < nao; iao++)
+                {
+                    for (int32_t jao = 0; jao < nao; jao++)
+                    {
+                        psi += phi[iao] * rho_data[iao * nao + jao] * phi[jao];
+                    }
+                }
+
+                int32_t index = xstride + ystride + zstride;
+
+                grid.values()[index] = psi;
+            }
+        }
+    }
 }
 
 std::vector<double>
@@ -1090,4 +928,124 @@ CVisualizationDriver::getTwoParticleDensity(const std::vector<std::vector<double
     }
 
     return std::vector<double>();
+}
+
+void
+CVisualizationDriver::compute(CCubicGrid&                 grid,
+                              const CMolecule&            molecule,
+                              const CMolecularBasis&      basis,
+                              const BufferHostXYd&        coeffs,
+                              const std::vector<int32_t>& idxs) const
+{
+    // grid information
+
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+
+    // compute local grid on this MPI process
+
+    auto xcntdsp = getCountsAndDisplacements(nx);
+
+    auto xcounts = xcntdsp[0];
+
+    auto xdispls = xcntdsp[1];
+
+    std::array origin{x0 + dx * xdispls[_locRank], y0, z0};
+
+    std::array stepsize{dx, dy, dz};
+
+    std::array npoints{xcounts[_locRank], ny, nz};
+
+    CCubicGrid localgrid(origin, stepsize, npoints);
+
+    _computeLocalGrid(localgrid, molecule, basis, coeffs, idxs);
+
+    // gather local grids
+
+    std::vector<int32_t> yzcounts, yzdispls;
+
+    for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
+    {
+        yzcounts.push_back(xcounts[i] * ny * nz);
+
+        yzdispls.push_back(xdispls[i] * ny * nz);
+    }
+
+    MPI_Gatherv(
+        localgrid.values(), yzcounts[_locRank], MPI_DOUBLE, grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE, mpi::master(), _locComm);
+}
+
+void
+CVisualizationDriver::_computeLocalGrid(CCubicGrid&                 grid,
+                                        const CMolecule&            molecule,
+                                        const CMolecularBasis&      basis,
+                                        const BufferHostXYd&        coeffs,
+                                        const std::vector<int32_t>& idxs) const
+{
+    // grid information
+
+    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+
+    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+
+    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+
+    // compute all AOs on the grid
+
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
+
+    auto nao = static_cast<int32_t>(phi0.size());
+
+    errors::assertMsgCritical(coeffs.nRows() == nao, "VisualizationDriver.compute: Inconsistent number of AOs");
+
+    // calculate psi on grid points
+
+    // check that the desired columns are within range
+    for (const auto& idx : idxs)
+    {
+        errors::assertMsgCritical(0 <= idx && idx < coeffs.nColumns(), "VisualizationDriver.compute: Invalid index of MO");
+    }
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int32_t ix = 0; ix < nx; ix++)
+    {
+        double xp = x0 + dx * ix;
+
+        int32_t xstride = ix * ny * nz;
+
+        for (int32_t iy = 0; iy < ny; iy++)
+        {
+            double yp = y0 + dy * iy;
+
+            int32_t ystride = iy * nz;
+
+            for (int32_t iz = 0; iz < nz; iz++)
+            {
+                double zp = z0 + dz * iz;
+
+                int32_t zstride = iz;
+
+                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+
+                double psi = 0.0;
+
+                for (const auto& idx : idxs)
+                {
+                    for (int32_t aoidx = 0; aoidx < nao; aoidx++)
+                    {
+                        auto coef = coeffs(aoidx, idx);
+
+                        psi += coef * phi[aoidx];
+                    }
+                }
+
+                int32_t index = xstride + ystride + zstride;
+
+                grid.values()[index] = psi;
+            }
+        }
+    }
 }

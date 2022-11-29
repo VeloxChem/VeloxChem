@@ -95,12 +95,12 @@ class CVisualizationDriver
      @param moidx the index of the molecular orbital (0-based).
      @param mospin the spin of the molecular orbital ('alpha' or 'beta').
      */
-    void _compute(CCubicGrid&               grid,
-                  const CMolecule&          molecule,
-                  const CMolecularBasis&    basis,
-                  const CMolecularOrbitals& molorb,
-                  const int32_t             moidx,
-                  const std::string&        mospin) const;
+    void _computeLocalGrid(CCubicGrid&               grid,
+                           const CMolecule&          molecule,
+                           const CMolecularBasis&    basis,
+                           const CMolecularOrbitals& molorb,
+                           const int32_t             moidx,
+                           const std::string&        mospin) const;
 
     /**
      Computes electronic densities at rank-local cubic grid points (OpenMP).
@@ -112,12 +112,12 @@ class CVisualizationDriver
      @param densityIndex the index of the density matrix (0-based).
      @param densitySpin the spin of the density matrix ('alpha' or 'beta').
      */
-    void _compute(CCubicGrid&             grid,
-                  const CMolecule&        molecule,
-                  const CMolecularBasis&  basis,
-                  const CAODensityMatrix& density,
-                  const int32_t           densityIndex,
-                  const std::string&      densitySpin) const;
+    void _computeLocalGrid(CCubicGrid&             grid,
+                           const CMolecule&        molecule,
+                           const CMolecularBasis&  basis,
+                           const CAODensityMatrix& density,
+                           const int32_t           densityIndex,
+                           const std::string&      densitySpin) const;
 
     /** Computes values of orbital-like quantities at rank-local cubic grid points (OpenMP).
      *
@@ -128,11 +128,11 @@ class CVisualizationDriver
      * quantities to plot. This is of N_AO x N_orb dimensions.
      * @param idxs indices of the orbital-like quantities to plot (0-based).
      */
-    void _compute(CCubicGrid&                 grid,
-                  const CMolecule&            molecule,
-                  const CMolecularBasis&      basis,
-                  const BufferHostXYd&        coeffs,
-                  const std::vector<int32_t>& idxs) const;
+    void _computeLocalGrid(CCubicGrid&                 grid,
+                           const CMolecule&            molecule,
+                           const CMolecularBasis&      basis,
+                           const BufferHostXYd&        coeffs,
+                           const std::vector<int32_t>& idxs) const;
 
    public:
     /**
