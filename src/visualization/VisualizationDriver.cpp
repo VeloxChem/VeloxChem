@@ -507,6 +507,53 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
 }
 
 void
+CVisualizationDriver::compute(CCubicGrid&                 grid,
+                              const CMolecule&            molecule,
+                              const CMolecularBasis&      basis,
+                              const BufferHostXYd&        coeffs,
+                              const std::vector<int32_t>& idxs) const
+{
+    // grid information
+
+    auto origin = grid.getOrigin();
+
+    auto stepsize = grid.getStepSize();
+
+    auto numpoints = grid.getNumPoints();
+
+    // compute local grid on this MPI process
+
+    auto xcntdsp = getCountsAndDisplacements(numpoints[0]);
+
+    auto xcounts = xcntdsp[0];
+
+    auto xdispls = xcntdsp[1];
+
+    std::array localorigin{origin[0] + stepsize[0] * xdispls[_locRank], origin[1], origin[2]};
+
+    std::array localnumpoints{xcounts[_locRank], numpoints[1], numpoints[2]};
+
+    CCubicGrid localgrid(localorigin, stepsize, localnumpoints);
+
+    _computeLocalGrid(localgrid, molecule, basis, coeffs, idxs);
+
+    // gather local grids
+
+    std::vector<int32_t> yzcounts, yzdispls;
+
+    for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
+    {
+        yzcounts.push_back(xcounts[i] * numpoints[1] * numpoints[2]);
+
+        yzdispls.push_back(xdispls[i] * numpoints[1] * numpoints[2]);
+    }
+
+    MPI_Gatherv(
+        localgrid.values(), yzcounts[_locRank], MPI_DOUBLE, grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE, mpi::master(), _locComm);
+}
+
+
+void
 CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
                                         const CMolecule&          molecule,
                                         const CMolecularBasis&    basis,
@@ -694,6 +741,78 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&             grid,
                     for (int32_t jao = 0; jao < nao; jao++)
                     {
                         psi += phi[iao] * rho_data[iao * nao + jao] * phi[jao];
+                    }
+                }
+
+                int32_t index = xstride + ystride + zstride;
+
+                grid.values()[index] = psi;
+            }
+        }
+    }
+}
+
+void
+CVisualizationDriver::_computeLocalGrid(CCubicGrid&                 grid,
+                                        const CMolecule&            molecule,
+                                        const CMolecularBasis&      basis,
+                                        const BufferHostXYd&        coeffs,
+                                        const std::vector<int32_t>& idxs) const
+{
+    // grid information
+
+    auto origin = grid.getOrigin();
+
+    auto stepsize = grid.getStepSize();
+
+    auto numpoints = grid.getNumPoints();
+
+    // compute all AOs on the grid
+
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, origin[0], origin[1], origin[2]);
+
+    auto nao = static_cast<int32_t>(phi0.size());
+
+    errors::assertMsgCritical(coeffs.nRows() == nao, "VisualizationDriver.compute: Inconsistent number of AOs");
+
+    // calculate psi on grid points
+
+    // check that the desired columns are within range
+    for (const auto& idx : idxs)
+    {
+        errors::assertMsgCritical(0 <= idx && idx < coeffs.nColumns(), "VisualizationDriver.compute: Invalid index of MO");
+    }
+
+    #pragma omp parallel for schedule(dynamic)
+    for (int32_t ix = 0; ix < numpoints[0]; ix++)
+    {
+        double xp = origin[0] + stepsize[0] * ix;
+
+        int32_t xstride = ix * numpoints[1] * numpoints[2];
+
+        for (int32_t iy = 0; iy < numpoints[1]; iy++)
+        {
+            double yp = origin[1] + stepsize[1] * iy;
+
+            int32_t ystride = iy * numpoints[2];
+
+            for (int32_t iz = 0; iz < numpoints[2]; iz++)
+            {
+                double zp = origin[2] + stepsize[2] * iz;
+
+                int32_t zstride = iz;
+
+                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
+
+                double psi = 0.0;
+
+                for (const auto& idx : idxs)
+                {
+                    for (int32_t aoidx = 0; aoidx < nao; aoidx++)
+                    {
+                        auto coef = coeffs(aoidx, idx);
+
+                        psi += coef * phi[aoidx];
                     }
                 }
 
@@ -924,122 +1043,4 @@ CVisualizationDriver::getTwoParticleDensity(const std::vector<std::vector<double
     }
 
     return std::vector<double>();
-}
-
-void
-CVisualizationDriver::compute(CCubicGrid&                 grid,
-                              const CMolecule&            molecule,
-                              const CMolecularBasis&      basis,
-                              const BufferHostXYd&        coeffs,
-                              const std::vector<int32_t>& idxs) const
-{
-    // grid information
-
-    auto origin = grid.getOrigin();
-
-    auto stepsize = grid.getStepSize();
-
-    auto numpoints = grid.getNumPoints();
-
-    // compute local grid on this MPI process
-
-    auto xcntdsp = getCountsAndDisplacements(numpoints[0]);
-
-    auto xcounts = xcntdsp[0];
-
-    auto xdispls = xcntdsp[1];
-
-    std::array localorigin{origin[0] + stepsize[0] * xdispls[_locRank], origin[1], origin[2]};
-
-    std::array localnumpoints{xcounts[_locRank], numpoints[1], numpoints[2]};
-
-    CCubicGrid localgrid(localorigin, stepsize, localnumpoints);
-
-    _computeLocalGrid(localgrid, molecule, basis, coeffs, idxs);
-
-    // gather local grids
-
-    std::vector<int32_t> yzcounts, yzdispls;
-
-    for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
-    {
-        yzcounts.push_back(xcounts[i] * numpoints[1] * numpoints[2]);
-
-        yzdispls.push_back(xdispls[i] * numpoints[1] * numpoints[2]);
-    }
-
-    MPI_Gatherv(
-        localgrid.values(), yzcounts[_locRank], MPI_DOUBLE, grid.values(), yzcounts.data(), yzdispls.data(), MPI_DOUBLE, mpi::master(), _locComm);
-}
-
-void
-CVisualizationDriver::_computeLocalGrid(CCubicGrid&                 grid,
-                                        const CMolecule&            molecule,
-                                        const CMolecularBasis&      basis,
-                                        const BufferHostXYd&        coeffs,
-                                        const std::vector<int32_t>& idxs) const
-{
-    // grid information
-
-    auto origin = grid.getOrigin();
-
-    auto stepsize = grid.getStepSize();
-
-    auto numpoints = grid.getNumPoints();
-
-    // compute all AOs on the grid
-
-    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, origin[0], origin[1], origin[2]);
-
-    auto nao = static_cast<int32_t>(phi0.size());
-
-    errors::assertMsgCritical(coeffs.nRows() == nao, "VisualizationDriver.compute: Inconsistent number of AOs");
-
-    // calculate psi on grid points
-
-    // check that the desired columns are within range
-    for (const auto& idx : idxs)
-    {
-        errors::assertMsgCritical(0 <= idx && idx < coeffs.nColumns(), "VisualizationDriver.compute: Invalid index of MO");
-    }
-
-    #pragma omp parallel for schedule(dynamic)
-    for (int32_t ix = 0; ix < numpoints[0]; ix++)
-    {
-        double xp = origin[0] + stepsize[0] * ix;
-
-        int32_t xstride = ix * numpoints[1] * numpoints[2];
-
-        for (int32_t iy = 0; iy < numpoints[1]; iy++)
-        {
-            double yp = origin[1] + stepsize[1] * iy;
-
-            int32_t ystride = iy * numpoints[2];
-
-            for (int32_t iz = 0; iz < numpoints[2]; iz++)
-            {
-                double zp = origin[2] + stepsize[2] * iz;
-
-                int32_t zstride = iz;
-
-                auto phi = _compPhiAtomicOrbitals(molecule, basis, xp, yp, zp);
-
-                double psi = 0.0;
-
-                for (const auto& idx : idxs)
-                {
-                    for (int32_t aoidx = 0; aoidx < nao; aoidx++)
-                    {
-                        auto coef = coeffs(aoidx, idx);
-
-                        psi += coef * phi[aoidx];
-                    }
-                }
-
-                int32_t index = xstride + ystride + zstride;
-
-                grid.values()[index] = psi;
-            }
-        }
-    }
 }
