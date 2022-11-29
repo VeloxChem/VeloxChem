@@ -1439,9 +1439,9 @@ CDensityGridDriver::_distPairDensityValuesForLda(      CDensityGrid*        dens
 void
 CDensityGridDriver::_genBatchOfPairDensityGridPointsForGga(CDensityGrid*           densityGrid,
                                                            const CAODensityMatrix* aoDensityMatrix,
-                                                           double*                 twoDM,
-                                                           double*                 activeMOs,
-                                                           int32_t                 nActive,
+                                                           const double*                 twoDM,
+                                                           const double*                 activeMOs,
+                                                           const int32_t                 nActive,
                                                            const CGtoContainer*    gtoContainer,
                                                            const double*           gridCoordinatesX,
                                                            const double*           gridCoordinatesY,
