@@ -308,28 +308,28 @@ CVisualizationDriver::computeAtomicOrbitalForGrid(CCubicGrid& grid, const CMolec
 
     // calculate atomic orbital on grid points
 
-    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+    auto origin = grid.getOrigin();
 
-    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+    auto stepsize = grid.getStepSize();
 
-    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+    auto numpoints = grid.getNumPoints();
 
     #pragma omp parallel for schedule(dynamic)
-    for (int32_t ix = 0; ix < nx; ix++)
+    for (int32_t ix = 0; ix < numpoints[0]; ix++)
     {
-        double rx = x0 + dx * ix;
+        double rx = origin[0] + stepsize[0] * ix;
 
-        int32_t xstride = ix * ny * nz;
+        int32_t xstride = ix * numpoints[1] * numpoints[2];
 
-        for (int32_t iy = 0; iy < ny; iy++)
+        for (int32_t iy = 0; iy < numpoints[1]; iy++)
         {
-            double ry = y0 + dy * iy;
+            double ry = origin[1] + stepsize[1] * iy;
 
-            int32_t ystride = iy * nz;
+            int32_t ystride = iy * numpoints[2];
 
-            for (int32_t iz = 0; iz < nz; iz++)
+            for (int32_t iz = 0; iz < numpoints[2]; iz++)
             {
-                double rz = z0 + dz * iz;
+                double rz = origin[2] + stepsize[2] * iz;
 
                 int32_t zstride = iz;
 
@@ -422,27 +422,25 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 {
     // grid information
 
-    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+    auto origin = grid.getOrigin();
 
-    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+    auto stepsize = grid.getStepSize();
 
-    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+    auto numpoints = grid.getNumPoints();
 
     // compute local grid on this MPI process
 
-    auto xcntdsp = getCountsAndDisplacements(nx);
+    auto xcntdsp = getCountsAndDisplacements(numpoints[0]);
 
     auto xcounts = xcntdsp[0];
 
     auto xdispls = xcntdsp[1];
 
-    std::array origin{x0 + dx * xdispls[_locRank], y0, z0};
+    std::array localorigin{origin[0] + stepsize[0] * xdispls[_locRank], origin[1], origin[2]};
 
-    std::array stepsize{dx, dy, dz};
+    std::array localnumpoints{xcounts[_locRank], numpoints[1], numpoints[2]};
 
-    std::array npoints{xcounts[_locRank], ny, nz};
-
-    CCubicGrid localgrid(origin, stepsize, npoints);
+    CCubicGrid localgrid(localorigin, stepsize, localnumpoints);
 
     _computeLocalGrid(localgrid, molecule, basis, mo, moidx, mospin);
 
@@ -452,9 +450,9 @@ CVisualizationDriver::compute(CCubicGrid&               grid,
 
     for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
     {
-        yzcounts.push_back(xcounts[i] * ny * nz);
+        yzcounts.push_back(xcounts[i] * numpoints[1] * numpoints[2]);
 
-        yzdispls.push_back(xdispls[i] * ny * nz);
+        yzdispls.push_back(xdispls[i] * numpoints[1] * numpoints[2]);
     }
 
     MPI_Gatherv(
@@ -471,27 +469,25 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
 {
     // grid information
 
-    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+    auto origin = grid.getOrigin();
 
-    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+    auto stepsize = grid.getStepSize();
 
-    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+    auto numpoints = grid.getNumPoints();
 
     // compute local grid on this MPI process
 
-    auto xcntdsp = getCountsAndDisplacements(nx);
+    auto xcntdsp = getCountsAndDisplacements(numpoints[0]);
 
     auto xcounts = xcntdsp[0];
 
     auto xdispls = xcntdsp[1];
 
-    std::array origin{x0 + dx * xdispls[_locRank], y0, z0};
+    std::array localorigin{origin[0] + stepsize[0] * xdispls[_locRank], origin[1], origin[2]};
 
-    std::array stepsize{dx, dy, dz};
+    std::array localnumpoints{xcounts[_locRank], numpoints[1], numpoints[2]};
 
-    std::array npoints{xcounts[_locRank], ny, nz};
-
-    CCubicGrid localgrid(origin, stepsize, npoints);
+    CCubicGrid localgrid(localorigin, stepsize, localnumpoints);
 
     _computeLocalGrid(localgrid, molecule, basis, density, denidx, denspin);
 
@@ -501,9 +497,9 @@ CVisualizationDriver::compute(CCubicGrid&             grid,
 
     for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
     {
-        yzcounts.push_back(xcounts[i] * ny * nz);
+        yzcounts.push_back(xcounts[i] * numpoints[1] * numpoints[2]);
 
-        yzdispls.push_back(xdispls[i] * ny * nz);
+        yzdispls.push_back(xdispls[i] * numpoints[1] * numpoints[2]);
     }
 
     MPI_Gatherv(
@@ -520,11 +516,11 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
 {
     // grid information
 
-    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+    auto origin = grid.getOrigin();
 
-    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+    auto stepsize = grid.getStepSize();
 
-    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+    auto numpoints = grid.getNumPoints();
 
     // sanity check
 
@@ -546,7 +542,7 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
 
     errors::assertMsgCritical(alphaspin || betaspin, errspin);
 
-    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, origin[0], origin[1], origin[2]);
 
     auto nao = static_cast<int32_t>(phi0.size());
 
@@ -559,21 +555,21 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&               grid,
     // calculate psi on grid points
 
     #pragma omp parallel for schedule(dynamic)
-    for (int32_t ix = 0; ix < nx; ix++)
+    for (int32_t ix = 0; ix < numpoints[0]; ix++)
     {
-        double xp = x0 + dx * ix;
+        double xp = origin[0] + stepsize[0] * ix;
 
-        int32_t xstride = ix * ny * nz;
+        int32_t xstride = ix * numpoints[1] * numpoints[2];
 
-        for (int32_t iy = 0; iy < ny; iy++)
+        for (int32_t iy = 0; iy < numpoints[1]; iy++)
         {
-            double yp = y0 + dy * iy;
+            double yp = origin[1] + stepsize[1] * iy;
 
-            int32_t ystride = iy * nz;
+            int32_t ystride = iy * numpoints[2];
 
-            for (int32_t iz = 0; iz < nz; iz++)
+            for (int32_t iz = 0; iz < numpoints[2]; iz++)
             {
-                double zp = z0 + dz * iz;
+                double zp = origin[2] + stepsize[2] * iz;
 
                 int32_t zstride = iz;
 
@@ -606,11 +602,11 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&             grid,
 {
     // grid information
 
-    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+    auto origin = grid.getOrigin();
 
-    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+    auto stepsize = grid.getStepSize();
 
-    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+    auto numpoints = grid.getNumPoints();
 
     // sanity check
 
@@ -632,7 +628,7 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&             grid,
 
     errors::assertMsgCritical(alphaspin || betaspin || diffspin, errspin);
 
-    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, origin[0], origin[1], origin[2]);
 
     const int32_t nao = static_cast<int32_t>(phi0.size());
 
@@ -671,21 +667,21 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&             grid,
     // calculate densities on grid points
 
     #pragma omp parallel for schedule(dynamic)
-    for (int32_t ix = 0; ix < nx; ix++)
+    for (int32_t ix = 0; ix < numpoints[0]; ix++)
     {
-        double xp = x0 + dx * ix;
+        double xp = origin[0] + stepsize[0] * ix;
 
-        int32_t xstride = ix * ny * nz;
+        int32_t xstride = ix * numpoints[1] * numpoints[2];
 
-        for (int32_t iy = 0; iy < ny; iy++)
+        for (int32_t iy = 0; iy < numpoints[1]; iy++)
         {
-            double yp = y0 + dy * iy;
+            double yp = origin[1] + stepsize[1] * iy;
 
-            int32_t ystride = iy * nz;
+            int32_t ystride = iy * numpoints[2];
 
-            for (int32_t iz = 0; iz < nz; iz++)
+            for (int32_t iz = 0; iz < numpoints[2]; iz++)
             {
-                double zp = z0 + dz * iz;
+                double zp = origin[2] + stepsize[2] * iz;
 
                 int32_t zstride = iz;
 
@@ -939,27 +935,25 @@ CVisualizationDriver::compute(CCubicGrid&                 grid,
 {
     // grid information
 
-    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+    auto origin = grid.getOrigin();
 
-    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+    auto stepsize = grid.getStepSize();
 
-    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+    auto numpoints = grid.getNumPoints();
 
     // compute local grid on this MPI process
 
-    auto xcntdsp = getCountsAndDisplacements(nx);
+    auto xcntdsp = getCountsAndDisplacements(numpoints[0]);
 
     auto xcounts = xcntdsp[0];
 
     auto xdispls = xcntdsp[1];
 
-    std::array origin{x0 + dx * xdispls[_locRank], y0, z0};
+    std::array localorigin{origin[0] + stepsize[0] * xdispls[_locRank], origin[1], origin[2]};
 
-    std::array stepsize{dx, dy, dz};
+    std::array localnumpoints{xcounts[_locRank], numpoints[1], numpoints[2]};
 
-    std::array npoints{xcounts[_locRank], ny, nz};
-
-    CCubicGrid localgrid(origin, stepsize, npoints);
+    CCubicGrid localgrid(localorigin, stepsize, localnumpoints);
 
     _computeLocalGrid(localgrid, molecule, basis, coeffs, idxs);
 
@@ -969,9 +963,9 @@ CVisualizationDriver::compute(CCubicGrid&                 grid,
 
     for (int32_t i = 0; i < static_cast<int32_t>(xcounts.size()); i++)
     {
-        yzcounts.push_back(xcounts[i] * ny * nz);
+        yzcounts.push_back(xcounts[i] * numpoints[1] * numpoints[2]);
 
-        yzdispls.push_back(xdispls[i] * ny * nz);
+        yzdispls.push_back(xdispls[i] * numpoints[1] * numpoints[2]);
     }
 
     MPI_Gatherv(
@@ -987,15 +981,15 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&                 grid,
 {
     // grid information
 
-    auto x0 = grid.getOrigin()[0], y0 = grid.getOrigin()[1], z0 = grid.getOrigin()[2];
+    auto origin = grid.getOrigin();
 
-    auto dx = grid.getStepSize()[0], dy = grid.getStepSize()[1], dz = grid.getStepSize()[2];
+    auto stepsize = grid.getStepSize();
 
-    auto nx = grid.getNumPoints()[0], ny = grid.getNumPoints()[1], nz = grid.getNumPoints()[2];
+    auto numpoints = grid.getNumPoints();
 
     // compute all AOs on the grid
 
-    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, x0, y0, z0);
+    auto phi0 = _compPhiAtomicOrbitals(molecule, basis, origin[0], origin[1], origin[2]);
 
     auto nao = static_cast<int32_t>(phi0.size());
 
@@ -1010,21 +1004,21 @@ CVisualizationDriver::_computeLocalGrid(CCubicGrid&                 grid,
     }
 
     #pragma omp parallel for schedule(dynamic)
-    for (int32_t ix = 0; ix < nx; ix++)
+    for (int32_t ix = 0; ix < numpoints[0]; ix++)
     {
-        double xp = x0 + dx * ix;
+        double xp = origin[0] + stepsize[0] * ix;
 
-        int32_t xstride = ix * ny * nz;
+        int32_t xstride = ix * numpoints[1] * numpoints[2];
 
-        for (int32_t iy = 0; iy < ny; iy++)
+        for (int32_t iy = 0; iy < numpoints[1]; iy++)
         {
-            double yp = y0 + dy * iy;
+            double yp = origin[1] + stepsize[1] * iy;
 
-            int32_t ystride = iy * nz;
+            int32_t ystride = iy * numpoints[2];
 
-            for (int32_t iz = 0; iz < nz; iz++)
+            for (int32_t iz = 0; iz < numpoints[2]; iz++)
             {
-                double zp = z0 + dz * iz;
+                double zp = origin[2] + stepsize[2] * iz;
 
                 int32_t zstride = iz;
 
