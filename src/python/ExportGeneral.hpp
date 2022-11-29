@@ -64,13 +64,12 @@ MPI_Comm* get_mpi_comm(py::object py_comm);
 /** Gets shape and strides parameters for array_t CTOR.
  *
  * @tparam T scalar type of array.
- * @tparam Container the object collecting dimensions, _e.g._ `std::vector` or `std::array`.
  * @param dimension the shape of numpy array.
  * @return shape and strides of numpy array.
  */
-template <typename T, typename Container>
+template <typename T>
 auto
-array_t_params(const Container& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
+array_t_params(const std::vector<int32_t>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
 {
     std::vector<py::ssize_t> shape, strides;
 
@@ -94,18 +93,13 @@ array_t_params(const Container& dimension) -> std::tuple<std::vector<py::ssize_t
 /** Gets numpy array from pointer and shape.
  *
  * @tparam T scalar type of array.
- * @tparam Container the object collecting dimensions, _e.g._ `std::vector` or `std::array`.
  * @param ptr pointer to data.
  * @param dimension the shape of numpy array.
  * @return numpy array.
- *
- * @note The return type is rather convoluted, but it boils down to "return an
- * object of `py::array<T>` only if the `dimension` argument implmentes a `size`
- * method and the type `T` is arithmetic".
  */
-template <typename T, typename Container>
+template <typename T>
 auto
-pointer_to_numpy(const T* ptr, const Container& dimension) -> decltype((void)(dimension.size()), (void)(std::is_arithmetic_v<T>), py::array_t<T>())
+pointer_to_numpy(const T* ptr, const std::vector<int32_t>& dimension) -> py::array_t<T>
 {
     static_assert(std::is_arithmetic_v<T>, "NumPy array can only be instantiated with arithmetic types.");
     if (ptr == nullptr || dimension.size() == 0)
@@ -146,6 +140,20 @@ auto
 pointer_to_numpy(const T* ptr, int32_t nRows, int32_t nColumns) -> py::array_t<T>
 {
     return pointer_to_numpy(ptr, std::vector<int32_t>{nRows, nColumns});
+}
+
+/** Gets 3d numpy array from double pointer and std::array<int32_t, 3> dimension.
+ *
+ * @tparam T scalar type of array.
+ * @param ptr pointer to data.
+ * @param dim the dimension.
+ * @return numpy array.
+ */
+template <typename T>
+auto
+pointer_to_numpy(const T* ptr, const std::array<int32_t, 3>& dim) -> py::array_t<T>
+{
+    return pointer_to_numpy(ptr, std::vector<int32_t>{dim[0], dim[1], dim[2]});
 }
 
 /**
