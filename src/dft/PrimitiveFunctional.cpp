@@ -635,9 +635,9 @@ Functional::compute_vxc(int32_t np, const double* rho, const double* sigma, doub
             vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
             vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
 
-            vsigma[2 * g + 0] += c * stage_vsigma[2 * g + 0];
-            vsigma[2 * g + 1] += c * stage_vsigma[2 * g + 1];
-            vsigma[2 * g + 2] += c * stage_vsigma[2 * g + 2];
+            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
         }
     }
 
@@ -675,9 +675,9 @@ Functional::compute_exc_vxc(int32_t np, const double* rho, const double* sigma, 
             vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
             vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
 
-            vsigma[2 * g + 0] += c * stage_vsigma[2 * g + 0];
-            vsigma[2 * g + 1] += c * stage_vsigma[2 * g + 1];
-            vsigma[2 * g + 2] += c * stage_vsigma[2 * g + 2];
+            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
         }
     }
 
@@ -751,9 +751,9 @@ Functional::compute_vxc(int32_t       np,
             vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
             vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
 
-            vsigma[2 * g + 0] += c * stage_vsigma[2 * g + 0];
-            vsigma[2 * g + 1] += c * stage_vsigma[2 * g + 1];
-            vsigma[2 * g + 2] += c * stage_vsigma[2 * g + 2];
+            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
 
             vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
             vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
@@ -810,9 +810,9 @@ Functional::compute_exc_vxc(int32_t       np,
             vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
             vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
 
-            vsigma[2 * g + 0] += c * stage_vsigma[2 * g + 0];
-            vsigma[2 * g + 1] += c * stage_vsigma[2 * g + 1];
-            vsigma[2 * g + 2] += c * stage_vsigma[2 * g + 2];
+            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
 
             vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
             vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];

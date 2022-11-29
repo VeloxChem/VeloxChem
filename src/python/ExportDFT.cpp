@@ -140,7 +140,8 @@ export_dft(py::module& m)
     // Functional class
     PyClass<Functional>(m, "Functional")
         .def(py::init<const std::vector<std::string>&, const std::vector<double>&>(), "labels"_a, "coeffs"_a)
-        .def(py::init([](const std::string& label, double coeff = 1.0) { return std::make_shared<Functional>(std::vector{label}, std::vector{coeff}); }),
+        .def(py::init(
+                 [](const std::string& label, double coeff = 1.0) { return std::make_shared<Functional>(std::vector{label}, std::vector{coeff}); }),
              "label"_a,
              "coeff"_a = 1.0)
         .def(

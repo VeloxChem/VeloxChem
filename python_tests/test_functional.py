@@ -111,7 +111,7 @@ class TestFunctionalExcVxc:
         )
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = Functional("GGA_X_LYP")
+        func = Functional("GGA_C_LYP")
 
         if scf_drv.rank == mpi_master():
             gto, gto_x, gto_y, gto_z = xc_drv.compute_gto_values_and_derivatives(
