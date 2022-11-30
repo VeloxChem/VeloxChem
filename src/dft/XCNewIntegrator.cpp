@@ -368,11 +368,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         CDensityGrid screened_dengrid(dengrid);
 
-        gridscreen::screenDensityGridForLDA(screened_point_inds,
-                                            screened_dengrid,
-                                            dengrid,
-
-                                            _screeningThresholdForDensityValues);
+        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_dengrid, dengrid, _screeningThresholdForDensityValues);
 
         auto screened_npoints = screened_dengrid.getNumberOfGridPoints();
 
@@ -654,11 +650,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         CDensityGrid screened_dengrid(dengrid);
 
-        gridscreen::screenDensityGridForGGA(screened_point_inds,
-                                            screened_dengrid,
-                                            dengrid,
-
-                                            _screeningThresholdForDensityValues);
+        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_dengrid, dengrid, _screeningThresholdForDensityValues);
 
         auto screened_npoints = screened_dengrid.getNumberOfGridPoints();
 
@@ -691,9 +683,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.start("XC functional eval.");
 
-        CXCGradientGrid vxcgrid(npoints, dengrid.getDensityGridType(), xcfuntype);
+        CXCGradientGrid vxcgrid(screened_npoints, screened_dengrid.getDensityGridType(), xcfuntype);
 
-        xcFunctional.compute(vxcgrid, dengrid);
+        xcFunctional.compute(vxcgrid, screened_dengrid);
 
         timer.stop("XC functional eval.");
 
@@ -2079,9 +2071,7 @@ CXCNewIntegrator::_integratePartialFxcFockForLDA(const int32_t         npoints,
 #pragma omp simd aligned(weights, grho_aa, grho_ab, rhowa, rhowb, G_val, chi_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-                G_val[nu_offset + g] = weights[g] *
-
-                                       (grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g]) * chi_val[nu_offset + g];
+                G_val[nu_offset + g] = weights[g] * (grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g]) * chi_val[nu_offset + g];
             }
         }
     }
