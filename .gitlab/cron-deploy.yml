@@ -1,7 +1,7 @@
 monkey:cron_deploy:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-0a3283e
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f3fb247
   variables:
     OMP_NUM_THREADS: "6"
     TARBALL: "veloxchem.tar.bz2"
