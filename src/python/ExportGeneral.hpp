@@ -108,7 +108,7 @@ pointer_to_numpy(const T* ptr, const std::vector<int32_t>& dimension) -> py::arr
     }
     else
     {
-        auto [shape, strides] = array_t_params<T>(dimension);
+        const auto [shape, strides] = array_t_params<T>(dimension);
         return py::array_t<T>(shape, strides, ptr);
     }
 }
@@ -140,6 +140,20 @@ auto
 pointer_to_numpy(const T* ptr, int32_t nRows, int32_t nColumns) -> py::array_t<T>
 {
     return pointer_to_numpy(ptr, std::vector<int32_t>{nRows, nColumns});
+}
+
+/** Gets 3d numpy array from double pointer and std::array<int32_t, 3> dimension.
+ *
+ * @tparam T scalar type of array.
+ * @param ptr pointer to data.
+ * @param dim the dimension.
+ * @return numpy array.
+ */
+template <typename T>
+auto
+pointer_to_numpy(const T* ptr, const std::array<int32_t, 3>& dim) -> py::array_t<T>
+{
+    return pointer_to_numpy(ptr, std::vector<int32_t>{dim[0], dim[1], dim[2]});
 }
 
 /**

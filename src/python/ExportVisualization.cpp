@@ -30,6 +30,10 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <array>
+#include <vector>
+
+#include "Buffer.hpp"
 #include "CubicGrid.hpp"
 #include "ExportGeneral.hpp"
 #include "VisualizationDriver.hpp"
@@ -48,7 +52,7 @@ export_visualization(py::module& m)
 
     PyClass<CCubicGrid>(m, "CubicGrid")
         .def(py::init<>())
-        .def(py::init<const std::vector<double>&, const std::vector<double>&, const std::vector<int32_t>>())
+        .def(py::init<const std::array<double, 3>&, const std::array<double, 3>&, const std::array<int32_t, 3>>())
         .def("get_origin", &CCubicGrid::getOrigin, "Gets coordinate of the origin.")
         .def("get_step_size", &CCubicGrid::getStepSize, "Gets step size in X, Y and Z direction.")
         .def("get_num_points", &CCubicGrid::getNumPoints, "Gets number of points in X, Y and Z direction.")
@@ -95,6 +99,23 @@ export_visualization(py::module& m)
              "density"_a,
              "denidx"_a,
              "denspin"_a)
+        .def(
+            "compute",
+            [](const CVisualizationDriver& self,
+               CCubicGrid&                 grid,
+               const CMolecule&            molecule,
+               const CMolecularBasis&      basis,
+               const py::array_t<double>&  coeffs,
+               const std::vector<int32_t>& idxs) -> void {
+                auto _coeffs = BufferHostXYd(coeffs.data(), coeffs.shape(0), coeffs.shape(1));
+                self.compute(grid, molecule, basis, _coeffs, idxs);
+            },
+            "Computes values of orbital-like quantities at cubic grid points.",
+            "grid"_a,
+            "molecule"_a,
+            "basis"_a,
+            "coeffs"_a,
+            "idxs"_a)
         .def("get_mo",
              &CVisualizationDriver::getMO,
              "Computes molecular orbital at given coordinates.",

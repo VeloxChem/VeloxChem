@@ -34,17 +34,17 @@
 
 CCubicGrid::CCubicGrid()
 
-    : _origin(std::vector<double>({0.0, 0.0, 0.0}))
+    : _origin{0.0, 0.0, 0.0}
 
-    , _stepSize(std::vector<double>({0.0, 0.0, 0.0}))
+    , _stepSize{0.0, 0.0, 0.0}
 
-    , _numPoints(std::vector<int32_t>({0, 0, 0}))
+    , _numPoints{0, 0, 0}
 
-    , _values(CMemBlock<double>())
+    , _values{CMemBlock<double>()}
 {
 }
 
-CCubicGrid::CCubicGrid(const std::vector<double>& origin, const std::vector<double>& stepSize, const std::vector<int32_t>& numPoints)
+CCubicGrid::CCubicGrid(const std::array<double, 3>& origin, const std::array<double, 3>& stepSize, const std::array<int32_t, 3>& numPoints)
 
     : _origin(origin)
 
@@ -143,19 +143,19 @@ CCubicGrid::operator!=(const CCubicGrid& other) const
     return !(*this == other);
 }
 
-std::vector<double>
+std::array<double, 3>
 CCubicGrid::getOrigin() const
 {
     return _origin;
 }
 
-std::vector<double>
+std::array<double, 3>
 CCubicGrid::getStepSize() const
 {
     return _stepSize;
 }
 
-std::vector<int32_t>
+std::array<int32_t, 3>
 CCubicGrid::getNumPoints() const
 {
     return _numPoints;
