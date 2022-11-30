@@ -1,14 +1,15 @@
 target_sources(vlxobjs
   PRIVATE
     AOKohnShamMatrix.cpp
+    ComputeFunctional.cpp
     DensityGrid.cpp
     DensityGridDriver.cpp
     DensityGridGenerator.cpp
     DensityGridQuad.cpp
     GridBox.cpp
-    GridScreener.cpp
     GridDriver.cpp
     GridPartitioner.cpp
+    GridScreener.cpp
     GtoEvaluator.cpp
     GtoFunc.cpp
     GtoFuncForGGA.cpp
