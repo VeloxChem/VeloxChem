@@ -61,6 +61,8 @@ find_package(Python 3.7 REQUIRED COMPONENTS Interpreter Development NumPy)
 find_package(pybind11 2.6 CONFIG REQUIRED)
 # Libxc
 find_package(Libxc 6.0.0 CONFIG REQUIRED COMPONENTS C)
+get_property(_loc TARGET Libxc::xc PROPERTY LOCATION)
+message(STATUS "Found Libxc: ${_loc} (found version \"${Libxc_VERSION}\")") 
 
 # VeloxChem-specific configuration
 include(${PROJECT_SOURCE_DIR}/cmake/custom/vlx.cmake)
