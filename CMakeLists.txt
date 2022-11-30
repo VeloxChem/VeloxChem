@@ -54,11 +54,14 @@ include(${PROJECT_SOURCE_DIR}/cmake/compiler_flags/CXXFlags.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/math.cmake)
 
+# find external dependencies
+# Python 3.7+
 find_package(Python 3.7 REQUIRED COMPONENTS Interpreter Development NumPy)
+# pybind11
+find_package(pybind11 2.6 CONFIG REQUIRED)
+# Libxc
+find_package(Libxc 6.0.0 CONFIG REQUIRED COMPONENTS C)
 
-# download pybind11 if not available on the system
-include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_pybind11.cmake)
-# download Libxc if not available on the system
-include(${PROJECT_SOURCE_DIR}/external/upstream/fetch_Libxc.cmake)
+# VeloxChem-specific configuration
 include(${PROJECT_SOURCE_DIR}/cmake/custom/vlx.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/downloaded/autocmake_save_flags.cmake)
