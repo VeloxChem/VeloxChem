@@ -58,6 +58,11 @@ class CTimer
     CTimer();
 
     /**
+     Destroys a timer object.
+     */
+    ~CTimer();
+
+    /**
      Resets the timer.
      */
     void reset();
