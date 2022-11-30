@@ -183,9 +183,9 @@ CDensityGridDriver::_genUnrestrictedDensityForLda(CDensityGrid&           densit
 
     // generate density on grid points
 
-#pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
     {
-#pragma omp single nowait
+        #pragma omp single nowait
         {
             for (int32_t i = 0; i < ntasks; i++)
             {
@@ -197,7 +197,7 @@ CDensityGridDriver::_genUnrestrictedDensityForLda(CDensityGrid&           densit
 
                 // generate task
 
-#pragma omp task firstprivate(tbsize, tbposition)
+                #pragma omp task firstprivate(tbsize, tbposition)
                 {
                     _genBatchOfUnrestrictedDensityGridPointsForLda(dgridptr, denptr, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                 }
@@ -308,7 +308,7 @@ CDensityGridDriver::_distUnrestrictedDensityValuesForLda(CDensityGrid*          
 
                 if (std::fabs(dval_a + dval_b) > _thresholdOfDensity)
                 {
-#pragma omp simd
+                    #pragma omp simd
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
                         const double fact = bgaos[l] * kgaos[l];
@@ -364,9 +364,9 @@ CDensityGridDriver::_genRestrictedDensityForLda(CDensityGrid&           densityG
 
     // generate density on grid points
 
-#pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
     {
-#pragma omp single nowait
+        #pragma omp single nowait
         {
             for (int32_t i = 0; i < ntasks; i++)
             {
@@ -378,7 +378,7 @@ CDensityGridDriver::_genRestrictedDensityForLda(CDensityGrid&           densityG
 
                 // generate task
 
-#pragma omp task firstprivate(tbsize, tbposition)
+                #pragma omp task firstprivate(tbsize, tbposition)
                 {
                     _genBatchOfRestrictedDensityGridPointsForLda(dgridptr, denptr, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                 }
@@ -436,9 +436,9 @@ CDensityGridDriver::_genRestrictedDensityForGga(CDensityGrid&           densityG
 
     // generate density on grid points
 
-#pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
     {
-#pragma omp single nowait
+        #pragma omp single nowait
         {
             for (int32_t i = 0; i < ntasks; i++)
             {
@@ -450,7 +450,7 @@ CDensityGridDriver::_genRestrictedDensityForGga(CDensityGrid&           densityG
 
                 // generate task
 
-#pragma omp task firstprivate(tbsize, tbposition)
+                #pragma omp task firstprivate(tbsize, tbposition)
                 {
                     _genBatchOfRestrictedDensityGridPointsForGga(dgridptr, denptr, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                 }
@@ -510,9 +510,9 @@ CDensityGridDriver::_genRestrictedDensityForMgga(CDensityGrid&           density
 
     // generate density on grid points
 
-#pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
     {
-#pragma omp single nowait
+        #pragma omp single nowait
         {
             for (int32_t i = 0; i < ntasks; i++)
             {
@@ -524,7 +524,7 @@ CDensityGridDriver::_genRestrictedDensityForMgga(CDensityGrid&           density
 
                 // generate task
 
-#pragma omp task firstprivate(tbsize, tbposition)
+                #pragma omp task firstprivate(tbsize, tbposition)
                 {
                     _genBatchOfRestrictedDensityGridPointsForMgga(dgridptr, denptr, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                 }
@@ -584,9 +584,9 @@ CDensityGridDriver::_genUnrestrictedDensityForGga(CDensityGrid&           densit
 
     // generate density on grid points
 
-#pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
     {
-#pragma omp single nowait
+        #pragma omp single nowait
         {
             for (int32_t i = 0; i < ntasks; i++)
             {
@@ -598,7 +598,7 @@ CDensityGridDriver::_genUnrestrictedDensityForGga(CDensityGrid&           densit
 
                 // generate task
 
-#pragma omp task firstprivate(tbsize, tbposition)
+                #pragma omp task firstprivate(tbsize, tbposition)
                 {
                     _genBatchOfUnrestrictedDensityGridPointsForGga(dgridptr, denptr, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                 }
@@ -909,7 +909,7 @@ CDensityGridDriver::_distRestrictedDensityValuesForLda(CDensityGrid*            
 
                 if (std::fabs(dval) > _thresholdOfDensity)
                 {
-#pragma omp simd
+                    #pragma omp simd
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
                         rhoa[gridOffset + gridBlockPosition + l] += dval * bgaos[l] * kgaos[l];
@@ -977,7 +977,7 @@ CDensityGridDriver::_distRestrictedDensityValuesForGga(CDensityGrid*            
 
                 if (std::fabs(dval) > _thresholdOfDensity)
                 {
-#pragma omp simd
+                    #pragma omp simd
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
                         rhoa[gridOffset + gridBlockPosition + l] += dval * bgaos[l] * kgaos[l];
@@ -1053,7 +1053,7 @@ CDensityGridDriver::_distRestrictedDensityValuesForMgga(CDensityGrid*           
 
                 if (std::fabs(dval) > _thresholdOfDensity)
                 {
-#pragma omp simd
+                    #pragma omp simd
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
                         rhoa[gridOffset + gridBlockPosition + l] += dval * bgaos[l] * kgaos[l];
@@ -1141,7 +1141,7 @@ CDensityGridDriver::_distUnrestrictedDensityValuesForGga(CDensityGrid*          
 
                 if (std::fabs(dvala + dvalb) > _thresholdOfDensity)
                 {
-#pragma omp simd
+                    #pragma omp simd
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
                         const double fgx = (bgaox[l] * kgaos[l] + bgaos[l] * kgaox[l]);
@@ -1190,7 +1190,8 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
 {
     // initialize density grid
 
-    CDensityGrid densityGrid(molecularGrid.getNumberOfGridPoints(), aoDensityMatrix.getNumberOfDensityMatrices(), xcFunctional, dengrid::ab);
+    CDensityGrid densityGrid(molecularGrid.getNumberOfGridPoints(), aoDensityMatrix.getNumberOfDensityMatrices(),
+                       xcFunctional, dengrid::ab);
 
     densityGrid.zero();
 
@@ -1215,22 +1216,22 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
     auto mgx = molecularGrid.getCoordinatesX();
 
     auto mgy = molecularGrid.getCoordinatesY();
-
+   
     auto mgz = molecularGrid.getCoordinatesZ();
-
+   
     // set up pointer to density matrix
-
+   
     auto denptr = &aoDensityMatrix;
-
+   
     // set up poinet to density grid
-
+   
     auto dgridptr = &densityGrid;
-
+   
     // generate density on grid points
-
-#pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
+   
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
     {
-#pragma omp single nowait
+        #pragma omp single nowait
         {
             for (int32_t i = 0; i < ntasks; i++)
             {
@@ -1244,24 +1245,23 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
 
                 if (xcFunctional == xcfun::lda)
                 {
-#pragma omp task firstprivate(tbsize, tbposition)
+                    #pragma omp task firstprivate(tbsize, tbposition)
                     {
-                        _genBatchOfPairDensityGridPointsForLda(
-                            dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
+                        _genBatchOfPairDensityGridPointsForLda(dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                     }
                 }
                 else if (xcFunctional == xcfun::gga)
                 {
-#pragma omp task firstprivate(tbsize, tbposition)
+                    #pragma omp task firstprivate(tbsize, tbposition)
                     {
-                        _genBatchOfPairDensityGridPointsForGga(
-                            dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
+                        _genBatchOfPairDensityGridPointsForGga(dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
                     }
                 }
+                
             }
         }
     }
-
+   
     if (xcFunctional == xcfun::gga)
     {
         // finalize density grid
@@ -1278,7 +1278,7 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
 }
 
 void
-CDensityGridDriver::_genBatchOfPairDensityGridPointsForLda(CDensityGrid*           densityGrid,
+CDensityGridDriver::_genBatchOfPairDensityGridPointsForLda(      CDensityGrid*     densityGrid,
                                                            const CAODensityMatrix* aoDensityMatrix,
                                                            const double*           twoDM,
                                                            const double*           activeMOs,
@@ -1316,7 +1316,7 @@ CDensityGridDriver::_genBatchOfPairDensityGridPointsForLda(CDensityGrid*        
 
             _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, gridOffset, igpnt, blockdim);
 
-            _distPairDensityValuesForLda(densityGrid, twoDM, activeMOs, nActive, naos, gaos, gridOffset, igpnt, blockdim);
+            _distPairDensityValuesForLda(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gridOffset, igpnt, blockdim);
 
             igpnt += blockdim;
         }
@@ -1333,7 +1333,7 @@ CDensityGridDriver::_genBatchOfPairDensityGridPointsForLda(CDensityGrid*        
 
         _distRestrictedDensityValuesForLda(densityGrid, aoDensityMatrix, gaos, gridOffset, igpnt, blockdim);
 
-        _distPairDensityValuesForLda(densityGrid, twoDM, activeMOs, nActive, naos, gaos, gridOffset, igpnt, blockdim);
+        _distPairDensityValuesForLda(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gridOffset, igpnt, blockdim);
     }
 }
 
@@ -1348,37 +1348,37 @@ CDensityGridDriver::_distPairDensityValuesForLda(      CDensityGrid*        dens
                                                  const int32_t              gridBlockPosition,
                                                  const int32_t              nGridPoints) const
 {
-    int32_t ndmat = 1;
+    int32_t ndmat=1;
 
     for (int32_t i = 0; i < ndmat; i++)
-    {
+    {   
         // set up pointer to density grid data
-
+        
         auto rhoa = densityGrid->alphaDensity(i);
 
         auto rhob = densityGrid->betaDensity(i);
 
         // Compute MOs on grid
 
-        double** ActMOs = new double*[nActive];
+        double** ActMOs=new double*[nActive];
 
         for (int32_t iAct = 0; iAct < nActive; iAct++)
         {
             ActMOs[iAct] = new double[nGridPoints];
-#pragma omp simd
+            #pragma omp simd 
             for (int32_t l = 0; l < nGridPoints; l++)
             {
                 ActMOs[iAct][l] = 0.0;
             }
 
-            auto MO = &activeMOs[iAct * nAOs];
+            auto MO = &activeMOs[iAct*nAOs];
             for (int32_t j = 0; j < nAOs; j++)
             {
                 auto bgaos = gtoValues.data(j);
-#pragma omp simd
+                #pragma omp simd 
                 for (int32_t l = 0; l < nGridPoints; l++)
                 {
-                    ActMOs[iAct][l] += bgaos[l] * MO[j];
+                    ActMOs[iAct][l]+= bgaos[l] * MO[j];
                 }
             }
         }
@@ -1389,20 +1389,20 @@ CDensityGridDriver::_distPairDensityValuesForLda(      CDensityGrid*        dens
             auto iMO = ActMOs[iAct];
             for (int32_t jAct = 0; jAct < nActive; jAct++)
             {
-                int32_t ioff = iAct * nActive + jAct;
-                auto    jMO  = ActMOs[jAct];
+                int32_t ioff=iAct*nActive+jAct;
+                auto jMO = ActMOs[jAct];
                 for (int32_t kAct = 0; kAct < nActive; kAct++)
                 {
-                    int32_t joff = ioff * nActive + kAct;
-                    auto    kMO  = ActMOs[kAct];
+                    int32_t joff=ioff*nActive+kAct;
+                    auto kMO = ActMOs[kAct];
                     for (int32_t lAct = 0; lAct < nActive; lAct++)
                     {
-                        auto   lMO    = ActMOs[lAct];
-                        double dval_b = twoDM[joff * nActive + lAct];
-#pragma omp simd
+                        auto lMO = ActMOs[lAct];
+                        double dval_b = twoDM[joff*nActive+lAct];
+                        #pragma omp simd 
                         for (int32_t l = 0; l < nGridPoints; l++)
                         {
-                            double fact = iMO[l] * jMO[l] * kMO[l] * lMO[l];
+                            double fact=iMO[l] * jMO[l] * kMO[l] * lMO[l];
                             rhob[gridOffset + gridBlockPosition + l] += dval_b * fact;
                         }
                     }
@@ -1421,27 +1421,27 @@ CDensityGridDriver::_distPairDensityValuesForLda(      CDensityGrid*        dens
             auto da = rhoa[gridOffset + gridBlockPosition + l];
             auto db = rhob[gridOffset + gridBlockPosition + l];
 
-            auto delta = -db;
-            if (delta > 0)
+            auto delta=-db;
+            if (delta>0)
             {
-                delta = sqrt(2.0 * delta);
+                delta=sqrt(2.0*delta);
             }
             else
             {
-                delta = 0.0;
+                delta=0.0;
             }
-            rhoa[gridOffset + gridBlockPosition + l] = 0.5 * (da + delta);
-            rhob[gridOffset + gridBlockPosition + l] = 0.5 * (da - delta);
+            rhoa[gridOffset + gridBlockPosition + l]=0.5*(da+delta);
+            rhob[gridOffset + gridBlockPosition + l]=0.5*(da-delta);
         }
     }
 }
 
 void
-CDensityGridDriver::_genBatchOfPairDensityGridPointsForGga(CDensityGrid*           densityGrid,
+CDensityGridDriver::_genBatchOfPairDensityGridPointsForGga(      CDensityGrid*     densityGrid,
                                                            const CAODensityMatrix* aoDensityMatrix,
-                                                           const double*                 twoDM,
-                                                           const double*                 activeMOs,
-                                                           const int32_t                 nActive,
+                                                           const double*           twoDM,
+                                                           const double*           activeMOs,
+                                                           const int32_t           nActive,
                                                            const CGtoContainer*    gtoContainer,
                                                            const double*           gridCoordinatesX,
                                                            const double*           gridCoordinatesY,
@@ -1477,11 +1477,13 @@ CDensityGridDriver::_genBatchOfPairDensityGridPointsForGga(CDensityGrid*        
 
         for (int32_t i = 0; i < nblocks; i++)
         {
-            gtorec::computeGtosValuesForGGA(
-                gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
+            gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz,  gtoContainer, gridCoordinatesX, gridCoordinatesY,
+                                             gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
-            _distRestrictedDensityValuesForGga(densityGrid, aoDensityMatrix, gaos, gaox, gaoy, gaoz, gridOffset, igpnt, blockdim);
-            _distPairDensityValuesForGga(densityGrid, twoDM, activeMOs, nActive, naos, gaos, gaox, gaoy, gaoz, gridOffset, igpnt, blockdim);
+            _distRestrictedDensityValuesForGga(densityGrid, aoDensityMatrix, gaos, gaox, gaoy, gaoz,
+                                               gridOffset, igpnt, blockdim);
+            _distPairDensityValuesForGga(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gaox, gaoy, gaoz, 
+                                               gridOffset, igpnt, blockdim);
 
             igpnt += blockdim;
         }
@@ -1500,12 +1502,14 @@ CDensityGridDriver::_genBatchOfPairDensityGridPointsForGga(CDensityGrid*        
 
         CMemBlock2D<double> gaoz(blockdim, naos);
 
-        gtorec::computeGtosValuesForGGA(
-            gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY, gridCoordinatesZ, gridOffset, igpnt, blockdim);
+        gtorec::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtoContainer, gridCoordinatesX, gridCoordinatesY,
+                                        gridCoordinatesZ, gridOffset, igpnt, blockdim);
 
-        _distRestrictedDensityValuesForGga(densityGrid, aoDensityMatrix, gaos, gaox, gaoy, gaoz, gridOffset, igpnt, blockdim);
+        _distRestrictedDensityValuesForGga(densityGrid, aoDensityMatrix, gaos, gaox, gaoy, gaoz,
+                                           gridOffset, igpnt, blockdim);
 
-        _distPairDensityValuesForGga(densityGrid, twoDM, activeMOs, nActive, naos, gaos, gaox, gaoy, gaoz, gridOffset, igpnt, blockdim);
+        _distPairDensityValuesForGga(densityGrid,twoDM, activeMOs, nActive, naos, gaos, gaox, gaoy, gaoz,
+                                           gridOffset, igpnt, blockdim);
     }
 }
 
@@ -1523,12 +1527,12 @@ CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        dens
                                                  const int32_t              gridBlockPosition,
                                                  const int32_t              nGridPoints) const
 {
-    int32_t ndmat = 1;
+    int32_t ndmat=1;
 
     for (int32_t i = 0; i < ndmat; i++)
-    {
+    {   
         // set up pointer to density grid data
-
+        
         auto rhoa = densityGrid->alphaDensity(i);
 
         auto gradax = densityGrid->alphaDensityGradientX(i);
@@ -1547,28 +1551,28 @@ CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        dens
 
         // Compute MOs on grid
 
-        double** ActMOs   = new double*[nActive];
-        double** ActMOs_x = new double*[nActive];
-        double** ActMOs_y = new double*[nActive];
-        double** ActMOs_z = new double*[nActive];
+        double** ActMOs=new double*[nActive];
+        double** ActMOs_x=new double*[nActive];
+        double** ActMOs_y=new double*[nActive];
+        double** ActMOs_z=new double*[nActive];
 
         for (int32_t iAct = 0; iAct < nActive; iAct++)
         {
-            ActMOs[iAct]   = new double[nGridPoints];
+            ActMOs[iAct] = new double[nGridPoints];
             ActMOs_x[iAct] = new double[nGridPoints];
             ActMOs_y[iAct] = new double[nGridPoints];
             ActMOs_z[iAct] = new double[nGridPoints];
 
-#pragma omp simd
+            #pragma omp simd 
             for (int32_t l = 0; l < nGridPoints; l++)
             {
-                ActMOs[iAct][l]   = 0.0;
+                ActMOs[iAct][l] = 0.0;
                 ActMOs_x[iAct][l] = 0.0;
                 ActMOs_y[iAct][l] = 0.0;
                 ActMOs_z[iAct][l] = 0.0;
             }
 
-            auto MO = &activeMOs[iAct * nAOs];
+            auto MO = &activeMOs[iAct*nAOs];
             for (int32_t j = 0; j < nAOs; j++)
             {
                 auto bgaos = gtoValues.data(j);
@@ -1576,13 +1580,13 @@ CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        dens
                 auto bgaoy = gtoValuesY.data(j);
                 auto bgaoz = gtoValuesZ.data(j);
 
-#pragma omp simd
+                #pragma omp simd 
                 for (int32_t l = 0; l < nGridPoints; l++)
                 {
-                    ActMOs[iAct][l] += bgaos[l] * MO[j];
-                    ActMOs_x[iAct][l] += bgaox[l] * MO[j];
-                    ActMOs_y[iAct][l] += bgaoy[l] * MO[j];
-                    ActMOs_z[iAct][l] += bgaoz[l] * MO[j];
+                    ActMOs[iAct][l]+= bgaos[l] * MO[j];
+                    ActMOs_x[iAct][l]+= bgaox[l] * MO[j];
+                    ActMOs_y[iAct][l]+= bgaoy[l] * MO[j];
+                    ActMOs_z[iAct][l]+= bgaoz[l] * MO[j];
                 }
             }
         }
@@ -1590,46 +1594,52 @@ CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        dens
         // Compute on-top pair density on grid
         for (int32_t iAct = 0; iAct < nActive; iAct++)
         {
-            auto iMO   = ActMOs[iAct];
+            auto iMO = ActMOs[iAct];
             auto iMO_x = ActMOs_x[iAct];
             auto iMO_y = ActMOs_y[iAct];
             auto iMO_z = ActMOs_z[iAct];
 
             for (int32_t jAct = 0; jAct < nActive; jAct++)
             {
-                int32_t ioff  = iAct * nActive + jAct;
-                auto    jMO   = ActMOs[jAct];
-                auto    jMO_x = ActMOs_x[jAct];
-                auto    jMO_y = ActMOs_y[jAct];
-                auto    jMO_z = ActMOs_z[jAct];
+                int32_t ioff=iAct*nActive+jAct;
+                auto jMO = ActMOs[jAct];
+                auto jMO_x = ActMOs_x[jAct];
+                auto jMO_y = ActMOs_y[jAct];
+                auto jMO_z = ActMOs_z[jAct];
 
                 for (int32_t kAct = 0; kAct < nActive; kAct++)
                 {
-                    int32_t joff  = ioff * nActive + kAct;
-                    auto    kMO   = ActMOs[kAct];
-                    auto    kMO_x = ActMOs_x[kAct];
-                    auto    kMO_y = ActMOs_y[kAct];
-                    auto    kMO_z = ActMOs_z[kAct];
+                    int32_t joff=ioff*nActive+kAct;
+                    auto kMO = ActMOs[kAct];
+                    auto kMO_x = ActMOs_x[kAct];
+                    auto kMO_y = ActMOs_y[kAct];
+                    auto kMO_z = ActMOs_z[kAct];
 
                     for (int32_t lAct = 0; lAct < nActive; lAct++)
                     {
-                        auto lMO   = ActMOs[lAct];
+                        auto lMO = ActMOs[lAct];
                         auto lMO_x = ActMOs_x[lAct];
                         auto lMO_y = ActMOs_y[lAct];
                         auto lMO_z = ActMOs_z[lAct];
 
-                        double dval_b = twoDM[joff * nActive + lAct];
-#pragma omp simd
+                        double dval_b = twoDM[joff*nActive+lAct];
+                        #pragma omp simd 
                         for (int32_t l = 0; l < nGridPoints; l++)
                         {
-                            double fact = iMO[l] * jMO[l] * kMO[l] * lMO[l];
+                            double fact=iMO[l] * jMO[l] * kMO[l] * lMO[l];
                             rhob[gridOffset + gridBlockPosition + l] += dval_b * fact;
-                            double fgx = iMO_x[l] * jMO[l] * kMO[l] * lMO[l] + iMO[l] * jMO_x[l] * kMO[l] * lMO[l] +
-                                         iMO[l] * jMO[l] * kMO_x[l] * lMO[l] + iMO[l] * jMO[l] * kMO[l] * lMO_x[l];
-                            double fgy = iMO_y[l] * jMO[l] * kMO[l] * lMO[l] + iMO[l] * jMO_y[l] * kMO[l] * lMO[l] +
-                                         iMO[l] * jMO[l] * kMO_y[l] * lMO[l] + iMO[l] * jMO[l] * kMO[l] * lMO_y[l];
-                            double fgz = iMO_z[l] * jMO[l] * kMO[l] * lMO[l] + iMO[l] * jMO_z[l] * kMO[l] * lMO[l] +
-                                         iMO[l] * jMO[l] * kMO_z[l] * lMO[l] + iMO[l] * jMO[l] * kMO[l] * lMO_z[l];
+                            double fgx= iMO_x[l] * jMO[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO_x[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO_x[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO[l] * lMO_x[l];
+                            double fgy= iMO_y[l] * jMO[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO_y[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO_y[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO[l] * lMO_y[l];
+                            double fgz= iMO_z[l] * jMO[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO_z[l] * kMO[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO_z[l] * lMO[l]
+                                       +iMO[l] * jMO[l] * kMO[l] * lMO_z[l];
                             gradbx[gridOffset + gridBlockPosition + l] += dval_b * fgx;
                             gradby[gridOffset + gridBlockPosition + l] += dval_b * fgy;
                             gradbz[gridOffset + gridBlockPosition + l] += dval_b * fgz;
@@ -1657,53 +1667,52 @@ CDensityGridDriver::_distPairDensityValuesForGga(      CDensityGrid*        dens
         // to reuse the usual functional expressions
         for (int32_t l = 0; l < nGridPoints; l++)
         {
-            auto da  = rhoa[gridOffset + gridBlockPosition + l];
+            auto da  = rhoa  [gridOffset + gridBlockPosition + l];
             auto dax = gradax[gridOffset + gridBlockPosition + l];
             auto day = graday[gridOffset + gridBlockPosition + l];
             auto daz = gradaz[gridOffset + gridBlockPosition + l];
-            auto db  = rhob[gridOffset + gridBlockPosition + l];
+            auto db = rhob   [gridOffset + gridBlockPosition + l];
+            auto dbx = gradbx[gridOffset + gridBlockPosition + l];
+            auto dby = gradby[gridOffset + gridBlockPosition + l];
+            auto dbz = gradbz[gridOffset + gridBlockPosition + l];
 
-            double delta = 0.0;
-            if (db < 0)
+            double delta=0.0;
+            if (db<0)
             {
-                delta = sqrt(-2.0 * db);
+                delta=sqrt(-2.0*db);
             }
-            rhoa[gridOffset + gridBlockPosition + l] = 0.5 * (da + delta);
-            rhob[gridOffset + gridBlockPosition + l] = 0.5 * (da - delta);
+            rhoa[gridOffset + gridBlockPosition + l]=0.5*(da+delta);
+            rhob[gridOffset + gridBlockPosition + l]=0.5*(da-delta);
 
-            // Correct formulas, but give bad results without extra care on the db~=0 case
-            // auto dbx = gradbx[gridOffset + gridBlockPosition + l];
-            // auto dby = gradby[gridOffset + gridBlockPosition + l];
-            // auto dbz = gradbz[gridOffset + gridBlockPosition + l];
-
-            // if (delta > 1.0e-8)
-            //{
-            //     gradax[gridOffset + gridBlockPosition + l] = 0.5 * (dax - dbx / delta);
-            //     graday[gridOffset + gridBlockPosition + l] = 0.5 * (day - dby / delta);
-            //     gradaz[gridOffset + gridBlockPosition + l] = 0.5 * (daz - dbz / delta);
-            //     gradbx[gridOffset + gridBlockPosition + l] = 0.5 * (dax + dbx / delta);
-            //     gradby[gridOffset + gridBlockPosition + l] = 0.5 * (day + dby / delta);
-            //     gradbz[gridOffset + gridBlockPosition + l] = 0.5 * (daz + dbz / delta);
+            //Correct formulas, but give bad results without extra care on the db~=0 case
+            // if (delta>1.0e-8)
+            // {
+            //     gradax[gridOffset + gridBlockPosition + l]=0.5*(dax-dbx/delta);
+            //     graday[gridOffset + gridBlockPosition + l]=0.5*(day-dby/delta);
+            //     gradaz[gridOffset + gridBlockPosition + l]=0.5*(daz-dbz/delta);
+            //     gradbx[gridOffset + gridBlockPosition + l]=0.5*(dax+dbx/delta);
+            //     gradby[gridOffset + gridBlockPosition + l]=0.5*(day+dby/delta);
+            //     gradbz[gridOffset + gridBlockPosition + l]=0.5*(daz+dbz/delta);
             // }
 
             //"translated" formulas from Li Manni 2014
-            if (da > 1.0e-8)
+            if (da>1.0e-8)
             {
-                gradax[gridOffset + gridBlockPosition + l] = 0.5 * (dax + delta * dax / da);
-                graday[gridOffset + gridBlockPosition + l] = 0.5 * (day + delta * day / da);
-                gradaz[gridOffset + gridBlockPosition + l] = 0.5 * (daz + delta * daz / da);
-                gradbx[gridOffset + gridBlockPosition + l] = 0.5 * (dax - delta * dax / da);
-                gradby[gridOffset + gridBlockPosition + l] = 0.5 * (day - delta * day / da);
-                gradbz[gridOffset + gridBlockPosition + l] = 0.5 * (daz - delta * daz / da);
+                gradax[gridOffset + gridBlockPosition + l]=0.5*(dax+delta*dax/da);
+                graday[gridOffset + gridBlockPosition + l]=0.5*(day+delta*day/da);
+                gradaz[gridOffset + gridBlockPosition + l]=0.5*(daz+delta*daz/da);
+                gradbx[gridOffset + gridBlockPosition + l]=0.5*(dax-delta*dax/da);
+                gradby[gridOffset + gridBlockPosition + l]=0.5*(day-delta*day/da);
+                gradbz[gridOffset + gridBlockPosition + l]=0.5*(daz-delta*daz/da);
             }
             else
             {
-                gradax[gridOffset + gridBlockPosition + l] = 0.5 * dax;
-                graday[gridOffset + gridBlockPosition + l] = 0.5 * day;
-                gradaz[gridOffset + gridBlockPosition + l] = 0.5 * daz;
-                gradbx[gridOffset + gridBlockPosition + l] = 0.5 * dax;
-                gradby[gridOffset + gridBlockPosition + l] = 0.5 * day;
-                gradbz[gridOffset + gridBlockPosition + l] = 0.5 * daz;
+                gradax[gridOffset + gridBlockPosition + l]=0.5*dax;
+                graday[gridOffset + gridBlockPosition + l]=0.5*day;
+                gradaz[gridOffset + gridBlockPosition + l]=0.5*daz;
+                gradbx[gridOffset + gridBlockPosition + l]=0.5*dax;
+                gradby[gridOffset + gridBlockPosition + l]=0.5*day;
+                gradbz[gridOffset + gridBlockPosition + l]=0.5*daz;
             }
         }
     }

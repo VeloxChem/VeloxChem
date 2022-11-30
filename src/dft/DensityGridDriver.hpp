@@ -401,14 +401,11 @@ class CDensityGridDriver
      @param twoDM the "active" MO two-body density matrix.
      @param activeMOs the active MO coefficients.
      @param nActive the number of active orbitals.
-     @param gtoContainer TODO
-     @param gridCoordinatesX TODO
-     @param gridCoordinatesY TODO
-     @param gridCoordinatesZ TODO
-     @param gridOffset TODO
-     @param nGridPoints TODO
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the distributed molecular grid.
      */
-    void _genBatchOfPairDensityGridPointsForLda(CDensityGrid*           densityGrid,
+    void _genBatchOfPairDensityGridPointsForLda(      CDensityGrid*     densityGrid,
                                                 const CAODensityMatrix* aoDensityMatrix,
                                                 const double*           twoDM,
                                                 const double*           activeMOs,
@@ -428,14 +425,11 @@ class CDensityGridDriver
      @param twoDM the "active" MO two-body density matrix.
      @param activeMOs the active MO coefficients.
      @param nActive the number of active orbitals.
-     @param gtoContainer TODO
-     @param gridCoordinatesX TODO
-     @param gridCoordinatesY TODO
-     @param gridCoordinatesZ TODO
-     @param gridOffset TODO
-     @param nGridPoints TODO
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the distributed molecular grid.
      */
-    void _genBatchOfPairDensityGridPointsForGga(CDensityGrid*           densityGrid,
+    void _genBatchOfPairDensityGridPointsForGga(      CDensityGrid*     densityGrid,
                                                 const CAODensityMatrix* aoDensityMatrix,
                                                 const double*           twoDM,
                                                 const double*           activeMOs,
@@ -559,6 +553,7 @@ class CDensityGridDriver
                                   const CMolecularBasis&  basis,
                                   const CMolecularGrid&   molecularGrid,
                                   const xcfun             xcFunctional);
+
 };
 
 #endif /* DensityGridDriver_hpp */
