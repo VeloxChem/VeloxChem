@@ -25,16 +25,16 @@
 
 #include "XCNewIntegrator.hpp"
 
-#include <omp.h>
-
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
 
-#include "AODensityMatrix.hpp"
+#include <omp.h>
+
 #include "AngularMomentum.hpp"
+#include "AODensityMatrix.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DensityGridType.hpp"
@@ -81,11 +81,11 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc);
+           return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc);
+           return _integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -125,11 +125,11 @@ CXCNewIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
     {
         if (xcfuntype == xcfun::lda)
         {
-            _integrateFxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
+           _integrateFxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            _integrateFxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
+           _integrateFxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -169,11 +169,15 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
     {
         if (xcfuntype == xcfun::lda)
         {
-            _integrateKxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+           _integrateKxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+
+                                   molecularGrid, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix, molecularGrid, fvxc, quadMode);
+           _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+
+                                   molecularGrid, fvxc, quadMode);
         }
         else
         {
@@ -229,7 +233,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
     // skip_ao_ids: whether an AO should be skipped
     // aoinds: mapping between AO indices before and after screening
 
-    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
@@ -289,7 +293,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("OMP GTO evaluation");
 
-#pragma omp parallel
+        #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
@@ -299,8 +303,9 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(
-                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -368,7 +373,9 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         CDensityGrid screened_dengrid(dengrid);
 
-        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_dengrid, dengrid, _screeningThresholdForDensityValues);
+        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_dengrid, dengrid,
+
+                                            _screeningThresholdForDensityValues);
 
         auto screened_npoints = screened_dengrid.getNumberOfGridPoints();
 
@@ -394,7 +401,9 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         // compute partial contribution to Vxc matrix
 
-        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(screened_npoints, screened_weights, screened_mat_chi, vxcgrid, timer);
+        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(screened_npoints, screened_weights, screened_mat_chi,
+
+                                                              vxcgrid, timer);
 
         // distribute partial Vxc to full Kohn-Sham matrix
 
@@ -430,15 +439,15 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
     //{
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 
     mat_Vxc.setNumberOfElectrons(nele);
 
@@ -492,7 +501,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     // skip_ao_ids: whether an AO should be skipped
     // aoinds: mapping between AO indices before and after screening
 
-    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
@@ -552,7 +561,7 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.start("OMP GTO evaluation");
 
-#pragma omp parallel
+        #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
@@ -562,8 +571,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(
-                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -590,8 +600,10 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -642,7 +654,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, xcfuntype, timer);
+        auto dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+
+                                                             sub_dens_mat, xcfuntype, timer);
 
         // screen density grid, weights and GTO matrix
 
@@ -650,7 +664,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         CDensityGrid screened_dengrid(dengrid);
 
-        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_dengrid, dengrid, _screeningThresholdForDensityValues);
+        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_dengrid, dengrid,
+
+                                            _screeningThresholdForDensityValues);
 
         auto screened_npoints = screened_dengrid.getNumberOfGridPoints();
 
@@ -664,16 +680,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         CDenseMatrix screened_mat_chi_z(mat_chi.getNumberOfRows(), screened_npoints);
 
-        gridscreen::screenGtoMatrixForGGA(screened_mat_chi,
-                                          screened_mat_chi_x,
-                                          screened_mat_chi_y,
-                                          screened_mat_chi_z,
-                                          mat_chi,
-                                          mat_chi_x,
-                                          mat_chi_y,
-                                          mat_chi_z,
-                                          screened_point_inds,
-                                          screened_npoints);
+        gridscreen::screenGtoMatrixForGGA(screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                          mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, screened_point_inds, screened_npoints);
 
         timer.stop("Density screening");
 
@@ -691,15 +700,11 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         // compute partial contribution to Vxc matrix
 
-        auto partial_mat_Vxc = _integratePartialVxcFockForGGA(screened_npoints,
-                                                              screened_weights,
-                                                              screened_mat_chi,
-                                                              screened_mat_chi_x,
-                                                              screened_mat_chi_y,
-                                                              screened_mat_chi_z,
-                                                              vxcgrid,
-                                                              screened_dengrid,
-                                                              timer);
+        auto partial_mat_Vxc = _integratePartialVxcFockForGGA(screened_npoints, screened_weights, screened_mat_chi,
+
+                                                              screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                                              vxcgrid, screened_dengrid, timer);
 
         // distribute partial Vxc to full Kohn-Sham matrix
 
@@ -735,15 +740,15 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
     //{
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 
     mat_Vxc.setNumberOfElectrons(nele);
 
@@ -787,7 +792,7 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     // skip_ao_ids: whether an AO should be skipped
     // aoinds: mapping between AO indices before and after screening
 
-    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
@@ -843,7 +848,7 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("OMP GTO evaluation");
 
-#pragma omp parallel
+        #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
@@ -853,8 +858,9 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(
-                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -922,7 +928,9 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         CDensityGrid screened_gsdengrid(gsdengrid);
 
-        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_gsdengrid, gsdengrid, _screeningThresholdForDensityValues);
+        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_gsdengrid, gsdengrid,
+
+                                            _screeningThresholdForDensityValues);
 
         auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
 
@@ -962,11 +970,15 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             auto xcfuntype = xcFunctional.getFunctionalType();
 
-            auto rwdengrid = dengridgen::generateDensityGridForLDA(screened_npoints, screened_mat_chi, sub_dens_mat, xcfuntype, timer);
+            auto rwdengrid = dengridgen::generateDensityGridForLDA(screened_npoints, screened_mat_chi, sub_dens_mat,
+
+                                                                   xcfuntype, timer);
 
             // compute partial contribution to Fxc matrix
 
-            auto partial_mat_Fxc = _integratePartialFxcFockForLDA(screened_npoints, screened_weights, screened_mat_chi, vxc2grid, rwdengrid, timer);
+            auto partial_mat_Fxc = _integratePartialFxcFockForLDA(screened_npoints, screened_weights, screened_mat_chi,
+
+                                                                  vxc2grid, rwdengrid, timer);
 
             // distribute partial Fxc to full Fock matrix
 
@@ -984,15 +996,15 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
     //{
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 }
 
 void
@@ -1036,7 +1048,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     // skip_ao_ids: whether an AO should be skipped
     // aoinds: mapping between AO indices before and after screening
 
-    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
@@ -1092,7 +1104,7 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("OMP GTO evaluation");
 
-#pragma omp parallel
+        #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
@@ -1102,8 +1114,9 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(
-                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -1130,8 +1143,10 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -1182,7 +1197,9 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto gsdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, xcfuntype, timer);
+        auto gsdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+
+                                                               sub_dens_mat, xcfuntype, timer);
 
         // screen density grid, weights and GTO matrix
 
@@ -1190,7 +1207,9 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         CDensityGrid screened_gsdengrid(gsdengrid);
 
-        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_gsdengrid, gsdengrid, _screeningThresholdForDensityValues);
+        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_gsdengrid, gsdengrid,
+
+                                            _screeningThresholdForDensityValues);
 
         auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
 
@@ -1204,16 +1223,9 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         CDenseMatrix screened_mat_chi_z(mat_chi.getNumberOfRows(), screened_npoints);
 
-        gridscreen::screenGtoMatrixForGGA(screened_mat_chi,
-                                          screened_mat_chi_x,
-                                          screened_mat_chi_y,
-                                          screened_mat_chi_z,
-                                          mat_chi,
-                                          mat_chi_x,
-                                          mat_chi_y,
-                                          mat_chi_z,
-                                          screened_point_inds,
-                                          screened_npoints);
+        gridscreen::screenGtoMatrixForGGA(screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                          mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, screened_point_inds, screened_npoints);
 
         timer.stop("Density screening");
 
@@ -1249,22 +1261,19 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             auto xcfuntype = xcFunctional.getFunctionalType();
 
-            auto rwdengrid = dengridgen::generateDensityGridForGGA(
-                screened_npoints, screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z, sub_dens_mat, xcfuntype, timer);
+            auto rwdengrid = dengridgen::generateDensityGridForGGA(screened_npoints, screened_mat_chi,
+
+                                                                   screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                                                   sub_dens_mat, xcfuntype, timer);
 
             // compute partial contribution to Fxc matrix
 
-            auto partial_mat_Fxc = _integratePartialFxcFockForGGA(screened_npoints,
-                                                                  screened_weights,
-                                                                  screened_mat_chi,
-                                                                  screened_mat_chi_x,
-                                                                  screened_mat_chi_y,
-                                                                  screened_mat_chi_z,
-                                                                  vxcgrid,
-                                                                  vxc2grid,
-                                                                  rwdengrid,
-                                                                  screened_gsdengrid,
-                                                                  timer);
+            auto partial_mat_Fxc = _integratePartialFxcFockForGGA(screened_npoints, screened_weights, screened_mat_chi,
+
+                                                                  screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                                                  vxcgrid, vxc2grid, rwdengrid, screened_gsdengrid, timer);
 
             // distribute partial Fxc to full Fock matrix
 
@@ -1282,15 +1291,15 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
     //{
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 }
 
 void
@@ -1330,7 +1339,7 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     // skip_ao_ids: whether an AO should be skipped
     // aoinds: mapping between AO indices before and after screening
 
-    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
@@ -1386,7 +1395,7 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("OMP GTO evaluation");
 
-#pragma omp parallel
+        #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
@@ -1396,8 +1405,9 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(
-                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -1465,7 +1475,9 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         CDensityGrid screened_gsdengrid(gsdengrid);
 
-        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_gsdengrid, gsdengrid, _screeningThresholdForDensityValues);
+        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_gsdengrid, gsdengrid,
+
+                                            _screeningThresholdForDensityValues);
 
         auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
 
@@ -1491,9 +1503,13 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         // generate density grid
 
-        auto rwdengrid = dengridgen::generateDensityGridForLDA(screened_npoints, screened_mat_chi, rw_sub_dens_mat, xcfuntype, timer);
+        auto rwdengrid = dengridgen::generateDensityGridForLDA(screened_npoints, screened_mat_chi,
 
-        auto rw2dengrid = dengridgen::generateDensityGridForLDA(screened_npoints, screened_mat_chi, rw2_sub_dens_mat, xcfuntype, timer);
+                                                               rw_sub_dens_mat, xcfuntype, timer);
+
+        auto rw2dengrid = dengridgen::generateDensityGridForLDA(screened_npoints, screened_mat_chi,
+
+                                                                rw2_sub_dens_mat, xcfuntype, timer);
 
         // compute perturbed density
 
@@ -1527,8 +1543,11 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
         {
             // compute partial contribution to Kxc matrix
 
-            auto partial_mat_Kxc = _integratePartialKxcFockForLDA(
-                screened_npoints, screened_weights, screened_mat_chi, vxc2grid, vxc3grid, rwdengridquad, rw2dengrid, idensity, timer);
+            auto partial_mat_Kxc = _integratePartialKxcFockForLDA(screened_npoints, screened_weights, screened_mat_chi,
+
+                                                                  vxc2grid, vxc3grid, rwdengridquad, rw2dengrid,
+
+                                                                  idensity, timer);
 
             // distribute partial Kxc to full Fock matrix
 
@@ -1546,15 +1565,15 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
     //{
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 }
 
 void
@@ -1600,7 +1619,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     // skip_ao_ids: whether an AO should be skipped
     // aoinds: mapping between AO indices before and after screening
 
-    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
@@ -1656,7 +1675,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("OMP GTO evaluation");
 
-#pragma omp parallel
+        #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
@@ -1666,8 +1685,9 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(
-                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -1694,8 +1714,10 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -1746,7 +1768,9 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto gsdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat, xcfuntype, timer);
+        auto gsdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+
+                                                               gs_sub_dens_mat, xcfuntype, timer);
 
         // screen density grid, weights and GTO matrix
 
@@ -1754,7 +1778,9 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         CDensityGrid screened_gsdengrid(gsdengrid);
 
-        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_gsdengrid, gsdengrid, _screeningThresholdForDensityValues);
+        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_gsdengrid, gsdengrid,
+
+                                            _screeningThresholdForDensityValues);
 
         auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
 
@@ -1768,16 +1794,9 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         CDenseMatrix screened_mat_chi_z(mat_chi.getNumberOfRows(), screened_npoints);
 
-        gridscreen::screenGtoMatrixForGGA(screened_mat_chi,
-                                          screened_mat_chi_x,
-                                          screened_mat_chi_y,
-                                          screened_mat_chi_z,
-                                          mat_chi,
-                                          mat_chi_x,
-                                          mat_chi_y,
-                                          mat_chi_z,
-                                          screened_point_inds,
-                                          screened_npoints);
+        gridscreen::screenGtoMatrixForGGA(screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                          mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, screened_point_inds, screened_npoints);
 
         timer.stop("Density screening");
 
@@ -1795,11 +1814,17 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         // generate density grid
 
-        auto rwdengrid = dengridgen::generateDensityGridForGGA(
-            screened_npoints, screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z, rw_sub_dens_mat, xcfuntype, timer);
+        auto rwdengrid = dengridgen::generateDensityGridForGGA(screened_npoints, screened_mat_chi,
 
-        auto rw2dengrid = dengridgen::generateDensityGridForGGA(
-            screened_npoints, screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z, rw2_sub_dens_mat, xcfuntype, timer);
+                                                               screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                                               rw_sub_dens_mat, xcfuntype, timer);
+
+        auto rw2dengrid = dengridgen::generateDensityGridForGGA(screened_npoints, screened_mat_chi,
+
+                                                                screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                                                rw2_sub_dens_mat, xcfuntype, timer);
 
         // compute perturbed density
 
@@ -1837,20 +1862,15 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
         {
             // compute partial contribution to Kxc matrix
 
-            auto partial_mat_Kxc = _integratePartialKxcFockForGGA(screened_npoints,
-                                                                  screened_weights,
-                                                                  screened_mat_chi,
-                                                                  screened_mat_chi_x,
-                                                                  screened_mat_chi_y,
-                                                                  screened_mat_chi_z,
-                                                                  vxcgrid,
-                                                                  vxc2grid,
-                                                                  vxc3grid,
-                                                                  rwdengridquad,
-                                                                  rw2dengrid,
-                                                                  screened_gsdengrid,
-                                                                  idensity,
-                                                                  timer);
+            auto partial_mat_Kxc = _integratePartialKxcFockForGGA(screened_npoints, screened_weights, screened_mat_chi,
+
+                                                                  screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+
+                                                                  vxcgrid, vxc2grid, vxc3grid,
+
+                                                                  rwdengridquad, rw2dengrid, screened_gsdengrid,
+
+                                                                  idensity, timer);
 
             // distribute partial Kxc to full Fock matrix
 
@@ -1868,15 +1888,15 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
     //{
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
 }
 
 CDenseMatrix
@@ -2054,7 +2074,7 @@ CXCNewIntegrator::_integratePartialFxcFockForLDA(const int32_t         npoints,
 
     auto G_val = mat_G.values();
 
-#pragma omp parallel
+    #pragma omp parallel
     {
         auto thread_id = omp_get_thread_num();
 
@@ -2068,10 +2088,14 @@ CXCNewIntegrator::_integratePartialFxcFockForLDA(const int32_t         npoints,
         {
             auto nu_offset = nu * npoints;
 
-#pragma omp simd aligned(weights, grho_aa, grho_ab, rhowa, rhowb, G_val, chi_val : VLX_ALIGN)
+            #pragma omp simd aligned(weights, \
+                    grho_aa, grho_ab, rhowa, rhowb, \
+                    G_val, chi_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-                G_val[nu_offset + g] = weights[g] * (grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g]) * chi_val[nu_offset + g];
+                G_val[nu_offset + g] = weights[g] *
+
+                          (grho_aa[g] * rhowa[g] + grho_ab[g] * rhowb[g]) * chi_val[nu_offset + g];
             }
         }
     }
@@ -2190,7 +2214,7 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          npoints,
 
     auto G_gga_val = mat_G_gga.values();
 
-#pragma omp parallel
+    #pragma omp parallel
     {
         auto thread_id = omp_get_thread_num();
 
@@ -2204,43 +2228,11 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t          npoints,
         {
             auto nu_offset = nu * npoints;
 
-#pragma omp simd aligned(weights,   \
-                         ggrad_a,   \
-                         ggrad_c,   \
-                         grho_aa,   \
-                         grho_ab,   \
-                         gmix_aa,   \
-                         gmix_ab,   \
-                         gmix_ac,   \
-                         gmix_bc,   \
-                         ggrad_aa,  \
-                         ggrad_ab,  \
-                         ggrad_ac,  \
-                         ggrad_bc,  \
-                         ggrad_cc,  \
-                         ngrada,    \
-                         ngradb,    \
-                         grada_x,   \
-                         grada_y,   \
-                         grada_z,   \
-                         gradb_x,   \
-                         gradb_y,   \
-                         gradb_z,   \
-                         rhowa,     \
-                         rhowb,     \
-                         gradwa_x,  \
-                         gradwa_y,  \
-                         gradwa_z,  \
-                         gradwb_x,  \
-                         gradwb_y,  \
-                         gradwb_z,  \
-                         G_val,     \
-                         G_gga_val, \
-                         chi_val,   \
-                         chi_x_val, \
-                         chi_y_val, \
-                         chi_z_val  \
-                         : VLX_ALIGN)
+            #pragma omp simd aligned(weights, ggrad_a, ggrad_c, grho_aa, grho_ab, \
+                    gmix_aa, gmix_ab, gmix_ac, gmix_bc, ggrad_aa, ggrad_ab, ggrad_ac, ggrad_bc, ggrad_cc, \
+                    ngrada, ngradb, grada_x, grada_y, grada_z, gradb_x, gradb_y, gradb_z, rhowa, rhowb, \
+                    gradwa_x, gradwa_y, gradwa_z, gradwb_x, gradwb_y, gradwb_z, \
+                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 double w = weights[g];
@@ -2410,7 +2402,7 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              npoi
 
     auto G_val = mat_G.values();
 
-#pragma omp parallel
+    #pragma omp parallel
     {
         auto thread_id = omp_get_thread_num();
 
@@ -2424,16 +2416,19 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              npoi
         {
             auto nu_offset = nu * npoints;
 
-#pragma omp simd aligned(weights, grho_aa, grho_ab, grho_aaa, grho_aab, grho_abb, rhow1a, rhow12a, rhow12b, G_val, chi_val : VLX_ALIGN)
+            #pragma omp simd aligned(weights, \
+                    grho_aa, grho_ab, grho_aaa, grho_aab, grho_abb, \
+                    rhow1a, rhow12a, rhow12b, \
+                    G_val, chi_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 G_val[nu_offset + g] = weights[g] *
 
-                                       ((grho_aaa[g] + grho_aab[g] + grho_aab[g] + grho_abb[g]) * rhow1a[g] +
+                          ((grho_aaa[g] + grho_aab[g] + grho_aab[g] + grho_abb[g]) * rhow1a[g] +
 
-                                        grho_aa[g] * rhow12a[g] + grho_ab[g] * rhow12b[g]) *
+                           grho_aa[g] * rhow12a[g] + grho_ab[g] * rhow12b[g]) *
 
-                                       chi_val[nu_offset + g];
+                          chi_val[nu_offset + g];
             }
         }
     }
@@ -2631,7 +2626,7 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 
     auto G_gga_val = mat_G_gga.values();
 
-#pragma omp parallel
+    #pragma omp parallel
     {
         auto thread_id = omp_get_thread_num();
 
@@ -2645,79 +2640,16 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
         {
             auto nu_offset = nu * npoints;
 
-#pragma omp simd aligned(weights,    \
-                         df2000,     \
-                         df1100,     \
-                         df1010,     \
-                         df1001,     \
-                         df10001,    \
-                         df0020,     \
-                         df0011,     \
-                         df00101,    \
-                         df00002,    \
-                         df0010,     \
-                         df00001,    \
-                         df00011,    \
-                         df01001,    \
-                         df0110,     \
-                         df3000,     \
-                         df2100,     \
-                         df1200,     \
-                         df2010,     \
-                         df0030,     \
-                         df0021,     \
-                         df0012,     \
-                         df00201,    \
-                         df00111,    \
-                         df00102,    \
-                         df00003,    \
-                         df2001,     \
-                         df1110,     \
-                         df1101,     \
-                         df20001,    \
-                         df11001,    \
-                         df1020,     \
-                         df1011,     \
-                         df1002,     \
-                         df10101,    \
-                         df10002,    \
-                         df01002,    \
-                         df0120,     \
-                         df0111,     \
-                         df01101,    \
-                         df10011,    \
-                         df01011,    \
-                         df0210,     \
-                         df02001,    \
-                         df00021,    \
-                         ngrada,     \
-                         grada_x,    \
-                         grada_y,    \
-                         grada_z,    \
-                         rhow1rhow2, \
-                         rxw1rhow2,  \
-                         ryw1rhow2,  \
-                         rzw1rhow2,  \
-                         rxw1rxw2,   \
-                         rxw1ryw2,   \
-                         rxw1rzw2,   \
-                         ryw1rxw2,   \
-                         ryw1ryw2,   \
-                         ryw1rzw2,   \
-                         rzw1rxw2,   \
-                         rzw1ryw2,   \
-                         rzw1rzw2,   \
-                         rhow12a,    \
-                         gradw12a_x, \
-                         gradw12a_y, \
-                         gradw12a_z, \
-                         G_val,      \
-                         G_gga_val,  \
-                         chi_val,    \
-                         chi_x_val,  \
-                         chi_y_val,  \
-                         chi_z_val   \
-                         : VLX_ALIGN)
+            #pragma omp simd aligned(weights, \
+                    df2000, df1100, df1010, df1001, df10001, df0020, df0011, df00101, df00002, \
+                    df0010, df00001, df00011, df01001, df0110, df3000, df2100, df1200, df2010, \
+                    df0030, df0021, df0012, df00201, df00111, df00102, df00003, df2001, df1110, \
+                    df1101, df20001, df11001, df1020, df1011, df1002, df10101, df10002, df01002, \
+                    df0120, df0111, df01101, df10011, df01011, df0210, df02001, df00021, \
+                    ngrada, grada_x, grada_y, grada_z, rhow1rhow2, rxw1rhow2, ryw1rhow2, rzw1rhow2, \
+                    rxw1rxw2, rxw1ryw2, rxw1rzw2, ryw1rxw2, ryw1ryw2, ryw1rzw2, rzw1rxw2, rzw1ryw2, rzw1rzw2, \
+                    rhow12a, gradw12a_x, gradw12a_y, gradw12a_z, \
+                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 double w = weights[g];
@@ -2784,14 +2716,17 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 
                 double grad_dot_rw12 = grada_x[g] * rxw12a + grada_y[g] * ryw12a + grada_z[g] * rzw12a;
 
-                double grad_dot_rw1rw2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] + grada_z[g] * rzw1rhow2[g];
+                double grad_dot_rw1rw2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] +
+                                         grada_z[g] * rzw1rhow2[g];
 
-                double grad_dot_rw1rhow2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] + grada_z[g] * rzw1rhow2[g];
+                double grad_dot_rw1rhow2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] +
+                                           grada_z[g] * rzw1rhow2[g];
 
-                double xigrad_dot_rw1_xigrad_dot_rw2 =
-                    xigrad_x * xigrad_x * rxw1rxw2[g] + xigrad_x * xigrad_y * rxw1ryw2[g] + xigrad_x * xigrad_z * rxw1rzw2[g] +
-                    xigrad_y * xigrad_x * ryw1rxw2[g] + xigrad_y * xigrad_y * ryw1ryw2[g] + xigrad_y * xigrad_z * ryw1rzw2[g] +
-                    xigrad_z * xigrad_x * rzw1rxw2[g] + xigrad_z * xigrad_y * rzw1ryw2[g] + xigrad_z * xigrad_z * rzw1rzw2[g];
+                double xigrad_dot_rw1_xigrad_dot_rw2 = xigrad_x * xigrad_x * rxw1rxw2[g] + xigrad_x * xigrad_y * rxw1ryw2[g] +
+                                                       xigrad_x * xigrad_z * rxw1rzw2[g] + xigrad_y * xigrad_x * ryw1rxw2[g] +
+                                                       xigrad_y * xigrad_y * ryw1ryw2[g] + xigrad_y * xigrad_z * ryw1rzw2[g] +
+                                                       xigrad_z * xigrad_x * rzw1rxw2[g] + xigrad_z * xigrad_y * rzw1ryw2[g] +
+                                                       xigrad_z * xigrad_z * rzw1rzw2[g];
 
                 // scalar contribution
 
@@ -2911,26 +2846,23 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 
                 prefac += (df0020[g] + df0011[g]);
 
-                xcomp += prefac * xigrad_x *
-                         (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
+                xcomp += prefac * xigrad_x * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
 
-                          xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
+                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
 
-                          xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
+                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
 
-                ycomp += prefac * xigrad_y *
-                         (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
+                ycomp += prefac * xigrad_y * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
 
-                          xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
+                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
 
-                          xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
+                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
 
-                zcomp += prefac * xigrad_z *
-                         (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
+                zcomp += prefac * xigrad_z * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
 
-                          xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
+                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
 
-                          xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
+                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
 
                 // twelfth third
 
@@ -3121,7 +3053,9 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 }
 
 CDenseMatrix
-CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, CMolecularGrid& molecularGrid) const
+CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule&       molecule,
+                                               const CMolecularBasis& basis,
+                                               CMolecularGrid&        molecularGrid) const
 {
     molecularGrid.partitionGridPoints();
 
@@ -3151,7 +3085,7 @@ CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const 
     // skip_ao_ids: whether an AO should be skipped
     // aoinds: mapping between AO indices before and after screening
 
-    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
@@ -3189,7 +3123,7 @@ CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const 
 
         // GTO values on grid points
 
-#pragma omp parallel
+        #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
@@ -3197,8 +3131,9 @@ CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const 
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(
-                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
         }
 
         int32_t aocount = 0;
@@ -3289,7 +3224,7 @@ CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&   
     // skip_ao_ids: whether an AO should be skipped
     // aoinds: mapping between AO indices before and after screening
 
-    CMemBlock<int32_t> skip_cgto_ids(naos);  // note: naos >= ncgtos
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
 
     CMemBlock<int32_t> skip_ao_ids(naos);
 
@@ -3327,7 +3262,7 @@ CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&   
 
         // GTO values on grid points
 
-#pragma omp parallel
+        #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
@@ -3335,8 +3270,9 @@ CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&   
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(
-                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
         }
 
         int32_t aocount = 0;
@@ -3357,8 +3293,10 @@ CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&   
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -3396,7 +3334,11 @@ CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&   
 }
 
 void
-CXCNewIntegrator::computeExcVxcForLDA(const std::string& xcFuncLabel, const int32_t npoints, const double* rho, double* exc, double* vrho) const
+CXCNewIntegrator::computeExcVxcForLDA(const std::string& xcFuncLabel,
+                                      const int32_t      npoints,
+                                      const double*      rho,
+                                      double*            exc,
+                                      double*            vrho) const
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
@@ -3518,7 +3460,10 @@ CXCNewIntegrator::computeExcVxcForGGA(const std::string& xcFuncLabel,
 }
 
 void
-CXCNewIntegrator::computeFxcForLDA(const std::string& xcFuncLabel, const int32_t npoints, const double* rho, double* v2rho2) const
+CXCNewIntegrator::computeFxcForLDA(const std::string& xcFuncLabel,
+                                   const int32_t      npoints,
+                                   const double*      rho,
+                                   double*            v2rho2) const
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
