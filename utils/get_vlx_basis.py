@@ -26,10 +26,20 @@ def get_vlx_basis_string(basis_name,
         The string for VeloxChem basis set.
     """
 
+    # geometric augmentation
+
+    geom_aug = 0
+    if basis_name.upper().startswith('DAUG-'):
+        geom_aug = 1
+    elif basis_name.upper().startswith('TAUG-'):
+        geom_aug = 2
+    elif basis_name.upper().startswith('QAUG-'):
+        geom_aug = 3
+
     # (aug-)cc-pCVnZ basis sets: H and He are added from (aug-)cc-pVnZ
 
-    is_cc_pcvnz_basis = (re.search(r'^(AUG-)?CC-PCV.Z$', basis_name.upper())
-                         is not None)
+    is_cc_pcvnz_basis = (re.search(r'^[DTQ]?(AUG-)?CC-PCV.Z$',
+                                   basis_name.upper()) is not None)
 
     # Process basis set name (or json file name)
 
@@ -42,6 +52,8 @@ def get_vlx_basis_string(basis_name,
         if basis_name.upper() == 'SADLEJ-PVTZ':
             basis_name = 'SADLEJ PVTZ'
         import basis_set_exchange as bse
+        if geom_aug >= 1:
+            basis_name = basis_name[1:]
         basis = bse.get_basis(basis_name,
                               header=False,
                               optimize_general=optimize_general)
@@ -50,6 +62,13 @@ def get_vlx_basis_string(basis_name,
             h_he_basis = bse.get_basis(h_he_basis_name,
                                        header=False,
                                        optimize_general=optimize_general)
+        if geom_aug >= 1:
+            basis = bse.manip.geometric_augmentation(basis, geom_aug)
+            basis_name = 'DTQ'[geom_aug - 1] + basis_name
+            if is_cc_pcvnz_basis:
+                h_he_basis = bse.manip.geometric_augmentation(
+                    h_he_basis, geom_aug)
+                h_he_basis_name = 'DTQ'[geom_aug - 1] + h_he_basis_name
         if basis_name.upper() == 'SADLEJ PVTZ':
             basis_name = 'SADLEJ-PVTZ'
 
