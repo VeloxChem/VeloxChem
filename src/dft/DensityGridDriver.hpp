@@ -407,9 +407,9 @@ class CDensityGridDriver
      */
     void _genBatchOfPairDensityGridPointsForLda(      CDensityGrid*     densityGrid,
                                                 const CAODensityMatrix* aoDensityMatrix,
-                                                double*                 twoDM,
-                                                double*                 activeMOs,
-                                                int32_t                 nActive,
+                                                const double*           twoDM,
+                                                const double*           activeMOs,
+                                                const int32_t           nActive,
                                                 const CGtoContainer*    gtoContainer,
                                                 const double*           gridCoordinatesX,
                                                 const double*           gridCoordinatesY,
@@ -431,9 +431,9 @@ class CDensityGridDriver
      */
     void _genBatchOfPairDensityGridPointsForGga(      CDensityGrid*     densityGrid,
                                                 const CAODensityMatrix* aoDensityMatrix,
-                                                double*                 twoDM,
-                                                double*                 activeMOs,
-                                                int32_t                 nActive,
+                                                const double*           twoDM,
+                                                const double*           activeMOs,
+                                                const int32_t           nActive,
                                                 const CGtoContainer*    gtoContainer,
                                                 const double*           gridCoordinatesX,
                                                 const double*           gridCoordinatesY,
@@ -455,10 +455,10 @@ class CDensityGridDriver
      @param nGridPoints the number of grid points in grid points batch.
      */
     void _distPairDensityValuesForLda(      CDensityGrid*        densityGrid,
-                                      double*                    twoDM,
-                                      double*                    activeMOs,
-                                      int32_t                    nActive,
-                                      int32_t                    nAOs,
+                                      const double*              twoDM,
+                                      const double*              activeMOs,
+                                      const int32_t              nActive,
+                                      const int32_t              nAOs,
                                       const CMemBlock2D<double>& gtoValues,
                                       const int32_t              gridOffset,
                                       const int32_t              gridBlockPosition,
@@ -481,10 +481,10 @@ class CDensityGridDriver
      @param nGridPoints the number of grid points in grid points batch.
      */
     void _distPairDensityValuesForGga(      CDensityGrid*        densityGrid,
-                                      double*                    twoDM,
-                                      double*                    activeMOs,
-                                      int32_t                    nActive,
-                                      int32_t                    nAOs,
+                                      const double*              twoDM,
+                                      const double*              activeMOs,
+                                      const int32_t              nActive,
+                                      const int32_t              nAOs,
                                       const CMemBlock2D<double>& gtoValues,
                                       const CMemBlock2D<double>& gtoValuesX,
                                       const CMemBlock2D<double>& gtoValuesY,
@@ -546,9 +546,9 @@ class CDensityGridDriver
      @return the density grid object.
      */
     CDensityGrid generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
-                                  double*                 twoDM,
-                                  double*                 activeMOs,
-                                  int32_t                 nActive,
+                                  const double*           twoDM,
+                                  const double*           activeMOs,
+                                  const int32_t           nActive,
                                   const CMolecule&        molecule,
                                   const CMolecularBasis&  basis,
                                   const CMolecularGrid&   molecularGrid,

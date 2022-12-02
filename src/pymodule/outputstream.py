@@ -23,10 +23,10 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import os
+from os import environ
+from pathlib import Path
 import sys
 import time as tm
-from pathlib import Path
 
 from .errorhandler import assert_msg_critical
 
@@ -297,9 +297,9 @@ class OutputStream:
         self.print_separator()
         self.print_blank()
 
-        if 'OMP_NUM_THREADS' in os.environ:
+        if 'OMP_NUM_THREADS' in environ:
             self.print_info('Using {} OpenMP threads per compute node.'.format(
-                os.environ['OMP_NUM_THREADS']))
+                environ['OMP_NUM_THREADS']))
             self.print_blank()
 
         return start_time

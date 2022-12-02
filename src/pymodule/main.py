@@ -67,7 +67,6 @@ from .xtbhessiandriver import XTBHessianDriver
 from .veloxchemlib import DiagEriDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
-from .slurminfo import get_slurm_end_time
 
 
 def select_scf_driver(task, scf_type):
@@ -233,12 +232,7 @@ def main():
         maximum_hours = float(task.input_dict['jobs']['maximum_hours'])
         program_end_time = program_start_time + timedelta(hours=maximum_hours)
     else:
-        if task.mpi_rank == mpi_master():
-            program_end_time = get_slurm_end_time()
-        else:
-            program_end_time = None
-        program_end_time = task.mpi_comm.bcast(program_end_time,
-                                               root=mpi_master())
+        program_end_time = None
 
     # Method settings
     # Note: the @pe group is added to method_dict as pe_options

@@ -23,7 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import os
+from os import environ
 import psutil
 import ctypes
 
@@ -62,10 +62,10 @@ def get_batch_size(input_batch_size, n_total, n_ao, comm):
 
         # computes maximum batch size from available memory
         avail_mem = psutil.virtual_memory().available - mem_adjust
-        if 'SLURM_NTASKS_PER_NODE' in os.environ:
-            avail_mem //= int(os.environ['SLURM_NTASKS_PER_NODE'])
+        if 'SLURM_NTASKS_PER_NODE' in environ:
+            avail_mem //= int(environ['SLURM_NTASKS_PER_NODE'])
         mem_per_mat = n_ao**2 * ctypes.sizeof(ctypes.c_double)
-        nthreads = int(os.environ['OMP_NUM_THREADS'])
+        nthreads = int(environ['OMP_NUM_THREADS'])
         max_batch_size = int(avail_mem / (mem_per_mat * nthreads))
         max_batch_size = max(1, max_batch_size)
 

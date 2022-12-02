@@ -26,8 +26,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-from multiprocessing import cpu_count
-from os import environ
+from os import environ, cpu_count
 
 try:
     from skbuild import setup
@@ -41,7 +40,10 @@ except ImportError:
 
 # number of cores to use for compiling
 # if unspecified, use all available cores to compile
-compile_jobs = int(environ.get("VLX_NUM_BUILD_JOBS", default=cpu_count()))
+ncores = cpu_count()
+if ncores is None:
+    ncores = 1
+compile_jobs = int(environ.get("VLX_NUM_BUILD_JOBS", default=ncores))
 
 # we keep most of the configuration in setup.cfg
 # usage of setup.py is deprecated

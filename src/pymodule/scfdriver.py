@@ -652,13 +652,15 @@ class ScfDriver:
 
         return self.scf_tensors
 
-    def maximum_overlap(self, molecule, orbitals, alpha_list, beta_list):
+    def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
         """
         Constraint the SCF calculation to find orbitals that maximize overlap
         with a reference set.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param orbitals:
             The reference MolecularOrbital object.
         :param alpha_list:
@@ -667,9 +669,16 @@ class ScfDriver:
             The list of beta occupied orbitals.
         """
 
+        C_start_a = None
+        C_start_b = None
+
         if self.rank == mpi_master():
             n_alpha = molecule.number_of_alpha_electrons()
             n_beta = molecule.number_of_beta_electrons()
+
+            # Reorder alpha to match beta
+            if self.scf_type == 'restricted_openshell':
+                alpha_list = beta_list + list(set(alpha_list) - set(beta_list))
 
             err_excitations = 'ScfDriver.maximum_overlap: '
             err_excitations += 'incorrect definition of occupation lists'
@@ -678,9 +687,25 @@ class ScfDriver:
             if self.scf_type == 'restricted':
                 assert_msg_critical(alpha_list == beta_list, err_excitations)
 
-            C_a = orbitals.alpha_to_numpy()[:, alpha_list]
-            C_b = orbitals.beta_to_numpy()[:, beta_list]
+            n_mo = orbitals.number_mos()
+            mo_a = orbitals.alpha_to_numpy()
+            mo_b = orbitals.beta_to_numpy()
+
+            C_a = mo_a[:, alpha_list]
+            C_b = mo_b[:, beta_list]
             self._mom = [C_a, C_b]
+
+            # Create guess orbitals
+            virtual_alpha = list(set(range(n_mo)) - set(alpha_list))
+            C_start_a = mo_a[:, alpha_list + virtual_alpha]
+            if self.scf_type == 'unrestricted':
+                virtual_beta = list(set(range(n_mo)) - set(beta_list))
+                C_start_b = mo_b[:, beta_list + virtual_beta]
+
+        if self.scf_type == 'unrestricted':
+            self.set_start_orbitals(molecule, basis, (C_start_a, C_start_b))
+        else:
+            self.set_start_orbitals(molecule, basis, C_start_a)
 
     def set_start_orbitals(self, molecule, basis, array):
         """

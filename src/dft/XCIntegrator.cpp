@@ -7447,9 +7447,9 @@ CXCIntegrator::_getReducedRestrictedGradient(const CXCGradientGrid* xcGradientGr
 }
 
 double CXCIntegrator::integratePdft(const CAODensityMatrix& aoDensityMatrix,
-                                    double*                 twoDM,
-                                    double*                 activeMOs,
-                                    int32_t                 nActive,
+                                    const double*           twoDM,
+                                    const double*           activeMOs,
+                                    const int32_t           nActive,
                                     const CMolecule&        molecule,
                                     const CMolecularBasis&  basis,
                                     const CMolecularGrid&   molecularGrid,

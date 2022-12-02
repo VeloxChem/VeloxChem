@@ -53,36 +53,24 @@ using namespace py::literals;
 namespace vlx_dft {  // vlx_dft namespace
 
 static double
-integrate_pdft(const CXCIntegrator&    self,
-               const CAODensityMatrix& aoDensityMatrix,
-               py::array_t<double>     Active2DM,
-               py::array_t<double>     ActiveMOs,
-               const CMolecule&        molecule,
-               const CMolecularBasis&  basis,
-               const CMolecularGrid&   molecularGrid,
-               const std::string&      xcFuncLabel)
+integrate_pdft(const CXCIntegrator&       self,
+               const CAODensityMatrix&    aoDensityMatrix,
+               const py::array_t<double>& Active2DM,
+               const py::array_t<double>& ActiveMOs,
+               const CMolecule&           molecule,
+               const CMolecularBasis&     basis,
+               const CMolecularGrid&      molecularGrid,
+               const std::string&         xcFuncLabel)
 {
     errors::assertMsgCritical(py::detail::check_flags(Active2DM.ptr(), py::array::c_style),
                               __func__ + std::string(": Expecting C-style contiguous numpy array for Active2DM"));
 
-    auto ptr_Active2DM = new double[Active2DM.size()];
-
-    std::memcpy(ptr_Active2DM, Active2DM.data(), Active2DM.size() * sizeof(double));
-
     errors::assertMsgCritical(py::detail::check_flags(ActiveMOs.ptr(), py::array::c_style),
                               __func__ + std::string(": Expecting C-style contiguous numpy array for ActiveMOs"));
 
-    auto nActive = Active2DM.shape(0);
+    auto nActive = static_cast<int32_t>(Active2DM.shape(0));
 
-    auto ptr_ActiveMOs = new double[ActiveMOs.size()];
-
-    std::memcpy(ptr_ActiveMOs, ActiveMOs.data(), ActiveMOs.size() * sizeof(double));
-
-    auto xcene = self.integratePdft(aoDensityMatrix, ptr_Active2DM, ptr_ActiveMOs, nActive, molecule, basis, molecularGrid, xcFuncLabel);
-
-    delete[] ptr_Active2DM;
-
-    delete[] ptr_ActiveMOs;
+    auto xcene = self.integratePdft(aoDensityMatrix, Active2DM.data(), ActiveMOs.data(), nActive, molecule, basis, molecularGrid, xcFuncLabel);
 
     return xcene;
 }

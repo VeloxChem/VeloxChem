@@ -23,7 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from os.path import isfile
+from pathlib import Path
 import time as tm
 
 from .veloxchemlib import SADGuessDriver
@@ -104,7 +104,7 @@ class DensityGuess:
         """
 
         if (self._checkpoint_file and isinstance(self._checkpoint_file, str) and
-                rank == mpi_master() and isfile(self._checkpoint_file)):
+                rank == mpi_master() and Path(self._checkpoint_file).is_file()):
             valid = MolecularOrbitals.match_hdf5(self._checkpoint_file,
                                                  nuclear_charges, basis_set,
                                                  scf_type)
