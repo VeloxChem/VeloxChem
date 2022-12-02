@@ -44,6 +44,7 @@
 #include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
+#include "XCNewFunctional.hpp"
 #include "XCNewIntegrator.hpp"
 #include "XCNewMolecularGradient.hpp"
 
@@ -137,16 +138,16 @@ export_dft(py::module& m)
         .def("is_undefined", &CXCFunctional::isUndefined, "Determines if exchange-correlation function is undefined.")
         .def(py::self == py::self);
 
-    // Functional class
-    PyClass<Functional>(m, "Functional")
+    // XCNewFunctional class
+    PyClass<CXCNewFunctional>(m, "XCNewFunctional")
         .def(py::init<const std::vector<std::string>&, const std::vector<double>&>(), "labels"_a, "coeffs"_a)
         .def(py::init(
-                 [](const std::string& label, double coeff = 1.0) { return std::make_shared<Functional>(std::vector{label}, std::vector{coeff}); }),
+                 [](const std::string& label, double coeff = 1.0) { return std::make_shared<CXCNewFunctional>(std::vector{label}, std::vector{coeff}); }),
              "label"_a,
              "coeff"_a = 1.0)
         .def(
             "compute_exc_vxc",
-            [](const Functional& self, const py::array_t<double>& rho) -> py::list {
+            [](const CXCNewFunctional& self, const py::array_t<double>& rho) -> py::list {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
@@ -164,7 +165,7 @@ export_dft(py::module& m)
             "rho"_a)
         .def(
             "compute_exc_vxc",
-            [](const Functional& self, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
+            [](const CXCNewFunctional& self, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style && sigma_c_style,

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import GridDriver, XCNewIntegrator, Functional
+from veloxchem.veloxchemlib import GridDriver, XCNewIntegrator, XCNewFunctional
 from veloxchem.veloxchemlib import is_single_node, mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -9,6 +9,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 
 class TestFunctionalExcVxc:
+
     @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_slater(self):
 
@@ -40,12 +41,11 @@ class TestFunctionalExcVxc:
         molgrid = grid_drv.generate(molecule)
 
         xc_drv = XCNewIntegrator()
-        vxc = xc_drv.integrate_vxc_fock(
-            molecule, basis, gs_density, molgrid, xcfun_label
-        )
+        vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
+                                        xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = Functional("LDA_X")
+        func = XCNewFunctional("LDA_X")
 
         if scf_drv.rank == mpi_master():
             gto = xc_drv.compute_gto_values(molecule, basis, molgrid)
@@ -106,17 +106,15 @@ class TestFunctionalExcVxc:
         molgrid = grid_drv.generate(molecule)
 
         xc_drv = XCNewIntegrator()
-        vxc = xc_drv.integrate_vxc_fock(
-            molecule, basis, gs_density, molgrid, xcfun_label
-        )
+        vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
+                                        xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = Functional("GGA_C_LYP")
+        func = XCNewFunctional("GGA_C_LYP")
 
         if scf_drv.rank == mpi_master():
             gto, gto_x, gto_y, gto_z = xc_drv.compute_gto_values_and_derivatives(
-                molecule, basis, molgrid
-            )
+                molecule, basis, molgrid)
             npoints = gto.shape[1]
 
             Dmat = gs_density.alpha_to_numpy(0)

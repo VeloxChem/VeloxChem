@@ -1,7 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
     AOKohnShamMatrix.cpp
-    ComputeFunctional.cpp
     DensityGrid.cpp
     DensityGridDriver.cpp
     DensityGridGenerator.cpp
@@ -27,6 +26,7 @@ target_sources(vlxobjs
     XCHessianGrid.cpp
     XCIntegrator.cpp
     XCMolecularGradient.cpp
+    XCNewFunctional.cpp
     XCNewIntegrator.cpp
     XCNewMolecularGradient.cpp
   )
