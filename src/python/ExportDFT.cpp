@@ -139,6 +139,14 @@ export_dft(py::module& m)
         .def("is_undefined", &CXCFunctional::isUndefined, "Determines if exchange-correlation function is undefined.")
         .def(py::self == py::self);
 
+    // XCComponent class
+    PyClass<CXCComponent>(m, "XCComponent")
+        .def(py::init<const std::string&, const double>(), "label"_a, "coeff"_a)
+        .def(py::init<const CXCComponent&>())
+        .def("get_scaling_factor", &CXCComponent::getScalingFactor, "Gets scaling factor of XC functional component.")
+        .def("get_label", &CXCComponent::getLabel, "Gets name of XC functional component.")
+        .def(py::self == py::self);
+
     // XCNewFunctional class
     PyClass<CXCNewFunctional>(m, "XCNewFunctional")
         .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const double>(), "labels"_a, "coeffs"_a, "frac_exact_exchange"_a)
