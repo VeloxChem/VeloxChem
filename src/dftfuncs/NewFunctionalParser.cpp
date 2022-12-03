@@ -26,8 +26,8 @@
 #include "NewFunctionalParser.hpp"
 
 #include <algorithm>
-#include <iostream>
 
+#include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 
 namespace newvxcfuncs {  // newvxcfuncs namespace
@@ -35,7 +35,7 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER"});
+    return std::vector<std::string>({"SLATER", "VWN_RPA", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP"});
 }
 
 CXCNewFunctional
@@ -45,87 +45,60 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
     if (std::find(availFuncs.begin(), availFuncs.end(), fstr::upcase(xcLabel)) != availFuncs.end())
     {
-        // pure spin-polarized Slater exchange functional
+        // Slater exchange functional
 
         if (fstr::upcase(xcLabel) == "SLATER") return CXCNewFunctional("LDA_X");
 
-        /*
-        // pure spin-polarized Vosko-Wilk-Nusair (Parameterization 3) correlation functional
+        // Vosko-Wilk-Nusair RPA correlation functional
 
-        if (fstr::upcase(xcLabel) == "VWN3") return vxcfuncs::setVWN3Functional();
+        if (fstr::upcase(xcLabel) == "VWN_RPA") return CXCNewFunctional("LDA_C_VWN_RPA");
 
-        // pure spin-polarized Becke (1988) exchange functional
+        // Becke (1988) exchange functional
 
-        if (fstr::upcase(xcLabel) == "BECKE88") return vxcfuncs::setBecke88Functional();
+        if (fstr::upcase(xcLabel) == "BECKE88") return CXCNewFunctional({"GGA_X_B88", "LDA_X"}, {1.0, -1.0});
 
-        // pure spin-polarized Lee, Yang and Parr correlation functional
+        // Lee, Yang and Parr correlation functional
 
-        if (fstr::upcase(xcLabel) == "LYP") return vxcfuncs::setLYPFunctional();
+        if (fstr::upcase(xcLabel) == "LYP") return CXCNewFunctional("GGA_C_LYP");
 
-        // pure spin-polarized local density exchange-correlation functional
+        // local density exchange-correlation functional
 
-        if (fstr::upcase(xcLabel) == "SLDA")
-        {
-            return CXCFunctional({"SLDA"}, xcfun::lda, 0.0, {setPrimitiveSlaterFunctional(), setPrimitiveVWN3Functional()}, {1.0, 1.0});
-        }
+        if (fstr::upcase(xcLabel) == "SLDA") return CXCNewFunctional({"LDA_X", "LDA_C_VWN_RPA"}, {1.0, 1.0});
 
-        // pure spin-polarized Becke/Slater exchange functional
+        // Becke/Slater exchange functional
 
-        if (fstr::upcase(xcLabel) == "B88X")
-        {
-            return CXCFunctional({"B88X"}, xcfun::gga, 0.0, {setPrimitiveSlaterFunctional(), setPrimitiveBecke88Functional()}, {1.0, 1.0});
-        }
+        if (fstr::upcase(xcLabel) == "B88X") return CXCNewFunctional("GGA_X_B88");
 
-        // pure spin-polarized BLYP exchange-correlation functional
+        // BLYP exchange-correlation functional
 
-        if (fstr::upcase(xcLabel) == "BLYP")
-        {
-            return CXCFunctional({"BLYP"},
-                                 xcfun::gga,
-                                 0.0,
-                                 {setPrimitiveSlaterFunctional(), setPrimitiveBecke88Functional(), setPrimitiveLYPFunctional()},
-                                 {1.0, 1.0, 1.0});
-        }
+        if (fstr::upcase(xcLabel) == "BLYP") return CXCNewFunctional({"GGA_X_B88", "GGA_C_LYP"}, {1.0, 1.0});
 
-        // pure spin-polarized hybrid B3LYP exchange-correlation functional
+        // hybrid B3LYP exchange-correlation functional
 
         if (fstr::upcase(xcLabel) == "B3LYP")
         {
-            return CXCFunctional(
-                {"B3LYP"},
-                xcfun::gga,
-                0.2,
-                {setPrimitiveSlaterFunctional(), setPrimitiveBecke88Functional(), setPrimitiveLYPFunctional(), setPrimitiveVWN3Functional()},
-                {0.8, 0.72, 0.81, 0.19});
+            return CXCNewFunctional({"LDA_X", "GGA_X_B88", "LDA_C_VWN_RPA", "GGA_C_LYP"}, {0.08, 0.72, 0.19, 0.81}, 0.2);
         }
 
-        // pure spin-polarized hybrid BHANDH exchange-correlation functional
+        // hybrid BHANDH exchange-correlation functional
 
-        if (fstr::upcase(xcLabel) == "BHANDH")
-        {
-            return CXCFunctional({"BHANDH"}, xcfun::gga, 0.5, {setPrimitiveSlaterFunctional(), setPrimitiveLYPFunctional()}, {0.5, 1.0});
-        }
+        if (fstr::upcase(xcLabel) == "BHANDH") return CXCNewFunctional({"LDA_X", "GGA_C_LYP"}, {0.5, 1.0}, 0.5);
 
-        // pure spin-polarized hybrid B3LYP exchange-correlation functional
+        // hybrid BHANDHLYP exchange-correlation functional
 
-        if (fstr::upcase(xcLabel) == "BHANDHLYP")
-        {
-            return CXCFunctional({"BHANDHLYP"},
-                                 xcfun::gga,
-                                 0.5,
-                                 {setPrimitiveSlaterFunctional(), setPrimitiveBecke88Functional(), setPrimitiveLYPFunctional()},
-                                 {0.5, 0.5, 1.0});
-        }
+        if (fstr::upcase(xcLabel) == "BHANDHLYP") return CXCNewFunctional({"GGA_X_B88", "GGA_C_LYP"}, {0.5, 1.0}, 0.5);
 
         // PKZB exchange functional
-
-        if (fstr::upcase(xcLabel) == "PKZB") return vxcfuncs::setPkzbFunctional();
+        // if (fstr::upcase(xcLabel) == "PKZB") return ...
 
         // FIX ME: add other functionals here...
-        */
     }
 
-    return CXCNewFunctional({}, {}, 0.0);
+    std::string errmsg(std::string("getExchangeCorrelationFunctional: Cannot find functional ") + xcLabel);
+
+    errors::assertMsgCritical(false, errmsg);
+
+    return CXCNewFunctional({}, {});
 }
 
 }  // namespace newvxcfuncs

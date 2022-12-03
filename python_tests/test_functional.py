@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import GridDriver, XCNewIntegrator, XCNewFunctional
-from veloxchem.veloxchemlib import is_single_node, mpi_master
+from veloxchem.veloxchemlib import is_single_node, mpi_master, new_parse_xc_func
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -11,7 +11,7 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 class TestFunctionalExcVxc:
 
     @pytest.mark.skipif(not is_single_node(), reason="single node only")
-    def test_slater(self):
+    def test_lda(self):
 
         mol_str = """
             O  0.0000000000   0.0000000000  -0.0254395383
@@ -22,7 +22,7 @@ class TestFunctionalExcVxc:
             H  4.5000000000  -0.7695699584   0.5948147012
         """
         basis_label = "def2-svp"
-        xcfun_label = "slater"
+        xcfun_label = "slda"
         grid_level = 1
         tol = 1.0e-10
 
@@ -45,7 +45,10 @@ class TestFunctionalExcVxc:
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = XCNewFunctional("LDA_X")
+        func = new_parse_xc_func('slda')
+
+        func_ref = XCNewFunctional(['LDA_X', 'LDA_C_VWN_RPA'], [1.0, 1.0])
+        assert func == func_ref
 
         if scf_drv.rank == mpi_master():
             gto = xc_drv.compute_gto_values(molecule, basis, molgrid)
@@ -76,7 +79,7 @@ class TestFunctionalExcVxc:
             assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
 
     @pytest.mark.skipif(not is_single_node(), reason="single node only")
-    def test_b3lyp(self):
+    def test_gga(self):
 
         mol_str = """
             O  0.0000000000   0.0000000000  -0.0254395383
@@ -110,9 +113,12 @@ class TestFunctionalExcVxc:
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = XCNewFunctional(
+        func = new_parse_xc_func('b3lyp')
+
+        func_ref = XCNewFunctional(
             ['LDA_X', 'GGA_X_B88', 'LDA_C_VWN_RPA', 'GGA_C_LYP'],
             [0.08, 0.72, 0.19, 0.81], 0.2)
+        assert func == func_ref
 
         if scf_drv.rank == mpi_master():
             gto, gto_x, gto_y, gto_z = xc_drv.compute_gto_values_and_derivatives(
