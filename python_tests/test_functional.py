@@ -76,7 +76,7 @@ class TestFunctionalExcVxc:
             assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
 
     @pytest.mark.skipif(not is_single_node(), reason="single node only")
-    def test_lyp(self):
+    def test_b3lyp(self):
 
         mol_str = """
             O  0.0000000000   0.0000000000  -0.0254395383
@@ -87,7 +87,7 @@ class TestFunctionalExcVxc:
             H  4.5000000000  -0.7695699584   0.5948147012
         """
         basis_label = "def2-svp"
-        xcfun_label = "lyp"
+        xcfun_label = "b3lyp"
         grid_level = 1
         tol = 1.0e-10
 
@@ -110,7 +110,9 @@ class TestFunctionalExcVxc:
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = XCNewFunctional("GGA_C_LYP")
+        func = XCNewFunctional(
+            ['LDA_X', 'GGA_X_B88', 'LDA_C_VWN_RPA', 'GGA_C_LYP'],
+            [0.08, 0.72, 0.19, 0.81], 0.2)
 
         if scf_drv.rank == mpi_master():
             gto, gto_x, gto_y, gto_z = xc_drv.compute_gto_values_and_derivatives(

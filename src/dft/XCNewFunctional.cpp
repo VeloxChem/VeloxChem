@@ -43,14 +43,7 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const
 
     errors::assertMsgCritical(labels.size() == coeffs.size(), errmsg);
 
-    auto is_in_family = [](const auto& options, auto family) {
-        return std::any_of(options.begin(), options.end(), [family](auto a) { return a == family; });
-    };
-
     _components.clear();
-
-    // TODO write function to compute this number based on functional family and order of derivatives available
-    auto n_xc_outputs = 0;
 
     for (auto i = 0; i < labels.size(); ++i)
     {
@@ -60,28 +53,34 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const
         auto funcID = xc_functional_get_number(label.c_str());
 
         xc_func_type func;
-        if (xc_func_init(&func, funcID, XC_POLARIZED))
+        auto         xc_err = xc_func_init(&func, funcID, XC_POLARIZED);
+        if (xc_err)
         {
             errors::msgCritical(std::string("Could not find required LibXC functional ") + label);
         }
 
         auto kind = func.info->kind;
 
-        if (kind == XC_EXCHANGE)
+        if ((kind == XC_EXCHANGE) || (kind == XC_CORRELATION))
         {
             _components.push_back({coeff, func});
         }
-        else if (kind == XC_CORRELATION)
+        else if (kind == XC_EXCHANGE_CORRELATION)
         {
-            _components.push_back({coeff, func});
+            if (labels.size() == 1)
+            {
+                _components.push_back({coeff, func});
+            }
+            else
+            {
+                xc_func_end(&func);
+                errors::msgCritical("We cannot mix functionals of kind XC_EXCHANGE_CORRELATION");
+            }
         }
         else
         {
-            // clean up
             xc_func_end(&func);
-
-            // error out if the kind is XC_EXCHANGE_CORRELATION ("canned" x-c mix in LibXC) or XC_KINETIC
-            errors::msgCritical("We cannot handle functionals of kind XC_EXCHANGE_CORRELATION or XC_KINETIC");
+            errors::msgCritical(std::string("We do not support functional ") + label);
         }
 
         auto flags = func.info->flags;
@@ -96,31 +95,20 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const
         // which family does this x-c mixture belong to?
         auto family = func.info->family;
 
-        // LDA?
-        if (is_in_family(std::array{XC_FAMILY_LDA, XC_FAMILY_HYB_LDA}, family))
-        {
-            _isLDA       = true;
-            n_xc_outputs = 15;
-        }
+        // LDA, GGA, metaGGA
+        _isMetaGGA = (_isMetaGGA || (family == XC_FAMILY_MGGA));
+        _isGGA     = ((!_isMetaGGA) && (_isGGA || (family == XC_FAMILY_GGA)));
+        _isLDA     = ((!_isMetaGGA) && (!_isGGA) && (_isLDA || (family == XC_FAMILY_LDA)));
 
-        // GGA?
-        if (is_in_family(std::array{XC_FAMILY_GGA, XC_FAMILY_HYB_GGA}, family))
-        {
-            _isGGA       = true;
-            n_xc_outputs = 126;
-        }
-
-        // metaGGA?
-        if (is_in_family(std::array{XC_FAMILY_MGGA, XC_FAMILY_HYB_MGGA}, family))
-        {
-            _isMetaGGA   = true;
-            n_xc_outputs = 767;
-        }
-
+        // FIXME
+        // 1) figure out fraction of exact exchange from "prebaked" functional (e.g. HYB_GGA_XC_B3LYP)
+        // 2) figure out whether a functional is range-separated (e.g. HYB_GGA_XC_LRC_WPBEH)
+        //
         // hybrid?
-        // FIXME possibly can be removed: I believe these checks are only
+        // possibly can be removed: I believe these checks are only
         // relevant if we allow usage of any of the "prebaked" mixes in LibXC
         // hybrid-ness should be established from passed coefficients for global/range-separation
+        /*
         if (is_in_family(std::array{XC_FAMILY_HYB_LDA, XC_FAMILY_HYB_GGA, XC_FAMILY_HYB_MGGA}, family))
         {
             // range separation using the error function or the Yukawa function
@@ -135,7 +123,15 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const
                 _isGlobalHybrid = true;
             }
         }
+        */
     }
+
+    // TODO write function to compute this number based on functional family and order of derivatives available
+    auto n_xc_outputs = 0;
+
+    if (_isLDA) n_xc_outputs = 15;
+    if (_isGGA) n_xc_outputs = 126;
+    if (_isMetaGGA) n_xc_outputs = 767;
 
     // allocate _stagingBuffer
     _stagingBuffer = mem::malloc<double>(n_xc_outputs * _ldStaging);
@@ -153,65 +149,6 @@ CXCNewFunctional::~CXCNewFunctional()
 }
 
 auto
-CXCNewFunctional::compute_exc_for_lda(int32_t np, const double* rho, double* exc) const -> void
-{
-    errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
-
-    // should we allocate staging buffers? Or can we use the global one?
-    bool alloc = (np > _ldStaging);
-
-    auto stage_exc = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
-
-    for (const auto& [coeff, func] : _components)
-    {
-        xc_lda_exc(&func, np, rho, stage_exc);
-
-        const auto c = coeff;
-
-#pragma omp simd aligned(exc, stage_exc : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
-        {
-            exc[g] += c * stage_exc[g];
-        }
-    }
-
-    if (alloc)
-    {
-        mem::free(stage_exc);
-    }
-}
-
-auto
-CXCNewFunctional::compute_vxc_for_lda(int32_t np, const double* rho, double* vrho) const -> void
-{
-    errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
-
-    // should we allocate staging buffers? Or can we use the global one?
-    bool alloc = (np > _ldStaging);
-
-    auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-
-    for (const auto& [coeff, func] : _components)
-    {
-        xc_lda_vxc(&func, np, rho, stage_vrho);
-
-        const auto c = coeff;
-
-#pragma omp simd aligned(vrho, stage_vrho : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
-        {
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
-        }
-    }
-
-    if (alloc)
-    {
-        mem::free(stage_vrho);
-    }
-}
-
-auto
 CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double* exc, double* vrho) const -> void
 {
     errors::assertMsgCritical(_hasExc && _hasVxc,
@@ -220,7 +157,7 @@ CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double*
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc  = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0];
+    auto stage_exc  = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
     auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
 
     for (const auto& [coeff, func] : _components)
@@ -247,71 +184,6 @@ CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double*
 }
 
 auto
-CXCNewFunctional::compute_exc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc) const -> void
-{
-    errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
-
-    // should we allocate staging buffers? Or can we use the global one?
-    bool alloc = (np > _ldStaging);
-
-    auto stage_exc = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
-
-    for (const auto& [coeff, func] : _components)
-    {
-        xc_gga_exc(&func, np, rho, sigma, stage_exc);
-
-        const auto c = coeff;
-
-#pragma omp simd aligned(exc, stage_exc : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
-        {
-            exc[g] += c * stage_exc[g];
-        }
-    }
-
-    if (alloc)
-    {
-        mem::free(stage_exc);
-    }
-}
-
-auto
-CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
-{
-    errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
-
-    // should we allocate staging buffers? Or can we use the global one?
-    bool alloc = (np > _ldStaging);
-
-    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-
-    for (const auto& [coeff, func] : _components)
-    {
-        xc_gga_vxc(&func, np, rho, sigma, stage_vrho, stage_vsigma);
-
-        const auto c = coeff;
-
-#pragma omp simd aligned(vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
-        {
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
-
-            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
-        }
-    }
-
-    if (alloc)
-    {
-        mem::free(stage_vrho);
-        mem::free(stage_vsigma);
-    }
-}
-
-auto
 CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void
 {
     errors::assertMsgCritical(_hasExc && _hasVxc,
@@ -320,27 +192,45 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0];
+    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
     auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
     for (const auto& [coeff, func] : _components)
     {
-        xc_gga_exc_vxc(&func, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
-
         const auto c = coeff;
+
+        auto family = func.info->family;
+
+        if (family == XC_FAMILY_LDA)
+        {
+            xc_lda_exc_vxc(&func, np, rho, stage_exc, stage_vrho);
+
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                exc[g] += c * stage_exc[g];
+
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+            }
+        }
+        else if (family == XC_FAMILY_GGA)
+        {
+            xc_gga_exc_vxc(&func, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
 #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
-        {
-            exc[g] += c * stage_exc[g];
+            for (auto g = 0; g < np; ++g)
+            {
+                exc[g] += c * stage_exc[g];
 
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
 
-            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+            }
         }
     }
 
@@ -349,90 +239,6 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
         mem::free(stage_exc);
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
-    }
-}
-
-auto
-CXCNewFunctional::compute_exc_for_mgga(int32_t np, const double* rho, const double* sigma, const double* lapl, const double* tau, double* exc) const
-    -> void
-{
-    errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
-
-    // should we allocate staging buffers? Or can we use the global one?
-    bool alloc = (np > _ldStaging);
-
-    auto stage_exc = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
-
-    for (const auto& [coeff, func] : _components)
-    {
-        xc_mgga_exc(&func, np, rho, sigma, lapl, tau, stage_exc);
-
-        const auto c = coeff;
-
-#pragma omp simd aligned(exc, stage_exc : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
-        {
-            exc[g] += c * stage_exc[g];
-        }
-    }
-
-    if (alloc)
-    {
-        mem::free(stage_exc);
-    }
-}
-
-auto
-CXCNewFunctional::compute_vxc_for_mgga(int32_t       np,
-                                       const double* rho,
-                                       const double* sigma,
-                                       const double* lapl,
-                                       const double* tau,
-                                       double*       vrho,
-                                       double*       vsigma,
-                                       double*       vlapl,
-                                       double*       vtau) const -> void
-{
-    errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
-
-    // should we allocate staging buffers? Or can we use the global one?
-    bool alloc = (np > _ldStaging);
-
-    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-    auto stage_vlapl  = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[6 * _ldStaging];
-    auto stage_vtau   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[8 * _ldStaging];
-
-    for (const auto& [coeff, func] : _components)
-    {
-        xc_mgga_vxc(&func, np, rho, sigma, lapl, tau, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
-
-        const auto c = coeff;
-
-#pragma omp simd aligned(vrho, stage_vrho, vsigma, stage_vsigma, vlapl, stage_vlapl, vtau, stage_vtau : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
-        {
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
-
-            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
-
-            vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
-            vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
-
-            vtau[2 * g + 0] += c * stage_vtau[2 * g + 0];
-            vtau[2 * g + 1] += c * stage_vtau[2 * g + 1];
-        }
-    }
-
-    if (alloc)
-    {
-        mem::free(stage_vrho);
-        mem::free(stage_vsigma);
-        mem::free(stage_vlapl);
-        mem::free(stage_vtau);
     }
 }
 
@@ -454,7 +260,7 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0];
+    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
     auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
     auto stage_vlapl  = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[6 * _ldStaging];
@@ -462,27 +268,62 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
 
     for (const auto& [coeff, func] : _components)
     {
-        xc_mgga_exc_vxc(&func, np, rho, sigma, lapl, tau, stage_exc, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
-
         const auto c = coeff;
 
-#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma, vlapl, stage_vlapl, vtau, stage_vtau : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        auto family = func.info->family;
+
+        if (family == XC_FAMILY_LDA)
         {
-            exc[g] += c * stage_exc[g];
+            xc_lda_exc_vxc(&func, np, rho, stage_exc, stage_vrho);
 
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                exc[g] += c * stage_exc[g];
 
-            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+            }
+        }
+        else if (family == XC_FAMILY_GGA)
+        {
+            xc_gga_exc_vxc(&func, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
-            vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
-            vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                exc[g] += c * stage_exc[g];
 
-            vtau[2 * g + 0] += c * stage_vtau[2 * g + 0];
-            vtau[2 * g + 1] += c * stage_vtau[2 * g + 1];
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+
+                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+            }
+        }
+        else if (family == XC_FAMILY_MGGA)
+        {
+            xc_mgga_exc_vxc(&func, np, rho, sigma, lapl, tau, stage_exc, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
+
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma, vlapl, stage_vlapl, vtau, stage_vtau : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                exc[g] += c * stage_exc[g];
+
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+
+                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+
+                vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
+                vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
+
+                vtau[2 * g + 0] += c * stage_vtau[2 * g + 0];
+                vtau[2 * g + 1] += c * stage_vtau[2 * g + 1];
+            }
         }
     }
 

@@ -140,7 +140,7 @@ export_dft(py::module& m)
 
     // XCNewFunctional class
     PyClass<CXCNewFunctional>(m, "XCNewFunctional")
-        .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const int32_t>(), "labels"_a, "coeffs"_a, "frac_exact_exchange"_a)
+        .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const double>(), "labels"_a, "coeffs"_a, "frac_exact_exchange"_a)
         .def(py::init([](const std::string& label, double coeff = 1.0, double frac_exact_exchang = 0.0) {
                  return std::make_shared<CXCNewFunctional>(std::vector{label}, std::vector{coeff}, frac_exact_exchang);
              }),

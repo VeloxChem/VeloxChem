@@ -155,27 +155,6 @@ class CXCNewFunctional
     auto repr() const -> std::string;
 
     /**@{ LDA computational functions. These are wrappers around `xc_lda_*` functions in LibXC. */
-    /** Computes values of LDA exchange-correlation functional on grid.
-     *
-     * @param[in] np number of grid points.
-     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
-     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
-     *
-     * @note Wrapper to `xc_lda_exc`
-     */
-    auto compute_exc_for_lda(int32_t np, const double* rho, double* exc) const -> void;
-
-    /** Computes first derivative of LDA exchange-correlation functional on grid.
-     *
-     * @param[in] np number of grid points.
-     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
-     * @param[in,out] vrho values of the first derivative of the
-     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
-     *
-     * @note Wrapper to `xc_lda_vxc`
-     */
-    auto compute_vxc_for_lda(int32_t np, const double* rho, double* vrho) const -> void;
-
     /** Computes values and first derivative of LDA exchange-correlation functional on grid.
      *
      * @param[in] np number of grid points.
@@ -226,31 +205,6 @@ class CXCNewFunctional
     /**}@*/
 
     /**@{ GGA computational functions. These are wrappers around `xc_gga_*` functions in LibXC. */
-    /** Computes values of GGA exchange-correlation functional on grid.
-     *
-     * @param[in] np number of grid points.
-     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
-     * @param[in] sigma values of the contracted gradient of density at grid points. Order: [(0, 0), (0, 1), (1, 1)].
-     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
-     *
-     * @note Wrapper to `xc_gga_exc`
-     */
-    auto compute_exc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc) const -> void;
-
-    /** Computes first derivative of GGA exchange-correlation functional on grid.
-     *
-     * @param[in] np number of grid points.
-     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
-     * @param[in] sigma values of the contracted gradient of density at grid points. Order: [(0), (1), (2)].
-     * @param[in,out] vrho values of the first derivative of the
-     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
-     * @param[in,out] vsigma values of the first derivative of the
-     * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
-     *
-     * @note Wrapper to `xc_gga_vxc`
-     */
-    auto compute_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void;
-
     /** Computes values and first derivative of GGA exchange-correlation functional on grid.
      *
      * @param[in] np number of grid points.
@@ -358,47 +312,6 @@ class CXCNewFunctional
     /**}@*/
 
     /**@{ metaGGA computational functions. These are wrappers around `xc_mgga_*` functions in LibXC. */
-    /** Computes values of metaGGA exchange-correlation functional on grid.
-     *
-     * @param[in] np number of grid points.
-     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
-     * @param[in] sigma values of the contracted gradient of density at grid points. Order: [(0, 0), (0, 1), (1, 1)].
-     * @param[in] lapl values of the density Laplacian at grid points. Order: [(0), (1)].
-     * @param[in] tau values of the kinetic energy density at grid points. Order: [(0), (1)].
-     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
-     *
-     * @note Wrapper to `xc_mgga_exc`
-     */
-    auto compute_exc_for_mgga(int32_t np, const double* rho, const double* sigma, const double* lapl, const double* tau, double* exc) const -> void;
-
-    /** Computes first derivative of metaGGA exchange-correlation functional on grid.
-     *
-     * @param[in] np number of grid points.
-     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
-     * @param[in] sigma values of the contracted gradient of density at grid points. Order: [(0), (1), (2)].
-     * @param[in] lapl values of the density Laplacian at grid points. Order: [(0), (1)].
-     * @param[in] tau values of the kinetic energy density at grid points. Order: [(0), (1)].
-     * @param[in,out] vrho values of the first derivative of the
-     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
-     * @param[in,out] vsigma values of the first derivative of the
-     * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
-     * @param[in,out] vlapl values of the first derivative of the
-     * exchange-correlation kernel wrt density Laplacian. Size: 2*np, order: [(0), (1)].
-     * @param[in,out] vtau alues of the first derivative of the
-     * exchange-correlation kernel wrt kinetic energy density. Size: 2*np, order: [(0), (1)].
-     *
-     * @note Wrapper to `xc_mgga_vxc`
-     */
-    auto compute_vxc_for_mgga(int32_t       np,
-                              const double* rho,
-                              const double* sigma,
-                              const double* lapl,
-                              const double* tau,
-                              double*       vrho,
-                              double*       vsigma,
-                              double*       vlapl,
-                              double*       vtau) const -> void;
-
     /** Computes values and first derivative of metaGGA exchange-correlation functional on grid.
      *
      * @param[in] np number of grid points.
