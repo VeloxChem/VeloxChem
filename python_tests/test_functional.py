@@ -58,7 +58,7 @@ class TestFunctionalExcVxc:
             rho[0::2] = rho_a[:]
             rho[1::2] = rho_b[:]
 
-            exc, vrho = func.compute_exc_vxc(rho)
+            exc, vrho = func.compute_exc_vxc_for_lda(rho)
             vrho_a = vrho[0::2]
 
             gw = molgrid.w_to_numpy()
@@ -143,7 +143,7 @@ class TestFunctionalExcVxc:
             sigma[1::3] = sigma_a_b[:]
             sigma[2::3] = sigma_b_b[:]
 
-            exc, vrho, vsigma = func.compute_exc_vxc(rho, sigma)
+            exc, vrho, vsigma = func.compute_exc_vxc_for_gga(rho, sigma)
             vrho_a = vrho[0::2]
             vsigma_aa = vsigma[0::3]
             vsigma_ab = vsigma[1::3]

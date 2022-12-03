@@ -140,22 +140,24 @@ export_dft(py::module& m)
 
     // XCNewFunctional class
     PyClass<CXCNewFunctional>(m, "XCNewFunctional")
-        .def(py::init<const std::vector<std::string>&, const std::vector<double>&>(), "labels"_a, "coeffs"_a)
-        .def(py::init(
-                 [](const std::string& label, double coeff = 1.0) { return std::make_shared<CXCNewFunctional>(std::vector{label}, std::vector{coeff}); }),
+        .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const int32_t>(), "labels"_a, "coeffs"_a, "frac_exact_exchange"_a)
+        .def(py::init([](const std::string& label, double coeff = 1.0, double frac_exact_exchang = 0.0) {
+                 return std::make_shared<CXCNewFunctional>(std::vector{label}, std::vector{coeff}, frac_exact_exchang);
+             }),
              "label"_a,
-             "coeff"_a = 1.0)
+             "coeff"_a               = 1.0,
+             "frac_exact_exchange"_a = 0.0)
         .def(
-            "compute_exc_vxc",
+            "compute_exc_vxc_for_lda",
             [](const CXCNewFunctional& self, const py::array_t<double>& rho) -> py::list {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
-                errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc: Expecting C-style contiguous numpy array"));
+                errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc_for_lda: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
                 CDenseMatrix exc(npoints, 1);
                 CDenseMatrix vrho(npoints, 2);
-                self.compute_exc_vxc(npoints, rho.data(), exc.values(), vrho.values());
+                self.compute_exc_vxc_for_lda(npoints, rho.data(), exc.values(), vrho.values());
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
                 ret.append(vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfElements()));
@@ -164,7 +166,7 @@ export_dft(py::module& m)
             "Computes Exc and Vxc for LDA.",
             "rho"_a)
         .def(
-            "compute_exc_vxc",
+            "compute_exc_vxc_for_gga",
             [](const CXCNewFunctional& self, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
@@ -178,7 +180,7 @@ export_dft(py::module& m)
                 CDenseMatrix exc(npoints, 1);
                 CDenseMatrix vrho(npoints, 2);
                 CDenseMatrix vsigma(npoints, 3);
-                self.compute_exc_vxc(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
+                self.compute_exc_vxc_for_gga(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
                 ret.append(vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfElements()));

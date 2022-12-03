@@ -35,7 +35,9 @@
 #include "ErrorHandler.hpp"
 #include "MemAlloc.hpp"
 
-CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const std::vector<double>& coeffs)
+CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const std::vector<double>& coeffs, const double fractionOfExactExchange)
+
+    : _fractionOfExactExchange(fractionOfExactExchange)
 {
     std::string errmsg(std::string(__func__) + ": Inconsistent sizes of functional labels and coefficients");
 
@@ -45,13 +47,7 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const
         return std::any_of(options.begin(), options.end(), [family](auto a) { return a == family; });
     };
 
-    // sum of coefficients of exchange components
-    auto total_x = 0.0;
-
-    // sum of coefficients of correlation components
-    auto total_c = 0.0;
-
-    std::vector<Component> x_funcs, c_funcs;
+    _components.clear();
 
     // TODO write function to compute this number based on functional family and order of derivatives available
     auto n_xc_outputs = 0;
@@ -73,13 +69,11 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const
 
         if (kind == XC_EXCHANGE)
         {
-            total_x += coeff;
-            x_funcs.push_back({coeff, func});
+            _components.push_back({coeff, func});
         }
         else if (kind == XC_CORRELATION)
         {
-            total_c += coeff;
-            c_funcs.push_back({coeff, func});
+            _components.push_back({coeff, func});
         }
         else
         {
@@ -143,21 +137,6 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const
         }
     }
 
-    _numberOfExchangeFunctionals    = x_funcs.size();
-    _numberOfCorrelationFunctionals = c_funcs.size();
-    // join the two lists together: first all exchange, then all correlation functionals.
-    _components.reserve(_numberOfExchangeFunctionals + _numberOfCorrelationFunctionals);
-    _components.insert(_components.end(), x_funcs.cbegin(), x_funcs.cend());
-    _components.insert(_components.end(), c_funcs.cbegin(), c_funcs.cend());
-
-    // warn if the sum of X coefficients and C coefficients is greater than 1
-    errors::assertMsgWarning(total_x <= 1.0, "Sum of coefficients for exchange functionals is greater than 1. We hope you know what your are doing!");
-    errors::assertMsgWarning(total_c <= 1.0,
-                             "Sum of coefficients for correlation functionals is greater than 1. We hope you know what your are doing!");
-
-    _xcName   = getXCName(x_funcs, c_funcs);
-    _citation = getCitation(x_funcs, c_funcs);
-
     // allocate _stagingBuffer
     _stagingBuffer = mem::malloc<double>(n_xc_outputs * _ldStaging);
 }
@@ -166,6 +145,7 @@ CXCNewFunctional::~CXCNewFunctional()
 {
     // clean up allocated LibXC objects
     std::for_each(std::begin(_components), std::end(_components), [](Component& c) { xc_func_end(&std::get<1>(c)); });
+
     _components.clear();
 
     // clean up staging buffer
@@ -173,166 +153,7 @@ CXCNewFunctional::~CXCNewFunctional()
 }
 
 auto
-CXCNewFunctional::repr() const -> std::string
-{
-    std::ostringstream os;
-
-    os << std::endl;
-
-    os << "[Functional (Object):" << this << "]" << std::endl;
-
-    os << "Functional name: " << _xcName << std::endl;
-
-    os << "Functional family: ";
-    if (_isMetaGGA)
-    {
-        os << "metaGGA." << std::endl;
-    }
-    else if (_isGGA)
-    {
-        os << "GGA." << std::endl;
-    }
-    else
-    {
-        os << "LDA." << std::endl;
-    }
-    os << std::endl;
-
-    os << "Available derivatives up to and including ";
-    if (_hasLxc)
-    {
-        os << "4th order." << std::endl;
-    }
-    else if (_hasKxc)
-    {
-        os << "3rd order." << std::endl;
-    }
-    else if (_hasFxc)
-    {
-        os << "2nd order." << std::endl;
-    }
-    else if (_hasVxc)
-    {
-        os << "1st order." << std::endl;
-    }
-    else
-    {
-        os << "0th order." << std::endl;
-    }
-
-    os << std::endl;
-
-    os << _citation;
-
-    return os.str();
-}
-
-std::ostream&
-operator<<(std::ostream& output, const CXCNewFunctional& source)
-{
-    return (output << source.repr());
-}
-
-auto
-CXCNewFunctional::getLibXCDescription() -> std::string
-{
-    std::ostringstream os;
-
-    os << "LibXC version " << std::string(xc_version_string()) << std::endl;
-
-    os << xc_reference() << " (" << xc_reference_doi() << ")";
-
-    return os.str();
-}
-
-auto
-CXCNewFunctional::getXCName(const std::vector<Component>& x_funcs, const std::vector<Component>& c_funcs) -> std::string
-{
-    // create label for this mix of functionals
-    std::ostringstream os;
-
-    auto i = 1;
-    for (const auto& [coeff, func] : x_funcs)
-    {
-        auto name = std::string(xc_functional_get_name(func.info->number));
-
-        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::toupper(c); });
-
-        os << std::setprecision(4) << coeff << "*" << name << (i != x_funcs.size() ? " + " : "");
-        ++i;
-    }
-
-    os << ", ";
-
-    i = 1;
-    for (const auto& [coeff, func] : c_funcs)
-    {
-        auto name = std::string(xc_functional_get_name(func.info->number));
-
-        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::toupper(c); });
-
-        os << std::setprecision(4) << coeff << "*" << name << (i != c_funcs.size() ? " + " : "");
-        ++i;
-    }
-
-    return os.str();
-}
-
-auto
-CXCNewFunctional::getFunctionalCitation(const xc_func_type& func) -> std::string
-{
-    std::ostringstream os;
-
-    for (auto i = 0; i < XC_MAX_REFERENCES; ++i)
-    {
-        if (func.info->refs[i])
-        {
-            if (i != 0)
-            {
-                os << std::endl;
-            }
-            os << "    ";
-            os << func.info->refs[i]->ref;
-            if (std::strlen(func.info->refs[i]->doi) > 0)
-            {
-                os << " (";
-                os << func.info->refs[i]->doi;
-                os << ")";
-            }
-        }
-    }
-
-    return os.str();
-}
-
-auto
-CXCNewFunctional::getCitation(const std::vector<Component>& x_funcs, const std::vector<Component>& c_funcs) -> std::string
-{
-    std::ostringstream os;
-
-    os << "Exchange components: " << std::endl;
-
-    for (const auto& [_, func] : x_funcs)
-    {
-        os << " * " << std::string(func.info->name) << std::endl;
-        os << getFunctionalCitation(func) << std::endl;
-    }
-
-    os << std::endl;
-
-    os << "Correlation components: " << std::endl;
-
-    for (const auto& [_, func] : c_funcs)
-    {
-        os << " * " << std::string(func.info->name) << std::endl;
-        os << getFunctionalCitation(func) << std::endl;
-    }
-
-    return os.str();
-}
-
-auto
-CXCNewFunctional::compute_exc(int32_t np, const double* rho, double* exc) const -> void
+CXCNewFunctional::compute_exc_for_lda(int32_t np, const double* rho, double* exc) const -> void
 {
     errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
 
@@ -361,7 +182,7 @@ CXCNewFunctional::compute_exc(int32_t np, const double* rho, double* exc) const 
 }
 
 auto
-CXCNewFunctional::compute_vxc(int32_t np, const double* rho, double* vrho) const -> void
+CXCNewFunctional::compute_vxc_for_lda(int32_t np, const double* rho, double* vrho) const -> void
 {
     errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
 
@@ -391,7 +212,7 @@ CXCNewFunctional::compute_vxc(int32_t np, const double* rho, double* vrho) const
 }
 
 auto
-CXCNewFunctional::compute_exc_vxc(int32_t np, const double* rho, double* exc, double* vrho) const -> void
+CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double* exc, double* vrho) const -> void
 {
     errors::assertMsgCritical(_hasExc && _hasVxc,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
@@ -399,7 +220,7 @@ CXCNewFunctional::compute_exc_vxc(int32_t np, const double* rho, double* exc, do
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc  = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+    auto stage_exc  = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0];
     auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
 
     for (const auto& [coeff, func] : _components)
@@ -426,7 +247,7 @@ CXCNewFunctional::compute_exc_vxc(int32_t np, const double* rho, double* exc, do
 }
 
 auto
-CXCNewFunctional::compute_exc(int32_t np, const double* rho, const double* sigma, double* exc) const -> void
+CXCNewFunctional::compute_exc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc) const -> void
 {
     errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
 
@@ -455,7 +276,7 @@ CXCNewFunctional::compute_exc(int32_t np, const double* rho, const double* sigma
 }
 
 auto
-CXCNewFunctional::compute_vxc(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
+CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
 {
     errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
 
@@ -491,7 +312,7 @@ CXCNewFunctional::compute_vxc(int32_t np, const double* rho, const double* sigma
 }
 
 auto
-CXCNewFunctional::compute_exc_vxc(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void
+CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void
 {
     errors::assertMsgCritical(_hasExc && _hasVxc,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
@@ -499,7 +320,7 @@ CXCNewFunctional::compute_exc_vxc(int32_t np, const double* rho, const double* s
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc    = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0];
     auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
@@ -532,7 +353,8 @@ CXCNewFunctional::compute_exc_vxc(int32_t np, const double* rho, const double* s
 }
 
 auto
-CXCNewFunctional::compute_exc(int32_t np, const double* rho, const double* sigma, const double* lapl, const double* tau, double* exc) const -> void
+CXCNewFunctional::compute_exc_for_mgga(int32_t np, const double* rho, const double* sigma, const double* lapl, const double* tau, double* exc) const
+    -> void
 {
     errors::assertMsgCritical(_hasExc, std::string(__func__) + ": exchange-correlation functional does not provide an evaluator for Exc on grid");
 
@@ -561,15 +383,15 @@ CXCNewFunctional::compute_exc(int32_t np, const double* rho, const double* sigma
 }
 
 auto
-CXCNewFunctional::compute_vxc(int32_t       np,
-                              const double* rho,
-                              const double* sigma,
-                              const double* lapl,
-                              const double* tau,
-                              double*       vrho,
-                              double*       vsigma,
-                              double*       vlapl,
-                              double*       vtau) const -> void
+CXCNewFunctional::compute_vxc_for_mgga(int32_t       np,
+                                       const double* rho,
+                                       const double* sigma,
+                                       const double* lapl,
+                                       const double* tau,
+                                       double*       vrho,
+                                       double*       vsigma,
+                                       double*       vlapl,
+                                       double*       vtau) const -> void
 {
     errors::assertMsgCritical(_hasVxc, std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
 
@@ -615,16 +437,16 @@ CXCNewFunctional::compute_vxc(int32_t       np,
 }
 
 auto
-CXCNewFunctional::compute_exc_vxc(int32_t       np,
-                                  const double* rho,
-                                  const double* sigma,
-                                  const double* lapl,
-                                  const double* tau,
-                                  double*       exc,
-                                  double*       vrho,
-                                  double*       vsigma,
-                                  double*       vlapl,
-                                  double*       vtau) const -> void
+CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
+                                           const double* rho,
+                                           const double* sigma,
+                                           const double* lapl,
+                                           const double* tau,
+                                           double*       exc,
+                                           double*       vrho,
+                                           double*       vsigma,
+                                           double*       vlapl,
+                                           double*       vtau) const -> void
 {
     errors::assertMsgCritical(_hasExc && _hasVxc,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
@@ -632,7 +454,7 @@ CXCNewFunctional::compute_exc_vxc(int32_t       np,
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc    = (alloc) ? mem::malloc<double>(np) : &_stagingBuffer[0];
+    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0];
     auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
     auto stage_vlapl  = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[6 * _ldStaging];

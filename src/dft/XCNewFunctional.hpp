@@ -90,26 +90,17 @@ class CXCNewFunctional
     bool _hasLxc{true};
     /** }@ */
 
-    /** Number of exchange components in the functional object. */
-    int32_t _numberOfExchangeFunctionals{0};
-
-    /** Number of correlation components in the functional object. */
-    int32_t _numberOfCorrelationFunctionals{0};
-
     /** Leading dimension for initial allocation of staging buffer. */
     int32_t _ldStaging{(1 << 10)};
 
     /** Buffer to stage output results from LibXC invocations. */
     double* _stagingBuffer{nullptr};
 
-    /** Name of the exchange-correlation functional. */
-    std::string _xcName{""};
-
-    /** Literature references for the exchange-correlation functional. */
-    std::string _citation{""};
-
-    /** The primitive exchange-correlation functionals and their coefficients. */
+    /** The functional components and their coefficients. */
     std::vector<Component> _components;
+
+    /** The fraction of exact Hatree-Fock exchange in functional. */
+    double _fractionOfExactExchange{0.0};
 
    public:
     /** Creates an exchange-correlation functional object.
@@ -117,7 +108,7 @@ class CXCNewFunctional
      * @param[in] labels list of labels of component exchange and correlation functionals.
      * @param[in] coeffs list of coefficients for the components of the functional.
      */
-    CXCNewFunctional(const std::vector<std::string>& labels, const std::vector<double>& coeffs);
+    CXCNewFunctional(const std::vector<std::string>& labels, const std::vector<double>& coeffs, const double fractionOfExactExchange);
 
     /** Copy-constructor.
      *
@@ -127,7 +118,7 @@ class CXCNewFunctional
 
     /** Move-constructor.
      *
-     *  @param[in] src the exchange-correlation functional object.
+     * @param[in] src the exchange-correlation functional object.
      */
     CXCNewFunctional(CXCNewFunctional&& src) noexcept;
 
@@ -160,18 +151,6 @@ class CXCNewFunctional
      */
     auto operator!=(const CXCNewFunctional& other) const -> bool;
 
-    auto
-    getNumberOfExchangeFunctionals() const -> int32_t
-    {
-        return _numberOfExchangeFunctionals;
-    }
-
-    auto
-    getNumberOfCorrelationFunctionals() const -> int32_t
-    {
-        return _numberOfCorrelationFunctionals;
-    }
-
     /** String representation of primitive functional. */
     auto repr() const -> std::string;
 
@@ -184,7 +163,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_lda_exc`
      */
-    auto compute_exc(int32_t np, const double* rho, double* exc) const -> void;
+    auto compute_exc_for_lda(int32_t np, const double* rho, double* exc) const -> void;
 
     /** Computes first derivative of LDA exchange-correlation functional on grid.
      *
@@ -195,7 +174,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_lda_vxc`
      */
-    auto compute_vxc(int32_t np, const double* rho, double* vrho) const -> void;
+    auto compute_vxc_for_lda(int32_t np, const double* rho, double* vrho) const -> void;
 
     /** Computes values and first derivative of LDA exchange-correlation functional on grid.
      *
@@ -207,7 +186,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_lda_exc_vxc`
      */
-    auto compute_exc_vxc(int32_t np, const double* rho, double* exc, double* vrho) const -> void;
+    auto compute_exc_vxc_for_lda(int32_t np, const double* rho, double* exc, double* vrho) const -> void;
 
     /** Computes second derivative of LDA exchange-correlation functional on grid.
      *
@@ -219,7 +198,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_lda_fxc`
      */
-    auto compute_fxc(int32_t np, const double* rho, double* v2rho2) const -> void;
+    auto compute_fxc_for_lda(int32_t np, const double* rho, double* v2rho2) const -> void;
 
     /** Computes third derivative of LDA exchange-correlation functional on grid.
      *
@@ -231,7 +210,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_lda_kxc`
      */
-    auto compute_kxc(int32_t np, const double* rho, double* v3rho3) const -> void;
+    auto compute_kxc_for_lda(int32_t np, const double* rho, double* v3rho3) const -> void;
 
     /** Computes fourth derivative of LDA exchange-correlation functional on grid.
      *
@@ -243,7 +222,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_lda_lxc`
      */
-    auto compute_lxc(int32_t np, const double* rho, double* v4rho4) const -> void;
+    auto compute_lxc_for_lda(int32_t np, const double* rho, double* v4rho4) const -> void;
     /**}@*/
 
     /**@{ GGA computational functions. These are wrappers around `xc_gga_*` functions in LibXC. */
@@ -256,7 +235,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_gga_exc`
      */
-    auto compute_exc(int32_t np, const double* rho, const double* sigma, double* exc) const -> void;
+    auto compute_exc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc) const -> void;
 
     /** Computes first derivative of GGA exchange-correlation functional on grid.
      *
@@ -270,7 +249,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_gga_vxc`
      */
-    auto compute_vxc(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void;
+    auto compute_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void;
 
     /** Computes values and first derivative of GGA exchange-correlation functional on grid.
      *
@@ -285,7 +264,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_gga_exc_vxc`
      */
-    auto compute_exc_vxc(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void;
+    auto compute_exc_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void;
 
     /** Computes second derivative of GGA exchange-correlation functional on grid.
      *
@@ -304,7 +283,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_gga_fxc`
      */
-    auto compute_fxc(int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const -> void;
+    auto compute_fxc_for_gga(int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const -> void;
 
     /** Computes third derivative of GGA exchange-correlation functional on grid.
      *
@@ -316,18 +295,26 @@ class CXCNewFunctional
      * [(0, 0, 0), (0, 0, 1), (0, 1, 1), (1, 1, 1)].
      * @param[in,out] v3rho2sigma values of the third derivative of the
      * exchange-correlation kernel wrt density and contracted gradients. Size: 9*np, order:
-     * [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 0), (0, 1, 1), (0, 1, 2), (1, 1, 0), (1, 1, 1), (1, 1, 2)]
+     * [(0, 0, 0), (0, 0, 1), (0, 0, 2),
+     *  (0, 1, 0), (0, 1, 1), (0, 1, 2),
+     *  (1, 1, 0), (1, 1, 1), (1, 1, 2)]
      * @param[in,out] v3rhosigma2 values of the third derivative of the
      * exchange-correlation kernel wrt density and contracted gradients. Size: 12*np, order:
-     * [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 1), (0, 1, 2), (0, 2, 2), (1, 0, 0), (1, 0, 1), (1, 0, 2), (1, 1, 1), (1, 1, 2), (1, 2, 2)]
+     * [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 1), (0, 1, 2), (0, 2, 2),
+     *  (1, 0, 0), (1, 0, 1), (1, 0, 2), (1, 1, 1), (1, 1, 2), (1, 2, 2)]
      * @param[in,out] v3sigma3 values of the third derivative of the
      * exchange-correlation kernel wrt contracted gradients. Size: 10*np, order:
      * [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 1), (0, 1, 2), (0, 2, 2), (1, 1, 1), (1, 1, 2), (1, 2, 2), (2, 2, 2)]
      *
      * @note Wrapper to `xc_gga_kxc`
      */
-    auto compute_kxc(int32_t np, const double* rho, const double* sigma, double* v3rho3, double* v3rho2sigma, double* v3rhosigma2, double* v3sigma3)
-        const -> void;
+    auto compute_kxc_for_gga(int32_t       np,
+                             const double* rho,
+                             const double* sigma,
+                             double*       v3rho3,
+                             double*       v3rho2sigma,
+                             double*       v3rhosigma2,
+                             double*       v3sigma3) const -> void;
 
     /** Computes fourth derivative of GGA exchange-correlation functional on grid.
      *
@@ -360,14 +347,14 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_gga_lxc`
      */
-    auto compute_lxc(int32_t       np,
-                     const double* rho,
-                     const double* sigma,
-                     double*       v4rho4,
-                     double*       v4rho3sigma,
-                     double*       v4rho2sigma2,
-                     double*       v4rhosigma3,
-                     double*       v4sigma4) const -> void;
+    auto compute_lxc_for_gga(int32_t       np,
+                             const double* rho,
+                             const double* sigma,
+                             double*       v4rho4,
+                             double*       v4rho3sigma,
+                             double*       v4rho2sigma2,
+                             double*       v4rhosigma3,
+                             double*       v4sigma4) const -> void;
     /**}@*/
 
     /**@{ metaGGA computational functions. These are wrappers around `xc_mgga_*` functions in LibXC. */
@@ -382,7 +369,7 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_mgga_exc`
      */
-    auto compute_exc(int32_t np, const double* rho, const double* sigma, const double* lapl, const double* tau, double* exc) const -> void;
+    auto compute_exc_for_mgga(int32_t np, const double* rho, const double* sigma, const double* lapl, const double* tau, double* exc) const -> void;
 
     /** Computes first derivative of metaGGA exchange-correlation functional on grid.
      *
@@ -402,15 +389,15 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_mgga_vxc`
      */
-    auto compute_vxc(int32_t       np,
-                     const double* rho,
-                     const double* sigma,
-                     const double* lapl,
-                     const double* tau,
-                     double*       vrho,
-                     double*       vsigma,
-                     double*       vlapl,
-                     double*       vtau) const -> void;
+    auto compute_vxc_for_mgga(int32_t       np,
+                              const double* rho,
+                              const double* sigma,
+                              const double* lapl,
+                              const double* tau,
+                              double*       vrho,
+                              double*       vsigma,
+                              double*       vlapl,
+                              double*       vtau) const -> void;
 
     /** Computes values and first derivative of metaGGA exchange-correlation functional on grid.
      *
@@ -431,16 +418,16 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_mgga_exc_vxc`
      */
-    auto compute_exc_vxc(int32_t       np,
-                         const double* rho,
-                         const double* sigma,
-                         const double* lapl,
-                         const double* tau,
-                         double*       exc,
-                         double*       vrho,
-                         double*       vsigma,
-                         double*       vlapl,
-                         double*       vtau) const -> void;
+    auto compute_exc_vxc_for_mgga(int32_t       np,
+                                  const double* rho,
+                                  const double* sigma,
+                                  const double* lapl,
+                                  const double* tau,
+                                  double*       exc,
+                                  double*       vrho,
+                                  double*       vsigma,
+                                  double*       vlapl,
+                                  double*       vtau) const -> void;
 
     /** Computes second derivative of metaGGA exchange-correlation functional on grid.
      *
@@ -482,21 +469,21 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_mgga_fxc`
      */
-    auto compute_fxc(int32_t       np,
-                     const double* rho,
-                     const double* sigma,
-                     const double* lapl,
-                     const double* tau,
-                     double*       v2rho2,
-                     double*       v2rhosigma,
-                     double*       v2rholapl,
-                     double*       v2rhotau,
-                     double*       v2sigma2,
-                     double*       v2sigmalapl,
-                     double*       v2sigmatau,
-                     double*       v2lapl2,
-                     double*       v2lapltau,
-                     double*       v2tau2) const -> void;
+    auto compute_fxc_for_mgga(int32_t       np,
+                              const double* rho,
+                              const double* sigma,
+                              const double* lapl,
+                              const double* tau,
+                              double*       v2rho2,
+                              double*       v2rhosigma,
+                              double*       v2rholapl,
+                              double*       v2rhotau,
+                              double*       v2sigma2,
+                              double*       v2sigmalapl,
+                              double*       v2sigmatau,
+                              double*       v2lapl2,
+                              double*       v2lapltau,
+                              double*       v2tau2) const -> void;
 
     /** Computes third derivative of metaGGA exchange-correlation functional on grid.
      *
@@ -566,31 +553,31 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_mgga_kxc`
      */
-    auto compute_kxc(int32_t       np,
-                     const double* rho,
-                     const double* sigma,
-                     const double* lapl,
-                     const double* tau,
-                     double*       v3rho3,
-                     double*       v3rho2sigma,
-                     double*       v3rho2lapl,
-                     double*       v3rho2tau,
-                     double*       v3rhosigma2,
-                     double*       v3rhosigmalapl,
-                     double*       v3rhosigmatau,
-                     double*       v3rholapl2,
-                     double*       v3rholapltau,
-                     double*       v3rhotau2,
-                     double*       v3sigma3,
-                     double*       v3sigma2lapl,
-                     double*       v3sigma2tau,
-                     double*       v3sigmalapl2,
-                     double*       v3sigmalapltau,
-                     double*       v3sigmatau2,
-                     double*       v3lapl3,
-                     double*       v3lapl2tau,
-                     double*       v3lapltau2,
-                     double*       v3tau3) const -> void;
+    auto compute_kxc_for_mgga(int32_t       np,
+                              const double* rho,
+                              const double* sigma,
+                              const double* lapl,
+                              const double* tau,
+                              double*       v3rho3,
+                              double*       v3rho2sigma,
+                              double*       v3rho2lapl,
+                              double*       v3rho2tau,
+                              double*       v3rhosigma2,
+                              double*       v3rhosigmalapl,
+                              double*       v3rhosigmatau,
+                              double*       v3rholapl2,
+                              double*       v3rholapltau,
+                              double*       v3rhotau2,
+                              double*       v3sigma3,
+                              double*       v3sigma2lapl,
+                              double*       v3sigma2tau,
+                              double*       v3sigmalapl2,
+                              double*       v3sigmalapltau,
+                              double*       v3sigmatau2,
+                              double*       v3lapl3,
+                              double*       v3lapl2tau,
+                              double*       v3lapltau2,
+                              double*       v3tau3) const -> void;
 
     /** Computes fourth derivative of metaGGA exchange-correlation functional on grid.
      *
@@ -708,61 +695,47 @@ class CXCNewFunctional
      *
      * @note Wrapper to `xc_mgga_lxc`
      */
-    auto compute_lxc(int32_t       np,
-                     const double* rho,
-                     const double* sigma,
-                     const double* lapl,
-                     const double* tau,
-                     double*       v4rho4,
-                     double*       v4rho3sigma,
-                     double*       v4rho3lapl,
-                     double*       v4rho3tau,
-                     double*       v4rho2sigma2,
-                     double*       v4rho2sigmalapl,
-                     double*       v4rho2sigmatau,
-                     double*       v4rho2lapl2,
-                     double*       v4rho2lapltau,
-                     double*       v4rho2tau2,
-                     double*       v4rhosigma3,
-                     double*       v4rhosigma2lapl,
-                     double*       v4rhosigma2tau,
-                     double*       v4rhosigmalapl2,
-                     double*       v4rhosigmalapltau,
-                     double*       v4rhosigmatau2,
-                     double*       v4rholapl3,
-                     double*       v4rholapl2tau,
-                     double*       v4rholapltau2,
-                     double*       v4rhotau3,
-                     double*       v4sigma4,
-                     double*       v4sigma3lapl,
-                     double*       v4sigma3tau,
-                     double*       v4sigma2lapl2,
-                     double*       v4sigma2lapltau,
-                     double*       v4sigma2tau2,
-                     double*       v4sigmalapl3,
-                     double*       v4sigmalapl2tau,
-                     double*       v4sigmalapltau2,
-                     double*       v4sigmatau3,
-                     double*       v4lapl4,
-                     double*       v4lapl3tau,
-                     double*       v4lapl2tau2,
-                     double*       v4lapltau3,
-                     double*       v4tau4) const -> void;
+    auto compute_lxc_for_mgga(int32_t       np,
+                              const double* rho,
+                              const double* sigma,
+                              const double* lapl,
+                              const double* tau,
+                              double*       v4rho4,
+                              double*       v4rho3sigma,
+                              double*       v4rho3lapl,
+                              double*       v4rho3tau,
+                              double*       v4rho2sigma2,
+                              double*       v4rho2sigmalapl,
+                              double*       v4rho2sigmatau,
+                              double*       v4rho2lapl2,
+                              double*       v4rho2lapltau,
+                              double*       v4rho2tau2,
+                              double*       v4rhosigma3,
+                              double*       v4rhosigma2lapl,
+                              double*       v4rhosigma2tau,
+                              double*       v4rhosigmalapl2,
+                              double*       v4rhosigmalapltau,
+                              double*       v4rhosigmatau2,
+                              double*       v4rholapl3,
+                              double*       v4rholapl2tau,
+                              double*       v4rholapltau2,
+                              double*       v4rhotau3,
+                              double*       v4sigma4,
+                              double*       v4sigma3lapl,
+                              double*       v4sigma3tau,
+                              double*       v4sigma2lapl2,
+                              double*       v4sigma2lapltau,
+                              double*       v4sigma2tau2,
+                              double*       v4sigmalapl3,
+                              double*       v4sigmalapl2tau,
+                              double*       v4sigmalapltau2,
+                              double*       v4sigmatau3,
+                              double*       v4lapl4,
+                              double*       v4lapl3tau,
+                              double*       v4lapl2tau2,
+                              double*       v4lapltau3,
+                              double*       v4tau4) const -> void;
     /**}@*/
-
-    /** Get descriptiton, with bibliographic reference, LibXC in use.
-     *
-     * @return the description.
-     */
-    auto getLibXCDescription() -> std::string;
-
-    auto getXCName(const std::vector<Component>& x_funcs, const std::vector<Component>& c_funcs) -> std::string;
-
-    auto getFunctionalCitation(const xc_func_type& func) -> std::string;
-
-    auto getCitation(const std::vector<Component>& x_funcs, const std::vector<Component>& c_funcs) -> std::string;
-
-    friend std::ostream& operator<<(std::ostream& output, const CXCNewFunctional& source);
 };
 
 #endif /* XCNewFunctional_hpp */
