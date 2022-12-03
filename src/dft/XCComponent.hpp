@@ -67,6 +67,11 @@ class CXCComponent
      */
     void _end_libxc_func();
 
+    /**
+     Resets libxc functional component.
+     */
+    void _reset_libxc_func();
+
    public:
     /**
      Creates an XC component object.

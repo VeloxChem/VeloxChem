@@ -37,70 +37,46 @@
 
 #include "Buffer.hpp"
 #include "DensityGrid.hpp"
+#include "XCComponent.hpp"
 #include "XCCubicHessianGrid.hpp"
 #include "XCFuncType.hpp"
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
 
-using Component = std::tuple<double, xc_func_type>;
-
 /**
  * Class CXCNewFunctional is a wrapper to the C functions and structs provided by LibXC.
  *
- * - The primitive functionals offered by LibXC are **always** initialized as
- *   spin-polarized.
- * - The functionals in the mix must be **all** of the same family.
- *
- * @author R. Di Remigio Eikås, Z. Rinkevicius
+ * @author R. Di Remigio Eikås, Z. Rinkevicius, X. Li
  */
 class CXCNewFunctional
 {
    private:
-    /** @{ Exchange-correlation family. */
-    /** Whether the functional is of local-density approximation type. */
-    bool _isLDA{false};
+    /** The fraction of exact Hatree-Fock exchange in functional. */
+    double _fractionOfExactExchange{0.0};
 
-    /** Whether the functional is of generalized-gradient approximation type. */
-    bool _isGGA{false};
+    /** The range-separation parameter in functional. */
+    double _rangeSeparationParameter{0.0};
 
-    /** Whether the functional is of meta-generalized-gradient approximation type. */
-    bool _isMetaGGA{false};
+    /** Highest order of available derivatives. */
+    int32_t _maxDerivOrder{0};
 
-    /** Whether the functional is of global hybrid type. */
-    bool _isGlobalHybrid{false};
-
-    /** Whether the functional is of range-separated hybrid type. */
-    bool _isRangeSeparatedHybrid{false};
-    /** }@ */
-
-    /** @{ Available derivative orders. */
-    /** Whether has zeroth-order derivatives available. */
-    bool _hasExc{true};
-
-    /** Whether has first-order derivatives available. */
-    bool _hasVxc{true};
-
-    /** Whether has second-order derivatives available. */
-    bool _hasFxc{true};
-
-    /** Whether has third-order derivatives available. */
-    bool _hasKxc{true};
-
-    /** Whether has fourth-order derivatives available. */
-    bool _hasLxc{true};
-    /** }@ */
+    /** Highest order of available derivatives. */
+    std::string _familyOfFunctional{std::string("LDA")};
 
     /** Leading dimension for initial allocation of staging buffer. */
-    int32_t _ldStaging{(1 << 10)};
+    int32_t _ldStaging{1024};
 
     /** Buffer to stage output results from LibXC invocations. */
     double* _stagingBuffer{nullptr};
 
     /** The functional components and their coefficients. */
-    std::vector<Component> _components;
+    std::vector<CXCComponent> _components;
 
-    /** The fraction of exact Hatree-Fock exchange in functional. */
-    double _fractionOfExactExchange{0.0};
+    /** Allocates the staging buffer. */
+    void _allocateStagingBuffer();
+
+    /** Frees the staging buffer. */
+    void _freeStagingBuffer();
 
    public:
     /** Creates an exchange-correlation functional object.
@@ -108,7 +84,10 @@ class CXCNewFunctional
      * @param[in] labels list of labels of component exchange and correlation functionals.
      * @param[in] coeffs list of coefficients for the components of the functional.
      */
-    CXCNewFunctional(const std::vector<std::string>& labels, const std::vector<double>& coeffs, const double fractionOfExactExchange);
+    CXCNewFunctional(const std::vector<std::string>& labels,
+                     const std::vector<double>&      coeffs,
+                     const double                    fractionOfExactExchange  = 0.0,
+                     const double                    rangeSeparationParameter = 0.0);
 
     /** Creates an exchange-correlation functional object.
      *
@@ -117,9 +96,53 @@ class CXCNewFunctional
     CXCNewFunctional(const std::string& label);
 
     /**
+     Creates an XC functional object by copying other XC functional object.
+
+     @param source the XC functional object.
+     */
+    CXCNewFunctional(const CXCNewFunctional& source);
+
+    /**
+     Creates an XC functional object by moving other XC functional object.
+
+     @param source the XC functional object.
+     */
+    CXCNewFunctional(CXCNewFunctional&& source) noexcept;
+
+    /**
      * Destroys an exchange-correlation functional object.
      */
     ~CXCNewFunctional();
+
+    /**
+     Assigns an XC functional object by copying other XC functional object.
+
+     @param source the XC functional object.
+     */
+    CXCNewFunctional& operator=(const CXCNewFunctional& source);
+
+    /**
+     Assigns an XC functional object by moving other XC functional object.
+
+     @param source the XC functional object.
+     */
+    CXCNewFunctional& operator=(CXCNewFunctional&& source) noexcept;
+
+    /**
+     Compares XC functional object with other XC functional object.
+
+     @param other the XC functional object.
+     @return true if XC functional objects are equal, false otherwise.
+     */
+    bool operator==(const CXCNewFunctional& other) const;
+
+    /**
+     Compares XC functional object with other XC functional object.
+
+     @param other the XC functional object.
+     @return true if XC functional objects are not equal, false otherwise.
+     */
+    bool operator!=(const CXCNewFunctional& other) const;
 
     /**@{ LDA computational functions. These are wrappers around `xc_lda_*` functions in LibXC. */
     /** Computes values and first derivative of LDA exchange-correlation functional on grid.

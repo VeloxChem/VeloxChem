@@ -26,7 +26,6 @@
 #include "XCComponent.hpp"
 
 #include <cstring>
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -93,6 +92,14 @@ CXCComponent::_end_libxc_func()
     }
 }
 
+void
+CXCComponent::_reset_libxc_func()
+{
+    _end_libxc_func();
+
+    _init_libxc_func();
+}
+
 CXCComponent&
 CXCComponent::operator=(const CXCComponent& source)
 {
@@ -102,9 +109,7 @@ CXCComponent::operator=(const CXCComponent& source)
 
     _scalingFactor = source._scalingFactor;
 
-    _end_libxc_func();
-
-    _init_libxc_func();
+    _reset_libxc_func();
 
     return *this;
 }
@@ -118,9 +123,7 @@ CXCComponent::operator=(CXCComponent&& source) noexcept
 
     _scalingFactor = std::move(source._scalingFactor);
 
-    _end_libxc_func();
-
-    _init_libxc_func();
+    _reset_libxc_func();
 
     source._end_libxc_func();
 

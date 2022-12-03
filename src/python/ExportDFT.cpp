@@ -149,8 +149,14 @@ export_dft(py::module& m)
 
     // XCNewFunctional class
     PyClass<CXCNewFunctional>(m, "XCNewFunctional")
-        .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const double>(), "labels"_a, "coeffs"_a, "frac_exact_exchange"_a)
+        .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const double, const double>(),
+             "labels"_a,
+             "coeffs"_a,
+             "fraction_of_exact_exchange"_a = 0.0,
+             "range_separation_parameter"_a = 0.0)
         .def(py::init<const std::string&>(), "label"_a)
+        .def(py::init<const CXCNewFunctional&>())
+        .def(py::self == py::self)
         .def(
             "compute_exc_vxc_for_lda",
             [](const CXCNewFunctional& self, const py::array_t<double>& rho) -> py::list {
