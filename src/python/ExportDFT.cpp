@@ -40,6 +40,7 @@
 #include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
+#include "NewFunctionalParser.hpp"
 #include "XCFuncType.hpp"
 #include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
@@ -141,12 +142,7 @@ export_dft(py::module& m)
     // XCNewFunctional class
     PyClass<CXCNewFunctional>(m, "XCNewFunctional")
         .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const double>(), "labels"_a, "coeffs"_a, "frac_exact_exchange"_a)
-        .def(py::init([](const std::string& label, double coeff = 1.0, double frac_exact_exchang = 0.0) {
-                 return std::make_shared<CXCNewFunctional>(std::vector{label}, std::vector{coeff}, frac_exact_exchang);
-             }),
-             "label"_a,
-             "coeff"_a               = 1.0,
-             "frac_exact_exchange"_a = 0.0)
+        .def(py::init<const std::string&>(), "label"_a)
         .def(
             "compute_exc_vxc_for_lda",
             [](const CXCNewFunctional& self, const py::array_t<double>& rho) -> py::list {
@@ -773,6 +769,11 @@ export_dft(py::module& m)
 
     m.def("parse_xc_func",
           &vxcfuncs::getExchangeCorrelationFunctional,
+          "Converts exchange-correlation functional label to exchange-correlation functional object.",
+          "xcLabel"_a);
+
+    m.def("new_parse_xc_func",
+          &newvxcfuncs::getExchangeCorrelationFunctional,
           "Converts exchange-correlation functional label to exchange-correlation functional object.",
           "xcLabel"_a);
 }

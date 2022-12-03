@@ -110,49 +110,16 @@ class CXCNewFunctional
      */
     CXCNewFunctional(const std::vector<std::string>& labels, const std::vector<double>& coeffs, const double fractionOfExactExchange);
 
-    /** Copy-constructor.
+    /** Creates an exchange-correlation functional object.
      *
-     * @param[in] src the exchange-correlation functional.
+     * @param[in] label label of component exchange and correlation functional.
      */
-    CXCNewFunctional(const CXCNewFunctional& src);
+    CXCNewFunctional(const std::string& label);
 
-    /** Move-constructor.
-     *
-     * @param[in] src the exchange-correlation functional object.
+    /**
+     * Destroys an exchange-correlation functional object.
      */
-    CXCNewFunctional(CXCNewFunctional&& src) noexcept;
-
-    /** Destroys an exchange-correlation functional object. */
     ~CXCNewFunctional();
-
-    /** Copy-assignment operator.
-     *
-     * @param[in] src the exchange-correlation functional object.
-     */
-    auto operator=(const CXCNewFunctional& src) -> CXCNewFunctional&;
-
-    /** Move-assignment operator.
-     *
-     * @param[in] src the exchange-correlation functional object.
-     */
-    auto operator=(CXCNewFunctional&& src) noexcept -> CXCNewFunctional&;
-
-    /** Equality operator.
-     *
-     * @param[in] other the exchange-correlation functional object.
-     * @return true if exchange-correlation functional objects are equal, false otherwise.
-     */
-    auto operator==(const CXCNewFunctional& other) const -> bool;
-
-    /** Inequality operator.
-     *
-     * @param[in] other the exchange-correlation functional object.
-     * @return true if exchange-correlation functional objects are different, false otherwise.
-     */
-    auto operator!=(const CXCNewFunctional& other) const -> bool;
-
-    /** String representation of primitive functional. */
-    auto repr() const -> std::string;
 
     /**@{ LDA computational functions. These are wrappers around `xc_lda_*` functions in LibXC. */
     /** Computes values and first derivative of LDA exchange-correlation functional on grid.

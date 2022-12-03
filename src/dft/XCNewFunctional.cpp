@@ -137,6 +137,12 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels, const
     _stagingBuffer = mem::malloc<double>(n_xc_outputs * _ldStaging);
 }
 
+CXCNewFunctional::CXCNewFunctional(const std::string& label)
+
+    : CXCNewFunctional({label}, {1.0}, 0.0)
+{
+}
+
 CXCNewFunctional::~CXCNewFunctional()
 {
     // clean up allocated LibXC objects
