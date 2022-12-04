@@ -48,6 +48,24 @@ int32_t screenDensityForLDA(std::vector<int32_t>& gridPointInds,
                             const double          densityThreshold);
 
 /**
+ Screens GGA density grid to get rid of invalid grid points.
+
+ @param gridPointInds mapping between grid points before and after screening
+ @param rho the pointer to density.
+ @param rhograd the pointer to density gradient.
+ @param sigma the pointer to dot product of density gradient.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ @return the number of grid points after screening.
+ */
+int32_t screenDensityForGGA(std::vector<int32_t>& gridPointInds,
+                            double*               rho,
+                            double*               rhograd,
+                            double*               sigma,
+                            const int32_t         npoints,
+                            const double          densityThreshold);
+
+/**
  Screens LDA density grid to get rid of invalid grid points.
 
  @param gridPointInds mapping between grid points before and after screening

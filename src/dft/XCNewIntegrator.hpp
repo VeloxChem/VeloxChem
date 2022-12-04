@@ -111,7 +111,7 @@ class CXCNewIntegrator
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& densityMatrix,
                                               const CMolecularGrid&   molecularGrid,
-                                              const CXCFunctional&    xcFunctional) const;
+                                              const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates second-order LDA exchnage-correlation functional contribution
@@ -237,8 +237,9 @@ class CXCNewIntegrator
                                                 const CDenseMatrix&    gtoValuesX,
                                                 const CDenseMatrix&    gtoValuesY,
                                                 const CDenseMatrix&    gtoValuesZ,
-                                                const CXCGradientGrid& xcGradientGrid,
-                                                const CDensityGrid&    densityGrid,
+                                                const double*          rhograd,
+                                                const double*          vrho,
+                                                const double*          vsigma,
                                                 CMultiTimer&           timer) const;
 
     /**
