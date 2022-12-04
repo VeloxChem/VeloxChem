@@ -131,7 +131,7 @@ class CXCNewIntegrator
                                  const CAODensityMatrix& rwDensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCFunctional&    xcFunctional) const;
+                                 const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates second-order GGA exchnage-correlation functional contribution
@@ -248,16 +248,16 @@ class CXCNewIntegrator
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
-     @param xcHessianGrid the exchange-correlation hessian grid.
-     @param rwDensityGrid the perturbed density grid.
+     @param rhow the pointer to perturbed density.
+     @param v2rho2 the 2nd-order functional derivative wrt density.
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
     CDenseMatrix _integratePartialFxcFockForLDA(const int32_t         npoints,
                                                 const double*         weights,
                                                 const CDenseMatrix&   gtoValues,
-                                                const CXCHessianGrid& xcHessianGrid,
-                                                const CDensityGrid&   rwDensityGrid,
+                                                const double*         rhow,
+                                                const double*         v2rho2,
                                                 CMultiTimer&          timer) const;
 
     /**

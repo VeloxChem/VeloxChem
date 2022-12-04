@@ -324,6 +324,50 @@ CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double*
 }
 
 auto
+CXCNewFunctional::compute_fxc_for_lda(int32_t np, const double* rho, double* v2rho2) const -> void
+{
+    errors::assertMsgCritical(_maxDerivOrder >= 2,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    // auto stage_exc = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    // auto stage_vrho= (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto stage_v2rho2 = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+
+#pragma omp simd aligned(v2rho2 : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        v2rho2[3 * g + 0] = 0.0;
+        v2rho2[3 * g + 1] = 0.0;
+        v2rho2[3 * g + 2] = 0.0;
+    }
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
+
+        const auto c = xccomp.getScalingFactor();
+
+#pragma omp simd aligned(v2rho2, stage_v2rho2 : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
+            v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
+            v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_v2rho2);
+    }
+}
+
+auto
 CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
