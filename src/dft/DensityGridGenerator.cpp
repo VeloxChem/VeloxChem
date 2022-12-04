@@ -169,8 +169,10 @@ generateDensityForGGA(double*             rho,
             #pragma omp simd aligned(rho, rhograd, F_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
+                // rho_a
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
 
+                // rho_a_grad
                 rhograd[6 * g + 0] += 2.0 * F_val[nu_offset + g] * chi_x_val[nu_offset + g];
 
                 rhograd[6 * g + 1] += 2.0 * F_val[nu_offset + g] * chi_y_val[nu_offset + g];
@@ -179,7 +181,7 @@ generateDensityForGGA(double*             rho,
             }
         }
 
-        #pragma omp simd aligned(rho, rhograd, sigma : VLX_ALIGN)
+        #pragma omp simd aligned(rho, rhograd : VLX_ALIGN)
         for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
             // rho_b
@@ -191,19 +193,26 @@ generateDensityForGGA(double*             rho,
             rhograd[6 * g + 4] = rhograd[6 * g + 1];
 
             rhograd[6 * g + 5] = rhograd[6 * g + 2];
+        }
 
-            // simga_aa, sigma_ab, sigma_bb
-            sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +
-                               rhograd[6 * g + 1] * rhograd[6 * g + 1] +
-                               rhograd[6 * g + 2] * rhograd[6 * g + 2];
+        if (sigma != nullptr)
+        {
+            #pragma omp simd aligned(rhograd, sigma : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                // simga_aa, sigma_ab, sigma_bb
+                sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +
+                                   rhograd[6 * g + 1] * rhograd[6 * g + 1] +
+                                   rhograd[6 * g + 2] * rhograd[6 * g + 2];
 
-            sigma[3 * g + 1] = rhograd[6 * g + 0] * rhograd[6 * g + 3] +
-                               rhograd[6 * g + 1] * rhograd[6 * g + 4] +
-                               rhograd[6 * g + 2] * rhograd[6 * g + 5];
+                sigma[3 * g + 1] = rhograd[6 * g + 0] * rhograd[6 * g + 3] +
+                                   rhograd[6 * g + 1] * rhograd[6 * g + 4] +
+                                   rhograd[6 * g + 2] * rhograd[6 * g + 5];
 
-            sigma[3 * g + 2] = rhograd[6 * g + 3] * rhograd[6 * g + 3] +
-                               rhograd[6 * g + 4] * rhograd[6 * g + 4] +
-                               rhograd[6 * g + 5] * rhograd[6 * g + 5];
+                sigma[3 * g + 2] = rhograd[6 * g + 3] * rhograd[6 * g + 3] +
+                                   rhograd[6 * g + 4] * rhograd[6 * g + 4] +
+                                   rhograd[6 * g + 5] * rhograd[6 * g + 5];
+            }
         }
     }
 

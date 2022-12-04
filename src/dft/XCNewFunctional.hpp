@@ -211,9 +211,23 @@ class CXCNewFunctional
      * @param[in,out] vsigma values of the first derivative of the
      * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
      *
-     * @note Wrapper to `xc_gga_exc_vxc`
+     * @note Wrapper to `xc_lda_exc_vxc` and `xc_gga_exc_vxc`
      */
     auto compute_exc_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void;
+
+    /** Computes first derivative of GGA exchange-correlation functional on grid.
+     *
+     * @param[in] np number of grid points.
+     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
+     * @param[in] sigma values of the contracted gradient of density at grid points. Order: [(0, 0), (0, 1), (1, 1)].
+     * @param[in,out] vrho values of the first derivative of the
+     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
+     * @param[in,out] vsigma values of the first derivative of the
+     * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
+     *
+     * @note Wrapper to `xc_lda_vxc` and `xc_gga_vxc`
+     */
+    auto compute_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void;
 
     /** Computes second derivative of GGA exchange-correlation functional on grid.
      *
@@ -230,7 +244,7 @@ class CXCNewFunctional
      * exchange-correlation kernel wrt contracted gradients. Size: 6*np, order:
      * [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)].
      *
-     * @note Wrapper to `xc_gga_fxc`
+     * @note Wrapper to `xc_lda_fxc` and `xc_gga_fxc`
      */
     auto compute_fxc_for_gga(int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const -> void;
 
@@ -324,7 +338,7 @@ class CXCNewFunctional
      * @param[in,out] vtau alues of the first derivative of the
      * exchange-correlation kernel wrt kinetic energy density. Size: 2*np, order: [(0), (1)].
      *
-     * @note Wrapper to `xc_mgga_exc_vxc`
+     * @note Wrapper to `xc_lda_exc_vxc`, `xc_gga_exc_vxc` and `xc_mgga_exc_vxc`
      */
     auto compute_exc_vxc_for_mgga(int32_t       np,
                                   const double* rho,

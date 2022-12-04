@@ -442,6 +442,168 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
 }
 
 auto
+CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
+{
+    errors::assertMsgCritical(_maxDerivOrder >= 1,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
+
+#pragma omp simd aligned(vrho, vsigma : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        vrho[2 * g + 0] = 0.0;
+        vrho[2 * g + 1] = 0.0;
+
+        vsigma[3 * g + 0] = 0.0;
+        vsigma[3 * g + 1] = 0.0;
+        vsigma[3 * g + 2] = 0.0;
+    }
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    // auto stage_exc = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        const auto c = xccomp.getScalingFactor();
+
+        auto family = funcptr->info->family;
+
+        if (family == XC_FAMILY_LDA)
+        {
+            xc_lda_vxc(funcptr, np, rho, stage_vrho);
+
+#pragma omp simd aligned(vrho, stage_vrho : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+            }
+        }
+        else if (family == XC_FAMILY_GGA)
+        {
+            xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
+
+#pragma omp simd aligned(vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+
+                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+            }
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_vrho);
+        mem::free(stage_vsigma);
+    }
+}
+
+auto
+CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const
+    -> void
+{
+    errors::assertMsgCritical(_maxDerivOrder >= 2,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
+
+#pragma omp simd aligned(v2rho2, v2rhosigma, v2sigma2 : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        v2rho2[3 * g + 0] = 0.0;
+        v2rho2[3 * g + 1] = 0.0;
+        v2rho2[3 * g + 2] = 0.0;
+
+        v2rhosigma[6 * g + 0] = 0.0;
+        v2rhosigma[6 * g + 1] = 0.0;
+        v2rhosigma[6 * g + 2] = 0.0;
+        v2rhosigma[6 * g + 3] = 0.0;
+        v2rhosigma[6 * g + 4] = 0.0;
+        v2rhosigma[6 * g + 5] = 0.0;
+
+        v2sigma2[6 * g + 0] = 0.0;
+        v2sigma2[6 * g + 1] = 0.0;
+        v2sigma2[6 * g + 2] = 0.0;
+        v2sigma2[6 * g + 3] = 0.0;
+        v2sigma2[6 * g + 4] = 0.0;
+        v2sigma2[6 * g + 5] = 0.0;
+    }
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    // auto stage_exc     = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    // auto stage_vrho    = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    // auto stage_vsigma  = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto stage_v2rho2     = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
+    auto stage_v2rhosigma = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
+    auto stage_v2sigma2   = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        const auto c = xccomp.getScalingFactor();
+
+        auto family = funcptr->info->family;
+
+        if (family == XC_FAMILY_LDA)
+        {
+            xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
+
+#pragma omp simd aligned(v2rho2, stage_v2rho2 : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
+                v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
+                v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+            }
+        }
+        else if (family == XC_FAMILY_GGA)
+        {
+            xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
+
+#pragma omp simd aligned(v2rho2, stage_v2rho2, v2rhosigma, stage_v2rhosigma, v2sigma2, stage_v2sigma2 : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
+                v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
+                v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+
+                v2rhosigma[6 * g + 0] += c * stage_v2rhosigma[6 * g + 0];
+                v2rhosigma[6 * g + 1] += c * stage_v2rhosigma[6 * g + 1];
+                v2rhosigma[6 * g + 2] += c * stage_v2rhosigma[6 * g + 2];
+                v2rhosigma[6 * g + 3] += c * stage_v2rhosigma[6 * g + 3];
+                v2rhosigma[6 * g + 4] += c * stage_v2rhosigma[6 * g + 4];
+                v2rhosigma[6 * g + 5] += c * stage_v2rhosigma[6 * g + 5];
+
+                v2sigma2[6 * g + 0] += c * stage_v2sigma2[6 * g + 0];
+                v2sigma2[6 * g + 1] += c * stage_v2sigma2[6 * g + 1];
+                v2sigma2[6 * g + 2] += c * stage_v2sigma2[6 * g + 2];
+                v2sigma2[6 * g + 3] += c * stage_v2sigma2[6 * g + 3];
+                v2sigma2[6 * g + 4] += c * stage_v2sigma2[6 * g + 4];
+                v2sigma2[6 * g + 5] += c * stage_v2sigma2[6 * g + 5];
+            }
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_v2rho2);
+        mem::free(stage_v2rhosigma);
+        mem::free(stage_v2sigma2);
+    }
+}
+
+auto
 CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                                            const double* rho,
                                            const double* sigma,

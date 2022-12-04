@@ -151,7 +151,7 @@ class CXCNewIntegrator
                                  const CAODensityMatrix& rwDensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCFunctional&    xcFunctional) const;
+                                 const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates third-order LDA exchnage-correlation functional contribution
@@ -269,10 +269,13 @@ class CXCNewIntegrator
      @param gtoValuesX the GTO gradient X values on grid points.
      @param gtoValuesY the GTO gradient Y values on grid points.
      @param gtoValuesZ the GTO gradient Z values on grid points.
-     @param xcGradientGrid the exchange-correlation gradient grid.
-     @param xcHessianGrid the exchange-correlation hessian grid.
-     @param rwDensityGrid the perturbed density grid.
-     @param gsDensityGrid the ground-state density grid.
+     @param rhow the pointer to perturbed density.
+     @param rhograd the pointer to density gradient.
+     @param rhowgrad the pointer to perturbed density gradient.
+     @param v2rho2 the 2nd-order functional derivative wrt density.
+     @param v2rhosigma the 2nd-order functional derivative wrt density and
+            density gradient.
+     @param v2sigma2 the 2nd-order functional derivative wrt density gradient.
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
@@ -282,10 +285,13 @@ class CXCNewIntegrator
                                                 const CDenseMatrix&    gtoValuesX,
                                                 const CDenseMatrix&    gtoValuesY,
                                                 const CDenseMatrix&    gtoValuesZ,
-                                                const CXCGradientGrid& xcGradientGrid,
-                                                const CXCHessianGrid&  xcHessianGrid,
-                                                const CDensityGrid&    rwDensityGrid,
-                                                const CDensityGrid&    gsDensityGrid,
+                                                const double*          rhow,
+                                                const double*          rhograd,
+                                                const double*          rhowgrad,
+                                                const double*          vsigma,
+                                                const double*          v2rho2,
+                                                const double*          v2rhosigma,
+                                                const double*          v2sigma2,
                                                 CMultiTimer&           timer) const;
 
     /**
