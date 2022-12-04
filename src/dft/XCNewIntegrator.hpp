@@ -45,6 +45,7 @@
 #include "XCFunctional.hpp"
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
+#include "XCNewFunctional.hpp"
 
 /**
  Class CXCNewIntegrator implements XC integrator.
@@ -93,7 +94,7 @@ class CXCNewIntegrator
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& densityMatrix,
                                               const CMolecularGrid&   molecularGrid,
-                                              const CXCFunctional&    xcFunctional) const;
+                                              const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates first-order GGA exchnage-correlation functional contribution to
@@ -206,15 +207,15 @@ class CXCNewIntegrator
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
-     @param xcGradientGrid the exchange-correlation gradient grid.
+     @param vrho the 1st-order functional derivative wrt density.
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialVxcFockForLDA(const int32_t          npoints,
-                                                const double*          weights,
-                                                const CDenseMatrix&    gtoValues,
-                                                const CXCGradientGrid& xcGradientGrid,
-                                                CMultiTimer&           timer) const;
+    CDenseMatrix _integratePartialVxcFockForLDA(const int32_t       npoints,
+                                                const double*       weights,
+                                                const CDenseMatrix& gtoValues,
+                                                const double*       vrho,
+                                                CMultiTimer&        timer) const;
 
     /**
      Integrates GGA contribution to AO Kohn-Sham matrix.

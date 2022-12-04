@@ -37,6 +37,20 @@ namespace gridscreen {  // gridscreen namespace
  Screens LDA density grid to get rid of invalid grid points.
 
  @param gridPointInds mapping between grid points before and after screening
+ @param rho the pointer to density.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ @return the number of grid points after screening.
+ */
+int32_t screenDensityForLDA(std::vector<int32_t>& gridPointInds,
+                            double*               rho,
+                            const int32_t         npoints,
+                            const double          densityThreshold);
+
+/**
+ Screens LDA density grid to get rid of invalid grid points.
+
+ @param gridPointInds mapping between grid points before and after screening
  @param destDensityGrid the density grid to store the result (destination).
  @param srcDensityGrid the density grid to provide the grid points (source).
  @param densityThreshold the threshold for density grid screening.

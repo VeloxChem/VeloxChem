@@ -27,11 +27,76 @@
 
 #include <cstring>
 
-#include "omp.h"
+#include <omp.h>
 
 #include "DenseLinearAlgebra.hpp"
 
 namespace dengridgen {  // dengridgen namespace
+
+void
+generateDensityForLDA(double*             rho,
+                      const int32_t       npoints,
+                      const CDenseMatrix& gtoValues,
+                      const CDenseMatrix& densityMatrix,
+                      CMultiTimer&        timer)
+{
+    // eq.(26), JCTC 2021, 17, 1512-1521
+
+    timer.start("Density grid matmul");
+
+    auto mat_F = denblas::multAB(densityMatrix, gtoValues);
+
+    timer.stop("Density grid matmul");
+
+    // eq.(27), JCTC 2021, 17, 1512-1521
+
+    timer.start("Density grid rho");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    auto nthreads = omp_get_max_threads();
+
+    auto F_val = mat_F.values();
+
+    auto chi_val = gtoValues.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        #pragma omp simd aligned(rho : VLX_ALIGN)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            // rho_alpha
+            rho[2 * g + 0] = 0.0;
+        }
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(rho, F_val, chi_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                // rho_alpha
+                rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+            }
+        }
+
+        #pragma omp simd aligned(rho : VLX_ALIGN)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            // rho_beta
+            rho[2 * g + 1] = rho[2 * g + 0];
+        }
+    }
+
+    timer.stop("Density grid rho");
+}
 
 CDensityGrid
 generateDensityGridForLDA(const int32_t       npoints,

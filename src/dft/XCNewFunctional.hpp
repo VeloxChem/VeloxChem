@@ -144,6 +144,11 @@ class CXCNewFunctional
      */
     bool operator!=(const CXCNewFunctional& other) const;
 
+    /**
+     Gets XC functional type.
+     */
+    xcfun getFunctionalType() const;
+
     /**@{ LDA computational functions. These are wrappers around `xc_lda_*` functions in LibXC. */
     /** Computes values and first derivative of LDA exchange-correlation functional on grid.
      *

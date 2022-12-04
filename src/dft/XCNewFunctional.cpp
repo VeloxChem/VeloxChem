@@ -271,6 +271,12 @@ CXCNewFunctional::operator!=(const CXCNewFunctional& other) const
     return !(*this == other);
 }
 
+xcfun
+CXCNewFunctional::getFunctionalType() const
+{
+    return to_xcfun(_familyOfFunctional);
+}
+
 auto
 CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double* exc, double* vrho) const -> void
 {
@@ -282,6 +288,15 @@ CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double*
 
     auto stage_exc  = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
     auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+
+#pragma omp simd aligned(exc, vrho : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        exc[g] = 0.0;
+
+        vrho[2 * g + 0] = 0.0;
+        vrho[2 * g + 1] = 0.0;
+    }
 
     for (const auto& xccomp : _components)
     {
@@ -313,6 +328,19 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
+
+#pragma omp simd aligned(exc, vrho, vsigma : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        exc[g] = 0.0;
+
+        vrho[2 * g + 0] = 0.0;
+        vrho[2 * g + 1] = 0.0;
+
+        vsigma[3 * g + 0] = 0.0;
+        vsigma[3 * g + 1] = 0.0;
+        vsigma[3 * g + 2] = 0.0;
+    }
 
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
@@ -383,6 +411,25 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
+
+#pragma omp simd aligned(exc, vrho, vsigma, vlapl, vtau : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        exc[g] = 0.0;
+
+        vrho[2 * g + 0] = 0.0;
+        vrho[2 * g + 1] = 0.0;
+
+        vsigma[3 * g + 0] = 0.0;
+        vsigma[3 * g + 1] = 0.0;
+        vsigma[3 * g + 2] = 0.0;
+
+        vlapl[2 * g + 0] = 0.0;
+        vlapl[2 * g + 1] = 0.0;
+
+        vtau[2 * g + 0] = 0.0;
+        vtau[2 * g + 1] = 0.0;
+    }
 
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);

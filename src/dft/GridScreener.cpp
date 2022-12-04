@@ -27,6 +27,32 @@
 
 namespace gridscreen {  // gridscreen namespace
 
+int32_t
+screenDensityForLDA(std::vector<int32_t>& gridPointInds,
+                    double*               rho,
+                    const int32_t         npoints,
+                    const double          densityThreshold)
+{
+    int32_t gpcount = 0;
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        if ((std::fabs(rho[2 * g + 0]) > densityThreshold) &&
+            (std::fabs(rho[2 * g + 1]) > densityThreshold))
+        {
+            gridPointInds[gpcount] = g;
+
+            rho[2 * gpcount + 0] = rho[2 * g + 0];
+
+            rho[2 * gpcount + 1] = rho[2 * g + 1];
+
+            ++gpcount;
+        }
+    }
+
+    return gpcount;
+}
+
 void
 screenDensityGridForLDA(std::vector<int32_t>& gridPointInds,
                         CDensityGrid&         destDensityGrid,
