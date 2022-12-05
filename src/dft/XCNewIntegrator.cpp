@@ -1023,13 +1023,9 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     std::vector<int32_t> aoinds(naos);
 
-    // indices for keeping track of valid grid points
+    // density and functional derivatives
 
-    std::vector<int32_t> screened_point_inds(molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    CMemBlock<double> screened_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    auto screened_weights = screened_weights_data.data();
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
@@ -1050,6 +1046,8 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
 
@@ -1208,41 +1206,27 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
                                           sub_dens_mat, timer);
 
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
-        auto screened_npoints = gridscreen::screenDensityForGGA(screened_point_inds, rho, rhograd, sigma, npoints,
-
-                                                                _screeningThresholdForDensityValues);
-
-        gridscreen::screenWeights(screened_weights, gridblockpos, weights, screened_point_inds, screened_npoints);
-
-        CDenseMatrix screened_mat_chi(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_x(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_y(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_z(mat_chi.getNumberOfRows(), screened_npoints);
-
-        gridscreen::screenGtoMatrixForGGA(screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
-
-                                          mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, screened_point_inds, screened_npoints);
-
-        timer.stop("Density screening");
-
-        if (screened_npoints == 0) continue;
-
         // compute exchange-correlation functional derivative
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_vxc_for_gga(screened_npoints, rho, sigma, vrho, vsigma);
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        xcFunctional.compute_fxc_for_gga(screened_npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+        xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
         timer.stop("XC functional eval.");
+
+        // screen density and functional derivatives
+
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        gridscreen::screenFxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
+
+                                        npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
 
         // go through rhow density matrices
 
@@ -1258,17 +1242,13 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             // generate density grid
 
-            dengridgen::generateDensityForGGA(rhow, rhowgrad, nullptr, screened_npoints, screened_mat_chi,
-
-                                              screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+            dengridgen::generateDensityForGGA(rhow, rhowgrad, nullptr, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
 
                                               sub_dens_mat, timer);
 
             // compute partial contribution to Fxc matrix
 
-            auto partial_mat_Fxc = _integratePartialFxcFockForGGA(screened_npoints, screened_weights, screened_mat_chi,
-
-                                                                  screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
+            auto partial_mat_Fxc = _integratePartialFxcFockForGGA(npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
 
                                                                   rhow, rhograd, rhowgrad, vsigma, v2rho2, v2rhosigma, v2sigma2,
 
