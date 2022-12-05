@@ -27,6 +27,37 @@
 
 namespace gridscreen {  // gridscreen namespace
 
+void
+screenVxcFockForLDA(double*               rho,
+                    double*               exc,
+                    double*               vrho,
+                    const int32_t         npoints,
+                    const double          densityThreshold)
+{
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        // rho_a
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
+        {
+            rho[2 * g + 0] = 0.0;
+
+            exc[g] = 0.0;
+
+            vrho[2 * g + 0] = 0.0;
+        }
+
+        // rho_b
+        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
+        {
+            rho[2 * g + 1] = 0.0;
+
+            exc[g] = 0.0;
+
+            vrho[2 * g + 1] = 0.0;
+        }
+    }
+}
+
 int32_t
 screenDensityForLDA(std::vector<int32_t>& gridPointInds,
                     double*               rho,
@@ -229,6 +260,18 @@ screenDensityGridForGGA(std::vector<int32_t>& gridPointInds,
     }
 
     destDensityGrid.slice(gpcount);
+}
+
+void
+copyWeights(double*                     screenedWeights,
+            const int32_t               gridBlockPosition,
+            const double*               weights,
+            const int32_t               nGridPoints)
+{
+    for (int32_t g = 0; g < nGridPoints; g++)
+    {
+        screenedWeights[g] = weights[gridBlockPosition + g];
+    }
 }
 
 void

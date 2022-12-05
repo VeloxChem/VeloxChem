@@ -240,19 +240,15 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     std::vector<int32_t> aoinds(naos);
 
-    // indices for keeping track of valid grid points
-
-    std::vector<int32_t> screened_point_inds(molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    CMemBlock<double> screened_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    auto screened_weights = screened_weights_data.data();
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
 
@@ -370,45 +366,37 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+
+        auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
         // generate density grid
 
-        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat, timer);
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
-        auto screened_npoints = gridscreen::screenDensityForLDA(screened_point_inds, rho, npoints,
-
-                                                                _screeningThresholdForDensityValues);
-
-        gridscreen::screenWeights(screened_weights, gridblockpos, weights, screened_point_inds, screened_npoints);
-
-        CDenseMatrix screened_mat_chi(mat_chi.getNumberOfRows(), screened_npoints);
-
-        gridscreen::screenGtoMatrixForLDA(screened_mat_chi, mat_chi, screened_point_inds, screened_npoints);
-
-        timer.stop("Density screening");
-
-        if (screened_npoints == 0) continue;
+        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, timer);
 
         // compute exchange-correlation functional derivative
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_lda(screened_npoints, rho, exc, vrho);
+        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
         timer.stop("XC functional eval.");
 
+        // screen density and functional derivatives
+
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
+
         // compute partial contribution to Vxc matrix
 
-        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(screened_npoints, screened_weights, screened_mat_chi,
-
-                                                              vrho, timer);
+        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
 
         // distribute partial Vxc to full Kohn-Sham matrix
 
@@ -422,13 +410,13 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("XC energy");
 
-        for (int32_t g = 0; g < screened_npoints; g++)
+        for (int32_t g = 0; g < npoints; g++)
         {
             auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
 
-            nele += screened_weights[g] * rho_total;
+            nele += local_weights[g] * rho_total;
 
-            xcene += screened_weights[g] * exc[g] * rho_total;
+            xcene += local_weights[g] * exc[g] * rho_total;
         }
 
         timer.stop("XC energy");

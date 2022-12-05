@@ -34,6 +34,23 @@
 namespace gridscreen {  // gridscreen namespace
 
 /**
+ Screens Vxc Fock for LDA.
+
+ @param rho the density.
+ @param exc the functional value.
+ @param vrho the 1st-order functional derivative wrt density.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ @return the number of grid points after screening.
+ */
+void
+screenVxcFockForLDA(double*               rho,
+                    double*               exc,
+                    double*               vrho,
+                    const int32_t         npoints,
+                    const double          densityThreshold);
+
+/**
  Screens LDA density grid to get rid of invalid grid points.
 
  @param gridPointInds mapping between grid points before and after screening
@@ -90,6 +107,20 @@ void screenDensityGridForGGA(std::vector<int32_t>& gridPointInds,
                              CDensityGrid&         destDensityGrid,
                              const CDensityGrid&   srcDensityGrid,
                              const double          densityThreshold);
+
+/**
+ Copies weights.
+
+ @param screenedWeights pointer to the screened weights.
+ @param gridBlockPosition the starting position of the grid box.
+ @param weights pointer to the original weights of all grid points.
+ @param nScreenedGridPoints the number of grid points after screening.
+ */
+void
+copyWeights(double*                     screenedWeights,
+            const int32_t               gridBlockPosition,
+            const double*               weights,
+            const int32_t               nGridPoints);
 
 /**
  Screens weights.
