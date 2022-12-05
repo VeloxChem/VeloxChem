@@ -59,10 +59,6 @@ CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
     _locComm = comm;
 }
 
-CXCNewIntegrator::~CXCNewIntegrator()
-{
-}
-
 CAOKohnShamMatrix
 CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
                                    const CMolecularBasis&  basis,

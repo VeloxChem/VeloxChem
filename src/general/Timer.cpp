@@ -33,10 +33,6 @@ CTimer::CTimer()
     reset();
 }
 
-CTimer::~CTimer()
-{
-}
-
 void
 CTimer::reset()
 {

@@ -58,10 +58,6 @@ CXCNewMolecularGradient::CXCNewMolecularGradient(MPI_Comm comm)
     _locComm = comm;
 }
 
-CXCNewMolecularGradient::~CXCNewMolecularGradient()
-{
-}
-
 CDenseMatrix
 CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
                                               const CMolecularBasis&  basis,

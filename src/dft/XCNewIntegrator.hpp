@@ -408,11 +408,6 @@ class CXCNewIntegrator
     CXCNewIntegrator(MPI_Comm comm);
 
     /**
-     Destroys an XC integrator object.
-     */
-    ~CXCNewIntegrator();
-
-    /**
      Integrates first-order exchnage-correlation functional contribution to AO
      Kohn-Sham matrix.
 

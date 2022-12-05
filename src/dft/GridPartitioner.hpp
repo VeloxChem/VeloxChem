@@ -57,11 +57,6 @@ class CGridPartitioner
     CGridPartitioner(const CGridBox& box, const int32_t numGridPointsThreshold);
 
     /**
-     Destroys a grid partitioner object.
-     */
-    ~CGridPartitioner();
-
-    /**
      Partitions the grid points.
      */
     void partitionGridPoints();

@@ -226,11 +226,6 @@ class CXCNewMolecularGradient
     CXCNewMolecularGradient(MPI_Comm comm);
 
     /**
-     Destroys an XC integrator object.
-     */
-    ~CXCNewMolecularGradient();
-
-    /**
      Integrates first-order exchnage-correlation functional contribution to
      molecular gradient.
 
