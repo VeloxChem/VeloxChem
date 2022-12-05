@@ -34,7 +34,6 @@
 
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
-#include "DensityGridDriver.hpp"
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
 #include "MolecularBasis.hpp"

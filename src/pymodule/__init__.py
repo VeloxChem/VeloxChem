@@ -34,7 +34,6 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
-from .veloxchemlib import DensityGridDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import DenseMatrix

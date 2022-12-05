@@ -35,7 +35,6 @@
 
 #include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
-#include "DensityGridDriver.hpp"
 #include "ExportGeneral.hpp"
 #include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
@@ -285,28 +284,6 @@ export_dft(py::module& m)
              &CGridDriver::setLevel,
              "Sets accuracy level for grid generation. Level: 1-6, where 1 is coarse grid, 5 is ultrafine grid, 6 special benchmarking grid.",
              "gridLevel"_a);
-
-    // CDensityGridDriver class
-
-    PyClass<CDensityGridDriver>(m, "DensityGridDriver")
-        .def(py::init(&vlx_general::create<CDensityGridDriver>), "comm"_a = py::none())
-        .def(
-            "generate",
-            [](CDensityGridDriver&     self,
-               const CAODensityMatrix& aoDensityMatrix,
-               const CMolecule&        molecule,
-               const CMolecularBasis&  basis,
-               const CMolecularGrid&   molecularGrid,
-               const std::string&      xcFunctionalType) -> CDensityGrid {
-                return self.generate(aoDensityMatrix, molecule, basis, molecularGrid, to_xcfun(xcFunctionalType));
-            },
-            "Generates partitioned density grid for given molecule and type of exchange-correlation functional. Density grid generation is "
-            "distributed within domain of MPI communicator.",
-            "aoDensityMatrix"_a,
-            "molecule"_a,
-            "basis"_a,
-            "molecularGrid"_a,
-            "xcFunctionalType"_a);
 
     // CXCIntegrator class
 
