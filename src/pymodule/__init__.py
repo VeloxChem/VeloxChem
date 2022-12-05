@@ -41,7 +41,6 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCNewIntegrator
 
 # C++ functions

@@ -313,51 +313,6 @@ export_dft(py::module& m)
 
     PyClass<CXCIntegrator>(m, "XCIntegrator")
         .def(py::init(&vlx_general::create<CXCIntegrator>), "comm"_a = py::none())
-        .def("integrate",
-             py::overload_cast<const CAODensityMatrix&, const CMolecule&, const CMolecularBasis&, const CMolecularGrid&, const std::string&>(
-                 &CXCIntegrator::integrate, py::const_),
-             "Integrate exchange-correlation functional contribution to zero order Kohn-Sham matrix.",
-             "aoDensityMatrix"_a,
-             "molecule"_a,
-             "basis"_a,
-             "molecularGrid"_a,
-             "xcFuncLabel"_a)
-        .def("integrate",
-             py::overload_cast<CAOFockMatrix&,
-                               const CAODensityMatrix&,
-                               const CAODensityMatrix&,
-                               const CMolecule&,
-                               const CMolecularBasis&,
-                               const CMolecularGrid&,
-                               const std::string&>(&CXCIntegrator::integrate, py::const_),
-             "Integrate exchange-correlation functional contribution to first order Fock matrices and adds it to AO Fock matrix.",
-             "aoFockMatrix"_a,
-             "rwDensityMatrix"_a,
-             "gsDensityMatrix"_a,
-             "molecule"_a,
-             "basis"_a,
-             "molecularGrid"_a,
-             "xcFuncLabel"_a)
-        .def("integrate",
-             py::overload_cast<CAOFockMatrix&,
-                               const CAODensityMatrix&,
-                               const CAODensityMatrix&,
-                               const CAODensityMatrix&,
-                               const CMolecule&,
-                               const CMolecularBasis&,
-                               const CMolecularGrid&,
-                               const std::string&,
-                               const std::string&>(&CXCIntegrator::integrate, py::const_),
-             "Integrate exchange-correlation functional contribution to first order Fock matrices and adds it to AO Fock matrix.",
-             "aoFockMatrix"_a,
-             "rwDensityMatrix"_a,
-             "rw12DensityMatrix"_a,
-             "gsDensityMatrix"_a,
-             "molecule"_a,
-             "basis"_a,
-             "molecularGrid"_a,
-             "xcFuncLabel"_a,
-             "quadMode"_a)
         .def("integrate_pdft", &integrate_pdft);
 
     // CXCNewIntegrator class

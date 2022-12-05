@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import GridDriver, XCIntegrator
+from veloxchem.veloxchemlib import (GridDriver, MolecularGrid, XCIntegrator,
+                                    XCNewIntegrator)
 from veloxchem.veloxchemlib import parse_xc_func, is_single_node
 from veloxchem.veloxchemlib import denmat, mpi_master
 from veloxchem.molecule import Molecule
@@ -32,9 +33,12 @@ class TestPDFT:
         molgrid = grid_drv.generate(molecule)
 
         xcfun = parse_xc_func(func)
-        xc_drv = XCIntegrator()
-        vxc_mat = xc_drv.integrate(scfdrv.density, molecule, basis, molgrid,
-                                   xcfun.get_func_label())
+        xc_drv_new = XCNewIntegrator()
+        molgrid_new = MolecularGrid(molgrid)
+        molgrid_new.partition_grid_points()
+        vxc_mat = xc_drv_new.integrate_vxc_fock(molecule, basis, scfdrv.density,
+                                                molgrid_new,
+                                                xcfun.get_func_label())
 
         comm = scfdrv.comm
         rank = scfdrv.rank
@@ -59,6 +63,7 @@ class TestPDFT:
             mo_act = None
         mo_act = comm.bcast(mo_act, root=mpi_master())
 
+        xc_drv = XCIntegrator()
         pdft_ene = xc_drv.integrate_pdft(den_mat, D2act, mo_act.T.copy(),
                                          molecule, basis, molgrid,
                                          xcfun.get_func_label())

@@ -11,6 +11,5 @@ target_sources(utests
     XCFunctionalTest.cpp
     XCGradientGridTest.cpp
     XCHessianGridTest.cpp
-    XCIntegratorTest.cpp
     XCMolecularGradientTest.cpp
   )

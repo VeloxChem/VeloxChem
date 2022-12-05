@@ -37,11 +37,8 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import GridDriver
-from .veloxchemlib import MolecularGrid
-from .veloxchemlib import XCIntegrator, XCNewIntegrator
-from .veloxchemlib import AOKohnShamMatrix
-from .veloxchemlib import DenseMatrix
+from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
+from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb, xcfun
@@ -1377,11 +1374,9 @@ class ScfDriver:
                                                     self._mol_grid,
                                                     self.xcfun.get_func_label())
             else:
-                xc_drv = XCIntegrator(self.comm)
-                self._mol_grid.distribute(self.rank, self.nodes, self.comm)
-                vxc_mat = xc_drv.integrate(den_mat, molecule, basis,
-                                           self._mol_grid,
-                                           self.xcfun.get_func_label())
+                assert_msg_critical(
+                    False, 'SCF driver: Unsupported XC functional type')
+
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
         else:
             vxc_mat = None
