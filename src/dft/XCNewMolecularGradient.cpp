@@ -396,9 +396,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -843,9 +843,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1360,11 +1360,11 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1824,11 +1824,11 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2502,11 +2502,11 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2999,11 +2999,11 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, aoinds, aocount, naos);
+        auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 

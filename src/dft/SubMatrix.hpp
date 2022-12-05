@@ -39,6 +39,7 @@ namespace submat {  // submat namespace
 
  @param densityMatrix the AO density matrix.
  @param densityIndex the density index.
+ @param densitySpin the density spin.
  @param aoIndices the index mapping from submatrix to full matrix.
  @param aoCount the number of indices in submatrix.
  @param nAOs the number of indices in full matrix.
@@ -46,6 +47,7 @@ namespace submat {  // submat namespace
  */
 CDenseMatrix getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
                                  const int32_t               densityIndex,
+                                 const std::string&          densitySpin,
                                  const std::vector<int32_t>& aoIndices,
                                  const int32_t               aoCount,
                                  const int32_t               nAOs);

@@ -25,11 +25,14 @@
 
 #include "SubMatrix.hpp"
 
+#include "StringFormat.hpp"
+
 namespace submat {  // submat namespace
 
 CDenseMatrix
 getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
                     const int32_t               densityIndex,
+                    const std::string&          densitySpin,
                     const std::vector<int32_t>& aoIndices,
                     const int32_t               aoCount,
                     const int32_t               nAOs)
@@ -38,13 +41,15 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
     {
         CDenseMatrix sub_dens(aoCount, aoCount);
 
-        const CDenseMatrix& dens = densityMatrix.getReferenceToDensity(densityIndex);
+        bool alphaspin = (fstr::upcase(densitySpin) == std::string("ALPHA"));
+
+        auto dens = alphaspin ? densityMatrix.alphaDensity(densityIndex) : densityMatrix.betaDensity(densityIndex);
 
         for (int32_t i = 0; i < aoCount; i++)
         {
             auto sub_dens_row = sub_dens.row(i);
 
-            auto dens_row = dens.row(aoIndices[i]);
+            auto dens_row = dens + aoIndices[i] * nAOs;
 
             for (int32_t j = 0; j < aoCount; j++)
             {
