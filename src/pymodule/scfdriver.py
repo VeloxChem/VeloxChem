@@ -1368,8 +1368,9 @@ class ScfDriver:
                 if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
-            if (self.scf_type == 'restricted' and
-                    self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]):
+            if (self.xcfun.get_func_type() == xcfun.lda or
+                (self.scf_type == 'restricted' and
+                 self.xcfun.get_func_type() == xcfun.gga)):
                 xc_drv = XCNewIntegrator(self.comm)
                 self._mol_grid.partition_grid_points()
                 self._mol_grid.distribute_counts_and_displacements(

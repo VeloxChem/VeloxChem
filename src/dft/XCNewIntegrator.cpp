@@ -97,9 +97,16 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
     }
     else
     {
-        std::string erropenshell("XCNewIntegrator.integrateVxcFock: Not implemented for open-shell");
+        if (xcfuntype == xcfun::lda)
+        {
+            return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, newfvxc, "openshell");
+        }
+        else
+        {
+            std::string erropenshell("XCNewIntegrator.integrateVxcFock: Not implemented for open-shell");
 
-        errors::assertMsgCritical(false, erropenshell);
+            errors::assertMsgCritical(false, erropenshell);
+        }
     }
 
     return CAOKohnShamMatrix();
@@ -200,13 +207,16 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
                                           const CMolecularBasis&  basis,
                                           const CAODensityMatrix& densityMatrix,
                                           const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional) const
+                                          const CXCNewFunctional& xcFunctional,
+                                          const std::string&      flag) const
 {
     CMultiTimer timer;
 
     timer.start("Total timing");
 
     timer.start("Preparation");
+
+    auto openshell = (fstr::upcase(flag) == "OPENSHELL");
 
     auto nthreads = omp_get_max_threads();
 
@@ -220,7 +230,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    CAOKohnShamMatrix mat_Vxc(densityMatrix.getNumberOfRows(0), densityMatrix.getNumberOfColumns(0), true);
+    CAOKohnShamMatrix mat_Vxc(densityMatrix.getNumberOfRows(0), densityMatrix.getNumberOfColumns(0), !openshell);
 
     mat_Vxc.zero();
 
@@ -368,13 +378,24 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+
+        CDenseMatrix sub_dens_mat_b;
+
+        if (openshell) sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
         // generate density grid
 
-        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat, timer);
+        if (!openshell)
+        {
+            dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, timer);
+        }
+        else
+        {
+            dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, sub_dens_mat_b, timer);
+        }
 
         // compute exchange-correlation functional derivative
 
@@ -396,13 +417,29 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         // compute partial contribution to Vxc matrix
 
-        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
+        std::vector<CDenseMatrix> partial_mat_Vxc;
+
+        if (!openshell)
+        {
+            partial_mat_Vxc.push_back(_integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer));
+        }
+        else
+        {
+            partial_mat_Vxc = _integratePartialVxcFockForLDAOpenShell(npoints, local_weights, mat_chi, vrho, timer);
+        }
 
         // distribute partial Vxc to full Kohn-Sham matrix
 
         timer.start("Vxc matrix dist.");
 
-        submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
+        if (!openshell)
+        {
+            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc[0], aoinds, aocount, naos);
+        }
+        else
+        {
+            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
+        }
 
         timer.stop("Vxc matrix dist.");
 
@@ -1932,6 +1969,70 @@ CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t          npoints,
     timer.stop("Vxc matrix matmul");
 
     return mat_Vxc;
+}
+
+std::vector<CDenseMatrix>
+CXCNewIntegrator::_integratePartialVxcFockForLDAOpenShell(const int32_t          npoints,
+                                                          const double*          weights,
+                                                          const CDenseMatrix&    gtoValues,
+                                                          const double*          vrho,
+                                                          CMultiTimer&           timer) const
+{
+    // GTO values on grid points
+
+    auto chi_val = gtoValues.values();
+
+    // eq.(30), JCTC 2021, 17, 1512-1521
+
+    timer.start("Vxc matrix G");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    CDenseMatrix mat_G_a(naos, npoints);
+
+    CDenseMatrix mat_G_b(naos, npoints);
+
+    auto G_a_val = mat_G_a.values();
+
+    auto G_b_val = mat_G_b.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(weights, vrho, G_a_val, G_b_val, chi_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                G_a_val[nu_offset + g] = weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
+
+                G_b_val[nu_offset + g] = weights[g] * vrho[2 * g + 1] * chi_val[nu_offset + g];
+            }
+        }
+    }
+
+    timer.stop("Vxc matrix G");
+
+    // eq.(31), JCTC 2021, 17, 1512-1521
+
+    timer.start("Vxc matrix matmul");
+
+    auto mat_Vxc_a = denblas::multABt(gtoValues, mat_G_a);
+
+    auto mat_Vxc_b = denblas::multABt(gtoValues, mat_G_b);
+
+    timer.stop("Vxc matrix matmul");
+
+    return std::vector<CDenseMatrix>{mat_Vxc_a, mat_Vxc_b};
 }
 
 CDenseMatrix

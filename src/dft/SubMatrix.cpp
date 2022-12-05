@@ -128,6 +128,43 @@ distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          aoKohnShamMatrix,
 }
 
 void
+distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMatrix,
+                              const std::vector<CDenseMatrix>& subMatrices,
+                              const std::vector<int32_t>&      aoIndices,
+                              const int32_t                    aoCount,
+                              const int32_t                    nAOs)
+{
+    if (aoCount <= nAOs)
+    {
+        auto nrows = subMatrices[0].getNumberOfRows();
+
+        auto ncols = subMatrices[0].getNumberOfColumns();
+
+        for (int32_t row = 0; row < nrows; row++)
+        {
+            auto row_orig = aoIndices[row];
+
+            auto ksmat_a_row_orig = aoKohnShamMatrix.getKohnSham(false) + row_orig * nAOs;
+
+            auto ksmat_b_row_orig = aoKohnShamMatrix.getKohnSham(true) + row_orig * nAOs;
+
+            auto submat_a_row = subMatrices[0].row(row);
+
+            auto submat_b_row = subMatrices[1].row(row);
+
+            for (int32_t col = 0; col < ncols; col++)
+            {
+                auto col_orig = aoIndices[col];
+
+                ksmat_a_row_orig[col_orig] += submat_a_row[col];
+
+                ksmat_b_row_orig[col_orig] += submat_b_row[col];
+            }
+        }
+    }
+}
+
+void
 distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
                           const int32_t               fockIndex,
                           const CDenseMatrix&         subMatrix,

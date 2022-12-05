@@ -94,7 +94,8 @@ class CXCNewIntegrator
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& densityMatrix,
                                               const CMolecularGrid&   molecularGrid,
-                                              const CXCNewFunctional& xcFunctional) const;
+                                              const CXCNewFunctional& xcFunctional,
+                                              const std::string&      flag=std::string("closedshell")) const;
 
     /**
      Integrates first-order GGA exchnage-correlation functional contribution to
@@ -216,6 +217,22 @@ class CXCNewIntegrator
                                                 const CDenseMatrix& gtoValues,
                                                 const double*       vrho,
                                                 CMultiTimer&        timer) const;
+
+    /**
+     Integrates LDA contribution to (first-order) Vxc matrix.
+
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param vrho the 1st-order functional derivative wrt density.
+     @param timer the timer.
+     @return the alpha and beta contribution as a list of CDenseMatrix objects.
+     */
+    std::vector<CDenseMatrix> _integratePartialVxcFockForLDAOpenShell(const int32_t          npoints,
+                                                                      const double*          weights,
+                                                                      const CDenseMatrix&    gtoValues,
+                                                                      const double*          vrho,
+                                                                      CMultiTimer&           timer) const;
 
     /**
      Integrates GGA contribution to AO Kohn-Sham matrix.

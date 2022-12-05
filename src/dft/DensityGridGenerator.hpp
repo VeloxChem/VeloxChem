@@ -51,6 +51,23 @@ void generateDensityForLDA(double*             rho,
                            CMultiTimer&        timer);
 
 /**
+ Generates density for LDA.
+
+ @param rho the pointer to density.
+ @param npoints the number of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param densityMatrixAlpha the density matrix.
+ @param densityMatrixBeta the density matrix.
+ @param timer the timer.
+ */
+void generateDensityForLDA(double*             rho,
+                           const int32_t       npoints,
+                           const CDenseMatrix& gtoValues,
+                           const CDenseMatrix& densityMatrixAlpha,
+                           const CDenseMatrix& densityMatrixBeta,
+                           CMultiTimer&        timer);
+
+/**
  Generates density for GGA.
 
  @param rho the pointer to density.

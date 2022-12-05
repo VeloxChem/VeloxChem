@@ -67,8 +67,8 @@ CAODensityMatrix getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
 /**
  Distributes partial Vxc matrix to full AO Kohn-Sham matrix.
 
- @param matVxc the AO Kohn-Sham matrix.
- @param partialMatVxc the partial Vxc matrix.
+ @param aoKohnShamMatrix the AO Kohn-Sham matrix.
+ @param subMatrix the partial Vxc matrix.
  @param aoIndices the index mapping from partial matrix to full matrix.
  @param aoCount the number of indices in partial matrix.
  @param nAOs the number of indices in full matrix.
@@ -78,6 +78,21 @@ void distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          aoKohnShamMatrix,
                                    const std::vector<int32_t>& aoIndices,
                                    const int32_t               aoCount,
                                    const int32_t               nAOs);
+
+/**
+ Distributes partial Vxc matrix to full AO Kohn-Sham matrix.
+
+ @param aoKohnShamMatrix the AO Kohn-Sham matrix.
+ @param subMatrices the partial Vxc matrices.
+ @param aoIndices the index mapping from partial matrix to full matrix.
+ @param aoCount the number of indices in partial matrix.
+ @param nAOs the number of indices in full matrix.
+ */
+void distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMatrix,
+                                   const std::vector<CDenseMatrix>& subMatrices,
+                                   const std::vector<int32_t>&      aoIndices,
+                                   const int32_t                    aoCount,
+                                   const int32_t                    nAOs);
 
 /**
  Distributes partial Fxc or Kxc matrix to full AO Fock matrix.
