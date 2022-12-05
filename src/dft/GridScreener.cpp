@@ -39,8 +39,6 @@ screenVxcFockForLDA(double*               rho,
         // rho_a
         if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
         {
-            rho[2 * g + 0] = 0.0;
-
             exc[g] = 0.0;
 
             vrho[2 * g + 0] = 0.0;
@@ -49,14 +47,62 @@ screenVxcFockForLDA(double*               rho,
         // rho_b
         if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
         {
-            rho[2 * g + 1] = 0.0;
-
             exc[g] = 0.0;
 
             vrho[2 * g + 1] = 0.0;
         }
     }
 }
+
+void
+screenVxcFockForGGA(double*               rho,
+                    double*               sigma,
+                    double*               exc,
+                    double*               vrho,
+                    double*               vsigma,
+                    const int32_t         npoints,
+                    const double          densityThreshold)
+{
+    double densityThresholdSquared = densityThreshold * densityThreshold;
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        // rho_a
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
+        {
+            exc[g] = 0.0;
+
+            vrho[2 * g + 0] = 0.0;
+        }
+
+        // rho_b
+        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
+        {
+            exc[g] = 0.0;
+
+            vrho[2 * g + 1] = 0.0;
+        }
+
+        // sigma_aa
+        if (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared)
+        {
+            exc[g] = 0.0;
+
+            vsigma[3 * g + 0] = 0.0;
+            vsigma[3 * g + 1] = 0.0;
+        }
+
+        // sigma_bb
+        if (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared)
+        {
+            exc[g] = 0.0;
+
+            vsigma[3 * g + 1] = 0.0;
+            vsigma[3 * g + 2] = 0.0;
+        }
+    }
+}
+
 
 int32_t
 screenDensityForLDA(std::vector<int32_t>& gridPointInds,
