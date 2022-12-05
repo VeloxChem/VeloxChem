@@ -26,7 +26,6 @@ target_sources(vlxobjs
     XCGradientGrid.cpp
     XCHessianGrid.cpp
     XCIntegrator.cpp
-    XCMolecularGradient.cpp
     XCNewFunctional.cpp
     XCNewIntegrator.cpp
     XCNewMolecularGradient.cpp
