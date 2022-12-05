@@ -42,12 +42,24 @@ namespace gridscreen {  // gridscreen namespace
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
-void
-screenVxcFockForLDA(double*               rho,
-                    double*               exc,
-                    double*               vrho,
-                    const int32_t         npoints,
-                    const double          densityThreshold);
+void screenVxcFockForLDA(double*               rho,
+                         double*               exc,
+                         double*               vrho,
+                         const int32_t         npoints,
+                         const double          densityThreshold);
+
+/**
+ Screens Fxc Fock for LDA.
+
+ @param rho the density.
+ @param v2rho2 the 2nd-order functional derivative wrt density.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ */
+void screenFxcFockForLDA(double*               rho,
+                         double*               v2rho2,
+                         const int32_t         npoints,
+                         const double          densityThreshold);
 
 /**
  Screens Vxc Fock for GGA.
@@ -60,14 +72,13 @@ screenVxcFockForLDA(double*               rho,
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
-void
-screenVxcFockForGGA(double*               rho,
-                    double*               sigma,
-                    double*               exc,
-                    double*               vrho,
-                    double*               vsigma,
-                    const int32_t         npoints,
-                    const double          densityThreshold);
+void screenVxcFockForGGA(double*               rho,
+                         double*               sigma,
+                         double*               exc,
+                         double*               vrho,
+                         double*               vsigma,
+                         const int32_t         npoints,
+                         const double          densityThreshold);
 
 /**
  Screens LDA density grid to get rid of invalid grid points.

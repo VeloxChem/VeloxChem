@@ -368,15 +368,13 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
-
-        auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
         // generate density grid
 
-        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, timer);
+        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat, timer);
 
         // compute exchange-correlation functional derivative
 
@@ -781,19 +779,17 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     std::vector<int32_t> aoinds(naos);
 
-    // indices for keeping track of valid grid points
+    // density and functional derivatives
 
-    std::vector<int32_t> screened_point_inds(molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    CMemBlock<double> screened_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    auto screened_weights = screened_weights_data.data();
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rhow_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
 
@@ -915,31 +911,23 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat, timer);
 
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
-        auto screened_npoints = gridscreen::screenDensityForLDA(screened_point_inds, rho, npoints,
-
-                                                                _screeningThresholdForDensityValues);
-
-        gridscreen::screenWeights(screened_weights, gridblockpos, weights, screened_point_inds, screened_npoints);
-
-        CDenseMatrix screened_mat_chi(mat_chi.getNumberOfRows(), screened_npoints);
-
-        gridscreen::screenGtoMatrixForLDA(screened_mat_chi, mat_chi, screened_point_inds, screened_npoints);
-
-        timer.stop("Density screening");
-
-        if (screened_npoints == 0) continue;
-
         // compute exchange-correlation functional derivative
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_fxc_for_lda(screened_npoints, rho, v2rho2);
+        xcFunctional.compute_fxc_for_lda(npoints, rho, v2rho2);
 
         timer.stop("XC functional eval.");
+
+        // screen density and functional derivatives
+
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
 
         // go through rhow density matrices
 
@@ -955,13 +943,11 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             // generate density grid
 
-            dengridgen::generateDensityForLDA(rhow, screened_npoints, screened_mat_chi, sub_dens_mat, timer);
+            dengridgen::generateDensityForLDA(rhow, npoints, mat_chi, sub_dens_mat, timer);
 
             // compute partial contribution to Fxc matrix
 
-            auto partial_mat_Fxc = _integratePartialFxcFockForLDA(screened_npoints, screened_weights, screened_mat_chi,
-
-                                                                  rhow, v2rho2, timer);
+            auto partial_mat_Fxc = _integratePartialFxcFockForLDA(npoints, local_weights, mat_chi, rhow, v2rho2, timer);
 
             // distribute partial Fxc to full Fock matrix
 
