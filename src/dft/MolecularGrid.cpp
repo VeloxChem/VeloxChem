@@ -554,6 +554,18 @@ CMolecularGrid::distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MP
     }
 }
 
+void
+CMolecularGrid::reDistributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm)
+{
+    _isPartitioned = false;
+
+    partitionGridPoints();
+
+    _isDistributed = false;
+
+    distributeCountsAndDisplacements(rank, nodes, comm);
+}
+
 bool
 CMolecularGrid::isPartitioned() const
 {

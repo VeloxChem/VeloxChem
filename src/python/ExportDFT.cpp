@@ -261,6 +261,16 @@ export_dft(py::module& m)
             "rank"_a,
             "nodes"_a,
             "py_comm"_a)
+        .def(
+            "re_distribute_counts_and_displacements",
+            [](CMolecularGrid& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.reDistributeCountsAndDisplacements(rank, nodes, *comm);
+            },
+            "Redo distributing MolecularGrid counts and displacements.",
+            "rank"_a,
+            "nodes"_a,
+            "py_comm"_a)
         .def(py::self == py::self);
 
     // CGridDriver class

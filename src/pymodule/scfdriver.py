@@ -1499,11 +1499,12 @@ class ScfDriver:
 
         # calculate Vxc on DFT nodes
         if dft_comm:
-            xc_drv = XCIntegrator(local_comm)
-            self._mol_grid.distribute(local_comm.Get_rank(),
-                                      local_comm.Get_size(), local_comm)
-            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self._mol_grid,
-                                       self.xcfun.get_func_label())
+            xc_drv = XCNewIntegrator(local_comm)
+            self._mol_grid.re_distribute_counts_and_displacements(
+                local_comm.Get_rank(), local_comm.Get_size(), local_comm)
+            vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
+                                                self._mol_grid,
+                                                self.xcfun.get_func_label())
             vxc_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                local_comm)
         else:

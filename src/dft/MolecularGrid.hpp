@@ -223,7 +223,7 @@ class CMolecularGrid
 
      @param rank the rank of MPI process.
      @param nodes the number of nodes in MPI domain.
-     @param comm he MPI communicator.
+     @param comm the MPI communicator.
      */
     void distribute(int32_t rank, int32_t nodes, MPI_Comm comm);
 
@@ -232,7 +232,7 @@ class CMolecularGrid
      of MPI communacator.
 
      @param rank the rank of MPI process.
-     @param comm he MPI communicator.
+     @param comm the MPI communicator.
      */
     void broadcast(int32_t rank, MPI_Comm comm);
     
@@ -279,9 +279,19 @@ class CMolecularGrid
 
      @param rank the rank of MPI process.
      @param nodes the number of nodes in MPI domain.
-     @param comm he MPI communicator.
+     @param comm the MPI communicator.
      */
     void distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm);
+
+    /**
+     Redo distributing grid point counts and displacements within domain of MPI
+     communacator and sets distribution flag to true.
+
+     @param rank the rank of MPI process.
+     @param nodes the number of nodes in MPI domain.
+     @param comm the MPI communicator.
+     */
+    void reDistributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm);
 
     /**
      Checks whether the molecular grid has been partitioned.
