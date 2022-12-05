@@ -88,6 +88,7 @@ class CXCNewIntegrator
      @param densityMatrix the AO density matrix.
      @param molecularGrid the molecular grid.
      @param xcFunctional the exchange-correlation functional.
+     @param flag the flag for closed/open shell.
      @return the AO Kohn-Sham matrix.
      */
     CAOKohnShamMatrix _integrateVxcFockForLDA(const CMolecule&        molecule,
@@ -106,13 +107,15 @@ class CXCNewIntegrator
      @param densityMatrix the AO density matrix.
      @param molecularGrid the molecular grid.
      @param xcFunctional the exchange-correlation functional.
+     @param flag the flag for closed/open shell.
      @return the AO Kohn-Sham matrix.
      */
     CAOKohnShamMatrix _integrateVxcFockForGGA(const CMolecule&        molecule,
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& densityMatrix,
                                               const CMolecularGrid&   molecularGrid,
-                                              const CXCNewFunctional& xcFunctional) const;
+                                              const CXCNewFunctional& xcFunctional,
+                                              const std::string&      flag=std::string("closedshell")) const;
 
     /**
      Integrates second-order LDA exchnage-correlation functional contribution
@@ -243,8 +246,9 @@ class CXCNewIntegrator
      @param gtoValuesX the GTO gradient X values on grid points.
      @param gtoValuesY the GTO gradient Y values on grid points.
      @param gtoValuesZ the GTO gradient Z values on grid points.
-     @param xcGradientGrid the exchange-correlation gradient grid.
-     @param densityGrid the density grid.
+     @param rhograd the gradient density.
+     @param vrho the 1st-order functional derivative wrt rho.
+     @param vsigma the 1st-order functional derivative wrt sigma.
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
@@ -258,6 +262,32 @@ class CXCNewIntegrator
                                                 const double*          vrho,
                                                 const double*          vsigma,
                                                 CMultiTimer&           timer) const;
+
+    /**
+     Integrates GGA contribution to AO Kohn-Sham matrix.
+
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param gtoValuesX the GTO gradient X values on grid points.
+     @param gtoValuesY the GTO gradient Y values on grid points.
+     @param gtoValuesZ the GTO gradient Z values on grid points.
+     @param rhograd the gradient density.
+     @param vrho the 1st-order functional derivative wrt rho.
+     @param vsigma the 1st-order functional derivative wrt sigma.
+     @param timer the timer.
+     @return the alpha and beta contribution as a list of CDenseMatrix objects.
+     */
+    std::vector<CDenseMatrix> _integratePartialVxcFockForGGAOpenShell(const int32_t          npoints,
+                                                                      const double*          weights,
+                                                                      const CDenseMatrix&    gtoValues,
+                                                                      const CDenseMatrix&    gtoValuesX,
+                                                                      const CDenseMatrix&    gtoValuesY,
+                                                                      const CDenseMatrix&    gtoValuesZ,
+                                                                      const double*          rhograd,
+                                                                      const double*          vrho,
+                                                                      const double*          vsigma,
+                                                                      CMultiTimer&           timer) const;
 
     /**
      Integrates LDA contribution to (second-order) Fxc matrix.

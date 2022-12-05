@@ -282,6 +282,121 @@ generateDensityForGGA(double*             rho,
     timer.stop("Density grid rho");
 }
 
+void
+generateDensityForGGA(double*             rho,
+                      double*             rhograd,
+                      double*             sigma,
+                      const int32_t       npoints,
+                      const CDenseMatrix& gtoValues,
+                      const CDenseMatrix& gtoValuesX,
+                      const CDenseMatrix& gtoValuesY,
+                      const CDenseMatrix& gtoValuesZ,
+                      const CDenseMatrix& densityMatrixAlpha,
+                      const CDenseMatrix& densityMatrixBeta,
+                      CMultiTimer&        timer)
+{
+    // eq.(26), JCTC 2021, 17, 1512-1521
+
+    timer.start("Density grid matmul");
+
+    CDenseMatrix symmetricDensityMatrixAlpha(densityMatrixAlpha);
+
+    CDenseMatrix symmetricDensityMatrixBeta(densityMatrixBeta);
+
+    symmetricDensityMatrixAlpha.symmetrizeAndScale(0.5);
+
+    symmetricDensityMatrixBeta.symmetrizeAndScale(0.5);
+
+    auto mat_F_a = denblas::multAB(symmetricDensityMatrixAlpha, gtoValues);
+
+    auto mat_F_b = denblas::multAB(symmetricDensityMatrixBeta, gtoValues);
+
+    timer.stop("Density grid matmul");
+
+    // eq.(27), JCTC 2021, 17, 1512-1521
+
+    timer.start("Density grid rho");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    auto nthreads = omp_get_max_threads();
+
+    auto F_a_val = mat_F_a.values();
+
+    auto F_b_val = mat_F_b.values();
+
+    auto chi_val = gtoValues.values();
+
+    auto chi_x_val = gtoValuesX.values();
+
+    auto chi_y_val = gtoValuesY.values();
+
+    auto chi_z_val = gtoValuesZ.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        #pragma omp simd aligned(rho, rhograd : VLX_ALIGN)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            rho[2 * g + 0] = 0.0;
+            rho[2 * g + 1] = 0.0;
+
+            rhograd[6 * g + 0] = 0.0;
+            rhograd[6 * g + 1] = 0.0;
+            rhograd[6 * g + 2] = 0.0;
+            rhograd[6 * g + 3] = 0.0;
+            rhograd[6 * g + 4] = 0.0;
+            rhograd[6 * g + 5] = 0.0;
+        }
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(rho, rhograd, F_a_val, F_b_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                rho[2 * g + 0] += F_a_val[nu_offset + g] * chi_val[nu_offset + g];
+                rho[2 * g + 1] += F_b_val[nu_offset + g] * chi_val[nu_offset + g];
+
+                rhograd[6 * g + 0] += 2.0 * F_a_val[nu_offset + g] * chi_x_val[nu_offset + g];
+                rhograd[6 * g + 1] += 2.0 * F_a_val[nu_offset + g] * chi_y_val[nu_offset + g];
+                rhograd[6 * g + 2] += 2.0 * F_a_val[nu_offset + g] * chi_z_val[nu_offset + g];
+                rhograd[6 * g + 3] += 2.0 * F_b_val[nu_offset + g] * chi_x_val[nu_offset + g];
+                rhograd[6 * g + 4] += 2.0 * F_b_val[nu_offset + g] * chi_y_val[nu_offset + g];
+                rhograd[6 * g + 5] += 2.0 * F_b_val[nu_offset + g] * chi_z_val[nu_offset + g];
+            }
+        }
+
+        if (sigma != nullptr)
+        {
+            #pragma omp simd aligned(rhograd, sigma : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +
+                                   rhograd[6 * g + 1] * rhograd[6 * g + 1] +
+                                   rhograd[6 * g + 2] * rhograd[6 * g + 2];
+
+                sigma[3 * g + 1] = rhograd[6 * g + 0] * rhograd[6 * g + 3] +
+                                   rhograd[6 * g + 1] * rhograd[6 * g + 4] +
+                                   rhograd[6 * g + 2] * rhograd[6 * g + 5];
+
+                sigma[3 * g + 2] = rhograd[6 * g + 3] * rhograd[6 * g + 3] +
+                                   rhograd[6 * g + 4] * rhograd[6 * g + 4] +
+                                   rhograd[6 * g + 5] * rhograd[6 * g + 5];
+            }
+        }
+    }
+
+    timer.stop("Density grid rho");
+}
+
 CDensityGrid
 generateDensityGridForLDA(const int32_t       npoints,
                           const CDenseMatrix& gtoValues,
