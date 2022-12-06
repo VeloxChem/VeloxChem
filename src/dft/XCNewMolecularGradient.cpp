@@ -41,6 +41,7 @@
 #include "FunctionalParser.hpp"
 #include "GridScreener.hpp"
 #include "GtoEvaluator.hpp"
+#include "NewFunctionalParser.hpp"
 #include "SubMatrix.hpp"
 #include "XCFuncType.hpp"
 #include "XCVarsType.hpp"
@@ -88,7 +89,9 @@ CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
+            auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+            return _integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
@@ -213,7 +216,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
                                                      const CAODensityMatrix& rwDensityMatrix,
                                                      const CAODensityMatrix& gsDensityMatrix,
                                                      const CMolecularGrid&   molecularGrid,
-                                                     const CXCFunctional&    xcFunctional) const
+                                                     const CXCNewFunctional& xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -263,13 +266,23 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
     std::vector<int32_t> aoinds(naos);
 
-    // indices for keeping track of valid grid points
+    // density and functional derivatives
 
-    std::vector<int32_t> screened_point_inds(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    CMemBlock<double> screened_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    auto screened_weights = screened_weights_data.data();
+    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
+
+    auto rho = rho_data.data();
+
+    auto exc = exc_data.data();
+
+    auto vrho = vrho_data.data();
 
     // coordinates and weights of grid points
 
@@ -400,49 +413,17 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         // generate density grid
 
-        auto xcfuntype = xcFunctional.getFunctionalType();
-
-        auto gsdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, gs_sub_dens_mat, xcfuntype, timer);
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
-        CDensityGrid screened_gsdengrid(gsdengrid);
-
-        gridscreen::screenDensityGridForLDA(screened_point_inds, screened_gsdengrid, gsdengrid,
-
-                                            _screeningThresholdForDensityValues);
-
-        auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
-
-        gridscreen::screenWeights(screened_weights, gridblockpos, weights, screened_point_inds, screened_npoints);
-
-        CDenseMatrix screened_mat_chi(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_x(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_y(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_z(mat_chi.getNumberOfRows(), screened_npoints);
-
-        gridscreen::screenGtoMatrixForGGA(screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
-
-                                          mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, screened_point_inds, screened_npoints);
-
-        timer.stop("Density screening");
-
-        if (screened_npoints == 0) continue;
+        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, gs_sub_dens_mat, timer);
 
         // generate density gradient grid
 
         timer.start("Density grad. grid prep.");
 
-        CDenseMatrix dengradx(natoms, screened_npoints);
+        CDenseMatrix dengradx(natoms, npoints);
 
-        CDenseMatrix dengrady(natoms, screened_npoints);
+        CDenseMatrix dengrady(natoms, npoints);
 
-        CDenseMatrix dengradz(natoms, screened_npoints);
+        CDenseMatrix dengradz(natoms, npoints);
 
         timer.stop("Density grad. grid prep.");
 
@@ -450,7 +431,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         timer.start("Density grad. grid matmul");
 
-        auto mat_F = denblas::multAB(rw_sub_dens_mat, screened_mat_chi);
+        auto mat_F = denblas::multAB(rw_sub_dens_mat, mat_chi);
 
         timer.stop("Density grad. grid matmul");
 
@@ -458,15 +439,15 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         timer.start("Density grad. grid rho");
 
-        auto naos = screened_mat_chi.getNumberOfRows();
+        auto naos = mat_chi.getNumberOfRows();
 
         auto F_val = mat_F.values();
 
-        auto chi_x_val = screened_mat_chi_x.values();
+        auto chi_x_val = mat_chi_x.values();
 
-        auto chi_y_val = screened_mat_chi_y.values();
+        auto chi_y_val = mat_chi_y.values();
 
-        auto chi_z_val = screened_mat_chi_z.values();
+        auto chi_z_val = mat_chi_z.values();
 
         auto gdenx = dengradx.values();
 
@@ -478,20 +459,19 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
         {
             auto thread_id = omp_get_thread_num();
 
-            auto grid_batch_size = mpi::batch_size(screened_npoints, thread_id, nthreads);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto grid_batch_offset = mpi::batch_offset(screened_npoints, thread_id, nthreads);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
-                auto atom_offset = atomidx * screened_npoints;
+                auto atom_offset = atomidx * npoints;
 
-                auto nu_offset = nu * screened_npoints;
+                auto nu_offset = nu * npoints;
 
-                #pragma omp simd aligned(gdenx, gdeny, gdenz, \
-                        F_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+                #pragma omp simd aligned(gdenx, gdeny, gdenz, F_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
                 for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
@@ -513,15 +493,19 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         timer.start("XC functional eval.");
 
-        CXCGradientGrid vxcgrid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
-
-        xcFunctional.compute(vxcgrid, screened_gsdengrid);
+        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
         timer.stop("XC functional eval.");
 
-        // exchange-correlation functional derivative
+        // screen density and functional derivatives
 
-        auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -531,25 +515,24 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
         {
             auto thread_id = omp_get_thread_num();
 
-            auto grid_batch_size = mpi::batch_size(screened_npoints, thread_id, nthreads);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto grid_batch_offset = mpi::batch_offset(screened_npoints, thread_id, nthreads);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
             auto gatm = molgrad_threads.data(thread_id);
 
             for (int32_t iatom = 0; iatom < natoms; iatom++)
             {
-                auto atom_offset = iatom * screened_npoints;
+                auto atom_offset = iatom * npoints;
 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
 
-                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(screened_weights, grhoa, \
-                        gdenx, gdeny, gdenz : VLX_ALIGN)
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(local_weights, vrho, gdenx, gdeny, gdenz : VLX_ALIGN)
                 for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
-                    double prefac = screened_weights[g] * grhoa[g];
+                    double prefac = local_weights[g] * vrho[2 * g + 0];
 
                     gatmx += prefac * gdenx[atom_g];
 

@@ -46,6 +46,7 @@
 #include "XCFunctional.hpp"
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
+#include "XCNewFunctional.hpp"
 
 /**
  Class CXCNewMolecularGradient implements XC molecular gradient.
@@ -97,7 +98,7 @@ class CXCNewMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrix,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+                                             const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates first-order GGA exchnage-correlation functional contribution to
