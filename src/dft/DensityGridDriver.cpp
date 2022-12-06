@@ -95,7 +95,7 @@ CDensityGridDriver::_distRestrictedDensityValuesForLda(CDensityGrid*            
 
                 if (std::fabs(dval) > _thresholdOfDensity)
                 {
-#pragma omp simd
+                    #pragma omp simd
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
                         rhoa[gridOffset + gridBlockPosition + l] += dval * bgaos[l] * kgaos[l];
@@ -163,7 +163,7 @@ CDensityGridDriver::_distRestrictedDensityValuesForGga(CDensityGrid*            
 
                 if (std::fabs(dval) > _thresholdOfDensity)
                 {
-#pragma omp simd
+                    #pragma omp simd
                     for (int32_t l = 0; l < nGridPoints; l++)
                     {
                         rhoa[gridOffset + gridBlockPosition + l] += dval * bgaos[l] * kgaos[l];
@@ -236,9 +236,9 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
 
     // generate density on grid points
 
-#pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
+    #pragma omp parallel shared(tbsizes, tbpositions, ntasks, mgx, mgy, mgz, gtovec, denptr, dgridptr)
     {
-#pragma omp single nowait
+        #pragma omp single nowait
         {
             for (int32_t i = 0; i < ntasks; i++)
             {
@@ -252,7 +252,7 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
 
                 if (xcFunctional == xcfun::lda)
                 {
-#pragma omp task firstprivate(tbsize, tbposition)
+                    #pragma omp task firstprivate(tbsize, tbposition)
                     {
                         _genBatchOfPairDensityGridPointsForLda(
                             dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
@@ -260,7 +260,7 @@ CDensityGridDriver::generatePdftGrid(const CAODensityMatrix& aoDensityMatrix,
                 }
                 else if (xcFunctional == xcfun::gga)
                 {
-#pragma omp task firstprivate(tbsize, tbposition)
+                    #pragma omp task firstprivate(tbsize, tbposition)
                     {
                         _genBatchOfPairDensityGridPointsForGga(
                             dgridptr, denptr, twoDM, activeMOs, nActive, gtovec, mgx, mgy, mgz, tbposition, tbsize);
@@ -373,7 +373,7 @@ CDensityGridDriver::_distPairDensityValuesForLda(CDensityGrid*              dens
         for (int32_t iAct = 0; iAct < nActive; iAct++)
         {
             ActMOs[iAct] = new double[nGridPoints];
-#pragma omp simd
+            #pragma omp simd
             for (int32_t l = 0; l < nGridPoints; l++)
             {
                 ActMOs[iAct][l] = 0.0;
@@ -383,7 +383,7 @@ CDensityGridDriver::_distPairDensityValuesForLda(CDensityGrid*              dens
             for (int32_t j = 0; j < nAOs; j++)
             {
                 auto bgaos = gtoValues.data(j);
-#pragma omp simd
+                #pragma omp simd
                 for (int32_t l = 0; l < nGridPoints; l++)
                 {
                     ActMOs[iAct][l] += bgaos[l] * MO[j];
@@ -407,7 +407,7 @@ CDensityGridDriver::_distPairDensityValuesForLda(CDensityGrid*              dens
                     {
                         auto   lMO    = ActMOs[lAct];
                         double dval_b = twoDM[joff * nActive + lAct];
-#pragma omp simd
+                        #pragma omp simd
                         for (int32_t l = 0; l < nGridPoints; l++)
                         {
                             double fact = iMO[l] * jMO[l] * kMO[l] * lMO[l];
@@ -567,7 +567,7 @@ CDensityGridDriver::_distPairDensityValuesForGga(CDensityGrid*              dens
             ActMOs_y[iAct] = new double[nGridPoints];
             ActMOs_z[iAct] = new double[nGridPoints];
 
-#pragma omp simd
+            #pragma omp simd
             for (int32_t l = 0; l < nGridPoints; l++)
             {
                 ActMOs[iAct][l]   = 0.0;
@@ -584,7 +584,7 @@ CDensityGridDriver::_distPairDensityValuesForGga(CDensityGrid*              dens
                 auto bgaoy = gtoValuesY.data(j);
                 auto bgaoz = gtoValuesZ.data(j);
 
-#pragma omp simd
+                #pragma omp simd
                 for (int32_t l = 0; l < nGridPoints; l++)
                 {
                     ActMOs[iAct][l] += bgaos[l] * MO[j];
@@ -627,7 +627,7 @@ CDensityGridDriver::_distPairDensityValuesForGga(CDensityGrid*              dens
                         auto lMO_z = ActMOs_z[lAct];
 
                         double dval_b = twoDM[joff * nActive + lAct];
-#pragma omp simd
+                        #pragma omp simd
                         for (int32_t l = 0; l < nGridPoints; l++)
                         {
                             double fact = iMO[l] * jMO[l] * kMO[l] * lMO[l];
