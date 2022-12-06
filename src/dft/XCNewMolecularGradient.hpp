@@ -139,7 +139,7 @@ class CXCNewMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+                                             const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates second-order GGA exchnage-correlation functional contribution
