@@ -117,7 +117,7 @@ class CXCNewMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrix,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+                                             const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates second-order LDA exchnage-correlation functional contribution

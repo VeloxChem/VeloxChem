@@ -81,21 +81,19 @@ CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
 
     molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
 
-    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = fvxc.getFunctionalType();
+    auto xcfuntype = newfvxc.getFunctionalType();
 
     if (rwDensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
-            auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-
             return _integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
+            return _integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
         }
         else
         {
@@ -587,7 +585,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
                                                      const CAODensityMatrix& rwDensityMatrix,
                                                      const CAODensityMatrix& gsDensityMatrix,
                                                      const CMolecularGrid&   molecularGrid,
-                                                     const CXCFunctional&    xcFunctional) const
+                                                     const CXCNewFunctional& xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -649,13 +647,35 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
     std::vector<int32_t> aoinds(naos);
 
-    // indices for keeping track of valid grid points
+    // density and functional derivatives
 
-    std::vector<int32_t> screened_point_inds(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    CMemBlock<double> screened_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    auto screened_weights = screened_weights_data.data();
+    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
+
+    auto rho = rho_data.data();
+
+    auto rhograd = rhograd_data.data();
+
+    auto sigma = sigma_data.data();
+
+    auto exc = exc_data.data();
+
+    auto vrho = vrho_data.data();
+
+    auto vsigma = vsigma_data.data();
 
     // coordinates and weights of grid points
 
@@ -830,89 +850,29 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         // generate density grid
 
-        auto xcfuntype = xcFunctional.getFunctionalType();
+        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
 
-        auto gsdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-
-                                                               gs_sub_dens_mat, xcfuntype, timer);
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
-        CDensityGrid screened_gsdengrid(gsdengrid);
-
-        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_gsdengrid, gsdengrid,
-
-                                            _screeningThresholdForDensityValues);
-
-        auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
-
-        gridscreen::screenWeights(screened_weights, gridblockpos, weights, screened_point_inds, screened_npoints);
-
-        CDenseMatrix screened_mat_chi(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_x(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_y(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_z(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_xx(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_xy(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_xz(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_yy(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_yz(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_zz(mat_chi.getNumberOfRows(), screened_npoints);
-
-        gridscreen::screenGtoMatrixForMetaGGA(screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
-
-                                              screened_mat_chi_xx, screened_mat_chi_xy, screened_mat_chi_xz,
-
-                                              screened_mat_chi_yy, screened_mat_chi_yz, screened_mat_chi_zz,
-
-                                              mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-
-                                              mat_chi_xx, mat_chi_xy, mat_chi_xz, mat_chi_yy, mat_chi_yz, mat_chi_zz,
-
-                                              screened_point_inds, screened_npoints);
-
-        timer.stop("Density screening");
-
-        if (screened_npoints == 0) continue;
+                                          gs_sub_dens_mat, timer);
 
         // generate density gradient grid
 
         timer.start("Density grad. grid prep.");
 
-        CDenseMatrix dengradx(natoms, screened_npoints);
+        CDenseMatrix dengradx(natoms, npoints);
+        CDenseMatrix dengrady(natoms, npoints);
+        CDenseMatrix dengradz(natoms, npoints);
 
-        CDenseMatrix dengrady(natoms, screened_npoints);
+        CDenseMatrix dengradxx(natoms, npoints);
+        CDenseMatrix dengradxy(natoms, npoints);
+        CDenseMatrix dengradxz(natoms, npoints);
 
-        CDenseMatrix dengradz(natoms, screened_npoints);
+        CDenseMatrix dengradyx(natoms, npoints);
+        CDenseMatrix dengradyy(natoms, npoints);
+        CDenseMatrix dengradyz(natoms, npoints);
 
-        CDenseMatrix dengradxx(natoms, screened_npoints);
-
-        CDenseMatrix dengradxy(natoms, screened_npoints);
-
-        CDenseMatrix dengradxz(natoms, screened_npoints);
-
-        CDenseMatrix dengradyx(natoms, screened_npoints);
-
-        CDenseMatrix dengradyy(natoms, screened_npoints);
-
-        CDenseMatrix dengradyz(natoms, screened_npoints);
-
-        CDenseMatrix dengradzx(natoms, screened_npoints);
-
-        CDenseMatrix dengradzy(natoms, screened_npoints);
-
-        CDenseMatrix dengradzz(natoms, screened_npoints);
+        CDenseMatrix dengradzx(natoms, npoints);
+        CDenseMatrix dengradzy(natoms, npoints);
+        CDenseMatrix dengradzz(natoms, npoints);
 
         timer.stop("Density grad. grid prep.");
 
@@ -920,13 +880,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         timer.start("Density grad. grid matmul");
 
-        auto mat_F = denblas::multAB(rw_sub_dens_mat, screened_mat_chi);
+        auto mat_F = denblas::multAB(rw_sub_dens_mat, mat_chi);
 
-        auto mat_F_x = denblas::multAB(rw_sub_dens_mat, screened_mat_chi_x);
-
-        auto mat_F_y = denblas::multAB(rw_sub_dens_mat, screened_mat_chi_y);
-
-        auto mat_F_z = denblas::multAB(rw_sub_dens_mat, screened_mat_chi_z);
+        auto mat_F_x = denblas::multAB(rw_sub_dens_mat, mat_chi_x);
+        auto mat_F_y = denblas::multAB(rw_sub_dens_mat, mat_chi_y);
+        auto mat_F_z = denblas::multAB(rw_sub_dens_mat, mat_chi_z);
 
         timer.stop("Density grad. grid matmul");
 
@@ -934,73 +892,57 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         timer.start("Density grad. grid rho");
 
-        auto naos = screened_mat_chi.getNumberOfRows();
+        auto naos = mat_chi.getNumberOfRows();
 
         auto F_val = mat_F.values();
 
         auto F_x_val = mat_F_x.values();
-
         auto F_y_val = mat_F_y.values();
-
         auto F_z_val = mat_F_z.values();
 
-        auto chi_x_val = screened_mat_chi_x.values();
+        auto chi_x_val = mat_chi_x.values();
+        auto chi_y_val = mat_chi_y.values();
+        auto chi_z_val = mat_chi_z.values();
 
-        auto chi_y_val = screened_mat_chi_y.values();
+        auto chi_xx_val = mat_chi_xx.values();
+        auto chi_xy_val = mat_chi_xy.values();
+        auto chi_xz_val = mat_chi_xz.values();
 
-        auto chi_z_val = screened_mat_chi_z.values();
-
-        auto chi_xx_val = screened_mat_chi_xx.values();
-
-        auto chi_xy_val = screened_mat_chi_xy.values();
-
-        auto chi_xz_val = screened_mat_chi_xz.values();
-
-        auto chi_yy_val = screened_mat_chi_yy.values();
-
-        auto chi_yz_val = screened_mat_chi_yz.values();
-
-        auto chi_zz_val = screened_mat_chi_zz.values();
+        auto chi_yy_val = mat_chi_yy.values();
+        auto chi_yz_val = mat_chi_yz.values();
+        auto chi_zz_val = mat_chi_zz.values();
 
         auto gdenx = dengradx.values();
-
         auto gdeny = dengrady.values();
-
         auto gdenz = dengradz.values();
 
         auto gdenxx = dengradxx.values();
-
         auto gdenxy = dengradxy.values();
-
         auto gdenxz = dengradxz.values();
 
         auto gdenyx = dengradyx.values();
-
         auto gdenyy = dengradyy.values();
-
         auto gdenyz = dengradyz.values();
 
         auto gdenzx = dengradzx.values();
-
         auto gdenzy = dengradzy.values();
-
         auto gdenzz = dengradzz.values();
 
         #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
 
-            auto grid_batch_size = mpi::batch_size(screened_npoints, thread_id, nthreads);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto grid_batch_offset = mpi::batch_offset(screened_npoints, thread_id, nthreads);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
-                auto atom_offset = atomidx * screened_npoints;
+                auto atom_offset = atomidx * npoints;
 
-                auto nu_offset = nu * screened_npoints;
+                auto nu_offset = nu * npoints;
 
                 #pragma omp simd aligned(gdenx, gdeny, gdenz, \
                         gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz, \
@@ -1013,27 +955,19 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
                     auto nu_g = nu_offset + g;
 
                     gdenx[atom_g] -= 2.0 * F_val[nu_g] * chi_x_val[nu_g];
-
                     gdeny[atom_g] -= 2.0 * F_val[nu_g] * chi_y_val[nu_g];
-
                     gdenz[atom_g] -= 2.0 * F_val[nu_g] * chi_z_val[nu_g];
 
                     gdenxx[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xx_val[nu_g]);
-
                     gdenxy[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
-
                     gdenxz[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
 
                     gdenyx[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
-
                     gdenyy[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yy_val[nu_g]);
-
                     gdenyz[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
 
                     gdenzx[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
-
                     gdenzy[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
-
                     gdenzz[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_zz_val[nu_g]);
                 }
             }
@@ -1045,29 +979,19 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         timer.start("XC functional eval.");
 
-        CXCGradientGrid vxcgrid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
-
-        xcFunctional.compute(vxcgrid, screened_gsdengrid);
+        xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
         timer.stop("XC functional eval.");
 
-        // pointers to exchange-correlation functional derrivatives
+        // screen density and functional derivatives
 
-        auto grhoa = vxcgrid.xcGradientValues(xcvars::rhoa);
+        timer.start("Density screening");
 
-        auto ggrada = vxcgrid.xcGradientValues(xcvars::grada);
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        auto ggradab = vxcgrid.xcGradientValues(xcvars::gradab);
+        gridscreen::screenVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
 
-        // pointers to density gradient norms
-
-        auto ngrada = screened_gsdengrid.alphaDensityGradient(0);
-
-        auto gradax = screened_gsdengrid.alphaDensityGradientX(0);
-
-        auto graday = screened_gsdengrid.alphaDensityGradientY(0);
-
-        auto gradaz = screened_gsdengrid.alphaDensityGradientZ(0);
+        timer.stop("Density screening");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -1077,48 +1001,42 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         {
             auto thread_id = omp_get_thread_num();
 
-            auto grid_batch_size = mpi::batch_size(screened_npoints, thread_id, nthreads);
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
 
-            auto grid_batch_offset = mpi::batch_offset(screened_npoints, thread_id, nthreads);
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
             auto gatm = molgrad_threads.data(thread_id);
 
             for (int32_t iatom = 0; iatom < natoms; iatom++)
             {
-                auto atom_offset = iatom * screened_npoints;
+                auto atom_offset = iatom * npoints;
 
                 double gatmx = 0.0, gatmy = 0.0, gatmz = 0.0;
 
-                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(screened_weights, \
-                        grhoa, ggrada, ggradab, ngrada, gradax, graday, gradaz, gdenx, gdeny, gdenz, \
+                #pragma omp simd reduction(+ : gatmx, gatmy, gatmz) aligned(local_weights, \
+                        rhograd, vrho, vsigma, gdenx, gdeny, gdenz, \
                         gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
                 for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto atom_g = atom_offset + g;
 
-                    auto prefac = screened_weights[g] * grhoa[g];
+                    auto vx = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
+                    auto vy = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
+                    auto vz = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 2] + vsigma[3 * g + 1] * rhograd[6 * g + 5];
 
-                    gatmx += prefac * gdenx[atom_g];
+                    gatmx += local_weights[g] * vrho[2 * g + 0] * gdenx[atom_g];
+                    gatmy += local_weights[g] * vrho[2 * g + 0] * gdeny[atom_g];
+                    gatmz += local_weights[g] * vrho[2 * g + 0] * gdenz[atom_g];
 
-                    gatmy += prefac * gdeny[atom_g];
-
-                    gatmz += prefac * gdenz[atom_g];
-
-                    prefac = screened_weights[g] * (ggrada[g] / ngrada[g] + ggradab[g]);
-
-                    gatmx += prefac * (gradax[g] * gdenxx[atom_g] + graday[g] * gdenyx[atom_g] + gradaz[g] * gdenzx[atom_g]);
-
-                    gatmy += prefac * (gradax[g] * gdenxy[atom_g] + graday[g] * gdenyy[atom_g] + gradaz[g] * gdenzy[atom_g]);
-
-                    gatmz += prefac * (gradax[g] * gdenxz[atom_g] + graday[g] * gdenyz[atom_g] + gradaz[g] * gdenzz[atom_g]);
+                    gatmx += local_weights[g] * (vx * gdenxx[atom_g] + vy * gdenyx[atom_g] + vz * gdenzx[atom_g]);
+                    gatmy += local_weights[g] * (vx * gdenxy[atom_g] + vy * gdenyy[atom_g] + vz * gdenzy[atom_g]);
+                    gatmz += local_weights[g] * (vx * gdenxz[atom_g] + vy * gdenyz[atom_g] + vz * gdenzz[atom_g]);
                 }
 
                 // factor of 2 from sum of alpha and beta contributions
 
                 gatm[iatom * 3 + 0] += 2.0 * gatmx;
-
                 gatm[iatom * 3 + 1] += 2.0 * gatmy;
-
                 gatm[iatom * 3 + 2] += 2.0 * gatmz;
             }
         }
@@ -1143,9 +1061,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
         {
             molgrad.row(iatom)[0] += molgrad_threads.data(thread_id)[iatom * 3 + 0];
-
             molgrad.row(iatom)[1] += molgrad_threads.data(thread_id)[iatom * 3 + 1];
-
             molgrad.row(iatom)[2] += molgrad_threads.data(thread_id)[iatom * 3 + 2];
         }
     }
