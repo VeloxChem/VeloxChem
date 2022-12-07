@@ -74,7 +74,7 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
     auto xcfuntype = newfvxc.getFunctionalType();
 
-    auto flag = densityMatrix.isClosedShell() ? std::string("closedshell") : std::string("openshell");
+    auto flag = densityMatrix.isClosedShell() ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
 
     if (xcfuntype == xcfun::lda)
     {
@@ -233,8 +233,6 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     timer.start("Preparation");
 
-    auto openshell = (fstr::upcase(flag) == "OPENSHELL");
-
     auto nthreads = omp_get_max_threads();
 
     std::vector<CMultiTimer> omptimers(nthreads);
@@ -247,7 +245,9 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    CAOKohnShamMatrix mat_Vxc(densityMatrix.getNumberOfRows(0), densityMatrix.getNumberOfColumns(0), !openshell);
+    bool closedshell = (fstr::upcase(flag) == std::string("CLOSEDSHELL"));
+
+    CAOKohnShamMatrix mat_Vxc(densityMatrix.getNumberOfRows(0), densityMatrix.getNumberOfColumns(0), closedshell);
 
     mat_Vxc.zero();
 
@@ -391,26 +391,27 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         if (aocount == 0) continue;
 
-        // generate sub density matrix
+        // generate sub density matrix and density grid
 
-        timer.start("Density matrix slicing");
-
-        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
-
-        CDenseMatrix sub_dens_mat_b;
-
-        if (openshell) sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
-
-        timer.stop("Density matrix slicing");
-
-        // generate density grid
-
-        if (!openshell)
+        if (closedshell)
         {
-            dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, timer);
+            timer.start("Density matrix slicing");
+
+            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+
+            timer.stop("Density matrix slicing");
+
+            dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat, timer);
         }
         else
         {
+            timer.start("Density matrix slicing");
+
+            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
+
+            timer.stop("Density matrix slicing");
+
             dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, sub_dens_mat_b, timer);
         }
 
@@ -432,33 +433,29 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.stop("Density screening");
 
-        // compute partial contribution to Vxc matrix
+        // compute partial contribution to Vxc matrix and distribute partial
+        // Vxc to full Kohn-Sham matrix
 
-        std::vector<CDenseMatrix> partial_mat_Vxc;
-
-        if (!openshell)
+        if (closedshell)
         {
-            partial_mat_Vxc.push_back(_integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer));
-        }
-        else
-        {
-            partial_mat_Vxc = _integratePartialVxcFockForLDAOpenShell(npoints, local_weights, mat_chi, vrho, timer);
-        }
+            auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
 
-        // distribute partial Vxc to full Kohn-Sham matrix
+            timer.start("Vxc matrix dist.");
 
-        timer.start("Vxc matrix dist.");
-
-        if (!openshell)
-        {
-            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc[0], aoinds, aocount, naos);
-        }
-        else
-        {
             submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
-        }
 
-        timer.stop("Vxc matrix dist.");
+            timer.stop("Vxc matrix dist.");
+        }
+        else
+        {
+            auto partial_mat_Vxc_ab = _integratePartialVxcFockForLDAOpenShell(npoints, local_weights, mat_chi, vrho, timer);
+
+            timer.start("Vxc matrix dist.");
+
+            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc_ab, aoinds, aocount, naos);
+
+            timer.stop("Vxc matrix dist.");
+        }
 
         // compute partial contribution to XC energy
 
@@ -513,8 +510,6 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     timer.start("Preparation");
 
-    auto openshell = (fstr::upcase(flag) == "OPENSHELL");
-
     auto nthreads = omp_get_max_threads();
 
     std::vector<CMultiTimer> omptimers(nthreads);
@@ -527,7 +522,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // Kohn-Sham matrix
 
-    CAOKohnShamMatrix mat_Vxc(densityMatrix.getNumberOfRows(0), densityMatrix.getNumberOfColumns(0), !openshell);
+    bool closedshell = (fstr::upcase(flag) == std::string("CLOSEDSHELL"));
+
+    CAOKohnShamMatrix mat_Vxc(densityMatrix.getNumberOfRows(0), densityMatrix.getNumberOfColumns(0), closedshell);
 
     mat_Vxc.zero();
 
@@ -710,31 +707,30 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         if (aocount == 0) continue;
 
-        // generate sub density matrix
+        // generate sub density matrix and density grid
 
-        timer.start("Density matrix slicing");
-
-        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
-
-        CDenseMatrix sub_dens_mat_b;
-
-        if (openshell) sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
-
-        timer.stop("Density matrix slicing");
-
-        // generate density grid
-
-        if (!openshell)
+        if (closedshell)
         {
-            dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+            timer.start("Density matrix slicing");
 
-                                              sub_dens_mat_a, timer);
+            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+
+            dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                              sub_dens_mat, timer);
+
+            timer.stop("Density matrix slicing");
         }
         else
         {
-            dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+            timer.start("Density matrix slicing");
 
+            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
+
+            dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
                                               sub_dens_mat_a, sub_dens_mat_b, timer);
+
+            timer.stop("Density matrix slicing");
         }
 
         // compute exchange-correlation functional derivative
@@ -755,35 +751,31 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.stop("Density screening");
 
-        // compute partial contribution to Vxc matrix
+        // compute partial contribution to Vxc matrix and distribute partial
+        // Vxc to full Kohn-Sham matrix
 
-        std::vector<CDenseMatrix> partial_mat_Vxc;
-
-        if (!openshell)
+        if (closedshell)
         {
-            partial_mat_Vxc.push_back(_integratePartialVxcFockForGGA(
-                npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer));
-        }
-        else
-        {
-            partial_mat_Vxc = _integratePartialVxcFockForGGAOpenShell(
+            auto partial_mat_Vxc = _integratePartialVxcFockForGGA(
                 npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer);
-        }
 
-        // distribute partial Vxc to full Kohn-Sham matrix
+            timer.start("Vxc matrix dist.");
 
-        timer.start("Vxc matrix dist.");
+            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
 
-        if (!openshell)
-        {
-            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc[0], aoinds, aocount, naos);
+            timer.stop("Vxc matrix dist.");
         }
         else
         {
-            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
-        }
+            auto partial_mat_Vxc_ab = _integratePartialVxcFockForGGAOpenShell(
+                npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer);
 
-        timer.stop("Vxc matrix dist.");
+            timer.start("Vxc matrix dist.");
+
+            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc_ab, aoinds, aocount, naos);
+
+            timer.stop("Vxc matrix dist.");
+        }
 
         // compute partial contribution to XC energy
 
