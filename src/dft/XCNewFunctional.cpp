@@ -332,8 +332,8 @@ CXCNewFunctional::compute_fxc_for_lda(int32_t np, const double* rho, double* v2r
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    // auto stage_exc = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    // auto stage_vrho= (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    //   stage_exc      (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    //   stage_vrho     (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_v2rho2 = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
 #pragma omp simd aligned(v2rho2 : VLX_ALIGN)
@@ -364,6 +364,53 @@ CXCNewFunctional::compute_fxc_for_lda(int32_t np, const double* rho, double* v2r
     if (alloc)
     {
         mem::free(stage_v2rho2);
+    }
+}
+
+auto
+CXCNewFunctional::compute_kxc_for_lda(int32_t np, const double* rho, double* v3rho3) const -> void
+{
+    errors::assertMsgCritical(_maxDerivOrder >= 3,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    // stage_exc        (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    // stage_vrho       (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    // stage_v2rho2     (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto stage_v3rho3 = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[6 * _ldStaging];
+
+#pragma omp simd aligned(v3rho3 : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        v3rho3[4 * g + 0] = 0.0;
+        v3rho3[4 * g + 1] = 0.0;
+        v3rho3[4 * g + 2] = 0.0;
+        v3rho3[4 * g + 3] = 0.0;
+    }
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
+
+        const auto c = xccomp.getScalingFactor();
+
+#pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
+            v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
+            v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
+            v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_v3rho3);
     }
 }
 
@@ -461,7 +508,7 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    // auto stage_exc = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    //   stage_exc      (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
     auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
@@ -540,9 +587,9 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    // auto stage_exc     = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    // auto stage_vrho    = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    // auto stage_vsigma  = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    //   stage_exc          (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    //   stage_vrho         (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    //   stage_vsigma       (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
     auto stage_v2rho2     = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
     auto stage_v2rhosigma = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
     auto stage_v2sigma2   = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
