@@ -1,8 +1,7 @@
 import numpy as np
 
 from veloxchem.veloxchemlib import mpi_master
-from veloxchem.veloxchemlib import (GridDriver, XCMolecularGradient,
-                                    XCNewMolecularGradient)
+from veloxchem.veloxchemlib import GridDriver, XCNewMolecularGradient
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -25,23 +24,14 @@ class TestXCMolGrad:
         grid_drv = GridDriver(scf_drv.comm)
         grid_drv.set_level(scf_drv.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.distribute(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        grad_drv = XCMolecularGradient(scf_drv.comm)
-        mol_grad = grad_drv.integrate_vxc_gradient(density, molecule, basis,
+        grad_drv = XCNewMolecularGradient(scf_drv.comm)
+        mol_grad = grad_drv.integrate_vxc_gradient(molecule, basis, density,
                                                    mol_grid, xcfun)
         mol_grad = scf_drv.comm.reduce(mol_grad, root=mpi_master())
 
-        mol_grid_new = grid_drv.generate(molecule)
-
-        grad_drv_new = XCNewMolecularGradient(scf_drv.comm)
-        mol_grad_new = grad_drv_new.integrate_vxc_gradient(
-            molecule, basis, density, mol_grid_new, xcfun)
-        mol_grad_new = scf_drv.comm.reduce(mol_grad_new, root=mpi_master())
-
         if scf_drv.rank == mpi_master():
             assert np.max(np.abs(mol_grad - ref_grad)) < 1.0e-4
-            assert np.max(np.abs(mol_grad_new - ref_grad)) < 1.0e-4
 
     def test_xc_mol_grad_slater(self):
 

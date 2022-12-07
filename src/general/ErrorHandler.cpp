@@ -25,32 +25,23 @@
 
 #include "ErrorHandler.hpp"
 
+#include <mpi.h>
+
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <string>
 
-#include <mpi.h>
-
 #include "MpiFunc.hpp"
 
 namespace errors {  // errors namespace
-
-void
-assertMsgCritical(const bool condition, const std::string& label)
-{
-    if (!condition)
-    {
-	    msgCritical(label);
-    }
-}
-
-void
-msgCritical(const std::string& label)
+namespace detail {
+auto
+msg(const std::string& label, const std::string& header) -> void
 {
     std::stringstream sst;
 
-    sst << "**** Critical Error";
+    sst << "**** " << header;
 
     if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
     {
@@ -59,9 +50,25 @@ msgCritical(const std::string& label)
 
     sst << " ****" << std::endl;
 
-    sst << "     " <<  label << std::endl << std::endl;
+    sst << "     " << label << std::endl << std::endl;
 
     std::cerr << sst.str();
+}
+}  // namespace detail
+
+auto
+assertMsgCritical(const bool condition, const std::string& message) -> void
+{
+    if (!condition)
+    {
+        msgCritical(message);
+    }
+}
+
+auto
+msgCritical(const std::string& message) -> void
+{
+    detail::msg(message, "Critical Error");
 
     if (mpi::initialized() && mpi::nodes(MPI_COMM_WORLD) > 1)
     {
@@ -71,4 +78,18 @@ msgCritical(const std::string& label)
     std::abort();
 }
 
+auto
+assertMsgWarning(const bool condition, const std::string& message) -> void
+{
+    if (!condition)
+    {
+        msgWarning(message);
+    }
+}
+
+auto
+msgWarning(const std::string& message) -> void
+{
+    detail::msg(message, "Warning");
+}
 }  // namespace errors

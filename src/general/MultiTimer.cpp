@@ -33,10 +33,6 @@ CMultiTimer::CMultiTimer()
 {
 }
 
-CMultiTimer::~CMultiTimer()
-{
-}
-
 void
 CMultiTimer::clear()
 {

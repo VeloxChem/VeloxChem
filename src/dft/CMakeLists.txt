@@ -6,9 +6,9 @@ target_sources(vlxobjs
     DensityGridGenerator.cpp
     DensityGridQuad.cpp
     GridBox.cpp
-    GridScreener.cpp
     GridDriver.cpp
     GridPartitioner.cpp
+    GridScreener.cpp
     GtoEvaluator.cpp
     GtoFunc.cpp
     GtoFuncForGGA.cpp
@@ -21,11 +21,12 @@ target_sources(vlxobjs
     PrimitiveFunctional.cpp
     SubMatrix.cpp
     XCCubicHessianGrid.cpp
+    XCComponent.cpp
     XCFunctional.cpp
     XCGradientGrid.cpp
     XCHessianGrid.cpp
     XCIntegrator.cpp
-    XCMolecularGradient.cpp
+    XCNewFunctional.cpp
     XCNewIntegrator.cpp
     XCNewMolecularGradient.cpp
   )

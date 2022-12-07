@@ -25,6 +25,7 @@
 
 #include "CubicGridTest.hpp"
 
+#include <array>
 #include <cstring>
 #include <vector>
 
@@ -33,11 +34,11 @@
 
 TEST_F(CCubicGridTest, Getters)
 {
-    std::vector<double> origin({0.1, 0.2, 0.3});
+    std::array origin{0.1, 0.2, 0.3};
 
-    std::vector<double> stepSize({1.0, 2.0, 3.0});
+    std::array stepSize{1.0, 2.0, 3.0};
 
-    std::vector<int32_t> numPoints({1, 2, 3});
+    std::array numPoints{1, 2, 3};
 
     CCubicGrid grid(origin, stepSize, numPoints);
 

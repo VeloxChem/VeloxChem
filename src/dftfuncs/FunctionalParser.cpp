@@ -39,7 +39,7 @@ namespace vxcfuncs {  // vxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN3", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PKZB"});
+    return std::vector<std::string>({"SLATER", "VWN3", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP"});
 }
 
 CXCFunctional
@@ -121,8 +121,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         }
 
         // PKZB exchange functional
-
-        if (fstr::upcase(xcLabel) == "PKZB") return vxcfuncs::setPkzbFunctional();
+        //if (fstr::upcase(xcLabel) == "PKZB") return vxcfuncs::setPkzbFunctional();
 
         // FIX ME: add other functionals here...
     }

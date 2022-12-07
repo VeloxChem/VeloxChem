@@ -37,11 +37,8 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import GridDriver
-from .veloxchemlib import MolecularGrid
-from .veloxchemlib import XCIntegrator, XCNewIntegrator
-from .veloxchemlib import AOKohnShamMatrix
-from .veloxchemlib import DenseMatrix
+from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
+from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb, xcfun
@@ -652,13 +649,15 @@ class ScfDriver:
 
         return self.scf_tensors
 
-    def maximum_overlap(self, molecule, orbitals, alpha_list, beta_list):
+    def maximum_overlap(self, molecule, basis, orbitals, alpha_list, beta_list):
         """
         Constraint the SCF calculation to find orbitals that maximize overlap
         with a reference set.
 
         :param molecule:
             The molecule.
+        :param basis:
+            The AO basis set.
         :param orbitals:
             The reference MolecularOrbital object.
         :param alpha_list:
@@ -667,9 +666,16 @@ class ScfDriver:
             The list of beta occupied orbitals.
         """
 
+        C_start_a = None
+        C_start_b = None
+
         if self.rank == mpi_master():
             n_alpha = molecule.number_of_alpha_electrons()
             n_beta = molecule.number_of_beta_electrons()
+
+            # Reorder alpha to match beta
+            if self.scf_type == 'restricted_openshell':
+                alpha_list = beta_list + list(set(alpha_list) - set(beta_list))
 
             err_excitations = 'ScfDriver.maximum_overlap: '
             err_excitations += 'incorrect definition of occupation lists'
@@ -678,9 +684,25 @@ class ScfDriver:
             if self.scf_type == 'restricted':
                 assert_msg_critical(alpha_list == beta_list, err_excitations)
 
-            C_a = orbitals.alpha_to_numpy()[:, alpha_list]
-            C_b = orbitals.beta_to_numpy()[:, beta_list]
+            n_mo = orbitals.number_mos()
+            mo_a = orbitals.alpha_to_numpy()
+            mo_b = orbitals.beta_to_numpy()
+
+            C_a = mo_a[:, alpha_list]
+            C_b = mo_b[:, beta_list]
             self._mom = [C_a, C_b]
+
+            # Create guess orbitals
+            virtual_alpha = list(set(range(n_mo)) - set(alpha_list))
+            C_start_a = mo_a[:, alpha_list + virtual_alpha]
+            if self.scf_type == 'unrestricted':
+                virtual_beta = list(set(range(n_mo)) - set(beta_list))
+                C_start_b = mo_b[:, beta_list + virtual_beta]
+
+        if self.scf_type == 'unrestricted':
+            self.set_start_orbitals(molecule, basis, (C_start_a, C_start_b))
+        else:
+            self.set_start_orbitals(molecule, basis, C_start_a)
 
     def set_start_orbitals(self, molecule, basis, array):
         """
@@ -1343,8 +1365,7 @@ class ScfDriver:
                 if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
-            if (self.scf_type == 'restricted' and
-                    self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]):
+            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
                 xc_drv = XCNewIntegrator(self.comm)
                 self._mol_grid.partition_grid_points()
                 self._mol_grid.distribute_counts_and_displacements(
@@ -1353,11 +1374,9 @@ class ScfDriver:
                                                     self._mol_grid,
                                                     self.xcfun.get_func_label())
             else:
-                xc_drv = XCIntegrator(self.comm)
-                self._mol_grid.distribute(self.rank, self.nodes, self.comm)
-                vxc_mat = xc_drv.integrate(den_mat, molecule, basis,
-                                           self._mol_grid,
-                                           self.xcfun.get_func_label())
+                assert_msg_critical(
+                    False, 'SCF driver: Unsupported XC functional type')
+
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
         else:
             vxc_mat = None
@@ -1475,11 +1494,12 @@ class ScfDriver:
 
         # calculate Vxc on DFT nodes
         if dft_comm:
-            xc_drv = XCIntegrator(local_comm)
-            self._mol_grid.distribute(local_comm.Get_rank(),
-                                      local_comm.Get_size(), local_comm)
-            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self._mol_grid,
-                                       self.xcfun.get_func_label())
+            xc_drv = XCNewIntegrator(local_comm)
+            self._mol_grid.re_distribute_counts_and_displacements(
+                local_comm.Get_rank(), local_comm.Get_size(), local_comm)
+            vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
+                                                self._mol_grid,
+                                                self.xcfun.get_func_label())
             vxc_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                local_comm)
         else:

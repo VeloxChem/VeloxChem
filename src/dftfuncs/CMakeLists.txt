@@ -2,6 +2,7 @@ target_sources(vlxobjs
   PRIVATE
     Becke88Functional.cpp
     FunctionalParser.cpp
+    NewFunctionalParser.cpp
     LYPFunctional.cpp
     PkzbFunctional.cpp
     SlaterFunctional.cpp

@@ -1,7 +1,6 @@
 target_sources(utests
   PRIVATE
     AOKohnShamMatrixTest.cpp
-    DensityGridDriverTest.cpp
     DensityGridTest.cpp
     GridDriverTest.cpp
     LebedevLaikovQuadratureTest.cpp
@@ -11,6 +10,4 @@ target_sources(utests
     XCFunctionalTest.cpp
     XCGradientGridTest.cpp
     XCHessianGridTest.cpp
-    XCIntegratorTest.cpp
-    XCMolecularGradientTest.cpp
   )

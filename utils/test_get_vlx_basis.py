@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 from veloxchem import InputParser, Molecule, MolecularBasis
 from veloxchem.molecularbasis import _basis_file_to_name
-from veloxchem.environ import get_basis_path
+from veloxchem.environment import get_basis_path
 from get_vlx_basis import get_vlx_basis_string
 
 
