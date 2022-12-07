@@ -119,6 +119,37 @@ void screenFxcFockForGGA(double*               rho,
                          const double          densityThreshold);
 
 /**
+ Screens Kxc Fock for GGA.
+
+ @param rho the density.
+ @param sigma the dot product of density gradient.
+ @param vrho the 1st-order functional derivative wrt rho.
+ @param vsigma the 1st-order functional derivative wrt sigma.
+ @param v2rho2 the 2nd-order functional derivative wrt rho.
+ @param v2rhosigma the 2nd-order functional derivative wrt rho and sigma.
+ @param v2sigma2 the 2nd-order functional derivative wrt sigma.
+ @param v3rho2 the 3rd-order functional derivative wrt rho.
+ @param v3rho2sigma the 3rd-order functional derivative wrt rho and sigma.
+ @param v3rhosigma2 the 3rd-order functional derivative wrt rho and sigma.
+ @param v3sigma2 the 3rd-order functional derivative wrt sigma.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ */
+void screenKxcFockForGGA(double*               rho,
+                         double*               sigma,
+                         double*               vrho,
+                         double*               vsigma,
+                         double*               v2rho2,
+                         double*               v2rhosigma,
+                         double*               v2sigma2,
+                         double*               v3rho3,
+                         double*               v3rho2sigma,
+                         double*               v3rhosigma2,
+                         double*               v3sigma3,
+                         const int32_t         npoints,
+                         const double          densityThreshold);
+
+/**
  Screens LDA density grid to get rid of invalid grid points.
 
  @param gridPointInds mapping between grid points before and after screening
