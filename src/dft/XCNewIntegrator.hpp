@@ -178,7 +178,7 @@ class CXCNewIntegrator
                                  const CAODensityMatrix& rw2DensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCFunctional&    xcFunctional,
+                                 const CXCNewFunctional& xcFunctional,
                                  const std::string&      quadMode) const;
 
     /**
@@ -347,8 +347,8 @@ class CXCNewIntegrator
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
-     @param xcHessianGrid the exchange-correlation hessian grid.
-     @param xcCubicHessianGrid the exchange-correlation cubic hessian grid.
+     @param v2rho2 the 2nd-order functional derivative wrt density.
+     @param v3rho3 the 3rd-order functional derivative wrt density.
      @param rwDensityGridQuad the products of one-time transformed densities on grid points.
      @param rw2DensityMatrix the two-time transformed densities on grid points.
      @param iFock the index of the AO Fock matrix.
@@ -358,8 +358,8 @@ class CXCNewIntegrator
     CDenseMatrix _integratePartialKxcFockForLDA(const int32_t              npoints,
                                                 const double*              weights,
                                                 const CDenseMatrix&        gtoValues,
-                                                const CXCHessianGrid&      xcHessianGrid,
-                                                const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                const double*              v2rho2,
+                                                const double*              v3rho3,
                                                 const CDensityGridQuad&    rwDensityGridQuad,
                                                 const CDensityGrid&        rw2DensityGrid,
                                                 const int32_t              iFock,
