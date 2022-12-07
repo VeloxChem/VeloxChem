@@ -651,6 +651,154 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
 }
 
 auto
+CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
+                                      const double* rho,
+                                      const double* sigma,
+                                      double*       v3rho3,
+                                      double*       v3rho2sigma,
+                                      double*       v3rhosigma2,
+                                      double*       v3sigma3) const -> void
+{
+    errors::assertMsgCritical(_maxDerivOrder >= 3,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
+
+#pragma omp simd aligned(v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3 : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        v3rho3[4 * g + 0] = 0.0;
+        v3rho3[4 * g + 1] = 0.0;
+        v3rho3[4 * g + 2] = 0.0;
+        v3rho3[4 * g + 3] = 0.0;
+
+        v3rho2sigma[9 * g + 0] = 0.0;
+        v3rho2sigma[9 * g + 1] = 0.0;
+        v3rho2sigma[9 * g + 2] = 0.0;
+        v3rho2sigma[9 * g + 3] = 0.0;
+        v3rho2sigma[9 * g + 4] = 0.0;
+        v3rho2sigma[9 * g + 5] = 0.0;
+        v3rho2sigma[9 * g + 6] = 0.0;
+        v3rho2sigma[9 * g + 7] = 0.0;
+        v3rho2sigma[9 * g + 8] = 0.0;
+
+        v3rhosigma2[12 * g + 0]  = 0.0;
+        v3rhosigma2[12 * g + 1]  = 0.0;
+        v3rhosigma2[12 * g + 2]  = 0.0;
+        v3rhosigma2[12 * g + 3]  = 0.0;
+        v3rhosigma2[12 * g + 4]  = 0.0;
+        v3rhosigma2[12 * g + 5]  = 0.0;
+        v3rhosigma2[12 * g + 6]  = 0.0;
+        v3rhosigma2[12 * g + 7]  = 0.0;
+        v3rhosigma2[12 * g + 8]  = 0.0;
+        v3rhosigma2[12 * g + 9]  = 0.0;
+        v3rhosigma2[12 * g + 10] = 0.0;
+        v3rhosigma2[12 * g + 11] = 0.0;
+
+        v3sigma3[10 * g + 0] = 0.0;
+        v3sigma3[10 * g + 1] = 0.0;
+        v3sigma3[10 * g + 2] = 0.0;
+        v3sigma3[10 * g + 3] = 0.0;
+        v3sigma3[10 * g + 4] = 0.0;
+        v3sigma3[10 * g + 5] = 0.0;
+        v3sigma3[10 * g + 6] = 0.0;
+        v3sigma3[10 * g + 7] = 0.0;
+        v3sigma3[10 * g + 8] = 0.0;
+        v3sigma3[10 * g + 9] = 0.0;
+    }
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    //   stage_exc           (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    //   stage_vrho          (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    //   stage_vsigma        (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    //   stage_v2rho2        (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
+    //   stage_v2rhosigma    (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
+    //   stage_v2sigma2      (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
+    auto stage_v3rho3      = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[21 * _ldStaging];
+    auto stage_v3rho2sigma = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[25 * _ldStaging];
+    auto stage_v3rhosigma2 = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[34 * _ldStaging];
+    auto stage_v3sigma3    = (alloc) ? mem::malloc<double>(10 * np) : &_stagingBuffer[46 * _ldStaging];
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        const auto c = xccomp.getScalingFactor();
+
+        auto family = funcptr->info->family;
+
+        if (family == XC_FAMILY_LDA)
+        {
+            xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
+
+#pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
+                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
+                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
+                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+            }
+        }
+        else if (family == XC_FAMILY_GGA)
+        {
+            xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
+
+#pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, v3rhosigma2, stage_v3rhosigma2, v3sigma3, stage_v3sigma3 : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
+                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
+                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
+                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+
+                v3rho2sigma[9 * g + 0] += c * stage_v3rho2sigma[9 * g + 0];
+                v3rho2sigma[9 * g + 1] += c * stage_v3rho2sigma[9 * g + 1];
+                v3rho2sigma[9 * g + 2] += c * stage_v3rho2sigma[9 * g + 2];
+                v3rho2sigma[9 * g + 3] += c * stage_v3rho2sigma[9 * g + 3];
+                v3rho2sigma[9 * g + 4] += c * stage_v3rho2sigma[9 * g + 4];
+                v3rho2sigma[9 * g + 5] += c * stage_v3rho2sigma[9 * g + 5];
+                v3rho2sigma[9 * g + 6] += c * stage_v3rho2sigma[9 * g + 6];
+                v3rho2sigma[9 * g + 7] += c * stage_v3rho2sigma[9 * g + 7];
+                v3rho2sigma[9 * g + 8] += c * stage_v3rho2sigma[9 * g + 8];
+
+                v3rhosigma2[12 * g + 0] += c * stage_v3rhosigma2[12 * g + 0];
+                v3rhosigma2[12 * g + 1] += c * stage_v3rhosigma2[12 * g + 1];
+                v3rhosigma2[12 * g + 2] += c * stage_v3rhosigma2[12 * g + 2];
+                v3rhosigma2[12 * g + 3] += c * stage_v3rhosigma2[12 * g + 3];
+                v3rhosigma2[12 * g + 4] += c * stage_v3rhosigma2[12 * g + 4];
+                v3rhosigma2[12 * g + 5] += c * stage_v3rhosigma2[12 * g + 5];
+                v3rhosigma2[12 * g + 6] += c * stage_v3rhosigma2[12 * g + 6];
+                v3rhosigma2[12 * g + 7] += c * stage_v3rhosigma2[12 * g + 7];
+                v3rhosigma2[12 * g + 8] += c * stage_v3rhosigma2[12 * g + 8];
+                v3rhosigma2[12 * g + 9] += c * stage_v3rhosigma2[12 * g + 9];
+                v3rhosigma2[12 * g + 10] += c * stage_v3rhosigma2[12 * g + 10];
+                v3rhosigma2[12 * g + 11] += c * stage_v3rhosigma2[12 * g + 11];
+
+                v3sigma3[10 * g + 0] += c * stage_v3sigma3[10 * g + 0];
+                v3sigma3[10 * g + 1] += c * stage_v3sigma3[10 * g + 1];
+                v3sigma3[10 * g + 2] += c * stage_v3sigma3[10 * g + 2];
+                v3sigma3[10 * g + 3] += c * stage_v3sigma3[10 * g + 3];
+                v3sigma3[10 * g + 4] += c * stage_v3sigma3[10 * g + 4];
+                v3sigma3[10 * g + 5] += c * stage_v3sigma3[10 * g + 5];
+                v3sigma3[10 * g + 6] += c * stage_v3sigma3[10 * g + 6];
+                v3sigma3[10 * g + 7] += c * stage_v3sigma3[10 * g + 7];
+                v3sigma3[10 * g + 8] += c * stage_v3sigma3[10 * g + 8];
+                v3sigma3[10 * g + 9] += c * stage_v3sigma3[10 * g + 9];
+            }
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_v3rho3);
+        mem::free(stage_v3rho2sigma);
+        mem::free(stage_v3rhosigma2);
+        mem::free(stage_v3sigma3);
+    }
+}
+
+auto
 CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                                            const double* rho,
                                            const double* sigma,

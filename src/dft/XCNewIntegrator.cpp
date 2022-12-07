@@ -149,7 +149,7 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
 
     molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
 
-    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -157,17 +157,15 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
     {
         if (xcfuntype == xcfun::lda)
         {
-            auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-
             _integrateKxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
 
-                                    molecularGrid, newfvxc, quadMode);
+                                    molecularGrid, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
-           _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+            _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
 
-                                   molecularGrid, fvxc, quadMode);
+                                    molecularGrid, fvxc, quadMode);
         }
         else
         {
@@ -1283,7 +1281,6 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
         // generate density grid
 
         dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-
                                           sub_dens_mat, timer);
 
         // compute exchange-correlation functional derivative
@@ -1303,7 +1300,6 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
         gridscreen::screenFxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
-
                                         npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
@@ -1323,7 +1319,6 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
             // generate density grid
 
             dengridgen::generateDensityForGGA(rhow, rhowgrad, nullptr, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-
                                               sub_dens_mat, timer);
 
             // compute partial contribution to Fxc matrix
@@ -1571,7 +1566,7 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.stop("XC functional eval.");
 
-        // screen density grid, weights and GTO matrix
+        // screen density and functional derivatives
 
         timer.start("Density screening");
 
@@ -1625,7 +1620,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                           const CAODensityMatrix& rw2DensityMatrix,
                                           const CAODensityMatrix& gsDensityMatrix,
                                           const CMolecularGrid&   molecularGrid,
-                                          const CXCFunctional&    xcFunctional,
+                                          const CXCNewFunctional& xcFunctional,
                                           const std::string&      quadMode) const
 {
     CMultiTimer timer;
@@ -1649,9 +1644,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
@@ -1666,22 +1659,49 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     std::vector<int32_t> aoinds(naos);
 
-    // indices for keeping track of valid grid points
+    // density and functional derivatives
 
-    std::vector<int32_t> screened_point_inds(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    CMemBlock<double> screened_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    auto screened_weights = screened_weights_data.data();
+    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rho2sigma_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rhosigma2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3sigma3_data(10 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
+
+    auto rho = rho_data.data();
+    auto rhograd = rhograd_data.data();
+    auto sigma = sigma_data.data();
+
+    auto vrho = vrho_data.data();
+    auto vsigma = vsigma_data.data();
+
+    auto v2rho2 = v2rho2_data.data();
+    auto v2rhosigma = v2rhosigma_data.data();
+    auto v2sigma2 = v2sigma2_data.data();
+
+    auto v3rho3 = v3rho3_data.data();
+    auto v3rho2sigma = v3rho2sigma_data.data();
+    auto v3rhosigma2 = v3rhosigma2_data.data();
+    auto v3sigma3 = v3sigma3_data.data();
 
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
-
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -1777,9 +1797,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
         CDenseMatrix mat_chi(aocount, npoints);
 
         CDenseMatrix mat_chi_x(aocount, npoints);
-
         CDenseMatrix mat_chi_y(aocount, npoints);
-
         CDenseMatrix mat_chi_z(aocount, npoints);
 
         for (int32_t i = 0; i < aocount; i++)
@@ -1787,9 +1805,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
         }
 
@@ -1807,41 +1823,8 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         // generate density grid
 
-        auto xcfuntype = xcFunctional.getFunctionalType();
-
-        auto gsdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-
-                                                               gs_sub_dens_mat, xcfuntype, timer);
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
-        CDensityGrid screened_gsdengrid(gsdengrid);
-
-        gridscreen::screenDensityGridForGGA(screened_point_inds, screened_gsdengrid, gsdengrid,
-
-                                            _screeningThresholdForDensityValues);
-
-        auto screened_npoints = screened_gsdengrid.getNumberOfGridPoints();
-
-        gridscreen::screenWeights(screened_weights, gridblockpos, weights, screened_point_inds, screened_npoints);
-
-        CDenseMatrix screened_mat_chi(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_x(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_y(mat_chi.getNumberOfRows(), screened_npoints);
-
-        CDenseMatrix screened_mat_chi_z(mat_chi.getNumberOfRows(), screened_npoints);
-
-        gridscreen::screenGtoMatrixForGGA(screened_mat_chi, screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
-
-                                          mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, screened_point_inds, screened_npoints);
-
-        timer.stop("Density screening");
-
-        if (screened_npoints == 0) continue;
+        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                          gs_sub_dens_mat, timer);
 
         // generate sub density matrix
 
@@ -1855,16 +1838,12 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         // generate density grid
 
-        auto rwdengrid = dengridgen::generateDensityGridForGGA(screened_npoints, screened_mat_chi,
+        auto xcfuntype = xcFunctional.getFunctionalType();
 
-                                                               screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
-
+        auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
                                                                rw_sub_dens_mat, xcfuntype, timer);
 
-        auto rw2dengrid = dengridgen::generateDensityGridForGGA(screened_npoints, screened_mat_chi,
-
-                                                                screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
-
+        auto rw2dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
                                                                 rw2_sub_dens_mat, xcfuntype, timer);
 
         // compute perturbed density
@@ -1873,7 +1852,7 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         auto numdens_rw2 = rw2DensityMatrix.getNumberOfDensityMatrices();
 
-        CDensityGridQuad rwdengridquad(screened_npoints, numdens_rw2, xcfuntype, dengrid::ab);
+        CDensityGridQuad rwdengridquad(npoints, numdens_rw2, xcfuntype, dengrid::ab);
 
         rwdengridquad.DensityProd(rwdengrid, xcfuntype, numdens_rw2, quadMode);
 
@@ -1883,19 +1862,25 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("XC functional eval.");
 
-        CXCGradientGrid vxcgrid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        CXCHessianGrid vxc2grid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
+        xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
-        CXCCubicHessianGrid vxc3grid(screened_npoints, screened_gsdengrid.getDensityGridType(), xcfuntype);
-
-        xcFunctional.compute(vxcgrid, screened_gsdengrid);
-
-        xcFunctional.compute(vxc2grid, screened_gsdengrid);
-
-        xcFunctional.compute(vxc3grid, screened_gsdengrid);
+        xcFunctional.compute_kxc_for_gga(npoints, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
 
         timer.stop("XC functional eval.");
+
+        // screen density and functional derivatives
+
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        gridscreen::screenKxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
+                                        v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
 
         // go through density matrices
 
@@ -1903,15 +1888,11 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
         {
             // compute partial contribution to Kxc matrix
 
-            auto partial_mat_Kxc = _integratePartialKxcFockForGGA(screened_npoints, screened_weights, screened_mat_chi,
-
-                                                                  screened_mat_chi_x, screened_mat_chi_y, screened_mat_chi_z,
-
-                                                                  vxcgrid, vxc2grid, vxc3grid,
-
-                                                                  rwdengridquad, rw2dengrid, screened_gsdengrid,
-
-                                                                  idensity, timer);
+            auto partial_mat_Kxc = _integratePartialKxcFockForGGA(npoints, local_weights, mat_chi,
+                                                                  mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                  rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2,
+                                                                  v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                                                  rwdengridquad, rw2dengrid, idensity, timer);
 
             // distribute partial Kxc to full Fock matrix
 
@@ -3026,12 +3007,17 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                                                  const CDenseMatrix&        gtoValuesX,
                                                  const CDenseMatrix&        gtoValuesY,
                                                  const CDenseMatrix&        gtoValuesZ,
-                                                 const CXCGradientGrid&     xcGradientGrid,
-                                                 const CXCHessianGrid&      xcHessianGrid,
-                                                 const CXCCubicHessianGrid& xcCubicHessianGrid,
+                                                 const double*              rhograd,
+                                                 const double*              vsigma,
+                                                 const double*              v2rho2,
+                                                 const double*              v2rhosigma,
+                                                 const double*              v2sigma2,
+                                                 const double*              v3rho3,
+                                                 const double*              v3rho2sigma,
+                                                 const double*              v3rhosigma2,
+                                                 const double*              v3sigma3,
                                                  const CDensityGridQuad&    rwDensityGridQuad,
                                                  const CDensityGrid&        rw2DensityGrid,
-                                                 const CDensityGrid&        gsDensityGrid,
                                                  const int32_t              iFock,
                                                  CMultiTimer&               timer) const
 {
@@ -3042,110 +3028,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
     auto chi_val = gtoValues.values();
 
     auto chi_x_val = gtoValuesX.values();
-
     auto chi_y_val = gtoValuesY.values();
-
     auto chi_z_val = gtoValuesZ.values();
-
-    // pointers to exchange-correlation functional derrivatives
-
-    auto df2000 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::rhoa);
-
-    auto df1100 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::rhob);
-
-    auto df1010 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::grada);
-
-    auto df1001 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::gradb);
-
-    auto df10001 = xcHessianGrid.xcHessianValues(xcvars::rhoa, xcvars::gradab);
-
-    auto df0020 = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::grada);
-
-    auto df0011 = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::gradb);
-
-    auto df00101 = xcHessianGrid.xcHessianValues(xcvars::grada, xcvars::gradab);
-
-    auto df00002 = xcHessianGrid.xcHessianValues(xcvars::gradab, xcvars::gradab);
-
-    auto df0010 = xcGradientGrid.xcGradientValues(xcvars::grada);
-
-    auto df00001 = xcGradientGrid.xcGradientValues(xcvars::gradab);
-
-    auto df00011 = xcHessianGrid.xcHessianValues(xcvars::gradb, xcvars::gradab);
-
-    auto df01001 = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::gradab);
-
-    auto df0110 = xcHessianGrid.xcHessianValues(xcvars::rhob, xcvars::grada);
-
-    auto df3000 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhoa);
-
-    auto df2100 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::rhob);
-
-    auto df1200 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::rhob);
-
-    auto df2010 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::grada);
-
-    auto df0030 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::grada, xcvars::grada);
-
-    auto df0021 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::grada, xcvars::gradb);
-
-    auto df0012 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::gradb, xcvars::gradb);
-
-    auto df00201 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::grada, xcvars::gradab);
-
-    auto df00111 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::gradb, xcvars::gradab);
-
-    auto df00102 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::grada, xcvars::gradab, xcvars::gradab);
-
-    auto df00003 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::gradab, xcvars::gradab, xcvars::gradab);
-
-    auto df2001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::gradb);
-
-    auto df1110 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::grada);
-
-    auto df1101 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::gradb);
-
-    auto df20001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhoa, xcvars::gradab);
-
-    auto df11001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::rhob, xcvars::gradab);
-
-    auto df1020 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::grada, xcvars::grada);
-
-    auto df1011 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::grada, xcvars::gradb);
-
-    auto df1002 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::gradb, xcvars::gradb);
-
-    auto df10101 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::grada, xcvars::gradab);
-
-    auto df10002 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::gradab, xcvars::gradab);
-
-    auto df01002 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::gradab, xcvars::gradab);
-
-    auto df0120 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::grada, xcvars::grada);
-
-    auto df0111 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::grada, xcvars::gradb);
-
-    auto df01101 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::grada, xcvars::gradab);
-
-    auto df10011 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhoa, xcvars::gradb, xcvars::gradab);
-
-    auto df01011 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::gradb, xcvars::gradab);
-
-    auto df0210 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::rhob, xcvars::grada);
-
-    auto df02001 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::rhob, xcvars::rhob, xcvars::gradab);
-
-    auto df00021 = xcCubicHessianGrid.xcCubicHessianValues(xcvars::gradb, xcvars::gradb, xcvars::gradab);
-
-    // pointers to ground state density gradient norms
-
-    auto ngrada = gsDensityGrid.alphaDensityGradient(0);
-
-    auto grada_x = gsDensityGrid.alphaDensityGradientX(0);
-
-    auto grada_y = gsDensityGrid.alphaDensityGradientY(0);
-
-    auto grada_z = gsDensityGrid.alphaDensityGradientZ(0);
 
     // pointers to perturbed density gradient norms
 
@@ -3192,11 +3076,9 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
     auto naos = gtoValues.getNumberOfRows();
 
     CDenseMatrix mat_G(naos, npoints);
-
     CDenseMatrix mat_G_gga(naos, npoints);
 
     auto G_val = mat_G.values();
-
     auto G_gga_val = mat_G_gga.values();
 
     #pragma omp parallel
@@ -3214,12 +3096,9 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
             auto nu_offset = nu * npoints;
 
             #pragma omp simd aligned(weights, \
-                    df2000, df1100, df1010, df1001, df10001, df0020, df0011, df00101, df00002, \
-                    df0010, df00001, df00011, df01001, df0110, df3000, df2100, df1200, df2010, \
-                    df0030, df0021, df0012, df00201, df00111, df00102, df00003, df2001, df1110, \
-                    df1101, df20001, df11001, df1020, df1011, df1002, df10101, df10002, df01002, \
-                    df0120, df0111, df01101, df10011, df01011, df0210, df02001, df00021, \
-                    ngrada, grada_x, grada_y, grada_z, rhow1rhow2, rxw1rhow2, ryw1rhow2, rzw1rhow2, \
+                    rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2, \
+                    v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, \
+                    rhow1rhow2, rxw1rhow2, ryw1rhow2, rzw1rhow2, \
                     rxw1rxw2, rxw1ryw2, rxw1rzw2, ryw1rxw2, ryw1ryw2, ryw1rzw2, rzw1rxw2, rzw1ryw2, rzw1rzw2, \
                     rhow12a, gradw12a_x, gradw12a_y, gradw12a_z, \
                     G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
@@ -3227,121 +3106,111 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
             {
                 double w = weights[g];
 
-                double znva = 1.0 / ngrada[g];
-
-                double znva3 = 1.0 / std::pow(ngrada[g], 3.0);
-
-                double znva5 = 1.0 / std::pow(ngrada[g], 5.0);
-
                 double rxw12a = gradw12a_x[g];
-
                 double ryw12a = gradw12a_y[g];
-
                 double rzw12a = gradw12a_z[g];
 
-                double xigrad_x = znva * grada_x[g];
+                double grada_x_g = rhograd[6 * g + 0];
+                double grada_y_g = rhograd[6 * g + 1];
+                double grada_z_g = rhograd[6 * g + 2];
 
-                double xigrad_y = znva * grada_y[g];
+                // various required quantities from density and density derivatives
 
-                double xigrad_z = znva * grada_z[g];
+                double grw1grw2 = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
 
-                double xigrad_xx = (znva - grada_x[g] * grada_x[g] * znva3);
+                //double grhogrho = ngrada[g] * ngrada[g];
 
-                double xigrad_yy = (znva - grada_y[g] * grada_y[g] * znva3);
+                double grhogrhow12 = grada_x_g * rxw12a + grada_y_g * ryw12a + grada_z_g * rzw12a;
 
-                double xigrad_zz = (znva - grada_z[g] * grada_z[g] * znva3);
+                double grhogrw1_rhow2 = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
 
-                double xigrad_xy = -grada_x[g] * grada_y[g] * znva3;
+                double grhogrw1_rw2_x = grada_x_g * rxw1rxw2[g] + grada_y_g * ryw1rxw2[g] + grada_z_g * rzw1rxw2[g];
+                double grhogrw1_rw2_y = grada_x_g * rxw1ryw2[g] + grada_y_g * ryw1ryw2[g] + grada_z_g * rzw1ryw2[g];
+                double grhogrw1_rw2_z = grada_x_g * rxw1rzw2[g] + grada_y_g * ryw1rzw2[g] + grada_z_g * rzw1rzw2[g];
 
-                double xigrad_xz = -grada_x[g] * grada_z[g] * znva3;
+                double grhogrw2_rw1_x = grada_x_g * rxw1rxw2[g] + grada_y_g * rxw1ryw2[g] + grada_z_g * rxw1rzw2[g];
+                double grhogrw2_rw1_y = grada_x_g * ryw1rxw2[g] + grada_y_g * ryw1ryw2[g] + grada_z_g * ryw1rzw2[g];
+                double grhogrw2_rw1_z = grada_x_g * rzw1rxw2[g] + grada_y_g * rzw1ryw2[g] + grada_z_g * rzw1rzw2[g];
 
-                double xigrad_yz = -grada_y[g] * grada_z[g] * znva3;
+                double grho_grhogrw2_grw1 = grada_x_g * grhogrw2_rw1_x + grada_y_g * grhogrw2_rw1_y + grada_z_g * grhogrw2_rw1_z;
 
-                double xigrad_xxy = 3.0 * grada_x[g] * grada_x[g] * grada_y[g] * znva5 - grada_y[g] * znva3;
+                double grho_x_grw1grw2 = grada_x_g * (2 * rxw1rxw2[g] - ryw1ryw2[g] - rzw1rzw2[g]);
+                double grho_y_grw1grw2 = grada_y_g * (2 * ryw1ryw2[g] - rzw1rzw2[g] - rxw1rxw2[g]);
+                double grho_z_grw1grw2 = grada_z_g * (2 * rzw1rzw2[g] - rxw1rxw2[g] - ryw1ryw2[g]);
 
-                double xigrad_xxz = 3.0 * grada_x[g] * grada_x[g] * grada_z[g] * znva5 - grada_z[g] * znva3;
+                // functional derivatives in libxc form
 
-                double xigrad_xyy = 3.0 * grada_x[g] * grada_y[g] * grada_y[g] * znva5 - grada_x[g] * znva3;
+                auto vsigma_a = vsigma[3 * g + 0];
+                auto vsigma_c = vsigma[3 * g + 1];
 
-                double xigrad_xzz = 3.0 * grada_x[g] * grada_z[g] * grada_z[g] * znva5 - grada_x[g] * znva3;
+                auto v2rho2_aa = v2rho2[3 * g + 0];
+                auto v2rho2_ab = v2rho2[3 * g + 1];
 
-                double xigrad_yzz = 3.0 * grada_y[g] * grada_z[g] * grada_z[g] * znva5 - grada_y[g] * znva3;
+                auto v2rhosigma_aa = v2rhosigma[6 * g + 0];
+                auto v2rhosigma_ac = v2rhosigma[6 * g + 1];
+                auto v2rhosigma_ab = v2rhosigma[6 * g + 2];
+                auto v2rhosigma_ba = v2rhosigma[6 * g + 3];
+                auto v2rhosigma_bc = v2rhosigma[6 * g + 4];
 
-                double xigrad_yyz = 3.0 * grada_y[g] * grada_y[g] * grada_z[g] * znva5 - grada_z[g] * znva3;
+                auto v2sigma2_aa = v2sigma2[6 * g + 0];
+                auto v2sigma2_ac = v2sigma2[6 * g + 1];
+                auto v2sigma2_ab = v2sigma2[6 * g + 2];
+                auto v2sigma2_cc = v2sigma2[6 * g + 3];
+                auto v2sigma2_cb = v2sigma2[6 * g + 4];
 
-                double xigrad_xyz = 3.0 * grada_x[g] * grada_y[g] * grada_z[g] * znva5;
+                auto v3rho3_aaa = v3rho3[4 * g + 0];
+                auto v3rho3_aab = v3rho3[4 * g + 1];
+                auto v3rho3_abb = v3rho3[4 * g + 2];
 
-                double xigrad_xxx = 3.0 * grada_x[g] * grada_x[g] * grada_x[g] * znva5 - 3.0 * grada_x[g] * znva3;
+                auto v3rho2sigma_aaa = v3rho2sigma[9 * g + 0];
+                auto v3rho2sigma_aac = v3rho2sigma[9 * g + 1];
+                auto v3rho2sigma_aab = v3rho2sigma[9 * g + 2];
+                auto v3rho2sigma_aba = v3rho2sigma[9 * g + 3];
+                auto v3rho2sigma_abc = v3rho2sigma[9 * g + 4];
+                auto v3rho2sigma_abb = v3rho2sigma[9 * g + 5];
+                auto v3rho2sigma_bba = v3rho2sigma[9 * g + 6];
+                auto v3rho2sigma_bbc = v3rho2sigma[9 * g + 7];
 
-                double xigrad_yyy = 3.0 * grada_y[g] * grada_y[g] * grada_y[g] * znva5 - 3.0 * grada_y[g] * znva3;
+                auto v3rhosigma2_aaa = v3rhosigma2[12 * g + 0];
+                auto v3rhosigma2_aac = v3rhosigma2[12 * g + 1];
+                auto v3rhosigma2_aab = v3rhosigma2[12 * g + 2];
+                auto v3rhosigma2_acc = v3rhosigma2[12 * g + 3];
+                auto v3rhosigma2_acb = v3rhosigma2[12 * g + 4];
+                auto v3rhosigma2_abb = v3rhosigma2[12 * g + 5];
+                auto v3rhosigma2_baa = v3rhosigma2[12 * g + 6];
+                auto v3rhosigma2_bac = v3rhosigma2[12 * g + 7];
+                auto v3rhosigma2_bab = v3rhosigma2[12 * g + 8];
+                auto v3rhosigma2_bcc = v3rhosigma2[12 * g + 9];
+                auto v3rhosigma2_bcb = v3rhosigma2[12 * g + 10];
 
-                double xigrad_zzz = 3.0 * grada_z[g] * grada_z[g] * grada_z[g] * znva5 - 3.0 * grada_z[g] * znva3;
-
-                // Various required quantities
-
-                double xigrad_dot_rw12a = (xigrad_x * rxw12a + xigrad_y * ryw12a + xigrad_z * rzw12a);
-
-                double xigrad_dot_rw1rw2 = xigrad_x * rxw1rhow2[g] + xigrad_y * ryw1rhow2[g] + xigrad_z * rzw1rhow2[g];
-
-                double rw1_dot_rw2 = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
-
-                double xigrad_dot_rw1rhow2 = xigrad_x * rxw1rhow2[g] + xigrad_y * ryw1rhow2[g] + xigrad_z * rzw1rhow2[g];
-
-                double grad_dot_rw12 = grada_x[g] * rxw12a + grada_y[g] * ryw12a + grada_z[g] * rzw12a;
-
-                double grad_dot_rw1rw2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] +
-                                         grada_z[g] * rzw1rhow2[g];
-
-                double grad_dot_rw1rhow2 = grada_x[g] * rxw1rhow2[g] + grada_y[g] * ryw1rhow2[g] +
-                                           grada_z[g] * rzw1rhow2[g];
-
-                double xigrad_dot_rw1_xigrad_dot_rw2 = xigrad_x * xigrad_x * rxw1rxw2[g] + xigrad_x * xigrad_y * rxw1ryw2[g] +
-                                                       xigrad_x * xigrad_z * rxw1rzw2[g] + xigrad_y * xigrad_x * ryw1rxw2[g] +
-                                                       xigrad_y * xigrad_y * ryw1ryw2[g] + xigrad_y * xigrad_z * ryw1rzw2[g] +
-                                                       xigrad_z * xigrad_x * rzw1rxw2[g] + xigrad_z * xigrad_y * rzw1ryw2[g] +
-                                                       xigrad_z * xigrad_z * rzw1rzw2[g];
+                auto v3sigma3_aaa = v3sigma3[10 * g + 0];
+                auto v3sigma3_aac = v3sigma3[10 * g + 1];
+                auto v3sigma3_aab = v3sigma3[10 * g + 2];
+                auto v3sigma3_acc = v3sigma3[10 * g + 3];
+                auto v3sigma3_acb = v3sigma3[10 * g + 4];
+                auto v3sigma3_abb = v3sigma3[10 * g + 5];
+                auto v3sigma3_ccc = v3sigma3[10 * g + 6];
+                auto v3sigma3_cbb = v3sigma3[10 * g + 8];
 
                 // scalar contribution
 
                 double prefac = 0.0;
 
-                // first, second
+                prefac += (v2rho2_aa + v2rho2_ab) * rhow12a[g];
 
-                prefac += (df2000[g] * rhow12a[g] + df1100[g] * rhow12a[g]) +
+                prefac += (v3rho3_aaa + 2 * v3rho3_aab + v3rho3_abb) * rhow1rhow2[g];
 
-                          (df1010[g] + df1001[g]) * xigrad_dot_rw12a +
+                prefac += 2 * (v2rhosigma_aa + v2rhosigma_ab + v2rhosigma_ac) * grhogrhow12;
 
-                          df10001[g] * 2.0 * grad_dot_rw12;
+                prefac += 2 * (v2rhosigma_aa + v2rhosigma_ab + v2rhosigma_ac) * grw1grw2;
 
-                // fifth
+                prefac += 2 * (v3rho2sigma_aaa + v3rho2sigma_aab +
+                               v3rho2sigma_aba + v3rho2sigma_abb +
+                               v3rho2sigma_aac + v3rho2sigma_abc) * grhogrw1_rhow2;
 
-                prefac += (df3000[g] + 2.0 * df2100[g] + df1200[g]) * rhow1rhow2[g];
-
-                // seventh
-
-                prefac += (df2010[g] + df2001[g]) * xigrad_dot_rw1rw2 +
-
-                          (df1110[g] + df1101[g]) * xigrad_dot_rw1rw2 +
-
-                          2.0 * (df20001[g] + df11001[g]) * grad_dot_rw1rw2;
-
-                // eighth
-
-                prefac += (df1020[g] + 2.0 * df1011[g] + df1002[g]) * xigrad_dot_rw1_xigrad_dot_rw2;
-
-                prefac += (df1010[g] + df1001[g]) *
-
-                          (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
-
-                           xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
-
-                           xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
-
-                prefac += 2.0 * (df10101[g] + df10101[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2;
-
-                prefac += 4.0 * df10002[g] * ngrada[g] * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2;
-
-                prefac += 2.0 * df10001[g] * rw1_dot_rw2;
+                prefac += 4 * (v3rhosigma2_aaa + 2 * v3rhosigma2_aab +
+                               v3rhosigma2_abb + 2 * v3rhosigma2_aac +
+                               v3rhosigma2_acc) * grho_grhogrw2_grw1;
 
                 G_val[nu_offset + g] = w * prefac * chi_val[nu_offset + g];
 
@@ -3349,258 +3218,72 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 
                 double xcomp = 0.0, ycomp = 0.0, zcomp = 0.0;
 
-                // third
+                prefac = 0.0;
 
-                prefac = (df1010[g] + df0110[g]) * rhow12a[g];
+                prefac += (2 * v2rhosigma_aa + 2 * v2rhosigma_ba + v2rhosigma_ac + v2rhosigma_bc) * rhow12a[g];
 
-                xcomp += prefac * xigrad_x;
+                prefac += 4 * (v2sigma2_aa + v2sigma2_ab + v2sigma2_ac + v2sigma2_cb) * grw1grw2;
 
-                ycomp += prefac * xigrad_y;
+                //prefac += v2sigma2_cc * grw1grw2;
 
-                zcomp += prefac * xigrad_z;
+                prefac += 4 * (v2sigma2_aa + v2sigma2_ab + v2sigma2_ac) * grhogrhow12;
 
-                prefac = (df10001[g] + df01001[g]) * rhow12a[g];
+                //prefac += 2 * (v2sigma2_ac + v2sigma2_cb + v2sigma2_cc) * grhogrhow12;
 
-                xcomp += prefac * grada_x[g];
+                prefac += 2 * (v3rho2sigma_aaa + 2 * v3rho2sigma_aba + v3rho2sigma_bba) * rhow1rhow2[g];
 
-                ycomp += prefac * grada_y[g];
+                prefac += (v3rho2sigma_aac + 2 * v3rho2sigma_abc + v3rho2sigma_bbc) * rhow1rhow2[g];
 
-                zcomp += prefac * grada_z[g];
+                prefac += 4 * (v3rhosigma2_aaa + v3rhosigma2_aab + v3rhosigma2_aac) * grhogrw1_rhow2;
 
-                // fourth
+                prefac += 4 * (v3rhosigma2_baa + v3rhosigma2_bab + v3rhosigma2_bac) * grhogrw1_rhow2;
 
-                xcomp += df0010[g] * (xigrad_xx * rxw12a + xigrad_xy * ryw12a + xigrad_xz * rzw12a);
+                //prefac += (4 * v3rhosigma2_acb + v3rhosigma2_acc + v3rhosigma2_bcc) * grhogrw1_rhow2;
 
-                ycomp += df0010[g] * (xigrad_xy * rxw12a + xigrad_yy * ryw12a + xigrad_yz * rzw12a);
+                //prefac += 8 * v3rhosigma2_bab * grhogrw1_rhow2;
 
-                zcomp += df0010[g] * (xigrad_xz * rxw12a + xigrad_yz * ryw12a + xigrad_zz * rzw12a);
+                //prefac += 2 * v3rhosigma2_bcb * grhogrw1_rhow2;
 
-                xcomp += df00001[g] * rxw12a;
+                prefac += 8 * (v3sigma3_aaa + 2 * v3sigma3_aab + v3sigma3_abb) * grho_grhogrw2_grw1;
 
-                ycomp += df00001[g] * ryw12a;
+                //prefac += 12 * v3sigma3_aac * grho_grhogrw2_grw1;
 
-                zcomp += df00001[g] * rzw12a;
+                //prefac += 16 * v3sigma3_acb * grho_grhogrw2_grw1;
 
-                // tenth
+                //prefac += 4 * (v3sigma3_acc + v3sigma3_cbb) * grho_grhogrw2_grw1;
 
-                prefac = (df1010[g] + df0110[g]);
+                //prefac += v3sigma3_ccc * grhogrho; // ???
 
-                xcomp += prefac * (xigrad_xx * rxw1rhow2[g] + xigrad_xy * ryw1rhow2[g] + xigrad_xz * rzw1rhow2[g]);
+                xcomp += prefac * grada_x_g;
+                ycomp += prefac * grada_y_g;
+                zcomp += prefac * grada_z_g;
 
-                ycomp += prefac * (xigrad_xy * rxw1rhow2[g] + xigrad_yy * ryw1rhow2[g] + xigrad_yz * rzw1rhow2[g]);
+                xcomp += (2 * vsigma_a + vsigma_c) * rxw12a;
+                ycomp += (2 * vsigma_a + vsigma_c) * ryw12a;
+                zcomp += (2 * vsigma_a + vsigma_c) * rzw12a;
 
-                zcomp += prefac * (xigrad_xz * rxw1rhow2[g] + xigrad_yz * ryw1rhow2[g] + xigrad_zz * rzw1rhow2[g]);
+                xcomp += (2 * v2rhosigma_aa + 2 * v2rhosigma_ba + v2rhosigma_ac + v2rhosigma_bc) * rxw1rhow2[g];
+                ycomp += (2 * v2rhosigma_aa + 2 * v2rhosigma_ba + v2rhosigma_ac + v2rhosigma_bc) * ryw1rhow2[g];
+                zcomp += (2 * v2rhosigma_aa + 2 * v2rhosigma_ba + v2rhosigma_ac + v2rhosigma_bc) * rzw1rhow2[g];
 
-                // twelfth first
+                xcomp += 4 * (v2sigma2_aa + v2sigma2_ab) * (grhogrw1_rw2_x + grhogrw2_rw1_x);
+                ycomp += 4 * (v2sigma2_aa + v2sigma2_ab) * (grhogrw1_rw2_y + grhogrw2_rw1_y);
+                zcomp += 4 * (v2sigma2_aa + v2sigma2_ab) * (grhogrw1_rw2_z + grhogrw2_rw1_z);
 
-                prefac = df0010[g];
+                //xcomp += 2 * v2sigma2_ac * (grhogrw1_rw2_x + grhogrw2_rw1_x);
 
-                xcomp += prefac * (xigrad_xxx * rxw1rxw2[g] + xigrad_xxy * rxw1ryw2[g] + xigrad_xxz * rxw1rzw2[g] +
+                //ycomp += 2 * v2sigma2_ac * (grhogrw1_rw2_y + grhogrw2_rw1_y);
 
-                                   xigrad_xxy * ryw1rxw2[g] + xigrad_xyy * ryw1ryw2[g] + xigrad_xyz * ryw1rzw2[g] +
+                //zcomp += 2 * v2sigma2_ac * (grhogrw1_rw2_z + grhogrw2_rw1_z);
 
-                                   xigrad_xxz * rzw1rxw2[g] + xigrad_xyz * rzw1ryw2[g] + xigrad_xzz * rzw1rzw2[g]);
+                //xcomp += (2 * v2sigma2_ac + 2 * v2sigma2_cb + v2sigma2_cc) * grhogrw2_rw1_x;
 
-                ycomp += prefac * (xigrad_xxy * rxw1rxw2[g] + xigrad_xyy * rxw1ryw2[g] + xigrad_xyz * rxw1rzw2[g] +
+                //ycomp += (2 * v2sigma2_ac + 2 * v2sigma2_cb + v2sigma2_cc) * grhogrw2_rw1_y;
 
-                                   xigrad_xyy * ryw1rxw2[g] + xigrad_yyy * ryw1ryw2[g] + xigrad_yyz * ryw1rzw2[g] +
-
-                                   xigrad_xyz * rzw1rxw2[g] + xigrad_yyz * rzw1ryw2[g] + xigrad_yzz * rzw1rzw2[g]);
-
-                zcomp += prefac * (xigrad_xxz * rxw1rxw2[g] + xigrad_xyz * rxw1ryw2[g] + xigrad_xzz * rxw1rzw2[g] +
-
-                                   xigrad_xyz * ryw1rxw2[g] + xigrad_yyz * ryw1ryw2[g] + xigrad_yzz * ryw1rzw2[g] +
-
-                                   xigrad_xzz * rzw1rxw2[g] + xigrad_yzz * rzw1ryw2[g] + xigrad_zzz * rzw1rzw2[g]);
-
-                // twelfth second
-
-                prefac = (df00101[g] + df00011[g]) * ngrada[g];
-
-                prefac += (df0020[g] + df0011[g]);
-
-                xcomp += prefac * xigrad_x * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
-
-                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
-
-                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
-
-                ycomp += prefac * xigrad_y * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
-
-                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
-
-                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
-
-                zcomp += prefac * xigrad_z * (xigrad_xx * rxw1rxw2[g] + xigrad_xy * rxw1ryw2[g] + xigrad_xz * rxw1rzw2[g] +
-
-                                              xigrad_xy * ryw1rxw2[g] + xigrad_yy * ryw1ryw2[g] + xigrad_yz * ryw1rzw2[g] +
-
-                                              xigrad_xz * rzw1rxw2[g] + xigrad_yz * rzw1ryw2[g] + xigrad_zz * rzw1rzw2[g]);
-
-                // twelfth third
-
-                prefac = (df0020[g] + df0011[g]);
-
-                prefac += df00101[g] * ngrada[g];
-
-                xcomp += prefac * (xigrad_xx * xigrad_x * (rxw1rxw2[g] + rxw1rxw2[g]) +
-
-                                   xigrad_xx * xigrad_y * (ryw1rxw2[g] + rxw1ryw2[g]) +
-
-                                   xigrad_xx * xigrad_z * (rzw1rxw2[g] + rxw1rzw2[g]) +
-
-                                   xigrad_xy * xigrad_x * (rxw1ryw2[g] + ryw1rxw2[g]) +
-
-                                   xigrad_xy * xigrad_y * (ryw1ryw2[g] + ryw1ryw2[g]) +
-
-                                   xigrad_xy * xigrad_z * (rzw1ryw2[g] + ryw1rzw2[g]) +
-
-                                   xigrad_xz * xigrad_x * (rxw1rzw2[g] + rzw1rxw2[g]) +
-
-                                   xigrad_xz * xigrad_y * (ryw1rzw2[g] + rzw1ryw2[g]) +
-
-                                   xigrad_xz * xigrad_z * (rzw1rzw2[g] + rzw1rzw2[g]));
-
-                ycomp += prefac * (xigrad_xy * xigrad_x * (rxw1rxw2[g] + rxw1rxw2[g]) +
-
-                                   xigrad_xy * xigrad_y * (ryw1rxw2[g] + rxw1ryw2[g]) +
-
-                                   xigrad_xy * xigrad_z * (rzw1rxw2[g] + rxw1rzw2[g]) +
-
-                                   xigrad_yy * xigrad_x * (rxw1ryw2[g] + ryw1rxw2[g]) +
-
-                                   xigrad_yy * xigrad_y * (ryw1ryw2[g] + ryw1ryw2[g]) +
-
-                                   xigrad_yy * xigrad_z * (rzw1ryw2[g] + ryw1rzw2[g]) +
-
-                                   xigrad_yz * xigrad_x * (rxw1rzw2[g] + rzw1rxw2[g]) +
-
-                                   xigrad_yz * xigrad_y * (ryw1rzw2[g] + rzw1ryw2[g]) +
-
-                                   xigrad_yz * xigrad_z * (rzw1rzw2[g] + rzw1rzw2[g]));
-
-                zcomp += prefac * (xigrad_xz * xigrad_x * (rxw1rxw2[g] + rxw1rxw2[g]) +
-
-                                   xigrad_xz * xigrad_y * (ryw1rxw2[g] + rxw1ryw2[g]) +
-
-                                   xigrad_xz * xigrad_z * (rzw1rxw2[g] + rxw1rzw2[g]) +
-
-                                   xigrad_yz * xigrad_x * (rxw1ryw2[g] + ryw1rxw2[g]) +
-
-                                   xigrad_yz * xigrad_y * (ryw1ryw2[g] + ryw1ryw2[g]) +
-
-                                   xigrad_yz * xigrad_z * (rzw1ryw2[g] + ryw1rzw2[g]) +
-
-                                   xigrad_zz * xigrad_x * (rxw1rzw2[g] + rzw1rxw2[g]) +
-
-                                   xigrad_zz * xigrad_y * (ryw1rzw2[g] + rzw1ryw2[g]) +
-
-                                   xigrad_zz * xigrad_z * (rzw1rzw2[g] + rzw1rzw2[g]));
-
-                // twelfth fourth gam
-
-                prefac = (df00101[g] + df00011[g]);
-
-                prefac += df00002[g] * ngrada[g];
-
-                xcomp += prefac * (xigrad_x * rxw1rxw2[g] + xigrad_y * ryw1rxw2[g] + xigrad_z * rzw1rxw2[g]);
-
-                ycomp += prefac * (xigrad_x * rxw1ryw2[g] + xigrad_y * ryw1ryw2[g] + xigrad_z * rzw1ryw2[g]);
-
-                zcomp += prefac * (xigrad_x * rxw1rzw2[g] + xigrad_y * ryw1rzw2[g] + xigrad_z * rzw1rzw2[g]);
-
-                // twelfth fifth gam
-
-                double twelfthfifth_gam = (xigrad_x * grada_x[g] + grada_x[g] * xigrad_x) * rxw1rxw2[g] +
-
-                                          (xigrad_x * grada_y[g] + grada_x[g] * xigrad_y) * rxw1ryw2[g] +
-
-                                          (xigrad_x * grada_z[g] + grada_x[g] * xigrad_z) * rxw1rzw2[g] +
-
-                                          (xigrad_y * grada_x[g] + grada_y[g] * xigrad_x) * rxw1rxw2[g] +
-
-                                          (xigrad_y * grada_y[g] + grada_y[g] * xigrad_y) * rxw1ryw2[g] +
-
-                                          (xigrad_y * grada_z[g] + grada_y[g] * xigrad_z) * rxw1rzw2[g] +
-
-                                          (xigrad_z * grada_x[g] + grada_z[g] * xigrad_x) * rxw1rxw2[g] +
-
-                                          (xigrad_z * grada_y[g] + grada_z[g] * xigrad_y) * rxw1ryw2[g] +
-
-                                          (xigrad_z * grada_z[g] + grada_z[g] * xigrad_z) * rxw1rzw2[g];
-
-                // fourth, ninth, tenth
-
-                // xigrad_dot_omega == (xigrad_x * xomega + xigrad_y * yomega + xigrad_z * zomega);
-
-                prefac = df00101[g] * (2.0 * grad_dot_rw12);
-
-                prefac += (df0020[g] + df0011[g]) * xigrad_dot_rw12a;
-
-                prefac += (df2010[g] + 2.0 * df1110[g] + df0210[g]) * rhow1rhow2[g];
-
-                prefac += (df1020[g] + df1011[g] + df0120[g] + df0111[g]) * xigrad_dot_rw1rhow2;
-
-                prefac += (df10101[g] + df10011[g] + df01101[g] + df0111[g]) * grad_dot_rw1rhow2;
-
-                prefac += (df0030[g] + 2.0 * df0021[g] + df0012[g]) * xigrad_dot_rw1_xigrad_dot_rw2;
-
-                prefac += (df00101[g] + df00011[g]) * rw1_dot_rw2;
-
-                prefac += (df00201[g] + df00111[g]) * twelfthfifth_gam;
-
-                prefac += df00102[g] * xigrad_dot_rw1_xigrad_dot_rw2;
-
-                xcomp += prefac * xigrad_x;
-
-                ycomp += prefac * xigrad_y;
-
-                zcomp += prefac * xigrad_z;
-
-                // fourth, ninth, tenth
-
-                // grad_dot_omega == grada_x[g] * xomega + grada_y[g] * yomega + grada_z[g] * zomega;
-
-                prefac = (df00101[g] * xigrad_dot_rw12a + df00011[g] * xigrad_dot_rw12a);
-
-                prefac += df00002[g] * (2.0 * grad_dot_rw12);
-
-                prefac += (df20001[g] + 2.0 * df11001[g] + df02001[g]) * rhow1rhow2[g];
-
-                prefac += (df10101[g] + df10011[g] + df01101[g] + df0111[g] + df01011[g]) * xigrad_dot_rw1rhow2;
-
-                prefac += (df10002[g] + df01002[g]) * grad_dot_rw1rhow2;
-
-                prefac += df00002[g] * rw1_dot_rw2;
-
-                prefac += (df00201[g] + 2 * df00111[g] + df00021[g]) * xigrad_dot_rw1_xigrad_dot_rw2;
-
-                prefac += (df00102[g] + df00011[g]) * ngrada[g] * xigrad_dot_rw1_xigrad_dot_rw2;
-
-                prefac += df00003[g] * ngrada[g] * ngrada[g];
-
-                xcomp += prefac * grada_x[g];
-
-                ycomp += prefac * grada_y[g];
-
-                zcomp += prefac * grada_z[g];
-
-                // tenth
-
-                // omega_dot_rw1rhow2 == xomega * rxw1rhow2[g] + yomega * ryw1rhow2[g] + zomega * rzw1rhow2[g];
-
-                prefac = (df10001[g] + df01001[g]);
-
-                xcomp += prefac * rxw1rhow2[g];
-
-                ycomp += prefac * ryw1rhow2[g];
-
-                zcomp += prefac * rzw1rhow2[g];
+                //zcomp += (2 * v2sigma2_ac + 2 * v2sigma2_cb + v2sigma2_cc) * grhogrw2_rw1_z;
 
                 G_gga_val[nu_offset + g] = w * (xcomp * chi_x_val[nu_offset + g] +
-
                                                 ycomp * chi_y_val[nu_offset + g] +
-
                                                 zcomp * chi_z_val[nu_offset + g]);
             }
         }
