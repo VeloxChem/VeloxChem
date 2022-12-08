@@ -43,7 +43,6 @@
 #include "NewFunctionalParser.hpp"
 #include "XCFuncType.hpp"
 #include "XCFunctional.hpp"
-#include "XCIntegrator.hpp"
 #include "XCNewFunctional.hpp"
 #include "XCNewIntegrator.hpp"
 #include "XCNewMolecularGradient.hpp"
@@ -52,31 +51,6 @@ namespace py = pybind11;
 using namespace py::literals;
 
 namespace vlx_dft {  // vlx_dft namespace
-
-static double
-integrate_pdft(const CXCIntegrator&       self,
-               const CAODensityMatrix&    aoDensityMatrix,
-               const py::array_t<double>& Active2DM,
-               const py::array_t<double>& ActiveMOs,
-               const CMolecule&           molecule,
-               const CMolecularBasis&     basis,
-               const CMolecularGrid&      molecularGrid,
-               const std::string&         xcFuncLabel)
-{
-    auto nActive = Active2DM.shape(0);
-
-    auto Tensor_2DM = vlx_math::CDense4DTensor_from_numpy(Active2DM);
-
-    auto ptr_Active2DM = Tensor_2DM->values();
-
-    auto Dense_active2DM = vlx_math::CDenseMatrix_from_numpy(ActiveMOs);
-
-    auto ptr_ActiveMOs = Dense_active2DM->values();
-
-    auto xcene = self.integratePdft(aoDensityMatrix, ptr_Active2DM, ptr_ActiveMOs, nActive, molecule, basis, molecularGrid, xcFuncLabel);
-
-    return xcene;
-}
 
 static double
 integrate_vxc_pdft(const CXCNewIntegrator&       self,
@@ -374,12 +348,6 @@ export_dft(py::module& m)
              &CGridDriver::setLevel,
              "Sets accuracy level for grid generation. Level: 1-6, where 1 is coarse grid, 5 is ultrafine grid, 6 special benchmarking grid.",
              "gridLevel"_a);
-
-    // CXCIntegrator class
-
-    PyClass<CXCIntegrator>(m, "XCIntegrator")
-        .def(py::init(&vlx_general::create<CXCIntegrator>), "comm"_a = py::none())
-        .def("integrate_pdft", &integrate_pdft);
 
     // CXCNewIntegrator class
 

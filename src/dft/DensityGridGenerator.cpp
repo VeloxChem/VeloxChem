@@ -31,6 +31,8 @@
 
 #include "DenseLinearAlgebra.hpp"
 
+#include <iostream>
+
 namespace dengridgen {  // dengridgen namespace
 
 void
@@ -635,27 +637,18 @@ generatePairDensityForGGA(double*             rho,
         for (int32_t i = 0; i < n_active; i++)
         {
             auto MOi = MOs_on_grid.row(i);
-            auto MOiX = MOs_on_gridX.row(i);
-            auto MOiY = MOs_on_gridY.row(i);
-            auto MOiZ = MOs_on_gridZ.row(i);
 
             for (int32_t j = 0; j < n_active; j++)
             {
                 auto ij = i * n_active + j;
 
                 auto MOj = MOs_on_grid.row(j);
-                auto MOjX = MOs_on_gridX.row(j);
-                auto MOjY = MOs_on_gridY.row(j);
-                auto MOjZ = MOs_on_gridZ.row(j);
 
                 for (int32_t k = 0; k < n_active; k++)
                 {
                     auto ijk = ij * n_active + k;
 
                     auto MOk = MOs_on_grid.row(k);
-                    auto MOkX = MOs_on_gridX.row(k);
-                    auto MOkY = MOs_on_gridY.row(k);
-                    auto MOkZ = MOs_on_gridZ.row(k);
 
                     for (int32_t l = 0; l < n_active; l++)
                     {
@@ -668,26 +661,16 @@ generatePairDensityForGGA(double*             rho,
                         auto MOlY = MOs_on_gridY.row(l);
                         auto MOlZ = MOs_on_gridZ.row(l);
 
-                        #pragma omp simd aligned(rho, rhograd, MOi, MOj, MOk, MOl : VLX_ALIGN)
+                        #pragma omp simd aligned(rho, rhograd, MOi, MOj, MOk, MOl, MOlX, MOlY, MOlZ: VLX_ALIGN)
                         for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                         {
                             rho[2 * g + 1] += twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOl[g];
 
-                            rhograd[6 * g + 3] += twoDM_ijkl * (MOiX[g] * MOj[g] * MOk[g] * MOl[g] +
-                                                                MOi[g] * MOjX[g] * MOk[g] * MOl[g] +
-                                                                MOi[g] * MOj[g] * MOkX[g] * MOl[g] +
-                                                                MOi[g] * MOj[g] * MOk[g] * MOlX[g]);
+                            rhograd[6 * g + 3] += 4 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlX[g];
 
-                            rhograd[6 * g + 4] += twoDM_ijkl * (MOiY[g] * MOj[g] * MOk[g] * MOl[g] +
-                                                                MOi[g] * MOjY[g] * MOk[g] * MOl[g] +
-                                                                MOi[g] * MOj[g] * MOkY[g] * MOl[g] +
-                                                                MOi[g] * MOj[g] * MOk[g] * MOlY[g]);
+                            rhograd[6 * g + 4] += 4 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlY[g];
 
-                            rhograd[6 * g + 5] += twoDM_ijkl * (MOiZ[g] * MOj[g] * MOk[g] * MOl[g] +
-                                                                MOi[g] * MOjZ[g] * MOk[g] * MOl[g] +
-                                                                MOi[g] * MOj[g] * MOkZ[g] * MOl[g] +
-                                                                MOi[g] * MOj[g] * MOk[g] * MOlZ[g]);
-
+                            rhograd[6 * g + 5] += 4 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlZ[g];
                         }
                     }
                 }

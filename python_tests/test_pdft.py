@@ -33,10 +33,10 @@ class TestPDFT:
         molgrid = grid_drv.generate(molecule)
 
         xcfun = parse_xc_func(func)
-        xc_drv_new = XCNewIntegrator()
+        xc_drv = XCNewIntegrator()
         molgrid_new = MolecularGrid(molgrid)
         molgrid_new.partition_grid_points()
-        vxc_mat = xc_drv_new.integrate_vxc_fock(molecule, basis, scfdrv.density,
+        vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, scfdrv.density,
                                                 molgrid_new,
                                                 xcfun.get_func_label())
 
@@ -63,8 +63,7 @@ class TestPDFT:
             mo_act = None
         mo_act = comm.bcast(mo_act, root=mpi_master())
 
-        xc_drv = XCIntegrator()
-        pdft_ene = xc_drv.integrate_pdft(den_mat, D2act, mo_act.T.copy(),
+        pdft_ene = xc_drv.integrate_vxc_pdft(den_mat, D2act, mo_act.T.copy(),
                                          molecule, basis, molgrid,
                                          xcfun.get_func_label())
 
