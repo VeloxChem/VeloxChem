@@ -73,10 +73,11 @@ CAODensityMatrix getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
  @param nAOs the number of indices in full matrix.
  @return the sub matrix.
  */
-CDenseMatrix getSubMatrix_column_slicing(const CDenseMatrix&         denseMatrix,
+CDenseMatrix getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
                                          const std::vector<int32_t>& aoIndices,
                                          const int32_t               aoCount,
                                          const int32_t               nAOs);
+
 /**
  Distributes partial Vxc matrix to full AO Kohn-Sham matrix.
 

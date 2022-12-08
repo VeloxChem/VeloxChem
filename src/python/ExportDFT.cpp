@@ -53,16 +53,15 @@ using namespace py::literals;
 namespace vlx_dft {  // vlx_dft namespace
 
 static double
-integrate_vxc_pdft(const CXCNewIntegrator&       self,
-               const CAODensityMatrix&    aoDensityMatrix,
-               const py::array_t<double>& Active2DM,
-               const py::array_t<double>& ActiveMOs,
-               const CMolecule&           molecule,
-               const CMolecularBasis&     basis,
-               CMolecularGrid&      molecularGrid,
-               const std::string&         xcFuncLabel)
+integrate_vxc_pdft(const CXCNewIntegrator&    self,
+                   const CAODensityMatrix&    aoDensityMatrix,
+                   const py::array_t<double>& Active2DM,
+                   const py::array_t<double>& ActiveMOs,
+                   const CMolecule&           molecule,
+                   const CMolecularBasis&     basis,
+                   CMolecularGrid&            molecularGrid,
+                   const std::string&         xcFuncLabel)
 {
-
     // Active2DM
 
     // check dimension
@@ -83,27 +82,23 @@ integrate_vxc_pdft(const CXCNewIntegrator&       self,
 
     auto nActive = static_cast<int32_t>(Active2DM.shape(0));
 
-    auto same_size = Active2DM.shape(0) == Active2DM.shape(1);
-
-    same_size &= Active2DM.shape(0) == Active2DM.shape(2);
-
-    same_size &= Active2DM.shape(0) == Active2DM.shape(3);
+    bool same_size = ((Active2DM.shape(0) == Active2DM.shape(1)) &&
+                      (Active2DM.shape(0) == Active2DM.shape(2)) &&
+                      (Active2DM.shape(0) == Active2DM.shape(3)));
 
     std::string errsizes("integrate_vxc_pdft, Active2DM: Expecting 4 identical dimensions");
 
     errors::assertMsgCritical(same_size, errsizes);
 
-    std::vector<double> vec(Active2DM.size());
+    std::vector<double> vec(Active2DM.data(), Active2DM.data() + Active2DM.size());
 
-    std::memcpy(vec.data(), Active2DM.data(), Active2DM.size() * sizeof(double));
-
-    auto Tensor_2DM = CDense4DTensor(vec, nActive, nActive, nActive, nActive);
+    CDense4DTensor Tensor_2DM(vec, nActive, nActive, nActive, nActive);
 
     // active MO
 
     // Check dimensions
 
-    errdim ="integrate_vxc_pdft, ActiveMOs: Expecting a 2D numpy array";
+    errdim = "integrate_vxc_pdft, ActiveMOs: Expecting a 2D numpy array";
 
     errors::assertMsgCritical(ActiveMOs.ndim() == 2, errdim);
 
@@ -117,22 +112,19 @@ integrate_vxc_pdft(const CXCNewIntegrator&       self,
 
     auto naos = ActiveMOs.shape(1);
 
-    std::vector<double> vec2(ActiveMOs.size());
+    std::vector<double> vec2(ActiveMOs.data(), ActiveMOs.data() + ActiveMOs.size());
 
-    std::memcpy(vec2.data(), ActiveMOs.data(), ActiveMOs.size() * sizeof(double));
-
-    auto Dense_activeMO = CDenseMatrix(vec2, nActive, naos);
+    CDenseMatrix Dense_activeMO(vec2, nActive, naos);
 
     CAOKohnShamMatrix mat_Vxc(naos, naos, true);
 
     mat_Vxc.zero();
 
-    auto TwoBodyGradient = CDense4DTensor(naos, nActive, nActive, nActive);
+    CDense4DTensor TwoBodyGradient(naos, nActive, nActive, nActive);
 
     TwoBodyGradient.zero();
 
-    self.integrateVxcPDFT(mat_Vxc, TwoBodyGradient, molecule, basis,
-                          aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
+    self.integrateVxcPDFT(mat_Vxc, TwoBodyGradient, molecule, basis, aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
 
     auto xcene = mat_Vxc.getExchangeCorrelationEnergy();
 

@@ -26,12 +26,12 @@
 #ifndef Dense4DTensor_hpp
 #define Dense4DTensor_hpp
 
+#include <mpi.h>
+
 #include <cstdint>
 #include <ostream>
 #include <string>
 #include <vector>
-
-#include <mpi.h>
 
 #include "MemBlock.hpp"
 #include "MpiFunc.hpp"
@@ -40,6 +40,8 @@
 /**
  Class CDense4DTensor stores 4D tensor in coordinate format (zero-based
  indexing scheme).
+
+ @author M. Delcey
  */
 class CDense4DTensor
 {
@@ -83,11 +85,7 @@ class CDense4DTensor
      @param kIndex the dimension of the third index.
      @param lIndex the dimension of the fourth index.
      */
-    CDense4DTensor(const std::vector<double>& values,
-                 const int32_t              iIndex,
-                 const int32_t              jIndex,
-                 const int32_t              kIndex,
-                 const int32_t              lIndex);
+    CDense4DTensor(const std::vector<double>& values, const int32_t iIndex, const int32_t jIndex, const int32_t kIndex, const int32_t lIndex);
 
     /**
      Creates an empty tensor object with specific dimensions.
@@ -97,11 +95,8 @@ class CDense4DTensor
      @param kIndex the dimension of the third index.
      @param lIndex the dimension of the fourth index.
      */
-    CDense4DTensor(const int32_t iIndex,
-                 const int32_t              jIndex,
-                 const int32_t              kIndex,
-                 const int32_t              lIndex);
-    
+    CDense4DTensor(const int32_t iIndex, const int32_t jIndex, const int32_t kIndex, const int32_t lIndex);
+
     /**
      Creates an empty tensor object with all dimensions identical.
 

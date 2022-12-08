@@ -214,7 +214,7 @@ class CXCNewIntegrator
      @param moTwoBodyGradient the MO Two-body energy gradient term.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param densityMatrix the AO density matrix object.
+     @param DensityMatrix the AO density matrix object.
      @param TwoBodyDensityMatrix the MO two-body active density matrix.
      @param ActiveMOs the active molecular orbitals.
      @param molecularGrid the molecular grid.
@@ -227,7 +227,7 @@ class CXCNewIntegrator
                                   const CAODensityMatrix& DensityMatrix,
                                   const CDense4DTensor&   TwoBodyDensityMatrix,
                                   const CDenseMatrix&     ActiveMOs,
-                                  CMolecularGrid&         molecularGrid,
+                                  const CMolecularGrid&   molecularGrid,
                                   const CXCNewFunctional& fvxc) const;
 
     /**
@@ -238,7 +238,7 @@ class CXCNewIntegrator
      @param moTwoBodyGradient the MO Two-body energy gradient term.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param densityMatrix the AO density matrix object.
+     @param DensityMatrix the AO density matrix object.
      @param TwoBodyDensityMatrix the MO two-body active density matrix.
      @param ActiveMOs the active molecular orbitals.
      @param molecularGrid the molecular grid.
@@ -251,7 +251,7 @@ class CXCNewIntegrator
                                   const CAODensityMatrix& DensityMatrix,
                                   const CDense4DTensor&   TwoBodyDensityMatrix,
                                   const CDenseMatrix&     ActiveMOs,
-                                  CMolecularGrid&         molecularGrid,
+                                  const CMolecularGrid&   molecularGrid,
                                   const CXCNewFunctional& fvxc) const;
 
     /**
@@ -540,6 +540,7 @@ class CXCNewIntegrator
                           const CDenseMatrix&     ActiveMOs,
                           CMolecularGrid&         molecularGrid,
                           const std::string&      xcFuncLabel) const;
+
     /**
      Computes GTOs values on grid points.
 

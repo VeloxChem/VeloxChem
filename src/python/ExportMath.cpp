@@ -23,6 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "ExportMath.hpp"
+
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
@@ -40,12 +42,8 @@
 #include <lapacke.h>
 #endif
 
-#include "DenseMatrix.hpp"
-#include "Dense4DTensor.hpp"
-#include "DenseMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
 #include "MathConst.hpp"
 #include "StringFormat.hpp"
 
@@ -129,25 +127,17 @@ CDense4DTensor_from_numpy(const py::array_t<double>& arr)
 
     auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
 
-    auto f_style = py::detail::check_flags(arr.ptr(), py::array::f_style);
-
     errors::assertMsgCritical(c_style, errsrc);
 
     // create CDense4DTensor from numpy array
 
     std::vector<double> vec(arr.size());
 
-    if (c_style)
-    {
-        std::memcpy(vec.data(), arr.data(), arr.size() * sizeof(double));
-    }
+    std::memcpy(vec.data(), arr.data(), arr.size() * sizeof(double));
 
     int32_t iIndex = static_cast<int32_t>(arr.shape(0));
-
     int32_t jIndex = static_cast<int32_t>(arr.shape(1));
-
     int32_t kIndex = static_cast<int32_t>(arr.shape(2));
-
     int32_t lIndex = static_cast<int32_t>(arr.shape(3));
 
     return std::make_shared<CDense4DTensor>(vec, iIndex, jIndex, kIndex, lIndex);

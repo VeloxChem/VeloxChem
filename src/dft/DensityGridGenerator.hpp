@@ -131,14 +131,13 @@ void generateDensityForGGA(double*             rho,
  @param twoBodyDensityMatrix the MO two-body density matrix.
  @param timer the timer.
  */
-void
-generatePairDensityForLDA(double*               rho,
-                          const int32_t         npoints,
-                          const CDenseMatrix&   gtoValues,
-                          const CDenseMatrix&   densityMatrix,
-                          const CDenseMatrix&   activeMOs,
-                          const CDense4DTensor& twoBodyDensityMatrix,
-                          CMultiTimer&          timer);
+void generatePairDensityForLDA(double*               rho,
+                               const int32_t         npoints,
+                               const CDenseMatrix&   gtoValues,
+                               const CDenseMatrix&   densityMatrix,
+                               const CDenseMatrix&   activeMOs,
+                               const CDense4DTensor& twoBodyDensityMatrix,
+                               CMultiTimer&          timer);
 
 /**
  Generates density and on-top pair-density for GGA.
@@ -157,19 +156,18 @@ generatePairDensityForLDA(double*               rho,
  @param timer the timer.
  */
 
-void
-generatePairDensityForGGA(double*             rho,
-                          double*             rhograd,
-                          double*             sigma,
-                          const int32_t       npoints,
-                          const CDenseMatrix& gtoValues,
-                          const CDenseMatrix& gtoValuesX,
-                          const CDenseMatrix& gtoValuesY,
-                          const CDenseMatrix& gtoValuesZ,
-                          const CDenseMatrix& densityMatrix,
-                          const CDenseMatrix&   activeMOs,
-                          const CDense4DTensor& twoBodyDensityMatrix,
-                          CMultiTimer&        timer);
+void generatePairDensityForGGA(double*               rho,
+                               double*               rhograd,
+                               double*               sigma,
+                               const int32_t         npoints,
+                               const CDenseMatrix&   gtoValues,
+                               const CDenseMatrix&   gtoValuesX,
+                               const CDenseMatrix&   gtoValuesY,
+                               const CDenseMatrix&   gtoValuesZ,
+                               const CDenseMatrix&   densityMatrix,
+                               const CDenseMatrix&   activeMOs,
+                               const CDense4DTensor& twoBodyDensityMatrix,
+                               CMultiTimer&          timer);
 
 /**
  Generates density grid (single density matrix) for LDA.

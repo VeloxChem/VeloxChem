@@ -183,7 +183,7 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&          aoFockMatrix,
+CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
                                    CDense4DTensor&         moTwoBodyGradient,
                                    const CMolecule&        molecule,
                                    const CMolecularBasis&  basis,
@@ -193,7 +193,6 @@ CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&          aoFockMatrix,
                                    CMolecularGrid&         molecularGrid,
                                    const std::string&      xcFuncLabel) const
 {
-
     molecularGrid.partitionGridPoints();
 
     molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
@@ -204,15 +203,17 @@ CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&          aoFockMatrix,
 
     if (xcfuntype == xcfun::lda)
     {
-       _integrateVxcPDFTForLDA(aoFockMatrix, moTwoBodyGradient, molecule, basis, DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
+        _integrateVxcPDFTForLDA(aoFockMatrix, moTwoBodyGradient, molecule, basis,
+                                DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
     }
     else if (xcfuntype == xcfun::gga)
     {
-       _integrateVxcPDFTForGGA(aoFockMatrix, moTwoBodyGradient, molecule, basis, DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
+        _integrateVxcPDFTForGGA(aoFockMatrix, moTwoBodyGradient, molecule, basis,
+                                DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
     }
     else
     {
-        std::string errxcfuntype("XCNewIntegrator.integrateVxcFock: Only implemented for LDA/GGA");
+        std::string errxcfuntype("XCNewIntegrator.integrateVxcPDFT: Only implemented for LDA/GGA");
 
         errors::assertMsgCritical(false, errxcfuntype);
     }
@@ -1956,15 +1957,15 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatrix,
-                                   CDense4DTensor&         moTwoBodyGradient,
-                                   const CMolecule&        molecule,
-                                   const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& DensityMatrix,
-                                   const CDense4DTensor&   TwoBodyDensityMatrix,
-                                   const CDenseMatrix&     ActiveMOs,
-                                   CMolecularGrid&         molecularGrid,
-                                   const CXCNewFunctional& xcFunctional) const
+CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&      aoFockMatrix,
+                                          CDense4DTensor&         moTwoBodyGradient,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& DensityMatrix,
+                                          const CDense4DTensor&   TwoBodyDensityMatrix,
+                                          const CDenseMatrix&     ActiveMOs,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCNewFunctional& xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2009,7 +2010,6 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatr
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
@@ -2017,7 +2017,6 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatr
     auto rho = rho_data.data();
 
     auto exc = exc_data.data();
-
     auto vrho = vrho_data.data();
 
     // initial values for XC energy and number of electrons
@@ -2027,11 +2026,8 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatr
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
-
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -2132,7 +2128,7 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatr
 
         auto sub_dens_mat_a = submat::getSubDensityMatrix(DensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto sub_ActiveMOs = submat::getSubMatrix_column_slicing(ActiveMOs, aoinds, aocount, naos);
+        auto sub_ActiveMOs = submat::getSubMatrixByColumnSlicing(ActiveMOs, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2144,7 +2140,7 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatr
 
         timer.start("XC functional eval.");
 
-        //MGD can I use my own functionals?
+        // TODO (MGD) implement and use own functional
         xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
         timer.stop("XC functional eval.");
@@ -2157,12 +2153,13 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatr
 
         gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
 
-        // MGD screen?
+        // TODO (MGD) screening
+
         timer.stop("Density screening");
 
         auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
 
-        // MGD 2-body gradient
+        // TODO (MGD) 2-body gradient
 
         // distribute partial Vxc to full Kohn-Sham matrix
 
@@ -2197,19 +2194,18 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatr
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
-
 }
 
 void
-CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatrix,
-                                   CDense4DTensor&         moTwoBodyGradient,
-                                   const CMolecule&        molecule,
-                                   const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& DensityMatrix,
-                                   const CDense4DTensor&   TwoBodyDensityMatrix,
-                                   const CDenseMatrix&     ActiveMOs,
-                                   CMolecularGrid&         molecularGrid,
-                                   const CXCNewFunctional& xcFunctional) const
+CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&      aoFockMatrix,
+                                          CDense4DTensor&         moTwoBodyGradient,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& DensityMatrix,
+                                          const CDense4DTensor&   TwoBodyDensityMatrix,
+                                          const CDenseMatrix&     ActiveMOs,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCNewFunctional& xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2236,9 +2232,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
     CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
@@ -2258,29 +2252,21 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
-
     auto rhograd = rhograd_data.data();
-
     auto sigma = sigma_data.data();
 
     auto exc = exc_data.data();
-
     auto vrho = vrho_data.data();
-
     auto vsigma = vsigma_data.data();
 
     // initial values for XC energy and number of electrons
@@ -2290,11 +2276,8 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
-
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -2361,9 +2344,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
             auto gaos_nu = gaos.data(nu);
 
             auto gaox_nu = gaox.data(nu);
-
             auto gaoy_nu = gaoy.data(nu);
-
             auto gaoz_nu = gaoz.data(nu);
 
             for (int32_t g = 0; g < npoints; g++)
@@ -2390,9 +2371,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
         CDenseMatrix mat_chi(aocount, npoints);
 
         CDenseMatrix mat_chi_x(aocount, npoints);
-
         CDenseMatrix mat_chi_y(aocount, npoints);
-
         CDenseMatrix mat_chi_z(aocount, npoints);
 
         for (int32_t i = 0; i < aocount; i++)
@@ -2400,9 +2379,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
         }
 
@@ -2416,7 +2393,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
 
         auto sub_dens_mat_a = submat::getSubDensityMatrix(DensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto sub_ActiveMOs = submat::getSubMatrix_column_slicing(ActiveMOs, aoinds, aocount, naos);
+        auto sub_ActiveMOs = submat::getSubMatrixByColumnSlicing(ActiveMOs, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2428,7 +2405,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
 
         timer.start("XC functional eval.");
 
-        //MGD can I use my own functionals?
+        // TODO (MGD) implement and use own functionals
         xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
         timer.stop("XC functional eval.");
@@ -2441,13 +2418,14 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
 
         gridscreen::screenVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
 
-        // MGD screen?
+        // TODO (MGD) screening
+
         timer.stop("Density screening");
 
         auto partial_mat_Vxc = _integratePartialVxcFockForGGA(
                 npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer);
 
-        // MGD 2-body gradient
+        // TODO (MGD) 2-body gradient
 
         // distribute partial Vxc to full Kohn-Sham matrix
 
@@ -2482,10 +2460,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&          aoFockMatr
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
-
 }
-
-
 
 CDenseMatrix
 CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t          npoints,

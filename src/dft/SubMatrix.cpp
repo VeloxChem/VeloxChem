@@ -64,14 +64,14 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
 }
 
 CDenseMatrix
-getSubMatrix_column_slicing(const CDenseMatrix&     denseMatrix,
-                    const std::vector<int32_t>& aoIndices,
-                    const int32_t               aoCount,
-                    const int32_t               nAOs)
+getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
+                            const std::vector<int32_t>& aoIndices,
+                            const int32_t               aoCount,
+                            const int32_t               nAOs)
 {
     auto nrows = denseMatrix.getNumberOfRows();
 
-    if (aoCount <= nAOs && nrows > 0)
+    if ((aoCount <= nAOs) && (nrows > 0))
     {
         CDenseMatrix sub_matrix(nrows, aoCount);
 

@@ -25,11 +25,11 @@
 
 #include "Dense4DTensor.hpp"
 
+#include <mpi.h>
+
 #include <cmath>
 #include <sstream>
 #include <utility>
-
-#include <mpi.h>
 
 #include "StringFormat.hpp"
 
@@ -46,10 +46,10 @@ CDense4DTensor::CDense4DTensor()
 }
 
 CDense4DTensor::CDense4DTensor(const std::vector<double>& values,
-                           const int32_t              iIndex,
-                           const int32_t              jIndex,
-                           const int32_t              kIndex,
-                           const int32_t              lIndex)
+                               const int32_t              iIndex,
+                               const int32_t              jIndex,
+                               const int32_t              kIndex,
+                               const int32_t              lIndex)
 
     : _iIndex(iIndex)
 
@@ -63,10 +63,7 @@ CDense4DTensor::CDense4DTensor(const std::vector<double>& values,
 {
 }
 
-CDense4DTensor::CDense4DTensor(const int32_t              iIndex,
-                           const int32_t              jIndex,
-                           const int32_t              kIndex,
-                           const int32_t              lIndex)
+CDense4DTensor::CDense4DTensor(const int32_t iIndex, const int32_t jIndex, const int32_t kIndex, const int32_t lIndex)
 
     : _iIndex(iIndex)
 
@@ -232,7 +229,6 @@ CDense4DTensor::values()
     return _values.data();
 }
 
-
 std::string
 CDense4DTensor::getString() const
 {
@@ -240,14 +236,16 @@ CDense4DTensor::getString() const
 
     auto vals = _values.data();
 
-    sst << "[Dimension " << _iIndex << " x " << _jIndex << " x " << _kIndex << " x " << _lIndex  <<"]\n";
+    sst << "[Dimension " << _iIndex << " x " << _jIndex << " x " << _kIndex << " x " << _lIndex << "]\n";
 
     for (int32_t i = 0; i < _iIndex; i++)
     {
         for (int32_t j = 0; j < _jIndex; j++)
         {
-            sst << i <<" " <<j <<"\n";
-            int32_t ij = (i * _jIndex +j) * _kIndex * _lIndex;
+            sst << i << " " << j << "\n";
+
+            int32_t ij = (i * _jIndex + j) * _kIndex * _lIndex;
+
             for (int32_t k = 0; k < _kIndex; k++)
             {
                 for (int32_t l = 0; l < _lIndex; l++)
@@ -258,7 +256,6 @@ CDense4DTensor::getString() const
             }
             sst << "\n";
         }
-
         sst << "\n";
     }
 

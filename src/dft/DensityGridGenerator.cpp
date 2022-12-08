@@ -446,10 +446,7 @@ generatePairDensityForLDA(double*               rho,
         #pragma omp simd aligned(rho : VLX_ALIGN)
         for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
-            // rho_alpha
             rho[2 * g + 0] = 0.0;
-
-            // rho_beta
             rho[2 * g + 1] = 0.0;
         }
 
@@ -462,7 +459,6 @@ generatePairDensityForLDA(double*               rho,
             #pragma omp simd aligned(rho, F_val, chi_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-                // rho_alpha
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
             }
         }
@@ -503,7 +499,8 @@ generatePairDensityForLDA(double*               rho,
             }
         }
 
-        //Translate
+        // Translate
+
         for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
             auto density = rho[2 * g + 0];
@@ -514,7 +511,7 @@ generatePairDensityForLDA(double*               rho,
 
             if (ontop_pair_density < 0)
             {
-                delta = sqrt( -2.0 * ontop_pair_density);
+                delta = sqrt(-2.0 * ontop_pair_density);
             }
 
             rho[2 * g + 0] = 0.5 * (density + delta);
@@ -527,18 +524,18 @@ generatePairDensityForLDA(double*               rho,
 }
 
 void
-generatePairDensityForGGA(double*             rho,
-                          double*             rhograd,
-                          double*             sigma,
-                          const int32_t       npoints,
-                          const CDenseMatrix& gtoValues,
-                          const CDenseMatrix& gtoValuesX,
-                          const CDenseMatrix& gtoValuesY,
-                          const CDenseMatrix& gtoValuesZ,
-                          const CDenseMatrix& densityMatrix,
+generatePairDensityForGGA(double*               rho,
+                          double*               rhograd,
+                          double*               sigma,
+                          const int32_t         npoints,
+                          const CDenseMatrix&   gtoValues,
+                          const CDenseMatrix&   gtoValuesX,
+                          const CDenseMatrix&   gtoValuesY,
+                          const CDenseMatrix&   gtoValuesZ,
+                          const CDenseMatrix&   densityMatrix,
                           const CDenseMatrix&   activeMOs,
                           const CDense4DTensor& twoBodyDensityMatrix,
-                          CMultiTimer&        timer)
+                          CMultiTimer&          timer)
 {
     // eq.(26), JCTC 2021, 17, 1512-1521
 
@@ -553,9 +550,7 @@ generatePairDensityForGGA(double*             rho,
     auto MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
 
     auto MOs_on_gridX = denblas::multAB(activeMOs, gtoValuesX);
-
     auto MOs_on_gridY = denblas::multAB(activeMOs, gtoValuesY);
-
     auto MOs_on_gridZ = denblas::multAB(activeMOs, gtoValuesZ);
 
     timer.stop("Density grid matmul");
@@ -575,9 +570,7 @@ generatePairDensityForGGA(double*             rho,
     auto chi_val = gtoValues.values();
 
     auto chi_x_val = gtoValuesX.values();
-
     auto chi_y_val = gtoValuesY.values();
-
     auto chi_z_val = gtoValuesZ.values();
 
     auto twoDM = twoBodyDensityMatrix.values();
@@ -593,26 +586,18 @@ generatePairDensityForGGA(double*             rho,
         #pragma omp simd aligned(rho, rhograd : VLX_ALIGN)
         for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
-            // rho_a
             rho[2 * g + 0] = 0.0;
-
-            // rho_b
             rho[2 * g + 1] = 0.0;
 
-            // rho_a_grad
             rhograd[6 * g + 0] = 0.0;
-
             rhograd[6 * g + 1] = 0.0;
-
             rhograd[6 * g + 2] = 0.0;
-
-            // rho_b_grad
             rhograd[6 * g + 3] = 0.0;
-
             rhograd[6 * g + 4] = 0.0;
-
             rhograd[6 * g + 5] = 0.0;
         }
+
+        // Density
 
         for (int32_t nu = 0; nu < naos; nu++)
         {
@@ -621,19 +606,16 @@ generatePairDensityForGGA(double*             rho,
             #pragma omp simd aligned(rho, rhograd, F_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-                // rho_a
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
 
-                // rho_a_grad
                 rhograd[6 * g + 0] += 2.0 * F_val[nu_offset + g] * chi_x_val[nu_offset + g];
-
                 rhograd[6 * g + 1] += 2.0 * F_val[nu_offset + g] * chi_y_val[nu_offset + g];
-
                 rhograd[6 * g + 2] += 2.0 * F_val[nu_offset + g] * chi_z_val[nu_offset + g];
             }
         }
 
         // Pair density
+
         for (int32_t i = 0; i < n_active; i++)
         {
             auto MOi = MOs_on_grid.row(i);
@@ -657,6 +639,7 @@ generatePairDensityForGGA(double*             rho,
                         auto twoDM_ijkl = twoDM[ijkl];
 
                         auto MOl = MOs_on_grid.row(l);
+
                         auto MOlX = MOs_on_gridX.row(l);
                         auto MOlY = MOs_on_gridY.row(l);
                         auto MOlZ = MOs_on_gridZ.row(l);
@@ -666,18 +649,17 @@ generatePairDensityForGGA(double*             rho,
                         {
                             rho[2 * g + 1] += twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOl[g];
 
-                            rhograd[6 * g + 3] += 4 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlX[g];
-
-                            rhograd[6 * g + 4] += 4 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlY[g];
-
-                            rhograd[6 * g + 5] += 4 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlZ[g];
+                            rhograd[6 * g + 3] += 4.0 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlX[g];
+                            rhograd[6 * g + 4] += 4.0 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlY[g];
+                            rhograd[6 * g + 5] += 4.0 * twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOlZ[g];
                         }
                     }
                 }
             }
         }
 
-        //Translate using the approximate formula from Li Manni 2014
+        // Translate using the approximate formula from Li Manni 2014
+
         for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
             auto density = rho[2 * g + 0];
@@ -696,24 +678,23 @@ generatePairDensityForGGA(double*             rho,
 
             if (ontop_pair_density < 0)
             {
-                delta = sqrt( -2.0 * ontop_pair_density);
+                delta = sqrt(-2.0 * ontop_pair_density);
             }
 
             rho[2 * g + 0] = 0.5 * (density + delta);
-
             rho[2 * g + 1] = 0.5 * (density - delta);
 
             if (density > 1.0e-8)
             {
                 auto reduced_delta = delta/density;
 
-                rhograd[6 * g + 0] = 0.5 * densityX * ( 1 + reduced_delta);
-                rhograd[6 * g + 1] = 0.5 * densityY * ( 1 + reduced_delta);
-                rhograd[6 * g + 2] = 0.5 * densityZ * ( 1 + reduced_delta);
+                rhograd[6 * g + 0] = 0.5 * densityX * (1.0 + reduced_delta);
+                rhograd[6 * g + 1] = 0.5 * densityY * (1.0 + reduced_delta);
+                rhograd[6 * g + 2] = 0.5 * densityZ * (1.0 + reduced_delta);
 
-                rhograd[6 * g + 3] = 0.5 * densityX * ( 1 - reduced_delta);
-                rhograd[6 * g + 4] = 0.5 * densityY * ( 1 - reduced_delta);
-                rhograd[6 * g + 5] = 0.5 * densityZ * ( 1 - reduced_delta);
+                rhograd[6 * g + 3] = 0.5 * densityX * (1.0 - reduced_delta);
+                rhograd[6 * g + 4] = 0.5 * densityY * (1.0 - reduced_delta);
+                rhograd[6 * g + 5] = 0.5 * densityZ * (1.0 - reduced_delta);
             }
         }
 
@@ -722,7 +703,6 @@ generatePairDensityForGGA(double*             rho,
             #pragma omp simd aligned(rhograd, sigma : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-                // simga_aa, sigma_ab, sigma_bb
                 sigma[3 * g + 0] = rhograd[6 * g + 0] * rhograd[6 * g + 0] +
                                    rhograd[6 * g + 1] * rhograd[6 * g + 1] +
                                    rhograd[6 * g + 2] * rhograd[6 * g + 2];
@@ -740,8 +720,6 @@ generatePairDensityForGGA(double*             rho,
 
     timer.stop("Density grid rho");
 }
-
-
 
 CDensityGrid
 generateDensityGridForLDA(const int32_t       npoints,
