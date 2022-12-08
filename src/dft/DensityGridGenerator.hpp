@@ -28,6 +28,7 @@
 
 #include "AODensityMatrix.hpp"
 #include "DenseLinearAlgebra.hpp"
+#include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
 #include "MultiTimer.hpp"
@@ -118,6 +119,26 @@ void generateDensityForGGA(double*             rho,
                            const CDenseMatrix& densityMatrixAlpha,
                            const CDenseMatrix& densityMatrixBeta,
                            CMultiTimer&        timer);
+
+/**
+ Generates density and on-top pair-density for LDA.
+
+ @param rho the pointer to density.
+ @param npoints the number of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param densityMatrix the total density matrix.
+ @param activeMOs the MO coefficients.
+ @param twoBodyDensityMatrix the MO two-body density matrix.
+ @param timer the timer.
+ */
+void
+generatePairDensityForLDA(double*               rho,
+                          const int32_t         npoints,
+                          const CDenseMatrix&   gtoValues,
+                          const CDenseMatrix&   densityMatrix,
+                          const CDenseMatrix&   activeMOs,
+                          const CDense4DTensor& twoBodyDensityMatrix,
+                          CMultiTimer&          timer);
 
 /**
  Generates density grid (single density matrix) for LDA.

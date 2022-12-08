@@ -397,6 +397,134 @@ generateDensityForGGA(double*             rho,
     timer.stop("Density grid rho");
 }
 
+
+void
+generatePairDensityForLDA(double*               rho,
+                          const int32_t         npoints,
+                          const CDenseMatrix&   gtoValues,
+                          const CDenseMatrix&   densityMatrix,
+                          const CDenseMatrix&   activeMOs,
+                          const CDense4DTensor& twoBodyDensityMatrix,
+                          CMultiTimer&          timer)
+{
+    // eq.(26), JCTC 2021, 17, 1512-1521
+
+    timer.start("Density grid matmul");
+
+    auto mat_F = denblas::multAB(densityMatrix, gtoValues);
+
+    auto MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+
+    timer.stop("Density grid matmul");
+
+    // eq.(27), JCTC 2021, 17, 1512-1521
+
+    timer.start("Density grid rho");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    auto n_active = activeMOs.getNumberOfRows();
+
+    auto nthreads = omp_get_max_threads();
+
+    auto F_val = mat_F.values();
+
+    auto chi_val = gtoValues.values();
+
+    auto twoDM = twoBodyDensityMatrix.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        #pragma omp simd aligned(rho : VLX_ALIGN)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            // rho_alpha
+            rho[2 * g + 0] = 0.0;
+
+            // rho_beta
+            rho[2 * g + 1] = 0.0;
+        }
+
+        // Density
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(rho, F_val, chi_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                // rho_alpha
+                rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+            }
+        }
+
+        // Pair density
+
+        for (int32_t i = 0; i < n_active; i++)
+        {
+            auto MOi = MOs_on_grid.row(i);
+
+            for (int32_t j = 0; j < n_active; j++)
+            {
+                auto ij = i * n_active + j;
+
+                auto MOj = MOs_on_grid.row(j);
+
+                for (int32_t k = 0; k < n_active; k++)
+                {
+                    auto ijk = ij * n_active + k;
+
+                    auto MOk = MOs_on_grid.row(k);
+
+                    for (int32_t l = 0; l < n_active; l++)
+                    {
+                        auto ijkl = ijk * n_active + l;
+
+                        auto twoDM_ijkl = twoDM[ijkl];
+
+                        auto MOl = MOs_on_grid.row(l);
+
+                        #pragma omp simd aligned(rho, MOi, MOj, MOk, MOl : VLX_ALIGN)
+                        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                        {
+                            rho[2 * g + 1] += twoDM_ijkl * MOi[g] * MOj[g] * MOk[g] * MOl[g];
+                        }
+                    }
+                }
+            }
+        }
+
+        //Translate
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            auto density = rho[2 * g + 0];
+
+            auto ontop_pair_density = rho[2 * g + 1];
+
+            double delta = 0.0;
+
+            if (ontop_pair_density < 0)
+            {
+                delta = sqrt( -2.0 * ontop_pair_density);
+            }
+
+            rho[2 * g + 0] = 0.5 * (density + delta);
+
+            rho[2 * g + 1] = 0.5 * (density - delta);
+        }
+    }
+
+    timer.stop("Density grid rho");
+}
+
+
 CDensityGrid
 generateDensityGridForLDA(const int32_t       npoints,
                           const CDenseMatrix& gtoValues,

@@ -2129,100 +2129,19 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&          aoFockMatr
 
         if (aocount == 0) continue;
 
-        // generate sub density matrix
+        // generate sub density matrix and MO coefficients
 
         timer.start("Density matrix slicing");
 
         auto sub_dens_mat_a = submat::getSubDensityMatrix(DensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        // Slice MO coefficients
-
-        CDenseMatrix sub_ActiveMOs;
-
-        if (aocount < naos && n_active > 0)
-        {
-            sub_ActiveMOs = CDenseMatrix(n_active, aocount);
-
-            auto mos = ActiveMOs.values();
-
-            for (int32_t i = 0; i < n_active; i++)
-            {
-                auto sub_mat_row = sub_ActiveMOs.row(i);
-
-                auto dens_row = mos + i * naos;
-
-                for (int32_t j = 0; j < aocount; j++)
-                {
-                    sub_mat_row[j] = dens_row[aoinds[j]];
-                }
-            }
-        }
-        else
-        {
-            sub_ActiveMOs = ActiveMOs;
-        }
+        auto sub_ActiveMOs = submat::getSubMatrix_column_slicing(ActiveMOs, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
-        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, timer);
+        // generate density and on-top pair density on the grid
 
-        // MGD generate pair-density grid
-        auto MOs_on_grid = denblas::multAB(sub_ActiveMOs, mat_chi);
-
-        auto twoDM = TwoBodyDensityMatrix.values();
-
-        for (int32_t igrid = 0; igrid < npoints; igrid++)
-        {
-            rho[2*igrid+1] = 0.0;
-        }
-
-        for (int32_t i = 0; i < n_active; i++)
-        {
-            auto MOi = MOs_on_grid.row(i);
-
-            for (int32_t j = 0; j < n_active; j++)
-            {
-                auto ij = i * n_active + j;
-
-                auto MOj = MOs_on_grid.row(j);
-
-                for (int32_t k = 0; k < n_active; k++)
-                {
-                    auto ijk = ij * n_active + k;
-
-                    auto MOk = MOs_on_grid.row(k);
-
-                    for (int32_t l = 0; l < n_active; l++)
-                    {
-                        auto ijkl = ijk * n_active + l;
-
-                        auto twoDM_ijkl = twoDM[ijkl];
-
-                        auto MOl = MOs_on_grid.row(l);
-
-                        for (int32_t igrid = 0; igrid < npoints; igrid++)
-                        {
-                            rho[2*igrid+1] += twoDM_ijkl * MOi[igrid] * MOj[igrid] * MOk[igrid] * MOl[igrid];
-                        }
-                    }
-                }
-            }
-        }
-
-        // Translate
-        for (int32_t igrid = 0; igrid < npoints; igrid++)
-        {
-            auto density = rho[2*igrid+0];
-            auto ontop_pair_density = rho[2*igrid+1];
-
-            double delta = 0.0;
-            if (ontop_pair_density < 0)
-            {
-                delta = sqrt( -2.0 * ontop_pair_density);
-            }
-            rho[2*igrid+0] = 0.5 * (density + delta);
-            rho[2*igrid+1] = 0.5 * (density - delta);
-        }
+        dengridgen::generatePairDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, sub_ActiveMOs, TwoBodyDensityMatrix, timer);
 
         // compute exchange-correlation functional derivative
 
