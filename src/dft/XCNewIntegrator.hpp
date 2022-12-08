@@ -231,6 +231,30 @@ class CXCNewIntegrator
                                   const CXCNewFunctional& fvxc) const;
 
     /**
+     Integrates first-order GGA pair-density functional contribution to
+     AO Kohn-Sham matrix and MO "Q-matrix".
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param moTwoBodyGradient the MO Two-body energy gradient term.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix object.
+     @param TwoBodyDensityMatrix the MO two-body active density matrix.
+     @param ActiveMOs the active molecular orbitals.
+     @param molecularGrid the molecular grid.
+     @param fvxc the exchange-correlation functional.
+     */
+     void _integrateVxcPDFTForGGA(CAOKohnShamMatrix&      aoFockMatrix,
+                                  CDense4DTensor&         moTwoBodyGradient,
+                                  const CMolecule&        molecule,
+                                  const CMolecularBasis&  basis,
+                                  const CAODensityMatrix& DensityMatrix,
+                                  const CDense4DTensor&   TwoBodyDensityMatrix,
+                                  const CDenseMatrix&     ActiveMOs,
+                                  CMolecularGrid&         molecularGrid,
+                                  const CXCNewFunctional& fvxc) const;
+
+    /**
      Integrates LDA contribution to (first-order) Vxc matrix.
 
      @param npoints the number of grid points.

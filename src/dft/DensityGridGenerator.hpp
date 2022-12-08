@@ -141,6 +141,37 @@ generatePairDensityForLDA(double*               rho,
                           CMultiTimer&          timer);
 
 /**
+ Generates density and on-top pair-density for GGA.
+
+ @param rho the pointer to density.
+ @param rhograd the pointer to density gradient.
+ @param sigma the pointer to dot product of density gradient.
+ @param npoints the number of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param gtoValuesX the GTO X derivative values on grid points.
+ @param gtoValuesY the GTO Y derivative values on grid points.
+ @param gtoValuesZ the GTO Z derivative values on grid points.
+ @param densityMatrix the total density matrix.
+ @param activeMOs the MO coefficients.
+ @param twoBodyDensityMatrix the MO two-body density matrix.
+ @param timer the timer.
+ */
+
+void
+generatePairDensityForGGA(double*             rho,
+                          double*             rhograd,
+                          double*             sigma,
+                          const int32_t       npoints,
+                          const CDenseMatrix& gtoValues,
+                          const CDenseMatrix& gtoValuesX,
+                          const CDenseMatrix& gtoValuesY,
+                          const CDenseMatrix& gtoValuesZ,
+                          const CDenseMatrix& densityMatrix,
+                          const CDenseMatrix&   activeMOs,
+                          const CDense4DTensor& twoBodyDensityMatrix,
+                          CMultiTimer&        timer);
+
+/**
  Generates density grid (single density matrix) for LDA.
 
  @param npoints the number of grid points.
