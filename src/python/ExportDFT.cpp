@@ -147,7 +147,7 @@ integrate_vxc_pdft(const CXCNewIntegrator&       self,
 
     std::memcpy(vec2.data(), ActiveMOs.data(), ActiveMOs.size() * sizeof(double));
 
-    auto Dense_activeMO = CDenseMatrix(vec2, naos, nActive);
+    auto Dense_activeMO = CDenseMatrix(vec2, nActive, naos);
 
     CAOKohnShamMatrix mat_Vxc(naos, naos, true);
 
