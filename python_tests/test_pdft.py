@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import (GridDriver, MolecularGrid, XCIntegrator,
-                                    XCNewIntegrator)
+from veloxchem.veloxchemlib import (GridDriver, MolecularGrid, XCNewIntegrator)
 from veloxchem.veloxchemlib import parse_xc_func, is_single_node
 from veloxchem.veloxchemlib import denmat, mpi_master
 from veloxchem.molecule import Molecule
