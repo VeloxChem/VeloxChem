@@ -13,7 +13,7 @@ from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import parse_xc_func
-from .veloxchemlib import GridDriver, XCMolecularGradient
+from .veloxchemlib import GridDriver, XCNewMolecularGradient
 from .cphfsolver import CphfSolver
 from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
@@ -292,7 +292,7 @@ class PolarizabilityGradient():
         mol_grid = grid_drv.generate(molecule)
         mol_grid.distribute(self.rank, self.nodes, self.comm)
 
-        xcgrad_drv = XCMolecularGradient(self.comm)
+        xcgrad_drv = XCNewMolecularGradient(self.comm)
         polgrad_xcgrad = xcgrad_drv.integrate_tddft_gradient(
             rhow_den, xmy_den, gs_density, molecule, ao_basis, mol_grid,
             xcfun_label)
