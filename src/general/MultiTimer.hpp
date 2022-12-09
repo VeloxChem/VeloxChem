@@ -55,11 +55,6 @@ class CMultiTimer
     CMultiTimer();
 
     /**
-     Destroys a timer object.
-     */
-    ~CMultiTimer();
-
-    /**
      Clears the multi-timer.
      */
     void clear();

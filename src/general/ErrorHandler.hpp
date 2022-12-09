@@ -30,16 +30,45 @@
 
 namespace errors {  // errors namespace
 
-/**
- * Prints message and aborts.
+namespace detail {
+/** Print message with header to `std::cerr`.
+ *
+ * @param[in] message message to print.
+ * @param[in] header title of message.
+ *
+ * A call like `msg("hello", "Log");` results in the following printout:
+ *
+ *    **** Log (process 1) ****
+ *         hello
  */
-void msgCritical(const std::string& message);
+auto msg(const std::string& message, const std::string& header) -> void;
+}  // namespace detail
 
-/**
- Prints message and aborts in case of a critical error.
+/** Prints message to `std::cerr` and aborts.
+ *
+ * @param[in] message what to print.
  */
-void assertMsgCritical(const bool condition, const std::string& message);
+auto msgCritical(const std::string& message) -> void;
 
+/** Prints message and aborts in case of a critical error.
+ *
+ * @param[in] condition what to check.
+ * @param[in] message what to print.
+ */
+auto assertMsgCritical(const bool condition, const std::string& message) -> void;
+
+/** Prints warning message to `std::cerr`.
+ *
+ * @param[in] message what to print.
+ */
+auto msgWarning(const std::string& message) -> void;
+
+/** Prints warning message if `condition` is not fulfilled.
+ *
+ * @param[in] condition what to check.
+ * @param[in] message what to print.
+ */
+auto assertMsgWarning(const bool condition, const std::string& message) -> void;
 }  // namespace errors
 
 #endif /* ErrorHandler_hpp */

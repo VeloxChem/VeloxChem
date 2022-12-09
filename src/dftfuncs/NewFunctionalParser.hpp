@@ -23,35 +23,32 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "XCIntegratorTest.hpp"
+#ifndef NewFunctionalParser_hpp
+#define NewFunctionalParser_hpp
 
-#include <mpi.h>
+#include <string>
+#include <vector>
 
-#include "GridDriver.hpp"
-#include "XCIntegrator.hpp"
-#include "MoleculeSetter.hpp"
-#include "AOFockMatrix.hpp"
-#include "MolecularBasisSetter.hpp"
-#include "AODensityMatrixSetter.hpp"
-#include "DenseLinearAlgebra.hpp"
+#include "XCNewFunctional.hpp"
 
-TEST_F(CXCIntegratorTest, IntegrateKohnSham)
-{
-    CGridDriver gdrv(MPI_COMM_WORLD);
-    
-    gdrv.setLevel(6);
-    
-    auto mh2o = vlxmol::getMoleculeH2O();
-    
-    auto mgrid = gdrv.generate(mh2o);
-    
-    auto mbas = vlxbas::getMolecularBasisForH2O();
-    
-    auto dmat = vlxden::getRestDensityMatrixForH2O();
-    
-    CXCIntegrator xcdrv(MPI_COMM_WORLD);
-    
-    auto ksmat = xcdrv.integrate(dmat, mh2o, mbas, mgrid, std::string("LYP"));
-    
-    ASSERT_NEAR(ksmat.getNumberOfElectrons(), 10.0, 1.0e-6);
-}
+namespace newvxcfuncs {  // newvxcfuncs namespace
+
+/**
+ Gets labels of available exchange-correlation functional.
+
+ @return a vector of labels of available exchange-correlation functionals.
+ */
+std::vector<std::string> getAvailableFunctionals();
+
+/**
+ Converts exchange-correlation functional label to exchange-correlation
+ functional object.
+
+ @param xcLabel the label of exchange-correlation functional.
+ @return the exchange-correlation functional object.
+ */
+CXCNewFunctional getExchangeCorrelationFunctional(const std::string &xcLabel);
+
+}  // namespace newvxcfuncs
+
+#endif /* NewFunctionalParser_hpp */

@@ -34,13 +34,9 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import GridDriver
-from .veloxchemlib import XCIntegrator, XCNewIntegrator
-from .veloxchemlib import MolecularGrid
+from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
-from .veloxchemlib import molorb
+from .veloxchemlib import denmat, fockmat, molorb
 from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
@@ -985,11 +981,11 @@ class LinearSolver:
 
         # calculate Fxc on DFT nodes
         if dft_comm:
-            xc_drv = XCIntegrator(local_comm)
-            molgrid.distribute(local_comm.Get_rank(), local_comm.Get_size(),
-                               local_comm)
-            xc_drv.integrate(fock, dens, gs_density, molecule, basis, molgrid,
-                             self.xcfun.get_func_label())
+            xc_drv = XCNewIntegrator(local_comm)
+            molgrid.re_distribute_counts_and_displacements(
+                local_comm.Get_rank(), local_comm.Get_size(), local_comm)
+            xc_drv.integrate_fxc_fock(fock, molecule, basis, dens, gs_density,
+                                      molgrid, self.xcfun.get_func_label())
 
         # calculate e_pe and V_pe on PE nodes
         if pe_comm:

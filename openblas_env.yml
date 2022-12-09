@@ -12,6 +12,8 @@ dependencies:
   - numpy
   - h5py
   - pip
+  - setuptools
+  - wheel
   - pybind11-global
   - python>=3.7
   - psutil
@@ -24,3 +26,4 @@ dependencies:
   - cppe
   - xtb
   - geometric
+  - libxc

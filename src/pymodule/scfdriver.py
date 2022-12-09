@@ -37,11 +37,8 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import GridDriver
-from .veloxchemlib import MolecularGrid
-from .veloxchemlib import XCIntegrator, XCNewIntegrator
-from .veloxchemlib import AOKohnShamMatrix
-from .veloxchemlib import DenseMatrix
+from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
+from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb, xcfun
@@ -1379,8 +1376,7 @@ class ScfDriver:
                 if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
-            if (self.scf_type == 'restricted' and
-                    self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]):
+            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
                 xc_drv = XCNewIntegrator(self.comm)
                 self._mol_grid.partition_grid_points()
                 self._mol_grid.distribute_counts_and_displacements(
@@ -1389,11 +1385,9 @@ class ScfDriver:
                                                     self._mol_grid,
                                                     self.xcfun.get_func_label())
             else:
-                xc_drv = XCIntegrator(self.comm)
-                self._mol_grid.distribute(self.rank, self.nodes, self.comm)
-                vxc_mat = xc_drv.integrate(den_mat, molecule, basis,
-                                           self._mol_grid,
-                                           self.xcfun.get_func_label())
+                assert_msg_critical(
+                    False, 'SCF driver: Unsupported XC functional type')
+
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
         else:
             vxc_mat = None
@@ -1511,11 +1505,12 @@ class ScfDriver:
 
         # calculate Vxc on DFT nodes
         if dft_comm:
-            xc_drv = XCIntegrator(local_comm)
-            self._mol_grid.distribute(local_comm.Get_rank(),
-                                      local_comm.Get_size(), local_comm)
-            vxc_mat = xc_drv.integrate(den_mat, molecule, basis, self._mol_grid,
-                                       self.xcfun.get_func_label())
+            xc_drv = XCNewIntegrator(local_comm)
+            self._mol_grid.re_distribute_counts_and_displacements(
+                local_comm.Get_rank(), local_comm.Get_size(), local_comm)
+            vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
+                                                self._mol_grid,
+                                                self.xcfun.get_func_label())
             vxc_mat.reduce_sum(local_comm.Get_rank(), local_comm.Get_size(),
                                local_comm)
         else:

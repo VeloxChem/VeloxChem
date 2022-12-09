@@ -26,7 +26,7 @@
 default:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-0a3283e
+  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f3fb247
   interruptible: true
 
 workflow:
@@ -82,7 +82,7 @@ monkey:cmake_build:
         -GNinja
         -DCMAKE_CXX_COMPILER=mpiicpc
         -DVLX_LA_VENDOR=MKL
-    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target utests -- -v -d stats
+    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib utests -- -v -d stats
   artifacts:
     paths:
       - build

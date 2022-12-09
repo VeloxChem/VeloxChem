@@ -34,14 +34,12 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
-from .veloxchemlib import DensityGridDriver
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import DispersionModel
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCNewIntegrator
 
 # C++ functions

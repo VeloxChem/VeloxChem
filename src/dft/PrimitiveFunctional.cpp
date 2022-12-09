@@ -24,7 +24,18 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "PrimitiveFunctional.hpp"
-#include <iostream>
+
+#include <xc.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <cstring>
+#include <iomanip>
+#include <sstream>
+#include <string>
+
+#include "ErrorHandler.hpp"
+#include "MemAlloc.hpp"
 
 CPrimitiveFunctional::CPrimitiveFunctional()
 
@@ -86,7 +97,6 @@ CPrimitiveFunctional::CPrimitiveFunctional(const std::string&                   
 
     , _bThirdOrderFunction(bThirdOrderFunction)
 {
-    
 }
 
 CPrimitiveFunctional::CPrimitiveFunctional(const CPrimitiveFunctional& source)
@@ -113,7 +123,6 @@ CPrimitiveFunctional::CPrimitiveFunctional(const CPrimitiveFunctional& source)
 
     , _bThirdOrderFunction(source._bThirdOrderFunction)
 {
-    
 }
 
 CPrimitiveFunctional::CPrimitiveFunctional(CPrimitiveFunctional&& source) noexcept
@@ -140,7 +149,6 @@ CPrimitiveFunctional::CPrimitiveFunctional(CPrimitiveFunctional&& source) noexce
 
     , _bThirdOrderFunction(std::move(source._bThirdOrderFunction))
 {
-    
 }
 
 CPrimitiveFunctional::~CPrimitiveFunctional()
@@ -155,23 +163,23 @@ CPrimitiveFunctional::operator=(const CPrimitiveFunctional& source)
     _label = source._label;
 
     _xcFuncType = source._xcFuncType;
-    
+
     _abFirstOrderFunction = source._abFirstOrderFunction;
-    
+
     _aFirstOrderFunction = source._aFirstOrderFunction;
-    
+
     _bFirstOrderFunction = source._bFirstOrderFunction;
-    
+
     _abSecondOrderFunction = source._abSecondOrderFunction;
-    
+
     _aSecondOrderFunction = source._aSecondOrderFunction;
-    
+
     _bSecondOrderFunction = source._bSecondOrderFunction;
 
     _abThirdOrderFunction = source._abThirdOrderFunction;
-    
+
     _aThirdOrderFunction = source._aThirdOrderFunction;
-    
+
     _bThirdOrderFunction = source._bThirdOrderFunction;
 
     return *this;
@@ -185,23 +193,23 @@ CPrimitiveFunctional::operator=(CPrimitiveFunctional&& source) noexcept
     _label = std::move(source._label);
 
     _xcFuncType = std::move(source._xcFuncType);
-    
+
     _abFirstOrderFunction = std::move(source._abFirstOrderFunction);
-    
+
     _aFirstOrderFunction = std::move(source._aFirstOrderFunction);
-    
+
     _bFirstOrderFunction = std::move(source._bFirstOrderFunction);
-    
+
     _abSecondOrderFunction = std::move(source._abSecondOrderFunction);
-    
+
     _aSecondOrderFunction = std::move(source._aSecondOrderFunction);
-    
+
     _bSecondOrderFunction = std::move(source._bSecondOrderFunction);
 
     _abThirdOrderFunction = std::move(source._abThirdOrderFunction);
-    
+
     _aThirdOrderFunction = std::move(source._aThirdOrderFunction);
-    
+
     _bThirdOrderFunction = std::move(source._bThirdOrderFunction);
 
     return *this;
@@ -213,7 +221,7 @@ CPrimitiveFunctional::operator==(const CPrimitiveFunctional& other) const
     if (this == &other) return true;
 
     if (_label != other._label) return false;
-    
+
     if (_xcFuncType != other._xcFuncType) return false;
 
     return true;
@@ -226,39 +234,32 @@ CPrimitiveFunctional::operator!=(const CPrimitiveFunctional& other) const
 }
 
 void
-CPrimitiveFunctional::compute(      CXCGradientGrid& xcGradientGrid,
-                              const double           factor,
-                              const CDensityGrid&    densityGrid) const
+CPrimitiveFunctional::compute(CXCGradientGrid& xcGradientGrid, const double factor, const CDensityGrid& densityGrid) const
 {
     if (densityGrid.getDensityGridType() == dengrid::ab) _abFirstOrderFunction(xcGradientGrid, factor, densityGrid);
-    
+
     if (densityGrid.getDensityGridType() == dengrid::lima) _aFirstOrderFunction(xcGradientGrid, factor, densityGrid);
-    
+
     if (densityGrid.getDensityGridType() == dengrid::limb) _bFirstOrderFunction(xcGradientGrid, factor, densityGrid);
 }
 
 void
-CPrimitiveFunctional::compute(      CXCHessianGrid& xcHessianGrid,
-                              const double          factor,
-                              const CDensityGrid&   densityGrid) const
+CPrimitiveFunctional::compute(CXCHessianGrid& xcHessianGrid, const double factor, const CDensityGrid& densityGrid) const
 {
     if (densityGrid.getDensityGridType() == dengrid::ab) _abSecondOrderFunction(xcHessianGrid, factor, densityGrid);
-    
+
     if (densityGrid.getDensityGridType() == dengrid::lima) _aSecondOrderFunction(xcHessianGrid, factor, densityGrid);
-    
+
     if (densityGrid.getDensityGridType() == dengrid::limb) _bSecondOrderFunction(xcHessianGrid, factor, densityGrid);
 }
 
 void
-CPrimitiveFunctional::compute(      CXCCubicHessianGrid& xcCubicHessianGrid,
-                              const double          factor,
-                              const CDensityGrid&   densityGrid) const
+CPrimitiveFunctional::compute(CXCCubicHessianGrid& xcCubicHessianGrid, const double factor, const CDensityGrid& densityGrid) const
 {
-
     if (densityGrid.getDensityGridType() == dengrid::ab) _abThirdOrderFunction(xcCubicHessianGrid, factor, densityGrid);
-    
+
     if (densityGrid.getDensityGridType() == dengrid::lima) _aThirdOrderFunction(xcCubicHessianGrid, factor, densityGrid);
-    
+
     if (densityGrid.getDensityGridType() == dengrid::limb) _bThirdOrderFunction(xcCubicHessianGrid, factor, densityGrid);
 }
 
@@ -274,7 +275,6 @@ CPrimitiveFunctional::getFunctionalType() const
     return _xcFuncType;
 }
 
-
 std::ostream&
 operator<<(std::ostream& output, const CPrimitiveFunctional& source)
 {
@@ -283,13 +283,13 @@ operator<<(std::ostream& output, const CPrimitiveFunctional& source)
     output << "[CPrimitiveFunctional (Object):" << &source << "]" << std::endl;
 
     output << "_label: " << source._label << std::endl;
-    
+
     output << "_xcFuncType:" << to_string(source._xcFuncType);
 
     output << "_abFirstOrderFunction: " << &(source._abFirstOrderFunction) << std::endl;
-    
+
     output << "_aFirstOrderFunction: " << &(source._aFirstOrderFunction) << std::endl;
-    
+
     output << "_bFirstOrderFunction: " << &(source._bFirstOrderFunction) << std::endl;
 
     return output;

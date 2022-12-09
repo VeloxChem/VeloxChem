@@ -38,10 +38,6 @@ CGridPartitioner::CGridPartitioner(const CGridBox& box, const int32_t numGridPoi
     _boxes.push_back(box);
 }
 
-CGridPartitioner::~CGridPartitioner()
-{
-}
-
 void
 CGridPartitioner::partitionGridPoints()
 {

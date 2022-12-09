@@ -78,219 +78,6 @@ class CDensityGridDriver
     execmode _runMode;
 
     /**
-     Creates density grid on each MPI node within domain of MPI communicator.
-     Density grid points are generated using only CPUs.
-
-     @param densityGrid the density grid object.
-     @param aoDensityMatrix the AO density matrices.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param molecularGrid the distributed molecular grid.
-     @param xcFunctional the exchange-correlation functional type.
-     */
-    void _genDensityGridOnCPU(CDensityGrid&           densityGrid,
-                              const CAODensityMatrix& aoDensityMatrix,
-                              const CMolecule&        molecule,
-                              const CMolecularBasis&  basis,
-                              const CMolecularGrid&   molecularGrid,
-                              const xcfun             xcFunctional);
-
-    /**
-     Creates density grid for spin-restricted LDA case.
-
-     @param densityGrid the density grid object.
-     @param aoDensityMatrix the AO density matrices.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param molecularGrid the distributed molecular grid.
-     */
-    void _genRestrictedDensityForLda(CDensityGrid&           densityGrid,
-                                     const CAODensityMatrix& aoDensityMatrix,
-                                     const CMolecule&        molecule,
-                                     const CMolecularBasis&  basis,
-                                     const CMolecularGrid&   molecularGrid) const;
-
-    /**
-     Creates density grid for spin-unrestricted LDA case.
-
-     @param densityGrid the density grid object.
-     @param aoDensityMatrix the AO density matrices.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param molecularGrid the distributed molecular grid.
-     */
-    void _genUnrestrictedDensityForLda(CDensityGrid&           densityGrid,
-                                       const CAODensityMatrix& aoDensityMatrix,
-                                       const CMolecule&        molecule,
-                                       const CMolecularBasis&  basis,
-                                       const CMolecularGrid&   molecularGrid) const;
-
-    /**
-      Creates density grid for spin-restricted GGA case.
-
-      @param densityGrid the density grid object.
-      @param aoDensityMatrix the AO density matrices.
-      @param molecule the molecule.
-      @param basis the molecular basis.
-      @param molecularGrid the distributed molecular grid.
-      */
-    void _genRestrictedDensityForGga(CDensityGrid&           densityGrid,
-                                     const CAODensityMatrix& aoDensityMatrix,
-                                     const CMolecule&        molecule,
-                                     const CMolecularBasis&  basis,
-                                     const CMolecularGrid&   molecularGrid) const;
-
-    /**
-   Creates density grid for spin-restricted GGA case.
-
-   @param densityGrid the density grid object.
-   @param aoDensityMatrix the AO density matrices.
-   @param molecule the molecule.
-   @param basis the molecular basis.
-   @param molecularGrid the distributed molecular grid.
-   */
-    void _genRestrictedDensityForMgga(CDensityGrid&           densityGrid,
-                                      const CAODensityMatrix& aoDensityMatrix,
-                                      const CMolecule&        molecule,
-                                      const CMolecularBasis&  basis,
-                                      const CMolecularGrid&   molecularGrid) const;
-
-    /**
-       Creates density grid for spin-restricted GGA case.
-
-       @param densityGrid the density grid object.
-       @param aoDensityMatrix the AO density matrices.
-       @param molecule the molecule.
-       @param basis the molecular basis.
-       @param molecularGrid the distributed molecular grid.
-       */
-    void _genUnrestrictedDensityForGga(CDensityGrid&           densityGrid,
-                                       const CAODensityMatrix& aoDensityMatrix,
-                                       const CMolecule&        molecule,
-                                       const CMolecularBasis&  basis,
-                                       const CMolecularGrid&   molecularGrid) const;
-
-    /**
-      Generates batch of spin restricted density grid points for LDA case.
-
-     @param densityGrid the pointer to density grid object.
-     @param aoDensityMatrix the AO density matrix.
-     @param gtoContainer the GTOs container.
-     @param gridCoordinatesX the vector of Cartesian X coordinates of grid
-     points.
-     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid
-     points.
-     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid
-     points.
-     @param gridOffset the batch offset in vector grid points.
-     @param nGridPoints the number of grid points in batch.
-     */
-    void _genBatchOfRestrictedDensityGridPointsForLda(CDensityGrid*           densityGrid,
-                                                      const CAODensityMatrix* aoDensityMatrix,
-                                                      const CGtoContainer*    gtoContainer,
-                                                      const double*           gridCoordinatesX,
-                                                      const double*           gridCoordinatesY,
-                                                      const double*           gridCoordinatesZ,
-                                                      const int32_t           gridOffset,
-                                                      const int32_t           nGridPoints) const;
-
-    /**
-     Generates batch of spin-unrestricted density grid points for LDA case.
-
-     @param densityGrid the pointer to density grid object.
-     @param aoDensityMatrix the AO density matrix.
-     @param gtoContainer the GTOs container.
-     @param gridCoordinatesX the vector of Cartesian X coordinates of grid
-     points.
-     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid
-     points.
-     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid
-     points.
-     @param gridOffset the batch offset in vector grid points.
-     @param nGridPoints the number of grid points in batch.
-     */
-    void _genBatchOfUnrestrictedDensityGridPointsForLda(CDensityGrid*           densityGrid,
-                                                        const CAODensityMatrix* aoDensityMatrix,
-                                                        const CGtoContainer*    gtoContainer,
-                                                        const double*           gridCoordinatesX,
-                                                        const double*           gridCoordinatesY,
-                                                        const double*           gridCoordinatesZ,
-                                                        const int32_t           gridOffset,
-                                                        const int32_t           nGridPoints) const;
-
-    /**
-     Generates batch of spin restricted density grid points for GGA case.
-
-     @param densityGrid the pointer to density grid object.
-     @param aoDensityMatrix the AO density matrix.
-     @param gtoContainer the GTOs container.
-     @param gridCoordinatesX the vector of Cartesian X coordinates of grid
-     points.
-     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid
-     points.
-     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid
-     points.
-     @param gridOffset the batch offset in vector grid points.
-     @param nGridPoints the number of grid points in batch.
-     */
-    void _genBatchOfRestrictedDensityGridPointsForGga(CDensityGrid*           densityGrid,
-                                                      const CAODensityMatrix* aoDensityMatrix,
-                                                      const CGtoContainer*    gtoContainer,
-                                                      const double*           gridCoordinatesX,
-                                                      const double*           gridCoordinatesY,
-                                                      const double*           gridCoordinatesZ,
-                                                      const int32_t           gridOffset,
-                                                      const int32_t           nGridPoints) const;
-
-    /**
-     Generates batch of spin restricted density grid points for MGGA case.
-
-     @param densityGrid the pointer to density grid object.
-     @param aoDensityMatrix the AO density matrix.
-     @param gtoContainer the GTOs container.
-     @param gridCoordinatesX the vector of Cartesian X coordinates of grid
-     points.
-     @param gridCoordinatesY the vector of Cartesian Y coordinates of grid
-     points.
-     @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid
-     points.
-     @param gridOffset the batch offset in vector grid points.
-     @param nGridPoints the number of grid points in batch.
-     */
-    void _genBatchOfRestrictedDensityGridPointsForMgga(CDensityGrid*           densityGrid,
-                                                       const CAODensityMatrix* aoDensityMatrix,
-                                                       const CGtoContainer*    gtoContainer,
-                                                       const double*           gridCoordinatesX,
-                                                       const double*           gridCoordinatesY,
-                                                       const double*           gridCoordinatesZ,
-                                                       const int32_t           gridOffset,
-                                                       const int32_t           nGridPoints) const;
-
-    /**
-      Generates batch of spin restricted density grid points for GGA case.
-
-      @param densityGrid the pointer to density grid object.
-      @param aoDensityMatrix the AO density matrix.
-      @param gtoContainer the GTOs container.
-      @param gridCoordinatesX the vector of Cartesian X coordinates of grid
-      points.
-      @param gridCoordinatesY the vector of Cartesian Y coordinates of grid
-      points.
-      @param gridCoordinatesZ the vector of Cartesian Y coordinates of grid
-      points.
-      @param gridOffset the batch offset in vector grid points.
-      @param nGridPoints the number of grid points in batch.
-      */
-    void _genBatchOfUnrestrictedDensityGridPointsForGga(CDensityGrid*           densityGrid,
-                                                        const CAODensityMatrix* aoDensityMatrix,
-                                                        const CGtoContainer*    gtoContainer,
-                                                        const double*           gridCoordinatesX,
-                                                        const double*           gridCoordinatesY,
-                                                        const double*           gridCoordinatesZ,
-                                                        const int32_t           gridOffset,
-                                                        const int32_t           nGridPoints) const;
-
-    /**
      Distributes spin-restriced density values into density grid.
 
      @param densityGrid the pointer to density grid object.
@@ -306,23 +93,6 @@ class CDensityGridDriver
                                             const int32_t              gridOffset,
                                             const int32_t              gridBlockPosition,
                                             const int32_t              nGridPoints) const;
-
-    /**
-     Distributes spin-unrestriced density values into density grid.
-
-     @param densityGrid the pointer to density grid object.
-     @param aoDensityMatrix the AO density matrix.
-     @param gtoValues the GTOs values buffer.
-     @param gridOffset the offset of grid points batch in molecular grid.
-     @param gridBlockPosition the position of grid block in GTOs values grid.
-     @param nGridPoints the number of grid points in grid points batch.
-     */
-    void _distUnrestrictedDensityValuesForLda(CDensityGrid*              densityGrid,
-                                              const CAODensityMatrix*    aoDensityMatrix,
-                                              const CMemBlock2D<double>& gtoValues,
-                                              const int32_t              gridOffset,
-                                              const int32_t              gridBlockPosition,
-                                              const int32_t              nGridPoints) const;
 
     /**
      Distributes spin-restriced density values into density grid.
@@ -348,52 +118,6 @@ class CDensityGridDriver
                                             const int32_t              nGridPoints) const;
 
     /**
-     Distributes spin-restriced density values into density grid.
-
-     @param densityGrid the pointer to density grid object.
-     @param aoDensityMatrix the AO density matrix.
-     @param gtoValues the GTOs values buffer.
-     @param gtoValuesX the GTOs gradient along X axis values buffer.
-     @param gtoValuesY the GTOs gradient along Y axis values buffer.
-     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
-     @param gridOffset the offset of grid points batch in molecular grid.
-     @param gridBlockPosition the position of grid block in GTOs values grid.
-     @param nGridPoints the number of grid points in grid points batch.
-     */
-    void _distRestrictedDensityValuesForMgga(CDensityGrid*              densityGrid,
-                                             const CAODensityMatrix*    aoDensityMatrix,
-                                             const CMemBlock2D<double>& gtoValues,
-                                             const CMemBlock2D<double>& gtoValuesX,
-                                             const CMemBlock2D<double>& gtoValuesY,
-                                             const CMemBlock2D<double>& gtoValuesZ,
-                                             const int32_t              gridOffset,
-                                             const int32_t              gridBlockPosition,
-                                             const int32_t              nGridPoints) const;
-
-    /**
-     Distributes spin-restriced density values into density grid.
-
-     @param densityGrid the pointer to density grid object.
-     @param aoDensityMatrix the AO density matrix.
-     @param gtoValues the GTOs values buffer.
-     @param gtoValuesX the GTOs gradient along X axis values buffer.
-     @param gtoValuesY the GTOs gradient along Y axis values buffer.
-     @param gtoValuesZ the GTOs gradient along Z axis values buffer.
-     @param gridOffset the offset of grid points batch in molecular grid.
-     @param gridBlockPosition the position of grid block in GTOs values grid.
-     @param nGridPoints the number of grid points in grid points batch.
-     */
-    void _distUnrestrictedDensityValuesForGga(CDensityGrid*              densityGrid,
-                                              const CAODensityMatrix*    aoDensityMatrix,
-                                              const CMemBlock2D<double>& gtoValues,
-                                              const CMemBlock2D<double>& gtoValuesX,
-                                              const CMemBlock2D<double>& gtoValuesY,
-                                              const CMemBlock2D<double>& gtoValuesZ,
-                                              const int32_t              gridOffset,
-                                              const int32_t              gridBlockPosition,
-                                              const int32_t              nGridPoints) const;
-
-    /**
      Creates density grid for pair-density LDA case.
 
      @param densityGrid the density grid object.
@@ -401,11 +125,14 @@ class CDensityGridDriver
      @param twoDM the "active" MO two-body density matrix.
      @param activeMOs the active MO coefficients.
      @param nActive the number of active orbitals.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param molecularGrid the distributed molecular grid.
+     @param gtoContainer TODO
+     @param gridCoordinatesX TODO
+     @param gridCoordinatesY TODO
+     @param gridCoordinatesZ TODO
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param nGridPoints the number of grid points in grid points batch.
      */
-    void _genBatchOfPairDensityGridPointsForLda(      CDensityGrid*     densityGrid,
+    void _genBatchOfPairDensityGridPointsForLda(CDensityGrid*           densityGrid,
                                                 const CAODensityMatrix* aoDensityMatrix,
                                                 const double*           twoDM,
                                                 const double*           activeMOs,
@@ -425,11 +152,14 @@ class CDensityGridDriver
      @param twoDM the "active" MO two-body density matrix.
      @param activeMOs the active MO coefficients.
      @param nActive the number of active orbitals.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param molecularGrid the distributed molecular grid.
+     @param gtoContainer TODO
+     @param gridCoordinatesX TODO
+     @param gridCoordinatesY TODO
+     @param gridCoordinatesZ TODO
+     @param gridOffset the offset of grid points batch in molecular grid.
+     @param nGridPoints the number of grid points in grid points batch.
      */
-    void _genBatchOfPairDensityGridPointsForGga(      CDensityGrid*     densityGrid,
+    void _genBatchOfPairDensityGridPointsForGga(CDensityGrid*           densityGrid,
                                                 const CAODensityMatrix* aoDensityMatrix,
                                                 const double*           twoDM,
                                                 const double*           activeMOs,
@@ -449,12 +179,13 @@ class CDensityGridDriver
      @param twoDM the "active" MO two-body density matrix.
      @param activeMOs the active MO coefficients.
      @param nActive the number of active orbitals.
+     @param nAOs TODO
      @param gtoValues the GTOs values buffer.
      @param gridOffset the offset of grid points batch in molecular grid.
      @param gridBlockPosition the position of grid block in GTOs values grid.
      @param nGridPoints the number of grid points in grid points batch.
      */
-    void _distPairDensityValuesForLda(      CDensityGrid*        densityGrid,
+    void _distPairDensityValuesForLda(CDensityGrid*              densityGrid,
                                       const double*              twoDM,
                                       const double*              activeMOs,
                                       const int32_t              nActive,
@@ -472,6 +203,7 @@ class CDensityGridDriver
      @param twoDM the "active" MO two-body density matrix.
      @param activeMOs the active MO coefficients.
      @param nActive the number of active orbitals.
+     @param nAOs TODO
      @param gtoValues the GTOs values buffer.
      @param gtoValuesX the GTOs gradient along X axis values buffer.
      @param gtoValuesY the GTOs gradient along Y axis values buffer.
@@ -480,7 +212,7 @@ class CDensityGridDriver
      @param gridBlockPosition the position of grid block in GTOs values grid.
      @param nGridPoints the number of grid points in grid points batch.
      */
-    void _distPairDensityValuesForGga(      CDensityGrid*        densityGrid,
+    void _distPairDensityValuesForGga(CDensityGrid*              densityGrid,
                                       const double*              twoDM,
                                       const double*              activeMOs,
                                       const int32_t              nActive,
@@ -492,6 +224,7 @@ class CDensityGridDriver
                                       const int32_t              gridOffset,
                                       const int32_t              gridBlockPosition,
                                       const int32_t              nGridPoints) const;
+
     /**
      Gets size of block in grid batch.
 
@@ -506,29 +239,6 @@ class CDensityGridDriver
      @param comm the MPI communicator.
      */
     CDensityGridDriver(MPI_Comm comm);
-
-    /**
-     Destroys a grid driver object.
-     */
-    ~CDensityGridDriver();
-
-    /**
-     Generates partitioned density grid for given molecule and type of
-     exchange-correlation functional. Density grid generation is distributed
-     within domain of MPI communicator.
-
-     @param aoDensityMatrix the AO density matrix.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param molecularGrid the molecular grid.
-     @param xcFunctional the type of exchange-correlation functional.
-     @return the density grid object.
-     */
-    CDensityGrid generate(const CAODensityMatrix& aoDensityMatrix,
-                          const CMolecule&        molecule,
-                          const CMolecularBasis&  basis,
-                          const CMolecularGrid&   molecularGrid,
-                          const xcfun             xcFunctional);
 
     /**
      Generates partitioned density and on-top-pair density grid for given molecule
@@ -553,7 +263,6 @@ class CDensityGridDriver
                                   const CMolecularBasis&  basis,
                                   const CMolecularGrid&   molecularGrid,
                                   const xcfun             xcFunctional);
-
 };
 
 #endif /* DensityGridDriver_hpp */

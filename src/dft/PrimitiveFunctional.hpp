@@ -30,12 +30,15 @@
 #include <functional>
 #include <ostream>
 #include <string>
+#include <tuple>
+#include <vector>
 
+#include "Buffer.hpp"
+#include "DensityGrid.hpp"
+#include "XCCubicHessianGrid.hpp"
 #include "XCFuncType.hpp"
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
-#include "XCCubicHessianGrid.hpp"
-#include "DensityGrid.hpp"
 
 using def_vxc_func_typ = void(CXCGradientGrid&, const double factor, const CDensityGrid&);
 
@@ -48,7 +51,7 @@ using def_vxc3_func_typ = void(CXCCubicHessianGrid&, const double factor, const 
 /**
  Class CPrimitiveFunctional stores information about primitive exchange-correlation functional
  and provides methods to perform actions with stored exchange-correlation functional.
- 
+
  @author Z. Rinkevicius
  */
 class CPrimitiveFunctional
@@ -57,58 +60,58 @@ class CPrimitiveFunctional
      The label of primitive exchange-correlation functional.
      */
     std::string _label;
-    
+
     /**
      The type of primitive exchange-correlation functional.
      */
     xcfun _xcFuncType;
-    
+
     /**
      The functions for computing first derrivatives of primitive exchange-correlation functional for density
      grid of dengrid::ab type.
      */
     std::function<def_vxc_func_typ> _abFirstOrderFunction;
-    
+
     /**
      The functions for computing first derrivatives of primitive exchange-correlation functional for density
      grid of dengrid::lima type.
      */
     std::function<def_vxc_func_typ> _aFirstOrderFunction;
-    
+
     /**
      The functions for computing first derrivatives of primitive exchange-correlation functional for density
      grid of dengrid::limb type.
      */
     std::function<def_vxc_func_typ> _bFirstOrderFunction;
-    
+
     /**
      The functions for computing second derrivatives of primitive exchange-correlation functional for density
      grid of dengrid::ab type.
      */
     std::function<def_vxc2_func_typ> _abSecondOrderFunction;
-    
+
     /**
      The functions for computing second derrivatives of primitive exchange-correlation functional for density
      grid of dengrid::lima type.
      */
     std::function<def_vxc2_func_typ> _aSecondOrderFunction;
-    
+
     /**
      The functions for computing second derrivatives of primitive exchange-correlation functional for density
      grid of dengrid::limb type.
      */
     std::function<def_vxc2_func_typ> _bSecondOrderFunction;
-    
+
     /**
      The functions for computing second derrivatives of primitive exchange-correlation functional for density
      grid of dengrid::ab type.
      */
     std::function<def_vxc3_func_typ> _abThirdOrderFunction;
 
-     /**
-     The functions for computing second derrivatives of primitive exchange-correlation functional for density
-     grid of dengrid::ab type.
-     */
+    /**
+    The functions for computing second derrivatives of primitive exchange-correlation functional for density
+    grid of dengrid::ab type.
+    */
     std::function<def_vxc3_func_typ> _aThirdOrderFunction;
 
     /**
@@ -117,15 +120,15 @@ class CPrimitiveFunctional
      */
     std::function<def_vxc3_func_typ> _bThirdOrderFunction;
 
-public:
+   public:
     /**
      Creates an empty primitive exchange-correlation functional object.
      */
     CPrimitiveFunctional();
-    
+
     /**
      Creates a primitive exchange-correlation functional object.
-     
+
      @param label the label of primitive exchange-correlation functional.
      @param xcFuncType the type of primitive exchange-correlation functional.
      @param abFirstOrderFunction the first-order derivative function (dengrid::ab).
@@ -145,75 +148,75 @@ public:
                          const std::function<def_vxc2_func_typ>& bSecondOrderFunction,
                          const std::function<def_vxc3_func_typ>& abThirdOrderFunction,
                          const std::function<def_vxc3_func_typ>& aThirdOrderFunction,
-                         const std::function<def_vxc3_func_typ>& bThirdOrderFunction); 
+                         const std::function<def_vxc3_func_typ>& bThirdOrderFunction);
 
     /**
      Creates a primitive exchange-correlation functional object by copying other primitive exchange-correlation functional
      object.
-     
+
      @param source the recursion term object.
      */
     CPrimitiveFunctional(const CPrimitiveFunctional& source);
-    
+
     /**
      Creates a primitive exchange-correlation functional object by moving other primitive exchange-correlation functional
      object.
-     
+
      @param source the primitive exchange-correlation functional object.
      */
     CPrimitiveFunctional(CPrimitiveFunctional&& source) noexcept;
-    
+
     /**
      Destroys a primitive exchange-correlation functional object.
      */
     ~CPrimitiveFunctional();
-    
+
     /**
      Assigns a primitive exchange-correlation functional object by copying other primitive exchange-correlation functional
      object.
-     
+
      @param source the primitive exchange-correlation functional object.
      */
     CPrimitiveFunctional& operator=(const CPrimitiveFunctional& source);
-    
+
     /**
      Assigns a primitive exchange-correlation functional object by moving other primitive exchange-correlation functional
      object.
-     
+
      @param source the primitive exchange-correlation functional object.
      */
     CPrimitiveFunctional& operator=(CPrimitiveFunctional&& source) noexcept;
-    
+
     /**
      Compares primitive exchange-correlation functional object with other primitive exchange-correlation functional object.
-     
+
      @param other the primitive exchange-correlation functional object.
      @return true if primitive exchange-correlation functional objects are equal, false otherwise.
      */
     bool operator==(const CPrimitiveFunctional& other) const;
-    
+
     /**
      Compares primitive exchange-correlation functional object with other primitive exchange-correlation functional object.
-     
+
      @param other the primitive exchange-correlation functional object.
      @return true if primitive exchange-correlation functional objects are not equal, false otherwise.
      */
     bool operator!=(const CPrimitiveFunctional& other) const;
-    
+
     /**
      Gets label of primitive exchange-correlation functional.
-     
+
      @return the label.
      */
     std::string getLabel() const;
-    
+
     /**
      Gets type of primitive exchange-correlation functional.
 
      @return the type of exchange-correlation functional.
      */
     xcfun getFunctionalType() const;
-    
+
     /**
      Computes first derivative of exchange-correlation functional for given density grid.
 
@@ -221,35 +224,29 @@ public:
      @param factor the scaling factor of functional contribution.
      @param densityGrid the density grid object.
      */
-    void compute(      CXCGradientGrid& xcGradientGrid,
-                 const double           factor,
-                 const CDensityGrid&    densityGrid) const;
-    
+    void compute(CXCGradientGrid& xcGradientGrid, const double factor, const CDensityGrid& densityGrid) const;
+
     /**
      Computes second derivative of exchange-correlation functional for given density grid.
-     
+
      @param xcHessianGrid the exchange-correlation hessian grid object.
      @param factor the scaling factor of functional contribution.
      @param densityGrid the density grid object.
      */
-    void compute(      CXCHessianGrid& xcHessianGrid,
-                 const double          factor,
-                 const CDensityGrid&   densityGrid) const;
-    
+    void compute(CXCHessianGrid& xcHessianGrid, const double factor, const CDensityGrid& densityGrid) const;
+
     /**
      Computes second derivative of exchange-correlation functional for given density grid.
-     
+
      @param xcCubicHessianGrid the exchange-correlation hessian grid object.
      @param factor the scaling factor of functional contribution.
      @param densityGrid the density grid object.
      */
-    void compute(      CXCCubicHessianGrid& xcCubicHessianGrid,
-                 const double          factor,
-                 const CDensityGrid&   densityGrid) const;
-    
+    void compute(CXCCubicHessianGrid& xcCubicHessianGrid, const double factor, const CDensityGrid& densityGrid) const;
+
     /**
      Converts primitive exchange-correlation functional object to text format and insert it into output text stream.
-     
+
      @param output the output text stream.
      @param source the primitive exchange-correlation functional object.
      */
