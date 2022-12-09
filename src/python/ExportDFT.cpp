@@ -52,7 +52,7 @@ using namespace py::literals;
 
 namespace vlx_dft {  // vlx_dft namespace
 
-static double
+CAOKohnShamMatrix
 integrate_vxc_pdft(const CXCNewIntegrator&    self,
                    const CAODensityMatrix&    aoDensityMatrix,
                    const py::array_t<double>& Active2DM,
@@ -128,7 +128,7 @@ integrate_vxc_pdft(const CXCNewIntegrator&    self,
 
     auto xcene = mat_Vxc.getExchangeCorrelationEnergy();
 
-    return xcene;
+    return mat_Vxc;
 }
 
 // Exports classes/functions in src/dft to python

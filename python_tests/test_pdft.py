@@ -58,13 +58,11 @@ class TestPDFT:
             mo_act = None
         mo_act = scfdrv.comm.bcast(mo_act, root=mpi_master())
 
-        pdft_ene = xc_drv.integrate_vxc_pdft(den_mat, D2act, mo_act.T.copy(),
+        pdft_mat = xc_drv.integrate_vxc_pdft(den_mat, D2act, mo_act.T.copy(),
                                              molecule, basis, molgrid,
                                              xcfun.get_func_label())
-        pdft_ene = scfdrv.comm.reduce(pdft_ene, root=mpi_master())
-
         if scfdrv.rank == mpi_master():
-            return vxc_mat.get_energy(), pdft_ene
+            return vxc_mat.get_energy(), pdft_mat.get_energy()
         else:
             return None, None
 
