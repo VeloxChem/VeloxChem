@@ -569,11 +569,19 @@ class CphfSolver(LinearSolver):
             #dist_trials.data -= dist_trials_proj.data
 
             # b b.T
-            bT_new_trials = np.matmul(old_trials.data, old_trials.data.T)
+            #bT_new_trials = np.matmul(old_trials.data, old_trials.data.T)
+            bT_new = np.matmul(old_trials.data.T, dist_trials.data)
             # (b b.T) t
-            dist_trials_proj = np.matmul(bT_new_trials, dist_trials.data)
+            #dist_trials_proj = np.matmul(bT_new_trials, dist_trials.data)
+
+            #print("Shapes: old trials, new trials      b b.T       b.T n\n", old_trials.data.shape, dist_trials.data.shape, bT_new_trials.shape, bT_new.shape)
+            dist_trials_proj_proper = np.matmul(old_trials.data, bT_new)
+
+            #print("\nHERE\n", dist_trials_proj-dist_trials_proj_proper)
+            #print()
+            #print(dist_trials_proj_proper)
             # t = t - (b b.T) t
-            dist_trials.data -= dist_trials_proj
+            dist_trials.data -= dist_trials_proj_proper
 
 
         # remove linear dependencies and orthonormalize trial vectors
