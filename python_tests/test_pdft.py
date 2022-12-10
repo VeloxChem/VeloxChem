@@ -61,6 +61,8 @@ class TestPDFT:
         pdft_mat = xc_drv.integrate_vxc_pdft(den_mat, D2act, mo_act.T.copy(),
                                              molecule, basis, molgrid,
                                              xcfun.get_func_label())
+        pdft_mat.reduce_sum(scfdrv.rank, scfdrv.nodes, scfdrv.comm)
+
         if scfdrv.rank == mpi_master():
             return vxc_mat.get_energy(), pdft_mat.get_energy()
         else:
