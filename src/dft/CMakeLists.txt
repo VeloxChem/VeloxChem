@@ -27,6 +27,7 @@ target_sources(vlxobjs
     XCNewFunctional.cpp
     XCNewIntegrator.cpp
     XCNewMolecularGradient.cpp
+    XCPairDensityFunctional.cpp
   )
 
 target_include_directories(vlxobjs

@@ -46,6 +46,7 @@
 #include "XCNewFunctional.hpp"
 #include "XCNewIntegrator.hpp"
 #include "XCNewMolecularGradient.hpp"
+#include "XCPairDensityFunctional.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -254,6 +255,32 @@ export_dft(py::module& m)
             "Computes Exc and Vxc for GGA.",
             "rho"_a,
             "sigma"_a);
+
+    // XCPairDensityFunctional class
+    PyClass<CXCPairDensityFunctional>(m, "XCPairDensityFunctional")
+        .def(py::init<const std::vector<std::string>&, const std::vector<double>&>(),
+             "labels"_a,
+             "coeffs"_a)
+        .def(py::init<const CXCPairDensityFunctional&>())
+        .def(py::self == py::self)
+        .def(
+            "compute_exc_vxc_for_plda",
+            [](const CXCPairDensityFunctional& self, const py::array_t<double>& rho) -> py::list {
+                auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc_for_plda: Expecting C-style contiguous numpy array"));
+                auto rho_size = static_cast<int32_t>(rho.size());
+                auto npoints  = rho_size / 2;
+                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_plda: Inconsistent array size"));
+                CDenseMatrix exc(npoints, 1);
+                CDenseMatrix vrho(npoints, 2);
+                self.compute_exc_vxc_for_plda(npoints, rho.data(), exc.values(), vrho.values());
+                py::list ret;
+                ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
+                ret.append(vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfElements()));
+                return ret;
+            },
+            "Computes Exc and Vxc for pair-density LDA.",
+            "rho"_a);
 
     // CMolecularGrid class
 

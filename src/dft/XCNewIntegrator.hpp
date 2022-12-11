@@ -47,6 +47,7 @@
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
 #include "XCNewFunctional.hpp"
+#include "XCPairDensityFunctional.hpp"
 
 /**
  Class CXCNewIntegrator implements XC integrator.
@@ -220,15 +221,15 @@ class CXCNewIntegrator
      @param molecularGrid the molecular grid.
      @param fvxc the exchange-correlation functional.
      */
-     void _integrateVxcPDFTForLDA(CAOKohnShamMatrix&      aoFockMatrix,
-                                  CDense4DTensor&         moTwoBodyGradient,
-                                  const CMolecule&        molecule,
-                                  const CMolecularBasis&  basis,
-                                  const CAODensityMatrix& DensityMatrix,
-                                  const CDense4DTensor&   TwoBodyDensityMatrix,
-                                  const CDenseMatrix&     ActiveMOs,
-                                  const CMolecularGrid&   molecularGrid,
-                                  const CXCNewFunctional& fvxc) const;
+     void _integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
+                                  CDense4DTensor&                 moTwoBodyGradient,
+                                  const CMolecule&                molecule,
+                                  const CMolecularBasis&          basis,
+                                  const CAODensityMatrix&         DensityMatrix,
+                                  const CDense4DTensor&           TwoBodyDensityMatrix,
+                                  const CDenseMatrix&             ActiveMOs,
+                                  const CMolecularGrid&           molecularGrid,
+                                  const CXCPairDensityFunctional& fvxc) const;
 
     /**
      Integrates first-order GGA pair-density functional contribution to
