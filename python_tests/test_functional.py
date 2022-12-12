@@ -47,7 +47,11 @@ class TestFunctionalExcVxc:
 
         func = new_parse_xc_func('slda')
 
-        func_ref = XCNewFunctional(['LDA_X', 'LDA_C_VWN_RPA'], [1.0, 1.0])
+        func_ref = XCNewFunctional(
+            'slda',
+            ['LDA_X', 'LDA_C_VWN_RPA'],
+            [1.0, 1.0],
+        )
         assert func == func_ref
 
         if scf_drv.rank == mpi_master():
@@ -116,8 +120,11 @@ class TestFunctionalExcVxc:
         func = new_parse_xc_func('b3lyp')
 
         func_ref = XCNewFunctional(
+            'b3lyp',
             ['LDA_X', 'GGA_X_B88', 'LDA_C_VWN_RPA', 'GGA_C_LYP'],
-            [0.08, 0.72, 0.19, 0.81], 0.2)
+            [0.08, 0.72, 0.19, 0.81],
+            0.2,
+        )
         assert func == func_ref
 
         if scf_drv.rank == mpi_master():
