@@ -4,6 +4,8 @@ target_sources(vlxobjs
     FunctionalParser.cpp
     NewFunctionalParser.cpp
     LYPFunctional.cpp
+    PairDensitySlater.cpp
+    PairDensityVWN.cpp
     PkzbFunctional.cpp
     SlaterFunctional.cpp
     VWN3Functional.cpp
