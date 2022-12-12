@@ -63,6 +63,38 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
     return CDenseMatrix();
 }
 
+CDenseMatrix
+getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
+                            const std::vector<int32_t>& aoIndices,
+                            const int32_t               aoCount,
+                            const int32_t               nAOs)
+{
+    auto nrows = denseMatrix.getNumberOfRows();
+
+    if ((aoCount <= nAOs) && (nrows > 0))
+    {
+        CDenseMatrix sub_matrix(nrows, aoCount);
+
+        auto dense = denseMatrix.values();
+
+        for (int32_t i = 0; i < nrows; i++)
+        {
+            auto sub_matrix_row = sub_matrix.row(i);
+
+            auto dense_row = dense + i * nAOs;
+
+            for (int32_t j = 0; j < aoCount; j++)
+            {
+                sub_matrix_row[j] = dense_row[aoIndices[j]];
+            }
+        }
+
+        return sub_matrix;
+    }
+
+    return CDenseMatrix();
+}
+
 CAODensityMatrix
 getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
                     const std::vector<int32_t>& aoIndices,

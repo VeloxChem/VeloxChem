@@ -36,13 +36,13 @@
 #include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
 #include "ExportGeneral.hpp"
+#include "ExportMath.hpp"
 #include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
 #include "NewFunctionalParser.hpp"
 #include "XCFuncType.hpp"
 #include "XCFunctional.hpp"
-#include "XCIntegrator.hpp"
 #include "XCNewFunctional.hpp"
 #include "XCNewIntegrator.hpp"
 #include "XCNewMolecularGradient.hpp"
@@ -53,24 +53,80 @@ using namespace py::literals;
 namespace vlx_dft {  // vlx_dft namespace
 
 static double
-integrate_pdft(const CXCIntegrator&       self,
-               const CAODensityMatrix&    aoDensityMatrix,
-               const py::array_t<double>& Active2DM,
-               const py::array_t<double>& ActiveMOs,
-               const CMolecule&           molecule,
-               const CMolecularBasis&     basis,
-               const CMolecularGrid&      molecularGrid,
-               const std::string&         xcFuncLabel)
+integrate_vxc_pdft(const CXCNewIntegrator&    self,
+                   const CAODensityMatrix&    aoDensityMatrix,
+                   const py::array_t<double>& Active2DM,
+                   const py::array_t<double>& ActiveMOs,
+                   const CMolecule&           molecule,
+                   const CMolecularBasis&     basis,
+                   CMolecularGrid&            molecularGrid,
+                   const std::string&         xcFuncLabel)
 {
-    errors::assertMsgCritical(py::detail::check_flags(Active2DM.ptr(), py::array::c_style),
-                              __func__ + std::string(": Expecting C-style contiguous numpy array for Active2DM"));
+    // Active2DM
 
-    errors::assertMsgCritical(py::detail::check_flags(ActiveMOs.ptr(), py::array::c_style),
-                              __func__ + std::string(": Expecting C-style contiguous numpy array for ActiveMOs"));
+    // check dimension
+
+    std::string errdim("integrate_vxc_pdft, Active2DM: Expecting a 4D numpy array");
+
+    errors::assertMsgCritical(Active2DM.ndim() == 4, errdim);
+
+    // check that the numpy array is c-style contiguous
+
+    std::string errsrc("integrate_vxc_pdft, Active2DM: Expecting a contiguous numpy array in C ordering");
+
+    auto c_style = py::detail::check_flags(Active2DM.ptr(), py::array::c_style);
+
+    errors::assertMsgCritical(c_style, errsrc);
+
+    // Form 4D tensor
 
     auto nActive = static_cast<int32_t>(Active2DM.shape(0));
 
-    auto xcene = self.integratePdft(aoDensityMatrix, Active2DM.data(), ActiveMOs.data(), nActive, molecule, basis, molecularGrid, xcFuncLabel);
+    bool same_size = ((Active2DM.shape(0) == Active2DM.shape(1)) &&
+                      (Active2DM.shape(0) == Active2DM.shape(2)) &&
+                      (Active2DM.shape(0) == Active2DM.shape(3)));
+
+    std::string errsizes("integrate_vxc_pdft, Active2DM: Expecting 4 identical dimensions");
+
+    errors::assertMsgCritical(same_size, errsizes);
+
+    std::vector<double> vec(Active2DM.data(), Active2DM.data() + Active2DM.size());
+
+    CDense4DTensor Tensor_2DM(vec, nActive, nActive, nActive, nActive);
+
+    // active MO
+
+    // Check dimensions
+
+    errdim = "integrate_vxc_pdft, ActiveMOs: Expecting a 2D numpy array";
+
+    errors::assertMsgCritical(ActiveMOs.ndim() == 2, errdim);
+
+    // check that the numpy array is c-style contiguous
+
+    errsrc = "integrate_vxc_pdft, ActiveMOs: Expecting a contiguous numpy array in C ordering";
+
+    c_style = py::detail::check_flags(ActiveMOs.ptr(), py::array::c_style);
+
+    errors::assertMsgCritical(c_style, errsrc);
+
+    auto naos = ActiveMOs.shape(1);
+
+    std::vector<double> vec2(ActiveMOs.data(), ActiveMOs.data() + ActiveMOs.size());
+
+    CDenseMatrix Dense_activeMO(vec2, nActive, naos);
+
+    CAOKohnShamMatrix mat_Vxc(naos, naos, true);
+
+    mat_Vxc.zero();
+
+    CDense4DTensor TwoBodyGradient(naos, nActive, nActive, nActive);
+
+    TwoBodyGradient.zero();
+
+    self.integrateVxcPDFT(mat_Vxc, TwoBodyGradient, molecule, basis, aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
+
+    auto xcene = mat_Vxc.getExchangeCorrelationEnergy();
 
     return xcene;
 }
@@ -128,12 +184,12 @@ export_dft(py::module& m)
         .def(py::init<const CXCFunctional&>())
         .def("get_frac_exact_exchange",
              &CXCFunctional::getFractionOfExactExchange,
-             "Gets fraction of exact Hatree-Fock exchange in exchange-correlation functional.")
+             "Gets fraction of exact Hartree-Fock exchange in exchange-correlation functional.")
         .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of exchange-correlation functional.")
         .def("get_func_label", &CXCFunctional::getLabel, "Gets label of exchange-correlation functional.")
         .def("is_hybrid",
              &CXCFunctional::isHybridFunctional,
-             "Determines if exchange-correlation functional is of hybrid type i.e. non-zero fraction of exact Hatree-Fock exchange.")
+             "Determines if exchange-correlation functional is of hybrid type i.e. non-zero fraction of exact Hartree-Fock exchange.")
         .def("is_undefined", &CXCFunctional::isUndefined, "Determines if exchange-correlation function is undefined.")
         .def(py::self == py::self);
 
@@ -147,14 +203,21 @@ export_dft(py::module& m)
 
     // XCNewFunctional class
     PyClass<CXCNewFunctional>(m, "XCNewFunctional")
-        .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const double, const double>(),
+        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&, const double, const double>(),
+             "name_of_functional"_a,
              "labels"_a,
              "coeffs"_a,
              "fraction_of_exact_exchange"_a = 0.0,
              "range_separation_parameter"_a = 0.0)
-        .def(py::init<const std::string&>(), "label"_a)
         .def(py::init<const CXCNewFunctional&>())
         .def(py::self == py::self)
+        .def("is_hybrid", &CXCNewFunctional::isHybrid, "Determines whether the XC functional is hybrid.")
+        .def("is_undefined", &CXCNewFunctional::isUndefined, "Determines whether the XC function is undefined.")
+        .def("get_func_type", &CXCNewFunctional::getFunctionalType, "Gets type of XC functional.")
+        .def("get_func_label", &CXCNewFunctional::getFunctionalLabel, "Gets name of XC functional.")
+        .def("get_frac_exact_exchange",
+             &CXCNewFunctional::getFractionOfExactExchange,
+             "Gets fraction of exact Hartree-Fock exchange in XC functional.")
         .def(
             "compute_exc_vxc_for_lda",
             [](const CXCNewFunctional& self, const py::array_t<double>& rho) -> py::list {
@@ -285,12 +348,6 @@ export_dft(py::module& m)
              "Sets accuracy level for grid generation. Level: 1-6, where 1 is coarse grid, 5 is ultrafine grid, 6 special benchmarking grid.",
              "gridLevel"_a);
 
-    // CXCIntegrator class
-
-    PyClass<CXCIntegrator>(m, "XCIntegrator")
-        .def(py::init(&vlx_general::create<CXCIntegrator>), "comm"_a = py::none())
-        .def("integrate_pdft", &integrate_pdft);
-
     // CXCNewIntegrator class
 
     PyClass<CXCNewIntegrator>(m, "XCNewIntegrator")
@@ -325,6 +382,7 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a,
              "quadMode"_a)
+        .def("integrate_vxc_pdft", &integrate_vxc_pdft)
         .def(
             "compute_gto_values",
             [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, CMolecularGrid& molecularGrid)

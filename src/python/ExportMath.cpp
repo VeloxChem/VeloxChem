@@ -23,6 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "ExportMath.hpp"
+
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
@@ -40,10 +42,8 @@
 #include <lapacke.h>
 #endif
 
-#include "DenseMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
-#include "ExportMath.hpp"
 #include "MathConst.hpp"
 #include "StringFormat.hpp"
 
@@ -103,6 +103,44 @@ CDenseMatrix_from_numpy(const py::array_t<double>& arr)
     int32_t ncols = static_cast<int32_t>(arr.shape(1));
 
     return std::make_shared<CDenseMatrix>(vec, nrows, ncols);
+}
+
+// Helper function for CDense4DTensor constructor
+
+std::shared_ptr<CDense4DTensor>
+CDense4DTensor_from_numpy(const py::array_t<double>& arr)
+{
+    // check dimension
+
+    std::string errdim("Dense4DTensor: Expecting a 4D numpy array");
+
+    errors::assertMsgCritical(arr.ndim() == 4, errdim);
+
+    if (arr.data() == nullptr || arr.size() == 0)
+    {
+        return std::make_shared<CDense4DTensor>();
+    }
+
+    // check that the numpy array is c-style contiguous
+
+    std::string errsrc("Dense4DTensor: Expecting a contiguous numpy array in C ordering");
+
+    auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
+
+    errors::assertMsgCritical(c_style, errsrc);
+
+    // create CDense4DTensor from numpy array
+
+    std::vector<double> vec(arr.size());
+
+    std::memcpy(vec.data(), arr.data(), arr.size() * sizeof(double));
+
+    int32_t iIndex = static_cast<int32_t>(arr.shape(0));
+    int32_t jIndex = static_cast<int32_t>(arr.shape(1));
+    int32_t kIndex = static_cast<int32_t>(arr.shape(2));
+    int32_t lIndex = static_cast<int32_t>(arr.shape(3));
+
+    return std::make_shared<CDense4DTensor>(vec, iIndex, jIndex, kIndex, lIndex);
 }
 
 static py::array_t<double>

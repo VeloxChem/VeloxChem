@@ -35,13 +35,17 @@
 
 #include "ErrorHandler.hpp"
 #include "MemAlloc.hpp"
+#include "StringFormat.hpp"
 
-CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
+CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctional,
+                                   const std::vector<std::string>& labels,
                                    const std::vector<double>&      coeffs,
                                    const double                    fractionOfExactExchange,
                                    const double                    rangeSeparationParameter)
 
-    : _fractionOfExactExchange(fractionOfExactExchange)
+    : _nameOfFunctional(fstr::upcase(nameOfFunctional))
+
+    , _fractionOfExactExchange(fractionOfExactExchange)
 
     , _rangeSeparationParameter(rangeSeparationParameter)
 {
@@ -99,10 +103,6 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
         isMGGA = (isMGGA || (family == XC_FAMILY_MGGA));
         isGGA  = ((!isMGGA) && (isGGA || (family == XC_FAMILY_GGA)));
         isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || (family == XC_FAMILY_LDA)));
-
-        // TODO
-        // 1) figure out fraction of exact exchange from "prebaked" functional (e.g. HYB_GGA_XC_B3LYP)
-        // 2) figure out whether a functional is range-separated (e.g. HYB_GGA_XC_LRC_WPBEH)
     }
 
     if (hasExc) _maxDerivOrder = 0;
@@ -115,18 +115,26 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
     if (isGGA) _familyOfFunctional = std::string("GGA");
     if (isMGGA) _familyOfFunctional = std::string("MGGA");
 
+    // figure out fraction of exact exchange from "prebaked" functional (e.g. HYB_GGA_XC_B3LYP)
+    if (_components.size() == 1)
+    {
+        auto funcptr = _components[0].getFunctionalPointer();
+        if (funcptr->info->kind == XC_EXCHANGE_CORRELATION)
+        {
+            _fractionOfExactExchange = xc_hyb_exx_coef(funcptr);
+        }
+    }
+
+    // TODO figure out whether a functional is range-separated (e.g. HYB_GGA_XC_LRC_WPBEH)
+
     _allocateStagingBuffer();
-}
-
-CXCNewFunctional::CXCNewFunctional(const std::string& label)
-
-    : CXCNewFunctional({label}, {1.0})
-{
 }
 
 CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
 
-    : _fractionOfExactExchange(source._fractionOfExactExchange)
+    : _nameOfFunctional(source._nameOfFunctional)
+
+    , _fractionOfExactExchange(source._fractionOfExactExchange)
 
     , _rangeSeparationParameter(source._rangeSeparationParameter)
 
@@ -143,7 +151,9 @@ CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
 
 CXCNewFunctional::CXCNewFunctional(CXCNewFunctional&& source) noexcept
 
-    : _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
+    : _nameOfFunctional(std::move(source._nameOfFunctional))
+
+    , _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
 
     , _rangeSeparationParameter(std::move(source._rangeSeparationParameter))
 
@@ -202,6 +212,8 @@ CXCNewFunctional::operator=(const CXCNewFunctional& source)
 {
     if (this == &source) return *this;
 
+    _nameOfFunctional = source._nameOfFunctional;
+
     _fractionOfExactExchange = source._fractionOfExactExchange;
 
     _rangeSeparationParameter = source._rangeSeparationParameter;
@@ -225,6 +237,8 @@ CXCNewFunctional&
 CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
 {
     if (this == &source) return *this;
+
+    _nameOfFunctional = std::move(source._nameOfFunctional);
 
     _fractionOfExactExchange = std::move(source._fractionOfExactExchange);
 
@@ -250,6 +264,8 @@ CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
 bool
 CXCNewFunctional::operator==(const CXCNewFunctional& other) const
 {
+    if (_nameOfFunctional != other._nameOfFunctional) return false;
+
     if (_fractionOfExactExchange != other._fractionOfExactExchange) return false;
 
     if (_rangeSeparationParameter != other._rangeSeparationParameter) return false;
@@ -271,10 +287,34 @@ CXCNewFunctional::operator!=(const CXCNewFunctional& other) const
     return !(*this == other);
 }
 
+std::string
+CXCNewFunctional::getFunctionalLabel() const
+{
+    return _nameOfFunctional;
+}
+
 xcfun
 CXCNewFunctional::getFunctionalType() const
 {
     return to_xcfun(_familyOfFunctional);
+}
+
+bool
+CXCNewFunctional::isUndefined() const
+{
+    return (fstr::upcase(_nameOfFunctional) == "UNDEFINED");
+}
+
+bool
+CXCNewFunctional::isHybrid() const
+{
+    return (std::fabs(_fractionOfExactExchange) > 1.0e-13);
+}
+
+double
+CXCNewFunctional::getFractionOfExactExchange() const
+{
+    return _fractionOfExactExchange;
 }
 
 auto
