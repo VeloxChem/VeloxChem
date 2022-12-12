@@ -409,6 +409,51 @@ class CXCNewIntegrator
                                                 const int32_t              iFock,
                                                 CMultiTimer&               timer) const;
 
+
+/**
+     Integrates GGA contribution to (fourth-order) Lxc matrix.
+
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param gtoValuesX the GTO gradient X values on grid points.
+     @param gtoValuesY the GTO gradient Y values on grid points.
+     @param gtoValuesZ the GTO gradient Z values on grid points.
+     @param rhograd the density gradient.
+     @param vsigma the 1st-order functional derivative wrt sigma.
+     @param v2rho2 the 2nd-order functional derivative wrt rho.
+     @param v2rhosigma the 2nd-order functional derivative wrt rho and sigma.
+     @param v2sigma2 the 2nd-order functional derivative wrt sigma.
+     @param v3rho3 the 3rd-order functional derivative wrt rho.
+     @param v3rho2sigma the 3rd-order functional derivative wrt rho and sigma.
+     @param v3rhosigma2 the 3rd-order functional derivative wrt rho and sigma.
+     @param v3sigma3 the 3rd-order functional derivative wrt sigma.
+     @param rwDensityGridQuad the products of one-time transformed densities on grid points.
+     @param rw2DensityMatrix the two-time transformed densities on grid points.
+     @param iFock the index of the AO Fock matrix.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
+    CDenseMatrix _integratePartialLxcFockForGGA(const int32_t              npoints,
+                                                const double*              weights,
+                                                const CDenseMatrix&        gtoValues,
+                                                const CDenseMatrix&        gtoValuesX,
+                                                const CDenseMatrix&        gtoValuesY,
+                                                const CDenseMatrix&        gtoValuesZ,
+                                                const double*              rhograd,
+                                                const double*              vsigma,
+                                                const double*              v2rho2,
+                                                const double*              v2rhosigma,
+                                                const double*              v2sigma2,
+                                                const double*              v3rho3,
+                                                const double*              v3rho2sigma,
+                                                const double*              v3rhosigma2,
+                                                const double*              v3sigma3,
+                                                const CDensityGridQuad&    rwDensityGridQuad,
+                                                const CDensityGrid&        rw2DensityGrid,
+                                                const int32_t              iFock,
+                                                CMultiTimer&               timer) const;
+
    public:
     /**
      Creates an XC integrator object using MPI info.
