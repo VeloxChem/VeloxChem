@@ -218,6 +218,50 @@ screenKxcFockForLDA(double*               rho,
 }
 
 void
+screenLxcFockForLDA(double*               rho,
+                    double*               v2rho2,
+                    double*               v3rho3,
+                    double*               v4rho4,
+                    const int32_t         npoints,
+                    const double          densityThreshold)
+{
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        // rho_a
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
+        {
+            v2rho2[3 * g + 0] = 0.0;
+            v2rho2[3 * g + 1] = 0.0;
+
+            v3rho3[4 * g + 0] = 0.0;
+            v3rho3[4 * g + 1] = 0.0;
+            v3rho3[4 * g + 2] = 0.0;
+
+            v4rho4[5 * g + 0] = 0.0;
+            v4rho4[5 * g + 1] = 0.0;
+            v4rho4[5 * g + 2] = 0.0;
+            v4rho4[5 * g + 3] = 0.0;
+        }
+
+        // rho_b
+        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
+        {
+            v2rho2[3 * g + 1] = 0.0;
+            v2rho2[3 * g + 2] = 0.0;
+
+            v3rho3[4 * g + 1] = 0.0;
+            v3rho3[4 * g + 2] = 0.0;
+            v3rho3[4 * g + 3] = 0.0;
+
+            v4rho4[5 * g + 1] = 0.0;
+            v4rho4[5 * g + 2] = 0.0;
+            v4rho4[5 * g + 3] = 0.0;
+            v4rho4[5 * g + 4] = 0.0;
+        }
+    }
+}
+
+void
 screenKxcFockForGGA(double*               rho,
                     double*               sigma,
                     double*               vrho,

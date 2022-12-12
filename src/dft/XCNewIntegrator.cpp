@@ -182,6 +182,55 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
     }
 }
 
+void
+CXCNewIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
+                                   const CMolecule&        molecule,
+                                   const CMolecularBasis&  basis,
+                                   const CAODensityMatrix& rwDensityMatrix,
+                                   const CAODensityMatrix& rw2DensityMatrix,
+                                   const CAODensityMatrix& rw3DensityMatrix,
+                                   const CAODensityMatrix& gsDensityMatrix,
+                                   CMolecularGrid&         molecularGrid,
+                                   const std::string&      xcFuncLabel,
+                                   const std::string&      quadMode) const
+{
+    molecularGrid.partitionGridPoints();
+
+    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
+
+    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (rwDensityMatrix.isClosedShell() && rw2DensityMatrix.isClosedShell() && rw3DensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            _integrateKxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+
+                                    molecularGrid, fvxc, quadMode);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+
+                                    molecularGrid, fvxc, quadMode);
+        }
+        else
+        {
+            std::string errxcfuntype("XCNewIntegrator.integrateKxcFock: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCNewIntegrator.integrateKxcFock: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+}
+
 CAOKohnShamMatrix
 CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
                                           const CMolecularBasis&  basis,
@@ -1575,6 +1624,272 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     //}
 }
 
+
+void
+CXCNewIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& rwDensityMatrix,
+                                          const CAODensityMatrix& rw2DensityMatrix,
+                                          const CAODensityMatrix& rw3DensityMatrix,
+                                          const CAODensityMatrix& gsDensityMatrix,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCNewFunctional& xcFunctional,
+                                          const std::string&      quadMode) const
+{
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Preparation");
+
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<CMultiTimer> omptimers(nthreads);
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // memory blocks for GTOs on grid points
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // density and functional derivatives
+
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rho4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
+
+    auto rho = rho_data.data();
+
+    auto v2rho2 = v2rho2_data.data();
+    auto v3rho3 = v3rho3_data.data();
+    auto v4rho4 = v4rho4_data.data();
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+    auto weights = molecularGrid.getWeights();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    timer.stop("Preparation");
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        timer.start("GTO pre-screening");
+
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, _screeningThresholdForGTOValues, boxdim);  // 0th order GTO derivative
+
+        timer.stop("GTO pre-screening");
+
+        // GTO values on grid points
+
+        timer.start("OMP GTO evaluation");
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            omptimers[thread_id].start("gtoeval");
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+
+            omptimers[thread_id].stop("gtoeval");
+        }
+
+        timer.stop("OMP GTO evaluation");
+
+        timer.start("GTO screening");
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if (std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues)
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        CDenseMatrix mat_chi(aocount, npoints);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+        }
+
+        timer.stop("GTO screening");
+
+        if (aocount == 0) continue;
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, gs_sub_dens_mat, timer);
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+
+        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+
+        auto rw3_sub_dens_mat = submat::getSubDensityMatrix(rw3DensityMatrix, aoinds, aocount);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        auto xcfuntype = xcFunctional.getFunctionalType();
+
+        auto rwdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw_sub_dens_mat, xcfuntype, timer);
+
+        auto rw2dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw2_sub_dens_mat, xcfuntype, timer);
+
+        auto rw3dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw3_sub_dens_mat, xcfuntype, timer);
+
+        // compute perturbed density
+
+        timer.start("Density grid cube");
+
+        auto numdens_rw3 = rw3DensityMatrix.getNumberOfDensityMatrices();
+
+        CDensityGridCubic rwdengridcube(npoints, numdens_rw3, xcfuntype, dengrid::ab);
+
+        rwdengridcube.DensityProd(rwdengrid, rw2dengrid, xcfuntype, numdens_rw3, quadMode);
+
+        timer.stop("Density grid cubic");
+
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        xcFunctional.compute_fxc_for_lda(npoints, rho, v2rho2);
+
+        xcFunctional.compute_kxc_for_lda(npoints, rho, v3rho3);
+        
+        xcFunctional.compute_lxc_for_lda(npoints, rho, v4rho4);
+
+        timer.stop("XC functional eval.");
+
+        // screen density and functional derivatives
+
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        gridscreen::screenLxcFockForLDA(rho, v2rho2, v3rho3, v4rho4, npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
+
+        // go through density matrices
+
+        for (int32_t idensity = 0; idensity < numdens_rw3; idensity++)
+        {
+            // compute partial contribution to Kxc matrix
+
+            auto partial_mat_Lxc = _integratePartialLxcFockForLDA(npoints, local_weights, mat_chi, v2rho2, v3rho3,v4rho4,
+                                                                  rwdengridcube, rw3dengrid, idensity, timer);
+
+            // distribute partial Kxc to full Fock matrix
+
+            timer.start("Lxc matrix dist.");
+
+            submat::distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Lxc, aoinds, aocount, naos);
+
+            timer.stop("Lxc matrix dist.");
+        }
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    timer.stop("Total timing");
+
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
+}
+
 void
 CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                           const CMolecule&        molecule,
@@ -2456,6 +2771,95 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              npoi
     auto mat_Kxc = denblas::multABt(gtoValues, mat_G);
 
     timer.stop("Kxc matrix matmul");
+
+    return mat_Kxc;
+}
+
+
+CDenseMatrix
+CXCNewIntegrator::_integratePartialLxcFockForLDA(const int32_t              npoints,
+                                                 const double*              weights,
+                                                 const CDenseMatrix&        gtoValues,
+                                                 const double*              v2rho2,
+                                                 const double*              v3rho3,
+                                                 const double*              v4rho4,
+                                                 const CDensityGridCubic&   rwDensityGridCubic,
+                                                 const CDensityGrid&        rw3DensityGrid,
+                                                 const int32_t              iFock,
+                                                 CMultiTimer&               timer) const
+{
+    timer.start("Lxc matrix prep.");
+
+    // GTO values on grid points
+
+    auto chi_val = gtoValues.values();
+
+    // pointers to perturbed density
+
+    auto rx_ry_rz = rwDensityGridCubic.rBrCrD(iFock);
+    auto rxy_rz = rwDensityGridCubic.RhoBCRhoD(iFock);
+    auto r_xyz = rw3DensityGrid.alphaDensity(iFock);
+
+    timer.stop("Lxc matrix prep.");
+
+    // eq.(30), JCTC 2021, 17, 1512-1521
+
+    timer.start("Lxc matrix G");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    CDenseMatrix mat_G(naos, npoints);
+
+    auto G_val = mat_G.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(weights, v2rho2, v3rho3, v4rho4, rx_ry_rz, rxy_rz, r_xyz, G_val, chi_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                auto v2rho2_aa = v2rho2[3 * g + 0];
+                auto v2rho2_ab = v2rho2[3 * g + 1];
+                auto v3rho3_aaa = v3rho3[4 * g + 0];
+                auto v3rho3_aab = v3rho3[4 * g + 1];
+                auto v3rho3_abb = v3rho3[4 * g + 2];
+                auto v4rho4_aaaa = v3rho3[5 * g + 0];
+                auto v4rho4_aaab = v3rho3[5 * g + 1];
+                auto v4rho4_aabb = v3rho3[5 * g + 2];
+                auto v4rho4_abbb = v3rho3[5 * g + 3];
+
+                double rr = (v2rho2_aa + v2rho2_ab);
+                double rrr = (v3rho3_aaa + 2.0 * v3rho3_aab + v3rho3_abb);
+                double rrrr = (v4rho4_aaaa +  3.0 * v4rho4_aaab + 3.0 * v4rho4_aabb + v4rho4_abbb);
+
+                G_val[nu_offset + g] = weights[g] *
+                            (    rr * r_xyz[g]
+                            +   rrr * rxy_rz[g]
+                            +   rrrr * rx_ry_rz[g]) * chi_val[nu_offset + g];
+            }
+        }
+    }
+
+    timer.stop("Lxc matrix G");
+
+    // eq.(31), JCTC 2021, 17, 1512-1521
+
+    timer.start("Lxc matrix matmul");
+
+    auto mat_Kxc = denblas::multABt(gtoValues, mat_G);
+
+    timer.stop("Lxc matrix matmul");
 
     return mat_Kxc;
 }

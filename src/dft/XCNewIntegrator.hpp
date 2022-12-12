@@ -34,6 +34,7 @@
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGridQuad.hpp"
+#include "DensityGridCubic.hpp"
 #include "GridBox.hpp"
 #include "GtoContainer.hpp"
 #include "MemBlock2D.hpp"
@@ -176,6 +177,32 @@ class CXCNewIntegrator
                                  const CMolecularBasis&  basis,
                                  const CAODensityMatrix& rwDensityMatrix,
                                  const CAODensityMatrix& rw2DensityMatrix,
+                                 const CAODensityMatrix& gsDensityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const CXCNewFunctional& xcFunctional,
+                                 const std::string&      quadMode) const;
+
+    /**
+     Integrates fourth-order LDA exchnage-correlation functional contribution
+     to AO Fock matrix.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param rw3DensityMatrix the three-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
+     */
+    void _integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                 const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& rwDensityMatrix,
+                                 const CAODensityMatrix& rw2DensityMatrix,
+                                 const CAODensityMatrix& rw3DensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
                                  const CXCNewFunctional& xcFunctional,
@@ -366,6 +393,33 @@ class CXCNewIntegrator
                                                 CMultiTimer&               timer) const;
 
     /**
+     Integrates LDA contribution to (fourth-order) Kxc matrix.
+
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param v2rho2 the 2nd-order functional derivative wrt density.
+     @param v3rho3 the 3rd-order functional derivative wrt density.
+     @param v4rho4 the 4rd-order functional derivative wrt density.
+     @param rwDensityGridCubic the products of one and two-time transformed densities on grid points.
+     @param rw3DensityMatrix the three-time transformed densities on grid points.
+     @param iFock the index of the AO Fock matrix.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
+    CDenseMatrix _integratePartialLxcFockForLDA(const int32_t              npoints,
+                                                const double*              weights,
+                                                const CDenseMatrix&        gtoValues,
+                                                const double*              v2rho2,
+                                                const double*              v3rho3,
+                                                const double*              v4rho4,
+                                                const CDensityGridCubic&    rwDensityGridCubic,
+                                                const CDensityGrid&        rw3DensityGrid,
+                                                const int32_t              iFock,
+                                                CMultiTimer&               timer) const;
+
+
+    /**
      Integrates GGA contribution to (third-order) Kxc matrix.
 
      @param npoints the number of grid points.
@@ -522,6 +576,34 @@ class CXCNewIntegrator
                           CMolecularGrid&         molecularGrid,
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const;
+
+
+    /**
+     Integrates fourth-order exchnage-correlation functional contribution to AO
+     Fock matrix in quadratic response.
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the one-time transformed densities.
+     @param rw2DensityMatrix the two-time transformed densities.
+     @param rw2DensityMatrix the three-time transformed densities.
+     @param gsDensityMatrix the ground state density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param quadMode a string that specifies which densities should be combined.
+     */
+    void integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
+                          const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& rwDensityMatrix,
+                          const CAODensityMatrix& rw2DensityMatrix,
+                          const CAODensityMatrix& rw3DensityMatrix,
+                          const CAODensityMatrix& gsDensityMatrix,
+                          CMolecularGrid&         molecularGrid,
+                          const std::string&      xcFuncLabel,
+                          const std::string&      quadMode) const;
+
 
     /**
      Computes GTOs values on grid points.

@@ -414,6 +414,58 @@ CXCNewFunctional::compute_kxc_for_lda(int32_t np, const double* rho, double* v3r
     }
 }
 
+
+
+auto
+CXCNewFunctional::compute_lxc_for_lda(int32_t np, const double* rho, double* v4rho4) const -> void
+{
+    errors::assertMsgCritical(_maxDerivOrder >= 4,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    // stage_exc        (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    // stage_vrho       (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    // stage_v2rho2     (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    // stage_v3rho3 = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[6 * _ldStaging];
+    auto stage_v4rho4 = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[6 * _ldStaging];
+
+#pragma omp simd aligned(v4rho4 : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        v4rho4[5 * g + 0] = 0.0;
+        v4rho4[5 * g + 1] = 0.0;
+        v4rho4[5 * g + 2] = 0.0;
+        v4rho4[5 * g + 3] = 0.0;
+        v4rho4[5 * g + 4] = 0.0;
+    }
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        xc_lda_kxc(funcptr, np, rho, stage_v4rho4);
+
+        const auto c = xccomp.getScalingFactor();
+
+#pragma omp simd aligned(v4rho4, stage_v4rho4 : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
+            v4rho4[5 * g + 1] += c * stage_v4rho4[5 * g + 1];
+            v4rho4[5 * g + 2] += c * stage_v4rho4[5 * g + 2];
+            v4rho4[5 * g + 3] += c * stage_v4rho4[5 * g + 3];
+            v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_v4rho4);
+    }
+}
+
 auto
 CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void
 {
