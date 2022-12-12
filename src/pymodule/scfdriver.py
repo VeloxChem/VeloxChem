@@ -40,7 +40,7 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import parse_xc_func
+from .veloxchemlib import new_parse_xc_func
 from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -435,7 +435,7 @@ class ScfDriver:
         # check xc functional
         if self.xcfun is not None:
             if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
+                self.xcfun = new_parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'SCF driver: Undefined XC functional')
         self._dft = (self.xcfun is not None)

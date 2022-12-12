@@ -54,7 +54,7 @@ class CXCNewFunctional
     /** Name of functional. */
     std::string _nameOfFunctional{std::string("Undefined")};
 
-    /** The fraction of exact Hatree-Fock exchange in functional. */
+    /** The fraction of exact Hartree-Fock exchange in functional. */
     double _fractionOfExactExchange{0.0};
 
     /** The range-separation parameter in functional. */
@@ -146,9 +146,29 @@ class CXCNewFunctional
     bool operator!=(const CXCNewFunctional& other) const;
 
     /**
+     Gets XC functional name.
+     */
+    std::string getFunctionalLabel() const;
+
+    /**
      Gets XC functional type.
      */
     xcfun getFunctionalType() const;
+
+    /**
+     Determines whether the XC functional is undefined.
+     */
+    bool isUndefined() const;
+
+    /**
+     Determines whether the XC functional is hybrid.
+     */
+    bool isHybrid() const;
+
+    /**
+     Gets the fraction of exact exchange.
+     */
+    double getFractionOfExactExchange() const;
 
     /**@{ LDA computational functions. These are wrappers around `xc_lda_*` functions in LibXC. */
     /** Computes values and first derivative of LDA exchange-correlation functional on grid.
