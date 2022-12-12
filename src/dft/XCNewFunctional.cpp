@@ -429,7 +429,7 @@ CXCNewFunctional::compute_lxc_for_lda(int32_t np, const double* rho, double* v4r
     // stage_vrho       (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     // stage_v2rho2     (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
     // stage_v3rho3 = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[6 * _ldStaging];
-    auto stage_v4rho4 = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[6 * _ldStaging];
+    auto stage_v4rho4 = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[10 * _ldStaging];
 
 #pragma omp simd aligned(v4rho4 : VLX_ALIGN)
     for (auto g = 0; g < np; ++g)
