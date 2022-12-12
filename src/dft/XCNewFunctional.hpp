@@ -51,6 +51,9 @@
 class CXCNewFunctional
 {
    private:
+    /** Name of functional. */
+    std::string _nameOfFunctional{std::string("Undefined")};
+
     /** The fraction of exact Hatree-Fock exchange in functional. */
     double _fractionOfExactExchange{0.0};
 
@@ -60,7 +63,7 @@ class CXCNewFunctional
     /** Highest order of available derivatives. */
     int32_t _maxDerivOrder{0};
 
-    /** Highest order of available derivatives. */
+    /** Family of functional. */
     std::string _familyOfFunctional{std::string("LDA")};
 
     /** Leading dimension for initial allocation of staging buffer. */
@@ -81,19 +84,17 @@ class CXCNewFunctional
    public:
     /** Creates an exchange-correlation functional object.
      *
-     * @param[in] labels list of labels of component exchange and correlation functionals.
-     * @param[in] coeffs list of coefficients for the components of the functional.
+     * @param[in] nameOfFunctional name of functional.
+     * @param[in] labels list of labels of functional components.
+     * @param[in] coeffs list of coefficients for functional components.
+     * @param[in] fractionOfExactExchange fraction of exact exchange.
+     * @param[in] rangeSeparationParameter range separation parameter.
      */
-    CXCNewFunctional(const std::vector<std::string>& labels,
+    CXCNewFunctional(const std::string&              nameOfFunctional,
+                     const std::vector<std::string>& labels,
                      const std::vector<double>&      coeffs,
                      const double                    fractionOfExactExchange  = 0.0,
                      const double                    rangeSeparationParameter = 0.0);
-
-    /** Creates an exchange-correlation functional object.
-     *
-     * @param[in] label label of component exchange and correlation functional.
-     */
-    CXCNewFunctional(const std::string& label);
 
     /**
      Creates an XC functional object by copying other XC functional object.

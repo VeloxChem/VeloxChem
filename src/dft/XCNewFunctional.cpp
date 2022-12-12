@@ -35,13 +35,17 @@
 
 #include "ErrorHandler.hpp"
 #include "MemAlloc.hpp"
+#include "StringFormat.hpp"
 
-CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
+CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctional,
+                                   const std::vector<std::string>& labels,
                                    const std::vector<double>&      coeffs,
                                    const double                    fractionOfExactExchange,
                                    const double                    rangeSeparationParameter)
 
-    : _fractionOfExactExchange(fractionOfExactExchange)
+    : _nameOfFunctional(fstr::upcase(nameOfFunctional))
+
+    , _fractionOfExactExchange(fractionOfExactExchange)
 
     , _rangeSeparationParameter(rangeSeparationParameter)
 {
@@ -118,15 +122,11 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
     _allocateStagingBuffer();
 }
 
-CXCNewFunctional::CXCNewFunctional(const std::string& label)
-
-    : CXCNewFunctional({label}, {1.0})
-{
-}
-
 CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
 
-    : _fractionOfExactExchange(source._fractionOfExactExchange)
+    : _nameOfFunctional(source._nameOfFunctional)
+
+    , _fractionOfExactExchange(source._fractionOfExactExchange)
 
     , _rangeSeparationParameter(source._rangeSeparationParameter)
 
@@ -143,7 +143,9 @@ CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
 
 CXCNewFunctional::CXCNewFunctional(CXCNewFunctional&& source) noexcept
 
-    : _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
+    : _nameOfFunctional(std::move(source._nameOfFunctional))
+
+    , _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
 
     , _rangeSeparationParameter(std::move(source._rangeSeparationParameter))
 
@@ -202,6 +204,8 @@ CXCNewFunctional::operator=(const CXCNewFunctional& source)
 {
     if (this == &source) return *this;
 
+    _nameOfFunctional = source._nameOfFunctional;
+
     _fractionOfExactExchange = source._fractionOfExactExchange;
 
     _rangeSeparationParameter = source._rangeSeparationParameter;
@@ -225,6 +229,8 @@ CXCNewFunctional&
 CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
 {
     if (this == &source) return *this;
+
+    _nameOfFunctional = std::move(source._nameOfFunctional);
 
     _fractionOfExactExchange = std::move(source._fractionOfExactExchange);
 
@@ -250,6 +256,8 @@ CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
 bool
 CXCNewFunctional::operator==(const CXCNewFunctional& other) const
 {
+    if (_nameOfFunctional != other._nameOfFunctional) return false;
+
     if (_fractionOfExactExchange != other._fractionOfExactExchange) return false;
 
     if (_rangeSeparationParameter != other._rangeSeparationParameter) return false;
