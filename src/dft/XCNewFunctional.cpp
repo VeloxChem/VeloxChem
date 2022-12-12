@@ -103,10 +103,6 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
         isMGGA = (isMGGA || (family == XC_FAMILY_MGGA));
         isGGA  = ((!isMGGA) && (isGGA || (family == XC_FAMILY_GGA)));
         isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || (family == XC_FAMILY_LDA)));
-
-        // TODO
-        // 1) figure out fraction of exact exchange from "prebaked" functional (e.g. HYB_GGA_XC_B3LYP)
-        // 2) figure out whether a functional is range-separated (e.g. HYB_GGA_XC_LRC_WPBEH)
     }
 
     if (hasExc) _maxDerivOrder = 0;
@@ -118,6 +114,18 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
     if (isLDA) _familyOfFunctional = std::string("LDA");
     if (isGGA) _familyOfFunctional = std::string("GGA");
     if (isMGGA) _familyOfFunctional = std::string("MGGA");
+
+    // figure out fraction of exact exchange from "prebaked" functional (e.g. HYB_GGA_XC_B3LYP)
+    if (_components.size() == 1)
+    {
+        auto funcptr = _components[0].getFunctionalPointer();
+        if (funcptr->info->kind == XC_EXCHANGE_CORRELATION)
+        {
+            _fractionOfExactExchange = xc_hyb_exx_coef(funcptr);
+        }
+    }
+
+    // TODO figure out whether a functional is range-separated (e.g. HYB_GGA_XC_LRC_WPBEH)
 
     _allocateStagingBuffer();
 }
@@ -279,10 +287,34 @@ CXCNewFunctional::operator!=(const CXCNewFunctional& other) const
     return !(*this == other);
 }
 
+std::string
+CXCNewFunctional::getFunctionalLabel() const
+{
+    return _nameOfFunctional;
+}
+
 xcfun
 CXCNewFunctional::getFunctionalType() const
 {
     return to_xcfun(_familyOfFunctional);
+}
+
+bool
+CXCNewFunctional::isUndefined() const
+{
+    return (fstr::upcase(_nameOfFunctional) == "UNDEFINED");
+}
+
+bool
+CXCNewFunctional::isHybrid() const
+{
+    return (std::fabs(_fractionOfExactExchange) > 1.0e-13);
+}
+
+double
+CXCNewFunctional::getFractionOfExactExchange() const
+{
+    return _fractionOfExactExchange;
 }
 
 auto

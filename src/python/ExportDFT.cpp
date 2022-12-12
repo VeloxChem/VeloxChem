@@ -185,12 +185,12 @@ export_dft(py::module& m)
         .def(py::init<const CXCFunctional&>())
         .def("get_frac_exact_exchange",
              &CXCFunctional::getFractionOfExactExchange,
-             "Gets fraction of exact Hatree-Fock exchange in exchange-correlation functional.")
+             "Gets fraction of exact Hartree-Fock exchange in exchange-correlation functional.")
         .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of exchange-correlation functional.")
         .def("get_func_label", &CXCFunctional::getLabel, "Gets label of exchange-correlation functional.")
         .def("is_hybrid",
              &CXCFunctional::isHybridFunctional,
-             "Determines if exchange-correlation functional is of hybrid type i.e. non-zero fraction of exact Hatree-Fock exchange.")
+             "Determines if exchange-correlation functional is of hybrid type i.e. non-zero fraction of exact Hartree-Fock exchange.")
         .def("is_undefined", &CXCFunctional::isUndefined, "Determines if exchange-correlation function is undefined.")
         .def(py::self == py::self);
 
@@ -212,6 +212,13 @@ export_dft(py::module& m)
              "range_separation_parameter"_a = 0.0)
         .def(py::init<const CXCNewFunctional&>())
         .def(py::self == py::self)
+        .def("is_hybrid", &CXCNewFunctional::isHybrid, "Determines whether the XC functional is hybrid.")
+        .def("is_undefined", &CXCNewFunctional::isUndefined, "Determines whether the XC function is undefined.")
+        .def("get_func_type", &CXCNewFunctional::getFunctionalType, "Gets type of XC functional.")
+        .def("get_func_label", &CXCNewFunctional::getFunctionalLabel, "Gets name of XC functional.")
+        .def("get_frac_exact_exchange",
+             &CXCNewFunctional::getFractionOfExactExchange,
+             "Gets fraction of exact Hartree-Fock exchange in XC functional.")
         .def(
             "compute_exc_vxc_for_lda",
             [](const CXCNewFunctional& self, const py::array_t<double>& rho) -> py::list {
