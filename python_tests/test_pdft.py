@@ -69,8 +69,7 @@ class TestPDFT:
     def test_O2_ROLDA(self):
         ksdft, pdft = self.run_RODFT('slda', 'plda')
         if is_mpi_master():
-            assert abs(pdft) < 1.0e-6
-            # assert abs(ksdft - pdft) < 1.0e-6
+            assert abs(ksdft - pdft) < 1.0e-6
 
     # def test_O2_ROGGA(self):
     #     ksdft, pdft = self.run_RODFT('BLYP')
