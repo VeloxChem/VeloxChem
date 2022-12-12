@@ -104,7 +104,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 std::vector<std::string>
 getAvailablePairDensityFunctionals()
 {
-    return std::vector<std::string>({"PSLATER", "PVWN", "PLDA"});
+    return std::vector<std::string>({"PLDA"});
 }
 
 CXCPairDensityFunctional
@@ -114,17 +114,9 @@ getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel)
 
     if (std::find(availFuncs.begin(), availFuncs.end(), fstr::upcase(xcLabel)) != availFuncs.end())
     {
-        // Pair-density Slater exchange functional
-
-        if (fstr::upcase(xcLabel) == "PSLATER") return CXCPairDensityFunctional({"PSLATER"}, {1.0});
-
-        // Pair-density Vosko-Wilk-Nusair correlation functional
-
-        if (fstr::upcase(xcLabel) == "PVWN") return CXCPairDensityFunctional({"PVWN"}, {1.0});
-
         // Pair-density local density exchange-correlation functional
 
-        if (fstr::upcase(xcLabel) == "PLDA") return CXCPairDensityFunctional({"PSLATER", "PVWN"}, {1.0, 1.0});
+        if (fstr::upcase(xcLabel) == "PLDA") return CXCPairDensityFunctional("PLDA", {"PSLATER", "PVWN"}, {1.0, 1.0});
 
         // FIX ME: add other functionals here...
     }
@@ -133,7 +125,7 @@ getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel)
 
     errors::assertMsgCritical(false, errmsg);
 
-    return CXCPairDensityFunctional({}, {});
+    return CXCPairDensityFunctional("Undefined", {}, {});
 }
 
 }  // namespace newvxcfuncs

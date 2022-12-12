@@ -258,11 +258,14 @@ export_dft(py::module& m)
 
     // XCPairDensityFunctional class
     PyClass<CXCPairDensityFunctional>(m, "XCPairDensityFunctional")
-        .def(py::init<const std::vector<std::string>&, const std::vector<double>&>(),
+        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&>(),
+             "name_of_functional"_a,
              "labels"_a,
              "coeffs"_a)
         .def(py::init<const CXCPairDensityFunctional&>())
         .def(py::self == py::self)
+        .def("get_func_label", &CXCPairDensityFunctional::getFunctionalLabel, "Gets functional name.")
+        .def("get_func_type", &CXCPairDensityFunctional::getFunctionalType, "Gets functional type.")
         .def(
             "compute_exc_vxc_for_plda",
             [](const CXCPairDensityFunctional& self, const py::array_t<double>& rho) -> py::list {

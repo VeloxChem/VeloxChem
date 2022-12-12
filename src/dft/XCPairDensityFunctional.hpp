@@ -41,7 +41,10 @@
 class CXCPairDensityFunctional
 {
    private:
-    /** Highest order of available derivatives. */
+    /** Name of functional. */
+    std::string _nameOfFunctional{std::string("Undefined")};
+
+    /** Family of functional. */
     std::string _familyOfFunctional{std::string("PLDA")};
 
     /** Leading dimension for initial allocation of staging buffer. */
@@ -62,10 +65,11 @@ class CXCPairDensityFunctional
    public:
     /** Creates an exchange-correlation functional object.
      *
-     * @param[in] labels list of labels of component exchange and correlation functionals.
-     * @param[in] coeffs list of coefficients for the components of the functional.
+     * @param[in] name of functional.
+     * @param[in] labels list of labels of functional components.
+     * @param[in] coeffs list of coefficients for functional components.
      */
-    CXCPairDensityFunctional(const std::vector<std::string>& labels, const std::vector<double>& coeffs);
+    CXCPairDensityFunctional(const std::string&, const std::vector<std::string>& labels, const std::vector<double>& coeffs);
 
     /**
      Creates an XC functional object by copying other XC functional object.
@@ -115,6 +119,11 @@ class CXCPairDensityFunctional
      @return true if XC functional objects are not equal, false otherwise.
      */
     bool operator!=(const CXCPairDensityFunctional& other) const;
+
+    /**
+     Gets functional name.
+     */
+    std::string getFunctionalLabel() const;
 
     /**
      Gets XC functional type.

@@ -31,7 +31,11 @@
 #include "PairDensityVWN.hpp"
 #include "StringFormat.hpp"
 
-CXCPairDensityFunctional::CXCPairDensityFunctional(const std::vector<std::string>& labels, const std::vector<double>& coeffs)
+CXCPairDensityFunctional::CXCPairDensityFunctional(const std::string&              nameOfFunctional,
+                                                   const std::vector<std::string>& labels,
+                                                   const std::vector<double>&      coeffs)
+
+    : _nameOfFunctional(fstr::upcase(nameOfFunctional))
 {
     std::string errmsg("XCPairDensityFunctional: Inconsistent sizes of functional labels and coefficients");
 
@@ -49,7 +53,9 @@ CXCPairDensityFunctional::CXCPairDensityFunctional(const std::vector<std::string
 
 CXCPairDensityFunctional::CXCPairDensityFunctional(const CXCPairDensityFunctional& source)
 
-    : _familyOfFunctional(source._familyOfFunctional)
+    : _nameOfFunctional(source._nameOfFunctional)
+
+    , _familyOfFunctional(source._familyOfFunctional)
 
     , _ldStaging(source._ldStaging)
 
@@ -60,7 +66,9 @@ CXCPairDensityFunctional::CXCPairDensityFunctional(const CXCPairDensityFunctiona
 
 CXCPairDensityFunctional::CXCPairDensityFunctional(CXCPairDensityFunctional&& source) noexcept
 
-    : _familyOfFunctional(std::move(source._familyOfFunctional))
+    : _nameOfFunctional(std::move(source._nameOfFunctional))
+
+    , _familyOfFunctional(std::move(source._familyOfFunctional))
 
     , _ldStaging(std::move(source._ldStaging))
 
@@ -109,6 +117,8 @@ CXCPairDensityFunctional::operator=(const CXCPairDensityFunctional& source)
 {
     if (this == &source) return *this;
 
+    _nameOfFunctional = source._nameOfFunctional;
+
     _familyOfFunctional = source._familyOfFunctional;
 
     _ldStaging = source._ldStaging;
@@ -126,6 +136,8 @@ CXCPairDensityFunctional&
 CXCPairDensityFunctional::operator=(CXCPairDensityFunctional&& source) noexcept
 {
     if (this == &source) return *this;
+
+    _nameOfFunctional = std::move(source._nameOfFunctional);
 
     _familyOfFunctional = std::move(source._familyOfFunctional);
 
@@ -145,6 +157,8 @@ CXCPairDensityFunctional::operator=(CXCPairDensityFunctional&& source) noexcept
 bool
 CXCPairDensityFunctional::operator==(const CXCPairDensityFunctional& other) const
 {
+    if (_nameOfFunctional != other._nameOfFunctional) return false;
+
     if (_familyOfFunctional != other._familyOfFunctional) return false;
 
     if (_ldStaging != other._ldStaging) return false;
@@ -158,6 +172,12 @@ bool
 CXCPairDensityFunctional::operator!=(const CXCPairDensityFunctional& other) const
 {
     return !(*this == other);
+}
+
+std::string
+CXCPairDensityFunctional::getFunctionalLabel() const
+{
+    return _nameOfFunctional;
 }
 
 std::string
