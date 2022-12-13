@@ -101,7 +101,8 @@ class TPAReducedDriver(TPADriver):
             A list of tranformed compounded densities
         """
 
-        density_list = []
+        density_list1 = []
+        density_list2 = []
 
         for w in wi:
 
@@ -133,6 +134,10 @@ class TPAReducedDriver(TPADriver):
 
             # density transformation from MO to AO basis
 
+            Dx = np.linalg.multi_dot([mo,  Dx , mo.T])
+            Dy = np.linalg.multi_dot([mo,  Dy , mo.T])
+            Dz = np.linalg.multi_dot([mo,  Dz , mo.T])
+
             D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
             D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
             D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
@@ -141,16 +146,24 @@ class TPAReducedDriver(TPADriver):
             D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
             D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
 
-            density_list.append(D_sig_xx.real)
-            density_list.append(D_sig_yy.real)
-            density_list.append(D_sig_zz.real)
-            density_list.append(D_sig_xy.real)
-            density_list.append(D_sig_xz.real)
-            density_list.append(D_sig_yz.real)
 
-        return density_list
+            density_list1.append(Dx.real)
+            density_list1.append(Dx.imag)
+            density_list1.append(Dy.real)
+            density_list1.append(Dy.imag)
+            density_list1.append(Dz.real)
+            density_list1.append(Dz.imag)
 
-    def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
+            density_list2.append(D_sig_xx.real)
+            density_list2.append(D_sig_yy.real)
+            density_list2.append(D_sig_zz.real)
+            density_list2.append(D_sig_xy.real)
+            density_list2.append(D_sig_xz.real)
+            density_list2.append(D_sig_yz.real)
+
+        return density_list1, density_list2,None
+
+    def get_fock_dict(self, wi, density_list1,density_list2, density_list3, F0_a, mo, molecule, ao_basis,dft_dict):
         """
         Computes the compounded Fock matrices F^{σ}  used for the reduced
         isotropic cubic response function
@@ -200,10 +213,15 @@ class TPAReducedDriver(TPADriver):
                                            self.ostream)
             focks['F0'] = F0_a
             return focks
-
+            
         time_start_fock = time.time()
-        dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real', None,
-                                         None, density_list, 'tpa')
+        if self.dft:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real', dft_dict,
+                                         density_list1, density_list2, None, 'redtpa_i')
+        else:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real', None,
+                                         None, density_list2, None, 'redtpa_i')
+
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -221,6 +239,8 @@ class TPAReducedDriver(TPADriver):
                                                  distribute=False)
                 fock_index += 1
 
+        total_time_fock = time_end_fock - time_start_fock
+        self._print_fock_time(total_time_fock)
         write_distributed_focks(fock_file, focks, keys, wi, self.comm,
                                 self.ostream)
 
@@ -431,7 +451,8 @@ class TPAReducedDriver(TPADriver):
             A list of tranformed compounded densities
         """
 
-        density_list = []
+        density_list1 = []
+        density_list2 = []
 
         for w in wi:
             k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)]
@@ -494,20 +515,31 @@ class TPAReducedDriver(TPADriver):
 
             # density transformation from MO to AO basis
 
+            Dc_x_= np.linalg.multi_dot([mo, Dc_x_, mo.T])
+            Dc_y_= np.linalg.multi_dot([mo, Dc_y_, mo.T])
+            Dc_z_= np.linalg.multi_dot([mo, Dc_z_, mo.T])
+
             Dx = np.linalg.multi_dot([mo, Dx, mo.T])
             Dy = np.linalg.multi_dot([mo, Dy, mo.T])
             Dz = np.linalg.multi_dot([mo, Dz, mo.T])
 
-            density_list.append(Dx.real)
-            density_list.append(Dx.imag)
-            density_list.append(Dy.real)
-            density_list.append(Dy.imag)
-            density_list.append(Dz.real)
-            density_list.append(Dz.imag)
+            density_list1.append(Dc_x_.real)
+            density_list1.append(Dc_x_.imag)
+            density_list1.append(Dc_y_.real)
+            density_list1.append(Dc_y_.imag)
+            density_list1.append(Dc_z_.real)
+            density_list1.append(Dc_z_.imag)
 
-        return density_list
+            density_list2.append(Dx.real)
+            density_list2.append(Dx.imag)
+            density_list2.append(Dy.real)
+            density_list2.append(Dy.imag)
+            density_list2.append(Dz.real)
+            density_list2.append(Dz.imag)
 
-    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
+        return density_list1,density_list2
+
+    def get_fock_dict_II(self, wi, density_list1,density_list2, mo, molecule, ao_basis,dft_dict):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
@@ -548,13 +580,13 @@ class TPAReducedDriver(TPADriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                         'real_and_imag', None, None,
-                                         density_list, 'tpa')
+        if self.dft:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        dft_dict, density_list1, density_list2, None, 'redtpa_ii')
+        else:
+             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        None, None, density_list2, None, 'redtpa_ii')
         time_end_fock = time.time()
-
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
 
         focks = {}
         for key in keys:
@@ -568,6 +600,8 @@ class TPAReducedDriver(TPADriver):
                                                  distribute=False)
                 fock_index += 1
 
+        total_time_fock = time_end_fock - time_start_fock
+        self._print_fock_time(total_time_fock)
         write_distributed_focks(fock_file, focks, keys, wi, self.comm,
                                 self.ostream)
 

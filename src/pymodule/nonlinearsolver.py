@@ -33,6 +33,7 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
+from .veloxchemlib import XCFunctional
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .linearsolver import LinearSolver
@@ -42,7 +43,7 @@ from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .veloxchemlib import XCNewIntegrator
 
 
@@ -93,9 +94,9 @@ class NonLinearSolver:
         self.batch_size = None
 
         # dft
+        self.dft = False
         self.xcfun = None
         self.grid_level = 4
-        self._dft = False
 
         # polarizable embedding
         self.potfile = None
@@ -270,7 +271,7 @@ class NonLinearSolver:
         # check xc functional
         if self.xcfun is not None:
             if isinstance(self.xcfun, str):
-                self.xcfun = new_parse_xc_func(self.xcfun.upper())
+                self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'NonLinearSolver: Undefined XC functional')
         self._dft = (self.xcfun is not None)
@@ -376,6 +377,7 @@ class NonLinearSolver:
                        dft_dict,
                        first_order_dens,
                        second_order_dens,
+                       third_oder_dens,
                        mode,
                        profiler=None):
         """
@@ -407,7 +409,7 @@ class NonLinearSolver:
         """
 
         f_total = self._comp_two_el_int(mo, molecule, ao_basis, dft_dict,
-                                        first_order_dens, second_order_dens,
+                                        first_order_dens, second_order_dens,third_oder_dens,
                                         mode, profiler)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
@@ -429,6 +431,7 @@ class NonLinearSolver:
                          dft_dict,
                          first_order_dens,
                          second_order_dens,
+                         third_order_dens,
                          mode,
                          profiler=None):
         """
@@ -466,8 +469,12 @@ class NonLinearSolver:
         # determine number of batches
 
         if self.rank == mpi_master():
-            n_total = len(second_order_dens)
-            n_ao = second_order_dens[0].shape[0]
+            if mode.lower() in ['crf' ,'tpa']:
+                n_total = len(third_order_dens)
+                n_ao = third_order_dens[0].shape[0]
+            else:
+                n_total = len(second_order_dens)
+                n_ao = second_order_dens[0].shape[0]
             norb = mo.shape[1]
         else:
             n_total = None
@@ -480,14 +487,58 @@ class NonLinearSolver:
 
         if self._dft:
             if self.rank == mpi_master():
-                num_1 = len(first_order_dens)
-                num_2 = len(second_order_dens)
+                if mode.lower() in ['crf' ,'tpa'] :
+                    num_1 = len(first_order_dens)
+                    num_2 = len(second_order_dens)
+                    num_3 = len(third_order_dens)
+                elif mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+                    num_1 = len(first_order_dens)
+                    num_2 = len(second_order_dens)
 
                 if mode.lower() == 'shg':
-                    # 6 first-order densities
-                    # 12 second-order densities
+                    # 6 first-order densities per frequency
+                    # 12 second-order densities per frequency
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 12
+                elif mode.lower() == 'qrf':
+                    # 4 first-order densities per frequency
+                    # 2 second-order densities per frequency
+                    # see get_densities in quadraticresponsedriver
+                    size_1, size_2 = 4, 2
+                elif mode.lower() == 'crf':
+                     # 6 first-order densities per frequency
+                     # 6 second-order densities per frequency
+                     # 2 third-order densities per frequency
+                     size_1, size_2, size_3 = 6, 6, 2
+                elif mode.lower() == 'tpa':
+                     # 12 first-order densities per frequency
+                     # 24 second-order densities per frequency
+                     # 6 third-order densities per frequency
+                     size_1, size_2, size_3 = 12, 24, 6
+                elif mode.lower() == 'tpa_i':
+                     # 12 first-order densities per frequency
+                     # 24 second-order densities per frequency
+                     size_1, size_2 = 12, 24
+                elif mode.lower() == 'tpa_ii':
+                     # 36 first-order densities per frequency
+                     # 6 second-order densities per frequency
+                     size_1, size_2 = 36, 6
+                elif mode.lower() == 'redtpa_i':
+                     # 36 first-order densities per frequency
+                     # 6 second-order densities per frequency
+                     size_1, size_2 = 18, 6
+                elif mode.lower() == 'redtpa_ii':
+                     # 36 first-order densities per frequency
+                     # 6 second-order densities per frequency
+                     size_1, size_2 = 18, 6
+                elif mode.lower() == 'crf_i':
+                     # 36 first-order densities per frequency
+                     # 6 second-order densities per frequency
+                     size_1, size_2 = 6, 6
+                elif mode.lower() == 'crf_ii':
+                     # 12 first-order densities per frequency
+                     # 6 second-order densities per frequency
+                     size_1, size_2 = 12, 6
 
                 elif mode.lower() == 'shg_red':
                     # 6 first-order densities
@@ -495,25 +546,31 @@ class NonLinearSolver:
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 6
 
-                elif mode.lower() == 'qrf':
-                    # 4 first-order densities
-                    # 2 second-order densities
-                    # see get_densities in quadraticresponsedriver
-                    size_1, size_2 = 4, 2
+                # condition = ((num_1 % size_1 == 0) and (num_2 % size_2 == 0) and
+                #              (num_1 // size_1 == num_2 // size_2))
 
-                condition = ((num_1 % size_1 == 0) and (num_2 % size_2 == 0) and
-                             (num_1 // size_1 == num_2 // size_2))
+                if mode.lower() in ['crf', 'tpa']:
+                    
+                    batch_size = max((batch_size // size_3) * size_3, size_3)
 
-                batch_size = max((batch_size // size_2) * size_2, size_2)
+                    batch_size_second_order = (batch_size // size_3) * size_2
 
-                batch_size_first_order = (batch_size // size_2) * size_1
+                    batch_size_first_order = (batch_size // size_3) * size_1
 
-                errmsg = 'NonLinearSolver._comp_nlr_fock: '
-                errmsg += f'inconsistent number of density matrices (mode={mode})'
-                assert_msg_critical(condition, errmsg)
+                else:
+
+                    batch_size = max((batch_size // size_2) * size_2, size_2)
+
+                    batch_size_first_order = (batch_size // size_2) * size_1
+
+                # errmsg = 'NonLinearSolver._comp_nlr_fock: '
+                # errmsg += f'inconsistent number of density matrices (mode={mode})'
+                # assert_msg_critical(condition, errmsg)
             else:
                 batch_size = None
                 batch_size_first_order = None
+                batch_size_second_order = None
+
             batch_size = self.comm.bcast(batch_size, root=mpi_master())
             batch_size_first_order = self.comm.bcast(batch_size_first_order,
                                                      root=mpi_master())
@@ -551,25 +608,54 @@ class NonLinearSolver:
 
                     dens1 = AODensityMatrix(dts1, denmat.rest)
 
+                    if mode.lower() in ['crf','tpa']:
+                        batch_start_second_order = batch_size_second_order * batch_ind
+                        
+                        batch_end_second_order = min(
+                        batch_start_second_order + batch_size_second_order,
+                        len(second_order_dens))
+
+                        dts2 = [np.ascontiguousarray(dab) for dab in second_order_dens[batch_start_second_order:batch_end_second_order]]
+                        
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
                 batch_start = batch_size * batch_ind
                 batch_end = min(batch_start + batch_size, n_total)
 
-                dts2 = [
-                    np.ascontiguousarray(dab)
-                    for dab in second_order_dens[batch_start:batch_end]
-                ]
+                if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii', 'redtpa_i','redtpa_ii' ,'crf_i','crf_ii','shg_red']:
+                    dts2 = [
+                        np.ascontiguousarray(dab)
+                        for dab in second_order_dens[batch_start:batch_end]
+                    ]
 
-                dens2 = AODensityMatrix(dts2, denmat.rest)
+                    dens2 = AODensityMatrix(dts2, denmat.rest)
+
+                if mode.lower() == 'crf' or mode.lower() == 'tpa':  
+                    dts3 = [
+                        np.ascontiguousarray(dab) for dab in third_order_dens[
+                            batch_start:batch_end] ]
+                    dens3 = AODensityMatrix(dts3, denmat.rest)
             else:
-                if self._dft:
-                    dens1 = AODensityMatrix()
-                dens2 = AODensityMatrix()
+                if mode.lower() == 'crf' or mode.lower() == 'tpa':
+                    dens3 = AODensityMatrix()
+                    if self.dft: 
+                        dens1 = AODensityMatrix()
+                        dens2 = AODensityMatrix()
+                if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+                        dens2 = AODensityMatrix()
+                        if self.dft:
+                            dens1 = AODensityMatrix()
 
-            if self._dft:
-                dens1.broadcast(self.rank, self.comm)
-            dens2.broadcast(self.rank, self.comm)
-
-            fock = AOFockMatrix(dens2)
+            if mode.lower() == 'crf' or mode.lower() == 'tpa':
+                dens3.broadcast(self.rank, self.comm)
+                if self.dft:
+                    dens1.broadcast(self.rank, self.comm)
+                    dens2.broadcast(self.rank, self.comm)
+                fock = AOFockMatrix(dens3)
+            if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+                dens2.broadcast(self.rank, self.comm)
+                if self.dft:
+                    dens1.broadcast(self.rank, self.comm)
+                fock = AOFockMatrix(dens2)
             fock_flag = fockmat.rgenjk
 
             if self._dft:
@@ -586,7 +672,11 @@ class NonLinearSolver:
 
             t0 = tm.time()
 
-            eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
+            if mode.lower() == 'crf' or mode.lower() == 'tpa':
+                eri_driver.compute(fock, dens3, molecule, ao_basis, screening)
+            if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+                eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
+
             if self._dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
@@ -604,7 +694,16 @@ class NonLinearSolver:
                 molgrid.partition_grid_points()
                 molgrid.distribute_counts_and_displacements(
                     self.rank, self.nodes, self.comm)
-                xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
+                
+                if mode.lower() == 'crf' or mode.lower() == 'tpa':
+
+                    xc_drv.integrate_lxc_fock(fock, molecule, ao_basis, dens1, dens2, dens3, 
+                                    gs_density, molgrid,
+                                    self.xcfun.get_func_label(), mode)
+
+                elif mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+
+                    xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
                                           dens2, gs_density, molgrid,
                                           self.xcfun.get_func_label(), mode)
 
@@ -972,7 +1071,7 @@ class NonLinearSolver:
         A3NxNy_c = self.complex_lrmat2vec(A3NxNy, nocc, norb)
         return -(1. / 6) * A3NxNy_c
 
-    def _zi(self, kB, kC, kD, Fc, Fd, Fbc, Fcb, F0):
+    def _zi(self, kB, kC, kD, Fc, Fd, Fbc, F0):
         """
         Returns a matrix used for the E[4] contraction
 
@@ -993,7 +1092,7 @@ class NonLinearSolver:
         M1 = self.commut(kC, self.commut(kD, F0) + 3 * Fd)
         M2 = self.commut(kD, self.commut(kC, F0) + 3 * Fc)
 
-        return (self.commut(kB, M1 + M2 + 3 * (Fbc + Fcb)))
+        return (self.commut(kB, M1 + M2 + 3 * Fbc))
 
     @staticmethod
     def anti_sym(vec):
