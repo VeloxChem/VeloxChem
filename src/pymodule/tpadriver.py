@@ -200,6 +200,8 @@ class TPADriver(NonLinearSolver):
             Nb_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.tpa_1.h5'))
 
+        Nb_drv.update_settings({}, self.method_dict)
+
         Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
         self._is_converged = Nb_drv.is_converged

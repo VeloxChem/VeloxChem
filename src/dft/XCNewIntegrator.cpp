@@ -192,7 +192,7 @@ CXCNewIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
                                    const CAODensityMatrix& gsDensityMatrix,
                                    CMolecularGrid&         molecularGrid,
                                    const std::string&      xcFuncLabel,
-                                   const std::string&      quadMode) const
+                                   const std::string&      cubeMode) const
 {
     molecularGrid.partitionGridPoints();
 
@@ -206,26 +206,26 @@ CXCNewIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
     {
         if (xcfuntype == xcfun::lda)
         {
-            _integrateKxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+            _integrateLxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix,rw3DensityMatrix, gsDensityMatrix,
 
-                                    molecularGrid, fvxc, quadMode);
+                                    molecularGrid, fvxc, cubeMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+            // _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
 
-                                    molecularGrid, fvxc, quadMode);
+            //                         molecularGrid, fvxc, cubeMode);
         }
         else
         {
-            std::string errxcfuntype("XCNewIntegrator.integrateKxcFock: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCNewIntegrator.integrateLxcFock: Only implemented for LDA/GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
     }
     else
     {
-        std::string erropenshell("XCNewIntegrator.integrateKxcFock: Not implemented for open-shell");
+        std::string erropenshell("XCNewIntegrator.integrateLxcFock: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }

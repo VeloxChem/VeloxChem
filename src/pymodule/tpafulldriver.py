@@ -328,7 +328,7 @@ class TPAFullDriver(TPADriver):
         for key in keys:
             focks[key] = {}
 
-        if self.dft:
+        if self._dft:
             
             Fxy = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
                                         dft_dict, density_list1, density_list2, None,'tpa_i')
@@ -608,6 +608,9 @@ class TPAFullDriver(TPADriver):
                 Path(self.checkpoint_file).with_suffix('.tpa_2_full.h5'))
 
         # commutpute second-order response vectors
+
+        N_total_drv.update_settings({}, self.method_dict)
+
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
 
@@ -1060,7 +1063,7 @@ class TPAFullDriver(TPADriver):
 
         time_start_fock = time.time()
 
-        if self.dft:
+        if self._dft:
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
                                             dft_dict, density_list1, density_list2, None, 'tpa_ii')
         else:

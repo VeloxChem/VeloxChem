@@ -651,7 +651,7 @@ class CXCNewIntegrator
                           const CAODensityMatrix& gsDensityMatrix,
                           CMolecularGrid&         molecularGrid,
                           const std::string&      xcFuncLabel,
-                          const std::string&      quadMode) const;
+                          const std::string&      cubeMode) const;
 
 
     /**

@@ -215,7 +215,7 @@ class TPAReducedDriver(TPADriver):
             return focks
             
         time_start_fock = time.time()
-        if self.dft:
+        if self._dft:
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real', dft_dict,
                                          density_list1, density_list2, None, 'redtpa_i')
         else:
@@ -303,6 +303,8 @@ class TPAReducedDriver(TPADriver):
         if self.checkpoint_file is not None:
             N_total_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.tpa_2_red.h5'))
+
+        N_total_drv.update_settings({}, self.method_dict)
 
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
@@ -580,7 +582,7 @@ class TPAReducedDriver(TPADriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        if self.dft:
+        if self._dft:
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
                                         dft_dict, density_list1, density_list2, None, 'redtpa_ii')
         else:

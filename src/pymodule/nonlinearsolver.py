@@ -94,7 +94,7 @@ class NonLinearSolver:
         self.batch_size = None
 
         # dft
-        self.dft = False
+        self._dft = False
         self.xcfun = None
         self.grid_level = 4
 
@@ -637,23 +637,23 @@ class NonLinearSolver:
             else:
                 if mode.lower() == 'crf' or mode.lower() == 'tpa':
                     dens3 = AODensityMatrix()
-                    if self.dft: 
+                    if self._dft: 
                         dens1 = AODensityMatrix()
                         dens2 = AODensityMatrix()
                 if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
                         dens2 = AODensityMatrix()
-                        if self.dft:
+                        if self._dft:
                             dens1 = AODensityMatrix()
 
             if mode.lower() == 'crf' or mode.lower() == 'tpa':
                 dens3.broadcast(self.rank, self.comm)
-                if self.dft:
+                if self._dft:
                     dens1.broadcast(self.rank, self.comm)
                     dens2.broadcast(self.rank, self.comm)
                 fock = AOFockMatrix(dens3)
             if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
                 dens2.broadcast(self.rank, self.comm)
-                if self.dft:
+                if self._dft:
                     dens1.broadcast(self.rank, self.comm)
                 fock = AOFockMatrix(dens2)
             fock_flag = fockmat.rgenjk
