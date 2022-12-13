@@ -90,25 +90,53 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
     for (int32_t g = 0; g < np; g++)
     {
-        //density = rho[2 * g + 0];
+        double density = rho[2 * g + 0];
 
-        //pair_density = rho[2 * g + 1];
+        if (density < 1.0e-8)
+        {
+            exc[g] = 0.0;
 
-        double rhoa = rho[2 * g + 0];
+            vrho[2 * g + 0] = 0.0;
 
-        double rhob = rho[2 * g + 1];
+            vrho[2 * g + 1] = 0.0;
 
-        double density = rhoa + rhob;
+            continue;
+        }
+
+        double pair_density = rho[2 * g + 1];
 
         double x  = DCRS * std::pow(density, f16);
 
         double xrho  = DCRS * f16 * std::pow(density,f76);
 
-        double zeta   = (rhoa-rhob)/density;
+        double f_zeta;
 
-        double f_zeta = spinpolf*(std::pow(1.0 +zeta,fourthree)+std::pow(1.0-zeta,fourthree)-2.0);
+        double f_zet1;
 
-        double f_zet1 = spinpolf*4.0/3.0 *(std::pow(1.0+zeta, 1.0/3.0)-std::pow(1.0-zeta, 1.0/3.0));
+        if (pair_density <= 0)
+        {
+            double delta = sqrt(-2.0 * pair_density);
+
+            double zeta   = delta/density;
+
+            f_zeta = spinpolf*(std::pow(1.0 +zeta,fourthree)+std::pow(1.0-zeta,fourthree)-2.0);
+
+            f_zet1 = spinpolf*4.0/3.0 *(std::pow(1.0+zeta, 1.0/3.0)-std::pow(1.0-zeta, 1.0/3.0));
+        }
+        else
+        {
+            double delta = sqrt(2.0 * pair_density);
+
+            double zeta   = delta/density;
+
+            double r = sqrt ( 1.0 + std::pow(zeta, 2) );
+
+            double theta = 4.0 / 3.0 * std::atan(zeta);
+
+            f_zeta = spinpolf * ( 2.0 * std::pow(r, 4.0/3.0) * std::cos(theta) - 2.0);
+
+            f_zet1 = 0.0;
+        }
 
         double xf   =   x * x +   pb * x + pc;
 

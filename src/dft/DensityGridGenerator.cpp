@@ -498,26 +498,6 @@ generatePairDensityForLDA(double*               rho,
                 }
             }
         }
-
-        // Translate
-
-        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-        {
-            auto density = rho[2 * g + 0];
-
-            auto ontop_pair_density = rho[2 * g + 1];
-
-            double delta = 0.0;
-
-            if (ontop_pair_density < 0)
-            {
-                delta = sqrt(-2.0 * ontop_pair_density);
-            }
-
-            rho[2 * g + 0] = 0.5 * (density + delta);
-
-            rho[2 * g + 1] = 0.5 * (density - delta);
-        }
     }
 
     timer.stop("Density grid rho");

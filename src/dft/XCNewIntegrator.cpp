@@ -203,8 +203,6 @@ CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
 
     if (xcfuntype == "PLDA")
     {
-        auto newfvxc = newvxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
-
         _integrateVxcPDFTForLDA(aoFockMatrix, moTwoBodyGradient, molecule, basis,
                                 DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
     }
@@ -2152,9 +2150,7 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFock
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
-
-        // TODO (MGD) screening
+        gridscreen::screenVxcFockForPLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -2176,7 +2172,7 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFock
 
         for (int32_t g = 0; g < npoints; g++)
         {
-            auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
+            auto rho_total = rho[2 * g + 0];
 
             nele += local_weights[g] * rho_total;
 

@@ -42,21 +42,51 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
     double fp = 1.0 / 3.0;
 
+    double twothird = 2.0 / 3.0;
+
+    double fourthird = 4.0 / 3.0;
+
     for (int32_t g = 0; g < np; g++)
     {
-        //density = rho[2 * g + 0];
+        double density = rho[2 * g + 0];
 
-        //pair_density = rho[2 * g + 1];
+        if (density < 1.0e-8)
+        {
+            exc[g] = 0.0;
 
-        double rhoa = rho[2 * g + 0];
+            vrho[2 * g + 0] = 0.0;
 
-        double rhob = rho[2 * g + 1];
+            vrho[2 * g + 1] = 0.0;
 
-        double fxa = std::pow(rhoa, fp);
+            continue;
+        }
 
-        double fxb = std::pow(rhob, fp);
+        double pair_density = rho[2 * g + 1];
 
-        exc[g] = fre * (rhoa * fxa +  rhob * fxb);
+        if (pair_density <= 0)
+        {
+            double delta = sqrt(-2.0 * pair_density);
+
+            double rhoa = 0.5 * (density + delta);
+
+            double rhob = 0.5 * (density - delta);
+
+            double fxa = std::pow(rhoa, fp);
+
+            double fxb = std::pow(rhob, fp);
+
+            exc[g] = fre * (rhoa * fxa +  rhob * fxb);
+        }
+        else
+        {
+            double delta = sqrt(2.0 * pair_density);
+
+            double r2 = 0.25 * std::pow(density, 2) + 0.5 * pair_density;
+
+            double theta = fourthird * std::atan(delta/density);
+
+            exc[g] = 2.0 * fre * std::pow(r2, twothird) * std::cos(theta);
+        }
         vrho[2 * g + 0] = 0.0;
         vrho[2 * g + 1] = 0.0;
     }

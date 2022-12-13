@@ -62,6 +62,21 @@ void screenFxcFockForLDA(double*               rho,
                          const double          densityThreshold);
 
 /**
+ Screens Vxc Fock for PLDA.
+
+ @param rho the density.
+ @param exc the functional value.
+ @param vrho the 1st-order functional derivative wrt density.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ */
+void screenVxcFockForPLDA(double*               rho,
+                          double*               exc,
+                          double*               vrho,
+                          const int32_t         npoints,
+                          const double          densityThreshold);
+
+/**
  Screens Vxc Fock for GGA.
 
  @param rho the density.
