@@ -124,13 +124,13 @@ class TPAReducedDriver(TPADriver):
             Dyy = self.commut(ky, Dy)
             Dzz = self.commut(kz, Dz)
 
-            D_sig_xx = 2 * (3 * Dxx + Dyy + Dzz)
-            D_sig_yy = 2 * (Dxx + 3 * Dyy + Dzz)
-            D_sig_zz = 2 * (Dxx + Dyy + 3 * Dzz)
+            D_sig_xx = 6 * (3 * Dxx + Dyy + Dzz)
+            D_sig_yy = 6 * (Dxx + 3 * Dyy + Dzz)
+            D_sig_zz = 6 * (Dxx + Dyy + 3 * Dzz)
 
-            D_sig_xy = 2 * (self.commut(ky, Dx) + self.commut(kx, Dy))
-            D_sig_xz = 2 * (self.commut(kx, Dz) + self.commut(kz, Dx))
-            D_sig_yz = 2 * (self.commut(ky, Dz) + self.commut(kz, Dy))
+            D_sig_xy = 6 * (self.commut(ky, Dx) + self.commut(kx, Dy))
+            D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
+            D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
             # density transformation from MO to AO basis
 
@@ -348,12 +348,12 @@ class TPAReducedDriver(TPADriver):
                 Fock['Fb'][('x', w)].data,
                 Fock['Fb'][('y', w)].data,
                 Fock['Fb'][('z', w)].data,
-                Fock['f_sig_xx'][w].data,
-                Fock['f_sig_yy'][w].data,
-                Fock['f_sig_zz'][w].data,
-                Fock['f_sig_xy'][w].data,
-                Fock['f_sig_xz'][w].data,
-                Fock['f_sig_yz'][w].data,
+                Fock['f_sig_xx'][w].data * 1/3,
+                Fock['f_sig_yy'][w].data * 1/3,
+                Fock['f_sig_zz'][w].data * 1/3,
+                Fock['f_sig_xy'][w].data * 1/3,
+                Fock['f_sig_xz'][w].data * 1/3,
+                Fock['f_sig_yz'][w].data * 1/3,
             ]).T.copy()
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
@@ -531,6 +531,20 @@ class TPAReducedDriver(TPADriver):
             density_list1.append(Dc_y_.imag)
             density_list1.append(Dc_z_.real)
             density_list1.append(Dc_z_.imag)
+
+            density_list1.append(D_sig_xx.real)
+            density_list1.append(D_sig_xx.imag)
+            density_list1.append(D_sig_yy.real)
+            density_list1.append(D_sig_yy.imag)
+            density_list1.append(D_sig_zz.real)
+            density_list1.append(D_sig_zz.imag)
+
+            density_list1.append(D_sig_xy.real)
+            density_list1.append(D_sig_xy.imag)
+            density_list1.append(D_sig_xz.real)
+            density_list1.append(D_sig_xz.imag)
+            density_list1.append(D_sig_yz.real)
+            density_list1.append(D_sig_yz.imag)
 
             density_list2.append(Dx.real)
             density_list2.append(Dx.imag)

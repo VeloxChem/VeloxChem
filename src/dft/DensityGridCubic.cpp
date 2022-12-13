@@ -959,7 +959,7 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
 
     if (xcFuncType == xcfun::lda)
     {
-         if (fstr::upcase(CubeMode) == "TPA")
+if (fstr::upcase(CubeMode) == "TPA")
         {
              for (int32_t j = 0; j < numdens / 6; j++)
             {

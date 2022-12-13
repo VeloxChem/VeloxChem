@@ -535,6 +535,7 @@ class CubicResponseDriver(NonLinearSolver):
                 result[('X2', wb, wc, wd)] = val_X2
                 result[('A3', wb, wc, wd)] = val_A3
                 result[('A2', wb, wc, wd)] = val_A2
+                result[('Gamma',wb,wc,wd)] = gamma
 
         profiler.check_memory_usage('End of CRF')
 
@@ -708,6 +709,11 @@ class CubicResponseDriver(NonLinearSolver):
             density_list2.append(Dbd.imag)
             density_list2.append(Dcd.real)
             density_list2.append(Dcd.imag)
+
+            print("Dbd")
+            print(8*Dbd)
+            print("Dcd")
+            print(8*Dbc + 8*Dcd)
 
             density_list3.append(D123.real)
             density_list3.append(D123.imag)
@@ -1023,6 +1029,9 @@ class CubicResponseDriver(NonLinearSolver):
 
             (fb, fc, fd, fbc, fbd, fcd, fbcd) = vec_pack
 
+            print("F123")
+            print(3 * fbcd)
+
             fb = np.conjugate(fb).T
             fc = np.conjugate(fc).T
             fd = np.conjugate(fd).T
@@ -1130,6 +1139,10 @@ class CubicResponseDriver(NonLinearSolver):
 
             (fb, fc, fd, fbc, fbd, fcd) = vec_pack
 
+            print("fbd")
+            print(3*fbd)
+            print("fcd")
+            print(3*fcd + 3*fbc)
 
             fb = np.conjugate(fb).T
             fc = np.conjugate(fc).T

@@ -135,13 +135,13 @@ class TPAFullDriver(TPADriver):
             Dyy = self.commut(ky, Dy)
             Dzz = self.commut(kz, Dz)
 
-            D_sig_xx = 2 * (3 * Dxx + Dyy + Dzz)
-            D_sig_yy = 2 * (Dxx + 3 * Dyy + Dzz)
-            D_sig_zz = 2 * (Dxx + Dyy + 3 * Dzz)
+            D_sig_xx = 6 * (3 * Dxx + Dyy + Dzz)
+            D_sig_yy = 6 * (Dxx + 3 * Dyy + Dzz)
+            D_sig_zz = 6 * (Dxx + Dyy + 3 * Dzz)
 
-            D_sig_xy = 2 * (self.commut(ky, Dx) + self.commut(kx, Dy))
-            D_sig_xz = 2 * (self.commut(kx, Dz) + self.commut(kz, Dx))
-            D_sig_yz = 2 * (self.commut(ky, Dz) + self.commut(kz, Dy))
+            D_sig_xy = 6 * (self.commut(ky, Dx) + self.commut(kx, Dy))
+            D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
+            D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
             # λ+τ terms #
 
@@ -149,41 +149,42 @@ class TPAFullDriver(TPADriver):
             Dyy = self.commut(ky_, Dy) + self.commut(ky, Dy_)
             Dzz = self.commut(kz_, Dz) + self.commut(kz, Dz_)
 
-            D_lamtau_xx = 2 * (3 * Dxx + Dyy + Dzz)
-            D_lamtau_yy = 2 * (Dxx + 3 * Dyy + Dzz)
-            D_lamtau_zz = 2 * (Dxx + Dyy + 3 * Dzz)
+            D_lamtau_xx = 6 * (3 * Dxx + Dyy + Dzz)
+            D_lamtau_yy = 6 * (Dxx + 3 * Dyy + Dzz)
+            D_lamtau_zz = 6 * (Dxx + Dyy + 3 * Dzz)
 
-            D_lamtau_xy = 2 * (self.commut(ky_, Dx) + self.commut(kx_, Dy))
-            D_lamtau_xy += 2 * (self.commut(ky, Dx_) + self.commut(kx, Dy_))
+            D_lamtau_xy = 6 * (self.commut(ky_, Dx) + self.commut(kx_, Dy))
+            D_lamtau_xy += 6 * (self.commut(ky, Dx_) + self.commut(kx, Dy_))
 
-            D_lamtau_xz = 2 * (self.commut(kx_, Dz) + self.commut(kz_, Dx))
-            D_lamtau_xz += 2 * (self.commut(kx, Dz_) + self.commut(kz, Dx_))
+            D_lamtau_xz = 6 * (self.commut(kx_, Dz) + self.commut(kz_, Dx))
+            D_lamtau_xz += 6 * (self.commut(kx, Dz_) + self.commut(kz, Dx_))
 
-            D_lamtau_yz = 2 * (self.commut(ky_, Dz) + self.commut(kz_, Dy))
-            D_lamtau_yz += 2 * (self.commut(ky, Dz_) + self.commut(kz, Dy_))
+            D_lamtau_yz = 6 * (self.commut(ky_, Dz) + self.commut(kz_, Dy))
+            D_lamtau_yz += 6 * (self.commut(ky, Dz_) + self.commut(kz, Dy_))
 
             # Create first order three indexed Densities #
 
-            D_lam_sig_tau_x = (self.commut(kx_, D_sig_xx) +
-                               self.commut(ky_, D_sig_xy) +
-                               self.commut(kz_, D_sig_xz))
-            D_lam_sig_tau_x += (self.commut(kx, D_lamtau_xx) +
-                                self.commut(ky, D_lamtau_xy) +
-                                self.commut(kz, D_lamtau_xz))
+            D_lam_sig_tau_x = (self.commut(kx_, 1/3 *D_sig_xx) +
+                               self.commut(ky_, 1/3 *D_sig_xy) +
+                               self.commut(kz_, 1/3 *D_sig_xz))
+                               
+            D_lam_sig_tau_x += (self.commut(kx, 1/3 *D_lamtau_xx) +
+                                self.commut(ky, 1/3 *D_lamtau_xy) +
+                                self.commut(kz, 1/3 *D_lamtau_xz))
 
-            D_lam_sig_tau_y = (self.commut(kx_, D_sig_xy) +
-                               self.commut(ky_, D_sig_yy) +
-                               self.commut(kz_, D_sig_yz))
-            D_lam_sig_tau_y += (self.commut(kx, D_lamtau_xy) +
-                                self.commut(ky, D_lamtau_yy) +
-                                self.commut(kz, D_lamtau_yz))
+            D_lam_sig_tau_y = (self.commut(kx_, 1/3 *D_sig_xy) +
+                               self.commut(ky_, 1/3 *D_sig_yy) +
+                               self.commut(kz_, 1/3 *D_sig_yz))
+            D_lam_sig_tau_y += (self.commut(kx, 1/3 *D_lamtau_xy) +
+                                self.commut(ky, 1/3 *D_lamtau_yy) +
+                                self.commut(kz, 1/3 *D_lamtau_yz))
 
-            D_lam_sig_tau_z = (self.commut(kx_, D_sig_xz) +
-                               self.commut(ky_, D_sig_yz) +
-                               self.commut(kz_, D_sig_zz))
-            D_lam_sig_tau_z += (self.commut(kx, D_lamtau_xz) +
-                                self.commut(ky, D_lamtau_yz) +
-                                self.commut(kz, D_lamtau_zz))
+            D_lam_sig_tau_z = (self.commut(kx_, 1/3 *D_sig_xz) +
+                               self.commut(ky_, 1/3 *D_sig_yz) +
+                               self.commut(kz_, 1/3 *D_sig_zz))
+            D_lam_sig_tau_z += (self.commut(kx, 1/3 *D_lamtau_xz) +
+                                self.commut(ky, 1/3 *D_lamtau_yz) +
+                                self.commut(kz, 1/3 *D_lamtau_zz))
 
             # density transformation from MO to AO basis
 
@@ -227,6 +228,13 @@ class TPAFullDriver(TPADriver):
             density_list1.append(Dy_.imag)
             density_list1.append(Dz_.real)
             density_list1.append(Dz_.imag)
+            
+
+            print("D_sig_zz")
+            print(D_sig_zz)
+
+            print("D_lamtau_zz")
+            print(D_lamtau_zz)
 
             density_list2.append(D_sig_xx.real)
             density_list2.append(D_sig_xx.imag)
@@ -402,18 +410,18 @@ class TPAFullDriver(TPADriver):
                 fo['Fb'][('x', w)].data,
                 fo['Fb'][('y', w)].data,
                 fo['Fb'][('z', w)].data,
-                fo['f_lamtau_xx'][w].data * 3,
-                fo['f_lamtau_yy'][w].data * 3,
-                fo['f_lamtau_zz'][w].data * 3,
-                fo['f_lamtau_xy'][w].data * 3,
-                fo['f_lamtau_xz'][w].data * 3,
-                fo['f_lamtau_yz'][w].data * 3,
-                fo['f_sig_xx'][w].data * 3,
-                fo['f_sig_yy'][w].data * 3,
-                fo['f_sig_zz'][w].data * 3,
-                fo['f_sig_xy'][w].data * 3,
-                fo['f_sig_xz'][w].data * 3,
-                fo['f_sig_yz'][w].data * 3,
+                fo['f_lamtau_xx'][w].data,
+                fo['f_lamtau_yy'][w].data,
+                fo['f_lamtau_zz'][w].data,
+                fo['f_lamtau_xy'][w].data,
+                fo['f_lamtau_xz'][w].data,
+                fo['f_lamtau_yz'][w].data,
+                fo['f_sig_xx'][w].data,
+                fo['f_sig_yy'][w].data,
+                fo['f_sig_zz'][w].data,
+                fo['f_sig_xy'][w].data,
+                fo['f_sig_xz'][w].data,
+                fo['f_sig_yz'][w].data,
                 fo['F123_x'][w].data,
                 fo['F123_y'][w].data,
                 fo['F123_z'][w].data,
@@ -429,6 +437,10 @@ class TPAFullDriver(TPADriver):
             (Fx, Fy, Fz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
              f_lamtau_xz, f_lamtau_yz, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy,
              f_sig_xz, f_sig_yz, f_x, f_y, f_z) = vec_pack
+
+
+            print("F123_z")
+            print(f_z)
 
             Fx_ = Fx.T.conj()  # fo['Fc'][('x', -w)]
             Fy_ = Fy.T.conj()  # fo['Fc'][('y', -w)]
@@ -653,18 +665,18 @@ class TPAFullDriver(TPADriver):
                 Fock['Fb'][('x', w)].data,
                 Fock['Fb'][('y', w)].data,
                 Fock['Fb'][('z', w)].data,
-                Fock['f_sig_xx'][w].data,
-                Fock['f_sig_yy'][w].data,
-                Fock['f_sig_zz'][w].data,
-                Fock['f_sig_xy'][w].data,
-                Fock['f_sig_xz'][w].data,
-                Fock['f_sig_yz'][w].data,
-                Fock['f_lamtau_xx'][w].data,
-                Fock['f_lamtau_yy'][w].data,
-                Fock['f_lamtau_zz'][w].data,
-                Fock['f_lamtau_xy'][w].data,
-                Fock['f_lamtau_xz'][w].data,
-                Fock['f_lamtau_yz'][w].data,
+                Fock['f_sig_xx'][w].data * 1/3,
+                Fock['f_sig_yy'][w].data * 1/3,
+                Fock['f_sig_zz'][w].data * 1/3,
+                Fock['f_sig_xy'][w].data * 1/3,
+                Fock['f_sig_xz'][w].data * 1/3,
+                Fock['f_sig_yz'][w].data * 1/3,
+                Fock['f_lamtau_xx'][w].data* 1/3,
+                Fock['f_lamtau_yy'][w].data* 1/3,
+                Fock['f_lamtau_zz'][w].data* 1/3,
+                Fock['f_lamtau_xy'][w].data* 1/3,
+                Fock['f_lamtau_xz'][w].data* 1/3,
+                Fock['f_lamtau_yz'][w].data* 1/3,
             ]).T.copy()
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
@@ -677,6 +689,13 @@ class TPAFullDriver(TPADriver):
             (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
              f_sig_yz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
              f_lamtau_xz, f_lamtau_yz) = vec_pack
+
+            print("f_sig_zz")
+            print(f_sig_zz)
+
+            print("f_lamtau_zz")
+            print(f_lamtau_zz)
+
 
             f_x_ = f_x.T.conj()  # Fock['Fc'][('x', -w)]
             f_y_ = f_y.T.conj()  # Fock['Fc'][('y', -w)]

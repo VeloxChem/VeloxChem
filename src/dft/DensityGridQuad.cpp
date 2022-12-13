@@ -1025,41 +1025,41 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
 
                 auto rr_z_i = rhow1rhow2(6 * j + 5);
                 
-                auto rhoCx_r = rwDensityGrid.alphaDensity(6 * j + 6);
+                auto rhoCx_r = rwDensityGrid.alphaDensity(18 * j);
 
-                auto rhoCx_i = rwDensityGrid.alphaDensity(6 * j + 7);
+                auto rhoCx_i = rwDensityGrid.alphaDensity(18 * j + 1);
 
-                auto rhoCy_r = rwDensityGrid.alphaDensity(6 * j + 8);
+                auto rhoCy_r = rwDensityGrid.alphaDensity(18 * j + 2);
 
-                auto rhoCy_i = rwDensityGrid.alphaDensity(6 * j + 9);
+                auto rhoCy_i = rwDensityGrid.alphaDensity(18 * j + 3);
 
-                auto rhoCz_r = rwDensityGrid.alphaDensity(6 * j + 10);
+                auto rhoCz_r = rwDensityGrid.alphaDensity(18 * j + 4);
 
-                auto rhoCz_i = rwDensityGrid.alphaDensity(6 * j + 11);  
+                auto rhoCz_i = rwDensityGrid.alphaDensity(18 * j + 5);  
 
-                auto Rho_sig_xx_r = rwDensityGrid.alphaDensity(36 * j + 12);
+                auto Rho_sig_xx_r = rwDensityGrid.alphaDensity(18 * j + 6);
 
-                auto Rho_sig_xx_i = rwDensityGrid.alphaDensity(36 * j + 13);
+                auto Rho_sig_xx_i = rwDensityGrid.alphaDensity(18 * j + 7);
 
-                auto Rho_sig_yy_r = rwDensityGrid.alphaDensity(36 * j + 14);
+                auto Rho_sig_yy_r = rwDensityGrid.alphaDensity(18 * j + 8);
 
-                auto Rho_sig_yy_i = rwDensityGrid.alphaDensity(36 * j + 15);
+                auto Rho_sig_yy_i = rwDensityGrid.alphaDensity(18 * j + 9);
 
-                auto Rho_sig_zz_r = rwDensityGrid.alphaDensity(36 * j + 16);
+                auto Rho_sig_zz_r = rwDensityGrid.alphaDensity(18 * j + 10);
 
-                auto Rho_sig_zz_i = rwDensityGrid.alphaDensity(36 * j + 17);
+                auto Rho_sig_zz_i = rwDensityGrid.alphaDensity(18 * j + 11);
 
-                auto Rho_sig_xy_r = rwDensityGrid.alphaDensity(36 * j + 18);
+                auto Rho_sig_xy_r = rwDensityGrid.alphaDensity(18 * j + 12);
 
-                auto Rho_sig_xy_i = rwDensityGrid.alphaDensity(36 * j + 19);
+                auto Rho_sig_xy_i = rwDensityGrid.alphaDensity(18 * j + 13);
 
-                auto Rho_sig_xz_r = rwDensityGrid.alphaDensity(36 * j + 20);
+                auto Rho_sig_xz_r = rwDensityGrid.alphaDensity(18 * j + 14);
 
-                auto Rho_sig_xz_i = rwDensityGrid.alphaDensity(36 * j + 21);
+                auto Rho_sig_xz_i = rwDensityGrid.alphaDensity(18 * j + 15);
 
-                auto Rho_sig_yz_r = rwDensityGrid.alphaDensity(36 * j + 22);
+                auto Rho_sig_yz_r = rwDensityGrid.alphaDensity(18 * j + 16);
 
-                auto Rho_sig_yz_i = rwDensityGrid.alphaDensity(36 * j + 23);
+                auto Rho_sig_yz_i = rwDensityGrid.alphaDensity(18 * j + 17);
 
                 for (int32_t i = 0; i < npoints; i++)
                 {
@@ -1120,6 +1120,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
         {
             // This routine is for computing the Fbc, Fbd, Fcd first-order fock matrices for the general cubic response function
             
+            std::cout << "crf_i" << std::endl;
 
             for (int32_t j = 0; j < numdens / 6; j++)
             {
@@ -1254,8 +1255,6 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
             for (int32_t j = 0; j < numdens / 6; j++)
             {
                 
-
-
                 auto F_x_rhow1rhow2_r = rhow1rhow2(6 * j);
 
                 auto F_x_rhow1rhow2_i = rhow1rhow2(6 * j + 1);
