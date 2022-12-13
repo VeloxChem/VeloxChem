@@ -212,9 +212,9 @@ CXCNewIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
         }
         else if (xcfuntype == xcfun::gga)
         {
-            // _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+            _integrateLxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix,rw3DensityMatrix, gsDensityMatrix,
 
-            //                         molecularGrid, fvxc, cubeMode);
+                                     molecularGrid, fvxc, cubeMode);
         }
         else
         {
@@ -2236,6 +2236,337 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     //}
 }
 
+
+void
+CXCNewIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& rwDensityMatrix,
+                                          const CAODensityMatrix& rw2DensityMatrix,
+                                          const CAODensityMatrix& rw3DensityMatrix,
+                                          const CAODensityMatrix& gsDensityMatrix,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCNewFunctional& xcFunctional,
+                                          const std::string&      cubeMode) const
+{
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Preparation");
+
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<CMultiTimer> omptimers(nthreads);
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // memory blocks for GTOs on grid points
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // density and functional derivatives
+
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rho2sigma_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rhosigma2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3sigma3_data(10 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v4rho4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rho3sigma_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rho2sigma2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rhosigma3_data(20 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4sigma4_data(15 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
+
+    auto rho = rho_data.data();
+    auto rhograd = rhograd_data.data();
+    auto sigma = sigma_data.data();
+
+    auto vrho = vrho_data.data();
+    auto vsigma = vsigma_data.data();
+
+    auto v2rho2 = v2rho2_data.data();
+    auto v2rhosigma = v2rhosigma_data.data();
+    auto v2sigma2 = v2sigma2_data.data();
+
+    auto v3rho3 = v3rho3_data.data();
+    auto v3rho2sigma = v3rho2sigma_data.data();
+    auto v3rhosigma2 = v3rhosigma2_data.data();
+    auto v3sigma3 = v3sigma3_data.data();
+
+    auto v4rho4 = v4rho4_data.data();
+    auto v4rho3sigma = v4rho3sigma_data.data();
+    auto v4rho2sigma2 = v4rho2sigma2_data.data();
+    auto v4rhosigma3 = v4rhosigma3_data.data();
+    auto v4sigma4 = v4sigma4_data.data();
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+    auto weights = molecularGrid.getWeights();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    timer.stop("Preparation");
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        timer.start("GTO pre-screening");
+
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, _screeningThresholdForGTOValues, boxdim);  // 1st order GTO derivative
+
+        timer.stop("GTO pre-screening");
+
+        // GTO values on grid points
+
+        timer.start("OMP GTO evaluation");
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            omptimers[thread_id].start("gtoeval");
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+
+            omptimers[thread_id].stop("gtoeval");
+        }
+
+        timer.stop("OMP GTO evaluation");
+
+        timer.start("GTO screening");
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            auto gaox_nu = gaox.data(nu);
+
+            auto gaoy_nu = gaoy.data(nu);
+
+            auto gaoz_nu = gaoz.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        CDenseMatrix mat_chi(aocount, npoints);
+
+        CDenseMatrix mat_chi_x(aocount, npoints);
+        CDenseMatrix mat_chi_y(aocount, npoints);
+        CDenseMatrix mat_chi_z(aocount, npoints);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
+            std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
+            std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
+        }
+
+        timer.stop("GTO screening");
+
+        if (aocount == 0) continue;
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                          gs_sub_dens_mat, timer);
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+
+        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+
+        auto rw3_sub_dens_mat = submat::getSubDensityMatrix(rw3DensityMatrix, aoinds, aocount);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        auto xcfuntype = xcFunctional.getFunctionalType();
+
+        auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                                               rw_sub_dens_mat, xcfuntype, timer);
+
+        auto rw2dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                rw2_sub_dens_mat, xcfuntype, timer);
+
+        auto rw3dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                rw3_sub_dens_mat, xcfuntype, timer);
+        // compute perturbed density
+
+        timer.start("Density grid cubic");
+
+        auto numdens_rw3 = rw3DensityMatrix.getNumberOfDensityMatrices();
+
+        CDensityGridCubic rwdengridcubic(npoints, numdens_rw3, xcfuntype, dengrid::ab);
+
+        rwdengridcubic.DensityProd(rwdengrid, rw2dengrid, xcfuntype, numdens_rw3, cubeMode);
+
+        timer.stop("Density grid cubic");
+
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
+
+        xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+
+        xcFunctional.compute_kxc_for_gga(npoints, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
+
+        xcFunctional.compute_lxc_for_gga(npoints, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2,v4rhosigma3, v4sigma4);
+
+        timer.stop("XC functional eval.");
+
+        // screen density and functional derivatives
+
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        gridscreen::screenLxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
+                                        v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                        v4rho4, v4rho3sigma, v4rho2sigma2,v4rhosigma3, v4sigma4,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
+
+        // go through density matrices
+
+        for (int32_t idensity = 0; idensity < numdens_rw3; idensity++)
+        {
+            // compute partial contribution to Lxc matrix
+
+            auto partial_mat_Kxc = _integratePartialLxcFockForGGA(npoints, local_weights, mat_chi,
+                                                                  mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                  rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2,
+                                                                  v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                                                  v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4,
+                                                                  rwdengridcubic, rw3dengrid, idensity, timer);
+
+            // distribute partial Lxc to full Fock matrix
+
+            timer.start("Lxc matrix dist.");
+
+            submat::distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
+
+            timer.stop("Lxc matrix dist.");
+        }
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    timer.stop("Total timing");
+
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
+}
+
 void
 CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&      aoFockMatrix,
                                           CDense4DTensor&         moTwoBodyGradient,
@@ -3732,8 +4063,13 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                                                  const double*              v3rho2sigma,
                                                  const double*              v3rhosigma2,
                                                  const double*              v3sigma3,
-                                                 const CDensityGridQuad&    rwDensityGridQuad,
-                                                 const CDensityGrid&        rw2DensityGrid,
+                                                 const double*              v4rho4,
+                                                 const double*              v4rho3sigma,
+                                                 const double*              v4rho2sigma2,
+                                                 const double*              v4rhosigma3,
+                                                 const double*              v4sigma4,                   
+                                                 const CDensityGridCubic&   rwDensityGridCubic,
+                                                 const CDensityGrid&        rw3DensityGrid,
                                                  const int32_t              iFock,
                                                  CMultiTimer&               timer) const
 {
@@ -3749,39 +4085,120 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
 
     // pointers to perturbed density gradient norms
 
-    auto rhow1rhow2 = rwDensityGridQuad.rhow1rhow2(iFock);
+    auto RhoBCRhoD = rwDensityGridCubic.RhoBCRhoD(iFock);
+    
+    auto RhoBCRhoDX = rwDensityGridCubic.RhoBCRhoDX(iFock);
+    
+    auto RhoBCRhoDY = rwDensityGridCubic.RhoBCRhoDY(iFock);
+    
+    auto RhoBCRhoDZ = rwDensityGridCubic.RhoBCRhoDZ(iFock);
 
-    auto rxw1rhow2 = rwDensityGridQuad.rxw1rhow2(iFock);
+    auto RhoBCRhoDXX = rwDensityGridCubic.RhoBCRhoDXX(iFock);
 
-    auto ryw1rhow2 = rwDensityGridQuad.ryw1rhow2(iFock);
+    auto RhoBCRhoDXY = rwDensityGridCubic.RhoBCRhoDXY(iFock); 
 
-    auto rzw1rhow2 = rwDensityGridQuad.rzw1rhow2(iFock);
+    auto RhoBCRhoDXZ = rwDensityGridCubic.RhoBCRhoDXZ(iFock);
+    
+    auto RhoBCRhoDYX = rwDensityGridCubic.RhoBCRhoDYX(iFock);
+    
+    auto RhoBCRhoDYY = rwDensityGridCubic.RhoBCRhoDYY(iFock);
+    
+    auto RhoBCRhoDYZ = rwDensityGridCubic.RhoBCRhoDYZ(iFock);
+    
+    auto RhoBCRhoDZX = rwDensityGridCubic.RhoBCRhoDZX(iFock);
+    
+    auto RhoBCRhoDZY = rwDensityGridCubic.RhoBCRhoDZY(iFock);
 
-    auto rxw1rxw2 = rwDensityGridQuad.rxw1rxw2(iFock);
+    auto RhoBCRhoDZZ = rwDensityGridCubic.RhoBCRhoDZZ(iFock);
 
-    auto rxw1ryw2 = rwDensityGridQuad.rxw1ryw2(iFock);
+    auto rBrCrD = rwDensityGridCubic.rBrCrD(iFock);
 
-    auto rxw1rzw2 = rwDensityGridQuad.rxw1rzw2(iFock);
+    auto rBrCrDX = rwDensityGridCubic.rBrCrDX(iFock);
 
-    auto ryw1rxw2 = rwDensityGridQuad.ryw1rxw2(iFock);
+    auto rBrCrDY = rwDensityGridCubic.rBrCrDY(iFock);
 
-    auto ryw1ryw2 = rwDensityGridQuad.ryw1ryw2(iFock);
+    auto rBrCrDZ = rwDensityGridCubic.rBrCrDZ(iFock);
 
-    auto ryw1rzw2 = rwDensityGridQuad.ryw1rzw2(iFock);
+    auto rBrCrDXX = rwDensityGridCubic.rBrCrDXX(iFock);
 
-    auto rzw1rxw2 = rwDensityGridQuad.rzw1rxw2(iFock);
+    auto rBrCrDXY = rwDensityGridCubic.rBrCrDXY(iFock);
 
-    auto rzw1ryw2 = rwDensityGridQuad.rzw1ryw2(iFock);
+    auto rBrCrDXZ = rwDensityGridCubic.rBrCrDXZ(iFock);
 
-    auto rzw1rzw2 = rwDensityGridQuad.rzw1rzw2(iFock);
+    auto rBrCrDYX = rwDensityGridCubic.rBrCrDYX(iFock);
 
-    auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
+    auto rBrCrDYY = rwDensityGridCubic.rBrCrDYY(iFock);
 
-    auto gradw12a_x = rw2DensityGrid.alphaDensityGradientX(iFock);
+    auto rBrCrDYZ = rwDensityGridCubic.rBrCrDYZ(iFock);
 
-    auto gradw12a_y = rw2DensityGrid.alphaDensityGradientY(iFock);
+    auto rBrCrDZX = rwDensityGridCubic.rBrCrDZX(iFock);
 
-    auto gradw12a_z = rw2DensityGrid.alphaDensityGradientZ(iFock);
+    auto rBrCrDZY = rwDensityGridCubic.rBrCrDZY(iFock);
+
+    auto rBrCrDZZ = rwDensityGridCubic.rBrCrDZZ(iFock);
+
+    auto rBrCrDXXX = rwDensityGridCubic.rBrCrDXXX(iFock);
+
+    auto rBrCrDXXY = rwDensityGridCubic.rBrCrDXXY(iFock);
+
+    auto rBrCrDXXZ = rwDensityGridCubic.rBrCrDXXZ(iFock);
+
+    auto rBrCrDXYX = rwDensityGridCubic.rBrCrDXYX(iFock);
+
+    auto rBrCrDXYY = rwDensityGridCubic.rBrCrDXYY(iFock);
+
+    auto rBrCrDXYZ = rwDensityGridCubic.rBrCrDXYZ(iFock);
+
+    auto rBrCrDXZX = rwDensityGridCubic.rBrCrDXZX(iFock);
+
+    auto rBrCrDXZY = rwDensityGridCubic.rBrCrDXZY(iFock);
+
+    auto rBrCrDXZZ = rwDensityGridCubic.rBrCrDXZZ(iFock);
+
+    auto rBrCrDYXX = rwDensityGridCubic.rBrCrDYXX(iFock);
+
+    auto rBrCrDYXY = rwDensityGridCubic.rBrCrDYXY(iFock);
+
+    auto rBrCrDYXZ = rwDensityGridCubic.rBrCrDYXZ(iFock);
+
+    auto rBrCrDYYX = rwDensityGridCubic.rBrCrDYYX(iFock);
+
+    auto rBrCrDYYY = rwDensityGridCubic.rBrCrDYYY(iFock);
+
+    auto rBrCrDYYZ = rwDensityGridCubic.rBrCrDYYZ(iFock);
+
+    auto rBrCrDYZX = rwDensityGridCubic.rBrCrDYZX(iFock);
+
+    auto rBrCrDYZY = rwDensityGridCubic.rBrCrDYZY(iFock);
+
+    auto rBrCrDYZZ = rwDensityGridCubic.rBrCrDYZZ(iFock);
+
+    auto rBrCrDZXX = rwDensityGridCubic.rBrCrDZXX(iFock);
+
+    auto rBrCrDZXY = rwDensityGridCubic.rBrCrDZXY(iFock);
+
+    auto rBrCrDZXZ = rwDensityGridCubic.rBrCrDZXZ(iFock);
+
+    auto rBrCrDZYX = rwDensityGridCubic.rBrCrDZYX(iFock);
+
+    auto rBrCrDZYY = rwDensityGridCubic.rBrCrDZYY(iFock);
+
+    auto rBrCrDZYZ = rwDensityGridCubic.rBrCrDZYZ(iFock);
+
+    auto rBrCrDZZX = rwDensityGridCubic.rBrCrDZZX(iFock);
+
+    auto rBrCrDZZY = rwDensityGridCubic.rBrCrDZZY(iFock);
+
+    auto rBrCrDZZZ = rwDensityGridCubic.rBrCrDZZZ(iFock);
+
+    auto rhoBCD = rw3DensityGrid.alphaDensity(iFock);
+    
+    auto gradBCD_x = rw3DensityGrid.alphaDensityGradientX(iFock);
+    
+    auto gradBCD_y = rw3DensityGrid.alphaDensityGradientY(iFock);
+    
+    auto gradBCD_z = rw3DensityGrid.alphaDensityGradientZ(iFock);
+
 
     timer.stop("Kxc matrix prep.");
 
@@ -3812,59 +4229,56 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
             auto nu_offset = nu * npoints;
 
             #pragma omp simd aligned(weights, \
-                    rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2, \
+                    vsigma, v2rho2, v2rhosigma, v2sigma2, \
                     v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, \
-                    rhow1rhow2, rxw1rhow2, ryw1rhow2, rzw1rhow2, \
-                    rxw1rxw2, rxw1ryw2, rxw1rzw2, ryw1rxw2, ryw1ryw2, ryw1rzw2, rzw1rxw2, rzw1ryw2, rzw1rzw2, \
-                    rhow12a, gradw12a_x, gradw12a_y, gradw12a_z, \
                     G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 double w = weights[g];
 
-                double rxw12a = gradw12a_x[g];
-                double ryw12a = gradw12a_y[g];
-                double rzw12a = gradw12a_z[g];
+                // double rxw12a = gradw12a_x[g];
+                // double ryw12a = gradw12a_y[g];
+                // double rzw12a = gradw12a_z[g];
 
-                double grada_x_g = rhograd[6 * g + 0];
-                double grada_y_g = rhograd[6 * g + 1];
-                double grada_z_g = rhograd[6 * g + 2];
+                // double grada_x_g = rhograd[6 * g + 0];
+                // double grada_y_g = rhograd[6 * g + 1];
+                // double grada_z_g = rhograd[6 * g + 2];
 
-                double l2contract = grada_x_g * rxw12a + grada_y_g * ryw12a + grada_z_g * rzw12a;
-                double l5contract_x = grada_x_g * l2contract;
-                double l5contract_y = grada_y_g * l2contract;
-                double l5contract_z = grada_z_g * l2contract;     
-                double q2contract = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
-                double q3contract =   grada_x_g * grada_x_g * rxw1rxw2[g]
-                                    + grada_x_g * grada_y_g * rxw1ryw2[g]
-                                    + grada_x_g * grada_z_g * rxw1rzw2[g]
-                                    + grada_y_g * grada_x_g * ryw1rxw2[g]
-                                    + grada_y_g * grada_y_g * ryw1ryw2[g]
-                                    + grada_y_g * grada_z_g * ryw1rzw2[g]
-                                    + grada_z_g * grada_x_g * rzw1rxw2[g]
-                                    + grada_z_g * grada_y_g * rzw1ryw2[g]
-                                    + grada_z_g * grada_z_g * rzw1rzw2[g];
+                // double l2contract = grada_x_g * rxw12a + grada_y_g * ryw12a + grada_z_g * rzw12a;
+                // double l5contract_x = grada_x_g * l2contract;
+                // double l5contract_y = grada_y_g * l2contract;
+                // double l5contract_z = grada_z_g * l2contract;     
+                // double q2contract = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
+                // double q3contract =   grada_x_g * grada_x_g * rxw1rxw2[g]
+                //                     + grada_x_g * grada_y_g * rxw1ryw2[g]
+                //                     + grada_x_g * grada_z_g * rxw1rzw2[g]
+                //                     + grada_y_g * grada_x_g * ryw1rxw2[g]
+                //                     + grada_y_g * grada_y_g * ryw1ryw2[g]
+                //                     + grada_y_g * grada_z_g * ryw1rzw2[g]
+                //                     + grada_z_g * grada_x_g * rzw1rxw2[g]
+                //                     + grada_z_g * grada_y_g * rzw1ryw2[g]
+                //                     + grada_z_g * grada_z_g * rzw1rzw2[g];
 
-                double q4contract = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
-                double q7contract_x =  grada_x_g * grada_x_g *  rxw1rhow2[g] + grada_x_g * grada_y_g *  ryw1rhow2[g] + grada_x_g * grada_z_g *  rzw1rhow2[g];
-                double q7contract_y =  grada_y_g * grada_x_g *  rxw1rhow2[g] + grada_y_g * grada_y_g *  ryw1rhow2[g] + grada_y_g * grada_z_g *  rzw1rhow2[g];
-                double q7contract_z =  grada_z_g * grada_x_g *  rxw1rhow2[g] + grada_z_g * grada_y_g *  ryw1rhow2[g] + grada_z_g * grada_z_g *  rzw1rhow2[g];
+                // double q4contract = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
+                // double q7contract_x =  grada_x_g * grada_x_g *  rxw1rhow2[g] + grada_x_g * grada_y_g *  ryw1rhow2[g] + grada_x_g * grada_z_g *  rzw1rhow2[g];
+                // double q7contract_y =  grada_y_g * grada_x_g *  rxw1rhow2[g] + grada_y_g * grada_y_g *  ryw1rhow2[g] + grada_y_g * grada_z_g *  rzw1rhow2[g];
+                // double q7contract_z =  grada_z_g * grada_x_g *  rxw1rhow2[g] + grada_z_g * grada_y_g *  ryw1rhow2[g] + grada_z_g * grada_z_g *  rzw1rhow2[g];
 
-                double q8contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  rxw1ryw2[g] + grada_z_g *  rxw1rzw2[g];
-                double q8contract_y =  grada_x_g *  ryw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  ryw1rzw2[g];
-                double q8contract_z =  grada_x_g *  rzw1rxw2[g] + grada_y_g *  rzw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+                // double q8contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  rxw1ryw2[g] + grada_z_g *  rxw1rzw2[g];
+                // double q8contract_y =  grada_x_g *  ryw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  ryw1rzw2[g];
+                // double q8contract_z =  grada_x_g *  rzw1rxw2[g] + grada_y_g *  rzw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
 
-                double q9contract_x =  grada_x_g *  q3contract;
-                double q9contract_y =  grada_y_g *  q3contract;
-                double q9contract_z =  grada_z_g *  q3contract;
+                // double q9contract_x =  grada_x_g *  q3contract;
+                // double q9contract_y =  grada_y_g *  q3contract;
+                // double q9contract_z =  grada_z_g *  q3contract;
 
-                double q10contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  ryw1rxw2[g] + grada_z_g *  rzw1rxw2[g];
-                double q10contract_y =  grada_x_g *  rxw1ryw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  rzw1ryw2[g];
-                double q10contract_z =  grada_x_g *  rxw1rzw2[g] + grada_y_g *  ryw1rzw2[g] + grada_z_g *  rzw1rzw2[g];
+                // double q10contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  ryw1rxw2[g] + grada_z_g *  rzw1rxw2[g];
+                // double q10contract_y =  grada_x_g *  rxw1ryw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  rzw1ryw2[g];
+                // double q10contract_z =  grada_x_g *  rxw1rzw2[g] + grada_y_g *  ryw1rzw2[g] + grada_z_g *  rzw1rzw2[g];
 
-                double q11contract_x =  grada_x_g *  rxw1rxw2[g] + grada_x_g *  ryw1ryw2[g] + grada_x_g *  rzw1rzw2[g];
-                double q11contract_y =  grada_y_g *  rxw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_y_g *  rzw1rzw2[g];
-                double q11contract_z =  grada_z_g *  rxw1rxw2[g] + grada_z_g *  ryw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+                // double q11contract_x =  grada_x_g *  rxw1rxw2[g] + grada_x_g *  ryw1ryw2[g] + grada_x_g *  rzw1rzw2[g];
+                // double q11contract_y =  grada_y_g *  rxw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_y_g *  rzw1rzw2[g];
+                // double q11contract_z =  grada_z_g *  rxw1rxw2[g] + grada_z_g *  ryw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
 
                 // functional derivatives in libxc form
 
@@ -3948,15 +4362,15 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
 
                 // vxc 1 contributions
 
-                prefac += rr * rhow12a[g] // l1
-                        + rx * l2contract;
+                // prefac += rr * rhow12a[g] // l1
+                //         + rx * l2contract;
                 
-                // vxc 2 contributions
+                // // vxc 2 contributions
                 
-                prefac += rrr * rhow1rhow2[g] // q1
-                        + rxr * q2contract
-                        + rxx * q3contract
-                        + rx * q4contract;
+                // prefac += rrr * rhow1rhow2[g] // q1
+                //         + rxr * q2contract
+                //         + rxx * q3contract
+                //         + rx * q4contract;
                 
                 // vxc 3 contributions
 
@@ -3968,37 +4382,37 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
 
                 // vxc 1 contributions
 
-                xcomp += xr * grada_x_g * rhow12a[g] // l3
-                        + x * rxw12a // l4
-                        + xx * l5contract_x;
+                // xcomp += xr * grada_x_g * rhow12a[g] // l3
+                //         + x * rxw12a // l4
+                //         + xx * l5contract_x;
 
-                ycomp += xr * grada_y_g * rhow12a[g] // l3
-                        + x * ryw12a // l4
-                        + xx * l5contract_y;
+                // ycomp += xr * grada_y_g * rhow12a[g] // l3
+                //         + x * ryw12a // l4
+                //         + xx * l5contract_y;
 
-                zcomp += xr * grada_z_g * rhow12a[g] // l3
-                        + x * rzw12a // l4
-                        + xx * l5contract_z;
+                // zcomp += xr * grada_z_g * rhow12a[g] // l3
+                //         + x * rzw12a // l4
+                //         + xx * l5contract_z;
                 
-                // vxc 2 contributions
+                // // vxc 2 contributions
                 
-                xcomp += xrr * grada_x_g * rhow1rhow2[g] // q5
-                        + xr * rxw1rhow2[g] // q6
-                        + xxr * q7contract_x
-                        + xx * (q8contract_x + q10contract_x + q11contract_x)
-                        + xxx * q9contract_x;
+                // xcomp += xrr * grada_x_g * rhow1rhow2[g] // q5
+                //         + xr * rxw1rhow2[g] // q6
+                //         + xxr * q7contract_x
+                //         + xx * (q8contract_x + q10contract_x + q11contract_x)
+                //         + xxx * q9contract_x;
 
-                ycomp += xrr * grada_y_g * rhow1rhow2[g] // q5
-                        + xr * ryw1rhow2[g] // q6
-                        + xxr * q7contract_y
-                        + xx * (q8contract_y + q10contract_y + q11contract_y)
-                        + xxx * q9contract_y;
+                // ycomp += xrr * grada_y_g * rhow1rhow2[g] // q5
+                //         + xr * ryw1rhow2[g] // q6
+                //         + xxr * q7contract_y
+                //         + xx * (q8contract_y + q10contract_y + q11contract_y)
+                //         + xxx * q9contract_y;
  
-                zcomp += xrr * grada_z_g * rhow1rhow2[g] // q5
-                        + xr * rzw1rhow2[g] // q6
-                        + xxr * q7contract_z
-                        + xx * (q8contract_z + q10contract_z + q11contract_z)
-                        + xxx * q9contract_z;
+                // zcomp += xrr * grada_z_g * rhow1rhow2[g] // q5
+                //         + xr * rzw1rhow2[g] // q6
+                //         + xxr * q7contract_z
+                //         + xx * (q8contract_z + q10contract_z + q11contract_z)
+                //         + xxx * q9contract_z;
 
                 // vxc 3 contributions
 
