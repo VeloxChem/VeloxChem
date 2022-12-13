@@ -1023,7 +1023,7 @@ class CDensityGridCubic
                      const CDensityGrid& rw2DensityGrid,
                      const xcfun         xcFuncType,
                      const int32_t             numdens,
-                     const std::string&  quadMode) const;
+                     const std::string&  quadMode);
 
     /**
      Converts density grid object to text and insert it into output text
