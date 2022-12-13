@@ -113,6 +113,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double f_zet1;
 
+        // Real case
         if (pair_density <= 0)
         {
             double delta = sqrt(-2.0 * pair_density);
@@ -123,6 +124,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             f_zet1 = spinpolf*4.0/3.0 *(std::pow(1.0+zeta, 1.0/3.0)-std::pow(1.0-zeta, 1.0/3.0));
         }
+        // Imaginary case
         else
         {
             double delta = sqrt(2.0 * pair_density);
@@ -180,7 +182,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double delta_en = f_zeta * ef0;
 
-        exc[g] = (ep_p0 + delta_en) * density ;
+        exc[g] = ep_p0 + delta_en;
         vrho[2 * g + 0] = 0.0;
         vrho[2 * g + 1] = 0.0;
     }

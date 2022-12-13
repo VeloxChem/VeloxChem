@@ -46,6 +46,8 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
     double fourthird = 4.0 / 3.0;
 
+    fre /= std::pow(2.0, fourthird);
+
     for (int32_t g = 0; g < np; g++)
     {
         double density = rho[2 * g + 0];
@@ -63,30 +65,38 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double pair_density = rho[2 * g + 1];
 
+        double f_zeta;
+
+        // Real case
         if (pair_density <= 0)
         {
             double delta = sqrt(-2.0 * pair_density);
 
-            double rhoa = 0.5 * (density + delta);
+            double zeta = delta / density;
 
-            double rhob = 0.5 * (density - delta);
+            double fxa = std::pow(1 + zeta, fourthird);
 
-            double fxa = std::pow(rhoa, fp);
+            double fxb = std::pow(1 - zeta, fourthird);
 
-            double fxb = std::pow(rhob, fp);
-
-            exc[g] = fre * (rhoa * fxa +  rhob * fxb);
+            f_zeta = fxa + fxb;
         }
+        // Imaginary case
         else
         {
             double delta = sqrt(2.0 * pair_density);
 
-            double r2 = 0.25 * std::pow(density, 2) + 0.5 * pair_density;
+            double zeta = delta / density;
 
-            double theta = fourthird * std::atan(delta/density);
+            double r = sqrt ( 1.0 + std::pow(zeta, 2) );
 
-            exc[g] = 2.0 * fre * std::pow(r2, twothird) * std::cos(theta);
+            double theta = 4.0 / 3.0 * std::atan(zeta);
+
+            f_zeta = 2.0 * std::pow(r, 4.0/3.0) * std::cos(theta);
         }
+
+        double rhothird = std::pow(density, fp);
+
+        exc[g] = fre * rhothird * f_zeta;
         vrho[2 * g + 0] = 0.0;
         vrho[2 * g + 1] = 0.0;
     }

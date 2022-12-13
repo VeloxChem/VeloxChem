@@ -2176,7 +2176,7 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFock
 
             nele += local_weights[g] * rho_total;
 
-            xcene += local_weights[g] * exc[g];
+            xcene += local_weights[g] * exc[g] * rho_total;
         }
 
         timer.stop("XC energy");
