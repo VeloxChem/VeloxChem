@@ -88,6 +88,7 @@ screenVxcFockForGGA(double*               rho,
             vsigma[3 * g + 1] = 0.0;
             vsigma[3 * g + 2] = 0.0;
         }
+
         // rho
         if (std::fabs(rho[2 * g + 0] + rho[2 * g + 1]) <= densityThreshold)
         {
@@ -98,10 +99,10 @@ screenVxcFockForGGA(double*               rho,
 
 void
 screenVxcFockForPLDA(double*               rho,
-                    double*               exc,
-                    double*               vrho,
-                    const int32_t         npoints,
-                    const double          densityThreshold)
+                     double*               exc,
+                     double*               vrho,
+                     const int32_t         npoints,
+                     const double          densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {

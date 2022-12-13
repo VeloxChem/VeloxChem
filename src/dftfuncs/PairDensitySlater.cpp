@@ -26,7 +26,6 @@
 #include "PairDensitySlater.hpp"
 
 #include <cmath>
-
 #include <iostream>
 
 #include "MathConst.hpp"
@@ -36,7 +35,7 @@ namespace pdftslater {  // pdftslater namespace
 void
 compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 {
-    double frg = - std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
+    double frg = -std::pow(6.0 / mathconst::getPiValue(), 1.0 / 3.0);
 
     double fre = 0.75 * frg;
 
@@ -87,16 +86,17 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double zeta = delta / density;
 
-            double r = sqrt ( 1.0 + std::pow(zeta, 2) );
+            double r = sqrt(1.0 + std::pow(zeta, 2));
 
             double theta = 4.0 / 3.0 * std::atan(zeta);
 
-            f_zeta = 2.0 * std::pow(r, 4.0/3.0) * std::cos(theta);
+            f_zeta = 2.0 * std::pow(r, 4.0 / 3.0) * std::cos(theta);
         }
 
         double rhothird = std::pow(density, fp);
 
         exc[g] = fre * rhothird * f_zeta;
+
         vrho[2 * g + 0] = 0.0;
         vrho[2 * g + 1] = 0.0;
     }
