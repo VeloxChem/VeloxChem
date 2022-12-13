@@ -948,7 +948,7 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
                               const CDensityGrid& rw2DensityGrid,
                               const xcfun         xcFuncType,
                               const int32_t             numdens,
-                              const std::string&  CubeMode) const
+                              const std::string&  CubeMode) 
 
 {
     if (_gridType != dengrid::ab) return;
