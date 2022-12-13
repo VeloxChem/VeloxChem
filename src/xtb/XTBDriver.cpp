@@ -56,6 +56,8 @@ CXTBDriver::CXTBDriver(MPI_Comm comm)
     _calculator = xtb_newCalculator();
           
     _results = xtb_newResults();
+
+    xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL); 
 #endif
 }
 
@@ -95,6 +97,18 @@ CXTBDriver::setOutputFilename(const std::string filename)
 }
 
 void 
+CXTBDriver::mute()
+{
+    if (isMasterNode()) xtb_setVerbosity(_environment, XTB_VERBOSITY_MUTED); 
+}
+
+void 
+CXTBDriver::unmute()
+{
+    if (isMasterNode()) xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL); 
+}
+
+void 
 CXTBDriver::compute(const CMolecule& molecule)
 {
 #ifdef ENABLE_XTB
@@ -103,8 +117,6 @@ CXTBDriver::compute(const CMolecule& molecule)
         // set up output stream 
     
         xtb_setOutput(_environment, _outputFilename.c_str());
-
-        xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL); 
 
         // xtb_setAccuracy(_environment, _calculator, 0.0001); 
 

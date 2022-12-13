@@ -152,6 +152,16 @@ class CXTBDriver
     void setOutputFilename(const std::string filename);
 
     /**
+     Mutes output.
+     */
+    void mute();
+
+    /**
+     Unmutes output.
+     */
+    void unmute();
+
+    /**
      Computes DTB-B single point energy using XTB package.
 
      @param molecule the molecule.

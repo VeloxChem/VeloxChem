@@ -24,6 +24,8 @@ class TestXTBHessianDriver:
         xtb_method = 'gfn2'
 
         xtb_drv = XTBDriver(task.mpi_comm)
+        xtb_drv.mute()
+
         xtb_drv.set_method(xtb_method.lower())
         xtb_drv.compute(task.molecule, task.ostream)
 
