@@ -228,13 +228,6 @@ class TPAFullDriver(TPADriver):
             density_list1.append(Dy_.imag)
             density_list1.append(Dz_.real)
             density_list1.append(Dz_.imag)
-            
-
-            print("D_sig_zz")
-            print(D_sig_zz)
-
-            print("D_lamtau_zz")
-            print(D_lamtau_zz)
 
             density_list2.append(D_sig_xx.real)
             density_list2.append(D_sig_xx.imag)
@@ -437,10 +430,6 @@ class TPAFullDriver(TPADriver):
             (Fx, Fy, Fz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
              f_lamtau_xz, f_lamtau_yz, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy,
              f_sig_xz, f_sig_yz, f_x, f_y, f_z) = vec_pack
-
-
-            print("F123_z")
-            print(f_z)
 
             Fx_ = Fx.T.conj()  # fo['Fc'][('x', -w)]
             Fy_ = Fy.T.conj()  # fo['Fc'][('y', -w)]
@@ -689,13 +678,6 @@ class TPAFullDriver(TPADriver):
             (f_x, f_y, f_z, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy, f_sig_xz,
              f_sig_yz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
              f_lamtau_xz, f_lamtau_yz) = vec_pack
-
-            print("f_sig_zz")
-            print(f_sig_zz)
-
-            print("f_lamtau_zz")
-            print(f_lamtau_zz)
-
 
             f_x_ = f_x.T.conj()  # Fock['Fc'][('x', -w)]
             f_y_ = f_y.T.conj()  # Fock['Fc'][('y', -w)]

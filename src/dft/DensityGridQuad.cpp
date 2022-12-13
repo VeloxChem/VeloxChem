@@ -1120,8 +1120,6 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
         {
             // This routine is for computing the Fbc, Fbd, Fcd first-order fock matrices for the general cubic response function
             
-            std::cout << "crf_i" << std::endl;
-
             for (int32_t j = 0; j < numdens / 6; j++)
             {
                 auto rho_bc_r = rhow1rhow2(6 * j);

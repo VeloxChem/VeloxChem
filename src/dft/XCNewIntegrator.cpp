@@ -1601,8 +1601,6 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         CDensityGridQuad rwdengridquad(npoints, numdens_rw2, xcfuntype, dengrid::ab);
 
-        std::cout << "Before den prod" << std::endl;
-
         rwdengridquad.DensityProd(rwdengrid, xcfuntype, numdens_rw2, quadMode);
 
         timer.stop("Density grid quad");
@@ -1628,8 +1626,6 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
         timer.stop("Density screening");
 
         // go through density matrices
-
-        std::cout << "Before vxc after den prod" << std::endl;
 
         for (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
         {

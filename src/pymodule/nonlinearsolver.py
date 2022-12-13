@@ -495,10 +495,6 @@ class NonLinearSolver:
                 elif mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
                     num_1 = len(first_order_dens)
                     num_2 = len(second_order_dens)
-                    print("len dens1")
-                    print(num_1)
-                    print("len dens2")
-                    print(num_2)
 
                 if mode.lower() == 'shg':
                     # 6 first-order densities per frequency
@@ -715,15 +711,11 @@ class NonLinearSolver:
 
                 if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
                     # Compute vxc contribution for two-time transformed Fock matrics
-                    print("second-order")
-                    print(mode.lower())
                     xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
                                           dens2, gs_density, molgrid,
                                           self.xcfun.get_func_label(), mode)
 
                 elif mode.lower() in ['crf','tpa']:
-                    print("third-order")
-                    print(mode.lower())
                     # Compute vxc contribution for three-time transformed Fock matrics
                     xc_drv.integrate_lxc_fock(fock, molecule, ao_basis, dens1, dens2, dens3, 
                                     gs_density, molgrid,

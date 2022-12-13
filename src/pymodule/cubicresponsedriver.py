@@ -710,11 +710,6 @@ class CubicResponseDriver(NonLinearSolver):
             density_list2.append(Dcd.real)
             density_list2.append(Dcd.imag)
 
-            print("Dbd")
-            print(8*Dbd)
-            print("Dcd")
-            print(8*Dbc + 8*Dcd)
-
             density_list3.append(D123.real)
             density_list3.append(D123.imag)
 
@@ -1029,9 +1024,6 @@ class CubicResponseDriver(NonLinearSolver):
 
             (fb, fc, fd, fbc, fbd, fcd, fbcd) = vec_pack
 
-            print("F123")
-            print(3 * fbcd)
-
             fb = np.conjugate(fb).T
             fc = np.conjugate(fc).T
             fd = np.conjugate(fd).T
@@ -1125,7 +1117,7 @@ class CubicResponseDriver(NonLinearSolver):
                 fo2[('B', wb)].data,
                 fo2[('C', wc)].data,
                 fo2[('D', wd)].data,
-                fo['Fbc'][wb].data,
+                fo['Fbc'][wb].data ,
                 fo['Fbd'][wb].data,
                 fo['Fcd'][wb].data,
             ]).T.copy()
@@ -1138,11 +1130,6 @@ class CubicResponseDriver(NonLinearSolver):
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
             (fb, fc, fd, fbc, fbd, fcd) = vec_pack
-
-            print("fbd")
-            print(3*fbd)
-            print("fcd")
-            print(3*fcd + 3*fbc)
 
             fb = np.conjugate(fb).T
             fc = np.conjugate(fc).T
