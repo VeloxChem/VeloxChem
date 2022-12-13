@@ -485,7 +485,7 @@ CXCNewFunctional::compute_lxc_for_lda(int32_t np, const double* rho, double* v4r
     {
         auto funcptr = xccomp.getFunctionalPointer();
 
-        xc_lda_kxc(funcptr, np, rho, stage_v4rho4);
+        xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
 
         const auto c = xccomp.getScalingFactor();
 

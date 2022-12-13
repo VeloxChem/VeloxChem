@@ -3377,10 +3377,10 @@ CXCNewIntegrator::_integratePartialLxcFockForLDA(const int32_t              npoi
                 auto v3rho3_aaa = v3rho3[4 * g + 0];
                 auto v3rho3_aab = v3rho3[4 * g + 1];
                 auto v3rho3_abb = v3rho3[4 * g + 2];
-                auto v4rho4_aaaa = v3rho3[5 * g + 0];
-                auto v4rho4_aaab = v3rho3[5 * g + 1];
-                auto v4rho4_aabb = v3rho3[5 * g + 2];
-                auto v4rho4_abbb = v3rho3[5 * g + 3];
+                auto v4rho4_aaaa = v4rho4[5 * g + 0];
+                auto v4rho4_aaab = v4rho4[5 * g + 1];
+                auto v4rho4_aabb = v4rho4[5 * g + 2];
+                auto v4rho4_abbb = v4rho4[5 * g + 3];
 
                 double rr = (v2rho2_aa + v2rho2_ab);
                 double rrr = (v3rho3_aaa + 2.0 * v3rho3_aab + v3rho3_abb);
