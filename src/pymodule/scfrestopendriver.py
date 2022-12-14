@@ -237,7 +237,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
             The scaled Fock/Kohn-Sham matrix.
         """
 
-        effmat = np.zeros(self._fock_matrices_proj[0].shape, dtype=float)
+        effmat = np.zeros(self._fock_matrices_proj[0].shape)
 
         for w, fmat in zip(weights, self._fock_matrices_proj):
             effmat = effmat + w * fmat

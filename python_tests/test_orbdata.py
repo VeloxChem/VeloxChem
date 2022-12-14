@@ -127,14 +127,14 @@ class TestOrbData:
             here = Path(__file__).parent
             h5file = str(here / 'inputs' / 'dummy.h5')
 
-            nuc_chg = np.array([1, 8, 1], dtype=np.int32)
+            nuc_chg = np.array([1, 8, 1], dtype='int32')
             orb_rest.write_hdf5(h5file, nuc_chg, 'sto-3g')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             assert orb_rest == dummy
             assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'sto-3g',
                                                 'restricted')
 
-            nuc_chg = np.array([1, 1, 8], dtype=np.int32)
+            nuc_chg = np.array([1, 1, 8], dtype='int32')
             orb_unrest.write_hdf5(h5file, nuc_chg, 'cc-pvdz')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             assert orb_unrest == dummy
