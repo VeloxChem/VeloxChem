@@ -99,9 +99,9 @@ from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
-from .shgdriver import SHGDriver
-from .tpafulldriver import TPAFullDriver
-from .tpareddriver import TPAReducedDriver
+from .shgdriver import ShgDriver
+from .tpafulldriver import TpaFullDriver
+from .tpareddriver import TpaReducedDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -126,8 +126,11 @@ from .xtbhessiandriver import XtbHessianDriver
 from .numerovdriver import NumerovDriver
 
 # for backward compatibility
-from .tdaeigensolver import TdaEigenSolver as TDAExciDriver
 from .xtbdriver import XtbDriver as XTBDriver
+from .tdaeigensolver import TdaEigenSolver as TDAExciDriver
+from .shgdriver import ShgDriver as SHGDriver
+from .tpafulldriver import TpaFullDriver as TPAFullDriver
+from .tpareddriver import TpaReducedDriver as TPAReducedDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical
