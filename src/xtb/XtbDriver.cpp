@@ -23,7 +23,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "XTBDriver.hpp"
+#include "XtbDriver.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -33,7 +33,7 @@
 #include "Molecule.hpp"
 #include "MpiFunc.hpp"
 
-CXTBDriver::CXTBDriver(MPI_Comm comm)
+CXtbDriver::CXtbDriver(MPI_Comm comm)
     : _outputFilename(std::string("STDOUT"))
 
     , _xtbMethod(std::string("gfn2"))
@@ -61,7 +61,7 @@ CXTBDriver::CXTBDriver(MPI_Comm comm)
 #endif
 }
 
-CXTBDriver::~CXTBDriver()
+CXtbDriver::~CXtbDriver()
 {
 #ifdef ENABLE_XTB
     xtb_delResults(&_results);
@@ -73,43 +73,47 @@ CXTBDriver::~CXTBDriver()
 }
 
 void 
-CXTBDriver::setMaxIterations(const int maxIterations)
+CXtbDriver::setMaxIterations(const int maxIterations)
 {
     _maxIterations = maxIterations; 
 }
 
 void 
-CXTBDriver::setElectronicTemp(const double electronicTemp)
+CXtbDriver::setElectronicTemp(const double electronicTemp)
 {
     _electronicTemp = electronicTemp; 
 }
 
 void 
-CXTBDriver::setMethod(const std::string method)
+CXtbDriver::setMethod(const std::string method)
 {
     _xtbMethod = method; 
 }
 
 void 
-CXTBDriver::setOutputFilename(const std::string filename)
+CXtbDriver::setOutputFilename(const std::string filename)
 {
     _outputFilename = filename; 
 }
 
 void 
-CXTBDriver::mute()
+CXtbDriver::mute()
 {
+#ifdef ENABLE_XTB
     if (isMasterNode()) xtb_setVerbosity(_environment, XTB_VERBOSITY_MUTED); 
+#endif
 }
 
 void 
-CXTBDriver::unmute()
+CXtbDriver::unmute()
 {
+#ifdef ENABLE_XTB
     if (isMasterNode()) xtb_setVerbosity(_environment, XTB_VERBOSITY_FULL); 
+#endif
 }
 
 void 
-CXTBDriver::compute(const CMolecule& molecule)
+CXtbDriver::compute(const CMolecule& molecule)
 {
 #ifdef ENABLE_XTB
     if (isMasterNode())
@@ -163,13 +167,13 @@ CXTBDriver::compute(const CMolecule& molecule)
 }
 
 bool 
-CXTBDriver::isMasterNode() const 
+CXtbDriver::isMasterNode() const 
 {
     return _locRank == mpi::master(); 
 }
 
 bool
-CXTBDriver::getState() const
+CXtbDriver::getState() const
 {
 #ifdef ENABLE_XTB
     return xtb_checkEnvironment(_environment) == 0;
@@ -178,7 +182,7 @@ CXTBDriver::getState() const
 }
 
 std::vector<std::string>
-CXTBDriver::getOutput() const
+CXtbDriver::getOutput() const
 {
     std::vector<std::string> output_strings;
 
@@ -204,13 +208,13 @@ CXTBDriver::getOutput() const
 }
 
 std::string
-CXTBDriver::getOutputFilename() const
+CXtbDriver::getOutputFilename() const
 {
     return _outputFilename;
 }
 
 double 
-CXTBDriver::getEnergy() const
+CXtbDriver::getEnergy() const
 {
     double energy = 0.0; 
  
@@ -225,7 +229,7 @@ CXTBDriver::getEnergy() const
 }
 
 std::vector<double> 
-CXTBDriver::getGradient() const
+CXtbDriver::getGradient() const
 {
     std::vector<double> grad;
 
@@ -242,7 +246,7 @@ CXTBDriver::getGradient() const
 }
 
 std::vector<double> 
-CXTBDriver::getDipole() const
+CXtbDriver::getDipole() const
 {
     std::vector<double> dipole;
 
@@ -260,7 +264,7 @@ CXTBDriver::getDipole() const
 
 #ifdef ENABLE_XTB
 xtb_TMolecule
-CXTBDriver::_set_molecule(const CMolecule& molecule)
+CXtbDriver::_set_molecule(const CMolecule& molecule)
 {
     _natoms = static_cast<int>(molecule.getNumberOfAtoms());
     

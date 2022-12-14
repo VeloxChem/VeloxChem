@@ -82,8 +82,8 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
-from .xtbdriver import XTBDriver
-from .xtbgradientdriver import XTBGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
@@ -122,11 +122,12 @@ from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
-from .xtbhessiandriver import XTBHessianDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .numerovdriver import NumerovDriver
 
 # for backward compatibility
 from .tdaeigensolver import TdaEigenSolver as TDAExciDriver
+from .xtbdriver import XtbDriver as XTBDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

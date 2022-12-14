@@ -23,8 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef XTBDriver_hpp
-#define XTBDriver_hpp
+#ifndef XtbDriver_hpp
+#define XtbDriver_hpp
 
 #include <mpi.h>
 
@@ -39,11 +39,11 @@
 class CMolecule;
 
 /**
- Class CXTBDriver enables DFT-B computations using XTB package from Grimme group.
+ Class CXtbDriver enables DFT-B computations using XTB package from Grimme group.
 
  @author Z. Rinkevicius
  */
-class CXTBDriver
+class CXtbDriver
 {
     /**
      The rank of associated local MPI process.
@@ -116,12 +116,12 @@ class CXTBDriver
 
      @param comm the MPI communicator.
      */
-    CXTBDriver(MPI_Comm comm);
+    CXtbDriver(MPI_Comm comm);
 
     /**
      Destroys a XTB driver object.
      */
-    ~CXTBDriver();
+    ~CXtbDriver();
 
     /**
      Sets maximum number of SCF iterations.
@@ -232,4 +232,4 @@ class CXTBDriver
     std::vector<double> getDipole() const;
 };
 
-#endif /* XTBDriver_hpp */
+#endif /* XtbDriver_hpp */

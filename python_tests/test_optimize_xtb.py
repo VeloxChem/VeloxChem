@@ -5,8 +5,8 @@ import pytest
 from veloxchem.mpitask import MpiTask
 from veloxchem.optimizationdriver import OptimizationDriver
 from veloxchem.veloxchemlib import bohr_in_angstroms, is_mpi_master
-from veloxchem.xtbdriver import XTBDriver
-from veloxchem.xtbgradientdriver import XTBGradientDriver
+from veloxchem.xtbdriver import XtbDriver
+from veloxchem.xtbgradientdriver import XtbGradientDriver
 
 from .addons import using_xtb
 
@@ -20,13 +20,13 @@ class TestOptimizeXTB:
 
         task = MpiTask([inpfile, None])
 
-        xtb_drv = XTBDriver(task.mpi_comm)
+        xtb_drv = XtbDriver(task.mpi_comm)
         xtb_drv.mute()
 
         xtb_drv.set_method(xtb_method.lower())
         xtb_drv.compute(task.molecule, task.ostream)
 
-        grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
+        grad_drv = XtbGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
         opt_drv = OptimizationDriver(grad_drv)
         opt_drv.update_settings({
             'coordsys': 'tric',
