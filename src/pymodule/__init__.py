@@ -91,7 +91,7 @@ from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
 from .rspdriver import ResponseDriver
-from .tdaexcidriver import TDAExciDriver
+from .tdaeigensolver import TdaEigenSolver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
@@ -124,6 +124,9 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .xtbhessiandriver import XTBHessianDriver
 from .numerovdriver import NumerovDriver
+
+# for backward compatibility
+from .tdaeigensolver import TdaEigenSolver as TDAExciDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

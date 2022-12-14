@@ -52,7 +52,7 @@ from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
                          write_rsp_solution)
 
 
-class TDAExciDriver(LinearSolver):
+class TdaEigenSolver(LinearSolver):
     """
     Implements TDA excited states computation schheme for Hartree-Fock/Kohn-Sham
     level of theory.
@@ -63,7 +63,7 @@ class TDAExciDriver(LinearSolver):
         The output stream.
 
     Instance variables
-        - nstates: The number of excited states determined by driver.
+        - nstates: The number of excited states to be determined.
         - solver: The eigenvalues solver.
         - nto: The flag for natural transition orbital analysis.
         - nto_pairs: The number of NTO pairs in NTO analysis.
@@ -118,8 +118,7 @@ class TDAExciDriver(LinearSolver):
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
-        Updates response and method settings in TDA excited states computation
-        driver.
+        Updates response and method settings in TDA excited states computation.
 
         :param rsp_dict:
             The dictionary of response input.
@@ -324,7 +323,7 @@ class TDAExciDriver(LinearSolver):
         profiler.print_timing(self.ostream)
         profiler.print_profiling_summary(self.ostream)
 
-        profiler.check_memory_usage('End of TDA driver')
+        profiler.check_memory_usage('End of TDA eigensolver')
         profiler.print_memory_usage(self.ostream)
 
         # compute 1e dipole integrals

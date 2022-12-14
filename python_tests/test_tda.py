@@ -5,7 +5,7 @@ import pytest
 
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.veloxchemlib import hartree_in_ev, is_mpi_master
 
 from .addons import using_cppe
@@ -34,7 +34,7 @@ class TestTDA:
         ref_osc_str = [float(line.split()[3]) for line in data_lines]
         ref_rot_str = [float(line.split()[4]) for line in data_lines]
 
-        tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
+        tda_solver = TdaEigenSolver(task.mpi_comm, task.ostream)
         tda_solver.update_settings({'nstates': len(ref_exc_ene)},
                                    task.input_dict['method_settings'])
         tda_results = tda_solver.compute(task.molecule, task.ao_basis,

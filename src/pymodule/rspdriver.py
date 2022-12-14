@@ -27,7 +27,7 @@ from .cppsolver import ComplexResponse
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6driver import C6Driver
-from .tdaexcidriver import TDAExciDriver
+from .tdaeigensolver import TdaEigenSolver
 from .tpafulldriver import TPAFullDriver
 from .tpareddriver import TPAReducedDriver
 from .shgdriver import SHGDriver
@@ -128,7 +128,7 @@ class ResponseDriver:
                 self._rsp_dict['residue'] == 'single' and
                 self._rsp_dict['complex'] == 'no'):
             if self.tamm_dancoff:
-                self._solver = TDAExciDriver(self.comm, self.ostream)
+                self._solver = TdaEigenSolver(self.comm, self.ostream)
             else:
                 self._solver = LinearResponseEigenSolver(
                     self.comm, self.ostream)

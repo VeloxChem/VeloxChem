@@ -5,7 +5,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import rotatory_strength_in_cgs
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 
 
@@ -22,7 +22,7 @@ class TestECD:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         if flag == 'tda':
-            rsp_drv = TDAExciDriver(task.mpi_comm, task.ostream)
+            rsp_drv = TdaEigenSolver(task.mpi_comm, task.ostream)
         elif flag == 'rpa':
             rsp_drv = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
         rsp_drv.update_settings({'nstates': ref['eig'].shape[0]},
