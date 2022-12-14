@@ -3940,9 +3940,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 auto v3sigma3_acb = v3sigma3[10 * g + 4];
                 auto v3sigma3_abb = v3sigma3[10 * g + 5];
                 auto v3sigma3_ccc = v3sigma3[10 * g + 6];
-                auto v3sigma3_cbb = v3sigma3[10 * g + 8];
-                // ? 
                 auto v3sigma3_bcc = v3sigma3[10 * g + 7];
+                auto v3sigma3_cbb = v3sigma3[10 * g + 8];
 
                 // functional derivatives
                 double rr = (v2rho2_aa + v2rho2_ab);
@@ -4085,126 +4084,126 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
 
     // pointers to perturbed density gradient norms
 
-    auto RhoBCRhoD = rwDensityGridCubic.RhoBCRhoD(iFock);
+    auto gam = rwDensityGridCubic.RhoBCRhoD(iFock);
     
-    auto RhoBCRhoDX = rwDensityGridCubic.RhoBCRhoDX(iFock);
+    auto gamx = rwDensityGridCubic.RhoBCRhoDX(iFock);
     
-    auto RhoBCRhoDY = rwDensityGridCubic.RhoBCRhoDY(iFock);
+    auto gamy = rwDensityGridCubic.RhoBCRhoDY(iFock);
     
-    auto RhoBCRhoDZ = rwDensityGridCubic.RhoBCRhoDZ(iFock);
+    auto gamz = rwDensityGridCubic.RhoBCRhoDZ(iFock);
 
-    auto RhoBCRhoDXX = rwDensityGridCubic.RhoBCRhoDXX(iFock);
+    auto gamxx = rwDensityGridCubic.RhoBCRhoDXX(iFock);
 
-    auto RhoBCRhoDXY = rwDensityGridCubic.RhoBCRhoDXY(iFock); 
+    auto gamxy = rwDensityGridCubic.RhoBCRhoDXY(iFock); 
 
-    auto RhoBCRhoDXZ = rwDensityGridCubic.RhoBCRhoDXZ(iFock);
+    auto gamxz = rwDensityGridCubic.RhoBCRhoDXZ(iFock);
     
-    auto RhoBCRhoDYX = rwDensityGridCubic.RhoBCRhoDYX(iFock);
+    auto gamyx = rwDensityGridCubic.RhoBCRhoDYX(iFock);
     
-    auto RhoBCRhoDYY = rwDensityGridCubic.RhoBCRhoDYY(iFock);
+    auto gamyy = rwDensityGridCubic.RhoBCRhoDYY(iFock);
     
-    auto RhoBCRhoDYZ = rwDensityGridCubic.RhoBCRhoDYZ(iFock);
+    auto gamyz = rwDensityGridCubic.RhoBCRhoDYZ(iFock);
     
-    auto RhoBCRhoDZX = rwDensityGridCubic.RhoBCRhoDZX(iFock);
+    auto gamzx = rwDensityGridCubic.RhoBCRhoDZX(iFock);
     
-    auto RhoBCRhoDZY = rwDensityGridCubic.RhoBCRhoDZY(iFock);
+    auto gamzy = rwDensityGridCubic.RhoBCRhoDZY(iFock);
 
-    auto RhoBCRhoDZZ = rwDensityGridCubic.RhoBCRhoDZZ(iFock);
+    auto gamzz = rwDensityGridCubic.RhoBCRhoDZZ(iFock);
 
-    auto rBrCrD = rwDensityGridCubic.rBrCrD(iFock);
+    auto pi = rwDensityGridCubic.rBrCrD(iFock);
 
-    auto rBrCrDX = rwDensityGridCubic.rBrCrDX(iFock);
+    auto pix = rwDensityGridCubic.rBrCrDX(iFock);
 
-    auto rBrCrDY = rwDensityGridCubic.rBrCrDY(iFock);
+    auto piy = rwDensityGridCubic.rBrCrDY(iFock);
 
-    auto rBrCrDZ = rwDensityGridCubic.rBrCrDZ(iFock);
+    auto piz = rwDensityGridCubic.rBrCrDZ(iFock);
 
-    auto rBrCrDXX = rwDensityGridCubic.rBrCrDXX(iFock);
+    auto pixx = rwDensityGridCubic.rBrCrDXX(iFock);
 
-    auto rBrCrDXY = rwDensityGridCubic.rBrCrDXY(iFock);
+    auto pixy = rwDensityGridCubic.rBrCrDXY(iFock);
 
-    auto rBrCrDXZ = rwDensityGridCubic.rBrCrDXZ(iFock);
+    auto pixz = rwDensityGridCubic.rBrCrDXZ(iFock);
 
-    auto rBrCrDYX = rwDensityGridCubic.rBrCrDYX(iFock);
+    auto piyx = rwDensityGridCubic.rBrCrDYX(iFock);
 
-    auto rBrCrDYY = rwDensityGridCubic.rBrCrDYY(iFock);
+    auto piyy = rwDensityGridCubic.rBrCrDYY(iFock);
 
-    auto rBrCrDYZ = rwDensityGridCubic.rBrCrDYZ(iFock);
+    auto piyz = rwDensityGridCubic.rBrCrDYZ(iFock);
 
-    auto rBrCrDZX = rwDensityGridCubic.rBrCrDZX(iFock);
+    auto pizx = rwDensityGridCubic.rBrCrDZX(iFock);
 
-    auto rBrCrDZY = rwDensityGridCubic.rBrCrDZY(iFock);
+    auto pizy = rwDensityGridCubic.rBrCrDZY(iFock);
 
-    auto rBrCrDZZ = rwDensityGridCubic.rBrCrDZZ(iFock);
+    auto pizz = rwDensityGridCubic.rBrCrDZZ(iFock);
 
-    auto rBrCrDXXX = rwDensityGridCubic.rBrCrDXXX(iFock);
+    auto pixxx = rwDensityGridCubic.rBrCrDXXX(iFock);
 
-    auto rBrCrDXXY = rwDensityGridCubic.rBrCrDXXY(iFock);
+    auto pixxy = rwDensityGridCubic.rBrCrDXXY(iFock);
 
-    auto rBrCrDXXZ = rwDensityGridCubic.rBrCrDXXZ(iFock);
+    auto pixxz = rwDensityGridCubic.rBrCrDXXZ(iFock);
 
-    auto rBrCrDXYX = rwDensityGridCubic.rBrCrDXYX(iFock);
+    auto pixyx = rwDensityGridCubic.rBrCrDXYX(iFock);
 
-    auto rBrCrDXYY = rwDensityGridCubic.rBrCrDXYY(iFock);
+    auto pixyy = rwDensityGridCubic.rBrCrDXYY(iFock);
 
-    auto rBrCrDXYZ = rwDensityGridCubic.rBrCrDXYZ(iFock);
+    auto pixyz = rwDensityGridCubic.rBrCrDXYZ(iFock);
 
-    auto rBrCrDXZX = rwDensityGridCubic.rBrCrDXZX(iFock);
+    auto pixzx = rwDensityGridCubic.rBrCrDXZX(iFock);
 
-    auto rBrCrDXZY = rwDensityGridCubic.rBrCrDXZY(iFock);
+    auto pixzy = rwDensityGridCubic.rBrCrDXZY(iFock);
 
-    auto rBrCrDXZZ = rwDensityGridCubic.rBrCrDXZZ(iFock);
+    auto pixzz = rwDensityGridCubic.rBrCrDXZZ(iFock);
 
-    auto rBrCrDYXX = rwDensityGridCubic.rBrCrDYXX(iFock);
+    auto piyxx = rwDensityGridCubic.rBrCrDYXX(iFock);
 
-    auto rBrCrDYXY = rwDensityGridCubic.rBrCrDYXY(iFock);
+    auto piyxy = rwDensityGridCubic.rBrCrDYXY(iFock);
 
-    auto rBrCrDYXZ = rwDensityGridCubic.rBrCrDYXZ(iFock);
+    auto piyxz = rwDensityGridCubic.rBrCrDYXZ(iFock);
 
-    auto rBrCrDYYX = rwDensityGridCubic.rBrCrDYYX(iFock);
+    auto piyyx = rwDensityGridCubic.rBrCrDYYX(iFock);
 
-    auto rBrCrDYYY = rwDensityGridCubic.rBrCrDYYY(iFock);
+    auto piyyy = rwDensityGridCubic.rBrCrDYYY(iFock);
 
-    auto rBrCrDYYZ = rwDensityGridCubic.rBrCrDYYZ(iFock);
+    auto piyyz = rwDensityGridCubic.rBrCrDYYZ(iFock);
 
-    auto rBrCrDYZX = rwDensityGridCubic.rBrCrDYZX(iFock);
+    auto piyzx = rwDensityGridCubic.rBrCrDYZX(iFock);
 
-    auto rBrCrDYZY = rwDensityGridCubic.rBrCrDYZY(iFock);
+    auto piyzy = rwDensityGridCubic.rBrCrDYZY(iFock);
 
-    auto rBrCrDYZZ = rwDensityGridCubic.rBrCrDYZZ(iFock);
+    auto piyzz = rwDensityGridCubic.rBrCrDYZZ(iFock);
 
-    auto rBrCrDZXX = rwDensityGridCubic.rBrCrDZXX(iFock);
+    auto pizxx = rwDensityGridCubic.rBrCrDZXX(iFock);
 
-    auto rBrCrDZXY = rwDensityGridCubic.rBrCrDZXY(iFock);
+    auto pizxy = rwDensityGridCubic.rBrCrDZXY(iFock);
 
-    auto rBrCrDZXZ = rwDensityGridCubic.rBrCrDZXZ(iFock);
+    auto pizxz = rwDensityGridCubic.rBrCrDZXZ(iFock);
 
-    auto rBrCrDZYX = rwDensityGridCubic.rBrCrDZYX(iFock);
+    auto pizyx = rwDensityGridCubic.rBrCrDZYX(iFock);
 
-    auto rBrCrDZYY = rwDensityGridCubic.rBrCrDZYY(iFock);
+    auto pizyy = rwDensityGridCubic.rBrCrDZYY(iFock);
 
-    auto rBrCrDZYZ = rwDensityGridCubic.rBrCrDZYZ(iFock);
+    auto pizyz = rwDensityGridCubic.rBrCrDZYZ(iFock);
 
-    auto rBrCrDZZX = rwDensityGridCubic.rBrCrDZZX(iFock);
+    auto pizzx = rwDensityGridCubic.rBrCrDZZX(iFock);
 
-    auto rBrCrDZZY = rwDensityGridCubic.rBrCrDZZY(iFock);
+    auto pizzy = rwDensityGridCubic.rBrCrDZZY(iFock);
 
-    auto rBrCrDZZZ = rwDensityGridCubic.rBrCrDZZZ(iFock);
+    auto pizzz = rwDensityGridCubic.rBrCrDZZZ(iFock);
 
-    auto rhoBCD = rw3DensityGrid.alphaDensity(iFock);
+    auto rho3 = rw3DensityGrid.alphaDensity(iFock);
     
-    auto gradBCD_x = rw3DensityGrid.alphaDensityGradientX(iFock);
+    auto grad3_x = rw3DensityGrid.alphaDensityGradientX(iFock);
     
-    auto gradBCD_y = rw3DensityGrid.alphaDensityGradientY(iFock);
+    auto grad3_y = rw3DensityGrid.alphaDensityGradientY(iFock);
     
-    auto gradBCD_z = rw3DensityGrid.alphaDensityGradientZ(iFock);
+    auto grad3_z = rw3DensityGrid.alphaDensityGradientZ(iFock);
 
 
-    timer.stop("Kxc matrix prep.");
+    timer.stop("Lxc matrix prep.");
 
     // eq.(30), JCTC 2021, 17, 1512-1521
 
-    timer.start("Kxc matrix G");
+    timer.start("Lxc matrix G");
 
     auto naos = gtoValues.getNumberOfRows();
 
@@ -4229,56 +4228,234 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
             auto nu_offset = nu * npoints;
 
             #pragma omp simd aligned(weights, \
-                    vsigma, v2rho2, v2rhosigma, v2sigma2, \
+                    gam, gamx, gamy, gamz  ,gamxx ,gamxy ,gamxz ,gamyx , \
+                    gamyy ,gamyz ,gamzx ,gamzy ,gamzz ,pi  ,pix  ,piy  ,piz  ,pixx  , pixy  ,\
+                    pixz  ,piyx  ,piyy  ,piyz  ,pizx  ,pizy  ,pizz  ,pixxx ,pixxy ,pixxz ,pixyx , \
+                    pixyy ,pixyz ,pixzx ,pixzy ,pixzz ,piyxx ,piyxy ,piyxz ,piyyx ,piyyy ,piyyz ,piyzx , \
+                    piyzy ,piyzz ,pizxx ,pizxy ,pizxz ,pizyx ,pizyy ,pizyz ,pizzx ,pizzy ,pizzz ,\
+                    rho3  ,grad3_x,grad3_y,grad3_z, vsigma, v2rho2, v2rhosigma, v2sigma2, rhograd, \
                     v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, \
+                    v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4,\
                     G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 double w = weights[g];
 
-                // double rxw12a = gradw12a_x[g];
-                // double ryw12a = gradw12a_y[g];
-                // double rzw12a = gradw12a_z[g];
+                double rxw123a = grad3_x[g];
+                double ryw123a = grad3_y[g];
+                double rzw123a = grad3_z[g];
 
-                // double grada_x_g = rhograd[6 * g + 0];
-                // double grada_y_g = rhograd[6 * g + 1];
-                // double grada_z_g = rhograd[6 * g + 2];
+                double grada_x_g = rhograd[6 * g + 0];
+                double grada_y_g = rhograd[6 * g + 1];
+                double grada_z_g = rhograd[6 * g + 2];
 
-                // double l2contract = grada_x_g * rxw12a + grada_y_g * ryw12a + grada_z_g * rzw12a;
-                // double l5contract_x = grada_x_g * l2contract;
-                // double l5contract_y = grada_y_g * l2contract;
-                // double l5contract_z = grada_z_g * l2contract;     
-                // double q2contract = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
-                // double q3contract =   grada_x_g * grada_x_g * rxw1rxw2[g]
-                //                     + grada_x_g * grada_y_g * rxw1ryw2[g]
-                //                     + grada_x_g * grada_z_g * rxw1rzw2[g]
-                //                     + grada_y_g * grada_x_g * ryw1rxw2[g]
-                //                     + grada_y_g * grada_y_g * ryw1ryw2[g]
-                //                     + grada_y_g * grada_z_g * ryw1rzw2[g]
-                //                     + grada_z_g * grada_x_g * rzw1rxw2[g]
-                //                     + grada_z_g * grada_y_g * rzw1ryw2[g]
-                //                     + grada_z_g * grada_z_g * rzw1rzw2[g];
+                double l2contract = grada_x_g * rxw123a + grada_y_g * ryw123a + grada_z_g * rzw123a;
+                double l5contract_x = grada_x_g * l2contract;
+                double l5contract_y = grada_y_g * l2contract;
+                double l5contract_z = grada_z_g * l2contract; 
 
-                // double q4contract = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
-                // double q7contract_x =  grada_x_g * grada_x_g *  rxw1rhow2[g] + grada_x_g * grada_y_g *  ryw1rhow2[g] + grada_x_g * grada_z_g *  rzw1rhow2[g];
-                // double q7contract_y =  grada_y_g * grada_x_g *  rxw1rhow2[g] + grada_y_g * grada_y_g *  ryw1rhow2[g] + grada_y_g * grada_z_g *  rzw1rhow2[g];
-                // double q7contract_z =  grada_z_g * grada_x_g *  rxw1rhow2[g] + grada_z_g * grada_y_g *  ryw1rhow2[g] + grada_z_g * grada_z_g *  rzw1rhow2[g];
+                // vx2 terms
+                double q2contract = grada_x_g * gamx[g] + grada_y_g * gamy[g] + grada_z_g * gamz[g];
+                double q3contract =   grada_x_g * grada_x_g * gamxx[g]
+                                    + grada_x_g * grada_y_g * gamxy[g]
+                                    + grada_x_g * grada_z_g * gamxz[g]
+                                    + grada_y_g * grada_x_g * gamyx[g]
+                                    + grada_y_g * grada_y_g * gamyy[g]
+                                    + grada_y_g * grada_z_g * gamyz[g]
+                                    + grada_z_g * grada_x_g * gamzx[g]
+                                    + grada_z_g * grada_y_g * gamzy[g]
+                                    + grada_z_g * grada_z_g * gamzz[g];
 
-                // double q8contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  rxw1ryw2[g] + grada_z_g *  rxw1rzw2[g];
-                // double q8contract_y =  grada_x_g *  ryw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  ryw1rzw2[g];
-                // double q8contract_z =  grada_x_g *  rzw1rxw2[g] + grada_y_g *  rzw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q4contract = gamxx[g] + gamyy[g] + gamzz[g];
+                double q7contract_x =  grada_x_g * grada_x_g *  gamx[g] + grada_x_g * grada_y_g *  gamy[g] + grada_x_g * grada_z_g *  gamz[g];
+                double q7contract_y =  grada_y_g * grada_x_g *  gamx[g] + grada_y_g * grada_y_g *  gamy[g] + grada_y_g * grada_z_g *  gamz[g];
+                double q7contract_z =  grada_z_g * grada_x_g *  gamx[g] + grada_z_g * grada_y_g *  gamy[g] + grada_z_g * grada_z_g *  gamz[g];
 
-                // double q9contract_x =  grada_x_g *  q3contract;
-                // double q9contract_y =  grada_y_g *  q3contract;
-                // double q9contract_z =  grada_z_g *  q3contract;
+                double q8contract_x =  grada_x_g *  gamxx[g] + grada_y_g *  gamxy[g] + grada_z_g *  gamxz[g];
+                double q8contract_y =  grada_x_g *  gamyx[g] + grada_y_g *  gamyy[g] + grada_z_g *  gamyz[g];
+                double q8contract_z =  grada_x_g *  gamzx[g] + grada_y_g *  gamzy[g] + grada_z_g *  gamzz[g];
 
-                // double q10contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  ryw1rxw2[g] + grada_z_g *  rzw1rxw2[g];
-                // double q10contract_y =  grada_x_g *  rxw1ryw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  rzw1ryw2[g];
-                // double q10contract_z =  grada_x_g *  rxw1rzw2[g] + grada_y_g *  ryw1rzw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q9contract_x =  grada_x_g *  q3contract;
+                double q9contract_y =  grada_y_g *  q3contract;
+                double q9contract_z =  grada_z_g *  q3contract;
 
-                // double q11contract_x =  grada_x_g *  rxw1rxw2[g] + grada_x_g *  ryw1ryw2[g] + grada_x_g *  rzw1rzw2[g];
-                // double q11contract_y =  grada_y_g *  rxw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_y_g *  rzw1rzw2[g];
-                // double q11contract_z =  grada_z_g *  rxw1rxw2[g] + grada_z_g *  ryw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q10contract_x =  grada_x_g *  gamxx[g] + grada_y_g *  gamyx[g] + grada_z_g *  gamzx[g];
+                double q10contract_y =  grada_x_g *  gamxy[g] + grada_y_g *  gamyy[g] + grada_z_g *  gamzy[g];
+                double q10contract_z =  grada_x_g *  gamxz[g] + grada_y_g *  gamyz[g] + grada_z_g *  gamzz[g];
+
+                double q11contract_x =  grada_x_g *  gamxx[g] + grada_x_g *  gamyy[g] + grada_x_g *  gamzz[g];
+                double q11contract_y =  grada_y_g *  gamxx[g] + grada_y_g *  gamyy[g] + grada_y_g *  gamzz[g];
+                double q11contract_z =  grada_z_g *  gamxx[g] + grada_z_g *  gamyy[g] + grada_z_g *  gamzz[g];
+
+                // vx3 terms
+                double c1 = pi[g];
+
+                double c2 = grada_x_g * pix[g] + grada_y_g * piy[g] + grada_z_g * piz[g];
+
+                double c3 = grada_x_g * grada_x_g *  pixx[g]
+                            +grada_x_g * grada_y_g * pixy[g]
+                            +grada_x_g * grada_z_g * pixz[g]
+                            +grada_y_g * grada_x_g * piyx[g]
+                            +grada_y_g * grada_y_g * piyy[g]
+                            +grada_y_g * grada_z_g * piyz[g]
+                            +grada_z_g * grada_x_g * pizx[g]
+                            +grada_z_g * grada_y_g * pizy[g]
+                            +grada_z_g * grada_z_g * pizz[g];
+
+                double c4 = pixx[g] + piyy[g] + pizz[g];
+
+                double c5_6 = grada_x_g *(pixxx[g] + pixxx[g])
+                            +grada_x_g * (piyxy[g] + pixyy[g])
+                            +grada_x_g * (pizxz[g] + pixzz[g])
+                            +grada_y_g * (pixyx[g] + piyxx[g])
+                            +grada_y_g * (piyyy[g] + piyyy[g])
+                            +grada_y_g * (pizyz[g] + piyzz[g])
+                            +grada_z_g * (pixzx[g] + pizxx[g])
+                            +grada_z_g * (piyzy[g] + pizyy[g])
+                            +grada_z_g * (pizzz[g] + pizzz[g]);
+                
+                double c7 =   grada_x_g * grada_x_g * grada_x_g * pixxx[g]
+                            + grada_x_g * grada_x_g * grada_y_g * pixxy[g]
+                            + grada_x_g * grada_x_g * grada_z_g * pixxz[g]
+                            + grada_x_g * grada_y_g * grada_x_g * pixyx[g]
+                            + grada_x_g * grada_y_g * grada_y_g * pixyy[g]
+                            + grada_x_g * grada_y_g * grada_z_g * pixyz[g]
+                            + grada_x_g * grada_z_g * grada_x_g * pixzx[g]
+                            + grada_x_g * grada_z_g * grada_y_g * pixzy[g]
+                            + grada_x_g * grada_z_g * grada_z_g * pixzz[g]
+                            + grada_y_g * grada_x_g * grada_x_g * piyxx[g]
+                            + grada_y_g * grada_x_g * grada_y_g * piyxy[g]
+                            + grada_y_g * grada_x_g * grada_z_g * piyxz[g]
+                            + grada_y_g * grada_y_g * grada_x_g * piyyx[g]
+                            + grada_y_g * grada_y_g * grada_y_g * piyyy[g]
+                            + grada_y_g * grada_y_g * grada_z_g * piyyz[g]
+                            + grada_y_g * grada_z_g * grada_x_g * piyzx[g]
+                            + grada_y_g * grada_z_g * grada_y_g * piyzy[g]
+                            + grada_y_g * grada_z_g * grada_z_g * piyzz[g]
+                            + grada_z_g * grada_x_g * grada_x_g * pizxx[g]
+                            + grada_z_g * grada_x_g * grada_y_g * pizxy[g]
+                            + grada_z_g * grada_x_g * grada_z_g * pizxz[g]
+                            + grada_z_g * grada_y_g * grada_x_g * pizyx[g]
+                            + grada_z_g * grada_y_g * grada_y_g * pizyy[g]
+                            + grada_z_g * grada_y_g * grada_z_g * pizyz[g]
+                            + grada_z_g * grada_z_g * grada_x_g * pizzx[g]
+                            + grada_z_g * grada_z_g * grada_y_g * pizzy[g]
+                            + grada_z_g * grada_z_g * grada_z_g * pizzz[g];
+
+                double c8 =  grada_x_g * pixxx[g]
+                            +grada_y_g * pixxy[g]
+                            +grada_z_g * pixxz[g]
+                            +grada_x_g * piyyx[g]
+                            +grada_y_g * piyyy[g]
+                            +grada_z_g * piyyz[g]
+                            +grada_x_g * pizzx[g]
+                            +grada_y_g * pizzy[g]
+                            +grada_z_g * pizzz[g];
+                
+                double c9_x = grada_x_g * pi[g];
+                double c9_y = grada_z_g * pi[g];
+                double c9_z = grada_y_g * pi[g];
+
+                double c10_x = pix[g];
+                double c10_y = piy[g];
+                double c10_z = piz[g];
+
+                double c11 = grada_x_g * pix[g]
+                            +grada_y_g * piy[g]
+                            +grada_z_g * piz[g];
+
+                double c11_x = c11 * grada_x_g;
+                double c11_y = c11 * grada_y_g;
+                double c11_z = c11 * grada_z_g;
+
+                double c12_c14_x =   grada_x_g * (pixx[g] + pixx[g])
+                                    +grada_y_g * (pixy[g] + piyx[g])
+                                    +grada_z_g * (pixz[g] + pizx[g]);
+
+                double c12_c14_y= grada_x_g *(piyx[g] + pixy[g])
+                                 + grada_y_g * (piyy[g] + piyy[g])
+                                 + grada_z_g * (piyz[g] + pizy[g]);
+
+                double c12_c14_z= grada_x_g * (pizx[g] + pixz[g])
+                                 + grada_y_g * (pizy[g] + piyz[g])
+                                 + grada_z_g * (pizz[g] + pizz[g]);
+
+                double c13 = grada_x_g * grada_x_g * pixx[g]
+                            +grada_x_g * grada_y_g * pixy[g]
+                            +grada_x_g * grada_z_g * pixz[g]
+                            +grada_y_g * grada_x_g * piyx[g]
+                            +grada_y_g * grada_y_g * piyy[g]
+                            +grada_y_g * grada_z_g * piyz[g]
+                            +grada_z_g * grada_x_g * pizx[g]
+                            +grada_z_g * grada_y_g * pizy[g]
+                            +grada_z_g * grada_z_g * pizz[g];
+                            
+                double c13_x = c13 * grada_x_g;
+                double c13_y = c13 * grada_y_g;
+                double c13_z = c13 * grada_z_g;
+
+                double c15_x = grada_x_g * c4;
+                double c15_y = grada_y_g * c4;
+                double c15_z = grada_z_g * c4;
+
+                double c16_19_22_x = grada_x_g * grada_x_g * pixxx[g] + grada_x_g * grada_x_g * pixxx[g] + grada_x_g * grada_x_g * pixxx[g]
+                                    +grada_x_g * grada_y_g * pixxy[g] + grada_x_g * grada_y_g * pixyx[g] + grada_x_g * grada_y_g * pixxy[g]
+                                    +grada_x_g * grada_z_g * pixxz[g] + grada_x_g * grada_z_g * pixzx[g] + grada_x_g * grada_z_g * pixxz[g]
+                                    +grada_y_g * grada_x_g * pixyx[g] + grada_y_g * grada_x_g * piyxx[g] + grada_y_g * grada_x_g * piyxx[g]
+                                    +grada_y_g * grada_y_g * pixyy[g] + grada_y_g * grada_y_g * piyyx[g] + grada_y_g * grada_y_g * piyxy[g]
+                                    +grada_y_g * grada_z_g * pixyz[g] + grada_y_g * grada_z_g * piyzx[g] + grada_y_g * grada_z_g * piyxz[g]
+                                    +grada_z_g * grada_x_g * pixzx[g] + grada_z_g * grada_x_g * pizxx[g] + grada_z_g * grada_x_g * pizxx[g]
+                                    +grada_z_g * grada_y_g * pixzy[g] + grada_z_g * grada_y_g * pizyx[g] + grada_z_g * grada_y_g * pizxy[g]
+                                    +grada_z_g * grada_z_g * pixzz[g] + grada_z_g * grada_z_g * pizzx[g] + grada_z_g * grada_z_g * pizxz[g];
+
+                double c16_19_22_y = grada_x_g * grada_x_g * piyxx[g] + grada_x_g * grada_x_g * pixxy[g] + grada_x_g * grada_x_g * pixyx[g]
+                                    +grada_x_g * grada_y_g * piyxy[g] + grada_x_g * grada_y_g * pixyy[g] + grada_x_g * grada_y_g * pixyy[g]
+                                    +grada_x_g * grada_z_g * piyxz[g] + grada_x_g * grada_z_g * pixzy[g] + grada_x_g * grada_z_g * pixyz[g]
+                                    +grada_y_g * grada_x_g * piyyx[g] + grada_y_g * grada_x_g * piyxy[g] + grada_y_g * grada_x_g * piyyx[g]
+                                    +grada_y_g * grada_y_g * piyyy[g] + grada_y_g * grada_y_g * piyyy[g] + grada_y_g * grada_y_g * piyyy[g]
+                                    +grada_y_g * grada_z_g * piyyz[g] + grada_y_g * grada_z_g * piyzy[g] + grada_y_g * grada_z_g * piyyz[g]
+                                    +grada_z_g * grada_x_g * piyzx[g] + grada_z_g * grada_x_g * pizxy[g] + grada_z_g * grada_x_g * pizyx[g]
+                                    +grada_z_g * grada_y_g * piyzy[g] + grada_z_g * grada_y_g * pizyy[g] + grada_z_g * grada_y_g * pizyy[g]
+                                    +grada_z_g * grada_z_g * piyzz[g] + grada_z_g * grada_z_g * pizzy[g] + grada_z_g * grada_z_g * pizyz[g];
+
+                double c16_19_22_z = grada_x_g * grada_x_g * pizxx[g] + grada_x_g * grada_x_g * pixxz[g] + grada_x_g * grada_x_g * pixzx[g]
+                                    +grada_x_g * grada_y_g * pizxy[g] + grada_x_g * grada_y_g * pixyz[g] + grada_x_g * grada_y_g * pixzy[g]
+                                    +grada_x_g * grada_z_g * pizxz[g] + grada_x_g * grada_z_g * pixzz[g] + grada_x_g * grada_z_g * pixzz[g]
+                                    +grada_y_g * grada_x_g * pizyx[g] + grada_y_g * grada_x_g * piyxz[g] + grada_y_g * grada_x_g * piyzx[g]
+                                    +grada_y_g * grada_y_g * pizyy[g] + grada_y_g * grada_y_g * piyyz[g] + grada_y_g * grada_y_g * piyzy[g]
+                                    +grada_y_g * grada_z_g * pizyz[g] + grada_y_g * grada_z_g * piyzz[g] + grada_y_g * grada_z_g * piyzz[g]
+                                    +grada_z_g * grada_x_g * pizzx[g] + grada_z_g * grada_x_g * pizxz[g] + grada_z_g * grada_x_g * pizzx[g]
+                                    +grada_z_g * grada_y_g * pizzy[g] + grada_z_g * grada_y_g * pizyz[g] + grada_z_g * grada_y_g * pizzy[g]
+                                    +grada_z_g * grada_z_g * pizzz[g] + grada_z_g * grada_z_g * pizzz[g] + grada_z_g * grada_z_g * pizzz[g];
+
+                double c17_24_25_x =  pixxx[g] + pixxx[g] + pixxx[g]
+                                    + pixyy[g] + piyxy[g] + piyyx[g]
+                                    + pixzz[g] + pizxz[g] + pizzx[g];
+
+                double c17_24_25_y =  piyxx[g] + pixyx[g] + pixxy[g]
+                                    + piyyy[g] + piyyy[g] + piyyy[g]
+                                    + piyzz[g] + pizyz[g] + pizzy[g];
+
+                double c17_24_25_z =  pizxx[g] + pixzx[g] + pixxz[g]
+                                    + pizyy[g] + piyzy[g] + piyyz[g]
+                                    + pizzz[g] + pizzz[g] + pizzz[g];
+
+                double c18_x = c7 * grada_x_g;
+                double c18_y = c7 * grada_y_g;
+                double c18_z = c7 * grada_z_g;
+
+                double c20_21_23_x = grada_x_g * (pixxx[g] + pixxx[g] + pixxx[g]) 
+                                    +grada_y_g * (pixyy[g] + piyyx[g] + piyxy[g]) 
+                                    +grada_z_g * (pixzz[g] + pizzx[g] + pizxz[g]); 
+
+                double c20_21_23_y = grada_x_g * (piyxx[g] + pixxy[g] + pixyx[g]) 
+                                    +grada_y_g * (piyyy[g] + piyyy[g] + piyyy[g]) 
+                                    +grada_z_g * (piyzz[g] + pizzy[g] + pizyz[g]); 
+
+                double c20_21_23_z = grada_x_g * (pizxx[g] + pixxz[g] + pixzx[g]) 
+                                    +grada_y_g * (pizyy[g] + piyyz[g] + piyzy[g]) 
+                                    +grada_z_g * (pizzz[g] + pizzz[g] + pizzz[g]); 
+
 
                 // functional derivatives in libxc form
 
@@ -4332,21 +4509,98 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                 auto v3sigma3_acb = v3sigma3[10 * g + 4];
                 auto v3sigma3_abb = v3sigma3[10 * g + 5];
                 auto v3sigma3_ccc = v3sigma3[10 * g + 6];
-                auto v3sigma3_cbb = v3sigma3[10 * g + 8];
-                // ? 
                 auto v3sigma3_bcc = v3sigma3[10 * g + 7];
+                auto v3sigma3_cbb = v3sigma3[10 * g + 8];
 
-                // functional derivatives
+                auto v4rho4_aaaa = v4rho4[5 * g + 0];
+                auto v4rho4_aaab = v4rho4[5 * g + 1];
+                auto v4rho4_aabb = v4rho4[5 * g + 2];
+                auto v4rho4_abbb = v4rho4[5 * g + 3];
+
+                auto v4rho3sigma_aaaa = v4rho3sigma[12 * g + 0]; 
+                auto v4rho3sigma_aaac = v4rho3sigma[12 * g + 1]; 
+                auto v4rho3sigma_aaab = v4rho3sigma[12 * g + 2];  
+                auto v4rho3sigma_aaba = v4rho3sigma[12 * g + 3];  
+                auto v4rho3sigma_aabc = v4rho3sigma[12 * g + 4];  
+                auto v4rho3sigma_aabb = v4rho3sigma[12 * g + 5];  
+                auto v4rho3sigma_abba = v4rho3sigma[12 * g + 6];  
+                auto v4rho3sigma_abbc = v4rho3sigma[12 * g + 7];  
+                auto v4rho3sigma_abbb = v4rho3sigma[12 * g + 8];  
+                auto v4rho3sigma_bbba = v4rho3sigma[12 * g + 9];  
+                auto v4rho3sigma_bbbc = v4rho3sigma[12 * g + 10]; 
+
+                auto v4rho2sigma2_aaaa = v4rho2sigma2[18 * g + 0];
+                auto v4rho2sigma2_aaac = v4rho2sigma2[18 * g + 1];
+                auto v4rho2sigma2_aaab = v4rho2sigma2[18 * g + 2];
+                auto v4rho2sigma2_aacc = v4rho2sigma2[18 * g + 3];
+                auto v4rho2sigma2_aacb = v4rho2sigma2[18 * g + 4];
+                auto v4rho2sigma2_aabb = v4rho2sigma2[18 * g + 5];
+                auto v4rho2sigma2_abaa = v4rho2sigma2[18 * g + 6];
+                auto v4rho2sigma2_abac = v4rho2sigma2[18 * g + 7];
+                auto v4rho2sigma2_abab = v4rho2sigma2[18 * g + 8];
+                auto v4rho2sigma2_abcc = v4rho2sigma2[18 * g + 9];
+                auto v4rho2sigma2_abcb = v4rho2sigma2[18 * g + 10];
+                auto v4rho2sigma2_abbb = v4rho2sigma2[18 * g + 11];
+                auto v4rho2sigma2_bbaa = v4rho2sigma2[18 * g + 12];
+                auto v4rho2sigma2_bbac = v4rho2sigma2[18 * g + 13];
+                auto v4rho2sigma2_bbab = v4rho2sigma2[18 * g + 14];
+                auto v4rho2sigma2_bbcc = v4rho2sigma2[18 * g + 15];
+                auto v4rho2sigma2_bbcb = v4rho2sigma2[18 * g + 16];
+                auto v4rho2sigma2_bbbb = v4rho2sigma2[18 * g + 17];
+
+                auto v4rhosigma3_aaaa  = v4rhosigma3[20 * g + 0];
+                auto v4rhosigma3_aaac  = v4rhosigma3[20 * g + 1];
+                auto v4rhosigma3_aaab  = v4rhosigma3[20 * g + 2];
+                auto v4rhosigma3_aacc  = v4rhosigma3[20 * g + 3];
+                auto v4rhosigma3_aacb  = v4rhosigma3[20 * g + 4];
+                auto v4rhosigma3_aabb  = v4rhosigma3[20 * g + 5];
+                auto v4rhosigma3_accc  = v4rhosigma3[20 * g + 6];
+                auto v4rhosigma3_accb  = v4rhosigma3[20 * g + 7];
+                auto v4rhosigma3_acbb  = v4rhosigma3[20 * g + 8];
+                auto v4rhosigma3_abbb  = v4rhosigma3[20 * g + 9];
+                auto v4rhosigma3_baaa  = v4rhosigma3[20 * g + 10];
+                auto v4rhosigma3_baac  = v4rhosigma3[20 * g + 11];
+                auto v4rhosigma3_baab  = v4rhosigma3[20 * g + 12];
+                auto v4rhosigma3_bacc  = v4rhosigma3[20 * g + 13];
+                auto v4rhosigma3_bacb  = v4rhosigma3[20 * g + 14];
+                auto v4rhosigma3_babb  = v4rhosigma3[20 * g + 15];
+                auto v4rhosigma3_bccc  = v4rhosigma3[20 * g + 16];
+                auto v4rhosigma3_bccb  = v4rhosigma3[20 * g + 17];
+                auto v4rhosigma3_bcbb  = v4rhosigma3[20 * g + 18];
+
+                auto v4sigma4_aaaa  = v4sigma4[15 * g + 0];
+                auto v4sigma4_aaac  = v4sigma4[15 * g + 1];
+                auto v4sigma4_aaab  = v4sigma4[15 * g + 2];
+                auto v4sigma4_aacc  = v4sigma4[15 * g + 3];
+                auto v4sigma4_aacb  = v4sigma4[15 * g + 4];
+                auto v4sigma4_aabb  = v4sigma4[15 * g + 5];
+                auto v4sigma4_accc  = v4sigma4[15 * g + 6];
+                auto v4sigma4_accb  = v4sigma4[15 * g + 7];
+                auto v4sigma4_acbb  = v4sigma4[15 * g + 8];
+                auto v4sigma4_abbb  = v4sigma4[15 * g + 9];
+                auto v4sigma4_cccc  = v4sigma4[15 * g + 10];
+                auto v4sigma4_cccb  = v4sigma4[15 * g + 11];
+                auto v4sigma4_ccbb  = v4sigma4[15 * g + 12];
+                auto v4sigma4_cbbb  = v4sigma4[15 * g + 13];
+                auto v4sigma4_bbbb  = v4sigma4[15 * g + 14];
+
+                // Transformation of derivatives 
+
+                // first-order 
+                double x = vsigma_c + 2.0*vsigma_a;
+                
+                // second-order
                 double rr = (v2rho2_aa + v2rho2_ab);
-                double rrr = (v3rho3_aaa + 2.0 * v3rho3_aab + v3rho3_abb);
                 double rx = (2.0*v2rhosigma_ac + 2.0*v2rhosigma_ab + 2.0*v2rhosigma_aa);
+                double xr = v2rhosigma_bc + 2.0*v2rhosigma_ba + v2rhosigma_ac + 2.0*v2rhosigma_aa;
+                double xx = 2.0*v2sigma2_cc + 2.0*v2sigma2_cb + 6.0*v2sigma2_ac + 4.0*v2sigma2_ab + 4.0*v2sigma2_aa;
+
+                // third-order
+                double rrr = (v3rho3_aaa + 2.0 * v3rho3_aab + v3rho3_abb);
                 double rxr = (2.0*v3rho2sigma_abc + 2.0*v3rho2sigma_abb + 2.0*v3rho2sigma_aba 
                              + 2.0*v3rho2sigma_aac + 2.0*v3rho2sigma_aab + 2.0*v3rho2sigma_aaa);
                 double rxx = (4.0*v3rhosigma2_acc + 8.0*v3rhosigma2_acb + 4.0*v3rhosigma2_abb 
                             + 8.0*v3rhosigma2_aac + 8.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa);
-                double x = vsigma_c + 2.0*vsigma_a;
-                double xr = v2rhosigma_bc + 2.0*v2rhosigma_ba + v2rhosigma_ac + 2.0*v2rhosigma_aa;
-                double xx = 2.0*v2sigma2_cc + 2.0*v2sigma2_cb + 6.0*v2sigma2_ac + 4.0*v2sigma2_ab + 4.0*v2sigma2_aa;
                 double xrr = v3rho2sigma_bbc + 2.0*v3rho2sigma_bba + 2.0*v3rho2sigma_abc + 4.0*v3rho2sigma_aba 
                             + v3rho2sigma_aac + 2.0*v3rho2sigma_aaa;
                 double xxr = 2.0*v3rhosigma2_bcc + 2.0*v3rhosigma2_bcb + 6.0*v3rhosigma2_bac 
@@ -4356,23 +4610,58 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                             + 24.0*v3sigma3_acb + 8.0*v3sigma3_abb + 20.0*v3sigma3_aac 
                             + 16.0*v3sigma3_aab + 8.0*v3sigma3_aaa;
 
-                // Scalar contribution
+                // fourth-order 
+                double xrrr =   v4rho3sigma_bbbc + 2.0 * v4rho3sigma_bbba + 3.0 * v4rho3sigma_abbc 
+                            + 6.0 * v4rho3sigma_abba + 3.0 * v4rho3sigma_aabc + 6.0 * v4rho3sigma_aaba 
+                            + v4rho3sigma_aaac + 2.0 * v4rho3sigma_aaaa;
+                double xxrr = 2.0 * v4rho2sigma2_bbcc + 2.0 * v4rho2sigma2_bbcb + 6.0 * v4rho2sigma2_bbac 
+                            + 4.0 * v4rho2sigma2_bbab + 4.0 * v4rho2sigma2_bbaa + 4.0 * v4rho2sigma2_abcc 
+                            + 4.0 * v4rho2sigma2_abcb + 12.0 * v4rho2sigma2_abac + 8.0 * v4rho2sigma2_abab 
+                            + 8.0 * v4rho2sigma2_abaa + 2.0 * v4rho2sigma2_aacc + 2.0 * v4rho2sigma2_aacb 
+                            + 6.0 * v4rho2sigma2_aaac + 4.0 * v4rho2sigma2_aaab + 4.0 * v4rho2sigma2_aaaa;                
+                double xxxr = 4.0 * v4rhosigma3_bccc + 8.0 * v4rhosigma3_bccb + 4.0 * v4rhosigma3_bcbb 
+                            + 16.0 * v4rhosigma3_bacc + 24.0 * v4rhosigma3_bacb + 8.0 * v4rhosigma3_babb 
+                            + 20.0 * v4rhosigma3_baac + 16.0 * v4rhosigma3_baab + 8.0 * v4rhosigma3_baaa 
+                            + 4.0 * v4rhosigma3_accc + 8.0 * v4rhosigma3_accb + 4.0 * v4rhosigma3_acbb 
+                            + 16.0 * v4rhosigma3_aacc + 24.0 * v4rhosigma3_aacb + 8.0 * v4rhosigma3_aabb 
+                            + 20.0 * v4rhosigma3_aaac + 16.0 * v4rhosigma3_aaab + 8.0 * v4rhosigma3_aaaa;
+                double xxxx = 8.0 * v4sigma4_cccc + 24.0 * v4sigma4_cccb + 24.0 * v4sigma4_ccbb + 8.0 * v4sigma4_cbbb 
+                            + 40.0 * v4sigma4_accc + 96.0 * v4sigma4_accb + 72.0 * v4sigma4_acbb + 16.0 * v4sigma4_abbb 
+                            + 72.0 * v4sigma4_aacc + 120.0 * v4sigma4_aacb + 48.0 * v4sigma4_aabb + 56.0 * v4sigma4_aaac 
+                            + 48.0 * v4sigma4_aaab + 16.0 * v4sigma4_aaaa;
+                double rrrr =  v4rho4_aaaa + 3.0  *  v4rho4_aaab + 3.0  *  v4rho4_aabb + v4rho4_abbb;
+                double rxrr =  2.0 * v4rho3sigma_abbc + 2.0 * v4rho3sigma_abbb + 2.0 * v4rho3sigma_abba + 4.0 * v4rho3sigma_aabc 
+                                + 4.0 * v4rho3sigma_aabb + 4.0 * v4rho3sigma_aaba + 2.0 * v4rho3sigma_aaac + 2.0 * v4rho3sigma_aaab + 2.0 * v4rho3sigma_aaaa;
+                double rxxr = 4.0 * v4rho2sigma2_abcc + 8.0 * v4rho2sigma2_abcb + 4.0 * v4rho2sigma2_abbb + 8.0 * v4rho2sigma2_abac 
+                            + 8.0 * v4rho2sigma2_abab + 4.0 * v4rho2sigma2_abaa + 4.0 * v4rho2sigma2_aacc + 8.0 * v4rho2sigma2_aacb 
+                            + 4.0 * v4rho2sigma2_aabb + 8.0 * v4rho2sigma2_aaac + 8.0 * v4rho2sigma2_aaab + 4.0 * v4rho2sigma2_aaaa;
+                double rxxx = 8.0 * v4rhosigma3_accc + 24.0 * v4rhosigma3_accb + 24.0 * v4rhosigma3_acbb + 8.0 * v4rhosigma3_abbb 
+                            + 24.0 * v4rhosigma3_aacc + 48.0 * v4rhosigma3_aacb + 24.0 * v4rhosigma3_aabb + 24.0 * v4rhosigma3_aaac 
+                            + 24.0 * v4rhosigma3_aaab + 8.0 * v4rhosigma3_aaaa; 
+                            
+                        // Scalar contribution
 
                 double prefac = 0.0;
 
                 // vxc 1 contributions
 
-                // prefac += rr * rhow12a[g] // l1
-                //         + rx * l2contract;
+                prefac += rr * rho3[g] // l1
+                        + rx * l2contract;
                 
                 // // vxc 2 contributions
                 
-                // prefac += rrr * rhow1rhow2[g] // q1
-                //         + rxr * q2contract
-                //         + rxx * q3contract
-                //         + rx * q4contract;
+                prefac += rrr * gam[g] // q1
+                        + rxr * q2contract
+                        + rxx * q3contract
+                        + rx * q4contract;
                 
                 // vxc 3 contributions
+                prefac += rrrr * c1
+                        + rxrr * c2
+                        + rxxr * c3
+                        + rxr * c4
+                        + rxx * (c5_6 + c8)
+                        + rxxx * c7;
 
                 G_val[nu_offset + g] = w * prefac * chi_val[nu_offset + g];
 
@@ -4382,39 +4671,66 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
 
                 // vxc 1 contributions
 
-                // xcomp += xr * grada_x_g * rhow12a[g] // l3
-                //         + x * rxw12a // l4
-                //         + xx * l5contract_x;
+                xcomp += xr * grada_x_g * rho3[g] // l3
+                        + x * rxw123a // l4
+                        + xx * l5contract_x;
 
-                // ycomp += xr * grada_y_g * rhow12a[g] // l3
-                //         + x * ryw12a // l4
-                //         + xx * l5contract_y;
+                ycomp += xr * grada_y_g * rho3[g] // l3
+                        + x * ryw123a // l4
+                        + xx * l5contract_y;
 
-                // zcomp += xr * grada_z_g * rhow12a[g] // l3
-                //         + x * rzw12a // l4
-                //         + xx * l5contract_z;
+                zcomp += xr * grada_z_g * rho3[g] // l3
+                        + x * rzw123a // l4
+                        + xx * l5contract_z;
                 
                 // // vxc 2 contributions
                 
-                // xcomp += xrr * grada_x_g * rhow1rhow2[g] // q5
-                //         + xr * rxw1rhow2[g] // q6
-                //         + xxr * q7contract_x
-                //         + xx * (q8contract_x + q10contract_x + q11contract_x)
-                //         + xxx * q9contract_x;
+                xcomp += xrr * grada_x_g * gam[g] // q5
+                        + xr * gamx[g] // q6
+                        + xxr * q7contract_x
+                        + xx * (q8contract_x + q10contract_x + q11contract_x)
+                        + xxx * q9contract_x;
 
-                // ycomp += xrr * grada_y_g * rhow1rhow2[g] // q5
-                //         + xr * ryw1rhow2[g] // q6
-                //         + xxr * q7contract_y
-                //         + xx * (q8contract_y + q10contract_y + q11contract_y)
-                //         + xxx * q9contract_y;
+                ycomp += xrr * grada_y_g * gam[g] // q5
+                        + xr * gamy[g] // q6
+                        + xxr * q7contract_y
+                        + xx * (q8contract_y + q10contract_y + q11contract_y)
+                        + xxx * q9contract_y;
  
-                // zcomp += xrr * grada_z_g * rhow1rhow2[g] // q5
-                //         + xr * rzw1rhow2[g] // q6
-                //         + xxr * q7contract_z
-                //         + xx * (q8contract_z + q10contract_z + q11contract_z)
-                //         + xxx * q9contract_z;
+                zcomp += xrr * grada_z_g * gam[g] // q5
+                        + xr * gamz[g] // q6
+                        + xxr * q7contract_z
+                        + xx * (q8contract_z + q10contract_z + q11contract_z)
+                        + xxx * q9contract_z;
 
                 // vxc 3 contributions
+                xcomp += xrrr * c9_x
+                        + xrr * c10_x
+                        + xxrr * c11_x
+                        + xxr * (c12_c14_x + c15_x)
+                        + xxxr * c13_x
+                        + xx * c17_24_25_x
+                        + xxxx * c18_x
+                        + xxx * (c16_19_22_x + c20_21_23_x) ;
+
+                ycomp += xrrr * c9_y
+                        + xrr * c10_y
+                        + xxrr * c11_y
+                        + xxr * (c12_c14_y + c15_y)
+                        + xxxr * c13_y
+                        + xx * c17_24_25_y
+                        + xxxx * c18_y
+                        + xxx * (c16_19_22_y + c20_21_23_y);
+                
+                zcomp += xrrr * c9_z
+                        + xrr * c10_z
+                        + xxrr * c11_z
+                        + xxr * (c12_c14_z + c15_z)
+                        + xxxr * c13_z
+                        + xx * c17_24_25_z
+                        + xxxx * c18_z
+                        + xxx * (c16_19_22_z + c20_21_23_z);
+
 
                 G_gga_val[nu_offset + g] = w * (xcomp * chi_x_val[nu_offset + g] +
                                                 ycomp * chi_y_val[nu_offset + g] +
@@ -4423,11 +4739,11 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
         }
     }
 
-    timer.stop("Kxc matrix G");
+    timer.stop("Lxc matrix G");
 
     // eq.(31), JCTC 2021, 17, 1512-1521
 
-    timer.start("Kxc matrix matmul");
+    timer.start("Lxc matrix matmul");
 
     auto mat_Lxc = denblas::multABt(gtoValues, mat_G);
 
@@ -4437,7 +4753,7 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
 
     mat_Lxc = denblas::addAB(mat_Lxc, mat_Lxc_gga, 1.0);
 
-    timer.stop("Kxc matrix matmul");
+    timer.stop("Lxc matrix matmul");
 
     return mat_Lxc;
 }
