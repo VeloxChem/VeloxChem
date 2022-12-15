@@ -37,7 +37,7 @@ from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 
 
-class TPADriver(NonLinearSolver):
+class TpaDriver(NonLinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)

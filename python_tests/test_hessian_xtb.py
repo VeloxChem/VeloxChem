@@ -4,13 +4,13 @@ import h5py
 import numpy as np
 from veloxchem.mpitask import MpiTask
 from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.xtbdriver import XTBDriver
-from veloxchem.xtbhessiandriver import XTBHessianDriver
+from veloxchem.xtbdriver import XtbDriver
+from veloxchem.xtbhessiandriver import XtbHessianDriver
 
 from .addons import using_xtb
 
 
-class TestXTBHessianDriver:
+class TestXtbHessianDriver:
 
     @using_xtb
     def test_xtb_hessian_driver(self):
@@ -23,11 +23,13 @@ class TestXTBHessianDriver:
 
         xtb_method = 'gfn2'
 
-        xtb_drv = XTBDriver(task.mpi_comm)
+        xtb_drv = XtbDriver(task.mpi_comm)
+        xtb_drv.mute()
+
         xtb_drv.set_method(xtb_method.lower())
         xtb_drv.compute(task.molecule, task.ostream)
 
-        xtb_hessian_drv = XTBHessianDriver(xtb_drv)
+        xtb_hessian_drv = XtbHessianDriver(xtb_drv)
         xtb_hessian_drv.ostream.state = False
         xtb_hessian_drv.compute(task.molecule)
 

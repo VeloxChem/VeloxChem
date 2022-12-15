@@ -27,7 +27,7 @@ from .veloxchemlib import mpi_master
 from .gradientdriver import GradientDriver
 
 
-class XTBGradientDriver(GradientDriver):
+class XtbGradientDriver(GradientDriver):
     """
     Implements XTB gradient driver.
 

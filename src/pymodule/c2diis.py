@@ -181,7 +181,7 @@ class CTwoDiis:
 
         bdim = len(self.error_vectors)
 
-        bmat = np.zeros(shape=(bdim, bdim), dtype=float)
+        bmat = np.zeros(shape=(bdim, bdim), dtype='float64')
         bidx = np.triu_indices(bdim)
 
         for i, j in zip(bidx[0], bidx[1]):
@@ -230,7 +230,7 @@ class CTwoDiis:
         wmin = weights[0]
 
         for w in weights:
-            evec = np.zeros(self.error_vectors[0].shape, dtype=float)
+            evec = np.zeros(self.error_vectors[0].shape, dtype='float64')
 
             for f, v in zip(w, self.error_vectors):
                 evec = evec + f * v

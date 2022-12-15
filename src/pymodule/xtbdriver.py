@@ -26,11 +26,11 @@
 import numpy as np
 import time as tm
 
-from .veloxchemlib import XTBDriver
+from .veloxchemlib import XtbDriver
 from .errorhandler import assert_msg_critical
 
 
-def _XTBDriver_compute(self, molecule, ostream):
+def _XtbDriver_compute(self, molecule, ostream):
     """
     Computes DFT-B energy using XTB driver.
 
@@ -40,7 +40,7 @@ def _XTBDriver_compute(self, molecule, ostream):
         The output stream.
     """
 
-    errmsg = 'XTBDriver: XTB not available. Please download and install XTB '
+    errmsg = 'XtbDriver: XTB not available. Please download and install XTB '
     errmsg += 'from https://github.com/grimme-lab/xtb, set XTBHOME environment '
     errmsg += 'variable, and reinstall VeloxChem.'
     assert_msg_critical(self.is_available(), errmsg)
@@ -85,4 +85,4 @@ def _XTBDriver_compute(self, molecule, ostream):
         ostream.flush()
 
 
-XTBDriver.compute = _XTBDriver_compute
+XtbDriver.compute = _XtbDriver_compute

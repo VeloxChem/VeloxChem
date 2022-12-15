@@ -817,7 +817,7 @@ class ExcitonModelDriver:
         ct_states = self.ct_nocc * self.ct_nvir
 
         # indices of diabatic excited states
-        excitation_ids = np.full((nfragments, nfragments), -1, dtype=np.int32)
+        excitation_ids = np.full((nfragments, nfragments), -1, dtype='int32')
 
         for ind in range(nfragments):
             # LE

@@ -5,7 +5,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
-from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.lrsolver import LinearResponseSolver
 
@@ -78,7 +78,7 @@ class TestH2Se:
         scf_tensors = scf_drv.scf_tensors
 
         # TDA
-        tda_exci = TDAExciDriver(task.mpi_comm, task.ostream)
+        tda_exci = TdaEigenSolver(task.mpi_comm, task.ostream)
 
         tda_exci.update_settings({
             'nstates': 3,

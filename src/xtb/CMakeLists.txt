@@ -54,7 +54,7 @@ endif()
 
 target_sources(vlxobjs
   PRIVATE
-    XTBDriver.cpp
+    XtbDriver.cpp
   )
 
 target_include_directories(vlxobjs

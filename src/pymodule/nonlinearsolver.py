@@ -411,7 +411,7 @@ class NonLinearSolver:
                                         mode, profiler)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
-        ff_data = np.zeros((nrows, half_ncols), dtype=np.complex128)
+        ff_data = np.zeros((nrows, half_ncols), dtype='complex128')
         if fock_flag == 'real_and_imag':
             for i in range(half_ncols):
                 ff_data[:, i] = (f_total.data[:, 2 * i] +
@@ -804,9 +804,9 @@ class NonLinearSolver:
             displacements = None
             recvbuf = None
 
-        if sendbuf.dtype == np.float64:
+        if sendbuf.dtype == np.dtype('float64'):
             mpi_data_type = MPI.DOUBLE
-        elif sendbuf.dtype == np.complex128:
+        elif sendbuf.dtype == np.dtype('complex128'):
             mpi_data_type = MPI.C_DOUBLE_COMPLEX
 
         self.comm.Gatherv(sendbuf,

@@ -82,8 +82,8 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
-from .xtbdriver import XTBDriver
-from .xtbgradientdriver import XTBGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .mointsdriver import MOIntegralsDriver
 from .mp2driver import Mp2Driver
@@ -91,7 +91,7 @@ from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
 from .rspdriver import ResponseDriver
-from .tdaexcidriver import TDAExciDriver
+from .tdaeigensolver import TdaEigenSolver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .lrsolver import LinearResponseSolver
@@ -99,9 +99,9 @@ from .cppsolver import ComplexResponse
 from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
-from .shgdriver import SHGDriver
-from .tpafulldriver import TPAFullDriver
-from .tpareddriver import TPAReducedDriver
+from .shgdriver import ShgDriver
+from .tpafulldriver import TpaFullDriver
+from .tpareddriver import TpaReducedDriver
 from .respchargesdriver import RespChargesDriver
 from .rspproperty import ResponseProperty
 from .rsplinabscross import LinearAbsorptionCrossSection
@@ -122,8 +122,15 @@ from .openmmgradientdriver import OpenMMGradientDriver
 from .orbitalviewer import OrbitalViewer
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
-from .xtbhessiandriver import XTBHessianDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .numerovdriver import NumerovDriver
+
+# for backward compatibility
+from .xtbdriver import XtbDriver as XTBDriver
+from .tdaeigensolver import TdaEigenSolver as TDAExciDriver
+from .shgdriver import ShgDriver as SHGDriver
+from .tpafulldriver import TpaFullDriver as TPAFullDriver
+from .tpareddriver import TpaReducedDriver as TPAReducedDriver
 
 # Python functions
 from .errorhandler import assert_msg_critical

@@ -586,13 +586,13 @@ CMolecularBasis::printBasis(const std::string& title,
 
     str.append(_label);
 
-    ss << fstr::format(str, 54, fmt::left) << "\n\n";
+    ss << fstr::format(str, 60, fmt::left) << "\n\n";
 
     ss << "  Atom ";
 
-    ss << fstr::format(std::string("Contracted GTOs"), 25, fmt::left);
+    ss << fstr::format(std::string("Contracted GTOs"), 26, fmt::left);
 
-    ss << fstr::format(std::string("Primitive GTOs"), 25, fmt::left);
+    ss << fstr::format(std::string("Primitive GTOs"), 30, fmt::left);
 
     ss << "\n\n";
 
@@ -608,9 +608,9 @@ CMolecularBasis::printBasis(const std::string& title,
 
         ss << fstr::format(lbl, 6, fmt::left);
 
-        ss << fstr::format(i->getContractionString(), 25, fmt::left);
+        ss << fstr::format(i->getContractionString(), 26, fmt::left);
 
-        ss << fstr::format(i->getPrimitivesString(), 25, fmt::left);
+        ss << fstr::format(i->getPrimitivesString(), 30, fmt::left);
 
         ss << "\n";
     }
@@ -621,13 +621,13 @@ CMolecularBasis::printBasis(const std::string& title,
 
     str.append(std::to_string(getDimensionsOfBasis(molecule)));
 
-    ss << fstr::format(str, 54, fmt::left) << "\n";
+    ss << fstr::format(str, 60, fmt::left) << "\n";
 
     str.assign("Primitive Basis Functions  : ");
 
     str.append(std::to_string(getDimensionsOfPrimitiveBasis(molecule)));
 
-    ss << fstr::format(str, 54, fmt::left) << "\n";
+    ss << fstr::format(str, 60, fmt::left) << "\n";
 
     ss << "\n";
 

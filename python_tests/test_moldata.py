@@ -176,7 +176,7 @@ class TestMolData:
 
         elem_ids = mol.elem_ids_to_numpy()
 
-        assert elem_ids.dtype.type is np.int32
+        assert elem_ids.dtype == np.dtype('int32')
 
         ref_ids = np.array([1, 3, 6, 7, 8, 16, 29, 30, 35, 47, 79, 80])
 

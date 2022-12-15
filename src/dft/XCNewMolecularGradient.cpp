@@ -558,9 +558,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
 
     CDenseMatrix molgrad(natoms, 3);
 
@@ -1050,9 +1050,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
 
     CDenseMatrix molgrad(natoms, 3);
 
@@ -1414,9 +1414,9 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
 
     CDenseMatrix molgrad(natoms, 3);
 
@@ -1938,9 +1938,9 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
 
     CDenseMatrix molgrad(natoms, 3);
 
@@ -2377,9 +2377,9 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
 
     CDenseMatrix molgrad(natoms, 3);
 
@@ -3444,9 +3444,9 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
     timer.stop("Total timing");
 
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
 
     CDenseMatrix molgrad(natoms, 3);
 

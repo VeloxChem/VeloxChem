@@ -155,7 +155,7 @@ class PulsedResponse:
         # TODO Override of number of pulses - set to 1
         self.pulse_settings['number_pulses'] = 1
 
-        field_w = np.zeros_like(truncated_freqs, dtype=np.complex128)
+        field_w = np.zeros_like(truncated_freqs, dtype='complex128')
 
         # Check that all Pulse list parameters are given correct
         for key in self.multi_input_keys:
