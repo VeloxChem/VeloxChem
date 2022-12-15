@@ -3,6 +3,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import is_single_node
+from veloxchem.veloxchemlib import hartree_in_ev
 from veloxchem import LinearResponseEigenSolver
 
 
@@ -30,8 +31,8 @@ class TestBroadening:
                     content = line.split()
                     state_str = content[2].replace(':', '')
                     state_id = int(state_str.replace('S', '')) - 1
-                    # excitation energy in a.u.
-                    exc_ene[state_id] = float(content[3])
+                    # excitation energy in eV
+                    exc_ene[state_id] = float(content[5])
                     # oscillator strength
                     osc_str[state_id] = float(content[8])
                 if 'Rot.Str.' in line:
@@ -49,8 +50,16 @@ class TestBroadening:
         tddft_file = Path(__file__).parent / 'inputs' / 'noradr_tddft.txt'
 
         exc_ene, osc_str, rot_str = self.read_tddft_output(tddft_file)
+
         xplot, yplot = LinearResponseEigenSolver.lorentzian_ecd_spectrum(
-            exc_ene, rot_str, 0.1825, 0.5, 0.0025)
+            'ev',
+            exc_ene,
+            rot_str,
+            0.1825 * hartree_in_ev(),
+            0.5 * hartree_in_ev(),
+            0.0025 * hartree_in_ev(),
+            0.0045563353 * hartree_in_ev(),
+        )
 
         ecd_file = Path(__file__).parent / 'inputs' / 'noradr_ecd.txt'
 
@@ -115,8 +124,16 @@ class TestBroadening:
         tddft_file = Path(__file__).parent / 'inputs' / 'noradr_tddft.txt'
 
         exc_ene, osc_str, rot_str = self.read_tddft_output(tddft_file)
+
         xplot, yplot = LinearResponseEigenSolver.lorentzian_absorption_spectrum(
-            exc_ene, osc_str, 0.0025, 0.5, 0.0025)
+            'ev',
+            exc_ene,
+            osc_str,
+            0.0025 * hartree_in_ev(),
+            0.5 * hartree_in_ev(),
+            0.0025 * hartree_in_ev(),
+            0.0045563353 * hartree_in_ev(),
+        )
 
         abs_file = Path(__file__).parent / 'inputs' / 'noradr_absorption.txt'
 

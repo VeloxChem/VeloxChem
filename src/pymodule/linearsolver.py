@@ -2063,37 +2063,43 @@ class LinearSolver:
         return excitation_details
 
     @staticmethod
-    def lorentzian_absorption_spectrum(exc_ene,
-                                       osc_str,
-                                       e_min=None,
-                                       e_max=None,
-                                       e_step=0.0002,
-                                       gamma=0.0045563353):
+    def lorentzian_absorption_spectrum(energy_unit, exc_ene, osc_str, e_min,
+                                       e_max, e_step, gamma):
         """
         Broadens absorption stick spectrum.
 
+        :param energy_unit:
+            The unit of excitation energies.
         :param exc_ene:
-            Excitation energies in a.u.
+            Excitation energies in energy_unit.
         :param osc_str:
             Oscillator strengths.
         :param e_min:
-            Minimal excitation energy in a.u. in the broadened spectrum.
+            Minimal excitation energy in energy_unit in broadened spectrum.
         :param e_max:
-            Maximum excitation energy in a.u. in the broadened spectrum.
+            Maximum excitation energy in energy_unit in broadened spectrum.
         :param e_step:
-            Step size of excitation energy in a.u. in the broadened spectrum.
+            Step size of excitation energy in energy_unit in broadened spectrum.
         :param gamma:
-            The broadening parameter in a.u.
+            The broadening parameter in energy_unit.
 
         :return:
-            The excitation energies in eV and sigma(w) in a.u.
+            The excitation energies in energy_unit and sigma(w) in a.u.
         """
 
-        if e_min is None:
-            e_min = max(np.min(exc_ene) - 0.01, e_step)
+        assert_msg_critical(
+            energy_unit.lower() in ['ev', 'au'],
+            'lorentzian_absorption_spectrum: Invalid energy_unit')
 
-        if e_max is None:
-            e_max = np.max(exc_ene) + 0.01
+        # convert all values to a.u.
+        if energy_unit.lower() == 'ev':
+            e_min /= hartree_in_ev()
+            e_max /= hartree_in_ev()
+            e_step /= hartree_in_ev()
+            gamma /= hartree_in_ev()
+            exc_ene_au = exc_ene / hartree_in_ev()
+        else:
+            exc_ene_au = exc_ene
 
         x_i = np.arange(e_min, e_max + e_step / 100.0, e_step, dtype='float64')
         y_i = np.zeros_like(x_i)
@@ -2101,58 +2107,65 @@ class LinearSolver:
         factor = 2.0 * math.pi * fine_structure_constant()
 
         for i in range(x_i.size):
-            for s in range(exc_ene.size):
+            for s in range(exc_ene_au.size):
                 y_i[i] += factor * gamma / (
-                    (x_i[i] - exc_ene[s])**2 + gamma**2) * osc_str[s]
+                    (x_i[i] - exc_ene_au[s])**2 + gamma**2) * osc_str[s]
 
-        x_i *= hartree_in_ev()
+        if energy_unit.lower() == 'ev':
+            x_i *= hartree_in_ev()
 
         return x_i, y_i
 
     @staticmethod
-    def lorentzian_ecd_spectrum(exc_ene,
-                                rot_str,
-                                e_min=None,
-                                e_max=None,
-                                e_step=0.0002,
-                                gamma=0.0045563353):
+    def lorentzian_ecd_spectrum(energy_unit, exc_ene, rot_str, e_min, e_max,
+                                e_step, gamma):
         """
         Broadens ECD stick spectrum.
 
+        :param energy_unit:
+            The unit of excitation energies.
         :param exc_ene:
-            Excitation energies in a.u.
+            Excitation energies in energy_unit
         :param rot_str:
             Rotatory strengths in 10**(-40) cgs unit.
         :param e_min:
-            Minimal excitation energy in a.u. in the broadened spectrum.
+            Minimal excitation energy in energy_unit in broadened spectrum.
         :param e_max:
-            Maximum excitation energy in a.u. in the broadened spectrum.
+            Maximum excitation energy in energy_unit in broadened spectrum.
         :param e_step:
-            Step size of excitation energy in a.u. in the broadened spectrum.
+            Step size of excitation energy in energy_unit in broadened spectrum.
         :param gamma:
-            The broadening parameter in a.u.
+            The broadening parameter in energy_unit.
 
         :return:
-            The excitation energies in eV and Delta_epsilon in L mol^-1 cm^-1
+            The excitation energies in energy_unit and Delta_epsilon in L mol^-1 cm^-1
         """
 
-        if e_min is None:
-            e_min = max(np.min(exc_ene) - 0.01, e_step)
+        assert_msg_critical(energy_unit.lower() in ['ev', 'au'],
+                            'lorentzian_ecd_spectrum: Invalid energy_unit')
 
-        if e_max is None:
-            e_max = np.max(exc_ene) + 0.01
+        # convert all values to a.u.
+        if energy_unit.lower() == 'ev':
+            e_min /= hartree_in_ev()
+            e_max /= hartree_in_ev()
+            e_step /= hartree_in_ev()
+            gamma /= hartree_in_ev()
+            exc_ene_au = exc_ene / hartree_in_ev()
+        else:
+            exc_ene_au = exc_ene
 
         x_i = np.arange(e_min, e_max + e_step / 100.0, e_step, dtype='float64')
         y_i = np.zeros_like(x_i)
 
-        factor = 1.0 / rotatory_strength_in_cgs()  # convert rot_str to a.u.
-        factor *= extinction_coefficient_from_beta() / 3
+        f = 1.0 / rotatory_strength_in_cgs()  # convert rot_str to a.u.
+        f *= extinction_coefficient_from_beta() / 3.0
 
         for i in range(x_i.size):
-            for s in range(exc_ene.size):
-                y_i[i] += factor * gamma / ((x_i[i] - exc_ene[s])**2 +
-                                            gamma**2) * exc_ene[s] * rot_str[s]
+            for s in range(exc_ene_au.size):
+                y_i[i] += f * gamma / ((x_i[i] - exc_ene_au[s])**2 +
+                                       gamma**2) * exc_ene_au[s] * rot_str[s]
 
-        x_i *= hartree_in_ev()
+        if energy_unit.lower() == 'ev':
+            x_i *= hartree_in_ev()
 
         return x_i, y_i
