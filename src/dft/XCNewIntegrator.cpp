@@ -208,8 +208,8 @@ CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
     }
     else if (xcfuntype == "PGGA")
     {
-        // _integrateVxcPDFTForGGA(aoFockMatrix, moTwoBodyGradient, molecule, basis,
-        //                         DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
+        _integrateVxcPDFTForGGA(aoFockMatrix, moTwoBodyGradient, molecule, basis,
+                                DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
     }
     else
     {
@@ -2202,7 +2202,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&      aoFockMatrix,
                                           const CDense4DTensor&   TwoBodyDensityMatrix,
                                           const CDenseMatrix&     ActiveMOs,
                                           const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional) const
+                                          const CXCPairDensityFunctional& xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2402,8 +2402,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&      aoFockMatrix,
 
         timer.start("XC functional eval.");
 
-        // TODO (MGD) implement and use own functionals
-        xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
+        xcFunctional.compute_exc_vxc_for_pgga(npoints, rho, sigma, exc, vrho, vsigma);
 
         timer.stop("XC functional eval.");
 
@@ -2413,9 +2412,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&      aoFockMatrix,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        // TODO (MGD) screening
+        gridscreen::screenVxcFockForPGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -2438,7 +2435,7 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&      aoFockMatrix,
 
         for (int32_t g = 0; g < npoints; g++)
         {
-            auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
+            auto rho_total = rho[2 * g + 0];
 
             nele += local_weights[g] * rho_total;
 

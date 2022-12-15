@@ -253,7 +253,7 @@ class CXCNewIntegrator
                                   const CDense4DTensor&   TwoBodyDensityMatrix,
                                   const CDenseMatrix&     ActiveMOs,
                                   const CMolecularGrid&   molecularGrid,
-                                  const CXCNewFunctional& fvxc) const;
+                                  const CXCPairDensityFunctional& xcFunctional) const;
 
     /**
      Integrates LDA contribution to (first-order) Vxc matrix.
