@@ -9,6 +9,8 @@ target_sources(vlxobjs
     PkzbFunctional.cpp
     SlaterFunctional.cpp
     VWN3Functional.cpp
+    PairDensityPBE_C.cpp
+    PairDensityPBE_X.cpp
   )
 
 target_include_directories(vlxobjs
