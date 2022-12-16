@@ -39,12 +39,12 @@ class TestStreams:
     def test_stdout(self):
 
         ostream = OutputStream(sys.stdout)
-        self.run_ostream_test(ostream, True)
+        assert ostream.get_state()
 
     def test_default(self):
 
         ostream = OutputStream()
-        self.run_ostream_test(ostream, True)
+        assert ostream.get_state()
 
     def test_none(self):
 

@@ -1,6 +1,6 @@
 import pytest
 
-from veloxchem.xtbdriver import XTBDriver
+from veloxchem.xtbdriver import XtbDriver
 
 __all__ = ["using_cppe", "using_xtb", "using_mdanalysis"]
 
@@ -25,7 +25,7 @@ using_cppe = pytest.mark.skipif(
 )
 
 using_xtb = pytest.mark.skipif(
-    not XTBDriver.is_available(),
+    not XtbDriver.is_available(),
     reason="Not detecting xTB. Install package if necessary",
 )
 

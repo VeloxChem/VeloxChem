@@ -35,7 +35,7 @@
 
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
-#include "XTBDriver.hpp"
+#include "XtbDriver.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -47,35 +47,37 @@ namespace vlx_xtb {  // vlx_xtb namespace
 void
 export_xtb(py::module& m)
 {
-    // CXTBDriver class
+    // CXtbDriver class
 
-    PyClass<CXTBDriver>(m, "XTBDriver")
-        .def(py::init(&vlx_general::create<CXTBDriver>), "comm"_a = py::none())
-        .def_static("is_available", &CXTBDriver::isAvailable, "Checks if XTB package is available.")
-        .def("is_master_node", &CXTBDriver::isMasterNode, "Checks if XTB driver is running on master node.")
-        .def("set_max_iter", &CXTBDriver::setMaxIterations, "Sets maximum number of SCF iterations.", "maxIterations"_a)
-        .def("set_elec_temp", &CXTBDriver::setElectronicTemp, "Sets electronic temperature for electron smearing.", "electronicTemp"_a)
-        .def("set_method", &CXTBDriver::setMethod, "Sets XTB method.", "method"_a)
-        .def("set_output_filename", &CXTBDriver::setOutputFilename, "Sets output filename.", "filename"_a)
-        .def("get_output", &CXTBDriver::getOutput, "Gets XTB output as a vector of strings.")
-        .def("get_output_filename", &CXTBDriver::getOutputFilename, "Gets XTB output filename.")
-        .def("get_energy", &CXTBDriver::getEnergy, "Gets energy of molecular system.")
+    PyClass<CXtbDriver>(m, "XtbDriver")
+        .def(py::init(&vlx_general::create<CXtbDriver>), "comm"_a = py::none())
+        .def_static("is_available", &CXtbDriver::isAvailable, "Checks if XTB package is available.")
+        .def("is_master_node", &CXtbDriver::isMasterNode, "Checks if XTB driver is running on master node.")
+        .def("set_max_iter", &CXtbDriver::setMaxIterations, "Sets maximum number of SCF iterations.", "maxIterations"_a)
+        .def("set_elec_temp", &CXtbDriver::setElectronicTemp, "Sets electronic temperature for electron smearing.", "electronicTemp"_a)
+        .def("set_method", &CXtbDriver::setMethod, "Sets XTB method.", "method"_a)
+        .def("set_output_filename", &CXtbDriver::setOutputFilename, "Sets output filename.", "filename"_a)
+        .def("mute", &CXtbDriver::mute, "Mutes output.")
+        .def("unmute", &CXtbDriver::unmute, "Unmutes output.")
+        .def("get_output", &CXtbDriver::getOutput, "Gets XTB output as a vector of strings.")
+        .def("get_output_filename", &CXtbDriver::getOutputFilename, "Gets XTB output filename.")
+        .def("get_energy", &CXtbDriver::getEnergy, "Gets energy of molecular system.")
         .def(
             "get_gradient",
-            [](const CXTBDriver& self) -> py::array_t<double> {
+            [](const CXtbDriver& self) -> py::array_t<double> {
                 auto grad = self.getGradient();
                 return vlx_general::pointer_to_numpy(grad.data(), grad.size() / 3, 3);
             },
             "Gets molecular gradient as numpy array of shape (natoms, 3).")
         .def(
             "get_dipole",
-            [](const CXTBDriver& self) -> py::array_t<double> {
+            [](const CXtbDriver& self) -> py::array_t<double> {
                 auto dipole = self.getDipole();
                 return vlx_general::pointer_to_numpy(dipole.data(), dipole.size());
             },
             "Gets molecular dipole moment as numpy array.")
         // prefixed by an underscore because it will be decorated in xtbdriver.py
-        .def("_compute", &CXTBDriver::compute);
+        .def("_compute", &CXtbDriver::compute);
 }
 
 }  // namespace vlx_xtb

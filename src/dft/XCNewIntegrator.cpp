@@ -254,19 +254,19 @@ CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
 
     molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
 
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = newvxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
-    if (xcfuntype == xcfun::lda)
+    if (xcfuntype == "PLDA")
     {
         _integrateVxcPDFTForLDA(aoFockMatrix, moTwoBodyGradient, molecule, basis,
                                 DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
     }
-    else if (xcfuntype == xcfun::gga)
+    else if (xcfuntype == "PGGA")
     {
-        _integrateVxcPDFTForGGA(aoFockMatrix, moTwoBodyGradient, molecule, basis,
-                                DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
+        // _integrateVxcPDFTForGGA(aoFockMatrix, moTwoBodyGradient, molecule, basis,
+        //                         DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
     }
     else
     {
@@ -2892,15 +2892,15 @@ CXCNewIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&      aoFockMatrix,
-                                          CDense4DTensor&         moTwoBodyGradient,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& DensityMatrix,
-                                          const CDense4DTensor&   TwoBodyDensityMatrix,
-                                          const CDenseMatrix&     ActiveMOs,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional) const
+CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
+                                          CDense4DTensor&                 moTwoBodyGradient,
+                                          const CMolecule&                molecule,
+                                          const CMolecularBasis&          basis,
+                                          const CAODensityMatrix&         DensityMatrix,
+                                          const CDense4DTensor&           TwoBodyDensityMatrix,
+                                          const CDenseMatrix&             ActiveMOs,
+                                          const CMolecularGrid&           molecularGrid,
+                                          const CXCPairDensityFunctional& xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -3075,8 +3075,7 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&      aoFockMatrix,
 
         timer.start("XC functional eval.");
 
-        // TODO (MGD) implement and use own functional
-        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
+        xcFunctional.compute_exc_vxc_for_plda(npoints, rho, exc, vrho);
 
         timer.stop("XC functional eval.");
 
@@ -3086,9 +3085,7 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&      aoFockMatrix,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
-
-        // TODO (MGD) screening
+        gridscreen::screenVxcFockForPLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -3110,7 +3107,7 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&      aoFockMatrix,
 
         for (int32_t g = 0; g < npoints; g++)
         {
-            auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
+            auto rho_total = rho[2 * g + 0];
 
             nele += local_weights[g] * rho_total;
 

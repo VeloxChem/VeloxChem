@@ -34,13 +34,13 @@ from .outputstream import OutputStream
 from .distributedarray import DistributedArray
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .tpadriver import TPADriver
+from .tpadriver import TpaDriver
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 
 
-class TPAReducedDriver(TPADriver):
+class TpaReducedDriver(TpaDriver):
     """
     Implements the reduced isotropic cubic response driver for two-photon
     absorption (TPA)

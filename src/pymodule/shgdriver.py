@@ -43,7 +43,7 @@ from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
 
-class SHGDriver(NonLinearSolver):
+class ShgDriver(NonLinearSolver):
     """
     Implements a quadratic response driver for SHG calculations
 

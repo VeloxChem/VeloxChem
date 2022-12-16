@@ -19,16 +19,18 @@ class TestMOM:
         """
 
         molecule = Molecule.read_str(water_xyz)
-        basis = MolecularBasis.read(molecule, '6-31G')
+        basis = MolecularBasis.read(molecule, '6-31G', ostream=None)
 
         # Ground state
         scf_gs = ScfRestrictedDriver()
+        scf_gs.ostream.state = False
         scf_gs.compute(molecule, basis)
 
         # Core-hole
         molecule.set_charge(1)
         molecule.set_multiplicity(2)
         scf_ch = ScfRestrictedOpenDriver()
+        scf_ch.ostream.state = False
 
         scf_ch.maximum_overlap(
             molecule,
@@ -58,10 +60,11 @@ class TestMOM:
         """
 
         molecule = Molecule.read_str(water_xyz)
-        basis = MolecularBasis.read(molecule, '6-31G')
+        basis = MolecularBasis.read(molecule, '6-31G', ostream=None)
 
         # Ground state
         scf_gs = ScfRestrictedDriver()
+        scf_gs.ostream.state = False
         scf_gs.xcfun = 'B3LYP'
         scf_gs.compute(molecule, basis)
 
@@ -69,6 +72,7 @@ class TestMOM:
         molecule.set_charge(1)
         molecule.set_multiplicity(2)
         scf_ch = ScfUnrestrictedDriver()
+        scf_ch.ostream.state = False
         scf_ch.xcfun = 'B3LYP'
 
         scf_ch.maximum_overlap(

@@ -43,11 +43,35 @@ class TestTripletH2:
         inpfile = str(here / 'inputs' / 'h2_t.inp')
 
         potfile = None
-
         xcfun_label = None
 
         ref_e_scf = -0.77331601
+        ref_dip = np.array([0.000000, 0.000000, 0.000000])
 
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+
+    def test_uscf_lda(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'h2_t.inp')
+
+        potfile = None
+        xcfun_label = 'slater'
+
+        ref_e_scf = -0.71006575
+        ref_dip = np.array([0.000000, 0.000000, 0.000000])
+
+        self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
+
+    def test_uscf_gga(self):
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'h2_t.inp')
+
+        potfile = None
+        xcfun_label = 'b3lyp'
+
+        ref_e_scf = -0.78739868
         ref_dip = np.array([0.000000, 0.000000, 0.000000])
 
         self.run_scf(inpfile, potfile, xcfun_label, ref_e_scf, ref_dip)
