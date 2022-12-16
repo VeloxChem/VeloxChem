@@ -880,9 +880,13 @@ class CubicResponseDriver(NonLinearSolver):
                     fock_index += 1
                 
         else:
+            if self.rank == mpi_master():
+                density_list_23 = density_list2 + density_list3
+            else:
+                density_list_23 = None
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                          'real_and_imag', None, None,None,
-                                         (density_list2 + density_list3), 'crf')
+                                         density_list_23, 'crf')
             fock_index = 0
             for wb in fock_freqs:
                 for key in keys:
