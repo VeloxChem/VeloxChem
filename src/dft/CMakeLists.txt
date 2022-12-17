@@ -9,10 +9,6 @@ target_sources(vlxobjs
     GridPartitioner.cpp
     GridScreener.cpp
     GtoEvaluator.cpp
-    GtoFunc.cpp
-    GtoFuncForGGA.cpp
-    GtoFuncForLDA.cpp
-    GtoFuncForMGGA.cpp
     LebedevLaikovQuadrature.cpp
     Log3Quadrature.cpp
     MolecularGrid.cpp
