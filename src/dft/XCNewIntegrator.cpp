@@ -85,10 +85,6 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
     }
     else if (xcfuntype == xcfun::mgga)
     {
-        std::string erropenshell("XCNewIntegrator.integrateVxcFock: Not implemented for open-shell meta-GGA");
-
-        errors::assertMsgCritical(fstr::upcase(flag) == "CLOSEDSHELL", erropenshell);
-
         return _integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, newfvxc, flag);
     }
 
@@ -1054,17 +1050,33 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
         // generate sub density matrix and density grid
 
-        timer.start("Density matrix slicing");
+        if (closedshell)
+        {
+            timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        // TODO open-shell meta-GGA
-        dengridgen::generateDensityForMGGA(rho, rhograd, sigma, lapl, tau, npoints,
-                                           mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                                           mat_chi_xx, mat_chi_yy, mat_chi_zz,
-                                           sub_dens_mat, timer);
+            dengridgen::generateDensityForMGGA(rho, rhograd, sigma, lapl, tau, npoints,
+                                               mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                               mat_chi_xx, mat_chi_yy, mat_chi_zz,
+                                               sub_dens_mat, timer);
 
-        timer.stop("Density matrix slicing");
+            timer.stop("Density matrix slicing");
+        }
+        else
+        {
+            timer.start("Density matrix slicing");
+
+            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
+
+            dengridgen::generateDensityForMGGA(rho, rhograd, sigma, lapl, tau, npoints,
+                                               mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                               mat_chi_xx, mat_chi_yy, mat_chi_zz,
+                                               sub_dens_mat_a, sub_dens_mat_b, timer);
+
+            timer.stop("Density matrix slicing");
+        }
 
         // compute exchange-correlation functional derivative
 
@@ -1088,16 +1100,30 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
 
-        // TODO open-shell meta-GGA
-        auto partial_mat_Vxc = _integratePartialVxcFockForMGGA(
-            npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-            mat_chi_xx, mat_chi_yy, mat_chi_zz, rhograd, vrho, vsigma, vlapl, vtau, timer);
+        if (closedshell)
+        {
+            auto partial_mat_Vxc = _integratePartialVxcFockForMGGA(
+                npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                mat_chi_xx, mat_chi_yy, mat_chi_zz, rhograd, vrho, vsigma, vlapl, vtau, timer);
 
-        timer.start("Vxc matrix dist.");
+            timer.start("Vxc matrix dist.");
 
-        submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
+            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
 
-        timer.stop("Vxc matrix dist.");
+            timer.stop("Vxc matrix dist.");
+        }
+        else
+        {
+            auto partial_mat_Vxc_ab = _integratePartialVxcFockForMGGAOpenShell(
+                npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                mat_chi_xx, mat_chi_yy, mat_chi_zz, rhograd, vrho, vsigma, vlapl, vtau, timer);
+
+            timer.start("Vxc matrix dist.");
+
+            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc_ab, aoinds, aocount, naos);
+
+            timer.stop("Vxc matrix dist.");
+        }
 
         // compute partial contribution to XC energy
 
@@ -2978,8 +3004,8 @@ CXCNewIntegrator::_integratePartialVxcFockForGGAOpenShell(const int32_t         
     auto G_a_val = mat_G_a.values();
     auto G_b_val = mat_G_b.values();
 
-    auto G_gga_a_val = mat_G_a_gga.values();
-    auto G_gga_b_val = mat_G_b_gga.values();
+    auto G_a_gga_val = mat_G_a_gga.values();
+    auto G_b_gga_val = mat_G_b_gga.values();
 
     auto chi_val = gtoValues.values();
 
@@ -3014,10 +3040,10 @@ CXCNewIntegrator::_integratePartialVxcFockForGGAOpenShell(const int32_t         
                 G_a_val[nu_offset + g] = weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
                 G_b_val[nu_offset + g] = weights[g] * vrho[2 * g + 1] * chi_val[nu_offset + g];
 
-                G_gga_a_val[nu_offset + g] = weights[g] * (vxa * chi_x_val[nu_offset + g] +
+                G_a_gga_val[nu_offset + g] = weights[g] * (vxa * chi_x_val[nu_offset + g] +
                                                            vya * chi_y_val[nu_offset + g] +
                                                            vza * chi_z_val[nu_offset + g]);
-                G_gga_b_val[nu_offset + g] = weights[g] * (vxb * chi_x_val[nu_offset + g] +
+                G_b_gga_val[nu_offset + g] = weights[g] * (vxb * chi_x_val[nu_offset + g] +
                                                            vyb * chi_y_val[nu_offset + g] +
                                                            vzb * chi_z_val[nu_offset + g]);
             }
@@ -3167,6 +3193,166 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t          npoints
     timer.stop("Vxc matrix matmul");
 
     return mat_Vxc;
+}
+
+std::vector<CDenseMatrix>
+CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t          npoints,
+                                                           const double*          weights,
+                                                           const CDenseMatrix&    gtoValues,
+                                                           const CDenseMatrix&    gtoValuesX,
+                                                           const CDenseMatrix&    gtoValuesY,
+                                                           const CDenseMatrix&    gtoValuesZ,
+                                                           const CDenseMatrix&    gtoValuesXX,
+                                                           const CDenseMatrix&    gtoValuesYY,
+                                                           const CDenseMatrix&    gtoValuesZZ,
+                                                           const double*          rhograd,
+                                                           const double*          vrho,
+                                                           const double*          vsigma,
+                                                           const double*          vlapl,
+                                                           const double*          vtau,
+                                                           CMultiTimer&           timer) const
+{
+    // eq.(30), JCTC 2021, 17, 1512-1521
+
+    timer.start("Vxc matrix G");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    // LDA contribution
+    CDenseMatrix mat_G_a(naos, npoints);
+    CDenseMatrix mat_G_b(naos, npoints);
+
+    // GGA and laplacian contribution
+    CDenseMatrix mat_G_a_gga(naos, npoints);
+    CDenseMatrix mat_G_b_gga(naos, npoints);
+
+    // tau contribution
+    CDenseMatrix mat_G_a_gga_x(naos, npoints);
+    CDenseMatrix mat_G_a_gga_y(naos, npoints);
+    CDenseMatrix mat_G_a_gga_z(naos, npoints);
+
+    CDenseMatrix mat_G_b_gga_x(naos, npoints);
+    CDenseMatrix mat_G_b_gga_y(naos, npoints);
+    CDenseMatrix mat_G_b_gga_z(naos, npoints);
+
+    auto G_a_val = mat_G_a.values();
+    auto G_b_val = mat_G_b.values();
+
+    auto G_a_gga_val = mat_G_a_gga.values();
+    auto G_b_gga_val = mat_G_b_gga.values();
+
+    auto G_a_gga_x_val = mat_G_a_gga_x.values();
+    auto G_a_gga_y_val = mat_G_a_gga_y.values();
+    auto G_a_gga_z_val = mat_G_a_gga_z.values();
+
+    auto G_b_gga_x_val = mat_G_b_gga_x.values();
+    auto G_b_gga_y_val = mat_G_b_gga_y.values();
+    auto G_b_gga_z_val = mat_G_b_gga_z.values();
+
+    auto chi_val = gtoValues.values();
+
+    auto chi_x_val = gtoValuesX.values();
+    auto chi_y_val = gtoValuesY.values();
+    auto chi_z_val = gtoValuesZ.values();
+
+    auto chi_xx_val = gtoValuesXX.values();
+    auto chi_yy_val = gtoValuesYY.values();
+    auto chi_zz_val = gtoValuesZZ.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                auto vxa = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
+                auto vya = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
+                auto vza = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 2] + vsigma[3 * g + 1] * rhograd[6 * g + 5];
+
+                auto vxb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 3] + vsigma[3 * g + 1] * rhograd[6 * g + 0];
+                auto vyb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 4] + vsigma[3 * g + 1] * rhograd[6 * g + 1];
+                auto vzb = 2.0 * vsigma[3 * g + 2] * rhograd[6 * g + 5] + vsigma[3 * g + 1] * rhograd[6 * g + 2];
+
+                // LDA contribution
+                G_a_val[nu_offset + g] = weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
+                G_b_val[nu_offset + g] = weights[g] * vrho[2 * g + 1] * chi_val[nu_offset + g];
+
+                // GGA contribution (will be scaled by 2 later)
+                G_a_gga_val[nu_offset + g] = weights[g] * (vxa * chi_x_val[nu_offset + g] +
+                                                           vya * chi_y_val[nu_offset + g] +
+                                                           vza * chi_z_val[nu_offset + g]);
+                G_b_gga_val[nu_offset + g] = weights[g] * (vxb * chi_x_val[nu_offset + g] +
+                                                           vyb * chi_y_val[nu_offset + g] +
+                                                           vzb * chi_z_val[nu_offset + g]);
+
+                // laplacian contribution (will be scaled by 2 later)
+                G_a_gga_val[nu_offset + g] += weights[g] * vlapl[2 * g + 0] * (chi_xx_val[nu_offset + g] +
+                                                                               chi_yy_val[nu_offset + g] +
+                                                                               chi_zz_val[nu_offset + g]);
+                G_b_gga_val[nu_offset + g] += weights[g] * vlapl[2 * g + 1] * (chi_xx_val[nu_offset + g] +
+                                                                               chi_yy_val[nu_offset + g] +
+                                                                               chi_zz_val[nu_offset + g]);
+
+                // tau contribution (will be scaled by 0.5 later)
+                G_a_gga_x_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_x_val[nu_offset + g];
+                G_a_gga_y_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_y_val[nu_offset + g];
+                G_a_gga_z_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_z_val[nu_offset + g];
+
+                G_b_gga_x_val[nu_offset + g] += weights[g] * vtau[2 * g + 1] * chi_x_val[nu_offset + g];
+                G_b_gga_y_val[nu_offset + g] += weights[g] * vtau[2 * g + 1] * chi_y_val[nu_offset + g];
+                G_b_gga_z_val[nu_offset + g] += weights[g] * vtau[2 * g + 1] * chi_z_val[nu_offset + g];
+            }
+        }
+    }
+
+    timer.stop("Vxc matrix G");
+
+    // eq.(31), JCTC 2021, 17, 1512-1521
+
+    // Note that we use matrix-matrix multiplication only once, and symmetrize
+    // the result. This is because the density matrix is symmetric, and the
+    // Kohn-Sham matrix from mat_G is also symmetric. Formally only the
+    // mat_G_gga contribution should be symmetrized.
+
+    timer.start("Vxc matrix matmul");
+
+    // LDA, GGA and laplacian contribution
+    auto mat_Vxc_a = denblas::multABt(gtoValues, denblas::addAB(mat_G_a, mat_G_a_gga, 2.0));
+    auto mat_Vxc_b = denblas::multABt(gtoValues, denblas::addAB(mat_G_b, mat_G_b_gga, 2.0));
+
+    // tau contribution
+    auto mat_Vxc_a_x = denblas::multABt(gtoValuesX, mat_G_a_gga_x);
+    auto mat_Vxc_a_y = denblas::multABt(gtoValuesY, mat_G_a_gga_y);
+    auto mat_Vxc_a_z = denblas::multABt(gtoValuesZ, mat_G_a_gga_z);
+
+    auto mat_Vxc_b_x = denblas::multABt(gtoValuesX, mat_G_b_gga_x);
+    auto mat_Vxc_b_y = denblas::multABt(gtoValuesY, mat_G_b_gga_y);
+    auto mat_Vxc_b_z = denblas::multABt(gtoValuesZ, mat_G_b_gga_z);
+
+    mat_Vxc_a = denblas::addAB(mat_Vxc_a, mat_Vxc_a_x, 0.5);
+    mat_Vxc_a = denblas::addAB(mat_Vxc_a, mat_Vxc_a_y, 0.5);
+    mat_Vxc_a = denblas::addAB(mat_Vxc_a, mat_Vxc_a_z, 0.5);
+
+    mat_Vxc_b = denblas::addAB(mat_Vxc_b, mat_Vxc_b_x, 0.5);
+    mat_Vxc_b = denblas::addAB(mat_Vxc_b, mat_Vxc_b_y, 0.5);
+    mat_Vxc_b = denblas::addAB(mat_Vxc_b, mat_Vxc_b_z, 0.5);
+
+    mat_Vxc_a.symmetrizeAndScale(0.5);
+    mat_Vxc_b.symmetrizeAndScale(0.5);
+
+    timer.stop("Vxc matrix matmul");
+
+    return std::vector<CDenseMatrix>{mat_Vxc_a, mat_Vxc_b};
 }
 
 CDenseMatrix

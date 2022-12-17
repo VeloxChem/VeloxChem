@@ -296,11 +296,11 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the alpha and beta contribution as a list of CDenseMatrix objects.
      */
-    std::vector<CDenseMatrix> _integratePartialVxcFockForLDAOpenShell(const int32_t          npoints,
-                                                                      const double*          weights,
-                                                                      const CDenseMatrix&    gtoValues,
-                                                                      const double*          vrho,
-                                                                      CMultiTimer&           timer) const;
+    std::vector<CDenseMatrix> _integratePartialVxcFockForLDAOpenShell(const int32_t       npoints,
+                                                                      const double*       weights,
+                                                                      const CDenseMatrix& gtoValues,
+                                                                      const double*       vrho,
+                                                                      CMultiTimer&        timer) const;
 
     /**
      Integrates GGA contribution to AO Kohn-Sham matrix.
@@ -317,16 +317,16 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialVxcFockForGGA(const int32_t          npoints,
-                                                const double*          weights,
-                                                const CDenseMatrix&    gtoValues,
-                                                const CDenseMatrix&    gtoValuesX,
-                                                const CDenseMatrix&    gtoValuesY,
-                                                const CDenseMatrix&    gtoValuesZ,
-                                                const double*          rhograd,
-                                                const double*          vrho,
-                                                const double*          vsigma,
-                                                CMultiTimer&           timer) const;
+    CDenseMatrix _integratePartialVxcFockForGGA(const int32_t       npoints,
+                                                const double*       weights,
+                                                const CDenseMatrix& gtoValues,
+                                                const CDenseMatrix& gtoValuesX,
+                                                const CDenseMatrix& gtoValuesY,
+                                                const CDenseMatrix& gtoValuesZ,
+                                                const double*       rhograd,
+                                                const double*       vrho,
+                                                const double*       vsigma,
+                                                CMultiTimer&        timer) const;
 
     /**
      Integrates GGA contribution to AO Kohn-Sham matrix.
@@ -343,16 +343,16 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the alpha and beta contribution as a list of CDenseMatrix objects.
      */
-    std::vector<CDenseMatrix> _integratePartialVxcFockForGGAOpenShell(const int32_t          npoints,
-                                                                      const double*          weights,
-                                                                      const CDenseMatrix&    gtoValues,
-                                                                      const CDenseMatrix&    gtoValuesX,
-                                                                      const CDenseMatrix&    gtoValuesY,
-                                                                      const CDenseMatrix&    gtoValuesZ,
-                                                                      const double*          rhograd,
-                                                                      const double*          vrho,
-                                                                      const double*          vsigma,
-                                                                      CMultiTimer&           timer) const;
+    std::vector<CDenseMatrix> _integratePartialVxcFockForGGAOpenShell(const int32_t       npoints,
+                                                                      const double*       weights,
+                                                                      const CDenseMatrix& gtoValues,
+                                                                      const CDenseMatrix& gtoValuesX,
+                                                                      const CDenseMatrix& gtoValuesY,
+                                                                      const CDenseMatrix& gtoValuesZ,
+                                                                      const double*       rhograd,
+                                                                      const double*       vrho,
+                                                                      const double*       vsigma,
+                                                                      CMultiTimer&        timer) const;
 
     /**
      Integrates meta-GGA contribution to AO Kohn-Sham matrix.
@@ -374,21 +374,57 @@ class CXCNewIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialVxcFockForMGGA(const int32_t          npoints,
-                                                 const double*          weights,
-                                                 const CDenseMatrix&    gtoValues,
-                                                 const CDenseMatrix&    gtoValuesX,
-                                                 const CDenseMatrix&    gtoValuesY,
-                                                 const CDenseMatrix&    gtoValuesZ,
-                                                 const CDenseMatrix&    gtoValuesXX,
-                                                 const CDenseMatrix&    gtoValuesYY,
-                                                 const CDenseMatrix&    gtoValuesZZ,
-                                                 const double*          rhograd,
-                                                 const double*          vrho,
-                                                 const double*          vsigma,
-                                                 const double*          vlapl,
-                                                 const double*          vtau,
-                                                 CMultiTimer&           timer) const;
+    CDenseMatrix _integratePartialVxcFockForMGGA(const int32_t       npoints,
+                                                 const double*       weights,
+                                                 const CDenseMatrix& gtoValues,
+                                                 const CDenseMatrix& gtoValuesX,
+                                                 const CDenseMatrix& gtoValuesY,
+                                                 const CDenseMatrix& gtoValuesZ,
+                                                 const CDenseMatrix& gtoValuesXX,
+                                                 const CDenseMatrix& gtoValuesYY,
+                                                 const CDenseMatrix& gtoValuesZZ,
+                                                 const double*       rhograd,
+                                                 const double*       vrho,
+                                                 const double*       vsigma,
+                                                 const double*       vlapl,
+                                                 const double*       vtau,
+                                                 CMultiTimer&        timer) const;
+
+    /**
+     Integrates meta-GGA contribution to AO Kohn-Sham matrix.
+
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param gtoValuesX the GTO gradient X values on grid points.
+     @param gtoValuesY the GTO gradient Y values on grid points.
+     @param gtoValuesZ the GTO gradient Z values on grid points.
+     @param gtoValuesXX the GTO gradient XX values on grid points.
+     @param gtoValuesYY the GTO gradient YY values on grid points.
+     @param gtoValuesZZ the GTO gradient ZZ values on grid points.
+     @param rhograd the gradient density.
+     @param vrho the 1st-order functional derivative wrt rho.
+     @param vsigma the 1st-order functional derivative wrt sigma.
+     @param vlapl the 1st-order functional derivative wrt laplacian.
+     @param vtau the 1st-order functional derivative wrt tau.
+     @param timer the timer.
+     @return the alpha and beta contribution as a list of CDenseMatrix objects.
+     */
+    std::vector<CDenseMatrix> _integratePartialVxcFockForMGGAOpenShell(const int32_t       npoints,
+                                                                       const double*       weights,
+                                                                       const CDenseMatrix& gtoValues,
+                                                                       const CDenseMatrix& gtoValuesX,
+                                                                       const CDenseMatrix& gtoValuesY,
+                                                                       const CDenseMatrix& gtoValuesZ,
+                                                                       const CDenseMatrix& gtoValuesXX,
+                                                                       const CDenseMatrix& gtoValuesYY,
+                                                                       const CDenseMatrix& gtoValuesZZ,
+                                                                       const double*       rhograd,
+                                                                       const double*       vrho,
+                                                                       const double*       vsigma,
+                                                                       const double*       vlapl,
+                                                                       const double*       vtau,
+                                                                       CMultiTimer&        timer) const;
 
     /**
      Integrates LDA contribution to (second-order) Fxc matrix.
