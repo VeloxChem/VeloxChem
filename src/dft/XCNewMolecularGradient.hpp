@@ -183,7 +183,7 @@ class CXCNewMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+                                             const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates third-order GGA exchnage-correlation functional contribution to
@@ -205,7 +205,7 @@ class CXCNewMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+                                             const CXCNewFunctional& xcFunctional) const;
 
     /**
      Computes AO-to-atom mapping.

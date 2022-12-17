@@ -3555,7 +3555,7 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 
                 double l5contract_x = grada_x_g * l2contract;
                 double l5contract_y = grada_y_g * l2contract;
-                double l5contract_z = grada_z_g * l2contract;     
+                double l5contract_z = grada_z_g * l2contract;
 
                 double q2contract = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
 
@@ -3670,7 +3670,7 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 // Q3
                 prefac += (4.0*v3rhosigma2_acc + 8.0*v3rhosigma2_acb + 4.0*v3rhosigma2_abb 
                          + 8.0*v3rhosigma2_aac + 8.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa) * q3contract;
-                
+
                 // Q4
                 prefac += (2.0*v2rhosigma_ac + 2.0*v2rhosigma_ab + 2.0*v2rhosigma_aa) * q4contract;
 
