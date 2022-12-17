@@ -42,9 +42,6 @@
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
-#include "XCCubicHessianGrid.hpp"
-#include "XCGradientGrid.hpp"
-#include "XCHessianGrid.hpp"
 #include "XCNewFunctional.hpp"
 #include "XCPairDensityFunctional.hpp"
 

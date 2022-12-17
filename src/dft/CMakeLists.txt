@@ -17,12 +17,8 @@ target_sources(vlxobjs
     Log3Quadrature.cpp
     MolecularGrid.cpp
     PartitionFunc.cpp
-    PrimitiveFunctional.cpp
     SubMatrix.cpp
-    XCCubicHessianGrid.cpp
     XCComponent.cpp
-    XCGradientGrid.cpp
-    XCHessianGrid.cpp
     XCNewFunctional.cpp
     XCNewIntegrator.cpp
     XCNewMolecularGradient.cpp

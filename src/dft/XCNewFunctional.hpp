@@ -38,10 +38,7 @@
 #include "Buffer.hpp"
 #include "DensityGrid.hpp"
 #include "XCComponent.hpp"
-#include "XCCubicHessianGrid.hpp"
 #include "XCFuncType.hpp"
-#include "XCGradientGrid.hpp"
-#include "XCHessianGrid.hpp"
 
 /**
  * Class CXCNewFunctional is a wrapper to the C functions and structs provided by LibXC.
