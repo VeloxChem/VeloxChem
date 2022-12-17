@@ -1080,9 +1080,8 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        // TODO screening
-        // gridscreen::screenVxcFockForMGGA(rho, sigma, exc, vrho, vsigma, vlapl, vtau,
-        //                                  npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenVxcFockForMGGA(rho, sigma, exc, vrho, vsigma, vlapl, vtau,
+                                         npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
