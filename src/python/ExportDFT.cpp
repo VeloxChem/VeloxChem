@@ -37,12 +37,10 @@
 #include "DensityGrid.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
-#include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
 #include "NewFunctionalParser.hpp"
 #include "XCFuncType.hpp"
-#include "XCFunctional.hpp"
 #include "XCNewFunctional.hpp"
 #include "XCNewIntegrator.hpp"
 #include "XCNewMolecularGradient.hpp"
@@ -176,22 +174,6 @@ export_dft(py::module& m)
             "source"_a)
         .def("get_electrons", &CAOKohnShamMatrix::getNumberOfElectrons, "Gets number of electrons obtained by integrating Kohn-Sham matrix.")
         .def("get_energy", &CAOKohnShamMatrix::getExchangeCorrelationEnergy, "Gets exchange-correlation energy associated with Kohn-Sham matrix.")
-        .def(py::self == py::self);
-
-    // CXCFunctional class
-
-    PyClass<CXCFunctional>(m, "XCFunctional")
-        .def(py::init<>())
-        .def(py::init<const CXCFunctional&>())
-        .def("get_frac_exact_exchange",
-             &CXCFunctional::getFractionOfExactExchange,
-             "Gets fraction of exact Hartree-Fock exchange in exchange-correlation functional.")
-        .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of exchange-correlation functional.")
-        .def("get_func_label", &CXCFunctional::getLabel, "Gets label of exchange-correlation functional.")
-        .def("is_hybrid",
-             &CXCFunctional::isHybridFunctional,
-             "Determines if exchange-correlation functional is of hybrid type i.e. non-zero fraction of exact Hartree-Fock exchange.")
-        .def("is_undefined", &CXCFunctional::isUndefined, "Determines if exchange-correlation function is undefined.")
         .def(py::self == py::self);
 
     // XCComponent class
@@ -701,12 +683,7 @@ export_dft(py::module& m)
 
     m.def("to_xcfun", &to_xcfun, "Converts string label to its enumerate class value.", "label"_a);
 
-    m.def("available_functionals", &vxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
-
-    m.def("parse_xc_func",
-          &vxcfuncs::getExchangeCorrelationFunctional,
-          "Converts exchange-correlation functional label to exchange-correlation functional object.",
-          "xcLabel"_a);
+    m.def("available_functionals", &newvxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
 
     m.def("new_parse_xc_func",
           &newvxcfuncs::getExchangeCorrelationFunctional,

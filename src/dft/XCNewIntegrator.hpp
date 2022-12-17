@@ -43,7 +43,6 @@
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
 #include "XCCubicHessianGrid.hpp"
-#include "XCFunctional.hpp"
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
 #include "XCNewFunctional.hpp"

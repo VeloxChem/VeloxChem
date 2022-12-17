@@ -37,7 +37,6 @@
 
 #include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
-#include "FunctionalParser.hpp"
 #include "GridPartitioner.hpp"
 #include "GtoContainer.hpp"
 #include "GtoFunc.hpp"

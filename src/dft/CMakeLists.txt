@@ -21,7 +21,6 @@ target_sources(vlxobjs
     SubMatrix.cpp
     XCCubicHessianGrid.cpp
     XCComponent.cpp
-    XCFunctional.cpp
     XCGradientGrid.cpp
     XCHessianGrid.cpp
     XCNewFunctional.cpp

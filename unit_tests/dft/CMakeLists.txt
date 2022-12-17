@@ -7,7 +7,4 @@ target_sources(utests
     Log3QuadratureTest.cpp
     MolecularGridTest.cpp
     PrimitiveFunctionalTest.cpp
-    XCFunctionalTest.cpp
-    XCGradientGridTest.cpp
-    XCHessianGridTest.cpp
   )
