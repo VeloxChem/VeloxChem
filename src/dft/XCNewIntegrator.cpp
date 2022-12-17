@@ -3478,40 +3478,30 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
     auto chi_y_val = gtoValuesY.values();
     auto chi_z_val = gtoValuesZ.values();
 
-    // pointers to perturbed density gradient norms
+    // pointers to perturbed densities
 
     auto rhow1rhow2 = rwDensityGridQuad.rhow1rhow2(iFock);
 
     auto rxw1rhow2 = rwDensityGridQuad.rxw1rhow2(iFock);
-
     auto ryw1rhow2 = rwDensityGridQuad.ryw1rhow2(iFock);
-
     auto rzw1rhow2 = rwDensityGridQuad.rzw1rhow2(iFock);
 
     auto rxw1rxw2 = rwDensityGridQuad.rxw1rxw2(iFock);
-
     auto rxw1ryw2 = rwDensityGridQuad.rxw1ryw2(iFock);
-
     auto rxw1rzw2 = rwDensityGridQuad.rxw1rzw2(iFock);
 
     auto ryw1rxw2 = rwDensityGridQuad.ryw1rxw2(iFock);
-
     auto ryw1ryw2 = rwDensityGridQuad.ryw1ryw2(iFock);
-
     auto ryw1rzw2 = rwDensityGridQuad.ryw1rzw2(iFock);
 
     auto rzw1rxw2 = rwDensityGridQuad.rzw1rxw2(iFock);
-
     auto rzw1ryw2 = rwDensityGridQuad.rzw1ryw2(iFock);
-
     auto rzw1rzw2 = rwDensityGridQuad.rzw1rzw2(iFock);
 
     auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
 
     auto gradw12a_x = rw2DensityGrid.alphaDensityGradientX(iFock);
-
     auto gradw12a_y = rw2DensityGrid.alphaDensityGradientY(iFock);
-
     auto gradw12a_z = rw2DensityGrid.alphaDensityGradientZ(iFock);
 
     timer.stop("Kxc matrix prep.");
@@ -3562,42 +3552,46 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 double grada_z_g = rhograd[6 * g + 2];
 
                 double l2contract = grada_x_g * rxw12a + grada_y_g * ryw12a + grada_z_g * rzw12a;
+
                 double l5contract_x = grada_x_g * l2contract;
                 double l5contract_y = grada_y_g * l2contract;
                 double l5contract_z = grada_z_g * l2contract;     
+
                 double q2contract = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
-                double q3contract =   grada_x_g * grada_x_g * rxw1rxw2[g]
-                                    + grada_x_g * grada_y_g * rxw1ryw2[g]
-                                    + grada_x_g * grada_z_g * rxw1rzw2[g]
-                                    + grada_y_g * grada_x_g * ryw1rxw2[g]
-                                    + grada_y_g * grada_y_g * ryw1ryw2[g]
-                                    + grada_y_g * grada_z_g * ryw1rzw2[g]
-                                    + grada_z_g * grada_x_g * rzw1rxw2[g]
-                                    + grada_z_g * grada_y_g * rzw1ryw2[g]
-                                    + grada_z_g * grada_z_g * rzw1rzw2[g];
+
+                double q3contract = grada_x_g * grada_x_g * rxw1rxw2[g] +
+                                    grada_x_g * grada_y_g * rxw1ryw2[g] +
+                                    grada_x_g * grada_z_g * rxw1rzw2[g] +
+                                    grada_y_g * grada_x_g * ryw1rxw2[g] +
+                                    grada_y_g * grada_y_g * ryw1ryw2[g] +
+                                    grada_y_g * grada_z_g * ryw1rzw2[g] +
+                                    grada_z_g * grada_x_g * rzw1rxw2[g] +
+                                    grada_z_g * grada_y_g * rzw1ryw2[g] +
+                                    grada_z_g * grada_z_g * rzw1rzw2[g];
 
                 double q4contract = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
-                double q7contract_x =  grada_x_g * grada_x_g *  rxw1rhow2[g] + grada_x_g * grada_y_g *  ryw1rhow2[g] + grada_x_g * grada_z_g *  rzw1rhow2[g];
-                double q7contract_y =  grada_y_g * grada_x_g *  rxw1rhow2[g] + grada_y_g * grada_y_g *  ryw1rhow2[g] + grada_y_g * grada_z_g *  rzw1rhow2[g];
-                double q7contract_z =  grada_z_g * grada_x_g *  rxw1rhow2[g] + grada_z_g * grada_y_g *  ryw1rhow2[g] + grada_z_g * grada_z_g *  rzw1rhow2[g];
 
-                double q8contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  rxw1ryw2[g] + grada_z_g *  rxw1rzw2[g];
-                double q8contract_y =  grada_x_g *  ryw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  ryw1rzw2[g];
-                double q8contract_z =  grada_x_g *  rzw1rxw2[g] + grada_y_g *  rzw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q7contract_x = grada_x_g * (grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g]);
+                double q7contract_y = grada_y_g * (grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g]);
+                double q7contract_z = grada_z_g * (grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g]);
 
-                double q9contract_x =  grada_x_g *  q3contract;
-                double q9contract_y =  grada_y_g *  q3contract;
-                double q9contract_z =  grada_z_g *  q3contract;
+                double q8contract_x = grada_x_g * rxw1rxw2[g] + grada_y_g * rxw1ryw2[g] + grada_z_g * rxw1rzw2[g];
+                double q8contract_y = grada_x_g * ryw1rxw2[g] + grada_y_g * ryw1ryw2[g] + grada_z_g * ryw1rzw2[g];
+                double q8contract_z = grada_x_g * rzw1rxw2[g] + grada_y_g * rzw1ryw2[g] + grada_z_g * rzw1rzw2[g];
 
-                double q10contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  ryw1rxw2[g] + grada_z_g *  rzw1rxw2[g];
-                double q10contract_y =  grada_x_g *  rxw1ryw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  rzw1ryw2[g];
-                double q10contract_z =  grada_x_g *  rxw1rzw2[g] + grada_y_g *  ryw1rzw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q9contract_x = grada_x_g * q3contract;
+                double q9contract_y = grada_y_g * q3contract;
+                double q9contract_z = grada_z_g * q3contract;
 
-                double q11contract_x =  grada_x_g *  rxw1rxw2[g] + grada_x_g *  ryw1ryw2[g] + grada_x_g *  rzw1rzw2[g];
-                double q11contract_y =  grada_y_g *  rxw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_y_g *  rzw1rzw2[g];
-                double q11contract_z =  grada_z_g *  rxw1rxw2[g] + grada_z_g *  ryw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q10contract_x = grada_x_g * rxw1rxw2[g] + grada_y_g * ryw1rxw2[g] + grada_z_g * rzw1rxw2[g];
+                double q10contract_y = grada_x_g * rxw1ryw2[g] + grada_y_g * ryw1ryw2[g] + grada_z_g * rzw1ryw2[g];
+                double q10contract_z = grada_x_g * rxw1rzw2[g] + grada_y_g * ryw1rzw2[g] + grada_z_g * rzw1rzw2[g];
 
-                // functional derivatives in libxc form
+                double q11contract_x = grada_x_g * rxw1rxw2[g] + grada_x_g * ryw1ryw2[g] + grada_x_g * rzw1rzw2[g];
+                double q11contract_y = grada_y_g * rxw1rxw2[g] + grada_y_g * ryw1ryw2[g] + grada_y_g * rzw1rzw2[g];
+                double q11contract_z = grada_z_g * rxw1rxw2[g] + grada_z_g * ryw1ryw2[g] + grada_z_g * rzw1rzw2[g];
+
+                // functional derivatives
 
                 auto vsigma_a = vsigma[3 * g + 0];
                 auto vsigma_c = vsigma[3 * g + 1];
@@ -3649,9 +3643,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 auto v3sigma3_acb = v3sigma3[10 * g + 4];
                 auto v3sigma3_abb = v3sigma3[10 * g + 5];
                 auto v3sigma3_ccc = v3sigma3[10 * g + 6];
+                auto v3sigma3_ccb = v3sigma3[10 * g + 7];
                 auto v3sigma3_cbb = v3sigma3[10 * g + 8];
-                // ? 
-                auto v3sigma3_bcc = v3sigma3[10 * g + 7];
 
                 // Scalar contribution
 
@@ -3664,18 +3657,19 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 
                 // L2
                 prefac += (2.0*v2rhosigma_ac + 2.0*v2rhosigma_ab + 2.0*v2rhosigma_aa) * l2contract;
-                
+
                 // vxc 2 contributions
+
                 // Q1
                 prefac += (v3rho3_aaa + 2.0 * v3rho3_aab + v3rho3_abb) * rhow1rhow2[g];
 
                 // Q2
                 prefac += (2.0*v3rho2sigma_abc + 2.0*v3rho2sigma_abb + 2.0*v3rho2sigma_aba 
-                        + 2.0*v3rho2sigma_aac + 2.0*v3rho2sigma_aab + 2.0*v3rho2sigma_aaa) * q2contract;
+                         + 2.0*v3rho2sigma_aac + 2.0*v3rho2sigma_aab + 2.0*v3rho2sigma_aaa) * q2contract;
 
                 // Q3
                 prefac += (4.0*v3rhosigma2_acc + 8.0*v3rhosigma2_acb + 4.0*v3rhosigma2_abb 
-                        + 8.0*v3rhosigma2_aac + 8.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa) * q3contract;
+                         + 8.0*v3rhosigma2_aac + 8.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa) * q3contract;
                 
                 // Q4
                 prefac += (2.0*v2rhosigma_ac + 2.0*v2rhosigma_ab + 2.0*v2rhosigma_aa) * q4contract;
@@ -3712,21 +3706,23 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 // vxc 2 contributions
 
                 // Q5
-                double q5 = v3rho2sigma_bbc + 2.0*v3rho2sigma_bba + 2.0*v3rho2sigma_abc + 4.0*v3rho2sigma_aba + v3rho2sigma_aac + 2.0*v3rho2sigma_aaa;
+                double q5 = v3rho2sigma_bbc + 2.0*v3rho2sigma_bba + 2.0*v3rho2sigma_abc + 4.0*v3rho2sigma_aba
+                          + v3rho2sigma_aac + 2.0*v3rho2sigma_aaa;
+
                 xcomp += q5 * grada_x_g * rhow1rhow2[g];
                 ycomp += q5 * grada_y_g * rhow1rhow2[g];
                 zcomp += q5 * grada_z_g * rhow1rhow2[g];
 
                 // Q6
                 double q6 = v2rhosigma_bc + 2.0*v2rhosigma_ba + v2rhosigma_ac + 2.0*v2rhosigma_aa;
+
                 xcomp += q6 * rxw1rhow2[g];
                 ycomp += q6 * ryw1rhow2[g];
                 zcomp += q6 * rzw1rhow2[g];
 
                 // Q7
-                double q7 = 2.0*v3rhosigma2_bcc + 2.0*v3rhosigma2_bcb + 6.0*v3rhosigma2_bac 
-                    + 4.0*v3rhosigma2_bab + 4.0*v3rhosigma2_baa + 2.0*v3rhosigma2_acc 
-                    + 2.0*v3rhosigma2_acb + 6.0*v3rhosigma2_aac + 4.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa;
+                double q7 = 2.0*v3rhosigma2_bcc + 2.0*v3rhosigma2_bcb + 6.0*v3rhosigma2_bac + 4.0*v3rhosigma2_bab + 4.0*v3rhosigma2_baa
+                          + 2.0*v3rhosigma2_acc + 2.0*v3rhosigma2_acb + 6.0*v3rhosigma2_aac + 4.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa;
 
                 xcomp += q7 * q7contract_x;
                 ycomp += q7 * q7contract_y;
@@ -3740,14 +3736,13 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 zcomp += q8 * (q8contract_z + q10contract_z + q11contract_z);
 
                 // Q9
-                double q9 = 4.0*v3sigma3_ccc + 8.0*v3sigma3_bcc + 4.0*v3sigma3_cbb + 16.0*v3sigma3_acc 
-                    + 24.0*v3sigma3_acb + 8.0*v3sigma3_abb + 20.0*v3sigma3_aac 
-                    + 16.0*v3sigma3_aab + 8.0*v3sigma3_aaa;
+                double q9 =  4.0*v3sigma3_ccc + 8.0*v3sigma3_ccb +  4.0*v3sigma3_cbb + 16.0*v3sigma3_acc 
+                          + 24.0*v3sigma3_acb + 8.0*v3sigma3_abb + 20.0*v3sigma3_aac 
+                          + 16.0*v3sigma3_aab + 8.0*v3sigma3_aaa;
 
                 xcomp += q9 * q9contract_x;
                 ycomp += q9 * q9contract_y;
                 zcomp += q9 * q9contract_z;
- 
 
                 G_gga_val[nu_offset + g] = w * (xcomp * chi_x_val[nu_offset + g] +
                                                 ycomp * chi_y_val[nu_offset + g] +
