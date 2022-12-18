@@ -1083,26 +1083,15 @@ CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
                 v4rhosigma3[20 * g + 19] += c *stage_v4rhosigma3[20 * g + 19] ;
 
                 v4sigma4[15 * g + 0]  += c *stage_v4sigma4[15 * g + 0]  ;
-                v4sigma4[15 * g + 0]  += c *stage_v4sigma4[15 * g + 0]  ;
-                v4sigma4[15 * g + 1]  += c *stage_v4sigma4[15 * g + 1]  ;
                 v4sigma4[15 * g + 1]  += c *stage_v4sigma4[15 * g + 1]  ;
                 v4sigma4[15 * g + 2]  += c *stage_v4sigma4[15 * g + 2]  ;
-                v4sigma4[15 * g + 2]  += c *stage_v4sigma4[15 * g + 2]  ;
-                v4sigma4[15 * g + 3]  += c *stage_v4sigma4[15 * g + 3]  ;
                 v4sigma4[15 * g + 3]  += c *stage_v4sigma4[15 * g + 3]  ;
                 v4sigma4[15 * g + 4]  += c *stage_v4sigma4[15 * g + 4]  ;
-                v4sigma4[15 * g + 4]  += c *stage_v4sigma4[15 * g + 4]  ;
-                v4sigma4[15 * g + 5]  += c *stage_v4sigma4[15 * g + 5]  ;
                 v4sigma4[15 * g + 5]  += c *stage_v4sigma4[15 * g + 5]  ;
                 v4sigma4[15 * g + 6]  += c *stage_v4sigma4[15 * g + 6]  ;
-                v4sigma4[15 * g + 6]  += c *stage_v4sigma4[15 * g + 6]  ;
-                v4sigma4[15 * g + 7]  += c *stage_v4sigma4[15 * g + 7]  ;
                 v4sigma4[15 * g + 7]  += c *stage_v4sigma4[15 * g + 7]  ;
                 v4sigma4[15 * g + 8]  += c *stage_v4sigma4[15 * g + 8]  ;
-                v4sigma4[15 * g + 8]  += c *stage_v4sigma4[15 * g + 8]  ;
                 v4sigma4[15 * g + 9]  += c *stage_v4sigma4[15 * g + 9]  ;
-                v4sigma4[15 * g + 9]  += c *stage_v4sigma4[15 * g + 9]  ;
-                v4sigma4[15 * g + 10] += c *stage_v4sigma4[15 * g + 10] ;
                 v4sigma4[15 * g + 10] += c *stage_v4sigma4[15 * g + 10] ;
                 v4sigma4[15 * g + 11] += c *stage_v4sigma4[15 * g + 11] ;
                 v4sigma4[15 * g + 12] += c *stage_v4sigma4[15 * g + 12] ;

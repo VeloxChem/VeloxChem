@@ -435,6 +435,10 @@ class TpaFullDriver(TpaDriver):
              f_lamtau_xz, f_lamtau_yz, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy,
              f_sig_xz, f_sig_yz, f_x, f_y, f_z) = vec_pack
 
+            F123_x = f_x
+            F123_y = f_y
+            F123_z = f_z
+
             Fx_ = Fx.T.conj()  # fo['Fc'][('x', -w)]
             Fy_ = Fy.T.conj()  # fo['Fc'][('y', -w)]
             Fz_ = Fz.T.conj()  # fo['Fc'][('z', -w)]

@@ -163,7 +163,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrD(const int32_t iDensityMatrix) const;
+    const double* pi(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -171,7 +171,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrD(const int32_t iDensityMatrix);
+    double* pi(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -179,7 +179,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDX(const int32_t iDensityMatrix) const;
+    const double* piX(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -187,7 +187,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDX(const int32_t iDensityMatrix);
+    double* piX(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -195,7 +195,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDY(const int32_t iDensityMatrix) const;
+    const double* piY(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -203,7 +203,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDY(const int32_t iDensityMatrix);
+    double* piY(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -211,7 +211,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDZ(const int32_t iDensityMatrix) const;
+    const double* piZ(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -219,7 +219,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDZ(const int32_t iDensityMatrix);
+    double* piZ(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -227,7 +227,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDXX(const int32_t iDensityMatrix) const;
+    const double* piXX(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -235,7 +235,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDXX(const int32_t iDensityMatrix);
+    double* piXX(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -243,7 +243,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDXY(const int32_t iDensityMatrix) const;
+    const double* piXY(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -251,7 +251,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDXY(const int32_t iDensityMatrix);
+    double* piXY(const int32_t iDensityMatrix);
 
         /**
      Gets constant pointer to one-time transformed density product values.
@@ -259,7 +259,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDXZ(const int32_t iDensityMatrix) const;
+    const double* piXZ(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -267,7 +267,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDXZ(const int32_t iDensityMatrix);
+    double* piXZ(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -275,7 +275,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDYX(const int32_t iDensityMatrix) const;
+    const double* piYX(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -283,7 +283,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDYX(const int32_t iDensityMatrix);
+    double* piYX(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -291,7 +291,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDYY(const int32_t iDensityMatrix) const;
+    const double* piYY(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -299,7 +299,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDYY(const int32_t iDensityMatrix);
+    double* piYY(const int32_t iDensityMatrix);
 
         /**
      Gets constant pointer to one-time transformed density product values.
@@ -307,7 +307,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDYZ(const int32_t iDensityMatrix) const;
+    const double* piYZ(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -315,7 +315,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDYZ(const int32_t iDensityMatrix);
+    double* piYZ(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -323,7 +323,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDZX(const int32_t iDensityMatrix) const;
+    const double* piZX(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -331,7 +331,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDZX(const int32_t iDensityMatrix);
+    double* piZX(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -339,7 +339,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDZY(const int32_t iDensityMatrix) const;
+    const double* piZY(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -347,7 +347,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDZY(const int32_t iDensityMatrix);
+    double* piZY(const int32_t iDensityMatrix);
 
         /**
      Gets constant pointer to one-time transformed density product values.
@@ -355,7 +355,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rBrCrDZZ(const int32_t iDensityMatrix) const;
+    const double* piZZ(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -363,7 +363,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rBrCrDZZ(const int32_t iDensityMatrix);
+    double* piZZ(const int32_t iDensityMatrix);
 
 
     /**
@@ -372,7 +372,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXXX(const int32_t iDensityMatrix) const;
+    const double* piXXX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -380,7 +380,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXXX(const int32_t iDensityMatrix);
+    double* piXXX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -388,7 +388,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXXY(const int32_t iDensityMatrix) const;
+    const double* piXXY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -396,7 +396,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXXY(const int32_t iDensityMatrix);
+    double* piXXY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -404,7 +404,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXXZ(const int32_t iDensityMatrix) const;
+    const double* piXXZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -412,7 +412,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXXZ(const int32_t iDensityMatrix);
+    double* piXXZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -420,7 +420,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXYX(const int32_t iDensityMatrix) const;
+    const double* piXYX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -428,7 +428,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXYX(const int32_t iDensityMatrix);
+    double* piXYX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -436,7 +436,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXYY(const int32_t iDensityMatrix) const;
+    const double* piXYY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -444,7 +444,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXYY(const int32_t iDensityMatrix);
+    double* piXYY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -452,7 +452,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXYZ(const int32_t iDensityMatrix) const;
+    const double* piXYZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -460,7 +460,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXYZ(const int32_t iDensityMatrix);
+    double* piXYZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -468,7 +468,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXZX(const int32_t iDensityMatrix) const;
+    const double* piXZX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -476,7 +476,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXZX(const int32_t iDensityMatrix);
+    double* piXZX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -484,7 +484,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXZY(const int32_t iDensityMatrix) const;
+    const double* piXZY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -492,7 +492,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXZY(const int32_t iDensityMatrix);
+    double* piXZY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -500,7 +500,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDXZZ(const int32_t iDensityMatrix) const;
+    const double* piXZZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -508,7 +508,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDXZZ(const int32_t iDensityMatrix);
+    double* piXZZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -516,7 +516,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYXX(const int32_t iDensityMatrix) const;
+    const double* piYXX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -524,7 +524,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYXX(const int32_t iDensityMatrix);
+    double* piYXX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -532,7 +532,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYXY(const int32_t iDensityMatrix) const;
+    const double* piYXY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -540,7 +540,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYXY(const int32_t iDensityMatrix);
+    double* piYXY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -548,7 +548,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYXZ(const int32_t iDensityMatrix) const;
+    const double* piYXZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -556,7 +556,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYXZ(const int32_t iDensityMatrix);
+    double* piYXZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -564,7 +564,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYYX(const int32_t iDensityMatrix) const;
+    const double* piYYX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -572,7 +572,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYYX(const int32_t iDensityMatrix);
+    double* piYYX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -580,7 +580,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYYY(const int32_t iDensityMatrix) const;
+    const double* piYYY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -588,7 +588,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYYY(const int32_t iDensityMatrix);
+    double* piYYY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -596,7 +596,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYYZ(const int32_t iDensityMatrix) const;
+    const double* piYYZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -604,7 +604,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYYZ(const int32_t iDensityMatrix);
+    double* piYYZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -612,7 +612,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYZX(const int32_t iDensityMatrix) const;
+    const double* piYZX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -620,7 +620,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYZX(const int32_t iDensityMatrix);
+    double* piYZX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -628,7 +628,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYZY(const int32_t iDensityMatrix) const;
+    const double* piYZY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -636,7 +636,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYZY(const int32_t iDensityMatrix);
+    double* piYZY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -644,7 +644,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDYZZ(const int32_t iDensityMatrix) const;
+    const double* piYZZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -652,7 +652,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDYZZ(const int32_t iDensityMatrix);
+    double* piYZZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -660,7 +660,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZXX(const int32_t iDensityMatrix) const;
+    const double* piZXX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -668,7 +668,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZXX(const int32_t iDensityMatrix);
+    double* piZXX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -676,7 +676,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZXY(const int32_t iDensityMatrix) const;
+    const double* piZXY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -684,7 +684,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZXY(const int32_t iDensityMatrix);
+    double* piZXY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -692,7 +692,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZXZ(const int32_t iDensityMatrix) const;
+    const double* piZXZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -700,7 +700,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZXZ(const int32_t iDensityMatrix);
+    double* piZXZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -708,7 +708,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZYX(const int32_t iDensityMatrix) const;
+    const double* piZYX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -716,7 +716,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZYX(const int32_t iDensityMatrix);
+    double* piZYX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -724,7 +724,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZYY(const int32_t iDensityMatrix) const;
+    const double* piZYY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -732,7 +732,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZYY(const int32_t iDensityMatrix);
+    double* piZYY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -740,7 +740,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZYZ(const int32_t iDensityMatrix) const;
+    const double* piZYZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -748,7 +748,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZYZ(const int32_t iDensityMatrix);
+    double* piZYZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -756,7 +756,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZZX(const int32_t iDensityMatrix) const;
+    const double* piZZX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -764,7 +764,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZZX(const int32_t iDensityMatrix);
+    double* piZZX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -772,7 +772,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZZY(const int32_t iDensityMatrix) const;
+    const double* piZZY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -780,7 +780,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZZY(const int32_t iDensityMatrix);
+    double* piZZY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -788,7 +788,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    const double* rBrCrDZZZ(const int32_t iDensityMatrix) const;
+    const double* piZZZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time transformed density product values.
@@ -796,7 +796,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values. 
     */
-    double* rBrCrDZZZ(const int32_t iDensityMatrix);
+    double* piZZZ(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product with X gradient of  one-time transformed density.
@@ -804,7 +804,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient X values.
      */
-    const double* RhoBCRhoD(const int32_t iDensityMatrix) const;
+    const double* gam(const int32_t iDensityMatrix) const;
 
     /**
      Gets  pointer to one-time transformed density product with X gradient of  one-time transformed density.
@@ -812,7 +812,7 @@ class CDensityGridCubic
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient X values.
      */
-    double* RhoBCRhoD(const int32_t iDensityMatrix);
+    double* gam(const int32_t iDensityMatrix);
 
 
     /**
@@ -821,7 +821,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDXX(const int32_t iDensityMatrix) const;
+    const double* gamXX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -829,7 +829,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDXX(const int32_t iDensityMatrix);
+    double* gamXX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -837,7 +837,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDXY(const int32_t iDensityMatrix) const;
+    const double* gamXY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -845,7 +845,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDXY(const int32_t iDensityMatrix);
+    double* gamXY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -853,7 +853,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDXZ(const int32_t iDensityMatrix) const;
+    const double* gamXZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -861,7 +861,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDXZ(const int32_t iDensityMatrix);
+    double* gamXZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -869,7 +869,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDYX(const int32_t iDensityMatrix) const;
+    const double* gamYX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -877,7 +877,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDYX(const int32_t iDensityMatrix);
+    double* gamYX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -885,7 +885,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDYY(const int32_t iDensityMatrix) const;
+    const double* gamYY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -893,7 +893,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDYY(const int32_t iDensityMatrix);
+    double* gamYY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -901,7 +901,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDYZ(const int32_t iDensityMatrix) const;
+    const double* gamYZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -909,7 +909,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDYZ(const int32_t iDensityMatrix);
+    double* gamYZ(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -917,7 +917,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDZX(const int32_t iDensityMatrix) const;
+    const double* gamZX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -925,7 +925,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDZX(const int32_t iDensityMatrix);
+    double* gamZX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -933,7 +933,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDZY(const int32_t iDensityMatrix) const;
+    const double* gamZY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -941,7 +941,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDZY(const int32_t iDensityMatrix);
+    double* gamZY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -949,7 +949,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDZZ(const int32_t iDensityMatrix) const;
+    const double* gamZZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -957,7 +957,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDZZ(const int32_t iDensityMatrix);
+    double* gamZZ(const int32_t iDensityMatrix);
 
 
 
@@ -967,7 +967,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDX(const int32_t iDensityMatrix) const;
+    const double* gamX(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -975,7 +975,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDX(const int32_t iDensityMatrix);
+    double* gamX(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -983,7 +983,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDY(const int32_t iDensityMatrix) const;
+    const double* gamY(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -991,7 +991,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDY(const int32_t iDensityMatrix);
+    double* gamY(const int32_t iDensityMatrix);
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -999,7 +999,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    const double* RhoBCRhoDZ(const int32_t iDensityMatrix) const;
+    const double* gamZ(const int32_t iDensityMatrix) const;
 
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
@@ -1007,7 +1007,7 @@ class CDensityGridCubic
     @param iDensityMatrix the index of density matrix.
     @return the pointer to alpha density values.
     */
-    double* RhoBCRhoDZ(const int32_t iDensityMatrix);
+    double* gamZ(const int32_t iDensityMatrix);
 
     /**
      Generates products of one-time transformed densities to be used for quadratic response.

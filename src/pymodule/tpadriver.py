@@ -400,7 +400,7 @@ class TpaDriver(NonLinearSolver):
                 't4_dict': t4_dict,
                 't3_dict': t3_dict,
                 'gamma': gamma,
-                'w': self.frequencies,
+                'w': self.frequencies
             })
 
         profiler.check_memory_usage('End of TPA')

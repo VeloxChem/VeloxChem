@@ -536,6 +536,8 @@ class CubicResponseDriver(NonLinearSolver):
                 result[('A3', wb, wc, wd)] = val_A3
                 result[('A2', wb, wc, wd)] = val_A2
                 result[('Gamma',wb,wc,wd)] = gamma
+                
+                
 
         profiler.check_memory_usage('End of CRF')
 
