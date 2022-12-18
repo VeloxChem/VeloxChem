@@ -2148,6 +2148,11 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                                 +rhoBz_r[i] * rhoCz_i[i] * rhoBz_r[i]
                                 +rhoBz_r[i] * rhoCz_r[i] * rhoBz_i[i]);
 
+                    pix_X_r[i] = 12.0 * (gradBx_x_r[i] * rhoCx_r[i] * rhoBx_r[i]
+                                -gradBx_x_i[i] * rhoCx_r[i] * rhoBx_i[i]
+                                -gradBx_x_r[i] * rhoCx_i[i] * rhoBx_i[i]
+                                -gradBx_x_i[i] * rhoCx_i[i] * rhoBx_r[i]);
+
                     pix_X_i[i] = 12.0 * ( -gradBx_x_i[i] * rhoCx_i[i] * rhoBx_i[i]
                                 +gradBx_x_i[i] * rhoCx_r[i] * rhoBx_r[i]
                                 +gradBx_x_r[i] * rhoCx_i[i] * rhoBx_r[i]
