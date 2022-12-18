@@ -1969,9 +1969,9 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                 {
                    
                     pix_r[i] = 12.0 * (rhoBx_r[i] * rhoCx_r[i] * rhoBx_r[i]
-                                -rhoBx_i[i] * rhoCx_r[i] * rhoBx_i[i]
-                                -rhoBx_r[i] * rhoCx_i[i] * rhoBx_i[i]
-                                -rhoBx_i[i] * rhoCx_i[i] * rhoBx_r[i]);
+                                    -rhoBx_i[i] * rhoCx_r[i] * rhoBx_i[i]
+                                    -rhoBx_r[i] * rhoCx_i[i] * rhoBx_i[i]
+                                    -rhoBx_i[i] * rhoCx_i[i] * rhoBx_r[i]);
 
                     pix_i[i] = 12.0 * ( -rhoBx_i[i] * rhoCx_i[i] * rhoBx_i[i]
                                 +rhoBx_i[i] * rhoCx_r[i] * rhoBx_r[i]
@@ -1988,12 +1988,12 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                                 +rhoBx_r[i] * rhoCx_i[i] * rhoBx_r[i]
                                 +rhoBx_r[i] * rhoCx_r[i] * rhoBx_i[i]);
 
-                    pix_r[i] = 12.0 * (rhoBx_r[i] * rhoCy_r[i] * rhoBy_r[i]
+                    pix_r[i] += 12.0 * (rhoBx_r[i] * rhoCy_r[i] * rhoBy_r[i]
                                 -rhoBx_i[i] * rhoCy_r[i] * rhoBy_i[i]
                                 -rhoBx_r[i] * rhoCy_i[i] * rhoBy_i[i]
                                 -rhoBx_i[i] * rhoCy_i[i] * rhoBy_r[i]);
 
-                    pix_i[i] = 12.0 * ( -rhoBx_i[i] * rhoCy_i[i] * rhoBy_i[i]
+                    pix_i[i] += 12.0 * ( -rhoBx_i[i] * rhoCy_i[i] * rhoBy_i[i]
                                 +rhoBx_i[i] * rhoCy_r[i] * rhoBy_r[i]
                                 +rhoBx_r[i] * rhoCy_i[i] * rhoBy_r[i]
                                 +rhoBx_r[i] * rhoCy_r[i] * rhoBy_i[i]);
@@ -2008,12 +2008,12 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                                 +rhoBy_r[i] * rhoCx_i[i] * rhoBy_r[i]
                                 +rhoBy_r[i] * rhoCx_r[i] * rhoBy_i[i]);
 
-                    pix_r[i] = 12.0 * (rhoBx_r[i] * rhoCz_r[i] * rhoBz_r[i]
+                    pix_r[i] += 12.0 * (rhoBx_r[i] * rhoCz_r[i] * rhoBz_r[i]
                                 -rhoBx_i[i] * rhoCz_r[i] * rhoBz_i[i]
                                 -rhoBx_r[i] * rhoCz_i[i] * rhoBz_i[i]
                                 -rhoBx_i[i] * rhoCz_i[i] * rhoBz_r[i]);
 
-                    pix_i[i] = 12.0 * ( -rhoBx_i[i] * rhoCz_i[i] * rhoBz_i[i]
+                    pix_i[i] += 12.0 * ( -rhoBx_i[i] * rhoCz_i[i] * rhoBz_i[i]
                                 +rhoBx_i[i] * rhoCz_r[i] * rhoBz_r[i]
                                 +rhoBx_r[i] * rhoCz_i[i] * rhoBz_r[i]
                                 +rhoBx_r[i] * rhoCz_r[i] * rhoBz_i[i]);
@@ -2048,12 +2048,12 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                                 +rhoBx_r[i] * rhoCy_i[i] * rhoBx_r[i]
                                 +rhoBx_r[i] * rhoCy_r[i] * rhoBx_i[i]);
 
-                    piy_r[i] = 12.0 * (rhoBy_r[i] * rhoCy_r[i] * rhoBy_r[i]
+                    piy_r[i] += 12.0 * (rhoBy_r[i] * rhoCy_r[i] * rhoBy_r[i]
                                 -rhoBy_i[i] * rhoCy_r[i] * rhoBy_i[i]
                                 -rhoBy_r[i] * rhoCy_i[i] * rhoBy_i[i]
                                 -rhoBy_i[i] * rhoCy_i[i] * rhoBy_r[i]);
 
-                    piy_i[i] = 12.0 * ( -rhoBy_i[i] * rhoCy_i[i] * rhoBy_i[i]
+                    piy_i[i] += 12.0 * ( -rhoBy_i[i] * rhoCy_i[i] * rhoBy_i[i]
                                 +rhoBy_i[i] * rhoCy_r[i] * rhoBy_r[i]
                                 +rhoBy_r[i] * rhoCy_i[i] * rhoBy_r[i]
                                 +rhoBy_r[i] * rhoCy_r[i] * rhoBy_i[i]);
@@ -2068,12 +2068,12 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                                 +rhoBy_r[i] * rhoCy_i[i] * rhoBy_r[i]
                                 +rhoBy_r[i] * rhoCy_r[i] * rhoBy_i[i]);
 
-                    piy_r[i] = 12.0 * (rhoBy_r[i] * rhoCz_r[i] * rhoBz_r[i]
+                    piy_r[i] += 12.0 * (rhoBy_r[i] * rhoCz_r[i] * rhoBz_r[i]
                                 -rhoBy_i[i] * rhoCz_r[i] * rhoBz_i[i]
                                 -rhoBy_r[i] * rhoCz_i[i] * rhoBz_i[i]
                                 -rhoBy_i[i] * rhoCz_i[i] * rhoBz_r[i]);
 
-                    piy_i[i] = 12.0 * ( -rhoBy_i[i] * rhoCz_i[i] * rhoBz_i[i]
+                    piy_i[i] += 12.0 * ( -rhoBy_i[i] * rhoCz_i[i] * rhoBz_i[i]
                                 +rhoBy_i[i] * rhoCz_r[i] * rhoBz_r[i]
                                 +rhoBy_r[i] * rhoCz_i[i] * rhoBz_r[i]
                                 +rhoBy_r[i] * rhoCz_r[i] * rhoBz_i[i]);
@@ -2108,12 +2108,12 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                                 +rhoBx_r[i] * rhoCz_i[i] * rhoBx_r[i]
                                 +rhoBx_r[i] * rhoCz_r[i] * rhoBx_i[i]);
 
-                    piz_r[i] = 12.0 * (rhoBz_r[i] * rhoCy_r[i] * rhoBy_r[i]
+                    piz_r[i] += 12.0 * (rhoBz_r[i] * rhoCy_r[i] * rhoBy_r[i]
                                 -rhoBz_i[i] * rhoCy_r[i] * rhoBy_i[i]
                                 -rhoBz_r[i] * rhoCy_i[i] * rhoBy_i[i]
                                 -rhoBz_i[i] * rhoCy_i[i] * rhoBy_r[i]);
 
-                    piz_i[i] = 12.0 * ( -rhoBz_i[i] * rhoCy_i[i] * rhoBy_i[i]
+                    piz_i[i] += 12.0 * ( -rhoBz_i[i] * rhoCy_i[i] * rhoBy_i[i]
                                 +rhoBz_i[i] * rhoCy_r[i] * rhoBy_r[i]
                                 +rhoBz_r[i] * rhoCy_i[i] * rhoBy_r[i]
                                 +rhoBz_r[i] * rhoCy_r[i] * rhoBy_i[i]);
@@ -2128,12 +2128,12 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                                 +rhoBy_r[i] * rhoCz_i[i] * rhoBy_r[i]
                                 +rhoBy_r[i] * rhoCz_r[i] * rhoBy_i[i]);
 
-                    piz_r[i] = 12.0 * (rhoBz_r[i] * rhoCz_r[i] * rhoBz_r[i]
+                    piz_r[i] += 12.0 * (rhoBz_r[i] * rhoCz_r[i] * rhoBz_r[i]
                                 -rhoBz_i[i] * rhoCz_r[i] * rhoBz_i[i]
                                 -rhoBz_r[i] * rhoCz_i[i] * rhoBz_i[i]
                                 -rhoBz_i[i] * rhoCz_i[i] * rhoBz_r[i]);
 
-                    piz_i[i] = 12.0 * ( -rhoBz_i[i] * rhoCz_i[i] * rhoBz_i[i]
+                    piz_i[i] += 12.0 * ( -rhoBz_i[i] * rhoCz_i[i] * rhoBz_i[i]
                                 +rhoBz_i[i] * rhoCz_r[i] * rhoBz_r[i]
                                 +rhoBz_r[i] * rhoCz_i[i] * rhoBz_r[i]
                                 +rhoBz_r[i] * rhoCz_r[i] * rhoBz_i[i]);
@@ -2147,11 +2147,6 @@ gamz_i[i] +=  (d_lamtau_zz_i * rhocz_r + d_lamtau_zz_r * rhocz_i);
                                 +rhoBz_i[i] * rhoCz_r[i] * rhoBz_r[i]
                                 +rhoBz_r[i] * rhoCz_i[i] * rhoBz_r[i]
                                 +rhoBz_r[i] * rhoCz_r[i] * rhoBz_i[i]);
-
-                    pix_X_r[i] = 12.0 * (gradBx_x_r[i] * rhoCx_r[i] * rhoBx_r[i]
-                                -gradBx_x_i[i] * rhoCx_r[i] * rhoBx_i[i]
-                                -gradBx_x_r[i] * rhoCx_i[i] * rhoBx_i[i]
-                                -gradBx_x_i[i] * rhoCx_i[i] * rhoBx_r[i]);
 
                     pix_X_i[i] = 12.0 * ( -gradBx_x_i[i] * rhoCx_i[i] * rhoBx_i[i]
                                 +gradBx_x_i[i] * rhoCx_r[i] * rhoBx_r[i]
