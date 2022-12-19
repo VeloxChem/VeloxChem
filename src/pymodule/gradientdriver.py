@@ -228,7 +228,6 @@ class GradientDriver:
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCNewMolecularGradient(self.comm)
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
@@ -262,7 +261,6 @@ class GradientDriver:
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCNewMolecularGradient(self.comm)
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
@@ -299,7 +297,6 @@ class GradientDriver:
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCNewMolecularGradient(self.comm)
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
@@ -334,9 +331,6 @@ class GradientDriver:
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.partition_grid_points()
-        mol_grid.distribute_counts_and_displacements(self.rank, self.nodes,
-                                                     self.comm)
 
         xcgrad_drv = XCNewMolecularGradient(self.comm)
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(

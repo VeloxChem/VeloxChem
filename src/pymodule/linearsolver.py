@@ -866,9 +866,6 @@ class LinearSolver:
                         fock.scale(2.0, ifock)
 
                 xc_drv = XCNewIntegrator(self.comm)
-                molgrid.partition_grid_points()
-                molgrid.distribute_counts_and_displacements(
-                    self.rank, self.nodes, self.comm)
                 xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
                                           gs_density, molgrid,
                                           self.xcfun.get_func_label())

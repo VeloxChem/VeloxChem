@@ -601,9 +601,6 @@ class NonLinearSolver:
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
-                molgrid.partition_grid_points()
-                molgrid.distribute_counts_and_displacements(
-                    self.rank, self.nodes, self.comm)
                 xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
                                           dens2, gs_density, molgrid,
                                           self.xcfun.get_func_label(), mode)

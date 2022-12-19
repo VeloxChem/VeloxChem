@@ -1367,9 +1367,6 @@ class ScfDriver:
 
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
                 xc_drv = XCNewIntegrator(self.comm)
-                self._mol_grid.partition_grid_points()
-                self._mol_grid.distribute_counts_and_displacements(
-                    self.rank, self.nodes, self.comm)
                 vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
                                                     self._mol_grid,
                                                     self.xcfun.get_func_label())
