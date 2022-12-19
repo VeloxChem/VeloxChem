@@ -127,8 +127,6 @@ integrate_vxc_pdft(const CXCNewIntegrator&    self,
 
     self.integrateVxcPDFT(mat_Vxc, TwoBodyGradient, molecule, basis, aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
 
-    auto xcene = mat_Vxc.getExchangeCorrelationEnergy();
-
     return mat_Vxc;
 }
 

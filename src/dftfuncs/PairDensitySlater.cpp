@@ -73,9 +73,9 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double zeta = delta / density;
 
-            double fxa = std::pow(1 + zeta, fourthird);
+            double fxa = std::pow(1.0 + zeta, fourthird);
 
-            double fxb = std::pow(1 - zeta, fourthird);
+            double fxb = std::pow(std::max(1.0 - zeta, 0.0), fourthird);
 
             f_zeta = fxa + fxb;
         }

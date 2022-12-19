@@ -26,6 +26,7 @@
 #include "PairDensityPBE_C.hpp"
 
 #include <cmath>
+#include <iostream>
 
 #include "MathConst.hpp"
 
@@ -108,8 +109,8 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         {
             double delta = sqrt(-2.0 * pair_density);
             double zeta = delta / density;
-            omega = omega_fact * (std::pow(1.0+zeta,fourthird)+std::pow(1.0-zeta,fourthird)-2.0);
-            u_ab = 0.5 * std::pow(1.0 + zeta, twothird) + 0.5 * std::pow(1.0 - zeta, twothird);
+            omega = omega_fact * (std::pow(1.0+zeta,fourthird)+std::pow(std::max(1.0-zeta,0.0),fourthird)-2.0);
+            u_ab = 0.5 * std::pow(1.0 + zeta, twothird) + 0.5 * std::pow(std::max(1.0 - zeta,0.0), twothird);
         }
         // Imaginary case
         else

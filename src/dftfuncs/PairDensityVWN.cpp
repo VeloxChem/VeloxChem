@@ -26,6 +26,7 @@
 #include "PairDensityVWN.hpp"
 
 #include <cmath>
+#include <iostream>
 
 #include "MathConst.hpp"
 
@@ -111,8 +112,6 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double f_zeta;
 
-        double f_zet1;
-
         // Real case
         if (pair_density <= 0)
         {
@@ -120,9 +119,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double zeta = delta / density;
 
-            f_zeta = spinpolf * (std::pow(1.0 + zeta, fourthree) + std::pow(1.0 - zeta, fourthree) - 2.0);
-
-            f_zet1 = spinpolf * 4.0 / 3.0 * (std::pow(1.0 + zeta, 1.0 / 3.0) - std::pow(1.0 - zeta, 1.0 / 3.0));
+            f_zeta = spinpolf * (std::pow(1.0 + zeta, fourthree) + std::pow(std::max(1.0 - zeta,0.0), fourthree) - 2.0);
         }
         // Imaginary case
         else
@@ -136,8 +133,6 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
             double theta = 4.0 / 3.0 * std::atan(zeta);
 
             f_zeta = spinpolf * (2.0 * std::pow(r, 4.0 / 3.0) * std::cos(theta) - 2.0);
-
-            f_zet1 = 0.0;
         }
 
         double xf = x * x + pb * x + pc;
@@ -178,7 +173,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double vcfp = f_zeta * ef1;
 
-        double delta = f_zet1 * ef0;
+        //double delta = f_zet1 * ef0;
 
         double delta_en = f_zeta * ef0;
 

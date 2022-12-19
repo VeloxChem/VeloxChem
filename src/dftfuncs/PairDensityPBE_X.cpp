@@ -94,14 +94,18 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double gradb2 = 0.25 * (sigma[3 * g + 0] + 2.0 * sigma[3 * g + 1]/delta + sigma[3 * g + 2]/delta2);
 
+
             Fxc_a = R/(1.0 + mus2r * grada2/pow(rhoa,2.666666666666667)); 
 
-            Fxc_b = R/(1.0 + mus2r * gradb2/pow(rhob,2.666666666666667)); 
+            if (rhob > 1.0e-12)
+            {
+                Fxc_b = R/(1.0 + mus2r * gradb2/pow(rhob,2.666666666666667));
+            }
         }
 
         double fa = pow(1.0 + zeta, fourthird)*(1.0 + R - Fxc_a);
 
-        double fb = pow(1.0 - zeta, fourthird)*(1.0 + R - Fxc_b);
+        double fb = pow(std::max(1.0 - zeta,0.0), fourthird)*(1.0 + R - Fxc_b);
 
         exc[g] = 0.5 * frg * rho13 * (fa + fb);
 
