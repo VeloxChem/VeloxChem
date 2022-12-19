@@ -97,6 +97,26 @@ class CXCNewMolecularGradient
                                              const CXCNewFunctional& xcFunctional) const;
 
     /**
+     Integrates first-order LDA exchnage-correlation functional contribution to
+     open-shell molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed AO density matrix (to be contracted
+            with GTO gradient).
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular gradient.
+     */
+    CDenseMatrix _integrateVxcGradientForLDAOpenShell(const CMolecule&        molecule,
+                                                      const CMolecularBasis&  basis,
+                                                      const CAODensityMatrix& rwDensityMatrix,
+                                                      const CAODensityMatrix& gsDensityMatrix,
+                                                      const CMolecularGrid&   molecularGrid,
+                                                      const CXCNewFunctional& xcFunctional) const;
+
+    /**
      Integrates first-order GGA exchnage-correlation functional contribution to
      molecular gradient.
 
