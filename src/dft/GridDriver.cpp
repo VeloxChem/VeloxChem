@@ -83,6 +83,10 @@ CGridDriver::generate(const CMolecule& molecule) const
     if (_runMode == execmode::cpu)
     {
         molgrid = _genGridPointsOnCPU(molecule);
+
+        molgrid.partitionGridPoints();
+
+        molgrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
     }
 
     // execution mode: CPU/GPU

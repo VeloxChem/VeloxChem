@@ -62,13 +62,9 @@ CAOKohnShamMatrix
 CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
                                    const CMolecularBasis&  basis,
                                    const CAODensityMatrix& densityMatrix,
-                                   CMolecularGrid&         molecularGrid,
+                                   const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel) const
 {
-    molecularGrid.partitionGridPoints();
-
-    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
-
     auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = newfvxc.getFunctionalType();
@@ -101,13 +97,9 @@ CXCNewIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
                                    const CMolecularBasis&  basis,
                                    const CAODensityMatrix& rwDensityMatrix,
                                    const CAODensityMatrix& gsDensityMatrix,
-                                   CMolecularGrid&         molecularGrid,
+                                   const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel) const
 {
-    molecularGrid.partitionGridPoints();
-
-    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
-
     auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
@@ -144,14 +136,10 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
                                    const CAODensityMatrix& rwDensityMatrix,
                                    const CAODensityMatrix& rw2DensityMatrix,
                                    const CAODensityMatrix& gsDensityMatrix,
-                                   CMolecularGrid&         molecularGrid,
+                                   const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel,
                                    const std::string&      quadMode) const
 {
-    molecularGrid.partitionGridPoints();
-
-    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
-
     auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
@@ -193,13 +181,9 @@ CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
                                    const CAODensityMatrix& DensityMatrix,
                                    const CDense4DTensor&   TwoBodyDensityMatrix,
                                    const CDenseMatrix&     ActiveMOs,
-                                   CMolecularGrid&         molecularGrid,
+                                   const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel) const
 {
-    molecularGrid.partitionGridPoints();
-
-    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
-
     auto fvxc = newvxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
@@ -3957,12 +3941,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 CDenseMatrix
 CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule&       molecule,
                                                const CMolecularBasis& basis,
-                                               CMolecularGrid&        molecularGrid) const
+                                               const CMolecularGrid&  molecularGrid) const
 {
-    molecularGrid.partitionGridPoints();
-
-    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
-
     // std::string errnotpartitioned("CXCNewIntegrator.computeGtoValuesOnGridPoints: Cannot use unpartitioned molecular grid");
 
     // errors::assertMsgCritical(molecularGrid.isPartitioned(), errnotpartitioned);
@@ -4084,12 +4064,8 @@ CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule&       molecule,
 std::vector<CDenseMatrix>
 CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
                                                              const CMolecularBasis& basis,
-                                                             CMolecularGrid&        molecularGrid) const
+                                                             const CMolecularGrid&  molecularGrid) const
 {
-    molecularGrid.partitionGridPoints();
-
-    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
-
     // std::string errnotpartitioned("CXCNewIntegrator.computeGtoValuesAndDerivativesOnGridPoints: Cannot use unpartitioned molecular grid");
 
     // errors::assertMsgCritical(molecularGrid.isPartitioned(), errnotpartitioned);

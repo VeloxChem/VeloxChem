@@ -568,7 +568,7 @@ class CXCNewIntegrator
     CAOKohnShamMatrix integrateVxcFock(const CMolecule&        molecule,
                                        const CMolecularBasis&  basis,
                                        const CAODensityMatrix& densityMatrix,
-                                       CMolecularGrid&         molecularGrid,
+                                       const CMolecularGrid&   molecularGrid,
                                        const std::string&      xcFuncLabel) const;
 
     /**
@@ -588,7 +588,7 @@ class CXCNewIntegrator
                           const CMolecularBasis&  basis,
                           const CAODensityMatrix& rwDensityMatrix,
                           const CAODensityMatrix& gsDensityMatrix,
-                          CMolecularGrid&         molecularGrid,
+                          const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel) const;
 
     /**
@@ -611,7 +611,7 @@ class CXCNewIntegrator
                           const CAODensityMatrix& rwDensityMatrix,
                           const CAODensityMatrix& rw2DensityMatrix,
                           const CAODensityMatrix& gsDensityMatrix,
-                          CMolecularGrid&         molecularGrid,
+                          const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const;
 
@@ -636,7 +636,7 @@ class CXCNewIntegrator
                           const CAODensityMatrix& DensityMatrix,
                           const CDense4DTensor&   TwoBodyDensityMatrix,
                           const CDenseMatrix&     ActiveMOs,
-                          CMolecularGrid&         molecularGrid,
+                          const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel) const;
 
     /**
@@ -647,7 +647,7 @@ class CXCNewIntegrator
      @param molecularGrid the molecular grid.
      @return the GTO values on grid points.
      */
-    CDenseMatrix computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, CMolecularGrid& molecularGrid) const;
+    CDenseMatrix computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) const;
 
     /**
      Computes GTOs values and derivatives on grid points.
@@ -659,7 +659,7 @@ class CXCNewIntegrator
      */
     std::vector<CDenseMatrix> computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
                                                                          const CMolecularBasis& basis,
-                                                                         CMolecularGrid&        molecularGrid) const;
+                                                                         const CMolecularGrid&  molecularGrid) const;
 
     /**
      Computes fucntional derivatives for LDA.

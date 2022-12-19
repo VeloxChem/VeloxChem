@@ -275,7 +275,7 @@ class CXCNewMolecularGradient
     CDenseMatrix integrateVxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      CMolecularGrid&         molecularGrid,
+                                      const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -295,7 +295,7 @@ class CXCNewMolecularGradient
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& rwDensityMatrix,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      CMolecularGrid&         molecularGrid,
+                                      const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -317,7 +317,7 @@ class CXCNewMolecularGradient
                                       const CAODensityMatrix& rwDensityMatrixOne,
                                       const CAODensityMatrix& rwDensityMatrixTwo,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      CMolecularGrid&         molecularGrid,
+                                      const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -339,7 +339,7 @@ class CXCNewMolecularGradient
                                       const CAODensityMatrix& rwDensityMatrixOne,
                                       const CAODensityMatrix& rwDensityMatrixTwo,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      CMolecularGrid&         molecularGrid,
+                                      const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 };
 
