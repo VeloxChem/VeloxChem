@@ -216,17 +216,6 @@ class CMolecularGrid
     double* getWeights();
 
     /**
-     Distributes grid points data across a molecular grid objects associated
-     with MPI processes within domain of MPI communacator and sets distribution
-     flag to true.
-
-     @param rank the rank of MPI process.
-     @param nodes the number of nodes in MPI domain.
-     @param comm the MPI communicator.
-     */
-    void distribute(int32_t rank, int32_t nodes, MPI_Comm comm);
-
-    /**
      Broadcasts grid points data across a molecular grid objects within domain
      of MPI communacator.
 

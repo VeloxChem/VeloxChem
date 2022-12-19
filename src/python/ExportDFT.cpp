@@ -304,16 +304,6 @@ export_dft(py::module& m)
             },
             "Gets weights of grid as numpy array.")
         .def(
-            "distribute",
-            [](CMolecularGrid& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {
-                auto comm = vlx_general::get_mpi_comm(py_comm);
-                self.distribute(rank, nodes, *comm);
-            },
-            "Distributes MolecularGrid object.",
-            "rank"_a,
-            "nodes"_a,
-            "py_comm"_a)
-        .def(
             "broadcast",
             [](CMolecularGrid& self, int32_t rank, py::object py_comm) -> void {
                 auto comm = vlx_general::get_mpi_comm(py_comm);
