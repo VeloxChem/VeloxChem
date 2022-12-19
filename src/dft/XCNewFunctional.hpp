@@ -54,8 +54,8 @@ class CXCNewFunctional
     /** The fraction of exact Hartree-Fock exchange in functional. */
     double _fractionOfExactExchange{0.0};
 
-    /** The range-separation parameter in functional. */
-    double _rangeSeparationParameter{0.0};
+    /** The range-separation parameters in functional. */
+    std::array<double, 3> _rangeSeparationParameters{0.0, 0.0, 0.0};
 
     /** Highest order of available derivatives. */
     int32_t _maxDerivOrder{0};
@@ -85,13 +85,11 @@ class CXCNewFunctional
      * @param[in] labels list of labels of functional components.
      * @param[in] coeffs list of coefficients for functional components.
      * @param[in] fractionOfExactExchange fraction of exact exchange.
-     * @param[in] rangeSeparationParameter range separation parameter.
      */
     CXCNewFunctional(const std::string&              nameOfFunctional,
                      const std::vector<std::string>& labels,
                      const std::vector<double>&      coeffs,
-                     const double                    fractionOfExactExchange  = 0.0,
-                     const double                    rangeSeparationParameter = 0.0);
+                     const double                    fractionOfExactExchange = 0.0);
 
     /**
      Creates an XC functional object by copying other XC functional object.

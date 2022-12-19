@@ -40,14 +40,11 @@
 CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctional,
                                    const std::vector<std::string>& labels,
                                    const std::vector<double>&      coeffs,
-                                   const double                    fractionOfExactExchange,
-                                   const double                    rangeSeparationParameter)
+                                   const double                    fractionOfExactExchange)
 
     : _nameOfFunctional(fstr::upcase(nameOfFunctional))
 
     , _fractionOfExactExchange(fractionOfExactExchange)
-
-    , _rangeSeparationParameter(rangeSeparationParameter)
 {
     std::string errmsg("XCNewFunctional: Inconsistent sizes of functional labels and coefficients");
 
@@ -115,7 +112,7 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
     if (isGGA) _familyOfFunctional = std::string("GGA");
     if (isMGGA) _familyOfFunctional = std::string("MGGA");
 
-    // figure out fraction of exact exchange from "prebaked" functional (e.g. HYB_GGA_XC_B3LYP)
+    // figure out fraction of exact exchange (e.g. HYB_GGA_XC_B3LYP)
     if (_components.size() == 1)
     {
         auto funcptr = _components[0].getFunctionalPointer();
@@ -125,7 +122,7 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
         }
     }
 
-    // TODO figure out whether a functional is range-separated (e.g. HYB_GGA_XC_LRC_WPBEH)
+    // TODO figure out range-separated parameters (e.g. HYB_GGA_XC_LRC_WPBEH)
 
     _allocateStagingBuffer();
 }
@@ -136,7 +133,7 @@ CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
 
     , _fractionOfExactExchange(source._fractionOfExactExchange)
 
-    , _rangeSeparationParameter(source._rangeSeparationParameter)
+    , _rangeSeparationParameters(source._rangeSeparationParameters)
 
     , _maxDerivOrder(source._maxDerivOrder)
 
@@ -155,7 +152,7 @@ CXCNewFunctional::CXCNewFunctional(CXCNewFunctional&& source) noexcept
 
     , _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
 
-    , _rangeSeparationParameter(std::move(source._rangeSeparationParameter))
+    , _rangeSeparationParameters(std::move(source._rangeSeparationParameters))
 
     , _maxDerivOrder(std::move(source._maxDerivOrder))
 
@@ -216,7 +213,7 @@ CXCNewFunctional::operator=(const CXCNewFunctional& source)
 
     _fractionOfExactExchange = source._fractionOfExactExchange;
 
-    _rangeSeparationParameter = source._rangeSeparationParameter;
+    _rangeSeparationParameters = source._rangeSeparationParameters;
 
     _maxDerivOrder = source._maxDerivOrder;
 
@@ -242,7 +239,7 @@ CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
 
     _fractionOfExactExchange = std::move(source._fractionOfExactExchange);
 
-    _rangeSeparationParameter = std::move(source._rangeSeparationParameter);
+    _rangeSeparationParameters = std::move(source._rangeSeparationParameters);
 
     _maxDerivOrder = std::move(source._maxDerivOrder);
 
@@ -268,7 +265,7 @@ CXCNewFunctional::operator==(const CXCNewFunctional& other) const
 
     if (_fractionOfExactExchange != other._fractionOfExactExchange) return false;
 
-    if (_rangeSeparationParameter != other._rangeSeparationParameter) return false;
+    if (_rangeSeparationParameters != other._rangeSeparationParameters) return false;
 
     if (_maxDerivOrder != other._maxDerivOrder) return false;
 

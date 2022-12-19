@@ -186,12 +186,11 @@ export_dft(py::module& m)
 
     // XCNewFunctional class
     PyClass<CXCNewFunctional>(m, "XCNewFunctional")
-        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&, const double, const double>(),
+        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&, const double>(),
              "name_of_functional"_a,
              "labels"_a,
              "coeffs"_a,
-             "fraction_of_exact_exchange"_a = 0.0,
-             "range_separation_parameter"_a = 0.0)
+             "fraction_of_exact_exchange"_a = 0.0)
         .def(py::init<const CXCNewFunctional&>())
         .def(py::self == py::self)
         .def("is_hybrid", &CXCNewFunctional::isHybrid, "Determines whether the XC functional is hybrid.")
