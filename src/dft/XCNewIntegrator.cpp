@@ -4798,8 +4798,8 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                             +grada_z_g * pizzz[g];
                 
                 double c9_x = grada_x_g * pi[g];
-                double c9_y = grada_z_g * pi[g];
-                double c9_z = grada_y_g * pi[g];
+                double c9_y = grada_y_g * pi[g];
+                double c9_z = grada_z_g * pi[g];
 
                 double c10_x = pix[g];
                 double c10_y = piy[g];
@@ -4885,6 +4885,7 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                 double c18_y = c7 * grada_y_g;
                 double c18_z = c7 * grada_z_g;
 
+
                 double c20_21_23 =   grada_x_g * (pixxx[g] + pixxx[g] + pixxx[g]) 
                                     +grada_x_g * (piyxy[g] + pixyy[g] + piyyx[g]) 
                                     +grada_x_g * (pizxz[g] + pixzz[g] + pizzx[g]) 
@@ -4958,18 +4959,19 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                 auto v4rho4_aaab = v4rho4[5 * g + 1];
                 auto v4rho4_aabb = v4rho4[5 * g + 2];
                 auto v4rho4_abbb = v4rho4[5 * g + 3];
+                auto v4rho4_bbbb = v4rho4[5 * g + 4];
 
-                auto v4rho3sigma_aaaa = v4rho3sigma[12 * g + 0]; 
-                auto v4rho3sigma_aaac = v4rho3sigma[12 * g + 1]; 
-                auto v4rho3sigma_aaab = v4rho3sigma[12 * g + 2];  
-                auto v4rho3sigma_aaba = v4rho3sigma[12 * g + 3];  
-                auto v4rho3sigma_aabc = v4rho3sigma[12 * g + 4];  
-                auto v4rho3sigma_aabb = v4rho3sigma[12 * g + 5];  
-                auto v4rho3sigma_abba = v4rho3sigma[12 * g + 6];  
-                auto v4rho3sigma_abbc = v4rho3sigma[12 * g + 7];  
-                auto v4rho3sigma_abbb = v4rho3sigma[12 * g + 8];  
-                auto v4rho3sigma_bbba = v4rho3sigma[12 * g + 9];  
-                auto v4rho3sigma_bbbc = v4rho3sigma[12 * g + 10]; 
+                auto v4rho3sigma_aaaa = v4rho3sigma[12 * g + 0];
+                auto v4rho3sigma_aaac = v4rho3sigma[12 * g + 1];
+                auto v4rho3sigma_aaab = v4rho3sigma[12 * g + 2];
+                auto v4rho3sigma_aaba = v4rho3sigma[12 * g + 3];
+                auto v4rho3sigma_aabc = v4rho3sigma[12 * g + 4];
+                auto v4rho3sigma_aabb = v4rho3sigma[12 * g + 5];
+                auto v4rho3sigma_abba = v4rho3sigma[12 * g + 6];
+                auto v4rho3sigma_abbc = v4rho3sigma[12 * g + 7];
+                auto v4rho3sigma_abbb = v4rho3sigma[12 * g + 8];
+                auto v4rho3sigma_bbba = v4rho3sigma[12 * g + 9];
+                auto v4rho3sigma_bbbc = v4rho3sigma[12 * g + 10];
 
                 auto v4rho2sigma2_aaaa = v4rho2sigma2[18 * g + 0];
                 auto v4rho2sigma2_aaac = v4rho2sigma2[18 * g + 1];
@@ -4990,41 +4992,42 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                 auto v4rho2sigma2_bbcb = v4rho2sigma2[18 * g + 16];
                 auto v4rho2sigma2_bbbb = v4rho2sigma2[18 * g + 17];
 
-                auto v4rhosigma3_aaaa  = v4rhosigma3[20 * g + 0];
-                auto v4rhosigma3_aaac  = v4rhosigma3[20 * g + 1];
-                auto v4rhosigma3_aaab  = v4rhosigma3[20 * g + 2];
-                auto v4rhosigma3_aacc  = v4rhosigma3[20 * g + 3];
-                auto v4rhosigma3_aacb  = v4rhosigma3[20 * g + 4];
-                auto v4rhosigma3_aabb  = v4rhosigma3[20 * g + 5];
-                auto v4rhosigma3_accc  = v4rhosigma3[20 * g + 6];
-                auto v4rhosigma3_accb  = v4rhosigma3[20 * g + 7];
-                auto v4rhosigma3_acbb  = v4rhosigma3[20 * g + 8];
-                auto v4rhosigma3_abbb  = v4rhosigma3[20 * g + 9];
-                auto v4rhosigma3_baaa  = v4rhosigma3[20 * g + 10];
-                auto v4rhosigma3_baac  = v4rhosigma3[20 * g + 11];
-                auto v4rhosigma3_baab  = v4rhosigma3[20 * g + 12];
-                auto v4rhosigma3_bacc  = v4rhosigma3[20 * g + 13];
-                auto v4rhosigma3_bacb  = v4rhosigma3[20 * g + 14];
-                auto v4rhosigma3_babb  = v4rhosigma3[20 * g + 15];
-                auto v4rhosigma3_bccc  = v4rhosigma3[20 * g + 16];
-                auto v4rhosigma3_bccb  = v4rhosigma3[20 * g + 17];
-                auto v4rhosigma3_bcbb  = v4rhosigma3[20 * g + 18];
+                auto v4rhosigma3_aaaa = v4rhosigma3[20 * g + 0];
+                auto v4rhosigma3_aaac = v4rhosigma3[20 * g + 1];
+                auto v4rhosigma3_aaab = v4rhosigma3[20 * g + 2];
+                auto v4rhosigma3_aacc = v4rhosigma3[20 * g + 3];
+                auto v4rhosigma3_aacb = v4rhosigma3[20 * g + 4];
+                auto v4rhosigma3_aabb = v4rhosigma3[20 * g + 5];
+                auto v4rhosigma3_accc = v4rhosigma3[20 * g + 6];
+                auto v4rhosigma3_accb = v4rhosigma3[20 * g + 7];
+                auto v4rhosigma3_acbb = v4rhosigma3[20 * g + 8];
+                auto v4rhosigma3_abbb = v4rhosigma3[20 * g + 9];
+                auto v4rhosigma3_baaa = v4rhosigma3[20 * g + 10];
+                auto v4rhosigma3_baac = v4rhosigma3[20 * g + 11];
+                auto v4rhosigma3_baab = v4rhosigma3[20 * g + 12];
+                auto v4rhosigma3_bacc = v4rhosigma3[20 * g + 13];
+                auto v4rhosigma3_bacb = v4rhosigma3[20 * g + 14];
+                auto v4rhosigma3_babb = v4rhosigma3[20 * g + 15];
+                auto v4rhosigma3_bccc = v4rhosigma3[20 * g + 16];
+                auto v4rhosigma3_bccb = v4rhosigma3[20 * g + 17];
+                auto v4rhosigma3_bcbb = v4rhosigma3[20 * g + 18];
+                auto v4rhosigma3_bbbb = v4rhosigma3[20 * g + 19];
 
-                auto v4sigma4_aaaa  = v4sigma4[15 * g + 0];
-                auto v4sigma4_aaac  = v4sigma4[15 * g + 1];
-                auto v4sigma4_aaab  = v4sigma4[15 * g + 2];
-                auto v4sigma4_aacc  = v4sigma4[15 * g + 3];
-                auto v4sigma4_aacb  = v4sigma4[15 * g + 4];
-                auto v4sigma4_aabb  = v4sigma4[15 * g + 5];
-                auto v4sigma4_accc  = v4sigma4[15 * g + 6];
-                auto v4sigma4_accb  = v4sigma4[15 * g + 7];
-                auto v4sigma4_acbb  = v4sigma4[15 * g + 8];
-                auto v4sigma4_abbb  = v4sigma4[15 * g + 9];
-                auto v4sigma4_cccc  = v4sigma4[15 * g + 10];
-                auto v4sigma4_cccb  = v4sigma4[15 * g + 11];
-                auto v4sigma4_ccbb  = v4sigma4[15 * g + 12];
-                auto v4sigma4_cbbb  = v4sigma4[15 * g + 13];
-                auto v4sigma4_bbbb  = v4sigma4[15 * g + 14];
+                auto v4sigma4_aaaa = v4sigma4[15 * g + 0];
+                auto v4sigma4_aaac = v4sigma4[15 * g + 1];
+                auto v4sigma4_aaab = v4sigma4[15 * g + 2];
+                auto v4sigma4_aacc = v4sigma4[15 * g + 3];
+                auto v4sigma4_aacb = v4sigma4[15 * g + 4];
+                auto v4sigma4_aabb = v4sigma4[15 * g + 5];
+                auto v4sigma4_accc = v4sigma4[15 * g + 6];
+                auto v4sigma4_accb = v4sigma4[15 * g + 7];
+                auto v4sigma4_acbb = v4sigma4[15 * g + 8];
+                auto v4sigma4_abbb = v4sigma4[15 * g + 9];
+                auto v4sigma4_cccc = v4sigma4[15 * g + 10];
+                auto v4sigma4_cccb = v4sigma4[15 * g + 11];
+                auto v4sigma4_ccbb = v4sigma4[15 * g + 12];
+                auto v4sigma4_cbbb = v4sigma4[15 * g + 13];
+                auto v4sigma4_bbbb = v4sigma4[15 * g + 14];
 
                 // Transformation of derivatives 
 
@@ -5053,9 +5056,10 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                             + 16.0*v3sigma3_aab + 8.0*v3sigma3_aaa;
 
                 // fourth-order 
+
                 double xrrr =   v4rho3sigma_bbbc + 2.0 * v4rho3sigma_bbba + 3.0 * v4rho3sigma_abbc 
-                            + 6.0 * v4rho3sigma_abba + 3.0 * v4rho3sigma_aabc + 6.0 * v4rho3sigma_aaba 
-                            + v4rho3sigma_aaac + 2.0 * v4rho3sigma_aaaa;
+                                + 6.0 * v4rho3sigma_abba + 3.0 * v4rho3sigma_aabc + 6.0 * v4rho3sigma_aaba 
+                                + v4rho3sigma_aaac + 2.0 * v4rho3sigma_aaaa;
 
                 double xxrr = 2.0 * v4rho2sigma2_bbcc + 2.0 * v4rho2sigma2_bbcb + 6.0 * v4rho2sigma2_bbac 
                             + 4.0 * v4rho2sigma2_bbab + 4.0 * v4rho2sigma2_bbaa + 4.0 * v4rho2sigma2_abcc 
@@ -5088,15 +5092,6 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                             + 24.0 * v4rhosigma3_aacc + 48.0 * v4rhosigma3_aacb + 24.0 * v4rhosigma3_aabb + 24.0 * v4rhosigma3_aaac 
                             + 24.0 * v4rhosigma3_aaab + 8.0 * v4rhosigma3_aaaa; 
                             
-                // double xrrr = 1;
-                // double xxrr = 1; 
-                // double xxxr = 1;
-                // double xxxx = 1;
-                // double rrrr = 1;
-                // double rxrr = 1;
-                // double rxxr = 1;
-                // double rxxx = 1;
-
                 // Scalar contribution
 
                 double prefac = 0.0;
@@ -5106,16 +5101,16 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                 prefac += rr * rho3[g] // l1 
                         + rx * l2contract; 
                 
-                // // // vxc 2 contributions
+                // // vxc 2 contributions
                 
                 prefac += rrr * gam[g] // q1 
                         + rxr * q2contract 
                         + rxx * q3contract 
                         + rx * q4contract; 
                 
-                // // vxc 3 contributions
+                // // // vxc 3 contributions
                 prefac += rrrr * c1
-                        + rxrr * c2 
+                        + rxrr * c2
                         + rxxr * c3 
                         + rxr * c4 
                         + rxx * (c5_6 + c8) 
@@ -5129,16 +5124,16 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
 
                 // vxc 1 contributions
 
-                xcomp += xr * grada_x_g * rho3[g] // l3
-                        + x * rxw123a // l4
+                xcomp += xr * grada_x_g * rho3[g] 
+                        + x * rxw123a
                         + xx * l5contract_x;
 
-                ycomp += xr * grada_y_g * rho3[g] // l3
-                        + x * ryw123a // l4
+                ycomp += xr * grada_y_g * rho3[g] 
+                        + x * ryw123a
                         + xx * l5contract_y;
 
-                zcomp += xr * grada_z_g * rho3[g] // l3
-                        + x * rzw123a // l4
+                zcomp += xr * grada_z_g * rho3[g] 
+                        + x * rzw123a
                         + xx * l5contract_z;
                 
                 // // vxc 2 contributions
@@ -5162,16 +5157,16 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                         + xxx * q9contract_z;
 
                 // vxc 3 contributions
-                xcomp +=   xrrr * c9_x 
+                xcomp +=  xrrr * c9_x
                         + xrr * c10_x 
                         + xxrr * c11_x
-                         + xxr * (c12_c14_x + c15_x)
-                         + xxxr * c13_x 
-                         + xx * c17_24_25_x 
-                         + xxxx * c18_x
-                         + xxx * (c16_19_22_x + c20_21_23_x); 
+                        + xxr * (c12_c14_x + c15_x)
+                        + xxxr * c13_x 
+                        + xx * c17_24_25_x
+                        + xxxx * c18_x
+                        + xxx * (c16_19_22_x + c20_21_23_x); 
 
-                ycomp += xrrr * c9_y
+                ycomp +=  xrrr * c9_y
                         + xrr * c10_y
                         + xxrr * c11_y
                         + xxr * (c12_c14_y + c15_y)
@@ -5179,10 +5174,10 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t              npoi
                         + xx * c17_24_25_y
                         + xxxx * c18_y
                         + xxx * (c16_19_22_y + c20_21_23_y);
-                
-                zcomp += xrrr * c9_z
+             
+                zcomp +=  xrrr * c9_z
                         + xrr * c10_z
-                        + xxrr * c11_z;
+                        + xxrr * c11_z
                         + xxr * (c12_c14_z + c15_z)
                         + xxxr * c13_z
                         + xx * c17_24_25_z

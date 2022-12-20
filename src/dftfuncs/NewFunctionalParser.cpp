@@ -35,7 +35,7 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN_RPA", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE0", "TPSS", "PKZB"});
+    return std::vector<std::string>({"SLATER", "VWN_RPA", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE0", "TPSS", "PKZB","BP86"});
 }
 
 CXCNewFunctional
@@ -52,6 +52,10 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         // Vosko-Wilk-Nusair RPA correlation functional
 
         if (fstr::upcase(xcLabel) == "VWN_RPA") return CXCNewFunctional("VWN_RPA", {"LDA_C_VWN_RPA"}, {1.0});
+        
+        // BP86 functional
+
+        if (fstr::upcase(xcLabel) == "BP86") return CXCNewFunctional("BP86", {"GGA_X_B88", "GGA_C_P86"}, {1.0, 1.0});
 
         // Becke (1988) exchange functional
 

@@ -993,6 +993,15 @@ class CDensityGridCubic
     */
     double* gamY(const int32_t iDensityMatrix);
 
+
+    double prod3_r(double B_r, double B_i, double C_r, double C_i, double D_r, double D_i);
+    
+    double prod3_i(double B_r, double B_i, double C_r, double C_i, double D_r, double D_i);
+
+    double prod2_r(double B_r, double B_i, double C_r, double C_i);
+
+    double prod2_i(double B_r, double B_i, double C_r, double C_i);
+
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
 
