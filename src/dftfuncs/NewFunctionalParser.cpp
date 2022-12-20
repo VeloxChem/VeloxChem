@@ -37,7 +37,7 @@ getAvailableFunctionals()
 {
     return std::vector<std::string>({
             "SLATER", "VWN_RPA", "SLDA",
-            "LYP", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE", "PBE0", "BP86",
+            "B88X", "LYP", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE", "PBE0", "BP86", "PW91", "OLYP",
             "TPSS", "TPSSH", "PKZB"});
 }
 
@@ -78,6 +78,10 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (fstr::upcase(xcLabel) == "PBE0") return CXCNewFunctional("PBE0", {"GGA_X_PBE", "GGA_C_PBE"}, {0.75, 1.0}, 0.25);
 
         if (fstr::upcase(xcLabel) == "BP86") return CXCNewFunctional("BP86", {"GGA_X_B88", "GGA_C_P86"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "PW91") return CXCNewFunctional("PW91", {"GGA_X_PW91", "GGA_C_PW91"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "OLYP") return CXCNewFunctional("OLYP", {"GGA_X_OPTX", "GGA_C_LYP"}, {1.0, 1.0});
 
         // meta-GGA
 
