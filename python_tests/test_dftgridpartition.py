@@ -29,10 +29,6 @@ class TestDftGridPartition:
         mol_grid = grid_drv.generate(molecule)
 
         xc_drv = XCNewIntegrator()
-        mol_grid.partition_grid_points()
-        mol_grid.distribute_counts_and_displacements(scf_drv.rank,
-                                                     scf_drv.nodes,
-                                                     scf_drv.comm)
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, density, mol_grid,
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)

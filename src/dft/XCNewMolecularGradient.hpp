@@ -42,10 +42,6 @@
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
-#include "XCCubicHessianGrid.hpp"
-#include "XCFunctional.hpp"
-#include "XCGradientGrid.hpp"
-#include "XCHessianGrid.hpp"
 #include "XCNewFunctional.hpp"
 
 /**
@@ -101,6 +97,26 @@ class CXCNewMolecularGradient
                                              const CXCNewFunctional& xcFunctional) const;
 
     /**
+     Integrates first-order LDA exchnage-correlation functional contribution to
+     open-shell molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed AO density matrix (to be contracted
+            with GTO gradient).
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular gradient.
+     */
+    CDenseMatrix _integrateVxcGradientForLDAOpenShell(const CMolecule&        molecule,
+                                                      const CMolecularBasis&  basis,
+                                                      const CAODensityMatrix& rwDensityMatrix,
+                                                      const CAODensityMatrix& gsDensityMatrix,
+                                                      const CMolecularGrid&   molecularGrid,
+                                                      const CXCNewFunctional& xcFunctional) const;
+
+    /**
      Integrates first-order GGA exchnage-correlation functional contribution to
      molecular gradient.
 
@@ -118,6 +134,25 @@ class CXCNewMolecularGradient
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
                                              const CXCNewFunctional& xcFunctional) const;
+
+    /**
+     Integrates first-order GGA exchnage-correlation functional contribution to
+     open-shell molecular gradient.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param rwDensityMatrix the perturbed AO density matrix.
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular gradient.
+     */
+    CDenseMatrix _integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
+                                                      const CMolecularBasis&  basis,
+                                                      const CAODensityMatrix& rwDensityMatrix,
+                                                      const CAODensityMatrix& gsDensityMatrix,
+                                                      const CMolecularGrid&   molecularGrid,
+                                                      const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates second-order LDA exchnage-correlation functional contribution
@@ -183,7 +218,7 @@ class CXCNewMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+                                             const CXCNewFunctional& xcFunctional) const;
 
     /**
      Integrates third-order GGA exchnage-correlation functional contribution to
@@ -205,7 +240,7 @@ class CXCNewMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCFunctional&    xcFunctional) const;
+                                             const CXCNewFunctional& xcFunctional) const;
 
     /**
      Computes AO-to-atom mapping.
@@ -240,7 +275,7 @@ class CXCNewMolecularGradient
     CDenseMatrix integrateVxcGradient(const CMolecule&        molecule,
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      CMolecularGrid&         molecularGrid,
+                                      const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -260,7 +295,7 @@ class CXCNewMolecularGradient
                                       const CMolecularBasis&  basis,
                                       const CAODensityMatrix& rwDensityMatrix,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      CMolecularGrid&         molecularGrid,
+                                      const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -282,7 +317,7 @@ class CXCNewMolecularGradient
                                       const CAODensityMatrix& rwDensityMatrixOne,
                                       const CAODensityMatrix& rwDensityMatrixTwo,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      CMolecularGrid&         molecularGrid,
+                                      const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 
     /**
@@ -304,7 +339,7 @@ class CXCNewMolecularGradient
                                       const CAODensityMatrix& rwDensityMatrixOne,
                                       const CAODensityMatrix& rwDensityMatrixTwo,
                                       const CAODensityMatrix& gsDensityMatrix,
-                                      CMolecularGrid&         molecularGrid,
+                                      const CMolecularGrid&   molecularGrid,
                                       const std::string&      xcFuncLabel) const;
 };
 

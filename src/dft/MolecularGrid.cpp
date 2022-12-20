@@ -37,10 +37,8 @@
 
 #include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
-#include "FunctionalParser.hpp"
 #include "GridPartitioner.hpp"
 #include "GtoContainer.hpp"
-#include "GtoFunc.hpp"
 #include "XCVarsType.hpp"
 
 CMolecularGrid::CMolecularGrid()
@@ -236,21 +234,6 @@ double*
 CMolecularGrid::getWeights()
 {
     return _gridPoints.data(3);
-}
-
-void
-CMolecularGrid::distribute(int32_t rank, int32_t nodes, MPI_Comm comm)
-{
-    std::string errpartitioned("MolecularGrid.distribute: Cannot distribute partitioned molecular grid");
-
-    errors::assertMsgCritical(!_isPartitioned, errpartitioned);
-
-    if (!_isDistributed)
-    {
-        _isDistributed = true;
-
-        _gridPoints.scatter(rank, nodes, comm);
-    }
 }
 
 void
@@ -596,6 +579,8 @@ operator<<(std::ostream& output, const CMolecularGrid& source)
     output << std::endl;
     
     output << "[CMolecularGrid (Object):" << &source << "]" << std::endl;
+
+    output << "_isPartitioned: " << source._isPartitioned << std::endl;
 
     output << "_isDistributed: " << source._isDistributed << std::endl;
 

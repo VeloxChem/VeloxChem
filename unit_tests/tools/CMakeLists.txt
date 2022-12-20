@@ -1,7 +1,6 @@
 target_sources(utests
   PRIVATE
     CheckFunctions.cpp
-    DummyFunctionals.cpp
     DummyFunctions.cpp
   )
 

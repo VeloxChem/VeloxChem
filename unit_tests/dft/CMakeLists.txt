@@ -6,8 +6,4 @@ target_sources(utests
     LebedevLaikovQuadratureTest.cpp
     Log3QuadratureTest.cpp
     MolecularGridTest.cpp
-    PrimitiveFunctionalTest.cpp
-    XCFunctionalTest.cpp
-    XCGradientGridTest.cpp
-    XCHessianGridTest.cpp
   )

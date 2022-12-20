@@ -40,7 +40,7 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import parse_xc_func
+from .veloxchemlib import new_parse_xc_func
 from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -435,7 +435,7 @@ class ScfDriver:
         # check xc functional
         if self.xcfun is not None:
             if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
+                self.xcfun = new_parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'SCF driver: Undefined XC functional')
         self._dft = (self.xcfun is not None)
@@ -1365,11 +1365,8 @@ class ScfDriver:
                 if self.scf_type == 'restricted':
                     fock_mat.scale(2.0, 0)
 
-            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga]:
+            if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
                 xc_drv = XCNewIntegrator(self.comm)
-                self._mol_grid.partition_grid_points()
-                self._mol_grid.distribute_counts_and_displacements(
-                    self.rank, self.nodes, self.comm)
                 vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
                                                     self._mol_grid,
                                                     self.xcfun.get_func_label())

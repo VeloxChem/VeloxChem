@@ -35,7 +35,10 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN_RPA", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "PBE", "B3LYP", "BHANDH", "BHANDHLYP"});
+    return std::vector<std::string>({
+            "SLATER", "VWN_RPA", "SLDA",
+            "LYP", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE", "PBE0", "BP86",
+            "TPSS", "TPSSH", "PKZB"});
 }
 
 CXCNewFunctional
@@ -45,64 +48,53 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
     if (std::find(availFuncs.begin(), availFuncs.end(), fstr::upcase(xcLabel)) != availFuncs.end())
     {
-        // Slater exchange functional
+        // LDA
 
-        if (fstr::upcase(xcLabel) == "SLATER") return CXCNewFunctional("LDA_X");
+        if (fstr::upcase(xcLabel) == "SLATER") return CXCNewFunctional("SLATER", {"LDA_X"}, {1.0});
 
-        // Vosko-Wilk-Nusair RPA correlation functional
+        if (fstr::upcase(xcLabel) == "VWN_RPA") return CXCNewFunctional("VWN_RPA", {"LDA_C_VWN_RPA"}, {1.0});
 
-        if (fstr::upcase(xcLabel) == "VWN_RPA") return CXCNewFunctional("LDA_C_VWN_RPA");
+        if (fstr::upcase(xcLabel) == "SLDA") return CXCNewFunctional("SLDA", {"LDA_X", "LDA_C_VWN_RPA"}, {1.0, 1.0});
 
-        // Becke (1988) exchange functional
+        // GGA
 
-        if (fstr::upcase(xcLabel) == "BECKE88") return CXCNewFunctional({"GGA_X_B88", "LDA_X"}, {1.0, -1.0});
+        if (fstr::upcase(xcLabel) == "B88X") return CXCNewFunctional("B88X", {"GGA_X_B88"}, {1.0});
 
-        // Lee, Yang and Parr correlation functional
+        if (fstr::upcase(xcLabel) == "LYP") return CXCNewFunctional("LYP", {"GGA_C_LYP"}, {1.0});
 
-        if (fstr::upcase(xcLabel) == "LYP") return CXCNewFunctional("GGA_C_LYP");
-
-        // local density exchange-correlation functional
-
-        if (fstr::upcase(xcLabel) == "SLDA") return CXCNewFunctional({"LDA_X", "LDA_C_VWN_RPA"}, {1.0, 1.0});
-
-        // Becke/Slater exchange functional
-
-        if (fstr::upcase(xcLabel) == "B88X") return CXCNewFunctional("GGA_X_B88");
-
-        // BLYP exchange-correlation functional
-
-        if (fstr::upcase(xcLabel) == "BLYP") return CXCNewFunctional({"GGA_X_B88", "GGA_C_LYP"}, {1.0, 1.0});
-
-        // PBE exchange-correlation functional
-
-        if (fstr::upcase(xcLabel) == "PBE") return CXCNewFunctional({"GGA_X_PBE", "GGA_C_PBE"}, {1.0, 1.0});
-
-        // hybrid B3LYP exchange-correlation functional
+        if (fstr::upcase(xcLabel) == "BLYP") return CXCNewFunctional("BLYP", {"GGA_X_B88", "GGA_C_LYP"}, {1.0, 1.0});
 
         if (fstr::upcase(xcLabel) == "B3LYP")
         {
-            return CXCNewFunctional({"LDA_X", "GGA_X_B88", "LDA_C_VWN_RPA", "GGA_C_LYP"}, {0.08, 0.72, 0.19, 0.81}, 0.2);
+            return CXCNewFunctional("B3LYP", {"LDA_X", "GGA_X_B88", "LDA_C_VWN_RPA", "GGA_C_LYP"}, {0.08, 0.72, 0.19, 0.81}, 0.2);
         }
 
-        // hybrid BHANDH exchange-correlation functional
+        if (fstr::upcase(xcLabel) == "BHANDH") return CXCNewFunctional("BHANDH", {"LDA_X", "GGA_C_LYP"}, {0.5, 1.0}, 0.5);
 
-        if (fstr::upcase(xcLabel) == "BHANDH") return CXCNewFunctional({"LDA_X", "GGA_C_LYP"}, {0.5, 1.0}, 0.5);
+        if (fstr::upcase(xcLabel) == "BHANDHLYP") return CXCNewFunctional("BHANDHLYP", {"GGA_X_B88", "GGA_C_LYP"}, {0.5, 1.0}, 0.5);
 
-        // hybrid BHANDHLYP exchange-correlation functional
+        if (fstr::upcase(xcLabel) == "PBE") return CXCNewFunctional("PBE", {"GGA_X_PBE", "GGA_C_PBE"}, {1.0, 1.0});
 
-        if (fstr::upcase(xcLabel) == "BHANDHLYP") return CXCNewFunctional({"GGA_X_B88", "GGA_C_LYP"}, {0.5, 1.0}, 0.5);
+        if (fstr::upcase(xcLabel) == "PBE0") return CXCNewFunctional("PBE0", {"GGA_X_PBE", "GGA_C_PBE"}, {0.75, 1.0}, 0.25);
 
-        // PKZB exchange functional
-        // if (fstr::upcase(xcLabel) == "PKZB") return ...
+        if (fstr::upcase(xcLabel) == "BP86") return CXCNewFunctional("BP86", {"GGA_X_B88", "GGA_C_P86"}, {1.0, 1.0});
 
-        // FIX ME: add other functionals here...
+        // meta-GGA
+
+        if (fstr::upcase(xcLabel) == "TPSS") return CXCNewFunctional("TPSS", {"MGGA_X_TPSS", "MGGA_C_TPSS"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "TPSSH") return CXCNewFunctional("TPSSH", {"MGGA_X_TPSS", "MGGA_C_TPSS"}, {0.9, 1.0}, 0.1);
+
+        if (fstr::upcase(xcLabel) == "PKZB") return CXCNewFunctional("PKZB", {"MGGA_X_PKZB", "MGGA_C_PKZB"}, {1.0, 1.0});
+
+        // TODO add more functionals here...
     }
 
     std::string errmsg(std::string("getExchangeCorrelationFunctional: Cannot find functional ") + xcLabel);
 
     errors::assertMsgCritical(false, errmsg);
 
-    return CXCNewFunctional({}, {});
+    return CXCNewFunctional("Undefined", {}, {});
 }
 
 std::vector<std::string>

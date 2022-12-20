@@ -37,12 +37,10 @@
 #include "DensityGrid.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
-#include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
 #include "NewFunctionalParser.hpp"
 #include "XCFuncType.hpp"
-#include "XCFunctional.hpp"
 #include "XCNewFunctional.hpp"
 #include "XCNewIntegrator.hpp"
 #include "XCNewMolecularGradient.hpp"
@@ -176,22 +174,6 @@ export_dft(py::module& m)
         .def("get_energy", &CAOKohnShamMatrix::getExchangeCorrelationEnergy, "Gets exchange-correlation energy associated with Kohn-Sham matrix.")
         .def(py::self == py::self);
 
-    // CXCFunctional class
-
-    PyClass<CXCFunctional>(m, "XCFunctional")
-        .def(py::init<>())
-        .def(py::init<const CXCFunctional&>())
-        .def("get_frac_exact_exchange",
-             &CXCFunctional::getFractionOfExactExchange,
-             "Gets fraction of exact Hatree-Fock exchange in exchange-correlation functional.")
-        .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of exchange-correlation functional.")
-        .def("get_func_label", &CXCFunctional::getLabel, "Gets label of exchange-correlation functional.")
-        .def("is_hybrid",
-             &CXCFunctional::isHybridFunctional,
-             "Determines if exchange-correlation functional is of hybrid type i.e. non-zero fraction of exact Hatree-Fock exchange.")
-        .def("is_undefined", &CXCFunctional::isUndefined, "Determines if exchange-correlation function is undefined.")
-        .def(py::self == py::self);
-
     // XCComponent class
     PyClass<CXCComponent>(m, "XCComponent")
         .def(py::init<const std::string&, const double>(), "label"_a, "coeff"_a)
@@ -202,14 +184,20 @@ export_dft(py::module& m)
 
     // XCNewFunctional class
     PyClass<CXCNewFunctional>(m, "XCNewFunctional")
-        .def(py::init<const std::vector<std::string>&, const std::vector<double>&, const double, const double>(),
+        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&, const double>(),
+             "name_of_functional"_a,
              "labels"_a,
              "coeffs"_a,
-             "fraction_of_exact_exchange"_a = 0.0,
-             "range_separation_parameter"_a = 0.0)
-        .def(py::init<const std::string&>(), "label"_a)
+             "fraction_of_exact_exchange"_a = 0.0)
         .def(py::init<const CXCNewFunctional&>())
         .def(py::self == py::self)
+        .def("is_hybrid", &CXCNewFunctional::isHybrid, "Determines whether the XC functional is hybrid.")
+        .def("is_undefined", &CXCNewFunctional::isUndefined, "Determines whether the XC function is undefined.")
+        .def("get_func_type", &CXCNewFunctional::getFunctionalType, "Gets type of XC functional.")
+        .def("get_func_label", &CXCNewFunctional::getFunctionalLabel, "Gets name of XC functional.")
+        .def("get_frac_exact_exchange",
+             &CXCNewFunctional::getFractionOfExactExchange,
+             "Gets fraction of exact Hartree-Fock exchange in XC functional.")
         .def(
             "compute_exc_vxc_for_lda",
             [](const CXCNewFunctional& self, const py::array_t<double>& rho) -> py::list {
@@ -313,16 +301,6 @@ export_dft(py::module& m)
                 return vlx_general::pointer_to_numpy(self.getWeights(), self.getNumberOfGridPoints());
             },
             "Gets weights of grid as numpy array.")
-        .def(
-            "distribute",
-            [](CMolecularGrid& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {
-                auto comm = vlx_general::get_mpi_comm(py_comm);
-                self.distribute(rank, nodes, *comm);
-            },
-            "Distributes MolecularGrid object.",
-            "rank"_a,
-            "nodes"_a,
-            "py_comm"_a)
         .def(
             "broadcast",
             [](CMolecularGrid& self, int32_t rank, py::object py_comm) -> void {
@@ -692,12 +670,7 @@ export_dft(py::module& m)
 
     m.def("to_xcfun", &to_xcfun, "Converts string label to its enumerate class value.", "label"_a);
 
-    m.def("available_functionals", &vxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
-
-    m.def("parse_xc_func",
-          &vxcfuncs::getExchangeCorrelationFunctional,
-          "Converts exchange-correlation functional label to exchange-correlation functional object.",
-          "xcLabel"_a);
+    m.def("available_functionals", &newvxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
 
     m.def("new_parse_xc_func",
           &newvxcfuncs::getExchangeCorrelationFunctional,

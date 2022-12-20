@@ -42,7 +42,7 @@ from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-from .veloxchemlib import parse_xc_func
+from .veloxchemlib import new_parse_xc_func
 from .veloxchemlib import XCNewIntegrator
 
 
@@ -270,7 +270,7 @@ class NonLinearSolver:
         # check xc functional
         if self.xcfun is not None:
             if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
+                self.xcfun = new_parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'NonLinearSolver: Undefined XC functional')
         self._dft = (self.xcfun is not None)
@@ -601,9 +601,6 @@ class NonLinearSolver:
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
-                molgrid.partition_grid_points()
-                molgrid.distribute_counts_and_displacements(
-                    self.rank, self.nodes, self.comm)
                 xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
                                           dens2, gs_density, molgrid,
                                           self.xcfun.get_func_label(), mode)

@@ -41,7 +41,7 @@ from .veloxchemlib import XCNewIntegrator
 from .veloxchemlib import denmat, fockmat, mpi_master
 from .veloxchemlib import (hartree_in_ev, bohr_in_angstroms,
                            rotatory_strength_in_cgs)
-from .veloxchemlib import get_dimer_ao_indices, parse_xc_func
+from .veloxchemlib import get_dimer_ao_indices, new_parse_xc_func
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .aodensitymatrix import AODensityMatrix
@@ -1158,7 +1158,7 @@ class ExcitonModelDriver:
         fock_mat = AOFockMatrix(dens_mat)
 
         if self.dft:
-            xcfun = parse_xc_func(self.xcfun_label.upper())
+            xcfun = new_parse_xc_func(self.xcfun_label.upper())
             if xcfun.is_hybrid():
                 fock_mat.set_fock_type(fockmat.restjkx, 0)
                 fock_mat.set_scale_factor(xcfun.get_frac_exact_exchange(), 0)
@@ -1177,10 +1177,6 @@ class ExcitonModelDriver:
         if self.dft:
             if not xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
-
-            dimer_molgrid.partition_grid_points()
-            dimer_molgrid.distribute_counts_and_displacements(
-                self.rank, self.nodes, self.comm)
 
             xc_drv = XCNewIntegrator(self.comm)
             vxc_mat = xc_drv.integrate_vxc_fock(dimer, basis, dens_mat,
@@ -1470,10 +1466,6 @@ class ExcitonModelDriver:
 
             dens_mat = dimer_prop['density']
             dimer_molgrid = dimer_prop['molgrid']
-
-            dimer_molgrid.partition_grid_points()
-            dimer_molgrid.distribute_counts_and_displacements(
-                self.rank, self.nodes, self.comm)
 
             xc_drv = XCNewIntegrator(self.comm)
             xc_drv.integrate_fxc_fock(tfock_mat, dimer, basis, tdens_mat,
