@@ -58,7 +58,7 @@ integrate_vxc_pdft(const CXCNewIntegrator&    self,
                    const py::array_t<double>& ActiveMOs,
                    const CMolecule&           molecule,
                    const CMolecularBasis&     basis,
-                   CMolecularGrid&            molecularGrid,
+                   const CMolecularGrid&      molecularGrid,
                    const std::string&         xcFuncLabel)
 {
     // Active2DM
@@ -81,9 +81,8 @@ integrate_vxc_pdft(const CXCNewIntegrator&    self,
 
     auto nActive = static_cast<int32_t>(Active2DM.shape(0));
 
-    bool same_size = ((Active2DM.shape(0) == Active2DM.shape(1)) &&
-                      (Active2DM.shape(0) == Active2DM.shape(2)) &&
-                      (Active2DM.shape(0) == Active2DM.shape(3)));
+    bool same_size =
+        ((Active2DM.shape(0) == Active2DM.shape(1)) && (Active2DM.shape(0) == Active2DM.shape(2)) && (Active2DM.shape(0) == Active2DM.shape(3)));
 
     std::string errsizes("integrate_vxc_pdft, Active2DM: Expecting 4 identical dimensions");
 
@@ -386,7 +385,7 @@ export_dft(py::module& m)
         .def("integrate_vxc_pdft", &integrate_vxc_pdft)
         .def(
             "compute_gto_values",
-            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, CMolecularGrid& molecularGrid)
+            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
                 -> py::array_t<double> {
                 auto gtovalues = self.computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
                 return vlx_general::pointer_to_numpy(gtovalues.values(), gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns());
@@ -397,8 +396,33 @@ export_dft(py::module& m)
             "molecularGrid"_a)
         .def(
             "compute_gto_values_and_derivatives",
-            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, CMolecularGrid& molecularGrid) -> py::list {
+            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> py::list {
                 auto     gtovaluesderivs = self.computeGtoValuesAndDerivativesOnGridPoints(molecule, basis, molecularGrid);
+                py::list ret;
+                for (int32_t i = 0; i < static_cast<int32_t>(gtovaluesderivs.size()); i++)
+                {
+                    ret.append(vlx_general::pointer_to_numpy(
+                        gtovaluesderivs[i].values(), gtovaluesderivs[i].getNumberOfRows(), gtovaluesderivs[i].getNumberOfColumns()));
+                }
+                return ret;
+            },
+            "Computes GTO values and derivatives on grid points.",
+            "molecule"_a,
+            "basis"_a,
+            "molecularGrid"_a)
+        .def(
+            "compute_gto_values_and_derivatives",
+            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const py::array_t<double>& points) -> py::list {
+                auto points_c_style = py::detail::check_flags(points.ptr(), py::array::c_style);
+                errors::assertMsgCritical(points_c_style,
+                                          std::string("compute_gto_values_and_derivatives_on_points: Expecting C-style contiguous numpy array"));
+                errors::assertMsgCritical(points.shape(0) == 3,
+                                          std::string("compute_gto_values_and_derivatives_on_points: Expecting numpy array of shape (3,N)"));
+                auto     npoints         = static_cast<int32_t>(points.shape(1));
+                auto     xcoords         = points.data();
+                auto     ycoords         = xcoords + npoints;
+                auto     zcoords         = ycoords + npoints;
+                auto     gtovaluesderivs = self.computeGtoValuesAndDerivativesOnGridPoints(molecule, basis, npoints, xcoords, ycoords, zcoords);
                 py::list ret;
                 for (int32_t i = 0; i < static_cast<int32_t>(gtovaluesderivs.size()); i++)
                 {
@@ -507,7 +531,7 @@ export_dft(py::module& m)
                const CMolecule&         molecule,
                const CMolecularBasis&   basis,
                const CAODensityMatrix&  gsDensityMatrix,
-               CMolecularGrid&          molecularGrid,
+               const CMolecularGrid&    molecularGrid,
                const std::string&       xcFuncLabel) -> py::array_t<double> {
                 auto molgrad = self.integrateVxcGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
@@ -525,7 +549,7 @@ export_dft(py::module& m)
                const CMolecularBasis&   basis,
                const CAODensityMatrix&  rwDensityMatrix,
                const CAODensityMatrix&  gsDensityMatrix,
-               CMolecularGrid&          molecularGrid,
+               const CMolecularGrid&    molecularGrid,
                const std::string&       xcFuncLabel) -> py::array_t<double> {
                 auto molgrad = self.integrateVxcGradient(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
@@ -545,7 +569,7 @@ export_dft(py::module& m)
                const CAODensityMatrix&  rwDensityMatrixOne,
                const CAODensityMatrix&  rwDensityMatrixTwo,
                const CAODensityMatrix&  gsDensityMatrix,
-               CMolecularGrid&          molecularGrid,
+               const CMolecularGrid&    molecularGrid,
                const std::string&       xcFuncLabel) -> py::array_t<double> {
                 auto molgrad =
                     self.integrateFxcGradient(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, xcFuncLabel);
@@ -567,7 +591,7 @@ export_dft(py::module& m)
                const CAODensityMatrix&  rwDensityMatrixOne,
                const CAODensityMatrix&  rwDensityMatrixTwo,
                const CAODensityMatrix&  gsDensityMatrix,
-               CMolecularGrid&          molecularGrid,
+               const CMolecularGrid&    molecularGrid,
                const std::string&       xcFuncLabel) -> py::array_t<double> {
                 auto molgrad =
                     self.integrateKxcGradient(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, xcFuncLabel);

@@ -4211,6 +4211,127 @@ CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&   
     return std::vector<CDenseMatrix>({allgtovalues, allgtoderivx, allgtoderivy, allgtoderivz});
 }
 
+std::vector<CDenseMatrix>
+CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                             const CMolecularBasis& basis,
+                                                             const int32_t          npoints,
+                                                             const double*          xcoords,
+                                                             const double*          ycoords,
+                                                             const double*          zcoords) const
+{
+    auto nthreads = omp_get_max_threads();
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // memory blocks for GTOs on grid points
+
+    CDenseMatrix allgtovalues(naos, npoints);
+
+    CDenseMatrix allgtoderivx(naos, npoints);
+    CDenseMatrix allgtoderivy(naos, npoints);
+    CDenseMatrix allgtoderivz(naos, npoints);
+
+    CMemBlock2D<double> gaos(npoints, naos);
+
+    CMemBlock2D<double> gaox(npoints, naos);
+    CMemBlock2D<double> gaoy(npoints, naos);
+    CMemBlock2D<double> gaoz(npoints, naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    {
+        auto gridblockpos = 0;
+
+        // dimension of grid box
+
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, _screeningThresholdForGTOValues, boxdim);  // 1st order GTO derivative
+
+        // GTO values on grid points
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+        }
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            auto gaox_nu = gaox.data(nu);
+            auto gaoy_nu = gaoy.data(nu);
+            auto gaoz_nu = gaoz.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            auto aoidx = aoinds[i];
+
+            std::memcpy(allgtovalues.row(aoidx) + gridblockpos, gaos.data(aoidx), npoints * sizeof(double));
+
+            std::memcpy(allgtoderivx.row(aoidx) + gridblockpos, gaox.data(aoidx), npoints * sizeof(double));
+            std::memcpy(allgtoderivy.row(aoidx) + gridblockpos, gaoy.data(aoidx), npoints * sizeof(double));
+            std::memcpy(allgtoderivz.row(aoidx) + gridblockpos, gaoz.data(aoidx), npoints * sizeof(double));
+        }
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    return std::vector<CDenseMatrix>({allgtovalues, allgtoderivx, allgtoderivy, allgtoderivz});
+}
+
 void
 CXCNewIntegrator::computeExcVxcForLDA(const std::string& xcFuncLabel,
                                       const int32_t      npoints,

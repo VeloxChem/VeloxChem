@@ -662,6 +662,24 @@ class CXCNewIntegrator
                                                                          const CMolecularGrid&  molecularGrid) const;
 
     /**
+     Computes GTOs values and derivatives on grid points.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param npoints the number of grid points.
+     @param xcoords the X coordinates of grid points.
+     @param ycoords the Y coordinates of grid points.
+     @param zcoords the Z coordinates of grid points.
+     @return the GTO values and derivatives on grid points.
+     */
+    std::vector<CDenseMatrix> computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                                         const CMolecularBasis& basis,
+                                                                         const int32_t          npoints,
+                                                                         const double*          xcoords,
+                                                                         const double*          ycoords,
+                                                                         const double*          zcoords) const;
+
+    /**
      Computes fucntional derivatives for LDA.
 
      @param xcFuncLabel the label of exchange-correlation functional.
