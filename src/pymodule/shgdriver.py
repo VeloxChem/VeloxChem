@@ -325,9 +325,11 @@ class ShgDriver(NonLinearSolver):
                 self.ostream.print_blank()
 
             title = 'Reference: '
-            title += 'K. Ahmadzadeh, X. Li, Z. Rinkevicius, P. Norman'
+            title += 'K. Ahmadzadeh, X. Li, Z. Rinkevicius, P. Norman,'
             self.ostream.print_header(title.ljust(width))
-            title = 'XXXXXXXX (2022)'
+            title = '           Electron. Struct. 2022, 4, 044004.'
+            self.ostream.print_header(title.ljust(width))
+            title = '           (DOI: 10.1088/2516-1075/aca859)'
             self.ostream.print_header(title.ljust(width))
             self.ostream.print_blank()
 
@@ -650,8 +652,7 @@ class ShgDriver(NonLinearSolver):
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                              'real_and_imag', dft_dict,
                                              first_order_dens,
-                                             second_order_dens, 'shg',
-                                             profiler)
+                                             second_order_dens, 'shg', profiler)
 
         time_end_fock = time.time()
 
