@@ -4,7 +4,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.gradientdriver import GradientDriver
 from veloxchem.tdhfgradientdriver import TdhfGradientDriver
@@ -37,7 +37,7 @@ class TestGrad:
    #     scf_drv.compute(molecule, basis)
 
    #     if tamm_dancoff:
-   #         rsp_solver = TDAExciDriver()
+   #         rsp_solver = TdaEigenSolver()
    #     else:
    #         rsp_solver = LinearResponseEigenSolver()
 

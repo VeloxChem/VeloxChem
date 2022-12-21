@@ -10,7 +10,7 @@ except ImportError:
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.tdaexcidriver import TDAExciDriver
+from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.tdaorbitalresponse import TdaOrbitalResponse
 from veloxchem.rpaorbitalresponse import RpaOrbitalResponse
@@ -40,7 +40,7 @@ class TestOrbitalResponse(unittest.TestCase):
         # Our references: lambda and omega in AO basis
 
         if is_tda:
-            tda_solver = TDAExciDriver(task.mpi_comm, task.ostream)
+            tda_solver = TdaEigenSolver(task.mpi_comm, task.ostream)
             tda_solver.update_settings({'nstates': 3},
                                        task.input_dict['method_settings'])
             rsp_results = tda_solver.compute(task.molecule, task.ao_basis,
