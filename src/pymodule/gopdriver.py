@@ -33,8 +33,8 @@ from .veloxchemlib import bohr_in_angstroms, hartree_in_kcalpermol
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .treeblock import TreeBlock
-from .xtbdriver import XTBDriver
-from .xtbgradientdriver import XTBGradientDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
 from .inputparser import parse_input
 
@@ -179,11 +179,11 @@ class GlobalOptimizationDriver:
             self.ostream.print_header(len(cur_str) * '=')
             self.ostream.print_blank()
 
-            xtb_drv = XTBDriver(self.comm)
+            xtb_drv = XtbDriver(self.comm)
             xtb_drv.set_method('gfn2')
 
             fname = filename + '.conformer.{:d}'.format(i)
-            grad_drv = XTBGradientDriver(xtb_drv, self.comm, self.ostream)
+            grad_drv = XtbGradientDriver(xtb_drv, self.comm, self.ostream)
             opt_drv = OptimizationDriver(fname, grad_drv, 'XTB')
             opt_drv.update_settings(opt_dict)
             mol = opt_drv.compute(confgeom)
@@ -245,9 +245,9 @@ class GlobalOptimizationDriver:
                             'conv_dmax': 8.0e-1,
                             'coordsys': 'cart'
                         }
-                        xtb_drv = XTBDriver(self.comm)
+                        xtb_drv = XtbDriver(self.comm)
                         xtb_drv.set_method('gfn2')
-                        grad_drv = XTBGradientDriver(xtb_drv, self.comm,
+                        grad_drv = XtbGradientDriver(xtb_drv, self.comm,
                                                      self.ostream)
                         fname = filename + '.partial.optimization.{:d}'.format(
                             i)

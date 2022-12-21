@@ -6,7 +6,7 @@ from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCNewIntegrator as XCIntegrator
 from .orbitalresponse import OrbitalResponse
 from .qqscheme import get_qq_scheme
 

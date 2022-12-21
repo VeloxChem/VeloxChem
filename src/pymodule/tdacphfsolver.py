@@ -6,7 +6,7 @@ from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCNewIntegrator as XCIntegrator
 from .cphfsolver import CphfSolver
 from .qqscheme import get_qq_scheme
 from .inputparser import parse_seq_fixed

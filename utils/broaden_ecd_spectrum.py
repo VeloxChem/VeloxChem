@@ -35,7 +35,7 @@ def lorentzian_ecd_ev(exc_ene,
     if e_max is None:
         e_max = np.max(exc_ene) + 0.01
 
-    x_i = np.arange(e_min, e_max + e_step / 100.0, e_step, dtype=np.float64)
+    x_i = np.arange(e_min, e_max + e_step / 100.0, e_step, dtype='float64')
     y_i = np.zeros_like(x_i)
 
     extinction_coefficient_from_beta = 19.6036975758
@@ -87,7 +87,7 @@ def lorentzian_ecd_nm(exc_ene,
     if w_max is None:
         w_max = int(hartree_nm / np.min(exc_ene)) + 75
 
-    w_i = np.arange(w_min, w_max + w_step / 100.0, w_step, dtype=np.float64)
+    w_i = np.arange(w_min, w_max + w_step / 100.0, w_step, dtype='float64')
     x_i = hartree_nm / w_i
     y_i = np.zeros_like(x_i)
 

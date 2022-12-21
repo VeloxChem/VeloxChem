@@ -61,9 +61,9 @@ from .tdhfhessiandriver import TdhfHessianDriver
 from .cphfsolver import CphfSolver
 from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
-from .xtbdriver import XTBDriver
-from .xtbgradientdriver import XTBGradientDriver
-from .xtbhessiandriver import XTBHessianDriver
+from .xtbdriver import XtbDriver
+from .xtbgradientdriver import XtbGradientDriver
+from .xtbhessiandriver import XtbHessianDriver
 from .veloxchemlib import DiagEriDriver
 from .cli import cli
 from .errorhandler import assert_msg_critical
@@ -331,11 +331,11 @@ def main():
 
         if use_xtb:
             if 'potfile' in method_dict:
-                errmsg = 'XTBDriver: The \'potfile\' keyword is not supported '
+                errmsg = 'XtbDriver: The \'potfile\' keyword is not supported '
                 errmsg += 'in XTB calculation.'
                 if task.mpi_rank == mpi_master():
                     assert_msg_critical(False, errmsg)
-            xtb_drv = XTBDriver(task.mpi_comm)
+            xtb_drv = XtbDriver(task.mpi_comm)
             xtb_drv.set_method(method_dict['xtb'].lower())
             xtb_drv.compute(task.molecule, task.ostream)
         else:
@@ -365,7 +365,7 @@ def main():
 
     if task_type == 'gradient':
         if use_xtb:
-            grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
+            grad_drv = XtbGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule)
         elif scf_drv.scf_type == 'restricted':
             if 'gradient' in task.input_dict:
@@ -382,7 +382,7 @@ def main():
         hessian_dict = (task.input_dict['hessian']
                         if 'hessian' in task.input_dict else {})
         if use_xtb:
-            hessian_drv = XTBHessianDriver(xtb_drv, task.mpi_comm, task.ostream)
+            hessian_drv = XtbHessianDriver(xtb_drv, task.mpi_comm, task.ostream)
             hessian_drv.update_settings(method_dict, hessian_dict)
             hessian_drv.compute(task.molecule)
 
@@ -409,7 +409,7 @@ def main():
         opt_dict['filename'] = task.input_dict['filename']
 
         if use_xtb:
-            grad_drv = XTBGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
+            grad_drv = XtbGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
             opt_drv = OptimizationDriver(grad_drv)
             opt_drv.update_settings(opt_dict)
             opt_drv.compute(task.molecule)

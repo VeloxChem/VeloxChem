@@ -762,7 +762,7 @@ class RespChargesDriver:
         labels = molecule.get_labels()
         covalent_radii = molecule.covalent_radii_to_numpy()
 
-        connectivity = np.full((n_atoms, n_atoms), False, dtype=bool)
+        connectivity = np.full((n_atoms, n_atoms), False, dtype='bool')
 
         # connect atoms with distances close to sum of covalent radii with
         # tolerance of 0.4 Angstrom

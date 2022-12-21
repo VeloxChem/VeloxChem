@@ -182,7 +182,7 @@ class ScfHessianDriver(HessianDriver):
             self.compute_analytical(molecule, ao_basis, min_basis, profiler)
 
         # print Hessian
-        if self.do_print_hessian is True:
+        if self.do_print_hessian:
             self.print_geometry(molecule)
             self.ostream.print_blank()
             self.print_hessian(molecule)

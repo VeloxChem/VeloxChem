@@ -1320,7 +1320,7 @@ class ScfDriver:
 
         if self.use_split_comm and not self._first_step:
             vxc_mat, e_pe, V_pe = self._comp_2e_fock_split_comm(
-                fock_mat, den_mat, molecule, basis, screening, e_grad)
+                fock_mat, den_mat, molecule, basis, screening, e_grad, profiler)
 
         else:
             vxc_mat, e_pe, V_pe = self._comp_2e_fock_single_comm(
@@ -1415,7 +1415,8 @@ class ScfDriver:
                                  molecule,
                                  basis,
                                  screening,
-                                 e_grad=None):
+                                 e_grad=None,
+                                 profiler=None):
         """
         Computes Fock/Kohn-Sham matrix on split communicators.
 
@@ -1431,6 +1432,8 @@ class ScfDriver:
             The screening container object.
         :param e_grad:
             The electronic gradient.
+        :param profiler:
+            The profiler.
 
         :return:
             The AO Kohn-Sham (Vxc) matrix.
@@ -1530,6 +1533,9 @@ class ScfDriver:
             self._pe_summary = ''
 
         dt = tm.time() - t0
+
+        if self.timing:
+            profiler.add_timing_info('FockBuild', dt)
 
         # collect Vxc to master node
         if self._dft:

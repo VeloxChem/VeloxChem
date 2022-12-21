@@ -850,7 +850,7 @@ class LinearSolver:
 
         if self.use_split_comm:
             self._comp_lr_fock_split_comm(fock, dens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict)
+                                          dft_dict, pe_dict, profiler)
 
         else:
             t0 = tm.time()
@@ -889,8 +889,15 @@ class LinearSolver:
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
-    def _comp_lr_fock_split_comm(self, fock, dens, molecule, basis, eri_dict,
-                                 dft_dict, pe_dict):
+    def _comp_lr_fock_split_comm(self,
+                                 fock,
+                                 dens,
+                                 molecule,
+                                 basis,
+                                 eri_dict,
+                                 dft_dict,
+                                 pe_dict,
+                                 profiler=None):
         """
         Computes linear response Fock/Fxc matrix on split communicators.
 
@@ -908,6 +915,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
+        :param profiler:
+            The profiler.
         """
 
         molgrid = dft_dict['molgrid']
@@ -999,6 +1008,9 @@ class LinearSolver:
                     fock.add_matrix(DenseMatrix(V_pe), ifock)
 
         dt = tm.time() - t0
+
+        if profiler is not None:
+            profiler.add_timing_info('FockBuild', dt)
 
         # collect Fock on master node
         fock.reduce_sum(self.rank, self.nodes, self.comm)
@@ -2004,6 +2016,21 @@ class LinearSolver:
         return filenames
 
     def get_excitation_details(self, eigvec, nocc, nvir, coef_thresh=0.2):
+        """
+        Get excitation details.
+
+        :param eigvec:
+            The eigenvectors.
+        :param nocc:
+            The number of occupied molecular orbitals.
+        :param nvir:
+            The number of virtual molecular orbitals.
+        :param coef_thresh:
+            The threshold for including transitions.
+
+        :return:
+            The excitation details as a list of strings.
+        """
 
         n_ov = nocc * nvir
         assert_msg_critical(

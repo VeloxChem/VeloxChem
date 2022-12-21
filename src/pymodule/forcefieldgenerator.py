@@ -1272,7 +1272,7 @@ class ForceFieldGenerator:
         n_atoms = self.molecule.number_of_atoms()
         covalent_radii = self.molecule.covalent_radii_to_numpy()
 
-        connectivity = np.full((n_atoms, n_atoms), False, dtype=bool)
+        connectivity = np.full((n_atoms, n_atoms), False, dtype='bool')
         tolerance = 0.4 / bohr_in_angstroms()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):

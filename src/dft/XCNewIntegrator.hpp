@@ -32,6 +32,7 @@
 #include "AODensityMatrix.hpp"
 #include "AOFockMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
+#include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGridQuad.hpp"
 #include "GridBox.hpp"
@@ -46,6 +47,7 @@
 #include "XCGradientGrid.hpp"
 #include "XCHessianGrid.hpp"
 #include "XCNewFunctional.hpp"
+#include "XCPairDensityFunctional.hpp"
 
 /**
  Class CXCNewIntegrator implements XC integrator.
@@ -80,7 +82,7 @@ class CXCNewIntegrator
     double _screeningThresholdForDensityValues;
 
     /**
-     Integrates first-order LDA exchnage-correlation functional contribution to
+     Integrates first-order LDA exchange-correlation functional contribution to
      AO Kohn-Sham matrix.
 
      @param molecule the molecule.
@@ -99,7 +101,7 @@ class CXCNewIntegrator
                                               const std::string&      flag=std::string("closedshell")) const;
 
     /**
-     Integrates first-order GGA exchnage-correlation functional contribution to
+     Integrates first-order GGA exchange-correlation functional contribution to
      AO Kohn-Sham matrix.
 
      @param molecule the molecule.
@@ -118,7 +120,7 @@ class CXCNewIntegrator
                                               const std::string&      flag=std::string("closedshell")) const;
 
     /**
-     Integrates second-order LDA exchnage-correlation functional contribution
+     Integrates second-order LDA exchange-correlation functional contribution
      to AO Fock matrix.
 
      @param aoFockMatrix the AO Fock matrix.
@@ -138,7 +140,7 @@ class CXCNewIntegrator
                                  const CXCNewFunctional& xcFunctional) const;
 
     /**
-     Integrates second-order GGA exchnage-correlation functional contribution
+     Integrates second-order GGA exchange-correlation functional contribution
      to AO Fock matrix.
 
      @param aoFockMatrix the AO Fock matrix.
@@ -158,7 +160,7 @@ class CXCNewIntegrator
                                  const CXCNewFunctional& xcFunctional) const;
 
     /**
-     Integrates third-order LDA exchnage-correlation functional contribution
+     Integrates third-order LDA exchange-correlation functional contribution
      to AO Fock matrix.
 
      @param aoFockMatrix the AO Fock matrix.
@@ -182,7 +184,7 @@ class CXCNewIntegrator
                                  const std::string&      quadMode) const;
 
     /**
-     Integrates third-order GGA exchnage-correlation functional contribution
+     Integrates third-order GGA exchange-correlation functional contribution
      to AO Fock matrix.
 
      @param aoFockMatrix the AO Fock matrix.
@@ -204,6 +206,54 @@ class CXCNewIntegrator
                                  const CMolecularGrid&   molecularGrid,
                                  const CXCFunctional&    xcFunctional,
                                  const std::string&      quadMode) const;
+
+    /**
+     Integrates first-order LDA pair-density functional contribution to
+     AO Kohn-Sham matrix and MO "Q-matrix".
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param moTwoBodyGradient the MO Two-body energy gradient term.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param DensityMatrix the AO density matrix object.
+     @param TwoBodyDensityMatrix the MO two-body active density matrix.
+     @param ActiveMOs the active molecular orbitals.
+     @param molecularGrid the molecular grid.
+     @param fvxc the exchange-correlation functional.
+     */
+     void _integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
+                                  CDense4DTensor&                 moTwoBodyGradient,
+                                  const CMolecule&                molecule,
+                                  const CMolecularBasis&          basis,
+                                  const CAODensityMatrix&         DensityMatrix,
+                                  const CDense4DTensor&           TwoBodyDensityMatrix,
+                                  const CDenseMatrix&             ActiveMOs,
+                                  const CMolecularGrid&           molecularGrid,
+                                  const CXCPairDensityFunctional& fvxc) const;
+
+    /**
+     Integrates first-order GGA pair-density functional contribution to
+     AO Kohn-Sham matrix and MO "Q-matrix".
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param moTwoBodyGradient the MO Two-body energy gradient term.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param DensityMatrix the AO density matrix object.
+     @param TwoBodyDensityMatrix the MO two-body active density matrix.
+     @param ActiveMOs the active molecular orbitals.
+     @param molecularGrid the molecular grid.
+     @param fvxc the exchange-correlation functional.
+     */
+     void _integrateVxcPDFTForGGA(CAOKohnShamMatrix&      aoFockMatrix,
+                                  CDense4DTensor&         moTwoBodyGradient,
+                                  const CMolecule&        molecule,
+                                  const CMolecularBasis&  basis,
+                                  const CAODensityMatrix& DensityMatrix,
+                                  const CDense4DTensor&   TwoBodyDensityMatrix,
+                                  const CDenseMatrix&     ActiveMOs,
+                                  const CMolecularGrid&   molecularGrid,
+                                  const CXCNewFunctional& fvxc) const;
 
     /**
      Integrates LDA contribution to (first-order) Vxc matrix.
@@ -408,7 +458,7 @@ class CXCNewIntegrator
     CXCNewIntegrator(MPI_Comm comm);
 
     /**
-     Integrates first-order exchnage-correlation functional contribution to AO
+     Integrates first-order exchange-correlation functional contribution to AO
      Kohn-Sham matrix.
 
      @param molecule the molecule.
@@ -425,7 +475,7 @@ class CXCNewIntegrator
                                        const std::string&      xcFuncLabel) const;
 
     /**
-     Integrates second-order exchnage-correlation functional contribution to AO
+     Integrates second-order exchange-correlation functional contribution to AO
      Fock matrix.
 
      @param aoFockMatrix the AO Fock matrix.
@@ -445,7 +495,7 @@ class CXCNewIntegrator
                           const std::string&      xcFuncLabel) const;
 
     /**
-     Integrates third-order exchnage-correlation functional contribution to AO
+     Integrates third-order exchange-correlation functional contribution to AO
      Fock matrix in quadratic response.
 
      @param aoFockMatrix the AO Fock matrix.
@@ -467,6 +517,30 @@ class CXCNewIntegrator
                           CMolecularGrid&         molecularGrid,
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const;
+
+    /**
+     Integrates first-order pair-density functional contribution to AO
+     Fock matrix and MO "Q-matrix".
+
+     @param aoFockMatrix the AO Fock matrix.
+     @param moTwoBodyGradient the MO Two-body energy gradient term.
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix object.
+     @param TwoBodyDensityMatrix the MO two-body active density matrix.
+     @param ActiveMOs the active molecular orbitals.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     */
+    void integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
+                          CDense4DTensor&         moTwoBodyGradient,
+                          const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& DensityMatrix,
+                          const CDense4DTensor&   TwoBodyDensityMatrix,
+                          const CDenseMatrix&     ActiveMOs,
+                          CMolecularGrid&         molecularGrid,
+                          const std::string&      xcFuncLabel) const;
 
     /**
      Computes GTOs values on grid points.

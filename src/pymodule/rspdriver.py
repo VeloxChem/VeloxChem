@@ -27,10 +27,10 @@ from .cppsolver import ComplexResponse
 from .lrsolver import LinearResponseSolver
 from .lreigensolver import LinearResponseEigenSolver
 from .c6driver import C6Driver
-from .tdaexcidriver import TDAExciDriver
-from .tpafulldriver import TPAFullDriver
-from .tpareddriver import TPAReducedDriver
-from .shgdriver import SHGDriver
+from .tdaeigensolver import TdaEigenSolver
+from .tpafulldriver import TpaFullDriver
+from .tpareddriver import TpaReducedDriver
+from .shgdriver import ShgDriver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
 from .errorhandler import assert_msg_critical
@@ -128,7 +128,7 @@ class ResponseDriver:
                 self._rsp_dict['residue'] == 'single' and
                 self._rsp_dict['complex'] == 'no'):
             if self.tamm_dancoff:
-                self._solver = TDAExciDriver(self.comm, self.ostream)
+                self._solver = TdaEigenSolver(self.comm, self.ostream)
             else:
                 self._solver = LinearResponseEigenSolver(
                     self.comm, self.ostream)
@@ -159,17 +159,17 @@ class ResponseDriver:
         # SHG
         if (self._rsp_dict['order'] == 'quadratic' and
                 self._rsp_dict['complex'] == 'yes'):
-            self._solver = SHGDriver(self.comm, self.ostream)
+            self._solver = ShgDriver(self.comm, self.ostream)
 
         # TPA
         elif (self._rsp_dict['order'] == 'cubic' and
               self._rsp_dict['complex'] == 'yes'):
             if ('tpa_type' not in self._rsp_dict or
                     self._rsp_dict['tpa_type'].lower() == 'full'):
-                self._solver = TPAFullDriver(self.comm, self.ostream)
+                self._solver = TpaFullDriver(self.comm, self.ostream)
             elif ('tpa_type' in self._rsp_dict and
                   self._rsp_dict['tpa_type'].lower() == 'reduced'):
-                self._solver = TPAReducedDriver(self.comm, self.ostream)
+                self._solver = TpaReducedDriver(self.comm, self.ostream)
             self._solver._input_keywords['response'].update({
                 'tpa_type': ('str_lower', 'full or reduced TPA calculation'),
             })

@@ -9,7 +9,7 @@ from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCNewIntegrator as XCIntegrator
 from .veloxchemlib import XCFunctional
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import parse_xc_func

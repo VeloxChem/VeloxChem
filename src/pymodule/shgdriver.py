@@ -45,11 +45,11 @@ from .checkpoint import write_distributed_focks
 from .inputparser import parse_input
 from pathlib import Path
 from .veloxchemlib import XCFunctional
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCNewIntegrator as XCIntegrator
 from .veloxchemlib import parse_xc_func
 
 
-class SHGDriver(NonLinearSolver):
+class ShgDriver(NonLinearSolver):
     """
     Implements a quadratic response driver for SHG calculations
 

@@ -8,7 +8,7 @@ from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import XCIntegrator, XCNewIntegrator
+from .veloxchemlib import XCNewIntegrator as XCIntegrator, XCNewIntegrator
 from .cphfsolver import CphfSolver
 from .qqscheme import get_qq_scheme
 from .molecule import Molecule

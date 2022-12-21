@@ -11,7 +11,7 @@ from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import GridDriver
 from .veloxchemlib import XCFunctional
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCNewIntegrator as XCIntegrator
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import parse_xc_func
 from .profiler import Profiler

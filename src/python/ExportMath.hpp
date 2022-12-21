@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "DenseMatrix.hpp"
+#include "Dense4DTensor.hpp"
 
 namespace py = pybind11;
 
@@ -44,6 +45,14 @@ namespace vlx_math {  // vlx_math namespace
  @return a CDenseMatrix object.
  */
 std::shared_ptr<CDenseMatrix> CDenseMatrix_from_numpy(const py::array_t<double>& arr);
+
+/**
+ Converts numpy array to CDense4DTensor
+
+ @param arr the numpy array.
+ @return a CDense4DTensor object.
+ */
+std::shared_ptr<CDense4DTensor> CDense4DTensor_from_numpy(const py::array_t<double>& arr);
 
 /**
  Exports classes/functions in src/math to python.
