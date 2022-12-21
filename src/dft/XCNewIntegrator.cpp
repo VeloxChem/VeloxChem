@@ -4534,7 +4534,7 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t           npoint
 
                 // first-order
                 double x = vsigma_c + 2.0 * vsigma_a;
-                // second-order gga
+                // second-order 
                 double rr = v2rho2_aa + v2rho2_ab;
                 double rx = 2.0*v2rhosigma_ac + 2.0*v2rhosigma_ab + 2.0*v2rhosigma_aa;
                 double rt = v2rhotau_aa + v2rhotau_ab;

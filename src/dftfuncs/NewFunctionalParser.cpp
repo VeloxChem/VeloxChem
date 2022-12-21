@@ -35,7 +35,7 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN_RPA", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE0", "TPSS", "PKZB","BP86"});
+    return std::vector<std::string>({"SLATER", "VWN_RPA", "BECKE88", "LYP", "SLDA", "B88X", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE0", "TPSS", "PKZB","BP86","M11L","SCAN"});
 }
 
 CXCNewFunctional
@@ -103,6 +103,14 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         // PKZB
 
         if (fstr::upcase(xcLabel) == "PKZB") return CXCNewFunctional("PKZB", {"MGGA_X_PKZB", "MGGA_C_PKZB"}, {1.0, 1.0});
+
+        // M11L
+
+        if(fstr::upcase(xcLabel) == "M11L") return CXCNewFunctional("M11L",{"MGGA_X_M11_L","MGGA_C_M11_L" },{1.0,1.0});
+
+        // SCAN
+
+        if(fstr::upcase(xcLabel) == "SCAN") return CXCNewFunctional("SCAN",{"MGGA_X_SCAN","MGGA_C_SCAN" },{1.0,1.0});
 
         // PKZB exchange functional
         // if (fstr::upcase(xcLabel) == "PKZB") return ...
