@@ -47,6 +47,16 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
     double mus2r = mu * pow(1.0 / 12 * std::pow( 6.0 /mathconst::getPiValue(), 2.0/ 3.0 ), 2) / R;
 
+    //Translation parameters
+
+    double transR0 = 0.01;
+
+    double transgrad_A = 156250000;
+
+    double transgrad_B = -56250;
+
+    double transgrad_C = 14.0625;
+
     for (int32_t g = 0; g < np; g++)
     {
         double density = rho[2 * g + 0];
@@ -71,43 +81,95 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double rho13 = std::pow(density, onethird);
 
-        double delta = 0.0;
+        double delta;
 
-        if (pair_density < 0)
+        if (pair_density <= 0)
         {
             delta = sqrt(-2.0 * pair_density);
+        }
+        else
+        {
+            delta = sqrt(2.0 * pair_density);
         }
 
         double zeta = delta / density;
 
-        double rhoa = 0.5*(density + delta);
+        double zeta2 = zeta*zeta; //This is really the absolute value
 
-        double rhob = 0.5*(density - delta);
+        double invdelta;
 
-        double Fxc_a = 0.0 ; 
-
-        double Fxc_b = 0.0 ; 
-
-        if (delta != 0.0)
+        if (zeta2 < transR0)
         {
-            double grada2 = 0.25 * (sigma[3 * g + 0] - 2.0 * sigma[3 * g + 1]/delta + sigma[3 * g + 2]/delta2);
+           invdelta = (transgrad_A * std::pow(zeta2, 4.0) + transgrad_B * std::pow(zeta2, 2.0) + transgrad_C) / density;
+        }
+        else
+        {
+            invdelta = 1.0 / delta;
+        }
 
-            double gradb2 = 0.25 * (sigma[3 * g + 0] + 2.0 * sigma[3 * g + 1]/delta + sigma[3 * g + 2]/delta2);
+        double gradR = 0.25 * (sigma[3 * g + 0] + sigma[3 * g + 2] * invdelta * invdelta);
 
+        double gradI = 0.5 * sigma[3 * g + 1] * invdelta;
 
-            Fxc_a = R/(1.0 + mus2r * grada2/pow(rhoa,2.666666666666667)); 
+        double f_zeta;
+
+        double fg_zeta;
+
+        // Real case
+        if (pair_density <= 0)
+        {
+            double fa = pow(1.0 + zeta, fourthird);
+
+            double fb = pow(std::max(1.0 - zeta,0.0), fourthird);
+
+            f_zeta = (fa + fb) * (1.0 + R);
+
+            double rhoa = 0.5*(density + delta);
+
+            double rhob = 0.5*(density - delta);
+
+            double grada2 = gradR - gradI;
+
+            double gradb2 = gradR + gradI;
+
+            double Fxc_a = R/(1.0 + mus2r * grada2/pow(rhoa,2.666666666666667));
+
+            double Fxc_b = 0.0;
 
             if (rhob > 1.0e-12)
             {
                 Fxc_b = R/(1.0 + mus2r * gradb2/pow(rhob,2.666666666666667));
             }
+
+            fg_zeta = fa * Fxc_a + fb * Fxc_b;
+        }
+        // Imaginary case
+        else
+        {
+            double r = sqrt(1.0 + zeta2);
+
+            double theta = 4.0 / 3.0 * std::atan(zeta);
+
+            f_zeta = 2.0 * std::pow(r, 4.0 / 3.0) * std::cos(theta) * (1.0 + R);
+
+            double rho83 = std::pow (density, 8.0 / 3.0);
+
+            double denom_R = rho83 * std::pow(0.5 * r, 8.0 / 3.0) * std::cos(2.0 * theta) + mus2r * gradR;
+
+            double denom_I = rho83 * std::pow(0.5 * r, 8.0 / 3.0) * std::sin(2.0 * theta) + mus2r * gradI;
+
+            double r_denom = sqrt( denom_R * denom_R + denom_I * denom_I);
+
+            double theta_denom = std::atan2(denom_I, denom_R);
+
+            double r_final = std::pow(0.5, 8.0 / 3.0) * std::pow(r, 4.0) / r_denom;
+
+            double theta_final = 2.0 * theta - theta_denom;
+
+            fg_zeta = 2.0 * R * rho83 * r_final * std::cos(theta_final);
         }
 
-        double fa = pow(1.0 + zeta, fourthird)*(1.0 + R - Fxc_a);
-
-        double fb = pow(std::max(1.0 - zeta,0.0), fourthird)*(1.0 + R - Fxc_b);
-
-        exc[g] = 0.5 * frg * rho13 * (fa + fb);
+        exc[g] = 0.5 * frg * rho13 * (f_zeta - fg_zeta);
 
         vrho[2 * g + 0] = 0.0;
         vrho[2 * g + 1] = 0.0;

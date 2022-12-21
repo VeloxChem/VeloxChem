@@ -704,7 +704,13 @@ generatePairDensityForLDA(double*               rho,
 
     auto mat_F = denblas::multAB(densityMatrix, gtoValues);
 
-    auto MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+    auto n_active = activeMOs.getNumberOfRows();
+
+    CDenseMatrix MOs_on_grid;
+    if (n_active > 0)
+    {
+        MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+    }
 
     timer.stop("Density grid matmul");
 
@@ -713,8 +719,6 @@ generatePairDensityForLDA(double*               rho,
     timer.start("Density grid rho");
 
     auto naos = gtoValues.getNumberOfRows();
-
-    auto n_active = activeMOs.getNumberOfRows();
 
     auto nthreads = omp_get_max_threads();
 
@@ -816,11 +820,22 @@ generatePairDensityForGGA(double*               rho,
 
     auto mat_F = denblas::multAB(symmetricDensityMatrix, gtoValues);
 
-    auto MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+    auto n_active = activeMOs.getNumberOfRows();
 
-    auto MOs_on_gridX = denblas::multAB(activeMOs, gtoValuesX);
-    auto MOs_on_gridY = denblas::multAB(activeMOs, gtoValuesY);
-    auto MOs_on_gridZ = denblas::multAB(activeMOs, gtoValuesZ);
+    CDenseMatrix MOs_on_grid;
+
+    CDenseMatrix MOs_on_gridX;
+    CDenseMatrix MOs_on_gridY;
+    CDenseMatrix MOs_on_gridZ;
+
+    if (n_active > 0)
+    {
+        MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+
+        MOs_on_gridX = denblas::multAB(activeMOs, gtoValuesX);
+        MOs_on_gridY = denblas::multAB(activeMOs, gtoValuesY);
+        MOs_on_gridZ = denblas::multAB(activeMOs, gtoValuesZ);
+    }
 
     timer.stop("Density grid matmul");
 
@@ -829,8 +844,6 @@ generatePairDensityForGGA(double*               rho,
     timer.start("Density grid rho");
 
     auto naos = gtoValues.getNumberOfRows();
-
-    auto n_active = activeMOs.getNumberOfRows();
 
     auto nthreads = omp_get_max_threads();
 
