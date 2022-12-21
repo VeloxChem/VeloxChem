@@ -425,6 +425,38 @@ class CXCNewFunctional
                                   double*       vlapl,
                                   double*       vtau) const -> void;
 
+
+
+    /**@{ metaGGA computational functions. These are wrappers around `xc_mgga_*` functions in LibXC. */
+    /** Computes values and first derivative of metaGGA exchange-correlation functional on grid.
+     *
+     * @param[in] np number of grid points.
+     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
+     * @param[in] sigma values of the contracted gradient of density at grid points. Order: [(0, 0), (0, 1), (1, 1)].
+     * @param[in] lapl values of the density Laplacian at grid points. Order: [(0), (1)].
+     * @param[in] tau values of the kinetic energy density at grid points. Order: [(0), (1)].
+     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
+     * @param[in,out] vrho values of the first derivative of the
+     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
+     * @param[in,out] vsigma values of the first derivative of the
+     * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
+     * @param[in,out] vlapl values of the first derivative of the
+     * exchange-correlation kernel wrt density Laplacian. Size: 2*np, order: [(0), (1)].
+     * @param[in,out] vtau alues of the first derivative of the
+     * exchange-correlation kernel wrt kinetic energy density. Size: 2*np, order: [(0), (1)].
+     *
+     * @note Wrapper to `xc_lda_exc_vxc`, `xc_gga_exc_vxc` and `xc_mgga_exc_vxc`
+     */
+    auto compute_vxc_for_mgga(int32_t       np,
+                                  const double* rho,
+                                  const double* sigma,
+                                  const double* lapl,
+                                  const double* tau,
+                                  double*       vrho,
+                                  double*       vsigma,
+                                  double*       vlapl,
+                                  double*       vtau) const -> void;
+
     /** Computes second derivative of metaGGA exchange-correlation functional on grid.
      *
      * @param[in] np number of grid points.

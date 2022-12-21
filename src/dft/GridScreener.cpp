@@ -206,6 +206,136 @@ screenFxcFockForGGA(double*               rho,
 }
 
 void
+screenFxcFockForMGGA(double*                rho, 
+                    double*                sigma, 
+                    double*                lapl, 
+                    double*                tau,
+                    double*                v2rho2, 
+                    double*                v2rhosigma,
+                    double*                v2rholapl,
+                    double*                v2rhotau,
+                    double*                v2sigma2,
+                    double*                v2sigmalapl,
+                    double*                v2sigmatau,
+                    double*                v2lapl2,
+                    double*                v2lapltau,
+                    double*                v2tau2,
+                    const int32_t         npoints,
+                    const double          densityThreshold)
+{
+
+    double densityThresholdSquared = densityThreshold * densityThreshold;
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        // rho_a and sigma_aa tau_a lap_a
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(lapl[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
+        {
+            v2rho2[3 * g + 0] = 0.0;
+            v2rho2[3 * g + 1] = 0.0;
+
+            v2rholapl[4 * g + 0] = 0.0;
+            v2rholapl[4 * g + 1] = 0.0;
+            v2rholapl[4 * g + 2] = 0.0;
+
+            v2rhotau[4 * g + 0] = 0.0;
+            v2rhotau[4 * g + 1] = 0.0;
+            v2rhotau[4 * g + 2] = 0.0;
+
+            v2lapl2[3 * g + 0] = 0.0;
+            v2lapl2[3 * g + 1] = 0.0;
+
+            v2lapltau[4 * g + 0] = 0.0;
+            v2lapltau[4 * g + 1] = 0.0;
+            v2lapltau[4 * g + 2] = 0.0;
+
+            v2tau2[3 * g + 0] = 0.0;
+            v2tau2[3 * g + 1] = 0.0;
+
+            v2sigmalapl[6 * g + 0] = 0.0;
+            v2sigmalapl[6 * g + 1] = 0.0;
+            v2sigmalapl[6 * g + 2] = 0.0;
+            v2sigmalapl[6 * g + 3] = 0.0;
+            v2sigmalapl[6 * g + 4] = 0.0;
+
+            v2sigmatau[6 * g + 0] = 0.0;
+            v2sigmatau[6 * g + 1] = 0.0;
+            v2sigmatau[6 * g + 2] = 0.0;
+            v2sigmatau[6 * g + 3] = 0.0;
+            v2sigmatau[6 * g + 4] = 0.0;
+
+            v2rhosigma[6 * g + 0] = 0.0;
+            v2rhosigma[6 * g + 1] = 0.0;
+            v2rhosigma[6 * g + 2] = 0.0;
+            v2rhosigma[6 * g + 3] = 0.0;
+            v2rhosigma[6 * g + 4] = 0.0;
+
+            v2sigma2[6 * g + 0] = 0.0;
+            v2sigma2[6 * g + 1] = 0.0;
+            v2sigma2[6 * g + 2] = 0.0;
+            v2sigma2[6 * g + 3] = 0.0;
+            v2sigma2[6 * g + 4] = 0.0;
+
+        }
+
+        // rho_b and sigma_bb tau_b lap_b
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(lapl[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
+        {
+            v2rho2[3 * g + 1] = 0.0;
+            v2rho2[3 * g + 2] = 0.0;
+
+            v2lapl2[3 * g + 1] = 0.0;
+            v2lapl2[3 * g + 2] = 0.0;
+
+            v2tau2[3 * g + 1] = 0.0;
+            v2tau2[3 * g + 2] = 0.0;
+
+            v2rholapl[4 * g + 1] = 0.0;
+            v2rholapl[4 * g + 2] = 0.0;
+            v2rholapl[4 * g + 3] = 0.0;
+
+            v2rhotau[4 * g + 1] = 0.0;
+            v2rhotau[4 * g + 2] = 0.0;
+            v2rhotau[4 * g + 3] = 0.0;
+
+            v2lapltau[4 * g + 1] = 0.0;
+            v2lapltau[4 * g + 2] = 0.0;
+            v2lapltau[4 * g + 3] = 0.0;
+
+            v2sigmalapl[6 * g + 1] = 0.0;
+            v2sigmalapl[6 * g + 2] = 0.0;
+            v2sigmalapl[6 * g + 3] = 0.0;
+            v2sigmalapl[6 * g + 4] = 0.0;
+            v2sigmalapl[6 * g + 5] = 0.0;
+
+            v2sigmatau[6 * g + 1] = 0.0;
+            v2sigmatau[6 * g + 2] = 0.0;
+            v2sigmatau[6 * g + 3] = 0.0;
+            v2sigmatau[6 * g + 4] = 0.0;
+            v2sigmatau[6 * g + 5] = 0.0;
+
+            v2rhosigma[6 * g + 1] = 0.0;
+            v2rhosigma[6 * g + 2] = 0.0;
+            v2rhosigma[6 * g + 3] = 0.0;
+            v2rhosigma[6 * g + 4] = 0.0;
+            v2rhosigma[6 * g + 5] = 0.0;
+
+            v2sigma2[6 * g + 1] = 0.0;
+            v2sigma2[6 * g + 2] = 0.0;
+            v2sigma2[6 * g + 3] = 0.0;
+            v2sigma2[6 * g + 4] = 0.0;
+            v2sigma2[6 * g + 5] = 0.0;
+        }
+    }
+}
+
+void
 screenKxcFockForLDA(double*               rho,
                     double*               v2rho2,
                     double*               v3rho3,

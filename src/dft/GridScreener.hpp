@@ -150,6 +150,38 @@ void screenFxcFockForGGA(double*               rho,
                          const int32_t         npoints,
                          const double          densityThreshold);
 
+
+/**
+ Screens Fxc Fock for MGGA.
+
+ @param rho the density.
+ @param sigma the dot product of density gradient.
+ @param vrho the 1st-order functional derivative wrt rho.
+ @param vsigma the 1st-order functional derivative wrt sigma.
+ @param v2rho2 the 2nd-order functional derivative wrt rho.
+ @param v2rhosigma the 2nd-order functional derivative wrt rho and sigma.
+ @param v2sigma2 the 2nd-order functional derivative wrt sigma
+ 
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ */
+void screenFxcFockForMGGA(double*                rho, 
+                          double*                sigma, 
+                          double*                lapl, 
+                          double*                tau, 
+                          double*                v2rho2, 
+                          double*                v2rhosigma,
+                          double*                v2rholapl,
+                          double*                v2rhotau,
+                          double*                v2sigma2,
+                          double*                v2sigmalapl,
+                          double*                v2sigmatau,
+                          double*                v2lapl2,
+                          double*                v2lapltau,
+                          double*                v2tau2,
+                          const int32_t         npoints,
+                          const double          densityThreshold);  
+
 /**
  Screens Kxc Fock for GGA.
 
