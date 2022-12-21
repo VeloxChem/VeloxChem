@@ -39,7 +39,9 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
     const double spinpolf = 1.92366105093154;
 
-    const double fourthree = 1.333333333333333;
+    double fourthird = 4.0 / 3.0;
+
+    double twothird = 2.0 / 3.0;
 
     double pa = 0.0621814, pb = 13.0720, pc = 42.7198, px0 = -0.4092860;
 
@@ -119,20 +121,20 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double zeta = delta / density;
 
-            f_zeta = spinpolf * (std::pow(1.0 + zeta, fourthree) + std::pow(std::max(1.0 - zeta,0.0), fourthree) - 2.0);
+            f_zeta = spinpolf * (std::pow(1.0 + zeta, fourthird) + std::pow(std::max(1.0 - zeta, 0.0), fourthird) - 2.0);
         }
         // Imaginary case
         else
         {
             double delta = sqrt(2.0 * pair_density);
 
-            double zeta = delta / density;
+            double eta = delta / density;
 
-            double r = sqrt(1.0 + std::pow(zeta, 2));
+            double r = 1.0 + std::pow(eta, 2);
 
-            double theta = 4.0 / 3.0 * std::atan(zeta);
+            double theta = fourthird * std::atan(eta);
 
-            f_zeta = spinpolf * (2.0 * std::pow(r, 4.0 / 3.0) * std::cos(theta) - 2.0);
+            f_zeta = spinpolf * (2.0 * std::pow(r, twothird) * std::cos(theta) - 2.0);
         }
 
         double xf = x * x + pb * x + pc;
@@ -173,7 +175,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double vcfp = f_zeta * ef1;
 
-        //double delta = f_zet1 * ef0;
+        // double delta = f_zet1 * ef0;
 
         double delta_en = f_zeta * ef0;
 

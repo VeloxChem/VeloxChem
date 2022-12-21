@@ -35,21 +35,21 @@ namespace pdftpbe_c {  // pdftpbe_c namespace
 void
 compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma)
 {
-    double onethird = 1.0 / 3.0;
-    double twothird = 2.0 / 3.0;
+    double onethird  = 1.0 / 3.0;
+    double twothird  = 2.0 / 3.0;
     double fourthird = 4.0 / 3.0;
 
     double frg = std::pow(0.75 / mathconst::getPiValue(), onethird);
 
-    double two13 = std::pow(2.0,onethird);
+    double two13 = std::pow(2.0, onethird);
     double two23 = two13 * two13;
 
     double three13 = std::pow(3.0, onethird);
 
     double pi13 = std::pow(mathconst::getPiValue(), onethird);
 
-    double l = 0.0716;
-    double lambda = 0.004235 * frg * two23 * 16.0;
+    double l       = 0.0716;
+    double lambda  = 0.004235 * frg * two23 * 16.0;
     double lambda2 = lambda * lambda;
 
     double d2fact = 1.0 / 16.0 * pi13 / three13;
@@ -77,7 +77,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
     double x3 = 0.88026;
     double y3 = 0.49671;
 
-    double omega_fact = 1.0/(2.0*two13-2.0);
+    double omega_fact = 1.0 / (2.0 * two13 - 2.0);
 
     for (int32_t g = 0; g < np; g++)
     {
@@ -100,7 +100,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         // Spin-polarization dependence
         double pair_density = rho[2 * g + 1];
 
-        double zeta4 = 4.0 * std::pow(pair_density,2.0)/std::pow(density,4.0);
+        double zeta4 = 4.0 * std::pow(pair_density, 2.0) / std::pow(density, 4.0);
 
         // Real case
         double omega;
@@ -108,15 +108,24 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         if (pair_density <= 0)
         {
             double delta = sqrt(-2.0 * pair_density);
-            double zeta = delta / density;
-            omega = omega_fact * (std::pow(1.0+zeta,fourthird)+std::pow(std::max(1.0-zeta,0.0),fourthird)-2.0);
-            u_ab = 0.5 * std::pow(1.0 + zeta, twothird) + 0.5 * std::pow(std::max(1.0 - zeta,0.0), twothird);
+            double zeta  = delta / density;
+
+            omega = omega_fact * (std::pow(1.0 + zeta, fourthird) + std::pow(std::max(1.0 - zeta, 0.0), fourthird) - 2.0);
+
+            u_ab = 0.5 * std::pow(1.0 + zeta, twothird) + 0.5 * std::pow(std::max(1.0 - zeta, 0.0), twothird);
         }
         // Imaginary case
         else
         {
-            omega = 0.0;
-            u_ab = 1.0;
+            double delta  = sqrt(2.0 * pair_density);
+            double eta    = delta / density;
+            double r      = 1.0 + std::pow(eta, 2);
+            double theta  = fourthird * std::atan(eta);
+            double theta2 = twothird * std::atan(eta);
+
+            omega = omega_fact * (2.0 * std::pow(r, twothird) * std::cos(theta) - 2.0);
+
+            u_ab = std::pow(r, onethird) * std::cos(theta2);
         }
 
         double u_ab2 = u_ab * u_ab;
@@ -124,7 +133,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         double u_ab3 = u_ab2 * u_ab;
 
         // Compute epsilon
-        double r = frg / std::pow(density,onethird);
+        double r = frg / std::pow(density, onethird);
 
         double r2 = r * r;
 
@@ -132,30 +141,24 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double r32 = r * r12;
 
-        double e1 = - 2.0 * t1 * (u1 * r + 1.0) *
-                    log(0.5 / (t1* (v1 * r12 + w1 * r + x1 * r32 + y1 * r2)) + 1.0);
+        double e1 = -2.0 * t1 * (u1 * r + 1.0) * log(0.5 / (t1 * (v1 * r12 + w1 * r + x1 * r32 + y1 * r2)) + 1.0);
 
-        double e2 = - 2.0 * t2 * (u2 * r + 1.0) *
-                    log(0.5 / (t2* (v2 * r12 + w2 * r + x2 * r32 + y2 * r2)) + 1.0);
+        double e2 = -2.0 * t2 * (u2 * r + 1.0) * log(0.5 / (t2 * (v2 * r12 + w2 * r + x2 * r32 + y2 * r2)) + 1.0);
 
-        double e3 = - 2.0 * t3 * (u3 * r + 1.0) *
-                    log(0.5 / (t3* (v3 * r12 + w3 * r + x3 * r32 + y3 * r2)) + 1.0);
+        double e3 = -2.0 * t3 * (u3 * r + 1.0) * log(0.5 / (t3 * (v3 * r12 + w3 * r + x3 * r32 + y3 * r2)) + 1.0);
 
-        double epsilon = e1 - e3 * omega * (1.0 - zeta4) /c +
-                         (e2 - e1) * omega * zeta4;
+        double epsilon = e1 - e3 * omega * (1.0 - zeta4) / c + (e2 - e1) * omega * zeta4;
 
         // Gradient-dependent terms
         double density_gradient = sigma[3 * g + 0];
 
-        double d2 = d2fact * density_gradient / (u_ab2 * pow(density,7.0/3.0));
+        double d2 = d2fact * density_gradient / (u_ab2 * pow(density, 7.0 / 3.0));
 
         double d4 = d2 * d2;
 
-        double N_ab = 2.0 * l / lambda / (exp(-2.0 * l / lambda2 * epsilon/u_ab3) -1.0) ;
+        double N_ab = 2.0 * l / lambda / (exp(-2.0 * l / lambda2 * epsilon / u_ab3) - 1.0);
 
-        exc[g] = 0.5 * lambda2 / l * u_ab3 * log(1.0 + 2.0 * l / lambda*
-        (N_ab * d4 + d2)/(N_ab * d2+ N_ab * N_ab * d4 +1.0))+epsilon;
-
+        exc[g] = 0.5 * lambda2 / l * u_ab3 * log(1.0 + 2.0 * l / lambda * (N_ab * d4 + d2) / (N_ab * d2 + N_ab * N_ab * d4 + 1.0)) + epsilon;
 
         vrho[2 * g + 0] = 0.0;
         vrho[2 * g + 1] = 0.0;
