@@ -230,14 +230,12 @@ class ShgDriver(NonLinearSolver):
 
         N_drv = ComplexResponse(self.comm, self.ostream)
 
-        if self._dft:
-            N_drv.update_settings({}, self.method_dict)
-
-        cpp_keywords = {
+        cpp_keywords = [
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
+            'xcfun', 'grid_level', 'potfile', 'electric_field',
             'program_end_time'
-        }
+        ]
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
