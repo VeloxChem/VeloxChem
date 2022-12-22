@@ -35,7 +35,8 @@ class TestCrfFD:
         # CR driver
 
         scf_settings = {'conv_thresh': scf_conv_thresh}
-        rsp_settings = {'conv_thresh': rsp_conv_thresh, 'damping': 0,'a_components':'z','b_components':'z','c_components': 'z','d_components': 'z'}
+        rsp_settings = {'conv_thresh': rsp_conv_thresh, 'damping': 0,'a_components':'z','b_components':'y','c_components': 'y','d_components': 'z',
+        'b_frequencies': [0.1], 'c_frequencies': [-0.3], 'd_frequencies': [0]}
         method_settings = {'xcfun': xcfun_label,'grid_level': 4}
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
@@ -47,7 +48,7 @@ class TestCrfFD:
         crf_results = crf.compute(molecule, basis, scfdrv.scf_tensors)
 
         if is_mpi_master():
-            gamma_zzzz = -crf_results[('Gamma', 0, 0, 0)].real
+            gamma_zzzz = -crf_results[('Gamma', 0.1, -0.3, 0)].real
 
         # Finite difference
 
@@ -77,9 +78,9 @@ class TestCrfFD:
         quad_result_minus = quad_solver_minus.compute(molecule, basis, scf_result_minus)
 
         if is_mpi_master():
-            beta_zzz_plus = -quad_result_plus[(0, 0)].real
-            beta_zzz_minus = -quad_result_minus[(0, 0)].real
+            beta_zzz_plus = -quad_result_plus[(0.1, -0.3)].real
+            beta_zzz_minus = -quad_result_minus[(0.1, -0.3)].real
             gamma_zzzz_fd = (beta_zzz_plus - beta_zzz_minus) / (2.0 * delta_ef)
 
             rel_diff = abs(gamma_zzzz - gamma_zzzz_fd) / abs(gamma_zzzz_fd)
-            assert rel_diff < 1.0e-6
+            assert rel_diff < 1.0e-5
