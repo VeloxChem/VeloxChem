@@ -35,7 +35,6 @@ class TestLrfFD:
         # LR driver
 
         scf_settings = {'conv_thresh': scf_conv_thresh}
-        rsp_settings = {'conv_thresh': rsp_conv_thresh, 'damping': 0,'a_components':'z','b_components':'z','c_components': 'z','d_components': 'z'}
         method_settings = {'xcfun': xcfun_label,'grid_level': 4}
 
         scfdrv = ScfRestrictedDriver(comm, ostream)
@@ -67,7 +66,6 @@ class TestLrfFD:
 
         scf_prop_plus = FirstOrderProperties(comm, ostream)
         scf_prop_plus.compute_scf_prop(molecule, basis, scf_drv_plus.scf_tensors)
-        mu_plus = scf_prop_plus.get_property('dipole moment')
 
         scf_drv_minus = ScfRestrictedDriver(comm, ostream)
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
@@ -75,7 +73,6 @@ class TestLrfFD:
 
         scf_prop_minus = FirstOrderProperties(comm, ostream)
         scf_prop_minus.compute_scf_prop(molecule, basis, scf_drv_minus.scf_tensors)
-        mu_minus = scf_prop_minus.get_property('dipole moment')
 
         if is_mpi_master():
             mu_plus = scf_prop_plus.get_property('dipole moment')
