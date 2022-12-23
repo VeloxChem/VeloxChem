@@ -662,68 +662,22 @@ class CXCNewIntegrator
                                                                          const CMolecularGrid&  molecularGrid) const;
 
     /**
-     Computes fucntional derivatives for LDA.
+     Computes GTOs values and derivatives on grid points.
 
-     @param xcFuncLabel the label of exchange-correlation functional.
+     @param molecule the molecule.
+     @param basis the molecular basis.
      @param npoints the number of grid points.
-     @param rho the constant pointer to densities.
-     @param exc the pointer to functional values.
-     @param vrho the pointer to functional derivative w.r.t. densities.
+     @param xcoords the X coordinates of grid points.
+     @param ycoords the Y coordinates of grid points.
+     @param zcoords the Z coordinates of grid points.
+     @return the GTO values and derivatives on grid points.
      */
-    void computeExcVxcForLDA(const std::string& xcFuncLabel, const int32_t npoints, const double* rho, double* exc, double* vrho) const;
-
-    /**
-     Computes fucntional derivatives for GGA.
-
-     @param xcFuncLabel the label of exchange-correlation functional.
-     @param npoints the number of grid points.
-     @param rho the constant pointer to densities.
-     @param sigma the constant pointer to density gradients.
-     @param exc the pointer to functional values.
-     @param vrho the pointer to functional derivative w.r.t. densities.
-     @param vsigma the pointer to functional derivative w.r.t. density
-            gradients.
-     */
-    void computeExcVxcForGGA(const std::string& xcFuncLabel,
-                             const int32_t      npoints,
-                             const double*      rho,
-                             const double*      sigma,
-                             double*            exc,
-                             double*            vrho,
-                             double*            vsigma) const;
-
-    /**
-     Computes 2nd-order fucntional derivatives for LDA.
-
-     @param xcFuncLabel the label of exchange-correlation functional.
-     @param npoints the number of grid points.
-     @param rho the constant pointer to densities.
-     @param v2rho2 the pointer to 2nd-order functional derivative w.r.t.
-            densities.
-     */
-    void computeFxcForLDA(const std::string& xcFuncLabel, const int32_t npoints, const double* rho, double* v2rho2) const;
-
-    /**
-     Computes 2nd-order fucntional derivatives for GGA.
-
-     @param xcFuncLabel the label of exchange-correlation functional.
-     @param npoints the number of grid points.
-     @param rho the constant pointer to densities.
-     @param sigma the constant pointer to density gradients.
-     @param v2rho2 the pointer to 2nd-order functional derivative w.r.t.
-            densities.
-     @param v2rhosigma the pointer to 2nd-order functional derivative w.r.t.
-            densities and density gradients.
-     @param v2sigma2 the pointer to 2nd-order functional derivative w.r.t.
-            density gradients.
-     */
-    void computeFxcForGGA(const std::string& xcFuncLabel,
-                          const int32_t      npoints,
-                          const double*      rho,
-                          const double*      sigma,
-                          double*            v2rho2,
-                          double*            v2rhosigma,
-                          double*            v2sigma2) const;
+    std::vector<CDenseMatrix> computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                                         const CMolecularBasis& basis,
+                                                                         const int32_t          npoints,
+                                                                         const double*          xcoords,
+                                                                         const double*          ycoords,
+                                                                         const double*          zcoords) const;
 };
 
 #endif /* XCNewIntegrator_hpp */

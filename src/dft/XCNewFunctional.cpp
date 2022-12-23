@@ -112,7 +112,9 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
     if (isGGA) _familyOfFunctional = std::string("GGA");
     if (isMGGA) _familyOfFunctional = std::string("MGGA");
 
-    // figure out fraction of exact exchange (e.g. HYB_GGA_XC_B3LYP)
+    // TODO figure out whether Laplacian is needed (XC_FLAGS_NEEDS_LAPLACIAN)
+
+    // fraction of exact exchange
     if (_components.size() == 1)
     {
         auto funcptr = _components[0].getFunctionalPointer();
@@ -122,7 +124,7 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
         }
     }
 
-    // TODO figure out range-separated parameters (e.g. HYB_GGA_XC_LRC_WPBEH)
+    // TODO figure out range-separation parameters
 
     _allocateStagingBuffer();
 }

@@ -225,8 +225,6 @@ class NonLinearSolver:
         if method_dict is None:
             method_dict = {}
 
-        self.method_dict = dict(method_dict)
-
         rsp_keywords = {
             key: val[0]
             for key, val in self._input_keywords['response'].items()
