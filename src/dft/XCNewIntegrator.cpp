@@ -243,6 +243,56 @@ CXCNewIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
     }
 }
 
+
+void
+CXCNewIntegrator::integrateKxcLxcFock(CAOFockMatrix&          aoFockMatrix,
+                                        const CMolecule&        molecule,
+                                        const CMolecularBasis&  basis,
+                                        const CAODensityMatrix& rwDensityMatrix,
+                                        const CAODensityMatrix& rw2DensityMatrix,
+                                        const CAODensityMatrix& rw3DensityMatrix,
+                                        const CAODensityMatrix& gsDensityMatrix,
+                                        CMolecularGrid&         molecularGrid,
+                                        const std::string&      xcFuncLabel,
+                                        const std::string&      cubeMode) const
+{
+    molecularGrid.partitionGridPoints();
+
+    molecularGrid.distributeCountsAndDisplacements(_locRank, _locNodes, _locComm);
+
+    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (rwDensityMatrix.isClosedShell() && rw2DensityMatrix.isClosedShell() && rw3DensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            _integrateKxcLxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix,rw3DensityMatrix, gsDensityMatrix,
+
+                                    molecularGrid, fvxc, cubeMode);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            _integrateKxcLxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix,rw3DensityMatrix, gsDensityMatrix,
+
+                                     molecularGrid, fvxc, cubeMode);
+        }
+        else
+        {
+            std::string errxcfuntype("XCNewIntegrator.integrateLxcFock: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCNewIntegrator.integrateLxcFock: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+}
+
 void
 CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
                                    CDense4DTensor&         moTwoBodyGradient,
@@ -2616,6 +2666,294 @@ CXCNewIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     //}
 }
 
+
+void
+CXCNewIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& rwDensityMatrix,
+                                          const CAODensityMatrix& rw2DensityMatrix,
+                                          const CAODensityMatrix& rw3DensityMatrix,
+                                          const CAODensityMatrix& gsDensityMatrix,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCNewFunctional& xcFunctional,
+                                          const std::string&      cubeMode) const
+{
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Preparation");
+
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<CMultiTimer> omptimers(nthreads);
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // memory blocks for GTOs on grid points
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // density and functional derivatives
+
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rho4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
+
+    auto rho = rho_data.data();
+
+    auto v2rho2 = v2rho2_data.data();
+    auto v3rho3 = v3rho3_data.data();
+    auto v4rho4 = v4rho4_data.data();
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+    auto weights = molecularGrid.getWeights();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    timer.stop("Preparation");
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        timer.start("GTO pre-screening");
+
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 0, _screeningThresholdForGTOValues, boxdim);  // 0th order GTO derivative
+
+        timer.stop("GTO pre-screening");
+
+        // GTO values on grid points
+
+        timer.start("OMP GTO evaluation");
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            omptimers[thread_id].start("gtoeval");
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForLDA(gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+
+            omptimers[thread_id].stop("gtoeval");
+        }
+
+        timer.stop("OMP GTO evaluation");
+
+        timer.start("GTO screening");
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if (std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues)
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        CDenseMatrix mat_chi(aocount, npoints);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+        }
+
+        timer.stop("GTO screening");
+
+        if (aocount == 0) continue;
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        dengridgen::generateDensityForLDA(rho, npoints, mat_chi, gs_sub_dens_mat, timer);
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+
+        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+
+        auto rw3_sub_dens_mat = submat::getSubDensityMatrix(rw3DensityMatrix, aoinds, aocount);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        auto xcfuntype = xcFunctional.getFunctionalType();
+
+        auto rwdengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw_sub_dens_mat, xcfuntype, timer);
+
+        auto rw2dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw2_sub_dens_mat, xcfuntype, timer);
+
+        auto rw3dengrid = dengridgen::generateDensityGridForLDA(npoints, mat_chi, rw3_sub_dens_mat, xcfuntype, timer);
+
+        // compute perturbed density
+
+        timer.start("Density grid cube");
+
+        auto numdens_rw3 = rw3DensityMatrix.getNumberOfDensityMatrices();
+
+        auto numdens_rw2 = rw2DensityMatrix.getNumberOfDensityMatrices();
+
+        CDensityGridCubic rwdengridcube(npoints, numdens_rw2 + numdens_rw3, xcfuntype, dengrid::ab);
+
+        rwdengridcube.DensityProd(rwdengrid, rw2dengrid, xcfuntype, (numdens_rw2 + numdens_rw3), cubeMode);
+
+        timer.stop("Density grid cubic");
+
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        xcFunctional.compute_fxc_for_lda(npoints, rho, v2rho2);
+
+        xcFunctional.compute_kxc_for_lda(npoints, rho, v3rho3);
+        
+        xcFunctional.compute_lxc_for_lda(npoints, rho, v4rho4);
+
+        timer.stop("XC functional eval.");
+
+        // screen density and functional derivatives
+
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        gridscreen::screenLxcFockForLDA(rho, v2rho2, v3rho3, v4rho4, npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
+
+        // go through density matrices
+
+
+        for  (int32_t idensity = 0; idensity < numdens_rw2; idensity++) 
+        {
+            // compute partial contribution to Kxc matrix
+
+
+            auto partial_mat_Kxc = _integratePartialKxcFockForLDA2(npoints, local_weights, mat_chi, v2rho2, v3rho3,
+                                                                  rwdengridcube, rw2dengrid, idensity, timer);
+
+            // distribute partial Kxc to full Fock matrix
+
+            timer.start("Kxc matrix dist.");
+
+            submat::distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
+
+            timer.stop("Kxc matrix dist.");
+        }
+
+        for (int32_t idensity = 0; idensity < numdens_rw3; idensity++)
+        {
+            // compute partial contribution to Kxc matrix
+
+            auto partial_mat_Lxc = _integratePartialLxcFockForLDA(npoints, local_weights, mat_chi, v2rho2, v3rho3,v4rho4,
+                                                                  rwdengridcube, rw3dengrid, idensity, timer);
+
+            // distribute partial Kxc to full Fock matrix
+
+            timer.start("Lxc matrix dist.");
+
+            submat::distributeSubMatrixToFock(aoFockMatrix, (idensity + numdens_rw2), partial_mat_Lxc, aoinds, aocount, naos);
+
+            timer.stop("Lxc matrix dist.");
+        }
+            
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    timer.stop("Total timing");
+
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
+}
+
+
 void
 CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                           const CMolecule&        molecule,
@@ -3236,6 +3574,361 @@ CXCNewIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             timer.stop("Lxc matrix dist.");
         }
+    }
+
+    // destroy GTOs container
+
+    delete gtovec;
+
+    timer.stop("Total timing");
+
+    //std::cout << "Timing of new integrator" << std::endl;
+    //std::cout << "------------------------" << std::endl;
+    //std::cout << timer.getSummary() << std::endl;
+    //std::cout << "OpenMP timing" << std::endl;
+    //for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    //{
+    //    std::cout << "Thread " << thread_id << std::endl;
+    //    std::cout << omptimers[thread_id].getSummary() << std::endl;
+    //}
+}
+
+
+void
+CXCNewIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& rwDensityMatrix,
+                                          const CAODensityMatrix& rw2DensityMatrix,
+                                          const CAODensityMatrix& rw3DensityMatrix,
+                                          const CAODensityMatrix& gsDensityMatrix,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCNewFunctional& xcFunctional,
+                                          const std::string&      cubeMode) const
+{
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Preparation");
+
+    auto nthreads = omp_get_max_threads();
+
+    std::vector<CMultiTimer> omptimers(nthreads);
+
+    // GTOs container and number of AOs
+
+    CGtoContainer* gtovec = new CGtoContainer(molecule, basis);
+
+    auto naos = gtovec->getNumberOfAtomicOrbitals();
+
+    // memory blocks for GTOs on grid points
+
+    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+
+    // indices for keeping track of GTOs
+
+    // skip_cgto_ids: whether a CGTO should be skipped
+    // skip_ao_ids: whether an AO should be skipped
+    // aoinds: mapping between AO indices before and after screening
+
+    CMemBlock<int32_t> skip_cgto_ids(naos); // note: naos >= ncgtos
+
+    CMemBlock<int32_t> skip_ao_ids(naos);
+
+    std::vector<int32_t> aoinds(naos);
+
+    // density and functional derivatives
+
+    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rho2sigma_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rhosigma2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3sigma3_data(10 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    CMemBlock<double> v4rho4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rho3sigma_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rho2sigma2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rhosigma3_data(20 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4sigma4_data(15 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+
+    auto local_weights = local_weights_data.data();
+
+    auto rho = rho_data.data();
+    auto rhograd = rhograd_data.data();
+    auto sigma = sigma_data.data();
+
+    auto vrho = vrho_data.data();
+    auto vsigma = vsigma_data.data();
+
+    auto v2rho2 = v2rho2_data.data();
+    auto v2rhosigma = v2rhosigma_data.data();
+    auto v2sigma2 = v2sigma2_data.data();
+
+    auto v3rho3 = v3rho3_data.data();
+    auto v3rho2sigma = v3rho2sigma_data.data();
+    auto v3rhosigma2 = v3rhosigma2_data.data();
+    auto v3sigma3 = v3sigma3_data.data();
+
+    auto v4rho4 = v4rho4_data.data();
+    auto v4rho3sigma = v4rho3sigma_data.data();
+    auto v4rho2sigma2 = v4rho2sigma2_data.data();
+    auto v4rhosigma3 = v4rhosigma3_data.data();
+    auto v4sigma4 = v4sigma4_data.data();
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+    auto weights = molecularGrid.getWeights();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    timer.stop("Preparation");
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = gtoeval::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // pre-screening of GTOs
+
+        timer.start("GTO pre-screening");
+
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, _screeningThresholdForGTOValues, boxdim);  // 1st order GTO derivative
+
+        timer.stop("GTO pre-screening");
+
+        // GTO values on grid points
+
+        timer.start("OMP GTO evaluation");
+
+        #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            omptimers[thread_id].start("gtoeval");
+
+            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+
+            omptimers[thread_id].stop("gtoeval");
+        }
+
+        timer.stop("OMP GTO evaluation");
+
+        timer.start("GTO screening");
+
+        int32_t aocount = 0;
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            if (skip_ao_ids.data()[nu]) continue;
+
+            bool skip = true;
+
+            auto gaos_nu = gaos.data(nu);
+
+            auto gaox_nu = gaox.data(nu);
+
+            auto gaoy_nu = gaoy.data(nu);
+
+            auto gaoz_nu = gaoz.data(nu);
+
+            for (int32_t g = 0; g < npoints; g++)
+            {
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                {
+                    skip = false;
+
+                    break;
+                }
+            }
+
+            if (!skip)
+            {
+                aoinds[aocount] = nu;
+
+                ++aocount;
+            }
+        }
+
+        CDenseMatrix mat_chi(aocount, npoints);
+
+        CDenseMatrix mat_chi_x(aocount, npoints);
+        CDenseMatrix mat_chi_y(aocount, npoints);
+        CDenseMatrix mat_chi_z(aocount, npoints);
+
+        for (int32_t i = 0; i < aocount; i++)
+        {
+            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
+            std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
+            std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
+        }
+
+        timer.stop("GTO screening");
+
+        if (aocount == 0) continue;
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                          gs_sub_dens_mat, timer);
+
+        // generate sub density matrix
+
+        timer.start("Density matrix slicing");
+
+        auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, aoinds, aocount);
+
+        auto rw2_sub_dens_mat = submat::getSubDensityMatrix(rw2DensityMatrix, aoinds, aocount);
+
+        auto rw3_sub_dens_mat = submat::getSubDensityMatrix(rw3DensityMatrix, aoinds, aocount);
+
+        timer.stop("Density matrix slicing");
+
+        // generate density grid
+
+        auto xcfuntype = xcFunctional.getFunctionalType();
+
+        auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                                               rw_sub_dens_mat, xcfuntype, timer);
+
+        auto rw2dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                rw2_sub_dens_mat, xcfuntype, timer);
+
+        auto rw3dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                rw3_sub_dens_mat, xcfuntype, timer);
+        // compute perturbed density
+
+        timer.start("Density grid cubic");
+
+        auto numdens_rw3 = rw3DensityMatrix.getNumberOfDensityMatrices();
+
+        auto numdens_rw2 = rw2DensityMatrix.getNumberOfDensityMatrices();
+
+        CDensityGridCubic rwdengridcube(npoints, (numdens_rw2 + numdens_rw3), xcfuntype, dengrid::ab);
+
+        rwdengridcube.DensityProd(rwdengrid, rw2dengrid, xcfuntype, (numdens_rw2 + numdens_rw3), cubeMode);
+
+        timer.stop("Density grid cubic");
+
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
+
+        xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+
+        xcFunctional.compute_kxc_for_gga(npoints, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
+
+        xcFunctional.compute_lxc_for_gga(npoints, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2,v4rhosigma3, v4sigma4);
+
+        timer.stop("XC functional eval.");
+
+        // screen density and functional derivatives
+
+        timer.start("Density screening");
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+
+        gridscreen::screenLxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
+                                        v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                        v4rho4, v4rho3sigma, v4rho2sigma2,v4rhosigma3, v4sigma4,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        timer.stop("Density screening");
+
+        // go through density matrices
+
+
+        for (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
+        {
+            // compute partial contribution to Kxc matrix
+
+            auto partial_mat_Kxc = _integratePartialKxcFockForGGA2(npoints, local_weights, mat_chi,
+                                                                  mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                  rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2,
+                                                                  v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                                                  rwdengridcube, rw2dengrid, idensity, timer);
+
+            // distribute partial Kxc to full Fock matrix
+
+            timer.start("Kxc matrix dist.");
+
+            submat::distributeSubMatrixToFock(aoFockMatrix, idensity, partial_mat_Kxc, aoinds, aocount, naos);
+
+            timer.stop("Kxc matrix dist.");
+        }
+
+
+        for (int32_t idensity = 0; idensity < numdens_rw3; idensity++)
+        {
+            // compute partial contribution to Lxc matrix
+
+            auto partial_mat_Lxc = _integratePartialLxcFockForGGA(npoints, local_weights, mat_chi,
+                                                                  mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                  rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2,
+                                                                  v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                                                  v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4,
+                                                                  rwdengridcube, rw3dengrid, idensity, timer);
+
+            // distribute partial Lxc to full Fock matrix
+
+            timer.start("Lxc matrix dist.");
+
+            submat::distributeSubMatrixToFock(aoFockMatrix, (idensity + numdens_rw2), partial_mat_Lxc, aoinds, aocount, naos);
+
+            timer.stop("Lxc matrix dist.");
+        }
+
     }
 
     // destroy GTOs container
@@ -4727,6 +5420,84 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              npoi
 
 
 CDenseMatrix
+CXCNewIntegrator::_integratePartialKxcFockForLDA2(const int32_t              npoints,
+                                                 const double*              weights,
+                                                 const CDenseMatrix&        gtoValues,
+                                                 const double*              v2rho2,
+                                                 const double*              v3rho3,
+                                                 const CDensityGridCubic&   rwDensityGridCubic,
+                                                 const CDensityGrid&        rw2DensityGrid,
+                                                 const int32_t              iFock,
+                                                 CMultiTimer&               timer) const
+{
+    timer.start("Kxc matrix prep.");
+
+    // GTO values on grid points
+
+    auto chi_val = gtoValues.values();
+
+    // pointers to perturbed density
+
+    auto rhow1a = rwDensityGridCubic.gam2(iFock);
+
+    auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
+
+    auto rhow12b = rw2DensityGrid.betaDensity(iFock);
+
+    timer.stop("Kxc matrix prep.");
+
+    // eq.(30), JCTC 2021, 17, 1512-1521
+
+    timer.start("Kxc matrix G");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    CDenseMatrix mat_G(naos, npoints);
+
+    auto G_val = mat_G.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(weights, v2rho2, v3rho3, rhow1a, rhow12a, rhow12b, G_val, chi_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                G_val[nu_offset + g] = weights[g] *
+
+                          ((v3rho3[4 * g + 0] + 2.0 * v3rho3[4 * g + 1] + v3rho3[4 * g + 2]) * rhow1a[g] +
+
+                           v2rho2[3 * g + 0] * rhow12a[g] + v2rho2[3 * g + 1] * rhow12b[g]) *
+
+                          chi_val[nu_offset + g];
+            }
+        }
+    }
+
+    timer.stop("Kxc matrix G");
+
+    // eq.(31), JCTC 2021, 17, 1512-1521
+
+    timer.start("Kxc matrix matmul");
+
+    auto mat_Kxc = denblas::multABt(gtoValues, mat_G);
+
+    timer.stop("Kxc matrix matmul");
+
+    return mat_Kxc;
+}
+
+CDenseMatrix
 CXCNewIntegrator::_integratePartialLxcFockForLDA(const int32_t              npoints,
                                                  const double*              weights,
                                                  const CDenseMatrix&        gtoValues,
@@ -5101,6 +5872,321 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
             }
         }
     }
+
+    timer.stop("Kxc matrix G");
+
+    // eq.(31), JCTC 2021, 17, 1512-1521
+
+    timer.start("Kxc matrix matmul");
+
+    auto mat_Kxc = denblas::multABt(gtoValues, mat_G);
+
+    auto mat_Kxc_gga = denblas::multABt(gtoValues, mat_G_gga);
+
+    mat_Kxc_gga.symmetrize();  // matrix + matrix.T
+
+    mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_gga, 1.0);
+
+    timer.stop("Kxc matrix matmul");
+
+    return mat_Kxc;
+}
+
+
+CDenseMatrix
+CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t              npoints,
+                                                 const double*              weights,
+                                                 const CDenseMatrix&        gtoValues,
+                                                 const CDenseMatrix&        gtoValuesX,
+                                                 const CDenseMatrix&        gtoValuesY,
+                                                 const CDenseMatrix&        gtoValuesZ,
+                                                 const double*              rhograd,
+                                                 const double*              vsigma,
+                                                 const double*              v2rho2,
+                                                 const double*              v2rhosigma,
+                                                 const double*              v2sigma2,
+                                                 const double*              v3rho3,
+                                                 const double*              v3rho2sigma,
+                                                 const double*              v3rhosigma2,
+                                                 const double*              v3sigma3,
+                                                 const CDensityGridCubic&   rwDensityGridCubic,
+                                                 const CDensityGrid&        rw2DensityGrid,
+                                                 const int32_t              iFock,
+                                                 CMultiTimer&               timer) const
+{
+    timer.start("Kxc matrix prep.");
+
+    // GTO values on grid points
+
+    auto chi_val = gtoValues.values();
+
+    auto chi_x_val = gtoValuesX.values();
+    auto chi_y_val = gtoValuesY.values();
+    auto chi_z_val = gtoValuesZ.values();
+
+    // pointers to perturbed density gradient norms
+
+    auto rhow1rhow2 = rwDensityGridCubic.gam2(iFock);
+
+    auto rxw1rhow2 = rwDensityGridCubic.gam2X(iFock);
+
+    auto ryw1rhow2 = rwDensityGridCubic.gam2Y(iFock);
+
+    auto rzw1rhow2 = rwDensityGridCubic.gam2Z(iFock);
+
+    auto rxw1rxw2 = rwDensityGridCubic.gam2XX(iFock);
+
+    auto rxw1ryw2 = rwDensityGridCubic.gam2XY(iFock);
+
+    auto rxw1rzw2 = rwDensityGridCubic.gam2XZ(iFock);
+
+    auto ryw1rxw2 = rwDensityGridCubic.gam2YX(iFock);
+
+    auto ryw1ryw2 = rwDensityGridCubic.gam2YY(iFock);
+
+    auto ryw1rzw2 = rwDensityGridCubic.gam2YZ(iFock);
+
+    auto rzw1rxw2 = rwDensityGridCubic.gam2ZX(iFock);
+
+    auto rzw1ryw2 = rwDensityGridCubic.gam2ZY(iFock);
+
+    auto rzw1rzw2 = rwDensityGridCubic.gam2ZZ(iFock);
+
+    auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
+
+    auto gradw12a_x = rw2DensityGrid.alphaDensityGradientX(iFock);
+
+    auto gradw12a_y = rw2DensityGrid.alphaDensityGradientY(iFock);
+
+    auto gradw12a_z = rw2DensityGrid.alphaDensityGradientZ(iFock);
+
+    timer.stop("Kxc matrix prep.");
+
+    // eq.(30), JCTC 2021, 17, 1512-1521
+
+    timer.start("Kxc matrix G");
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    CDenseMatrix mat_G(naos, npoints);
+    CDenseMatrix mat_G_gga(naos, npoints);
+
+    auto G_val = mat_G.values();
+    auto G_gga_val = mat_G_gga.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+            #pragma omp simd aligned(weights, \
+                    rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2, \
+                    v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, \
+                    rhow1rhow2, rxw1rhow2, ryw1rhow2, rzw1rhow2, \
+                    rxw1rxw2, rxw1ryw2, rxw1rzw2, ryw1rxw2, ryw1ryw2, ryw1rzw2, rzw1rxw2, rzw1ryw2, rzw1rzw2, \
+                    rhow12a, gradw12a_x, gradw12a_y, gradw12a_z, \
+                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+
+                double w = weights[g];
+
+
+                double rxw12a = gradw12a_x[g];
+                double ryw12a = gradw12a_y[g];
+                double rzw12a = gradw12a_z[g];
+
+                double grada_x_g = rhograd[6 * g + 0];
+                double grada_y_g = rhograd[6 * g + 1];
+                double grada_z_g = rhograd[6 * g + 2];
+
+
+                double l2contract = grada_x_g * rxw12a + grada_y_g * ryw12a + grada_z_g * rzw12a;
+                double l5contract_x = grada_x_g * l2contract;
+                double l5contract_y = grada_y_g * l2contract;
+                double l5contract_z = grada_z_g * l2contract;     
+                double q2contract = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
+                double q3contract =   grada_x_g * grada_x_g * rxw1rxw2[g]
+                                    + grada_x_g * grada_y_g * rxw1ryw2[g]
+                                    + grada_x_g * grada_z_g * rxw1rzw2[g]
+                                    + grada_y_g * grada_x_g * ryw1rxw2[g]
+                                    + grada_y_g * grada_y_g * ryw1ryw2[g]
+                                    + grada_y_g * grada_z_g * ryw1rzw2[g]
+                                    + grada_z_g * grada_x_g * rzw1rxw2[g]
+                                    + grada_z_g * grada_y_g * rzw1ryw2[g]
+                                    + grada_z_g * grada_z_g * rzw1rzw2[g];
+
+                double q4contract = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
+                double q7contract_x =  grada_x_g * grada_x_g *  rxw1rhow2[g] + grada_x_g * grada_y_g *  ryw1rhow2[g] + grada_x_g * grada_z_g *  rzw1rhow2[g];
+                double q7contract_y =  grada_y_g * grada_x_g *  rxw1rhow2[g] + grada_y_g * grada_y_g *  ryw1rhow2[g] + grada_y_g * grada_z_g *  rzw1rhow2[g];
+                double q7contract_z =  grada_z_g * grada_x_g *  rxw1rhow2[g] + grada_z_g * grada_y_g *  ryw1rhow2[g] + grada_z_g * grada_z_g *  rzw1rhow2[g];
+
+
+                double q8contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  rxw1ryw2[g] + grada_z_g *  rxw1rzw2[g];
+                double q8contract_y =  grada_x_g *  ryw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  ryw1rzw2[g];
+                double q8contract_z =  grada_x_g *  rzw1rxw2[g] + grada_y_g *  rzw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+
+                double q9contract_x =  grada_x_g *  q3contract;
+                double q9contract_y =  grada_y_g *  q3contract;
+                double q9contract_z =  grada_z_g *  q3contract;
+
+                double q10contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  ryw1rxw2[g] + grada_z_g *  rzw1rxw2[g];
+                double q10contract_y =  grada_x_g *  rxw1ryw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  rzw1ryw2[g];
+                double q10contract_z =  grada_x_g *  rxw1rzw2[g] + grada_y_g *  ryw1rzw2[g] + grada_z_g *  rzw1rzw2[g];
+
+                double q11contract_x =  grada_x_g *  rxw1rxw2[g] + grada_x_g *  ryw1ryw2[g] + grada_x_g *  rzw1rzw2[g];
+                double q11contract_y =  grada_y_g *  rxw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_y_g *  rzw1rzw2[g];
+                double q11contract_z =  grada_z_g *  rxw1rxw2[g] + grada_z_g *  ryw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+
+
+                // functional derivatives in libxc form
+
+                auto vsigma_a = vsigma[3 * g + 0];
+                auto vsigma_c = vsigma[3 * g + 1];
+
+                auto v2rho2_aa = v2rho2[3 * g + 0];
+                auto v2rho2_ab = v2rho2[3 * g + 1];
+
+                auto v2rhosigma_aa = v2rhosigma[6 * g + 0];
+                auto v2rhosigma_ac = v2rhosigma[6 * g + 1];
+                auto v2rhosigma_ab = v2rhosigma[6 * g + 2];
+                auto v2rhosigma_ba = v2rhosigma[6 * g + 3];
+                auto v2rhosigma_bc = v2rhosigma[6 * g + 4];
+
+                auto v2sigma2_aa = v2sigma2[6 * g + 0];
+                auto v2sigma2_ac = v2sigma2[6 * g + 1];
+                auto v2sigma2_ab = v2sigma2[6 * g + 2];
+                auto v2sigma2_cc = v2sigma2[6 * g + 3];
+                auto v2sigma2_cb = v2sigma2[6 * g + 4];
+
+                auto v3rho3_aaa = v3rho3[4 * g + 0];
+                auto v3rho3_aab = v3rho3[4 * g + 1];
+                auto v3rho3_abb = v3rho3[4 * g + 2];
+
+                auto v3rho2sigma_aaa = v3rho2sigma[9 * g + 0];
+                auto v3rho2sigma_aac = v3rho2sigma[9 * g + 1];
+                auto v3rho2sigma_aab = v3rho2sigma[9 * g + 2];
+                auto v3rho2sigma_aba = v3rho2sigma[9 * g + 3];
+                auto v3rho2sigma_abc = v3rho2sigma[9 * g + 4];
+                auto v3rho2sigma_abb = v3rho2sigma[9 * g + 5];
+                auto v3rho2sigma_bba = v3rho2sigma[9 * g + 6];
+                auto v3rho2sigma_bbc = v3rho2sigma[9 * g + 7];
+
+                auto v3rhosigma2_aaa = v3rhosigma2[12 * g + 0];
+                auto v3rhosigma2_aac = v3rhosigma2[12 * g + 1];
+                auto v3rhosigma2_aab = v3rhosigma2[12 * g + 2];
+                auto v3rhosigma2_acc = v3rhosigma2[12 * g + 3];
+                auto v3rhosigma2_acb = v3rhosigma2[12 * g + 4];
+                auto v3rhosigma2_abb = v3rhosigma2[12 * g + 5];
+                auto v3rhosigma2_baa = v3rhosigma2[12 * g + 6];
+                auto v3rhosigma2_bac = v3rhosigma2[12 * g + 7];
+                auto v3rhosigma2_bab = v3rhosigma2[12 * g + 8];
+                auto v3rhosigma2_bcc = v3rhosigma2[12 * g + 9];
+                auto v3rhosigma2_bcb = v3rhosigma2[12 * g + 10];
+
+                auto v3sigma3_aaa = v3sigma3[10 * g + 0];
+                auto v3sigma3_aac = v3sigma3[10 * g + 1];
+                auto v3sigma3_aab = v3sigma3[10 * g + 2];
+                auto v3sigma3_acc = v3sigma3[10 * g + 3];
+                auto v3sigma3_acb = v3sigma3[10 * g + 4];
+                auto v3sigma3_abb = v3sigma3[10 * g + 5];
+                auto v3sigma3_ccc = v3sigma3[10 * g + 6];
+                auto v3sigma3_bcc = v3sigma3[10 * g + 7];
+                auto v3sigma3_cbb = v3sigma3[10 * g + 8];
+
+
+                // functional derivatives
+                double rr = (v2rho2_aa + v2rho2_ab);
+                double rrr = (v3rho3_aaa + 2.0 * v3rho3_aab + v3rho3_abb);
+                double rx = (2.0*v2rhosigma_ac + 2.0*v2rhosigma_ab + 2.0*v2rhosigma_aa);
+                double rxr = (2.0*v3rho2sigma_abc + 2.0*v3rho2sigma_abb + 2.0*v3rho2sigma_aba 
+                             + 2.0*v3rho2sigma_aac + 2.0*v3rho2sigma_aab + 2.0*v3rho2sigma_aaa);
+                double rxx = (4.0*v3rhosigma2_acc + 8.0*v3rhosigma2_acb + 4.0*v3rhosigma2_abb 
+                            + 8.0*v3rhosigma2_aac + 8.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa);
+                double x = vsigma_c + 2.0*vsigma_a;
+                double xr = v2rhosigma_bc + 2.0*v2rhosigma_ba + v2rhosigma_ac + 2.0*v2rhosigma_aa;
+                double xx = 2.0*v2sigma2_cc + 2.0*v2sigma2_cb + 6.0*v2sigma2_ac + 4.0*v2sigma2_ab + 4.0*v2sigma2_aa;
+                double xrr = v3rho2sigma_bbc + 2.0*v3rho2sigma_bba + 2.0*v3rho2sigma_abc + 4.0*v3rho2sigma_aba 
+                            + v3rho2sigma_aac + 2.0*v3rho2sigma_aaa;
+                double xxr = 2.0*v3rhosigma2_bcc + 2.0*v3rhosigma2_bcb + 6.0*v3rhosigma2_bac 
+                            + 4.0*v3rhosigma2_bab + 4.0*v3rhosigma2_baa + 2.0*v3rhosigma2_acc 
+                            + 2.0*v3rhosigma2_acb + 6.0*v3rhosigma2_aac + 4.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa;
+                double xxx = 4.0*v3sigma3_ccc + 8.0*v3sigma3_bcc + 4.0*v3sigma3_cbb + 16.0*v3sigma3_acc 
+                            + 24.0*v3sigma3_acb + 8.0*v3sigma3_abb + 20.0*v3sigma3_aac 
+                            + 16.0*v3sigma3_aab + 8.0*v3sigma3_aaa;
+
+                // Scalar contribution
+
+                double prefac = 0.0;
+
+                // vxc 1 contributions
+
+                prefac += rr * rhow12a[g] // l1
+                        + rx * l2contract;
+                
+                // vxc 2 contributions
+                
+                prefac += rrr * rhow1rhow2[g] // q1
+                        + rxr * q2contract
+                        + rxx * q3contract
+                        + rx * q4contract;
+
+                G_val[nu_offset + g] = w * prefac * chi_val[nu_offset + g];
+
+                // vector contribution
+
+                double xcomp = 0.0, ycomp = 0.0, zcomp = 0.0;
+
+                // vxc 1 contributions
+
+                xcomp += xr * grada_x_g * rhow12a[g] // l3
+                        + x * rxw12a // l4
+                        + xx * l5contract_x;
+
+                ycomp += xr * grada_y_g * rhow12a[g] // l3
+                        + x * ryw12a // l4
+                        + xx * l5contract_y;
+
+                zcomp += xr * grada_z_g * rhow12a[g] // l3
+                        + x * rzw12a // l4
+                        + xx * l5contract_z;
+                
+                // vxc 2 contributions
+                
+                xcomp += xrr * grada_x_g * rhow1rhow2[g] // q5
+                        + xr * rxw1rhow2[g] // q6
+                        + xxr * q7contract_x
+                        + xx * (q8contract_x + q10contract_x + q11contract_x)
+                        + xxx * q9contract_x;
+
+                ycomp += xrr * grada_y_g * rhow1rhow2[g] // q5
+                        + xr * ryw1rhow2[g] // q6
+                        + xxr * q7contract_y
+                        + xx * (q8contract_y + q10contract_y + q11contract_y)
+                        + xxx * q9contract_y;
+ 
+                zcomp += xrr * grada_z_g * rhow1rhow2[g] // q5
+                        + xr * rzw1rhow2[g] // q6
+                        + xxr * q7contract_z
+                        + xx * (q8contract_z + q10contract_z + q11contract_z)
+                        + xxx * q9contract_z;
+
+                G_gga_val[nu_offset + g] = w * (xcomp * chi_x_val[nu_offset + g] +
+                                                ycomp * chi_y_val[nu_offset + g] +
+                                                zcomp * chi_z_val[nu_offset + g]);
+            }
+        }
+    }
+
 
     timer.stop("Kxc matrix G");
 

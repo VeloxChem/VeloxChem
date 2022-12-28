@@ -619,6 +619,8 @@ class NonLinearSolver:
                     dens2 = AODensityMatrix(dts2, denmat.rest)
                     dts3 = [np.ascontiguousarray(dab) for dab in third_order_dens]
                     dens3 = AODensityMatrix(dts3, denmat.rest)
+                    dts4 = dts2 + dts3
+                    dens4 = AODensityMatrix(dts4, denmat.rest)
 
             else:
                 # If HF on MPI_master
@@ -644,6 +646,7 @@ class NonLinearSolver:
                     dens1 = AODensityMatrix()
             elif mode.lower() in ['crf','tpa']:
                 dens3 = AODensityMatrix()
+                dens4 = AODensityMatrix()
                 if self._dft: 
                     # for dft we also need dens1 and dens 2 for cubic contributions
                     dens1 = AODensityMatrix()
@@ -661,10 +664,14 @@ class NonLinearSolver:
         elif mode.lower() in ['crf','tpa']:
             dens3.broadcast(self.rank, self.comm)
             # For  three-time perturbed Fock matrices we have as many Fock matrices as len dens3 
-            fock = AOFockMatrix(dens3)
             if self._dft:
+                dens4.broadcast(self.rank, self.comm)
+                fock = AOFockMatrix(dens4)
                 dens1.broadcast(self.rank, self.comm)
                 dens2.broadcast(self.rank, self.comm)
+            else:
+                fock = AOFockMatrix(dens3)
+
             
         fock_flag = fockmat.rgenjk
         if self._dft:
@@ -689,7 +696,10 @@ class NonLinearSolver:
         # Compute HF/two-electron part of three-time perturbed Fock matrices
         elif mode.lower() in ['crf','tpa']:
             # For three-time perturbed Fock matrix, the two-electron (HF) part is only contracted with dens3
-            eri_driver.compute(fock, dens3, molecule, ao_basis, screening)
+            if self._dft:
+                eri_driver.compute(fock, dens4, molecule, ao_basis, screening)
+            else:
+                eri_driver.compute(fock, dens3, molecule, ao_basis, screening)
             
 
         if self._dft and not self.xcfun.is_hybrid():
@@ -712,16 +722,11 @@ class NonLinearSolver:
 
             if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
                 # Compute vxc contribution for two-time transformed Fock matrics
-                xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
-                                        dens2, gs_density, molgrid,
-                                        self.xcfun.get_func_label(), mode)
+                xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,dens2, gs_density, molgrid,self.xcfun.get_func_label(), mode)
 
             elif mode.lower() in ['crf','tpa']:
                 # Compute vxc contribution for three-time transformed Fock matrics
-                xc_drv.integrate_lxc_fock(fock, molecule, ao_basis, dens1, dens2, dens3, 
-                                gs_density, molgrid,
-                                self.xcfun.get_func_label(), mode)
-                
+                xc_drv.integrate_kxclxc_fock(fock, molecule, ao_basis, dens1, dens2, dens3, gs_density, molgrid,self.xcfun.get_func_label(), mode)
 
             if profiler is not None:
                 profiler.add_timing_info('FockXC', tm.time() - t0)

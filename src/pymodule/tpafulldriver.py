@@ -331,22 +331,19 @@ class TpaFullDriver(TpaDriver):
 
         if self._dft:
             
-            Fxy = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, density_list1, density_list2, None,'tpa_i')
-
-            Fxyz = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
                                                 dft_dict, density_list1, density_list2, density_list3,'tpa')
                 
             fock_index = 0
             for wb in wi:
                 for key in ['f_sig_xx','f_sig_yy', 'f_sig_zz', 'f_sig_xy','f_sig_xz','f_sig_yz','f_lamtau_xx','f_lamtau_yy', 'f_lamtau_zz','f_lamtau_xy','f_lamtau_xz', 'f_lamtau_yz',]:
-                    focks[key][wb] = DistributedArray(Fxy.data[:, fock_index], self.comm,distribute=False)
+                    focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
                     fock_index += 1
             
-            fock_index = 0
+            
             for wb in wi:
                     for key in ['F123_x','F123_y','F123_z'] :
-                        focks[key][wb] = DistributedArray(Fxyz.data[:, fock_index], self.comm,distribute=False)
+                        focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
                         fock_index += 1
                 
         else:

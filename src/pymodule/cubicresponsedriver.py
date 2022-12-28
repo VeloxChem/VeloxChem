@@ -864,21 +864,19 @@ class CubicResponseDriver(NonLinearSolver):
 
         time_start_fock = time.time()
         if self._dft:
-            Fxy = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, density_list1, density_list2, None,'crf_i')
-
-            Fxyz = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+            
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
                                                 dft_dict, density_list1, density_list2, density_list3,'crf')
             
             fock_index = 0
             for wb in fock_freqs:
                 for key in ['Fbc','Fbd','Fcd']:
-                    focks[key][wb] = DistributedArray(Fxy.data[:, fock_index], self.comm,distribute=False)
+                    focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
                     fock_index += 1
             
-            fock_index = 0
+            
             for wb in fock_freqs:
-                    focks['Fbcd'][wb] = DistributedArray(Fxyz.data[:, fock_index], self.comm,distribute=False)
+                    focks['Fbcd'][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
                     fock_index += 1
                 
         else:
