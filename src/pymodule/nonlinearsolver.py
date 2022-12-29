@@ -492,7 +492,7 @@ class NonLinearSolver:
                     num_1 = len(first_order_dens)
                     num_2 = len(second_order_dens)
                     num_3 = len(third_order_dens)
-                elif mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+                elif mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
                     num_1 = len(first_order_dens)
                     num_2 = len(second_order_dens)
 
@@ -516,10 +516,6 @@ class NonLinearSolver:
                      # 24 second-order densities per frequency
                      # 6 third-order densities per frequency
                      size_1, size_2, size_3 = 12, 24, 6
-                elif mode.lower() == 'tpa_i':
-                     # 12 first-order densities per frequency
-                     # 24 second-order densities per frequency
-                     size_1, size_2 = 12, 24
                 elif mode.lower() == 'tpa_ii':
                      # 36 first-order densities per frequency
                      # 6 second-order densities per frequency
@@ -527,19 +523,15 @@ class NonLinearSolver:
                 elif mode.lower() == 'redtpa_i':
                      # 36 first-order densities per frequency
                      # 6 second-order densities per frequency
-                     size_1, size_2 = 18, 6
+                     size_1, size_2 = 6, 6
                 elif mode.lower() == 'redtpa_ii':
                      # 36 first-order densities per frequency
                      # 6 second-order densities per frequency
                      size_1, size_2 = 18, 6
-                elif mode.lower() == 'crf_i':
-                     # 36 first-order densities per frequency
-                     # 6 second-order densities per frequency
-                     size_1, size_2 = 6, 6
                 elif mode.lower() == 'crf_ii':
                      # 12 first-order densities per frequency
                      # 6 second-order densities per frequency
-                     size_1, size_2 = 12, 6
+                     size_1, size_2 = 12, 2
                 elif mode.lower() == 'shg_red':
                     # 6 first-order densities
                     # 6 second-order densities
@@ -624,7 +616,7 @@ class NonLinearSolver:
 
             else:
                 # If HF on MPI_master
-                if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii', 'redtpa_i','redtpa_ii' ,'crf_i','crf_ii','shg_red']:
+                if mode.lower() in ['qrf','shg','tpa_ii', 'redtpa_i','redtpa_ii','crf_ii','shg_red']:
                     # If computing two-time perturbed Fock matrices at HF level only second-order perturbed densities are needed
                     # batch_start = batch_size * batch_ind
                     # batch_end = min(batch_start + batch_size, n_total) 
@@ -639,7 +631,7 @@ class NonLinearSolver:
                     dens3 = AODensityMatrix(dts3, denmat.rest)
         else:
             # If not MPI master 
-            if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+            if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
                 dens2 = AODensityMatrix()
                 if self._dft:
                     # for dft we also need dens 1 for quadratic contribution
@@ -653,7 +645,7 @@ class NonLinearSolver:
                     dens2 = AODensityMatrix()
 
         # Construct Fock matrix object for two-time transformed Fock matrices 
-        if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+        if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
             # For two-time perturbed Fock matrices we have as many Fock matrices as len dens2
             dens2.broadcast(self.rank, self.comm)
             fock = AOFockMatrix(dens2)
@@ -689,7 +681,7 @@ class NonLinearSolver:
         t0 = tm.time()
 
         # Compute HF/two-electron part of two-time perturbed Fock matrices
-        if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+        if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
             # For two-time perturbed Fock matrix, the two-electron (HF) part is only contracted with dens2
             eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
 
@@ -720,7 +712,7 @@ class NonLinearSolver:
             molgrid.distribute_counts_and_displacements(
                 self.rank, self.nodes, self.comm)
 
-            if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii','redtpa_i','redtpa_ii','crf_i','crf_ii','shg_red']:
+            if mode.lower() in ['qrf','shg','tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
                 # Compute vxc contribution for two-time transformed Fock matrics
                 xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,dens2, gs_density, molgrid,self.xcfun.get_func_label(), mode)
 

@@ -163,7 +163,7 @@ class CDensityGridQuad
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    const double* rhow1rhow2(const int32_t iDensityMatrix) const;
+    const double* gam(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product values.
@@ -171,7 +171,7 @@ class CDensityGridQuad
     @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density values.
      */
-    double* rhow1rhow2(const int32_t iDensityMatrix);
+    double* gam(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product with X gradient of  one-time transformed density.
@@ -179,7 +179,7 @@ class CDensityGridQuad
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient X values.
      */
-    const double* rxw1rhow2(const int32_t iDensityMatrix) const;
+    const double* gamX(const int32_t iDensityMatrix) const;
 
     /**
      Gets  pointer to one-time transformed density product with X gradient of  one-time transformed density.
@@ -187,7 +187,7 @@ class CDensityGridQuad
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient X values.
      */
-    double* rxw1rhow2(const int32_t iDensityMatrix);
+    double* gamX(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product with Y gradient of  one-time transformed density.
@@ -195,7 +195,7 @@ class CDensityGridQuad
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Y values.
      */
-    const double* ryw1rhow2(const int32_t iDensityMatrix) const;
+    const double* gamY(const int32_t iDensityMatrix) const;
 
     /**
      Gets constant pointer to one-time transformed density product with Y gradient of  one-time transformed density.
@@ -203,7 +203,7 @@ class CDensityGridQuad
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Y values.
      */
-    double* ryw1rhow2(const int32_t iDensityMatrix);
+    double* gamY(const int32_t iDensityMatrix);
 
     /**
      Gets constant pointer to one-time transformed density product with Z gradient of  one-time transformed density.
@@ -211,7 +211,7 @@ class CDensityGridQuad
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Z values.
      */
-    const double* rzw1rhow2(const int32_t iDensityMatrix) const;
+    const double* gamZ(const int32_t iDensityMatrix) const;
 
     /**
      Gets pointer to one-time transformed density product with Z gradient of  one-time transformed density.
@@ -219,7 +219,7 @@ class CDensityGridQuad
      @param iDensityMatrix the index of density matrix.
      @return the pointer to alpha density gradient Z values.
      */
-    double* rzw1rhow2(const int32_t iDensityMatrix);
+    double* gamZ(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to X gradient one-time transformed density product with X gradient of  one-time transformed density.
@@ -227,7 +227,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* rxw1rxw2(const int32_t iDensityMatrix) const;
+    const double* gamXX(const int32_t iDensityMatrix) const;
 
     /**
    Gets pointer to X gradient one-time transformed density product with X gradient of  one-time transformed density.
@@ -235,7 +235,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* rxw1rxw2(const int32_t iDensityMatrix);
+    double* gamXX(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to X gradient one-time transformed density product with Y gradient of  one-time transformed density.
@@ -243,7 +243,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* rxw1ryw2(const int32_t iDensityMatrix) const;
+    const double* gamXY(const int32_t iDensityMatrix) const;
 
     /**
    Gets  pointer to X gradient one-time transformed density product with X gradient of  one-time transformed density.
@@ -251,7 +251,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* rxw1ryw2(const int32_t iDensityMatrix);
+    double* gamXY(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to X gradient one-time transformed density product with Z gradient of  one-time transformed density.
@@ -259,7 +259,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* rxw1rzw2(const int32_t iDensityMatrix) const;
+    const double* gamXZ(const int32_t iDensityMatrix) const;
 
     /**
    Gets pointer to X gradient one-time transformed density product with Z gradient of  one-time transformed density.
@@ -267,7 +267,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* rxw1rzw2(const int32_t iDensityMatrix);
+    double* gamXZ(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to Y gradient one-time transformed density product with X gradient of  one-time transformed density.
@@ -275,7 +275,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* ryw1rxw2(const int32_t iDensityMatrix) const;
+    const double* gamYX(const int32_t iDensityMatrix) const;
 
     /**
    Gets pointer to Y gradient one-time transformed density product with X gradient of  one-time transformed density.
@@ -283,7 +283,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* ryw1rxw2(const int32_t iDensityMatrix);
+    double* gamYX(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to Y gradient one-time transformed density product with Y gradient of  one-time transformed density.
@@ -291,7 +291,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* ryw1ryw2(const int32_t iDensityMatrix) const;
+    const double* gamYY(const int32_t iDensityMatrix) const;
 
     /**
    Gets pointer to Y gradient one-time transformed density product with Y gradient of  one-time transformed density.
@@ -299,7 +299,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* ryw1ryw2(const int32_t iDensityMatrix);
+    double* gamYY(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to Y gradient one-time transformed density product with Z gradient of  one-time transformed density.
@@ -307,7 +307,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* ryw1rzw2(const int32_t iDensityMatrix) const;
+    const double* gamYZ(const int32_t iDensityMatrix) const;
 
     /**
    Gets pointer to Y gradient one-time transformed density product with Z gradient of  one-time transformed density.
@@ -315,7 +315,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* ryw1rzw2(const int32_t iDensityMatrix);
+    double* gamYZ(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to Z gradient one-time transformed density product with X gradient of  one-time transformed density.
@@ -323,7 +323,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* rzw1rxw2(const int32_t iDensityMatrix) const;
+    const double* gamZX(const int32_t iDensityMatrix) const;
 
     /**
    Gets  pointer to Z gradient one-time transformed density product with X gradient of  one-time transformed density.
@@ -331,7 +331,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* rzw1rxw2(const int32_t iDensityMatrix);
+    double* gamZX(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to Z gradient one-time transformed density product with Y gradient of  one-time transformed density.
@@ -339,7 +339,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* rzw1ryw2(const int32_t iDensityMatrix) const;
+    const double* gamZY(const int32_t iDensityMatrix) const;
 
     /**
    Gets pointer to Z gradient one-time transformed density product with Y gradient of  one-time transformed density.
@@ -347,7 +347,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* rzw1ryw2(const int32_t iDensityMatrix);
+    double* gamZY(const int32_t iDensityMatrix);
 
     /**
    Gets constant pointer to Z gradient one-time transformed density product with Z gradient of  one-time transformed density.
@@ -355,7 +355,7 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    const double* rzw1rzw2(const int32_t iDensityMatrix) const;
+    const double* gamZZ(const int32_t iDensityMatrix) const;
 
     /**
    Gets pointer Z X gradient one-time transformed density product with Z gradient of  one-time transformed density.
@@ -363,7 +363,11 @@ class CDensityGridQuad
    @param iDensityMatrix the index of density matrix.
    @return the pointer to beta density gradient Z values.
    */
-    double* rzw1rzw2(const int32_t iDensityMatrix);
+    double* gamZZ(const int32_t iDensityMatrix);
+
+    double prod2_r(double B_r, double B_i, double C_r, double C_i);
+
+    double prod2_i(double B_r, double B_i, double C_r, double C_i);
 
     /**
      Generates products of one-time transformed densities to be used for quadratic response.

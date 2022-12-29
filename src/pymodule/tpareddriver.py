@@ -38,6 +38,8 @@ from .tpadriver import TpaDriver
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
+import pandas as pd
+
 
 
 class TpaReducedDriver(TpaDriver):
@@ -132,6 +134,7 @@ class TpaReducedDriver(TpaDriver):
             D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
             D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
+
             # density transformation from MO to AO basis
 
             Dx = np.linalg.multi_dot([mo,  Dx , mo.T])
@@ -145,7 +148,6 @@ class TpaReducedDriver(TpaDriver):
             D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
             D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
             D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
-
 
             density_list1.append(Dx.real)
             density_list1.append(Dx.imag)
@@ -524,6 +526,13 @@ class TpaReducedDriver(TpaDriver):
             Dx = np.linalg.multi_dot([mo, Dx, mo.T])
             Dy = np.linalg.multi_dot([mo, Dy, mo.T])
             Dz = np.linalg.multi_dot([mo, Dz, mo.T])
+
+            D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx , mo.T])
+            D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy , mo.T])
+            D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz , mo.T])
+            D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy , mo.T])
+            D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz , mo.T])
+            D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz , mo.T])
 
             density_list1.append(Dc_x_.real)
             density_list1.append(Dc_x_.imag)

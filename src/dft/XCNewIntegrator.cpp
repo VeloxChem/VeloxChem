@@ -5359,7 +5359,7 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              npoi
 
     // pointers to perturbed density
 
-    auto rhow1a = rwDensityGridQuad.rhow1rhow2(iFock);
+    auto rhow1a = rwDensityGridQuad.gam(iFock);
 
     auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
 
@@ -5618,31 +5618,31 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
 
     // pointers to perturbed density gradient norms
 
-    auto rhow1rhow2 = rwDensityGridQuad.rhow1rhow2(iFock);
+    auto gam = rwDensityGridQuad.gam(iFock);
 
-    auto rxw1rhow2 = rwDensityGridQuad.rxw1rhow2(iFock);
+    auto gamx = rwDensityGridQuad.gamX(iFock);
 
-    auto ryw1rhow2 = rwDensityGridQuad.ryw1rhow2(iFock);
+    auto gamy = rwDensityGridQuad.gamY(iFock);
 
-    auto rzw1rhow2 = rwDensityGridQuad.rzw1rhow2(iFock);
+    auto gamz = rwDensityGridQuad.gamZ(iFock);
 
-    auto rxw1rxw2 = rwDensityGridQuad.rxw1rxw2(iFock);
+    auto gamxx = rwDensityGridQuad.gamXX(iFock);
 
-    auto rxw1ryw2 = rwDensityGridQuad.rxw1ryw2(iFock);
+    auto gamxy = rwDensityGridQuad.gamXY(iFock);
 
-    auto rxw1rzw2 = rwDensityGridQuad.rxw1rzw2(iFock);
+    auto gamxz = rwDensityGridQuad.gamXZ(iFock);
 
-    auto ryw1rxw2 = rwDensityGridQuad.ryw1rxw2(iFock);
+    auto gamyx = rwDensityGridQuad.gamYX(iFock);
 
-    auto ryw1ryw2 = rwDensityGridQuad.ryw1ryw2(iFock);
+    auto gamyy = rwDensityGridQuad.gamYY(iFock);
 
-    auto ryw1rzw2 = rwDensityGridQuad.ryw1rzw2(iFock);
+    auto gamyz = rwDensityGridQuad.gamYZ(iFock);
 
-    auto rzw1rxw2 = rwDensityGridQuad.rzw1rxw2(iFock);
+    auto gamzx = rwDensityGridQuad.gamZX(iFock);
 
-    auto rzw1ryw2 = rwDensityGridQuad.rzw1ryw2(iFock);
+    auto gamzy = rwDensityGridQuad.gamZY(iFock);
 
-    auto rzw1rzw2 = rwDensityGridQuad.rzw1rzw2(iFock);
+    auto gamzz = rwDensityGridQuad.gamZZ(iFock);
 
     auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
 
@@ -5683,8 +5683,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
             #pragma omp simd aligned(weights, \
                     rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2, \
                     v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, \
-                    rhow1rhow2, rxw1rhow2, ryw1rhow2, rzw1rhow2, \
-                    rxw1rxw2, rxw1ryw2, rxw1rzw2, ryw1rxw2, ryw1ryw2, ryw1rzw2, rzw1rxw2, rzw1ryw2, rzw1rzw2, \
+                    gam, gamx, gamy, gamz, \
+                    gamxx, gamxy, gamxz, gamyx, gamyy, gamyz, gamzx, gamzy, gamzz, \
                     rhow12a, gradw12a_x, gradw12a_y, gradw12a_z, \
                     G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
@@ -5703,37 +5703,37 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 double l5contract_x = grada_x_g * l2contract;
                 double l5contract_y = grada_y_g * l2contract;
                 double l5contract_z = grada_z_g * l2contract;     
-                double q2contract = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
-                double q3contract =   grada_x_g * grada_x_g * rxw1rxw2[g]
-                                    + grada_x_g * grada_y_g * rxw1ryw2[g]
-                                    + grada_x_g * grada_z_g * rxw1rzw2[g]
-                                    + grada_y_g * grada_x_g * ryw1rxw2[g]
-                                    + grada_y_g * grada_y_g * ryw1ryw2[g]
-                                    + grada_y_g * grada_z_g * ryw1rzw2[g]
-                                    + grada_z_g * grada_x_g * rzw1rxw2[g]
-                                    + grada_z_g * grada_y_g * rzw1ryw2[g]
-                                    + grada_z_g * grada_z_g * rzw1rzw2[g];
+                double q2contract = grada_x_g * gamx[g] + grada_y_g * gamy[g] + grada_z_g * gamz[g];
+                double q3contract =   grada_x_g * grada_x_g * gamxx[g]
+                                    + grada_x_g * grada_y_g * gamxy[g]
+                                    + grada_x_g * grada_z_g * gamxz[g]
+                                    + grada_y_g * grada_x_g * gamyx[g]
+                                    + grada_y_g * grada_y_g * gamyy[g]
+                                    + grada_y_g * grada_z_g * gamyz[g]
+                                    + grada_z_g * grada_x_g * gamzx[g]
+                                    + grada_z_g * grada_y_g * gamzy[g]
+                                    + grada_z_g * grada_z_g * gamzz[g];
 
-                double q4contract = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
-                double q7contract_x =  grada_x_g * grada_x_g *  rxw1rhow2[g] + grada_x_g * grada_y_g *  ryw1rhow2[g] + grada_x_g * grada_z_g *  rzw1rhow2[g];
-                double q7contract_y =  grada_y_g * grada_x_g *  rxw1rhow2[g] + grada_y_g * grada_y_g *  ryw1rhow2[g] + grada_y_g * grada_z_g *  rzw1rhow2[g];
-                double q7contract_z =  grada_z_g * grada_x_g *  rxw1rhow2[g] + grada_z_g * grada_y_g *  ryw1rhow2[g] + grada_z_g * grada_z_g *  rzw1rhow2[g];
+                double q4contract = gamxx[g] + gamyy[g] + gamzz[g];
+                double q7contract_x =  grada_x_g * grada_x_g *  gamx[g] + grada_x_g * grada_y_g *  gamy[g] + grada_x_g * grada_z_g *  gamz[g];
+                double q7contract_y =  grada_y_g * grada_x_g *  gamx[g] + grada_y_g * grada_y_g *  gamy[g] + grada_y_g * grada_z_g *  gamz[g];
+                double q7contract_z =  grada_z_g * grada_x_g *  gamx[g] + grada_z_g * grada_y_g *  gamy[g] + grada_z_g * grada_z_g *  gamz[g];
 
-                double q8contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  rxw1ryw2[g] + grada_z_g *  rxw1rzw2[g];
-                double q8contract_y =  grada_x_g *  ryw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  ryw1rzw2[g];
-                double q8contract_z =  grada_x_g *  rzw1rxw2[g] + grada_y_g *  rzw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q8contract_x =  grada_x_g *  gamxx[g] + grada_y_g *  gamxy[g] + grada_z_g *  gamxz[g];
+                double q8contract_y =  grada_x_g *  gamyx[g] + grada_y_g *  gamyy[g] + grada_z_g *  gamyz[g];
+                double q8contract_z =  grada_x_g *  gamzx[g] + grada_y_g *  gamzy[g] + grada_z_g *  gamzz[g];
 
                 double q9contract_x =  grada_x_g *  q3contract;
                 double q9contract_y =  grada_y_g *  q3contract;
                 double q9contract_z =  grada_z_g *  q3contract;
 
-                double q10contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  ryw1rxw2[g] + grada_z_g *  rzw1rxw2[g];
-                double q10contract_y =  grada_x_g *  rxw1ryw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  rzw1ryw2[g];
-                double q10contract_z =  grada_x_g *  rxw1rzw2[g] + grada_y_g *  ryw1rzw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q10contract_x =  grada_x_g *  gamxx[g] + grada_y_g *  gamyx[g] + grada_z_g *  gamzx[g];
+                double q10contract_y =  grada_x_g *  gamxy[g] + grada_y_g *  gamyy[g] + grada_z_g *  gamzy[g];
+                double q10contract_z =  grada_x_g *  gamxz[g] + grada_y_g *  gamyz[g] + grada_z_g *  gamzz[g];
 
-                double q11contract_x =  grada_x_g *  rxw1rxw2[g] + grada_x_g *  ryw1ryw2[g] + grada_x_g *  rzw1rzw2[g];
-                double q11contract_y =  grada_y_g *  rxw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_y_g *  rzw1rzw2[g];
-                double q11contract_z =  grada_z_g *  rxw1rxw2[g] + grada_z_g *  ryw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
+                double q11contract_x =  grada_x_g *  gamxx[g] + grada_x_g *  gamyy[g] + grada_x_g *  gamzz[g];
+                double q11contract_y =  grada_y_g *  gamxx[g] + grada_y_g *  gamyy[g] + grada_y_g *  gamzz[g];
+                double q11contract_z =  grada_z_g *  gamxx[g] + grada_z_g *  gamyy[g] + grada_z_g *  gamzz[g];
 
                 // functional derivatives in libxc form
 
@@ -5821,7 +5821,7 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 
                 // vxc 2 contributions
                 
-                prefac += rrr * rhow1rhow2[g] // q1
+                prefac += rrr * gam[g] // q1
                         + rxr * q2contract
                         + rxx * q3contract
                         + rx * q4contract;
@@ -5848,20 +5848,20 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t              npoi
                 
                 // vxc 2 contributions
                 
-                xcomp += xrr * grada_x_g * rhow1rhow2[g] // q5
-                        + xr * rxw1rhow2[g] // q6
+                xcomp += xrr * grada_x_g * gam[g] // q5
+                        + xr * gamx[g] // q6
                         + xxr * q7contract_x
                         + xx * (q8contract_x + q10contract_x + q11contract_x)
                         + xxx * q9contract_x;
 
-                ycomp += xrr * grada_y_g * rhow1rhow2[g] // q5
-                        + xr * ryw1rhow2[g] // q6
+                ycomp += xrr * grada_y_g * gam[g] // q5
+                        + xr * gamy[g] // q6
                         + xxr * q7contract_y
                         + xx * (q8contract_y + q10contract_y + q11contract_y)
                         + xxx * q9contract_y;
  
-                zcomp += xrr * grada_z_g * rhow1rhow2[g] // q5
-                        + xr * rzw1rhow2[g] // q6
+                zcomp += xrr * grada_z_g * gam[g] // q5
+                        + xr * gamz[g] // q6
                         + xxr * q7contract_z
                         + xx * (q8contract_z + q10contract_z + q11contract_z)
                         + xxx * q9contract_z;

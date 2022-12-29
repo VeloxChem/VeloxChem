@@ -1509,8 +1509,7 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
         }
     }
     if (xcFuncType == xcfun::gga)
-    {
-        
+    {   
         if (fstr::upcase(CubeMode) == "TPA")
         {
             for (int32_t j = 0; j < numdens / 30; j++)

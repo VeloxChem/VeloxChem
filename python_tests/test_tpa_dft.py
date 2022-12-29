@@ -57,9 +57,9 @@ class TestTPA:
                     if tpa_result[key] is None:
                         continue
                     assert abs(tpa_result[key][(w, -w, w)].real -
-                               ref_result[key].real) < 1.0e-4
+                               ref_result[key].real) < 1.0e-5
                     assert abs(tpa_result[key][(w, -w, w)].imag -
-                               ref_result[key].imag) < 1.0e-4
+                               ref_result[key].imag) < 1.0e-5
 
     def test_tpa_full(self):
 
@@ -82,15 +82,13 @@ class TestTPA:
 
     def test_tpa_reduced(self):
 
-        # vlxtag: RHF, TPA, CR
-
         w = 0.05
 
         ref_result = {
-            't3_dict': -25.70843072 -0.75696289j,
-            'NaX2Nyz': 238.00752432 + 7.20155143j,
-            'NxA2Nyz':  238.27183617 + 2.15574117j,
-            'gamma': 450.57092976 + 8.60032971j,
+            't3_dict': -35.37821846 -0.92780165j,
+            'NaX2Nyz': 230.17509800 + 7.10707465j,
+            'NxA2Nyz':  230.43689707 + 2.16398432j,
+            'gamma': 425.23377660 + 8.34325731j,
         }
 
         here = Path(__file__).parent
