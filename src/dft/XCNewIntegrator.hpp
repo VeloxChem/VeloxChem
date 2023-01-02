@@ -363,9 +363,6 @@ class CXCNewIntegrator
      @param gtoValuesX the GTO gradient X values on grid points.
      @param gtoValuesY the GTO gradient Y values on grid points.
      @param gtoValuesZ the GTO gradient Z values on grid points.
-     @param gtoValuesXX the GTO gradient XX values on grid points.
-     @param gtoValuesYY the GTO gradient YY values on grid points.
-     @param gtoValuesZZ the GTO gradient ZZ values on grid points.
      @param rhograd the gradient density.
      @param vrho the 1st-order functional derivative wrt rho.
      @param vsigma the 1st-order functional derivative wrt sigma.
@@ -380,9 +377,6 @@ class CXCNewIntegrator
                                                  const CDenseMatrix& gtoValuesX,
                                                  const CDenseMatrix& gtoValuesY,
                                                  const CDenseMatrix& gtoValuesZ,
-                                                 const CDenseMatrix& gtoValuesXX,
-                                                 const CDenseMatrix& gtoValuesYY,
-                                                 const CDenseMatrix& gtoValuesZZ,
                                                  const double*       rhograd,
                                                  const double*       vrho,
                                                  const double*       vsigma,
@@ -399,9 +393,6 @@ class CXCNewIntegrator
      @param gtoValuesX the GTO gradient X values on grid points.
      @param gtoValuesY the GTO gradient Y values on grid points.
      @param gtoValuesZ the GTO gradient Z values on grid points.
-     @param gtoValuesXX the GTO gradient XX values on grid points.
-     @param gtoValuesYY the GTO gradient YY values on grid points.
-     @param gtoValuesZZ the GTO gradient ZZ values on grid points.
      @param rhograd the gradient density.
      @param vrho the 1st-order functional derivative wrt rho.
      @param vsigma the 1st-order functional derivative wrt sigma.
@@ -416,9 +407,6 @@ class CXCNewIntegrator
                                                                        const CDenseMatrix& gtoValuesX,
                                                                        const CDenseMatrix& gtoValuesY,
                                                                        const CDenseMatrix& gtoValuesZ,
-                                                                       const CDenseMatrix& gtoValuesXX,
-                                                                       const CDenseMatrix& gtoValuesYY,
-                                                                       const CDenseMatrix& gtoValuesZZ,
                                                                        const double*       rhograd,
                                                                        const double*       vrho,
                                                                        const double*       vsigma,

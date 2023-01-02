@@ -133,9 +133,6 @@ void generateDensityForGGA(double*             rho,
  @param gtoValuesX the GTO X derivative values on grid points.
  @param gtoValuesY the GTO Y derivative values on grid points.
  @param gtoValuesZ the GTO Z derivative values on grid points.
- @param gtoValuesXX the GTO XX derivative values on grid points.
- @param gtoValuesYY the GTO YY derivative values on grid points.
- @param gtoValuesZZ the GTO ZZ derivative values on grid points.
  @param densityMatrix the density matrix.
  @param timer the timer.
  */
@@ -149,9 +146,6 @@ void generateDensityForMGGA(double*             rho,
                             const CDenseMatrix& gtoValuesX,
                             const CDenseMatrix& gtoValuesY,
                             const CDenseMatrix& gtoValuesZ,
-                            const CDenseMatrix& gtoValuesXX,
-                            const CDenseMatrix& gtoValuesYY,
-                            const CDenseMatrix& gtoValuesZZ,
                             const CDenseMatrix& densityMatrix,
                             CMultiTimer&        timer);
 
@@ -168,9 +162,6 @@ void generateDensityForMGGA(double*             rho,
  @param gtoValuesX the GTO X derivative values on grid points.
  @param gtoValuesY the GTO Y derivative values on grid points.
  @param gtoValuesZ the GTO Z derivative values on grid points.
- @param gtoValuesXX the GTO XX derivative values on grid points.
- @param gtoValuesYY the GTO YY derivative values on grid points.
- @param gtoValuesZZ the GTO ZZ derivative values on grid points.
  @param densityMatrixAlpha the alpha density matrix.
  @param densityMatrixBeta the beta density matrix.
  @param timer the timer.
@@ -185,9 +176,6 @@ void generateDensityForMGGA(double*             rho,
                             const CDenseMatrix& gtoValuesX,
                             const CDenseMatrix& gtoValuesY,
                             const CDenseMatrix& gtoValuesZ,
-                            const CDenseMatrix& gtoValuesXX,
-                            const CDenseMatrix& gtoValuesYY,
-                            const CDenseMatrix& gtoValuesZZ,
                             const CDenseMatrix& densityMatrixAlpha,
                             const CDenseMatrix& densityMatrixBeta,
                             CMultiTimer&        timer);
