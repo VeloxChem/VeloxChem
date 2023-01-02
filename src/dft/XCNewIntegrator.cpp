@@ -43,7 +43,6 @@
 #include "NewFunctionalParser.hpp"
 #include "SubMatrix.hpp"
 #include "XCFuncType.hpp"
-#include "XCVarsType.hpp"
 
 CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
 
