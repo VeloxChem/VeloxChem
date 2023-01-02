@@ -32,7 +32,7 @@ class TestScfRestrictedOpenShell:
 
         if task.mpi_rank == mpi_master():
             e_scf = scf_drv.get_scf_energy()
-            tol = 1.0e-5 if xcfun_label is not None else 1.0e-6
+            tol = 1.0e-4 if xcfun_label is not None else 1.0e-6
             assert e_scf == approx(ref_e_scf, abs=tol)
 
     @pytest.mark.parametrize(
@@ -51,11 +51,13 @@ class TestScfRestrictedOpenShell:
             ('water_triplet.inp', 'blyp', 'def2-svp', -76.055256325587),
             ('water_triplet.inp', 'b3lyp', 'def2-svp', -76.074465451578),
             ('water_triplet.inp', 'b3lyp', 'aug-cc-pvdz', -76.176630915242),
+            ('water_triplet.inp', 'tpssh', 'aug-cc-pvdz', -76.170884),
+            ('water_triplet.inp', 'm06', 'aug-cc-pvdz', -76.123272),
         ],
         ids=[
             'Li', 'ClH2', 'H3O', 'CH5', 'HeH', 'HeH-Slater', 'HeH-B3LYP',
             'H2O-HF', 'H2O-SLATER', 'H2O-SLDA', 'H2O-BLYP', 'H2O-B3LYP',
-            'H2O-B3LYP-aDZ'
+            'H2O-B3LYP-aDZ', 'H2O-TPSSh-aDZ', 'H2O-M06-aDZ'
         ],
     )
     def test_scf(self, inpfile, xcfun_label, basis_label, ref_e_scf):

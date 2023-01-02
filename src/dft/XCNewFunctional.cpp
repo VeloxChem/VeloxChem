@@ -56,6 +56,8 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
 
     bool isLDA = false, isGGA = false, isMGGA = false;
 
+    bool needLaplacian = false;
+
     for (int32_t i = 0; i < static_cast<int32_t>(labels.size()); i++)
     {
         auto label = labels[i];
@@ -65,6 +67,8 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
         auto xccomp = CXCComponent(label, coeff);
 
         auto funcptr = xccomp.getFunctionalPointer();
+
+        // check functional kind
 
         auto kind = funcptr->info->kind;
 
@@ -84,22 +88,38 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
             errors::assertMsgCritical(false, std::string("XCNewFunctional: Unsupported functional ") + label);
         }
 
+        // check functional flags
+
         auto flags = funcptr->info->flags;
 
         // which derivative orders do we have for this x-c mixture?
-        hasExc = hasExc && (flags & XC_FLAGS_HAVE_EXC);
-        hasVxc = hasVxc && (flags & XC_FLAGS_HAVE_VXC);
-        hasFxc = hasFxc && (flags & XC_FLAGS_HAVE_FXC);
-        hasKxc = hasKxc && (flags & XC_FLAGS_HAVE_KXC);
-        hasLxc = hasLxc && (flags & XC_FLAGS_HAVE_LXC);
+        hasExc = (hasExc && (flags & XC_FLAGS_HAVE_EXC));
+        hasVxc = (hasVxc && (flags & XC_FLAGS_HAVE_VXC));
+        hasFxc = (hasFxc && (flags & XC_FLAGS_HAVE_FXC));
+        hasKxc = (hasKxc && (flags & XC_FLAGS_HAVE_KXC));
+        hasLxc = (hasLxc && (flags & XC_FLAGS_HAVE_LXC));
+
+        // whether Laplacian is needed
+        needLaplacian = (needLaplacian || (flags & XC_FLAGS_NEEDS_LAPLACIAN));
+
+        // check functional family
 
         // which family does this x-c mixture belong to?
         auto family = funcptr->info->family;
 
         // LDA, GGA, metaGGA
-        isMGGA = (isMGGA || (family == XC_FAMILY_MGGA));
-        isGGA  = ((!isMGGA) && (isGGA || (family == XC_FAMILY_GGA)));
-        isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || (family == XC_FAMILY_LDA)));
+        isMGGA = (isMGGA || (family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA));
+        isGGA  = ((!isMGGA) && (isGGA || (family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA)));
+        isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || (family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA)));
+
+        // check functional hybrid type
+        // TODO use xc_hyb_type when it is available
+
+        auto hyb_exx_coeff = xc_hyb_exx_coef(funcptr);
+
+        if (hyb_exx_coeff != 0.0) _fractionOfExactExchange += coeff * hyb_exx_coeff;
+
+        // TODO figure out range-separation parameters
     }
 
     if (hasExc) _maxDerivOrder = 0;
@@ -112,19 +132,7 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
     if (isGGA) _familyOfFunctional = std::string("GGA");
     if (isMGGA) _familyOfFunctional = std::string("MGGA");
 
-    // TODO figure out whether Laplacian is needed (XC_FLAGS_NEEDS_LAPLACIAN)
-
-    // fraction of exact exchange
-    if (_components.size() == 1)
-    {
-        auto funcptr = _components[0].getFunctionalPointer();
-        if (funcptr->info->kind == XC_EXCHANGE_CORRELATION)
-        {
-            _fractionOfExactExchange = xc_hyb_exx_coef(funcptr);
-        }
-    }
-
-    // TODO figure out range-separation parameters
+    errors::assertMsgCritical(!needLaplacian, std::string("XCNewFunctional: Density Laplacian is not supported"));
 
     _allocateStagingBuffer();
 }
@@ -487,7 +495,7 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
 
@@ -500,7 +508,7 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
@@ -559,7 +567,7 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_vxc(funcptr, np, rho, stage_vrho);
 
@@ -570,7 +578,7 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
 
@@ -641,7 +649,7 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
 
@@ -653,7 +661,7 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
                 v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
 
@@ -766,7 +774,7 @@ CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
 
@@ -779,7 +787,7 @@ CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
                 v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
 
@@ -888,7 +896,7 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
 
@@ -901,7 +909,7 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
@@ -918,7 +926,7 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                 vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
             }
         }
-        else if (family == XC_FAMILY_MGGA)
+        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
         {
             xc_mgga_exc_vxc(funcptr, np, rho, sigma, lapl, tau, stage_exc, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
 

@@ -39,7 +39,6 @@
 #include "ErrorHandler.hpp"
 #include "GridPartitioner.hpp"
 #include "GtoContainer.hpp"
-#include "XCVarsType.hpp"
 
 CMolecularGrid::CMolecularGrid()
 

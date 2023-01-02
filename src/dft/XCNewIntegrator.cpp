@@ -43,7 +43,6 @@
 #include "NewFunctionalParser.hpp"
 #include "SubMatrix.hpp"
 #include "XCFuncType.hpp"
-#include "XCVarsType.hpp"
 
 CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
 
@@ -836,19 +835,13 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
     mat_Vxc.zero();
 
     // memory blocks for GTOs on grid points
+    // TODO implement Laplacian dependence
 
     CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
     CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
     CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
-    CMemBlock2D<double> gaoxx(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoxy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoxz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoyy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoyz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaozz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
 
@@ -928,7 +921,7 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
         timer.start("GTO pre-screening");
 
-        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 2, _screeningThresholdForGTOValues, boxdim);  // 2nd order GTO derivative
+        gtoeval::preScreenGtos(skip_cgto_ids, skip_ao_ids, gtovec, 1, _screeningThresholdForGTOValues, boxdim);  // 1st order GTO derivative
 
         timer.stop("GTO pre-screening");
 
@@ -946,9 +939,8 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForMetaGGA(gaos, gaox, gaoy, gaoz, gaoxx, gaoxy, gaoxz, gaoyy, gaoyz, gaozz,
-                                                 gtovec, xcoords, ycoords, zcoords, gridblockpos,
-                                                 grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
+                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -971,25 +963,12 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
             auto gaoy_nu = gaoy.data(nu);
             auto gaoz_nu = gaoz.data(nu);
 
-            auto gaoxx_nu = gaoxx.data(nu);
-            auto gaoxy_nu = gaoxy.data(nu);
-            auto gaoxz_nu = gaoxz.data(nu);
-            auto gaoyy_nu = gaoyy.data(nu);
-            auto gaoyz_nu = gaoyz.data(nu);
-            auto gaozz_nu = gaozz.data(nu);
-
             for (int32_t g = 0; g < npoints; g++)
             {
                 if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
                     (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
                     (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
+                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -1011,10 +990,6 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
         CDenseMatrix mat_chi_y(aocount, npoints);
         CDenseMatrix mat_chi_z(aocount, npoints);
 
-        CDenseMatrix mat_chi_xx(aocount, npoints);
-        CDenseMatrix mat_chi_yy(aocount, npoints);
-        CDenseMatrix mat_chi_zz(aocount, npoints);
-
         for (int32_t i = 0; i < aocount; i++)
         {
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
@@ -1022,10 +997,6 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
             std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
             std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
-
-            std::memcpy(mat_chi_xx.row(i), gaoxx.data(aoinds[i]), npoints * sizeof(double));
-            std::memcpy(mat_chi_yy.row(i), gaoyy.data(aoinds[i]), npoints * sizeof(double));
-            std::memcpy(mat_chi_zz.row(i), gaozz.data(aoinds[i]), npoints * sizeof(double));
         }
 
         timer.stop("GTO screening");
@@ -1042,7 +1013,6 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
             dengridgen::generateDensityForMGGA(rho, rhograd, sigma, lapl, tau, npoints,
                                                mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                                               mat_chi_xx, mat_chi_yy, mat_chi_zz,
                                                sub_dens_mat, timer);
 
             timer.stop("Density matrix slicing");
@@ -1056,7 +1026,6 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
             dengridgen::generateDensityForMGGA(rho, rhograd, sigma, lapl, tau, npoints,
                                                mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                                               mat_chi_xx, mat_chi_yy, mat_chi_zz,
                                                sub_dens_mat_a, sub_dens_mat_b, timer);
 
             timer.stop("Density matrix slicing");
@@ -1088,7 +1057,7 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
         {
             auto partial_mat_Vxc = _integratePartialVxcFockForMGGA(
                 npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                mat_chi_xx, mat_chi_yy, mat_chi_zz, rhograd, vrho, vsigma, vlapl, vtau, timer);
+                rhograd, vrho, vsigma, vlapl, vtau, timer);
 
             timer.start("Vxc matrix dist.");
 
@@ -1100,7 +1069,7 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
         {
             auto partial_mat_Vxc_ab = _integratePartialVxcFockForMGGAOpenShell(
                 npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                mat_chi_xx, mat_chi_yy, mat_chi_zz, rhograd, vrho, vsigma, vlapl, vtau, timer);
+                rhograd, vrho, vsigma, vlapl, vtau, timer);
 
             timer.start("Vxc matrix dist.");
 
@@ -3060,9 +3029,6 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t          npoints
                                                   const CDenseMatrix&    gtoValuesX,
                                                   const CDenseMatrix&    gtoValuesY,
                                                   const CDenseMatrix&    gtoValuesZ,
-                                                  const CDenseMatrix&    gtoValuesXX,
-                                                  const CDenseMatrix&    gtoValuesYY,
-                                                  const CDenseMatrix&    gtoValuesZZ,
                                                   const double*          rhograd,
                                                   const double*          vrho,
                                                   const double*          vsigma,
@@ -3079,7 +3045,7 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t          npoints
     // LDA contribution
     CDenseMatrix mat_G(naos, npoints);
 
-    // GGA and laplacian contribution
+    // GGA contribution
     CDenseMatrix mat_G_gga(naos, npoints);
 
     // tau contribution
@@ -3100,10 +3066,6 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t          npoints
     auto chi_x_val = gtoValuesX.values();
     auto chi_y_val = gtoValuesY.values();
     auto chi_z_val = gtoValuesZ.values();
-
-    auto chi_xx_val = gtoValuesXX.values();
-    auto chi_yy_val = gtoValuesYY.values();
-    auto chi_zz_val = gtoValuesZZ.values();
 
     #pragma omp parallel
     {
@@ -3133,10 +3095,7 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t          npoints
                                                          vy * chi_y_val[nu_offset + g] +
                                                          vz * chi_z_val[nu_offset + g]);
 
-                // laplacian contribution (will be scaled by 2 later)
-                G_gga_val[nu_offset + g] += weights[g] * vlapl[2 * g + 0] * (chi_xx_val[nu_offset + g] +
-                                                                             chi_yy_val[nu_offset + g] +
-                                                                             chi_zz_val[nu_offset + g]);
+                // TODO implement Laplacian dependence
 
                 // tau contribution (will be scaled by 0.5 later)
                 G_gga_x_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_x_val[nu_offset + g];
@@ -3157,7 +3116,7 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t          npoints
 
     timer.start("Vxc matrix matmul");
 
-    // LDA, GGA and laplacian contribution
+    // LDA and GGA contribution
     auto mat_Vxc = denblas::multABt(gtoValues, denblas::addAB(mat_G, mat_G_gga, 2.0));
 
     // tau contribution
@@ -3183,9 +3142,6 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t        
                                                            const CDenseMatrix&    gtoValuesX,
                                                            const CDenseMatrix&    gtoValuesY,
                                                            const CDenseMatrix&    gtoValuesZ,
-                                                           const CDenseMatrix&    gtoValuesXX,
-                                                           const CDenseMatrix&    gtoValuesYY,
-                                                           const CDenseMatrix&    gtoValuesZZ,
                                                            const double*          rhograd,
                                                            const double*          vrho,
                                                            const double*          vsigma,
@@ -3203,7 +3159,7 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t        
     CDenseMatrix mat_G_a(naos, npoints);
     CDenseMatrix mat_G_b(naos, npoints);
 
-    // GGA and laplacian contribution
+    // GGA contribution
     CDenseMatrix mat_G_a_gga(naos, npoints);
     CDenseMatrix mat_G_b_gga(naos, npoints);
 
@@ -3235,10 +3191,6 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t        
     auto chi_x_val = gtoValuesX.values();
     auto chi_y_val = gtoValuesY.values();
     auto chi_z_val = gtoValuesZ.values();
-
-    auto chi_xx_val = gtoValuesXX.values();
-    auto chi_yy_val = gtoValuesYY.values();
-    auto chi_zz_val = gtoValuesZZ.values();
 
     #pragma omp parallel
     {
@@ -3276,13 +3228,7 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t        
                                                            vyb * chi_y_val[nu_offset + g] +
                                                            vzb * chi_z_val[nu_offset + g]);
 
-                // laplacian contribution (will be scaled by 2 later)
-                G_a_gga_val[nu_offset + g] += weights[g] * vlapl[2 * g + 0] * (chi_xx_val[nu_offset + g] +
-                                                                               chi_yy_val[nu_offset + g] +
-                                                                               chi_zz_val[nu_offset + g]);
-                G_b_gga_val[nu_offset + g] += weights[g] * vlapl[2 * g + 1] * (chi_xx_val[nu_offset + g] +
-                                                                               chi_yy_val[nu_offset + g] +
-                                                                               chi_zz_val[nu_offset + g]);
+                // TODO implement Laplacian dependence
 
                 // tau contribution (will be scaled by 0.5 later)
                 G_a_gga_x_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_x_val[nu_offset + g];
@@ -3307,7 +3253,7 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t        
 
     timer.start("Vxc matrix matmul");
 
-    // LDA, GGA and laplacian contribution
+    // LDA and GGA contribution
     auto mat_Vxc_a = denblas::multABt(gtoValues, denblas::addAB(mat_G_a, mat_G_a_gga, 2.0));
     auto mat_Vxc_b = denblas::multABt(gtoValues, denblas::addAB(mat_G_b, mat_G_b_gga, 2.0));
 

@@ -394,9 +394,6 @@ generateDensityForMGGA(double*             rho,
                        const CDenseMatrix& gtoValuesX,
                        const CDenseMatrix& gtoValuesY,
                        const CDenseMatrix& gtoValuesZ,
-                       const CDenseMatrix& gtoValuesXX,
-                       const CDenseMatrix& gtoValuesYY,
-                       const CDenseMatrix& gtoValuesZZ,
                        const CDenseMatrix& densityMatrix,
                        CMultiTimer&        timer)
 {
@@ -436,10 +433,6 @@ generateDensityForMGGA(double*             rho,
     auto chi_y_val = gtoValuesY.values();
     auto chi_z_val = gtoValuesZ.values();
 
-    auto chi_xx_val = gtoValuesXX.values();
-    auto chi_yy_val = gtoValuesYY.values();
-    auto chi_zz_val = gtoValuesZZ.values();
-
     #pragma omp parallel
     {
         auto thread_id = omp_get_thread_num();
@@ -470,9 +463,8 @@ generateDensityForMGGA(double*             rho,
         {
             auto nu_offset = nu * npoints;
 
-            #pragma omp simd aligned(rho, rhograd, F_val, chi_val, chi_x_val, chi_y_val, chi_z_val, \
-                                     F_x_val, F_y_val, F_z_val, chi_xx_val, chi_yy_val, chi_zz_val, \
-                                     lapl, tau : VLX_ALIGN)
+            #pragma omp simd aligned(rho, rhograd, F_val, F_x_val, F_y_val, F_z_val, \
+                                     chi_val, chi_x_val, chi_y_val, chi_z_val, lapl, tau : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 // rho_a
@@ -483,10 +475,7 @@ generateDensityForMGGA(double*             rho,
                 rhograd[6 * g + 1] += 2.0 * F_val[nu_offset + g] * chi_y_val[nu_offset + g];
                 rhograd[6 * g + 2] += 2.0 * F_val[nu_offset + g] * chi_z_val[nu_offset + g];
 
-                // lapl_a
-                lapl[2 * g + 0] += 2.0 * F_val[nu_offset + g] * (chi_xx_val[nu_offset + g] +
-                                                                 chi_yy_val[nu_offset + g] +
-                                                                 chi_zz_val[nu_offset + g]);
+                // TODO implement Laplacian dependence
 
                 // tau_a
                 tau[2 * g + 0] += 0.5 * (F_x_val[nu_offset + g] * chi_x_val[nu_offset + g] +
@@ -545,9 +534,6 @@ generateDensityForMGGA(double*             rho,
                        const CDenseMatrix& gtoValuesX,
                        const CDenseMatrix& gtoValuesY,
                        const CDenseMatrix& gtoValuesZ,
-                       const CDenseMatrix& gtoValuesXX,
-                       const CDenseMatrix& gtoValuesYY,
-                       const CDenseMatrix& gtoValuesZZ,
                        const CDenseMatrix& densityMatrixAlpha,
                        const CDenseMatrix& densityMatrixBeta,
                        CMultiTimer&        timer)
@@ -600,10 +586,6 @@ generateDensityForMGGA(double*             rho,
     auto chi_y_val = gtoValuesY.values();
     auto chi_z_val = gtoValuesZ.values();
 
-    auto chi_xx_val = gtoValuesXX.values();
-    auto chi_yy_val = gtoValuesYY.values();
-    auto chi_zz_val = gtoValuesZZ.values();
-
     #pragma omp parallel
     {
         auto thread_id = omp_get_thread_num();
@@ -636,10 +618,9 @@ generateDensityForMGGA(double*             rho,
         {
             auto nu_offset = nu * npoints;
 
-            #pragma omp simd aligned(rho, rhograd, F_a_val, F_b_val, chi_val, \
-                                     chi_x_val, chi_y_val, chi_z_val, chi_xx_val, chi_yy_val, chi_zz_val, \
+            #pragma omp simd aligned(rho, rhograd, F_a_val, F_b_val, \
                                      F_a_x_val, F_a_y_val, F_a_z_val, F_b_x_val, F_b_y_val, F_b_z_val, \
-                                     lapl, tau : VLX_ALIGN)
+                                     chi_val, chi_x_val, chi_y_val, chi_z_val, lapl, tau : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 rho[2 * g + 0] += F_a_val[nu_offset + g] * chi_val[nu_offset + g];
@@ -653,12 +634,7 @@ generateDensityForMGGA(double*             rho,
                 rhograd[6 * g + 4] += 2.0 * F_b_val[nu_offset + g] * chi_y_val[nu_offset + g];
                 rhograd[6 * g + 5] += 2.0 * F_b_val[nu_offset + g] * chi_z_val[nu_offset + g];
 
-                lapl[2 * g + 0] += 2.0 * F_a_val[nu_offset + g] * (chi_xx_val[nu_offset + g] +
-                                                                   chi_yy_val[nu_offset + g] +
-                                                                   chi_zz_val[nu_offset + g]);
-                lapl[2 * g + 1] += 2.0 * F_b_val[nu_offset + g] * (chi_xx_val[nu_offset + g] +
-                                                                   chi_yy_val[nu_offset + g] +
-                                                                   chi_zz_val[nu_offset + g]);
+                // TODO implement Laplacian dependence
 
                 tau[2 * g + 0] += 0.5 * (F_a_x_val[nu_offset + g] * chi_x_val[nu_offset + g] +
                                          F_a_y_val[nu_offset + g] * chi_y_val[nu_offset + g] +
