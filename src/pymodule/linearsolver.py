@@ -27,7 +27,6 @@ from pathlib import Path
 from datetime import datetime
 import numpy as np
 import time as tm
-import math
 import sys
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
@@ -36,9 +35,7 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
-from .veloxchemlib import (mpi_master, fine_structure_constant, hartree_in_ev,
-                           extinction_coefficient_from_beta,
-                           rotatory_strength_in_cgs)
+from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat, fockmat, molorb
 from .veloxchemlib import new_parse_xc_func
 from .aodensitymatrix import AODensityMatrix
@@ -853,7 +850,7 @@ class LinearSolver:
 
         if self.use_split_comm:
             self._comp_lr_fock_split_comm(fock, dens, molecule, basis, eri_dict,
-                                          dft_dict, pe_dict)
+                                          dft_dict, pe_dict, profiler)
 
         else:
             t0 = tm.time()
@@ -869,9 +866,6 @@ class LinearSolver:
                         fock.scale(2.0, ifock)
 
                 xc_drv = XCNewIntegrator(self.comm)
-                molgrid.partition_grid_points()
-                molgrid.distribute_counts_and_displacements(
-                    self.rank, self.nodes, self.comm)
                 xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
                                           gs_density, molgrid,
                                           self.xcfun.get_func_label())
@@ -892,8 +886,15 @@ class LinearSolver:
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
 
-    def _comp_lr_fock_split_comm(self, fock, dens, molecule, basis, eri_dict,
-                                 dft_dict, pe_dict):
+    def _comp_lr_fock_split_comm(self,
+                                 fock,
+                                 dens,
+                                 molecule,
+                                 basis,
+                                 eri_dict,
+                                 dft_dict,
+                                 pe_dict,
+                                 profiler=None):
         """
         Computes linear response Fock/Fxc matrix on split communicators.
 
@@ -911,6 +912,8 @@ class LinearSolver:
             The dictionary containing DFT information.
         :param pe_dict:
             The dictionary containing PE information.
+        :param profiler:
+            The profiler.
         """
 
         molgrid = dft_dict['molgrid']
@@ -1002,6 +1005,9 @@ class LinearSolver:
                     fock.add_matrix(DenseMatrix(V_pe), ifock)
 
         dt = tm.time() - t0
+
+        if profiler is not None:
+            profiler.add_timing_info('FockBuild', dt)
 
         # collect Fock on master node
         fock.reduce_sum(self.rank, self.nodes, self.comm)
@@ -2061,111 +2067,3 @@ class LinearSolver:
             excitation_details.append(de_exc[1])
 
         return excitation_details
-
-    @staticmethod
-    def lorentzian_absorption_spectrum(energy_unit, exc_ene, osc_str, e_min,
-                                       e_max, e_step, gamma):
-        """
-        Broadens absorption stick spectrum.
-
-        :param energy_unit:
-            The unit of excitation energies.
-        :param exc_ene:
-            Excitation energies in energy_unit.
-        :param osc_str:
-            Oscillator strengths.
-        :param e_min:
-            Minimal excitation energy in energy_unit in broadened spectrum.
-        :param e_max:
-            Maximum excitation energy in energy_unit in broadened spectrum.
-        :param e_step:
-            Step size of excitation energy in energy_unit in broadened spectrum.
-        :param gamma:
-            The broadening parameter in energy_unit.
-
-        :return:
-            The excitation energies in energy_unit and sigma(w) in a.u.
-        """
-
-        assert_msg_critical(
-            energy_unit.lower() in ['ev', 'au'],
-            'lorentzian_absorption_spectrum: Invalid energy_unit')
-
-        # convert all values to a.u.
-        if energy_unit.lower() == 'ev':
-            e_min /= hartree_in_ev()
-            e_max /= hartree_in_ev()
-            e_step /= hartree_in_ev()
-            gamma /= hartree_in_ev()
-            exc_ene_au = exc_ene / hartree_in_ev()
-        else:
-            exc_ene_au = exc_ene
-
-        x_i = np.arange(e_min, e_max + e_step / 100.0, e_step, dtype='float64')
-        y_i = np.zeros_like(x_i)
-
-        factor = 2.0 * math.pi * fine_structure_constant()
-
-        for i in range(x_i.size):
-            for s in range(exc_ene_au.size):
-                y_i[i] += factor * gamma / (
-                    (x_i[i] - exc_ene_au[s])**2 + gamma**2) * osc_str[s]
-
-        if energy_unit.lower() == 'ev':
-            x_i *= hartree_in_ev()
-
-        return x_i, y_i
-
-    @staticmethod
-    def lorentzian_ecd_spectrum(energy_unit, exc_ene, rot_str, e_min, e_max,
-                                e_step, gamma):
-        """
-        Broadens ECD stick spectrum.
-
-        :param energy_unit:
-            The unit of excitation energies.
-        :param exc_ene:
-            Excitation energies in energy_unit
-        :param rot_str:
-            Rotatory strengths in 10**(-40) cgs unit.
-        :param e_min:
-            Minimal excitation energy in energy_unit in broadened spectrum.
-        :param e_max:
-            Maximum excitation energy in energy_unit in broadened spectrum.
-        :param e_step:
-            Step size of excitation energy in energy_unit in broadened spectrum.
-        :param gamma:
-            The broadening parameter in energy_unit.
-
-        :return:
-            The excitation energies in energy_unit and Delta_epsilon in L mol^-1 cm^-1
-        """
-
-        assert_msg_critical(energy_unit.lower() in ['ev', 'au'],
-                            'lorentzian_ecd_spectrum: Invalid energy_unit')
-
-        # convert all values to a.u.
-        if energy_unit.lower() == 'ev':
-            e_min /= hartree_in_ev()
-            e_max /= hartree_in_ev()
-            e_step /= hartree_in_ev()
-            gamma /= hartree_in_ev()
-            exc_ene_au = exc_ene / hartree_in_ev()
-        else:
-            exc_ene_au = exc_ene
-
-        x_i = np.arange(e_min, e_max + e_step / 100.0, e_step, dtype='float64')
-        y_i = np.zeros_like(x_i)
-
-        f = 1.0 / rotatory_strength_in_cgs()  # convert rot_str to a.u.
-        f *= extinction_coefficient_from_beta() / 3.0
-
-        for i in range(x_i.size):
-            for s in range(exc_ene_au.size):
-                y_i[i] += f * gamma / ((x_i[i] - exc_ene_au[s])**2 +
-                                       gamma**2) * exc_ene_au[s] * rot_str[s]
-
-        if energy_unit.lower() == 'ev':
-            x_i *= hartree_in_ev()
-
-        return x_i, y_i

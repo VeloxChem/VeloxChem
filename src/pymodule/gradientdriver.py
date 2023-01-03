@@ -29,7 +29,7 @@ import sys
 
 from .veloxchemlib import GridDriver, XCNewMolecularGradient
 from .veloxchemlib import mpi_master
-from .veloxchemlib import parse_xc_func
+from .veloxchemlib import new_parse_xc_func
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
@@ -121,7 +121,7 @@ class GradientDriver:
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            self.xcfun = new_parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Gradient driver: Undefined XC functional')
 
@@ -228,7 +228,6 @@ class GradientDriver:
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCNewMolecularGradient(self.comm)
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
@@ -262,7 +261,6 @@ class GradientDriver:
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCNewMolecularGradient(self.comm)
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
@@ -299,7 +297,6 @@ class GradientDriver:
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.distribute(self.rank, self.nodes, self.comm)
 
         xc_molgrad_drv = XCNewMolecularGradient(self.comm)
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
@@ -334,9 +331,6 @@ class GradientDriver:
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.partition_grid_points()
-        mol_grid.distribute_counts_and_displacements(self.rank, self.nodes,
-                                                     self.comm)
 
         xcgrad_drv = XCNewMolecularGradient(self.comm)
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(

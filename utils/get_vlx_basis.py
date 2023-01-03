@@ -3,6 +3,7 @@ import numpy as np
 import argparse
 import hashlib
 import sys
+import re
 
 
 def get_vlx_basis_string(basis_name,
@@ -25,6 +26,21 @@ def get_vlx_basis_string(basis_name,
         The string for VeloxChem basis set.
     """
 
+    # geometric augmentation
+
+    geom_aug = 0
+    if basis_name.upper().startswith('DAUG-'):
+        geom_aug = 1
+    elif basis_name.upper().startswith('TAUG-'):
+        geom_aug = 2
+    elif basis_name.upper().startswith('QAUG-'):
+        geom_aug = 3
+
+    # (aug-)cc-pCVnZ basis sets: H and He are added from (aug-)cc-pVnZ
+
+    is_cc_pcvnz_basis = (re.search(r'^[DTQ]?(AUG-)?CC-PCV.Z$',
+                                   basis_name.upper()) is not None)
+
     # Process basis set name (or json file name)
 
     if basis_name[-5:] == '.json' and Path(basis_name).is_file():
@@ -36,9 +52,23 @@ def get_vlx_basis_string(basis_name,
         if basis_name.upper() == 'SADLEJ-PVTZ':
             basis_name = 'SADLEJ PVTZ'
         import basis_set_exchange as bse
+        if geom_aug >= 1:
+            basis_name = basis_name[1:]
         basis = bse.get_basis(basis_name,
                               header=False,
                               optimize_general=optimize_general)
+        if is_cc_pcvnz_basis:
+            h_he_basis_name = basis_name.upper().replace('CC-PCV', 'CC-PV')
+            h_he_basis = bse.get_basis(h_he_basis_name,
+                                       header=False,
+                                       optimize_general=optimize_general)
+        if geom_aug >= 1:
+            basis = bse.manip.geometric_augmentation(basis, geom_aug)
+            basis_name = 'DTQ'[geom_aug - 1] + basis_name
+            if is_cc_pcvnz_basis:
+                h_he_basis = bse.manip.geometric_augmentation(
+                    h_he_basis, geom_aug)
+                h_he_basis_name = 'DTQ'[geom_aug - 1] + h_he_basis_name
         if basis_name.upper() == 'SADLEJ PVTZ':
             basis_name = 'SADLEJ-PVTZ'
 
@@ -47,6 +77,8 @@ def get_vlx_basis_string(basis_name,
         basis_title = f'{Path(output_name).name}'
         if basis_title.upper() != basis_name.upper():
             basis_title += f'  !{basis_name.upper()}'
+            if is_cc_pcvnz_basis:
+                basis_title += f'  (H and He from {h_he_basis_name})'
     vlx_basis_str = f'@BASIS_SET {basis_title}\n'
 
     # Go through elements (up to Rn)
@@ -62,7 +94,14 @@ def get_vlx_basis_string(basis_name,
         'At', 'Rn'
     ]
 
-    for elem, atombasis in basis['elements'].items():
+    basis_elements = {}
+    if is_cc_pcvnz_basis:
+        for elem, atombasis in h_he_basis['elements'].items():
+            if int(elem) in [1, 2]:
+                basis_elements[elem] = h_he_basis['elements'][elem]
+    basis_elements.update(basis['elements'])
+
+    for elem, atombasis in basis_elements.items():
 
         if int(elem) > 86:
             continue

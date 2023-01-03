@@ -296,6 +296,7 @@ class TpaReducedDriver(TpaDriver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
+            'xcfun', 'grid_level', 'potfile', 'electric_field',
             'program_end_time'
         }
 
@@ -305,8 +306,6 @@ class TpaReducedDriver(TpaDriver):
         if self.checkpoint_file is not None:
             N_total_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.tpa_2_red.h5'))
-
-        N_total_drv.update_settings({}, self.method_dict)
 
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)

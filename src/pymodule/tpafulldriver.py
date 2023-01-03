@@ -603,6 +603,7 @@ class TpaFullDriver(TpaDriver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
+            'xcfun', 'grid_level', 'potfile', 'electric_field',
             'program_end_time'
         }
 
@@ -614,8 +615,6 @@ class TpaFullDriver(TpaDriver):
                 Path(self.checkpoint_file).with_suffix('.tpa_2_full.h5'))
 
         # commutpute second-order response vectors
-
-        N_total_drv.update_settings({}, self.method_dict)
 
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)

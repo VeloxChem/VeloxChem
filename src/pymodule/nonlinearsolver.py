@@ -33,7 +33,6 @@ from .veloxchemlib import MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import XCFunctional
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .linearsolver import LinearSolver
@@ -225,8 +224,6 @@ class NonLinearSolver:
 
         if method_dict is None:
             method_dict = {}
-
-        self.method_dict = dict(method_dict)
 
         rsp_keywords = {
             key: val[0]

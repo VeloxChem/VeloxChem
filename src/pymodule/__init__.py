@@ -41,7 +41,9 @@ from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import XCNewIntegrator
+from .veloxchemlib import XCNewFunctional
 from .veloxchemlib import XCNewIntegrator as XCIntegrator
+from .veloxchemlib import XCNewFunctional as XCFunctional
 
 # C++ functions
 from .veloxchemlib import available_functionals

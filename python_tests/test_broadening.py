@@ -4,7 +4,8 @@ import pytest
 
 from veloxchem.veloxchemlib import is_single_node
 from veloxchem.veloxchemlib import hartree_in_ev
-from veloxchem import LinearResponseEigenSolver
+from veloxchem.utils import (lorentzian_absorption_spectrum,
+                             lorentzian_ecd_spectrum)
 
 
 class TestBroadening:
@@ -51,7 +52,7 @@ class TestBroadening:
 
         exc_ene, osc_str, rot_str = self.read_tddft_output(tddft_file)
 
-        xplot, yplot = LinearResponseEigenSolver.lorentzian_ecd_spectrum(
+        xplot, yplot = lorentzian_ecd_spectrum(
             'ev',
             exc_ene,
             rot_str,
@@ -125,7 +126,7 @@ class TestBroadening:
 
         exc_ene, osc_str, rot_str = self.read_tddft_output(tddft_file)
 
-        xplot, yplot = LinearResponseEigenSolver.lorentzian_absorption_spectrum(
+        xplot, yplot = lorentzian_absorption_spectrum(
             'ev',
             exc_ene,
             osc_str,

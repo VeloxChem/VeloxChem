@@ -256,13 +256,12 @@ class CubicResponseDriver(NonLinearSolver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
+            'xcfun', 'grid_level', 'potfile', 'electric_field',
             'program_end_time'
         }
 
         for key in cpp_keywords:
             setattr(N_drv, key, getattr(self, key))
-
-        N_drv.update_settings({}, self.method_dict)
 
         if self.checkpoint_file is not None:
             N_drv.checkpoint_file = str(
@@ -1196,6 +1195,7 @@ class CubicResponseDriver(NonLinearSolver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
+            'xcfun', 'grid_level', 'potfile', 'electric_field',
             'program_end_time'
         }
 
@@ -1206,8 +1206,6 @@ class CubicResponseDriver(NonLinearSolver):
             Nxy_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.crf_2.h5'))
 
-        Nxy_drv.update_settings({}, self.method_dict)
-        
         Nxy_results = Nxy_drv.compute(molecule, ao_basis, scf_tensors, XY)
 
         self._is_converged = (self._is_converged and Nxy_drv.is_converged)

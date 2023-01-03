@@ -1178,10 +1178,6 @@ class ExcitonModelDriver:
             if not xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
-            dimer_molgrid.partition_grid_points()
-            dimer_molgrid.distribute_counts_and_displacements(
-                self.rank, self.nodes, self.comm)
-
             xc_drv = XCNewIntegrator(self.comm)
             vxc_mat = xc_drv.integrate_vxc_fock(dimer, basis, dens_mat,
                                                 dimer_molgrid, self.xcfun_label)
@@ -1470,10 +1466,6 @@ class ExcitonModelDriver:
 
             dens_mat = dimer_prop['density']
             dimer_molgrid = dimer_prop['molgrid']
-
-            dimer_molgrid.partition_grid_points()
-            dimer_molgrid.distribute_counts_and_displacements(
-                self.rank, self.nodes, self.comm)
 
             xc_drv = XCNewIntegrator(self.comm)
             xc_drv.integrate_fxc_fock(tfock_mat, dimer, basis, tdens_mat,

@@ -648,6 +648,38 @@ CDensityGrid::betaDensitytau(const int32_t iDensityMatrix)
 }
 
 const double*
+CDensityGrid::alphaDensitylapl(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(13 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+double*
+CDensityGrid::alphaDensitylapl(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(13 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+const double*
+CDensityGrid::betaDensitylapl(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(14 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+double*
+CDensityGrid::betaDensitylapl(const int32_t iDensityMatrix)
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(14 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+const double*
 CDensityGrid::getComponent(const int32_t iComponent) const
 {
     return _densityValues.data(iComponent);

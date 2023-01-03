@@ -365,6 +365,204 @@ class CDensityGridQuad
    */
     double* gamZZ(const int32_t iDensityMatrix);
 
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* rt_gam(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* rt_gam(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* rl_gam(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* rl_gam(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* tt_gam(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* tt_gam(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* tl_gam(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* tl_gam(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* ll_gam(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* ll_gam(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* st_gamX(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* st_gamX(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* st_gamY(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* st_gamY(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* st_gamZ(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* st_gamZ(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* sl_gamX(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* sl_gamX(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* sl_gamY(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* sl_gamY(const int32_t iDensityMatrix) const;
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    double* sl_gamZ(const int32_t iDensityMatrix);
+
+    /**
+         Gets constant pointer to one-time transformed density product.
+
+        @param iDensityMatrix the index of density matrix.
+        @return the pointer to alpha density gradient Y values.
+        */
+
+    const double* sl_gamZ(const int32_t iDensityMatrix) const;
+
     double prod2_r(double B_r, double B_i, double C_r, double C_i);
 
     double prod2_i(double B_r, double B_i, double C_r, double C_i);

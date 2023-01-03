@@ -9,21 +9,12 @@ target_sources(vlxobjs
     GridPartitioner.cpp
     GridScreener.cpp
     GtoEvaluator.cpp
-    GtoFunc.cpp
-    GtoFuncForGGA.cpp
-    GtoFuncForLDA.cpp
-    GtoFuncForMGGA.cpp
     LebedevLaikovQuadrature.cpp
     Log3Quadrature.cpp
     MolecularGrid.cpp
     PartitionFunc.cpp
-    PrimitiveFunctional.cpp
     SubMatrix.cpp
-    XCCubicHessianGrid.cpp
     XCComponent.cpp
-    XCFunctional.cpp
-    XCGradientGrid.cpp
-    XCHessianGrid.cpp
     XCNewFunctional.cpp
     XCNewIntegrator.cpp
     XCNewMolecularGradient.cpp

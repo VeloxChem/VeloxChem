@@ -23,7 +23,7 @@ class TestQrfFD:
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
         """
-        xcfun_label = 'pbe0'
+        xcfun_label = 'bp86'
         basis_set_label = 'def2-svp'
         scf_conv_thresh = 1.0e-8
         rsp_conv_thresh = 1.0e-6

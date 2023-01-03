@@ -518,6 +518,39 @@ class CDensityGrid
      */
     double* betaDensitytau(const int32_t iDensityMatrix);
 
+
+    /**
+     Gets constant pointer to alpha density laplacian values.
+
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to alpha laplacian values.
+     */
+    const double* alphaDensitylapl(const int32_t iDensityMatrix) const;
+
+    /**
+     Gets pointer to alpha density laplacian values.
+
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to  alpha laplacian values.
+     */
+    double* alphaDensitylapl(const int32_t iDensityMatrix);
+
+    /**
+    Gets constant pointer to beta density laplacian  values.
+
+    @param iDensityMatrix the index of density matrix.
+    @return the pointer to beta laplacian values.
+    */
+    const double* betaDensitylapl(const int32_t iDensityMatrix) const;
+
+    /**
+     Gets pointer to beta density laplacian values.
+
+     @param iDensityMatrix the index of density matrix.
+     @return the pointer to beta laplacian values.
+     */
+    double* betaDensitylapl(const int32_t iDensityMatrix);
+
     /**
      Gets constant pointer to specific component of density grid.
      

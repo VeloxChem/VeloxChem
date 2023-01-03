@@ -387,10 +387,203 @@ CDensityGridQuad::gamZZ(const int32_t iDensityMatrix)
     return nullptr;
 }
 
+const double*
+CDensityGridQuad::rt_gam(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(13 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+    
+
+double*
+CDensityGridQuad::rt_gam(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(13 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::rl_gam(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(14 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+double*
+CDensityGridQuad::rl_gam(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(14 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::tt_gam(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(15 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+double*
+CDensityGridQuad::tt_gam(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(15 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::tl_gam(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(16 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+double*
+CDensityGridQuad::tl_gam(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(16 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::ll_gam(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(17 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+double*
+CDensityGridQuad::ll_gam(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(17 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::st_gamX(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(18 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+double*
+CDensityGridQuad::st_gamX(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(18 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::st_gamY(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(19 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+double*
+CDensityGridQuad::st_gamY(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(19 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::st_gamZ(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(20 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+double*
+CDensityGridQuad::st_gamZ(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(20 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::sl_gamX(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(21 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::sl_gamX(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(21 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+
+const double*
+CDensityGridQuad::sl_gamY(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(22 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::sl_gamY(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(22 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+const double*
+CDensityGridQuad::sl_gamZ(const int32_t iDensityMatrix) const
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(23 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
+double*
+CDensityGridQuad::sl_gamZ(const int32_t iDensityMatrix) 
+{
+    if (_gridType == dengrid::ab) return _densityValues.data(23 * _nDensityMatrices + iDensityMatrix);
+
+    return nullptr;
+}
+
 void
 CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                               const xcfun         xcFuncType,
-                              const int32_t             numdens,
+                              const int32_t       numdens,
                               const std::string&  quadMode)
 
 {

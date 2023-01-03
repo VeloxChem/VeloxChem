@@ -190,7 +190,9 @@ class TpaDriver(NonLinearSolver):
         cpp_keywords = {
             'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
-            'batch_size', 'restart', 'program_end_time'
+            'batch_size', 'restart',
+            'xcfun', 'grid_level', 'potfile', 'electric_field',
+            'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -199,8 +201,6 @@ class TpaDriver(NonLinearSolver):
         if self.checkpoint_file is not None:
             Nb_drv.checkpoint_file = str(
                 Path(self.checkpoint_file).with_suffix('.tpa_1.h5'))
-
-        Nb_drv.update_settings({}, self.method_dict)
 
         Nb_results = Nb_drv.compute(molecule, ao_basis, scf_tensors, v_grad)
 
