@@ -420,8 +420,6 @@ class CXCNewFunctional
                                   double*       vlapl,
                                   double*       vtau) const -> void;
 
-
-
     /**@{ metaGGA computational functions. These are wrappers around `xc_mgga_*` functions in LibXC. */
     /** Computes values and first derivative of metaGGA exchange-correlation functional on grid.
      *
@@ -443,14 +441,14 @@ class CXCNewFunctional
      * @note Wrapper to `xc_lda_exc_vxc`, `xc_gga_exc_vxc` and `xc_mgga_exc_vxc`
      */
     auto compute_vxc_for_mgga(int32_t       np,
-                                  const double* rho,
-                                  const double* sigma,
-                                  const double* lapl,
-                                  const double* tau,
-                                  double*       vrho,
-                                  double*       vsigma,
-                                  double*       vlapl,
-                                  double*       vtau) const -> void;
+                              const double* rho,
+                              const double* sigma,
+                              const double* lapl,
+                              const double* tau,
+                              double*       vrho,
+                              double*       vsigma,
+                              double*       vlapl,
+                              double*       vtau) const -> void;
 
     /** Computes second derivative of metaGGA exchange-correlation functional on grid.
      *

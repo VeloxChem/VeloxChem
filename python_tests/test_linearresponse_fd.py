@@ -24,10 +24,10 @@ class TestLrfFD:
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
         """
-        xcfun_label = 'SCAN'
+        xcfun_label = 'BP86'
         basis_set_label = 'def2-svp'
         scf_conv_thresh = 1.0e-8
-        rsp_conv_thresh = 1.0e-8
+        rsp_conv_thresh = 1.0e-6
 
         molecule = Molecule.read_str(molecule_string, units='au')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=ostream)

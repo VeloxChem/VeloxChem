@@ -113,13 +113,14 @@ CXCNewIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
         {
             _integrateFxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
-        else if (xcfuntype == xcfun::mgga)
-        {
-            _integrateFxcFockForMGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
-        }
+        //else if (xcfuntype == xcfun::mgga)
+        //{
+        //    _integrateFxcFockForMGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
+        //}
         else
         {
-            std::string errxcfuntype("XCNewIntegrator.integrateFxcFock: Only implemented for LDA/GGA/MGGA");
+            //std::string errxcfuntype("XCNewIntegrator.integrateFxcFock: Only implemented for LDA/GGA/MGGA");
+            std::string errxcfuntype("XCNewIntegrator.integrateFxcFock: Only implemented for LDA/GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }

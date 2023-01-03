@@ -89,6 +89,8 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (fstr::upcase(xcLabel) == "TPSSH") return CXCNewFunctional("TPSSH", {"MGGA_X_TPSS", "MGGA_C_TPSS"}, {0.9, 1.0}, 0.1);
 
+        if (fstr::upcase(xcLabel) == "PKZB") return CXCNewFunctional("PKZB", {"MGGA_X_PKZB", "MGGA_C_PKZB"}, {1.0, 1.0});
+
         if (fstr::upcase(xcLabel) == "SCAN") return CXCNewFunctional("SCAN", {"MGGA_X_SCAN", "MGGA_C_SCAN"}, {1.0, 1.0});
 
         if (fstr::upcase(xcLabel) == "M06") return CXCNewFunctional("M06", {"HYB_MGGA_X_M06", "MGGA_C_M06"}, {1.0, 1.0});
