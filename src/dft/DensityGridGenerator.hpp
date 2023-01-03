@@ -280,6 +280,32 @@ CDensityGrid generateDensityGridForGGA(const int32_t           npoints,
                                        const xcfun             xcFunType,
                                        CMultiTimer&            timer);
 
+
+/**
+ Generates density grid (multiple density matrices) for MGGA.
+
+ @param npoints the number of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param gtoValuesX the GTO gradient X values on grid points.
+ @param gtoValuesY the GTO gradient Y values on grid points.
+ @param gtoValuesZ the GTO gradient Z values on grid points.
+ @param densityMatrix the AO density matrices.
+ @param xcFunType the type of exchange-correlation functional.
+ @param timer the timer.
+ @return the density grid.
+ */
+CDensityGrid generateDensityGridForMGGA(const int32_t       npoints,
+                                        const CDenseMatrix& gtoValues,
+                                        const CDenseMatrix& gtoValuesX,
+                                        const CDenseMatrix& gtoValuesY,
+                                        const CDenseMatrix& gtoValuesZ,
+                                        const CDenseMatrix& gtoValuesXX,
+                                        const CDenseMatrix& gtoValuesYY,
+                                        const CDenseMatrix& gtoValuesZZ,
+                                        const CAODensityMatrix& densityMatrix,
+                                        const xcfun             xcFunType,
+                                        CMultiTimer&            timer);
+
 }  // namespace dengridgen
 
 #endif /* DensityGridGenerator_hpp */

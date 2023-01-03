@@ -112,6 +112,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if(fstr::upcase(xcLabel) == "SCAN") return CXCNewFunctional("SCAN",{"MGGA_X_SCAN","MGGA_C_SCAN" },{1.0,1.0});
 
+
         // PKZB exchange functional
         // if (fstr::upcase(xcLabel) == "PKZB") return ...
 

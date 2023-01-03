@@ -183,6 +183,47 @@ void screenFxcFockForMGGA(double*                rho,
                           const double          densityThreshold);  
 
 /**
+ Screens Kxc Fock for MGGA.
+
+ @param rho the density.
+ @param sigma the dot product of density gradient.
+ @param vrho the 1st-order functional derivative wrt rho.
+ @param vsigma the 1st-order functional derivative wrt sigma.
+ @param v2rho2 the 2nd-order functional derivative wrt rho.
+ @param v2rhosigma the 2nd-order functional derivative wrt rho and sigma.
+ @param v2sigma2 the 2nd-order functional derivative wrt sigma
+ 
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ */
+void screenKxcFockForMGGA(double*               rho, 
+                          double*               sigma, 
+                          double*               lapl, 
+                          double*               tau,
+                          double*               v3rho3,
+                          double*               v3rho2sigma,
+                          double*               v3rho2lapl,
+                          double*               v3rho2tau,
+                          double*               v3rhosigma2,
+                          double*               v3rhosigmalapl,
+                          double*               v3rhosigmatau,
+                          double*               v3rholapl2,
+                          double*               v3rholapltau,
+                          double*               v3rhotau2,
+                          double*               v3sigma3,
+                          double*               v3sigma2lapl,
+                          double*               v3sigma2tau,
+                          double*               v3sigmalapl2,
+                          double*               v3sigmalapltau,
+                          double*               v3sigmatau2,
+                          double*               v3lapl3,
+                          double*               v3lapl2tau,
+                          double*               v3lapltau2,
+                          double*               v3tau3,      
+                          const int32_t         npoints,
+                          const double          densityThreshold);
+
+/**
  Screens Kxc Fock for GGA.
 
  @param rho the density.

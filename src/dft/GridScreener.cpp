@@ -335,6 +335,383 @@ screenFxcFockForMGGA(double*                rho,
     }
 }
 
+
+void
+screenKxcFockForMGGA(double*              rho, 
+                    double*               sigma, 
+                    double*               lapl, 
+                    double*               tau,
+                    double*               v3rho3,
+                    double*               v3rho2sigma,
+                    double*               v3rho2lapl,
+                    double*               v3rho2tau,
+                    double*               v3rhosigma2,
+                    double*               v3rhosigmalapl,
+                    double*               v3rhosigmatau,
+                    double*               v3rholapl2,
+                    double*               v3rholapltau,
+                    double*               v3rhotau2,
+                    double*               v3sigma3,
+                    double*               v3sigma2lapl,
+                    double*               v3sigma2tau,
+                    double*               v3sigmalapl2,
+                    double*               v3sigmalapltau,
+                    double*               v3sigmatau2,
+                    double*               v3lapl3,
+                    double*               v3lapl2tau,
+                    double*               v3lapltau2,
+                    double*               v3tau3,      
+                    const int32_t         npoints,
+                    const double          densityThreshold)
+{
+
+     
+    double densityThresholdSquared = densityThreshold * densityThreshold;
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        // rho_a and sigma_aa tau_a lap_a
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(lapl[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
+        {
+                v3rho3[4 * g + 0] = 0;
+                v3rho3[4 * g + 1] = 0;
+                v3rho3[4 * g + 2] = 0;
+
+                v3rho2lapl[6 * g + 0] = 0;
+                v3rho2lapl[6 * g + 1] = 0;
+                v3rho2lapl[6 * g + 2] = 0;
+                v3rho2lapl[6 * g + 3] = 0;
+                v3rho2lapl[6 * g + 4] = 0;
+
+                v3rho2tau[6 * g + 0] = 0;
+                v3rho2tau[6 * g + 1] = 0;
+                v3rho2tau[6 * g + 2] = 0;
+                v3rho2tau[6 * g + 3] = 0;
+                v3rho2tau[6 * g + 4] = 0;
+
+                v3rholapl2[6 * g + 0] = 0;
+                v3rholapl2[6 * g + 1] = 0;
+                v3rholapl2[6 * g + 2] = 0;
+                v3rholapl2[6 * g + 3] = 0;
+                v3rholapl2[6 * g + 4] = 0;
+
+                v3rholapltau[8 * g + 0] = 0;
+                v3rholapltau[8 * g + 1] = 0;
+                v3rholapltau[8 * g + 2] = 0;
+                v3rholapltau[8 * g + 3] = 0;
+                v3rholapltau[8 * g + 4] = 0;
+                v3rholapltau[8 * g + 5] = 0;
+                v3rholapltau[8 * g + 6] = 0;
+
+                v3rhotau2[6 * g + 0] = 0;
+                v3rhotau2[6 * g + 1] = 0;
+                v3rhotau2[6 * g + 2] = 0;
+                v3rhotau2[6 * g + 3] = 0;
+                v3rhotau2[6 * g + 4] = 0;
+
+                v3sigma2lapl[12 * g + 0] = 0;
+                v3sigma2lapl[12 * g + 1] = 0;
+                v3sigma2lapl[12 * g + 2] = 0;
+                v3sigma2lapl[12 * g + 3] = 0;
+                v3sigma2lapl[12 * g + 4] = 0;
+                v3sigma2lapl[12 * g + 5] = 0;
+                v3sigma2lapl[12 * g + 6] = 0;
+                v3sigma2lapl[12 * g + 7] = 0;
+                v3sigma2lapl[12 * g + 8] = 0;
+                v3sigma2lapl[12 * g + 9] = 0;
+                v3sigma2lapl[12 * g + 10] = 0;
+
+                v3rhosigmalapl[12 * g + 0] = 0;
+                v3rhosigmalapl[12 * g + 1] = 0;
+                v3rhosigmalapl[12 * g + 2] = 0;
+                v3rhosigmalapl[12 * g + 3] = 0;
+                v3rhosigmalapl[12 * g + 4] = 0;
+                v3rhosigmalapl[12 * g + 5] = 0;
+                v3rhosigmalapl[12 * g + 6] = 0;
+                v3rhosigmalapl[12 * g + 7] = 0;
+                v3rhosigmalapl[12 * g + 8] = 0;
+                v3rhosigmalapl[12 * g + 9] = 0;
+                v3rhosigmalapl[12 * g + 10] = 0;
+
+                v3rhosigmatau[12 * g + 0] = 0;
+                v3rhosigmatau[12 * g + 1] = 0;
+                v3rhosigmatau[12 * g + 2] = 0;
+                v3rhosigmatau[12 * g + 3] = 0;
+                v3rhosigmatau[12 * g + 4] = 0;
+                v3rhosigmatau[12 * g + 5] = 0;
+                v3rhosigmatau[12 * g + 6] = 0;
+                v3rhosigmatau[12 * g + 7] = 0;
+                v3rhosigmatau[12 * g + 8] = 0;
+                v3rhosigmatau[12 * g + 9] = 0;
+                v3rhosigmatau[12 * g + 10] = 0;
+
+                v3sigma2tau[12 * g + 0] = 0;
+                v3sigma2tau[12 * g + 1] = 0;
+                v3sigma2tau[12 * g + 2] = 0;
+                v3sigma2tau[12 * g + 3] = 0;
+                v3sigma2tau[12 * g + 4] = 0;
+                v3sigma2tau[12 * g + 5] = 0;
+                v3sigma2tau[12 * g + 6] = 0;
+                v3sigma2tau[12 * g + 7] = 0;
+                v3sigma2tau[12 * g + 8] = 0;
+                v3sigma2tau[12 * g + 9] = 0;
+                v3sigma2tau[12 * g + 10] = 0;
+
+                v3sigmalapl2[9 * g + 0] = 0;
+                v3sigmalapl2[9 * g + 1] = 0;
+                v3sigmalapl2[9 * g + 2] = 0;
+                v3sigmalapl2[9 * g + 3] = 0;
+                v3sigmalapl2[9 * g + 4] = 0;
+                v3sigmalapl2[9 * g + 5] = 0;
+                v3sigmalapl2[9 * g + 6] = 0;
+                v3sigmalapl2[9 * g + 7] = 0;
+
+                v3sigmalapltau[12 * g + 0] = 0;
+                v3sigmalapltau[12 * g + 1] = 0;
+                v3sigmalapltau[12 * g + 2] = 0;
+                v3sigmalapltau[12 * g + 3] = 0;
+                v3sigmalapltau[12 * g + 4] = 0;
+                v3sigmalapltau[12 * g + 5] = 0;
+                v3sigmalapltau[12 * g + 6] = 0;
+                v3sigmalapltau[12 * g + 7] = 0;
+                v3sigmalapltau[12 * g + 8] = 0;
+                v3sigmalapltau[12 * g + 9] = 0;
+                v3sigmalapltau[12 * g + 10] = 0;
+
+                v3sigmatau2[9 * g + 0] = 0;
+                v3sigmatau2[9 * g + 1] = 0;
+                v3sigmatau2[9 * g + 2] = 0;
+                v3sigmatau2[9 * g + 3] = 0;
+                v3sigmatau2[9 * g + 4] = 0;
+                v3sigmatau2[9 * g + 5] = 0;
+                v3sigmatau2[9 * g + 6] = 0;
+                v3sigmatau2[9 * g + 7] = 0;
+
+                v3lapl3[4 * g + 0] = 0;
+                v3lapl3[4 * g + 1] = 0;
+                v3lapl3[4 * g + 2] = 0;
+
+                v3lapl2tau[6 * g + 0] = 0;
+                v3lapl2tau[6 * g + 1] = 0;
+                v3lapl2tau[6 * g + 2] = 0;
+                v3lapl2tau[6 * g + 3] = 0;
+                v3lapl2tau[6 * g + 4] = 0;
+
+                v3lapltau2[6 * g + 0] = 0;
+                v3lapltau2[6 * g + 1] = 0;
+                v3lapltau2[6 * g + 2] = 0;
+                v3lapltau2[6 * g + 3] = 0;
+                v3lapltau2[6 * g + 4] = 0;
+
+                v3tau3[4 * g + 0] = 0;
+                v3tau3[4 * g + 1] = 0;
+                v3tau3[4 * g + 2] = 0;
+
+                v3rho2sigma[9 * g + 0] = 0;
+                v3rho2sigma[9 * g + 1] = 0;
+                v3rho2sigma[9 * g + 2] = 0;
+                v3rho2sigma[9 * g + 3] = 0;
+                v3rho2sigma[9 * g + 4] = 0;
+                v3rho2sigma[9 * g + 5] = 0;
+                v3rho2sigma[9 * g + 6] = 0;
+
+                v3rhosigma2[12 * g + 0] = 0;
+                v3rhosigma2[12 * g + 1] = 0;
+                v3rhosigma2[12 * g + 2] = 0;
+                v3rhosigma2[12 * g + 3] = 0;
+                v3rhosigma2[12 * g + 4] = 0;
+                v3rhosigma2[12 * g + 5] = 0;
+                v3rhosigma2[12 * g + 6] = 0;
+                v3rhosigma2[12 * g + 7] = 0;
+                v3rhosigma2[12 * g + 8] = 0;
+                v3rhosigma2[12 * g + 9] = 0;
+                v3rhosigma2[12 * g + 10] = 0;
+
+                v3sigma3[10 * g + 0] = 0;
+                v3sigma3[10 * g + 1] = 0;
+                v3sigma3[10 * g + 2] = 0;
+                v3sigma3[10 * g + 3] = 0;
+                v3sigma3[10 * g + 4] = 0;
+                v3sigma3[10 * g + 5] = 0;
+                v3sigma3[10 * g + 6] = 0;
+                v3sigma3[10 * g + 7] = 0;
+                v3sigma3[10 * g + 8] = 0;
+        }
+
+        // rho_b and sigma_bb tau_b lap_b
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(lapl[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
+        {
+                v3rho3[4 * g + 1] = 0;
+                v3rho3[4 * g + 2] = 0;
+                v3rho3[4 * g + 3] = 0;
+
+                v3rho2lapl[6 * g + 1] = 0;
+                v3rho2lapl[6 * g + 2] = 0;
+                v3rho2lapl[6 * g + 3] = 0;
+                v3rho2lapl[6 * g + 4] = 0;
+                v3rho2lapl[6 * g + 5] = 0;
+
+                v3rho2tau[6 * g + 1] = 0;
+                v3rho2tau[6 * g + 2] = 0;
+                v3rho2tau[6 * g + 3] = 0;
+                v3rho2tau[6 * g + 4] = 0;
+                v3rho2tau[6 * g + 5] = 0;
+
+                v3rholapl2[6 * g + 1] = 0;
+                v3rholapl2[6 * g + 2] = 0;
+                v3rholapl2[6 * g + 3] = 0;
+                v3rholapl2[6 * g + 4] = 0;
+                v3rholapl2[6 * g + 5] = 0;
+
+                v3rholapltau[8 * g + 1] = 0;
+                v3rholapltau[8 * g + 2] = 0;
+                v3rholapltau[8 * g + 3] = 0;
+                v3rholapltau[8 * g + 4] = 0;
+                v3rholapltau[8 * g + 5] = 0;
+                v3rholapltau[8 * g + 6] = 0;
+                v3rholapltau[8 * g + 7] = 0;
+
+                v3rhotau2[6 * g + 1] = 0;
+                v3rhotau2[6 * g + 2] = 0;
+                v3rhotau2[6 * g + 3] = 0;
+                v3rhotau2[6 * g + 4] = 0;
+                v3rhotau2[6 * g + 5] = 0;
+
+                v3sigma2lapl[12 * g + 1] = 0;
+                v3sigma2lapl[12 * g + 2] = 0;
+                v3sigma2lapl[12 * g + 3] = 0;
+                v3sigma2lapl[12 * g + 4] = 0;
+                v3sigma2lapl[12 * g + 5] = 0;
+                v3sigma2lapl[12 * g + 6] = 0;
+                v3sigma2lapl[12 * g + 7] = 0;
+                v3sigma2lapl[12 * g + 8] = 0;
+                v3sigma2lapl[12 * g + 9] = 0;
+                v3sigma2lapl[12 * g + 10] = 0;
+                v3sigma2lapl[12 * g + 11] = 0;
+
+                v3rhosigmalapl[12 * g + 1] = 0;
+                v3rhosigmalapl[12 * g + 2] = 0;
+                v3rhosigmalapl[12 * g + 3] = 0;
+                v3rhosigmalapl[12 * g + 4] = 0;
+                v3rhosigmalapl[12 * g + 5] = 0;
+                v3rhosigmalapl[12 * g + 6] = 0;
+                v3rhosigmalapl[12 * g + 7] = 0;
+                v3rhosigmalapl[12 * g + 8] = 0;
+                v3rhosigmalapl[12 * g + 9] = 0;
+                v3rhosigmalapl[12 * g + 10] = 0;
+                v3rhosigmalapl[12 * g + 11] = 0;
+
+                v3rhosigmatau[12 * g + 1] = 0;
+                v3rhosigmatau[12 * g + 2] = 0;
+                v3rhosigmatau[12 * g + 3] = 0;
+                v3rhosigmatau[12 * g + 4] = 0;
+                v3rhosigmatau[12 * g + 5] = 0;
+                v3rhosigmatau[12 * g + 6] = 0;
+                v3rhosigmatau[12 * g + 7] = 0;
+                v3rhosigmatau[12 * g + 8] = 0;
+                v3rhosigmatau[12 * g + 9] = 0;
+                v3rhosigmatau[12 * g + 10] = 0;
+                v3rhosigmatau[12 * g + 11] = 0;
+
+                v3sigma2tau[12 * g + 1] = 0;
+                v3sigma2tau[12 * g + 2] = 0;
+                v3sigma2tau[12 * g + 3] = 0;
+                v3sigma2tau[12 * g + 4] = 0;
+                v3sigma2tau[12 * g + 5] = 0;
+                v3sigma2tau[12 * g + 6] = 0;
+                v3sigma2tau[12 * g + 7] = 0;
+                v3sigma2tau[12 * g + 8] = 0;
+                v3sigma2tau[12 * g + 9] = 0;
+                v3sigma2tau[12 * g + 10] = 0;
+                v3sigma2tau[12 * g + 11] = 0;
+
+                v3sigmalapl2[9 * g + 1] = 0;
+                v3sigmalapl2[9 * g + 2] = 0;
+                v3sigmalapl2[9 * g + 3] = 0;
+                v3sigmalapl2[9 * g + 4] = 0;
+                v3sigmalapl2[9 * g + 5] = 0;
+                v3sigmalapl2[9 * g + 6] = 0;
+                v3sigmalapl2[9 * g + 7] = 0;
+                v3sigmalapl2[9 * g + 8] = 0;
+
+                v3sigmalapltau[12 * g + 1] = 0;
+                v3sigmalapltau[12 * g + 2] = 0;
+                v3sigmalapltau[12 * g + 3] = 0;
+                v3sigmalapltau[12 * g + 4] = 0;
+                v3sigmalapltau[12 * g + 5] = 0;
+                v3sigmalapltau[12 * g + 6] = 0;
+                v3sigmalapltau[12 * g + 7] = 0;
+                v3sigmalapltau[12 * g + 8] = 0;
+                v3sigmalapltau[12 * g + 9] = 0;
+                v3sigmalapltau[12 * g + 10] = 0;
+                v3sigmalapltau[12 * g + 11] = 0;
+
+                v3sigmatau2[9 * g + 1] = 0;
+                v3sigmatau2[9 * g + 2] = 0;
+                v3sigmatau2[9 * g + 3] = 0;
+                v3sigmatau2[9 * g + 4] = 0;
+                v3sigmatau2[9 * g + 5] = 0;
+                v3sigmatau2[9 * g + 6] = 0;
+                v3sigmatau2[9 * g + 7] = 0;
+                v3sigmatau2[9 * g + 8] = 0;
+
+                v3lapl3[4 * g + 1] = 0;
+                v3lapl3[4 * g + 2] = 0;
+                v3lapl3[4 * g + 3] = 0;
+
+                v3lapl2tau[6 * g + 1] = 0;
+                v3lapl2tau[6 * g + 2] = 0;
+                v3lapl2tau[6 * g + 3] = 0;
+                v3lapl2tau[6 * g + 4] = 0;
+                v3lapl2tau[6 * g + 5] = 0;
+
+                v3lapltau2[6 * g + 1] = 0;
+                v3lapltau2[6 * g + 2] = 0;
+                v3lapltau2[6 * g + 3] = 0;
+                v3lapltau2[6 * g + 4] = 0;
+                v3lapltau2[6 * g + 5] = 0;
+
+                v3tau3[4 * g + 1] = 0;
+                v3tau3[4 * g + 2] = 0;
+                v3tau3[4 * g + 3] = 0;
+
+                v3rho2sigma[9 * g + 1] = 0;
+                v3rho2sigma[9 * g + 2] = 0;
+                v3rho2sigma[9 * g + 3] = 0;
+                v3rho2sigma[9 * g + 4] = 0;
+                v3rho2sigma[9 * g + 5] = 0;
+                v3rho2sigma[9 * g + 6] = 0;
+                v3rho2sigma[9 * g + 7] = 0;
+
+                v3rhosigma2[12 * g + 1] = 0;
+                v3rhosigma2[12 * g + 2] = 0;
+                v3rhosigma2[12 * g + 3] = 0;
+                v3rhosigma2[12 * g + 4] = 0;
+                v3rhosigma2[12 * g + 5] = 0;
+                v3rhosigma2[12 * g + 6] = 0;
+                v3rhosigma2[12 * g + 7] = 0;
+                v3rhosigma2[12 * g + 8] = 0;
+                v3rhosigma2[12 * g + 9] = 0;
+                v3rhosigma2[12 * g + 10] = 0;
+
+                v3sigma3[10 * g + 1] = 0;
+                v3sigma3[10 * g + 2] = 0;
+                v3sigma3[10 * g + 3] = 0;
+                v3sigma3[10 * g + 4] = 0;
+                v3sigma3[10 * g + 5] = 0;
+                v3sigma3[10 * g + 6] = 0;
+                v3sigma3[10 * g + 7] = 0;
+                v3sigma3[10 * g + 8] = 0;
+        }
+    }
+}
+
 void
 screenKxcFockForLDA(double*               rho,
                     double*               v2rho2,
