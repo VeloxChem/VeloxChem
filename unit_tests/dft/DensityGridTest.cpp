@@ -925,52 +925,6 @@ TEST_F(CDensityGridTest, GetComponentConstant)
     vlxtest::compare({2.0, 4.0}, dgridab.getComponent(4));
 }
 
-TEST_F(CDensityGridTest, SetScreenedGrids)
-{
-    CMemBlock2D<double> dblocka({0.1, 2.0, 0.1,
-                                 0.7, 1.0, 0.2},
-                                 3, 2);
-    
-    CDensityGrid dgrida(dblocka, dengrid::ab);
-    
-    CMemBlock2D<double> mblocka({1.2, 2.4, 3.0,
-                                 1.3, 4.0, 1.0,
-                                 3.0, 4.0, 5.0,
-                                 7.1, 9.9, 1.0},
-                                3, 4);
-    
-    CMolecularGrid mgrid(mblocka);
-    
-    CDensityGrid dgrid;
-    
-    dgrida.getScreenedGridsPair(dgrid, mgrid, 0, 0.9, xcfun::lda);
-    
-    ASSERT_EQ(dgrid, CDensityGrid(CMemBlock2D<double>({2.0, 1.0}, 1, 2), dengrid::ab));
-    
-    ASSERT_EQ(mgrid, CMolecularGrid(CMemBlock2D<double>({2.4, 4.0, 4.0, 9.9}, 1, 4)));
-}
-
-TEST_F(CDensityGridTest, GetScreenedGrid)
-{
-    CMemBlock2D<double> dblocka({0.1, 2.0, 0.1,
-                                 0.7, 1.0, 0.2},
-                                 3, 2);
-    
-    CDensityGrid dgrida(dblocka, dengrid::ab);
-    
-    CMemBlock2D<double> mblocka({1.2, 2.4, 3.0,
-                                 1.3, 4.0, 1.0,
-                                 3.0, 4.0, 5.0,
-                                 7.1, 9.9, 1.0},
-                                 3, 4);
-    
-    CMolecularGrid refgrid(mblocka);
-    
-    auto mgrid = dgrida.getScreenedGrid(refgrid, 0, 0.9, xcfun::lda);
-    
-    ASSERT_EQ(mgrid, CMolecularGrid(CMemBlock2D<double>({2.4, 4.0, 4.0, 9.9}, 1, 4)));
-}
-
 TEST_F(CDensityGridTest, UpdateBetaDensities)
 {
     CMemBlock2D<double> mblockab({1.0, 2.0, 3.0, 6.0, 4.0, 5.0, 7.0, 9.0, 2.0, 4.0,
