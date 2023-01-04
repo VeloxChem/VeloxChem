@@ -107,7 +107,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         double u_ab;
         if (pair_density <= 0)
         {
-            double delta = sqrt(-2.0 * pair_density);
+            double delta = std::sqrt(-2.0 * pair_density);
             double zeta  = delta / density;
 
             omega = omega_fact * (std::pow(1.0 + zeta, fourthird) + std::pow(std::max(1.0 - zeta, 0.0), fourthird) - 2.0);
@@ -117,7 +117,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         // Imaginary case
         else
         {
-            double delta  = sqrt(2.0 * pair_density);
+            double delta  = std::sqrt(2.0 * pair_density);
             double eta    = delta / density;
             double r      = 1.0 + std::pow(eta, 2);
             double theta  = fourthird * std::atan(eta);
@@ -137,7 +137,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double r2 = r * r;
 
-        double r12 = sqrt(r);
+        double r12 = std::sqrt(r);
 
         double r32 = r * r12;
 
@@ -152,7 +152,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         // Gradient-dependent terms
         double density_gradient = sigma[3 * g + 0];
 
-        double d2 = d2fact * density_gradient / (u_ab2 * pow(density, 7.0 / 3.0));
+        double d2 = d2fact * density_gradient / (u_ab2 * std::pow(density, 7.0 / 3.0));
 
         double d4 = d2 * d2;
 
