@@ -5131,9 +5131,9 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t          npoints
                 // TODO implement Laplacian dependence
 
                 // tau contribution (will be scaled by 0.5 later)
-                G_gga_x_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_x_val[nu_offset + g];
-                G_gga_y_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_y_val[nu_offset + g];
-                G_gga_z_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_z_val[nu_offset + g];
+                G_gga_x_val[nu_offset + g] = weights[g] * vtau[2 * g + 0] * chi_x_val[nu_offset + g];
+                G_gga_y_val[nu_offset + g] = weights[g] * vtau[2 * g + 0] * chi_y_val[nu_offset + g];
+                G_gga_z_val[nu_offset + g] = weights[g] * vtau[2 * g + 0] * chi_z_val[nu_offset + g];
             }
         }
     }
@@ -5264,13 +5264,13 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t        
                 // TODO implement Laplacian dependence
 
                 // tau contribution (will be scaled by 0.5 later)
-                G_a_gga_x_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_x_val[nu_offset + g];
-                G_a_gga_y_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_y_val[nu_offset + g];
-                G_a_gga_z_val[nu_offset + g] += weights[g] * vtau[2 * g + 0] * chi_z_val[nu_offset + g];
+                G_a_gga_x_val[nu_offset + g] = weights[g] * vtau[2 * g + 0] * chi_x_val[nu_offset + g];
+                G_a_gga_y_val[nu_offset + g] = weights[g] * vtau[2 * g + 0] * chi_y_val[nu_offset + g];
+                G_a_gga_z_val[nu_offset + g] = weights[g] * vtau[2 * g + 0] * chi_z_val[nu_offset + g];
 
-                G_b_gga_x_val[nu_offset + g] += weights[g] * vtau[2 * g + 1] * chi_x_val[nu_offset + g];
-                G_b_gga_y_val[nu_offset + g] += weights[g] * vtau[2 * g + 1] * chi_y_val[nu_offset + g];
-                G_b_gga_z_val[nu_offset + g] += weights[g] * vtau[2 * g + 1] * chi_z_val[nu_offset + g];
+                G_b_gga_x_val[nu_offset + g] = weights[g] * vtau[2 * g + 1] * chi_x_val[nu_offset + g];
+                G_b_gga_y_val[nu_offset + g] = weights[g] * vtau[2 * g + 1] * chi_y_val[nu_offset + g];
+                G_b_gga_z_val[nu_offset + g] = weights[g] * vtau[2 * g + 1] * chi_z_val[nu_offset + g];
             }
         }
     }
@@ -5737,9 +5737,9 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                                 + tt * tauwa 
                                 + tl * laplwa;   
 
-                G_gga_x_val[nu_offset + g] += w * tau_0 * chi_x_val[nu_offset + g];
-                G_gga_y_val[nu_offset + g] += w * tau_0 * chi_y_val[nu_offset + g];
-                G_gga_z_val[nu_offset + g] += w * tau_0 * chi_z_val[nu_offset + g];
+                G_gga_x_val[nu_offset + g] = w * tau_0 * chi_x_val[nu_offset + g];
+                G_gga_y_val[nu_offset + g] = w * tau_0 * chi_y_val[nu_offset + g];
+                G_gga_z_val[nu_offset + g] = w * tau_0 * chi_z_val[nu_offset + g];
             }
         }
     }
@@ -6878,9 +6878,9 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA(const int32_t           npoint
                 //                                         chi_yy_val[nu_offset + g] +
                 //                                         chi_zz_val[nu_offset + g]);
 
-                G_gga_x_val[nu_offset + g] += w * tau_0 * chi_x_val[nu_offset + g];
-                G_gga_y_val[nu_offset + g] += w * tau_0 * chi_y_val[nu_offset + g];
-                G_gga_z_val[nu_offset + g] += w * tau_0 * chi_z_val[nu_offset + g];
+                G_gga_x_val[nu_offset + g] = w * tau_0 * chi_x_val[nu_offset + g];
+                G_gga_y_val[nu_offset + g] = w * tau_0 * chi_y_val[nu_offset + g];
+                G_gga_z_val[nu_offset + g] = w * tau_0 * chi_z_val[nu_offset + g];
             }
         }
     }
