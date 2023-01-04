@@ -563,187 +563,225 @@ class NonLinearSolver:
             batch_size = self.comm.bcast(batch_size, root=mpi_master())
             batch_size_first_order = self.comm.bcast(batch_size_first_order,
                                                      root=mpi_master())
+            if mode.lower() in ['crf', 'tpa']:
+                batch_size_second_order = self.comm.bcast(batch_size_second_order,
+                                                          root=mpi_master())
             num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # go through batches
 
         dist_fabs = None
+        dist_fabs_2 = None
+        dist_fabs_3 = None
 
-        if self.rank == mpi_master():
-            batch_str = 'Processing Fock builds...'
-            batch_str += ' (batch size: {:d})'.format(batch_size)
-            self.ostream.print_info(batch_str)
+        batch_str = 'Processing Fock builds...'
+        batch_str += ' (batch size: {:d})'.format(batch_size)
+        self.ostream.print_info(batch_str)
 
-        # for batch_ind in range(num_batches):
+        for batch_ind in range(num_batches):
 
-        # if self.rank == mpi_master():
-        #         self.ostream.print_info('  batch {}/{}'.format(batch_ind + 1, num_batches))
-        #         self.ostream.flush()
+            self.ostream.print_info('  batch {}/{}'.format(batch_ind + 1, num_batches))
+            self.ostream.flush()
 
-        if self.rank == mpi_master():
-            if self._dft:
-                # batch_start_first_order = batch_size_first_order * batch_ind
-                # batch_end_first_order = min(batch_start_first_order + batch_size_first_order,len(first_order_dens))
+            if self.rank == mpi_master():
 
-                #  One,two and three-time perturbed Fock matrices all use one-time perturbed densities
-                dts1 = [np.ascontiguousarray(dab) for dab in first_order_dens]
-                dens1 = AODensityMatrix(dts1, denmat.rest)
+                batch_start = batch_size * batch_ind
+                batch_end = min(batch_start + batch_size, n_total)
 
-                if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii', 'redtpa_i','redtpa_ii' ,'crf_i','crf_ii','shg_red']:
-                    # If computing two-time perturbed Fock matrices (DFT) then include first and second-order perturbed densities
-                    # batch_start = batch_size * batch_ind
-                    # batch_end = min(batch_start + batch_size, n_total) 
-
-                    dts2 = [np.ascontiguousarray(dab)for dab in second_order_dens]
-                    dens2 = AODensityMatrix(dts2, denmat.rest)
-
-                elif mode.lower() in ['crf','tpa']:
-                    # If computing three-time perturbed Fock matrices (DFT) then include first,second and third-order perturbed densities
-                    # batch_start_second_order = batch_size_second_order * batch_ind
-                    # batch_end_second_order = min(batch_start_second_order + batch_size_second_order,len(second_order_dens))
-                    # batch_start = batch_size * batch_ind
-                    # batch_end = min(batch_start + batch_size, n_total)
-
-                    dts2 = [np.ascontiguousarray(dab) for dab in second_order_dens]
-                    dens2 = AODensityMatrix(dts2, denmat.rest)
-                    dts3 = [np.ascontiguousarray(dab) for dab in third_order_dens]
-                    dens3 = AODensityMatrix(dts3, denmat.rest)
-                    dts4 = dts2 + dts3
-                    dens4 = AODensityMatrix(dts4, denmat.rest)
-
-            else:
-                # If HF on MPI_master
-                if mode.lower() in ['qrf','shg','tpa_ii', 'redtpa_i','redtpa_ii','crf_ii','shg_red']:
-                    # If computing two-time perturbed Fock matrices at HF level only second-order perturbed densities are needed
-                    # batch_start = batch_size * batch_ind
-                    # batch_end = min(batch_start + batch_size, n_total) 
-                    dts2 = [np.ascontiguousarray(dab)for dab in second_order_dens]
-                    dens2 = AODensityMatrix(dts2, denmat.rest)
-
-                elif mode.lower() in ['crf','tpa']:
-                    # If computing three-time perturbed Fock matrices at HF level only third-order perturbed densities are needed
-                    # batch_start = batch_size * batch_ind
-                    # batch_end = min(batch_start + batch_size, n_total) 
-                    dts3 = [np.ascontiguousarray(dab) for dab in third_order_dens]
-                    dens3 = AODensityMatrix(dts3, denmat.rest)
-        else:
-            # If not MPI master 
-            if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
-                dens2 = AODensityMatrix()
                 if self._dft:
-                    # for dft we also need dens 1 for quadratic contribution
-                    dens1 = AODensityMatrix()
-            elif mode.lower() in ['crf','tpa']:
-                dens3 = AODensityMatrix()
-                dens4 = AODensityMatrix()
-                if self._dft: 
-                    # for dft we also need dens1 and dens 2 for cubic contributions
-                    dens1 = AODensityMatrix()
+                    batch_start_first_order = batch_size_first_order * batch_ind
+                    batch_end_first_order = min(batch_start_first_order + batch_size_first_order,len(first_order_dens))
+
+                    #  One,two and three-time perturbed Fock matrices all use one-time perturbed densities
+                    dts1 = [np.ascontiguousarray(dab) for dab in first_order_dens[
+                            batch_start_first_order:batch_end_first_order]]
+                    dens1 = AODensityMatrix(dts1, denmat.rest)
+
+                    if mode.lower() in ['qrf','shg','tpa_i', 'tpa_ii', 'redtpa_i','redtpa_ii' ,'crf_i','crf_ii','shg_red']:
+                        # If computing two-time perturbed Fock matrices (DFT) then include first and second-order perturbed densities
+                        # batch_start = batch_size * batch_ind
+                        # batch_end = min(batch_start + batch_size, n_total) 
+
+                        dts2 = [np.ascontiguousarray(dab)for dab in second_order_dens[
+                                batch_start:batch_end]]
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
+
+                    elif mode.lower() in ['crf','tpa']:
+                        # If computing three-time perturbed Fock matrices (DFT) then include first,second and third-order perturbed densities
+                        # batch_start_second_order = batch_size_second_order * batch_ind
+                        # batch_end_second_order = min(batch_start_second_order + batch_size_second_order,len(second_order_dens))
+                        # batch_start = batch_size * batch_ind
+                        # batch_end = min(batch_start + batch_size, n_total)
+
+                        batch_start_second_order = batch_size_second_order * batch_ind
+                        batch_end_second_order = min(batch_start_second_order + batch_size_second_order,len(second_order_dens))
+
+                        dts2 = [np.ascontiguousarray(dab) for dab in second_order_dens[
+                                batch_start_second_order:batch_end_second_order]]
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
+                        dts3 = [np.ascontiguousarray(dab) for dab in third_order_dens[
+                                batch_start:batch_end]]
+                        dens3 = AODensityMatrix(dts3, denmat.rest)
+                        dts4 = dts2 + dts3
+                        dens4 = AODensityMatrix(dts4, denmat.rest)
+
+                else:
+                    # If HF on MPI_master
+                    if mode.lower() in ['qrf','shg','tpa_ii', 'redtpa_i','redtpa_ii','crf_ii','shg_red']:
+                        # If computing two-time perturbed Fock matrices at HF level only second-order perturbed densities are needed
+                        # batch_start = batch_size * batch_ind
+                        # batch_end = min(batch_start + batch_size, n_total) 
+                        dts2 = [np.ascontiguousarray(dab)for dab in second_order_dens[
+                                batch_start:batch_end]]
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
+
+                    elif mode.lower() in ['crf','tpa']:
+                        # If computing three-time perturbed Fock matrices at HF level only third-order perturbed densities are needed
+                        # batch_start = batch_size * batch_ind
+                        # batch_end = min(batch_start + batch_size, n_total) 
+                        dts3 = [np.ascontiguousarray(dab) for dab in third_order_dens[
+                                batch_start:batch_end]]
+                        dens3 = AODensityMatrix(dts3, denmat.rest)
+            else:
+                # If not MPI master 
+                if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
                     dens2 = AODensityMatrix()
+                    if self._dft:
+                        # for dft we also need dens 1 for quadratic contribution
+                        dens1 = AODensityMatrix()
+                elif mode.lower() in ['crf','tpa']:
+                    dens3 = AODensityMatrix()
+                    dens4 = AODensityMatrix()
+                    if self._dft: 
+                        # for dft we also need dens1 and dens 2 for cubic contributions
+                        dens1 = AODensityMatrix()
+                        dens2 = AODensityMatrix()
 
-        # Construct Fock matrix object for two-time transformed Fock matrices 
-        if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
-            # For two-time perturbed Fock matrices we have as many Fock matrices as len dens2
-            dens2.broadcast(self.rank, self.comm)
-            fock = AOFockMatrix(dens2)
-            if self._dft:
-                dens1.broadcast(self.rank, self.comm)
-
-        # Construct Fock matrix object for three-time transformed Fock matrices 
-        elif mode.lower() in ['crf','tpa']:
-            dens3.broadcast(self.rank, self.comm)
-            # For  three-time perturbed Fock matrices we have as many Fock matrices as len dens3 
-            if self._dft:
-                dens4.broadcast(self.rank, self.comm)
-                fock = AOFockMatrix(dens4)
-                dens1.broadcast(self.rank, self.comm)
+            # Construct Fock matrix object for two-time transformed Fock matrices 
+            if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
+                # For two-time perturbed Fock matrices we have as many Fock matrices as len dens2
                 dens2.broadcast(self.rank, self.comm)
-            else:
-                fock = AOFockMatrix(dens3)
+                fock = AOFockMatrix(dens2)
+                if self._dft:
+                    dens1.broadcast(self.rank, self.comm)
 
-            
-        fock_flag = fockmat.rgenjk
-        if self._dft:
-            if self.xcfun.is_hybrid():
-                fock_flag = fockmat.rgenjkx
-                fact_xc = self.xcfun.get_frac_exact_exchange()
-                for i in range(fock.number_of_fock_matrices()):
-                    fock.set_scale_factor(fact_xc, i)
-            else:
-                fock_flag = fockmat.rgenj
+            # Construct Fock matrix object for three-time transformed Fock matrices 
+            elif mode.lower() in ['crf','tpa']:
+                dens3.broadcast(self.rank, self.comm)
+                # For  three-time perturbed Fock matrices we have as many Fock matrices as len dens3 
+                if self._dft:
+                    dens4.broadcast(self.rank, self.comm)
+                    fock = AOFockMatrix(dens4)
+                    dens1.broadcast(self.rank, self.comm)
+                    dens2.broadcast(self.rank, self.comm)
+                else:
+                    fock = AOFockMatrix(dens3)
 
-        for i in range(fock.number_of_fock_matrices()):
-            fock.set_fock_type(fock_flag, i)
-
-        t0 = tm.time()
-
-        # Compute HF/two-electron part of two-time perturbed Fock matrices
-        if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
-            # For two-time perturbed Fock matrix, the two-electron (HF) part is only contracted with dens2
-            eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
-
-        # Compute HF/two-electron part of three-time perturbed Fock matrices
-        elif mode.lower() in ['crf','tpa']:
-            # For three-time perturbed Fock matrix, the two-electron (HF) part is only contracted with dens3
+                
+            fock_flag = fockmat.rgenjk
             if self._dft:
-                eri_driver.compute(fock, dens4, molecule, ao_basis, screening)
-            else:
-                eri_driver.compute(fock, dens3, molecule, ao_basis, screening)
-            
+                if self.xcfun.is_hybrid():
+                    fock_flag = fockmat.rgenjkx
+                    fact_xc = self.xcfun.get_frac_exact_exchange()
+                    for i in range(fock.number_of_fock_matrices()):
+                        fock.set_scale_factor(fact_xc, i)
+                else:
+                    fock_flag = fockmat.rgenj
 
-        if self._dft and not self.xcfun.is_hybrid():
-            for ifock in range(fock.number_of_fock_matrices()):
-                fock.scale(2.0, ifock)
+            for i in range(fock.number_of_fock_matrices()):
+                fock.set_fock_type(fock_flag, i)
 
-        if profiler is not None:
-            profiler.add_timing_info('FockERI', tm.time() - t0)
-
-        if self._dft:
             t0 = tm.time()
 
-            xc_drv = XCNewIntegrator(self.comm)
-            molgrid = dft_dict['molgrid']
-            gs_density = dft_dict['gs_density']
+            # Compute HF/two-electron part of two-time perturbed Fock matrices
+            if mode.lower() in ['qrf','shg', 'tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
+                # For two-time perturbed Fock matrix, the two-electron (HF) part is only contracted with dens2
+                eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
 
-            molgrid.partition_grid_points()
-            molgrid.distribute_counts_and_displacements(
-                self.rank, self.nodes, self.comm)
-
-            if mode.lower() in ['qrf','shg','tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
-                # Compute vxc contribution for two-time transformed Fock matrics
-                xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,dens2, gs_density, molgrid,self.xcfun.get_func_label(), mode)
-
+            # Compute HF/two-electron part of three-time perturbed Fock matrices
             elif mode.lower() in ['crf','tpa']:
-                # Compute vxc contribution for three-time transformed Fock matrics
-                xc_drv.integrate_kxclxc_fock(fock, molecule, ao_basis, dens1, dens2, dens3, gs_density, molgrid,self.xcfun.get_func_label(), mode)
+                # For three-time perturbed Fock matrix, the two-electron (HF) part is only contracted with dens3
+                if self._dft:
+                    eri_driver.compute(fock, dens4, molecule, ao_basis, screening)
+                else:
+                    eri_driver.compute(fock, dens3, molecule, ao_basis, screening)
+                
+
+            if self._dft and not self.xcfun.is_hybrid():
+                for ifock in range(fock.number_of_fock_matrices()):
+                    fock.scale(2.0, ifock)
 
             if profiler is not None:
-                profiler.add_timing_info('FockXC', tm.time() - t0)
+                profiler.add_timing_info('FockERI', tm.time() - t0)
 
-        fock.reduce_sum(self.rank, self.nodes, self.comm)
+            if self._dft:
+                t0 = tm.time()
 
-        t0 = tm.time()
+                xc_drv = XCNewIntegrator(self.comm)
+                molgrid = dft_dict['molgrid']
+                gs_density = dft_dict['gs_density']
 
-        if self.rank == mpi_master():
-            nfocks = fock.number_of_fock_matrices()
-            fock_mo = np.zeros((norb**2, nfocks))
-            for i in range(nfocks):
-                fock_mo[:, i] = self.ao2mo(mo,
-                                            fock.to_numpy(i).T).reshape(-1)
-        else:
-            fock_mo = None
+                molgrid.partition_grid_points()
+                molgrid.distribute_counts_and_displacements(
+                    self.rank, self.nodes, self.comm)
 
-        if profiler is not None:
-            profiler.add_timing_info('AOtoMO', tm.time() - t0)
+                if mode.lower() in ['qrf','shg','tpa_ii','redtpa_i','redtpa_ii','crf_ii','shg_red']:
+                    # Compute vxc contribution for two-time transformed Fock matrics
+                    xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,dens2, gs_density, molgrid,self.xcfun.get_func_label(), mode)
 
-        dist_fock_mo = DistributedArray(fock_mo, self.comm)
+                elif mode.lower() in ['crf','tpa']:
+                    # Compute vxc contribution for three-time transformed Fock matrics
+                    xc_drv.integrate_kxclxc_fock(fock, molecule, ao_basis, dens1, dens2, dens3, gs_density, molgrid,self.xcfun.get_func_label(), mode)
 
-        if dist_fabs is None:
-            dist_fabs = DistributedArray(dist_fock_mo.data,
-                                            self.comm,
-                                            distribute=False)
-        else:
-            dist_fabs.append(dist_fock_mo, axis=1)
+                if profiler is not None:
+                    profiler.add_timing_info('FockXC', tm.time() - t0)
+
+            fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+            t0 = tm.time()
+
+            if self.rank == mpi_master():
+                nfocks = fock.number_of_fock_matrices()
+                fock_mo = np.zeros((norb**2, nfocks))
+                for i in range(nfocks):
+                    fock_mo[:, i] = self.ao2mo(mo,
+                                                fock.to_numpy(i).T).reshape(-1)
+            else:
+                fock_mo = None
+
+            if profiler is not None:
+                profiler.add_timing_info('AOtoMO', tm.time() - t0)
+
+            if mode.lower() in ['crf','tpa']:
+                dist_fock_mo_2 = DistributedArray(fock_mo[:, :len(dts2)], self.comm)
+                dist_fock_mo_3 = DistributedArray(fock_mo[:, len(dts2):], self.comm)
+                if dist_fabs_2 is None:
+                    dist_fabs_2 = DistributedArray(dist_fock_mo_2.data,
+                                                   self.comm,
+                                                   distribute=False)
+                else:
+                    dist_fabs_2.append(dist_fock_mo_2, axis=1)
+                if dist_fabs_3 is None:
+                    dist_fabs_3 = DistributedArray(dist_fock_mo_3.data,
+                                                   self.comm,
+                                                   distribute=False)
+                else:
+                    dist_fabs_3.append(dist_fock_mo_3, axis=1)
+            else:
+                dist_fock_mo = DistributedArray(fock_mo, self.comm)
+
+                if dist_fabs is None:
+                    dist_fabs = DistributedArray(dist_fock_mo.data,
+                                                 self.comm,
+                                                 distribute=False)
+                else:
+                    dist_fabs.append(dist_fock_mo, axis=1)
+
+        if mode.lower() in ['crf','tpa']:
+            dist_fabs = DistributedArray(dist_fabs_2.data,
+                                         self.comm,
+                                         distribute=False)
+            dist_fabs.append(dist_fabs_3, axis=1)
 
         self.ostream.print_blank()
 
