@@ -535,26 +535,27 @@ class NonLinearSolver:
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 6
 
-                # condition = ((num_1 % size_1 == 0) and (num_2 % size_2 == 0) and
-                #              (num_1 // size_1 == num_2 // size_2))
-
                 if mode.lower() in ['crf', 'tpa']:
-                    
                     batch_size = max((batch_size // size_3) * size_3, size_3)
-
                     batch_size_second_order = (batch_size // size_3) * size_2
-
                     batch_size_first_order = (batch_size // size_3) * size_1
 
+                    condition = ((num_1 % size_1 == 0) and
+                                 (num_2 % size_2 == 0) and
+                                 (num_3 % size_3 == 0) and
+                                 (num_1 // size_1 == num_3 // size_3) and
+                                 (num_2 // size_2 == num_3 // size_3))
                 else:
-
                     batch_size = max((batch_size // size_2) * size_2, size_2)
-
                     batch_size_first_order = (batch_size // size_2) * size_1
 
-                # errmsg = 'NonLinearSolver._comp_nlr_fock: '
-                # errmsg += f'inconsistent number of density matrices (mode={mode})'
-                # assert_msg_critical(condition, errmsg)
+                    condition = ((num_1 % size_1 == 0) and
+                                 (num_2 % size_2 == 0) and
+                                 (num_1 // size_1 == num_2 // size_2))
+
+                errmsg = 'NonLinearSolver._comp_nlr_fock: '
+                errmsg += f'inconsistent number of density matrices (mode={mode})'
+                assert_msg_critical(condition, errmsg)
             else:
                 batch_size = None
                 batch_size_first_order = None
@@ -752,15 +753,24 @@ class NonLinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('AOtoMO', tm.time() - t0)
 
-            if mode.lower() in ['crf','tpa']:
-                dist_fock_mo_2 = DistributedArray(fock_mo[:, :len(dts2)], self.comm)
-                dist_fock_mo_3 = DistributedArray(fock_mo[:, len(dts2):], self.comm)
+            if self._dft and mode.lower() in ['crf','tpa']:
+                if self.rank == mpi_master():
+                    fock_mo_2 = fock_mo[:, :len(dts2)]
+                    fock_mo_3 = fock_mo[:, len(dts2):]
+                else:
+                    fock_mo_2 = None
+                    fock_mo_3 = None
+
+                dist_fock_mo_2 = DistributedArray(fock_mo_2, self.comm)
+                dist_fock_mo_3 = DistributedArray(fock_mo_3, self.comm)
+
                 if dist_fabs_2 is None:
                     dist_fabs_2 = DistributedArray(dist_fock_mo_2.data,
                                                    self.comm,
                                                    distribute=False)
                 else:
                     dist_fabs_2.append(dist_fock_mo_2, axis=1)
+
                 if dist_fabs_3 is None:
                     dist_fabs_3 = DistributedArray(dist_fock_mo_3.data,
                                                    self.comm,
@@ -777,7 +787,7 @@ class NonLinearSolver:
                 else:
                     dist_fabs.append(dist_fock_mo, axis=1)
 
-        if mode.lower() in ['crf','tpa']:
+        if self._dft and mode.lower() in ['crf','tpa']:
             dist_fabs = DistributedArray(dist_fabs_2.data,
                                          self.comm,
                                          distribute=False)

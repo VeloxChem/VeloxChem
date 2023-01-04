@@ -114,7 +114,7 @@ class TpaDriver(NonLinearSolver):
         """
 
         profiler = Profiler({
-            'timing': False,
+            'timing': self.timing,
             'profiling': self.profiling,
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
@@ -313,9 +313,18 @@ class TpaDriver(NonLinearSolver):
 
         profiler.check_memory_usage('1st densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         #  computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(w, density_list1,density_list2,density_list3, F0, mo, molecule,
-                                       ao_basis,dft_dict)
+                                       ao_basis,dft_dict,fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('1st Focks')
 
@@ -342,10 +351,19 @@ class TpaDriver(NonLinearSolver):
 
         profiler.check_memory_usage('2nd densities')
 
+        fock_profiler_two = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         # computing the remaning second-order Fock matrices from the
         # second-order densities
         fock_dict_two = self.get_fock_dict_II(w, density_list_two1,density_list_two2, mo, molecule,
-                                              ao_basis,dft_dict)
+                                              ao_basis,dft_dict,fock_profiler_two)
+
+        fock_profiler_two.end(self.ostream)
 
         profiler.check_memory_usage('2nd Focks')
 
@@ -428,7 +446,7 @@ class TpaDriver(NonLinearSolver):
 
         return None
 
-    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis,dft_dict):
+    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis,dft_dict,profiler):
         """
         Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
@@ -533,7 +551,7 @@ class TpaDriver(NonLinearSolver):
 
         return None
 
-    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis,dft_dict):
+    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis,dft_dict,profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function

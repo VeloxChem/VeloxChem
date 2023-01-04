@@ -263,7 +263,7 @@ class TpaFullDriver(TpaDriver):
 
         return density_list1, density_list2, density_list3
 
-    def get_fock_dict(self, wi, density_list1,density_list2,density_list3, F0_a, mo, molecule, ao_basis,dft_dict):
+    def get_fock_dict(self, wi, density_list1,density_list2,density_list3, F0_a, mo, molecule, ao_basis,dft_dict, profiler):
         """
         Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
@@ -332,7 +332,7 @@ class TpaFullDriver(TpaDriver):
         if self._dft:
             
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                                dft_dict, density_list1, density_list2, density_list3,'tpa')
+                                                dft_dict, density_list1, density_list2, density_list3,'tpa',profiler)
                 
             fock_index = 0
             for wb in wi:
@@ -352,7 +352,7 @@ class TpaFullDriver(TpaDriver):
             else:
                 density_list_23 = None
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                             None, None, None, density_list_23,'tpa')
+                                             None, None, None, density_list_23,'tpa',profiler)
             fock_index = 0
             for wb in wi:
                 for key in keys:
@@ -1026,7 +1026,7 @@ class TpaFullDriver(TpaDriver):
 
         return density_list1,density_list2
 
-    def get_fock_dict_II(self, wi, density_list1,density_list2, mo, molecule, ao_basis,dft_dict):
+    def get_fock_dict_II(self, wi, density_list1,density_list2, mo, molecule, ao_basis,dft_dict,profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
@@ -1070,10 +1070,10 @@ class TpaFullDriver(TpaDriver):
 
         if self._dft:
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                            dft_dict, density_list1, density_list2, None, 'tpa_ii')
+                                            dft_dict, density_list1, density_list2, None, 'tpa_ii',profiler)
         else:
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                            None, None, density_list2, None, 'tpa_ii')
+                                            None, None, density_list2, None, 'tpa_ii',profiler)
 
         time_end_fock = time.time()
 
@@ -1092,8 +1092,6 @@ class TpaFullDriver(TpaDriver):
                                                  distribute=False)
                 fock_index += 1
 
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
         write_distributed_focks(fock_file, focks, keys, wi, self.comm,
                                 self.ostream)
 

@@ -163,7 +163,7 @@ class TpaReducedDriver(TpaDriver):
 
         return density_list1, density_list2,None
 
-    def get_fock_dict(self, wi, density_list1,density_list2, density_list3, F0_a, mo, molecule, ao_basis,dft_dict):
+    def get_fock_dict(self, wi, density_list1,density_list2, density_list3, F0_a, mo, molecule, ao_basis,dft_dict,profiler):
         """
         Computes the compounded Fock matrices F^{σ}  used for the reduced
         isotropic cubic response function
@@ -217,11 +217,10 @@ class TpaReducedDriver(TpaDriver):
         time_start_fock = time.time()
         if self._dft:
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real', dft_dict,
-                                         density_list1, density_list2, None, 'redtpa_i')
+                                         density_list1, density_list2, None, 'redtpa_i',profiler)
         else:
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real', None,
-                                         None, density_list2, None, 'redtpa_i')
-
+                                         None, density_list2, None, 'redtpa_i',profiler)
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock
@@ -239,8 +238,6 @@ class TpaReducedDriver(TpaDriver):
                                                  distribute=False)
                 fock_index += 1
 
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
         write_distributed_focks(fock_file, focks, keys, wi, self.comm,
                                 self.ostream)
 
@@ -561,7 +558,7 @@ class TpaReducedDriver(TpaDriver):
 
         return density_list1,density_list2
 
-    def get_fock_dict_II(self, wi, density_list1,density_list2, mo, molecule, ao_basis,dft_dict):
+    def get_fock_dict_II(self, wi, density_list1,density_list2, mo, molecule, ao_basis,dft_dict,profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
@@ -604,11 +601,14 @@ class TpaReducedDriver(TpaDriver):
         time_start_fock = time.time()
         if self._dft:
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, density_list1, density_list2, None, 'redtpa_ii')
+                                        dft_dict, density_list1, density_list2, None, 'redtpa_ii',profiler)
         else:
-             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        None, None, density_list2, None, 'redtpa_ii')
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
+                                        None, None, density_list2, None, 'redtpa_ii',profiler)
         time_end_fock = time.time()
+
+        total_time_fock = time_end_fock - time_start_fock
+        self._print_fock_time(total_time_fock)
 
         focks = {}
         for key in keys:
@@ -622,8 +622,6 @@ class TpaReducedDriver(TpaDriver):
                                                  distribute=False)
                 fock_index += 1
 
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
         write_distributed_focks(fock_file, focks, keys, wi, self.comm,
                                 self.ostream)
 
