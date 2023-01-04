@@ -71,7 +71,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double rho13 = std::pow(density, onethird);
 
-        double delta = std::sqrt( std::abs(-2.0 * pair_density));
+        double delta = std::sqrt(std::fabs(-2.0 * pair_density));
 
         double zeta = delta / density;
 
