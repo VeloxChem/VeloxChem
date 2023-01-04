@@ -35,10 +35,8 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({
-            "SLATER", "VWN_RPA", "SLDA",
-            "B88X", "LYP", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE", "PBE0", "BP86", "PW91", "OLYP",
-            "TPSS", "TPSSH", "PKZB", "SCAN", "M06", "M06L"});
+    return std::vector<std::string>({"SLATER", "VWN_RPA", "SLDA", "B88X", "LYP",  "BLYP",  "B3LYP", "BHANDH", "BHANDHLYP", "PBE",
+                                     "PBE0",   "BP86",    "PW91", "OLYP", "TPSS", "TPSSH", "PKZB",  "SCAN",   "M06",       "M06L"});
 }
 
 CXCNewFunctional

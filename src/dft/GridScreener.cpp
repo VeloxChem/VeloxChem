@@ -166,13 +166,13 @@ screenVxcFockForPLDA(double*       rho,
 }
 
 void
-screenVxcFockForPGGA(double*               rho,
-                    double*               sigma,
-                    double*               exc,
-                    double*               vrho,
-                    double*               vsigma,
-                    const int32_t         npoints,
-                    const double          densityThreshold)
+screenVxcFockForPGGA(double*       rho,
+                     double*       sigma,
+                     double*       exc,
+                     double*       vrho,
+                     double*       vsigma,
+                     const int32_t npoints,
+                     const double  densityThreshold)
 {
     double densityThresholdSquared = densityThreshold * densityThreshold;
 

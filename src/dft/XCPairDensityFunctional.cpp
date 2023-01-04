@@ -27,10 +27,10 @@
 
 #include "ErrorHandler.hpp"
 #include "MemAlloc.hpp"
-#include "PairDensitySlater.hpp"
-#include "PairDensityVWN.hpp"
 #include "PairDensityPBE_C.hpp"
 #include "PairDensityPBE_X.hpp"
+#include "PairDensitySlater.hpp"
+#include "PairDensityVWN.hpp"
 #include "StringFormat.hpp"
 
 CXCPairDensityFunctional::CXCPairDensityFunctional(const std::string&              nameOfFunctional,
@@ -50,7 +50,7 @@ CXCPairDensityFunctional::CXCPairDensityFunctional(const std::string&           
         _components.push_back(std::make_tuple(labels[i], coeffs[i]));
     }
 
-    //TO DO: make a more general system to find out family
+    // TODO: make a more general system to find out family
     if (fstr::upcase(nameOfFunctional) == "PLDA")
     {
         _familyOfFunctional = std::string("PLDA");
@@ -246,13 +246,14 @@ CXCPairDensityFunctional::compute_exc_vxc_for_plda(int32_t np, const double* rho
 }
 
 auto
-CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void
+CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma)
+    const -> void
 {
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc  = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
 #pragma omp simd aligned(exc, vrho : VLX_ALIGN)

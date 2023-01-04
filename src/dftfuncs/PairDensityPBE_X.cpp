@@ -39,13 +39,13 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
     double fourthird = 4.0 / 3.0;
 
-    double frg = - 0.75 * std::pow(3.0 / mathconst::getPiValue(), onethird);
+    double frg = -0.75 * std::pow(3.0 / mathconst::getPiValue(), onethird);
 
     double R = 0.804;
 
-    double mu = 0.066725 / 3.0 *  std::pow(mathconst::getPiValue(), 2);
+    double mu = 0.066725 / 3.0 * std::pow(mathconst::getPiValue(), 2);
 
-    double mus2r = mu * std::pow(1.0 / 12 * std::pow( 6.0 /mathconst::getPiValue(), 2.0/ 3.0 ), 2) / R;
+    double mus2r = mu * std::pow(1.0 / 12 * std::pow(6.0 / mathconst::getPiValue(), 2.0 / 3.0), 2) / R;
 
     for (int32_t g = 0; g < np; g++)
     {
@@ -75,13 +75,12 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double zeta = delta / density;
 
-        double zeta2 = zeta*zeta; //This is really the absolute value
+        double zeta2 = zeta * zeta;  // This is really the absolute value
 
-        //Li Manni's 2014 translation of gradients
+        // Li Manni's 2014 translation of gradients
         double gradR = 0.25 * sigma[3 * g + 0] * (1.0 + delta2 / (density * density));
 
         double gradI = 0.25 * sigma[3 * g + 0] * zeta;
-
 
         double f_zeta;
 
@@ -92,25 +91,25 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         {
             double fa = std::pow(1.0 + zeta, fourthird);
 
-            double fb = std::pow(std::max(1.0 - zeta,0.0), fourthird);
+            double fb = std::pow(std::max(1.0 - zeta, 0.0), fourthird);
 
             f_zeta = (fa + fb) * (1.0 + R);
 
-            double rhoa = 0.5*(density + delta);
+            double rhoa = 0.5 * (density + delta);
 
-            double rhob = 0.5*(density - delta);
+            double rhob = 0.5 * (density - delta);
 
             double grada2 = gradR + gradI;
 
             double gradb2 = gradR - gradI;
 
-            double Fxc_a = R/(1.0 + mus2r * grada2/std::pow(rhoa,2.666666666666667));
+            double Fxc_a = R / (1.0 + mus2r * grada2 / std::pow(rhoa, 2.666666666666667));
 
             double Fxc_b = R;
 
             if (rhob > 1.0e-12)
             {
-                Fxc_b = R/(1.0 + mus2r * gradb2/std::pow(rhob,2.666666666666667));
+                Fxc_b = R / (1.0 + mus2r * gradb2 / std::pow(rhob, 2.666666666666667));
             }
 
             fg_zeta = fa * Fxc_a + fb * Fxc_b;
@@ -124,13 +123,13 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             f_zeta = 2.0 * std::pow(r, 4.0 / 3.0) * std::cos(theta) * (1.0 + R);
 
-            double rho83 = std::pow (density, 8.0 / 3.0);
+            double rho83 = std::pow(density, 8.0 / 3.0);
 
             double denom_R = rho83 * std::pow(0.5 * r, 8.0 / 3.0) * std::cos(2.0 * theta) + mus2r * gradR;
 
             double denom_I = rho83 * std::pow(0.5 * r, 8.0 / 3.0) * std::sin(2.0 * theta) + mus2r * gradI;
 
-            double r_denom = std::sqrt( denom_R * denom_R + denom_I * denom_I);
+            double r_denom = std::sqrt(denom_R * denom_R + denom_I * denom_I);
 
             double theta_denom = std::atan2(denom_I, denom_R);
 
