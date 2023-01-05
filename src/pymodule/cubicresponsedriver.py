@@ -863,21 +863,8 @@ class CubicResponseDriver(NonLinearSolver):
 
         time_start_fock = time.time()
         if self._dft:
-            
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
                                                 dft_dict, density_list1, density_list2, density_list3,'crf')
-            
-            fock_index = 0
-            for wb in fock_freqs:
-                for key in ['Fbc','Fbd','Fcd']:
-                    focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
-                    fock_index += 1
-            
-            
-            for wb in fock_freqs:
-                    focks['Fbcd'][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
-                    fock_index += 1
-                
         else:
             if self.rank == mpi_master():
                 density_list_23 = density_list2 + density_list3
@@ -886,11 +873,16 @@ class CubicResponseDriver(NonLinearSolver):
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                          'real_and_imag', None, None,None,
                                          density_list_23, 'crf')
-            fock_index = 0
-            for wb in fock_freqs:
-                for key in keys:
-                    focks[key][wb] = DistributedArray(dist_focks.data[:,fock_index],self.comm,distribute=False)
-                    fock_index += 1
+        fock_index = 0
+        for wb in fock_freqs:
+            for key in ['Fbc','Fbd','Fcd']:
+                focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
+                fock_index += 1
+        
+        for wb in fock_freqs:
+                focks['Fbcd'][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
+                fock_index += 1
+
 
         time_end_fock = time.time()
 

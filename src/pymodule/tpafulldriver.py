@@ -333,19 +333,7 @@ class TpaFullDriver(TpaDriver):
             
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
                                                 dft_dict, density_list1, density_list2, density_list3,'tpa',profiler)
-                
-            fock_index = 0
-            for wb in wi:
-                for key in ['f_sig_xx','f_sig_yy', 'f_sig_zz', 'f_sig_xy','f_sig_xz','f_sig_yz','f_lamtau_xx','f_lamtau_yy', 'f_lamtau_zz','f_lamtau_xy','f_lamtau_xz', 'f_lamtau_yz',]:
-                    focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
-                    fock_index += 1
-            
-            
-            for wb in wi:
-                    for key in ['F123_x','F123_y','F123_z'] :
-                        focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
-                        fock_index += 1
-                
+                                
         else:
             if self.rank == mpi_master():
                 density_list_23 = density_list2 + density_list3
@@ -353,15 +341,18 @@ class TpaFullDriver(TpaDriver):
                 density_list_23 = None
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
                                              None, None, None, density_list_23,'tpa',profiler)
-            fock_index = 0
-            for wb in wi:
-                for key in keys:
-                    focks[key][wb] = DistributedArray(dist_focks.data[:,
-                                                                    fock_index],
-                                                    self.comm,
-                                                    distribute=False)
-                    fock_index += 1
 
+        fock_index = 0
+        for wb in wi:
+            for key in ['f_sig_xx','f_sig_yy', 'f_sig_zz', 'f_sig_xy','f_sig_xz','f_sig_yz','f_lamtau_xx','f_lamtau_yy', 'f_lamtau_zz','f_lamtau_xy','f_lamtau_xz', 'f_lamtau_yz',]:
+                focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
+                fock_index += 1
+        
+        
+        for wb in wi:
+                for key in ['F123_x','F123_y','F123_z'] :
+                    focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
+                    fock_index += 1
 
         time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
