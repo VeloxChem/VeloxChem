@@ -89,8 +89,9 @@ screenVxcFockForGGA(double*       rho,
             vsigma[3 * g + 2] = 0.0;
         }
 
-        // rho
-        if (std::fabs(rho[2 * g + 0] + rho[2 * g + 1]) <= densityThreshold)
+        // rho and sigma
+        if ((std::fabs(rho[2 * g + 0]) + std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(sigma[3 * g + 0]) + std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             exc[g] = 0.0;
         }
@@ -100,6 +101,8 @@ screenVxcFockForGGA(double*       rho,
 void
 screenVxcFockForMGGA(double*       rho,
                      double*       sigma,
+                     double*       lapl,
+                     double*       tau,
                      double*       exc,
                      double*       vrho,
                      double*       vsigma,
@@ -114,8 +117,9 @@ screenVxcFockForMGGA(double*       rho,
 
     for (int32_t g = 0; g < npoints; g++)
     {
-        // rho_a and sigma_aa
+        // rho_a, tau_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             vrho[2 * g + 0] = 0.0;
@@ -128,8 +132,9 @@ screenVxcFockForMGGA(double*       rho,
             vtau[2 * g + 0] = 0.0;
         }
 
-        // rho_b and sigma_bb
+        // rho_b, tau_b and sigma_bb
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             vrho[2 * g + 1] = 0.0;
@@ -142,8 +147,10 @@ screenVxcFockForMGGA(double*       rho,
             vtau[2 * g + 1] = 0.0;
         }
 
-        // rho
-        if (std::fabs(rho[2 * g + 0] + rho[2 * g + 1]) <= densityThreshold)
+        // rho, tau and sigma
+        if ((std::fabs(rho[2 * g + 0]) + std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 0]) + std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
+            (std::fabs(sigma[3 * g + 0]) + std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             exc[g] = 0.0;
         }
@@ -282,8 +289,9 @@ screenFxcFockForMGGA(double*       rho,
 
     for (int32_t g = 0; g < npoints; g++)
     {
-        // rho_a and sigma_aa
+        // rho_a, tau_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             v2rho2[3 * g + 0] = 0.0;
@@ -332,8 +340,9 @@ screenFxcFockForMGGA(double*       rho,
             v2sigma2[6 * g + 4] = 0.0;
         }
 
-        // rho_b and sigma_bb
+        // rho_b, tau_b and sigma_bb
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             v2rho2[3 * g + 1] = 0.0;
@@ -592,8 +601,9 @@ screenKxcFockForMGGA(double*       rho,
 
     for (int32_t g = 0; g < npoints; g++)
     {
-        // rho_a and sigma_aa
+        // rho_a, tau_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             v3rho3[4 * g + 0] = 0.0;
@@ -761,8 +771,9 @@ screenKxcFockForMGGA(double*       rho,
             v3sigma3[10 * g + 8] = 0.0;
         }
 
-        // rho_b and sigma_bb
+        // rho_b, tau_b and sigma_bb
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
+            (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             v3rho3[4 * g + 1] = 0.0;
