@@ -326,7 +326,6 @@ class CubicResponseDriver(NonLinearSolver):
             F0 = None
             norb = None
 
-        
         dft_dict = self._init_dft(molecule, scf_tensors)
 
         F0 = self.comm.bcast(F0, root=mpi_master())
@@ -336,7 +335,8 @@ class CubicResponseDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list1,density_list2,density_list3 = self.get_densities(freqtriples, kX, mo, nocc)
+            density_list1, density_list2, density_list3 = self.get_densities(
+                freqtriples, kX, mo, nocc)
         else:
             density_list1 = None
             density_list2 = None
@@ -345,8 +345,9 @@ class CubicResponseDriver(NonLinearSolver):
         profiler.check_memory_usage('1st densities')
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(freqtriples, density_list1,density_list2,density_list3, F0, mo,
-                                       molecule, ao_basis,dft_dict)
+        fock_dict = self.get_fock_dict(freqtriples, density_list1,
+                                       density_list2, density_list3, F0, mo,
+                                       molecule, ao_basis, dft_dict)
 
         profiler.check_memory_usage('1st Focks')
 
@@ -361,16 +362,17 @@ class CubicResponseDriver(NonLinearSolver):
         profiler.check_memory_usage('2nd CPP')
 
         if self.rank == mpi_master():
-            density_list1_two, density_list2_two = self.get_densities_II(freqtriples, kX, k_xy, mo,
-                                                     nocc)
+            density_list1_two, density_list2_two = self.get_densities_II(
+                freqtriples, kX, k_xy, mo, nocc)
         else:
             density_list1_two = None
             density_list2_two = None
 
         profiler.check_memory_usage('2nd densities')
 
-        fock_dict_two = self.get_fock_dict_II(freqtriples, density_list1_two, density_list2_two, F0,
-                                              mo, molecule, ao_basis,dft_dict)
+        fock_dict_two = self.get_fock_dict_II(freqtriples, density_list1_two,
+                                              density_list2_two, F0, mo,
+                                              molecule, ao_basis, dft_dict)
 
         profiler.check_memory_usage('2nd Focks')
 
@@ -407,7 +409,6 @@ class CubicResponseDriver(NonLinearSolver):
                 NaR4NbNcNd = r4_dict[wb]
 
                 NaE3NbNcd = np.dot(Na, e3_dict[(('E3'), (wb, wc, wd))])
-
 
                 # X3 terms
                 NaB3NcNd = np.dot(
@@ -534,9 +535,7 @@ class CubicResponseDriver(NonLinearSolver):
                 result[('X2', wb, wc, wd)] = val_X2
                 result[('A3', wb, wc, wd)] = val_A3
                 result[('A2', wb, wc, wd)] = val_A2
-                result[('Gamma',wb,wc,wd)] = gamma
-                
-                
+                result[('gamma', wb, wc, wd)] = gamma
 
         profiler.check_memory_usage('End of CRF')
 
@@ -580,7 +579,6 @@ class CubicResponseDriver(NonLinearSolver):
                 fo3[(('CD', wc, wd), wc + wd)].data,
             ]).T.copy()
 
-
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
             if self.rank != mpi_master():
@@ -588,8 +586,7 @@ class CubicResponseDriver(NonLinearSolver):
 
             vec_pack = vec_pack.T.copy().reshape(-1, norb, norb)
 
-            (fb, fc, fd, f123, fbc, fbd,
-             fcd) = vec_pack
+            (fb, fc, fd, f123, fbc, fbd, fcd) = vec_pack
 
             fb = np.conjugate(fb).T
             fc = np.conjugate(fc).T
@@ -621,7 +618,7 @@ class CubicResponseDriver(NonLinearSolver):
 
             xi_d_bc = self._xi(kd, kbc, fd, fbc, F0_a)
 
-            e3fock = (xi_b_cd + xi_c_bd +  xi_d_bc).T + (0.5 * f123).T
+            e3fock = (xi_b_cd + xi_c_bd + xi_d_bc).T + (0.5 * f123).T
 
             e3vec[('E3', (wb, wc, wd))] = self.anti_sym(
                 -2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
@@ -695,8 +692,9 @@ class CubicResponseDriver(NonLinearSolver):
             Dbd = np.linalg.multi_dot([mo, (Dbd + Ddb), mo.T])
             Dcd = np.linalg.multi_dot([mo, (Ddc + Dcd), mo.T])
 
-            D123 = np.linalg.multi_dot([mo, (Dbcd +  Dbdc + Dcbd + Dcdb + Ddbc + Ddcb), mo.T])
-            
+            D123 = np.linalg.multi_dot(
+                [mo, (Dbcd + Dbdc + Dcbd + Dcdb + Ddbc + Ddcb), mo.T])
+
             density_list1.append(Db.real)
             density_list1.append(Db.imag)
             density_list1.append(Dc.real)
@@ -713,7 +711,6 @@ class CubicResponseDriver(NonLinearSolver):
 
             density_list3.append(D123.real)
             density_list3.append(D123.imag)
-
 
         return density_list1, density_list2, density_list3
 
@@ -776,7 +773,8 @@ class CubicResponseDriver(NonLinearSolver):
 
             # density transformation from MO to AO basis
 
-            d_total = np.linalg.multi_dot([mo, (Db_cd + Dcd_b + Dc_bd + Dbd_c + Dd_bc + Dbc_d), mo.T])
+            d_total = np.linalg.multi_dot(
+                [mo, (Db_cd + Dcd_b + Dc_bd + Dbd_c + Dd_bc + Dbc_d), mo.T])
 
             Db = np.linalg.multi_dot([mo, Db, mo.T])
             Dc = np.linalg.multi_dot([mo, Dc, mo.T])
@@ -784,7 +782,6 @@ class CubicResponseDriver(NonLinearSolver):
             Dbc = np.linalg.multi_dot([mo, Dbc, mo.T])
             Dbd = np.linalg.multi_dot([mo, Dbd, mo.T])
             Dcd = np.linalg.multi_dot([mo, Dcd, mo.T])
-
 
             density_list1.append(Db.real)
             density_list1.append(Db.imag)
@@ -803,9 +800,10 @@ class CubicResponseDriver(NonLinearSolver):
             density_list2.append(d_total.real)
             density_list2.append(d_total.imag)
 
-        return density_list1,density_list2
+        return density_list1, density_list2
 
-    def get_fock_dict(self, wi, density_list1, density_list2, density_list3, F0, mo, molecule, ao_basis,dft_dict):
+    def get_fock_dict(self, wi, density_list1, density_list2, density_list3, F0,
+                      mo, molecule, ao_basis, dft_dict):
         """
         Computes the Fock matrices for a cubic response function
 
@@ -856,45 +854,61 @@ class CubicResponseDriver(NonLinearSolver):
             focks['F0'] = F0
             return focks
 
-
-        focks = {'F0': F0}
-        for key in keys:
-            focks[key] = {}
-
         time_start_fock = time.time()
+
         if self._dft:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                                dft_dict, density_list1, density_list2, density_list3,'crf')
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', dft_dict,
+                                             density_list1, density_list2,
+                                             density_list3, 'crf')
         else:
             if self.rank == mpi_master():
                 density_list_23 = density_list2 + density_list3
             else:
                 density_list_23 = None
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                         'real_and_imag', None, None,None,
-                                         density_list_23, 'crf')
-        fock_index = 0
-        for wb in fock_freqs:
-            for key in ['Fbc','Fbd','Fcd']:
-                focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
-                fock_index += 1
-        
-        for wb in fock_freqs:
-                focks['Fbcd'][wb] = DistributedArray(dist_focks.data[:, fock_index], self.comm,distribute=False)
-                fock_index += 1
-
+                                             'real_and_imag', None, None, None,
+                                             density_list_23, 'crf')
 
         time_end_fock = time.time()
-
         total_time_fock = time_end_fock - time_start_fock
         self._print_fock_time(total_time_fock)
+
+        focks = {'F0': F0}
+        for key in keys:
+            focks[key] = {}
+
+        fock_index = 0
+
+        for wb in fock_freqs:
+            for key in [
+                    'Fbc',
+                    'Fbd',
+                    'Fcd',
+            ]:
+                focks[key][wb] = DistributedArray(dist_focks.data[:,
+                                                                  fock_index],
+                                                  self.comm,
+                                                  distribute=False)
+                fock_index += 1
+
+        for wb in fock_freqs:
+            for key in [
+                    'Fbcd',
+            ]:
+                focks[key][wb] = DistributedArray(dist_focks.data[:,
+                                                                  fock_index],
+                                                  self.comm,
+                                                  distribute=False)
+                fock_index += 1
 
         write_distributed_focks(fock_file, focks, keys, fock_freqs, self.comm,
                                 self.ostream)
 
         return focks
 
-    def get_fock_dict_II(self, wi, density_list1,density_list2, F0, mo, molecule, ao_basis,dft_dict):
+    def get_fock_dict_II(self, wi, density_list1, density_list2, F0, mo,
+                         molecule, ao_basis, dft_dict):
         """
         Computes the Fock matrices for a cubic response function
 
@@ -919,7 +933,7 @@ class CubicResponseDriver(NonLinearSolver):
             self._print_fock_header()
 
         keys = [
-            'F123'
+            'F123',
         ]
 
         if self.checkpoint_file is not None:
@@ -940,15 +954,18 @@ class CubicResponseDriver(NonLinearSolver):
             return focks
 
         time_start_fock = time.time()
+
         if self._dft:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                            dft_dict, density_list1, density_list2, None, 'crf_ii')
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', dft_dict,
+                                             density_list1, density_list2, None,
+                                             'crf_ii')
         else:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                            None, None, density_list2, None, 'crf_ii')
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', None, None,
+                                             density_list2, None, 'crf_ii')
 
         time_end_fock = time.time()
-
         total_time_fock = time_end_fock - time_start_fock
         self._print_fock_time(total_time_fock)
 
@@ -1112,7 +1129,7 @@ class CubicResponseDriver(NonLinearSolver):
                 fo2[('B', wb)].data,
                 fo2[('C', wc)].data,
                 fo2[('D', wd)].data,
-                fo['Fbc'][wb].data ,
+                fo['Fbc'][wb].data,
                 fo['Fbd'][wb].data,
                 fo['Fcd'][wb].data,
             ]).T.copy()

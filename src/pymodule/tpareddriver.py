@@ -132,12 +132,11 @@ class TpaReducedDriver(TpaDriver):
             D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
             D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
-
             # density transformation from MO to AO basis
 
-            Dx = np.linalg.multi_dot([mo,  Dx , mo.T])
-            Dy = np.linalg.multi_dot([mo,  Dy , mo.T])
-            Dz = np.linalg.multi_dot([mo,  Dz , mo.T])
+            Dx = np.linalg.multi_dot([mo, Dx, mo.T])
+            Dy = np.linalg.multi_dot([mo, Dy, mo.T])
+            Dz = np.linalg.multi_dot([mo, Dz, mo.T])
 
             D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
             D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
@@ -161,9 +160,10 @@ class TpaReducedDriver(TpaDriver):
             density_list2.append(D_sig_xz.real)
             density_list2.append(D_sig_yz.real)
 
-        return density_list1, density_list2,None
+        return density_list1, density_list2, None
 
-    def get_fock_dict(self, wi, density_list1,density_list2, density_list3, F0_a, mo, molecule, ao_basis,dft_dict,profiler):
+    def get_fock_dict(self, wi, density_list1, density_list2, density_list3,
+                      F0_a, mo, molecule, ao_basis, dft_dict, profiler):
         """
         Computes the compounded Fock matrices F^{σ}  used for the reduced
         isotropic cubic response function
@@ -213,16 +213,20 @@ class TpaReducedDriver(TpaDriver):
                                            self.ostream)
             focks['F0'] = F0_a
             return focks
-            
-        time_start_fock = time.time()
-        if self._dft:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real', dft_dict,
-                                         density_list1, density_list2, None, 'redtpa_i',profiler)
-        else:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real', None,
-                                         None, density_list2, None, 'redtpa_i',profiler)
-        time_end_fock = time.time()
 
+        time_start_fock = time.time()
+
+        if self._dft:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                             dft_dict, density_list1,
+                                             density_list2, None, 'redtpa_i',
+                                             profiler)
+        else:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                             None, None, density_list2, None,
+                                             'redtpa_i', profiler)
+
+        time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
         self._print_fock_time(total_time_fock)
 
@@ -338,18 +342,20 @@ class TpaReducedDriver(TpaDriver):
 
         xy_dict = {}
 
+        one_third = 1.0 / 3.0
+
         for w in wi:
 
             vec_pack = np.array([
                 Fock['Fb'][('x', w)].data,
                 Fock['Fb'][('y', w)].data,
                 Fock['Fb'][('z', w)].data,
-                Fock['f_sig_xx'][w].data * 1/3,
-                Fock['f_sig_yy'][w].data * 1/3,
-                Fock['f_sig_zz'][w].data * 1/3,
-                Fock['f_sig_xy'][w].data * 1/3,
-                Fock['f_sig_xz'][w].data * 1/3,
-                Fock['f_sig_yz'][w].data * 1/3,
+                Fock['f_sig_xx'][w].data * one_third,
+                Fock['f_sig_yy'][w].data * one_third,
+                Fock['f_sig_zz'][w].data * one_third,
+                Fock['f_sig_xy'][w].data * one_third,
+                Fock['f_sig_xz'][w].data * one_third,
+                Fock['f_sig_yz'][w].data * one_third,
             ]).T.copy()
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
@@ -513,20 +519,20 @@ class TpaReducedDriver(TpaDriver):
 
             # density transformation from MO to AO basis
 
-            Dc_x_= np.linalg.multi_dot([mo, Dc_x_, mo.T])
-            Dc_y_= np.linalg.multi_dot([mo, Dc_y_, mo.T])
-            Dc_z_= np.linalg.multi_dot([mo, Dc_z_, mo.T])
+            Dc_x_ = np.linalg.multi_dot([mo, Dc_x_, mo.T])
+            Dc_y_ = np.linalg.multi_dot([mo, Dc_y_, mo.T])
+            Dc_z_ = np.linalg.multi_dot([mo, Dc_z_, mo.T])
 
             Dx = np.linalg.multi_dot([mo, Dx, mo.T])
             Dy = np.linalg.multi_dot([mo, Dy, mo.T])
             Dz = np.linalg.multi_dot([mo, Dz, mo.T])
 
-            D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx , mo.T])
-            D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy , mo.T])
-            D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz , mo.T])
-            D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy , mo.T])
-            D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz , mo.T])
-            D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz , mo.T])
+            D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
+            D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
+            D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
+            D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
+            D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
+            D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
 
             density_list1.append(Dc_x_.real)
             density_list1.append(Dc_x_.imag)
@@ -556,9 +562,10 @@ class TpaReducedDriver(TpaDriver):
             density_list2.append(Dz.real)
             density_list2.append(Dz.imag)
 
-        return density_list1,density_list2
+        return density_list1, density_list2
 
-    def get_fock_dict_II(self, wi, density_list1,density_list2, mo, molecule, ao_basis,dft_dict,profiler):
+    def get_fock_dict_II(self, wi, density_list1, density_list2, mo, molecule,
+                         ao_basis, dft_dict, profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
@@ -599,14 +606,19 @@ class TpaReducedDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        if self._dft:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        dft_dict, density_list1, density_list2, None, 'redtpa_ii',profiler)
-        else:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real_and_imag',
-                                        None, None, density_list2, None, 'redtpa_ii',profiler)
-        time_end_fock = time.time()
 
+        if self._dft:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', dft_dict,
+                                             density_list1, density_list2, None,
+                                             'redtpa_ii', profiler)
+        else:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', None, None,
+                                             density_list2, None, 'redtpa_ii',
+                                             profiler)
+
+        time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
         self._print_fock_time(total_time_fock)
 
