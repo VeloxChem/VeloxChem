@@ -127,7 +127,6 @@ class TpaDriver(NonLinearSolver):
 
         dft_dict = self._init_dft(molecule, scf_tensors)
 
-
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
         nbeta = molecule.number_of_beta_electrons()
@@ -190,9 +189,8 @@ class TpaDriver(NonLinearSolver):
         cpp_keywords = {
             'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
             'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
-            'batch_size', 'restart',
-            'xcfun', 'grid_level', 'potfile', 'electric_field',
-            'program_end_time'
+            'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
+            'electric_field', 'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -248,7 +246,7 @@ class TpaDriver(NonLinearSolver):
         tpa_dict = self.compute_tpa_components(Focks, self.frequencies, X,
                                                d_a_mo, kX, self.comp,
                                                scf_tensors, molecule, ao_basis,
-                                               profiler,dft_dict)
+                                               profiler, dft_dict)
 
         valstr = '*** Time spent in TPA calculation: {:.2f} sec ***'.format(
             time.time() - start_time)
@@ -261,7 +259,8 @@ class TpaDriver(NonLinearSolver):
         return tpa_dict
 
     def compute_tpa_components(self, Focks, w, X, d_a_mo, kX, track,
-                               scf_tensors, molecule, ao_basis, profiler,dft_dict):
+                               scf_tensors, molecule, ao_basis, profiler,
+                               dft_dict):
         """
         Computes all the relevent terms to third-order isotropic gradient
 
@@ -305,7 +304,8 @@ class TpaDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list1,density_list2,density_list3 = self.get_densities(w, kX, mo, nocc)
+            density_list1, density_list2, density_list3 = self.get_densities(
+                w, kX, mo, nocc)
         else:
             density_list1 = None
             density_list2 = None
@@ -321,8 +321,9 @@ class TpaDriver(NonLinearSolver):
         })
 
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(w, density_list1,density_list2,density_list3, F0, mo, molecule,
-                                       ao_basis,dft_dict,fock_profiler)
+        fock_dict = self.get_fock_dict(w, density_list1, density_list2,
+                                       density_list3, F0, mo, molecule,
+                                       ao_basis, dft_dict, fock_profiler)
 
         fock_profiler.end(self.ostream)
 
@@ -344,7 +345,8 @@ class TpaDriver(NonLinearSolver):
         # computing all second-order compounded densities based on the
         # second-order response vectors
         if self.rank == mpi_master():
-            density_list_two1,density_list_two2 = self.get_densities_II(w, kX, kXY_dict, mo, nocc)
+            density_list_two1, density_list_two2 = self.get_densities_II(
+                w, kX, kXY_dict, mo, nocc)
         else:
             density_list_two1 = None
             density_list_two2 = None
@@ -360,8 +362,10 @@ class TpaDriver(NonLinearSolver):
 
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two = self.get_fock_dict_II(w, density_list_two1,density_list_two2, mo, molecule,
-                                              ao_basis,dft_dict,fock_profiler_two)
+        fock_dict_two = self.get_fock_dict_II(w, density_list_two1,
+                                              density_list_two2, mo, molecule,
+                                              ao_basis, dft_dict,
+                                              fock_profiler_two)
 
         fock_profiler_two.end(self.ostream)
 
@@ -446,7 +450,8 @@ class TpaDriver(NonLinearSolver):
 
         return None
 
-    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis,dft_dict,profiler):
+    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis,
+                      dft_dict, profiler):
         """
         Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
@@ -551,7 +556,8 @@ class TpaDriver(NonLinearSolver):
 
         return None
 
-    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis,dft_dict,profiler):
+    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis,
+                         dft_dict, profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function

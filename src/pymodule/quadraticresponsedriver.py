@@ -502,8 +502,8 @@ class QuadraticResponseDriver(NonLinearSolver):
         time_start_fock = time.time()
         dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                          'real_and_imag', dft_dict,
-                                         first_order_dens, second_order_dens, None,
-                                         'qrf')
+                                         first_order_dens, second_order_dens,
+                                         None, 'qrf')
         time_end_fock = time.time()
 
         total_time_fock = time_end_fock - time_start_fock

@@ -31,14 +31,14 @@ class TestCrf:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.state = False
         method_settings = {'xcfun': 'SLDA', 'grid_level': 4}
-        scf_drv.update_settings(scf_settings,method_settings)
+        scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.compute(molecule, basis)
 
-        return scf_drv.scf_tensors, molecule, basis,method_settings
+        return scf_drv.scf_tensors, molecule, basis, method_settings
 
     def run_crf(self, ref_result):
 
-        scf_tensors, molecule, ao_basis,method_settings = self.run_scf()
+        scf_tensors, molecule, ao_basis, method_settings = self.run_scf()
 
         wb = 0
         wc = 0
@@ -58,7 +58,7 @@ class TestCrf:
 
         crf_prop = CubicResponseDriver()
         crf_prop.ostream.state = False
-        crf_prop.update_settings(rsp_settings,method_settings)
+        crf_prop.update_settings(rsp_settings, method_settings)
         crf_result_yyzz = crf_prop.compute(molecule, ao_basis, scf_tensors)
 
         if is_mpi_master():
@@ -84,12 +84,12 @@ class TestCrf:
     def test_crf(self):
 
         ref_result = {
-            'E3':   103.05627199,
-            'T4':   58.87127176 ,
-            'X2': -505.15579639 ,
-            'X3':  133.84179900 ,
-            'A2': -505.15579639 ,
-            'A3':   44.61393300 ,
+            'E3': 103.05627199,
+            'T4': 58.87127176,
+            'X2': -505.15579639,
+            'X3': 133.84179900,
+            'A2': -505.15579639,
+            'A3': 44.61393300,
         }
 
         self.run_crf(ref_result)

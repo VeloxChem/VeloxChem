@@ -13,7 +13,6 @@ from veloxchem.rsptpa import TPA
 @pytest.mark.solvers
 class TestTPA:
 
-
     def run_scf(self, task):
         scf_settings = {'conv_thresh': 1.0e-8}
         method_settings = {'xcfun': 'BP86'}
@@ -30,13 +29,13 @@ class TestTPA:
 
         scf_tensors = self.run_scf(task)
 
-        tpa_prop = TPA({
-            'damping': task.input_dict['response']['damping'],
-            'frequencies': task.input_dict['response']['frequencies'],
-            'conv_thresh': '1.0e-8',
-            'tpa_type': tpa_type,
-        },{'xcfun': 'BP86'})
-
+        tpa_prop = TPA(
+            {
+                'damping': task.input_dict['response']['damping'],
+                'frequencies': task.input_dict['response']['frequencies'],
+                'conv_thresh': '1.0e-8',
+                'tpa_type': tpa_type,
+            }, {'xcfun': 'BP86'})
 
         tpa_prop.init_driver(task.mpi_comm, task.ostream)
         tpa_prop.compute(task.molecule, task.ao_basis, scf_tensors)
@@ -66,12 +65,12 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't4_dict': -39.80683343-0.37934801j,
-            't3_dict': -92.30911828-1.15693267j,
-            'NaX3NyNz': -154.10953954-1.18508642j ,
-            'NaA3NxNy': -51.38824383-0.10346367j ,
-            'NaX2Nyz': 621.18409570 + 10.77095784j ,
-            'NxA2Nyz': 621.79842988 + 2.18029474j ,
+            't4_dict': -39.80683343 - 0.37934801j,
+            't3_dict': -92.30911828 - 1.15693267j,
+            'NaX3NyNz': -154.10953954 - 1.18508642j,
+            'NaA3NxNy': -51.38824383 - 0.10346367j,
+            'NaX2Nyz': 621.18409570 + 10.77095784j,
+            'NxA2Nyz': 621.79842988 + 2.18029474j,
             'gamma': 905.36879049 + 10.12642181j,
         }
 
@@ -85,9 +84,9 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't3_dict': -35.37821846 -0.92780165j,
+            't3_dict': -35.37821846 - 0.92780165j,
             'NaX2Nyz': 230.17509800 + 7.10707465j,
-            'NxA2Nyz':  230.43689707 + 2.16398432j,
+            'NxA2Nyz': 230.43689707 + 2.16398432j,
             'gamma': 425.23377660 + 8.34325731j,
         }
 
