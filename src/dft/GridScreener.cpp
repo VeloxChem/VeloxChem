@@ -28,11 +28,7 @@
 namespace gridscreen {  // gridscreen namespace
 
 void
-screenVxcFockForLDA(double*       rho,
-                    double*       exc,
-                    double*       vrho,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -57,21 +53,14 @@ screenVxcFockForLDA(double*       rho,
 }
 
 void
-screenVxcFockForGGA(double*       rho,
-                    double*       sigma,
-                    double*       exc,
-                    double*       vrho,
-                    double*       vsigma,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold)
 {
     double densityThresholdSquared = densityThreshold * densityThreshold;
 
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             vrho[2 * g + 0] = 0.0;
 
@@ -80,8 +69,7 @@ screenVxcFockForGGA(double*       rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             vrho[2 * g + 1] = 0.0;
 
@@ -118,8 +106,7 @@ screenVxcFockForMGGA(double*       rho,
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a, tau_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             vrho[2 * g + 0] = 0.0;
@@ -133,8 +120,7 @@ screenVxcFockForMGGA(double*       rho,
         }
 
         // rho_b, tau_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             vrho[2 * g + 1] = 0.0;
@@ -158,11 +144,7 @@ screenVxcFockForMGGA(double*       rho,
 }
 
 void
-screenVxcFockForPLDA(double*       rho,
-                     double*       exc,
-                     double*       vrho,
-                     const int32_t npoints,
-                     const double  densityThreshold)
+screenVxcFockForPLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -175,10 +157,22 @@ screenVxcFockForPLDA(double*       rho,
 }
 
 void
-screenFxcFockForLDA(double*       rho,
-                    double*       v2rho2,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenVxcFockForPGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold)
+{
+    double densityThresholdSquared = densityThreshold * densityThreshold;
+
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        // rho
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
+        {
+            exc[g] = 0.0;
+        }
+    }
+}
+
+void
+screenFxcFockForLDA(double* rho, double* v2rho2, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -214,8 +208,7 @@ screenFxcFockForGGA(double*       rho,
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             vrho[2 * g + 0] = 0.0;
 
@@ -239,8 +232,7 @@ screenFxcFockForGGA(double*       rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             vrho[2 * g + 1] = 0.0;
 
@@ -266,11 +258,11 @@ screenFxcFockForGGA(double*       rho,
 }
 
 void
-screenFxcFockForMGGA(double*       rho, 
-                     double*       sigma, 
-                     double*       lapl, 
+screenFxcFockForMGGA(double*       rho,
+                     double*       sigma,
+                     double*       lapl,
                      double*       tau,
-                     double*       v2rho2, 
+                     double*       v2rho2,
                      double*       v2rhosigma,
                      double*       v2rholapl,
                      double*       v2rhotau,
@@ -290,8 +282,7 @@ screenFxcFockForMGGA(double*       rho,
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a, tau_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             v2rho2[3 * g + 0] = 0.0;
@@ -341,8 +332,7 @@ screenFxcFockForMGGA(double*       rho,
         }
 
         // rho_b, tau_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             v2rho2[3 * g + 1] = 0.0;
@@ -394,11 +384,7 @@ screenFxcFockForMGGA(double*       rho,
 }
 
 void
-screenKxcFockForLDA(double*       rho,
-                    double*       v2rho2,
-                    double*       v3rho3,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenKxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -446,8 +432,7 @@ screenKxcFockForGGA(double*       rho,
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             vrho[2 * g + 0] = 0.0;
 
@@ -482,16 +467,16 @@ screenKxcFockForGGA(double*       rho,
             v3rho2sigma[9 * g + 6] = 0.0;
             v3rho2sigma[9 * g + 7] = 0.0;
 
-            v3rhosigma2[12 * g + 0] = 0.0;
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 0]  = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
 
             v3sigma3[10 * g + 0] = 0.0;
@@ -506,8 +491,7 @@ screenKxcFockForGGA(double*       rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             vrho[2 * g + 1] = 0.0;
 
@@ -542,15 +526,15 @@ screenKxcFockForGGA(double*       rho,
             v3rho2sigma[9 * g + 7] = 0.0;
             v3rho2sigma[9 * g + 8] = 0.0;
 
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
             v3rhosigma2[12 * g + 11] = 0.0;
 
@@ -602,8 +586,7 @@ screenKxcFockForMGGA(double*       rho,
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a, tau_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(tau[2 * g + 0]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             v3rho3[4 * g + 0] = 0.0;
@@ -642,52 +625,52 @@ screenKxcFockForMGGA(double*       rho,
             v3rhotau2[6 * g + 3] = 0.0;
             v3rhotau2[6 * g + 4] = 0.0;
 
-            v3sigma2lapl[12 * g + 0] = 0.0;
-            v3sigma2lapl[12 * g + 1] = 0.0;
-            v3sigma2lapl[12 * g + 2] = 0.0;
-            v3sigma2lapl[12 * g + 3] = 0.0;
-            v3sigma2lapl[12 * g + 4] = 0.0;
-            v3sigma2lapl[12 * g + 5] = 0.0;
-            v3sigma2lapl[12 * g + 6] = 0.0;
-            v3sigma2lapl[12 * g + 7] = 0.0;
-            v3sigma2lapl[12 * g + 8] = 0.0;
-            v3sigma2lapl[12 * g + 9] = 0.0;
+            v3sigma2lapl[12 * g + 0]  = 0.0;
+            v3sigma2lapl[12 * g + 1]  = 0.0;
+            v3sigma2lapl[12 * g + 2]  = 0.0;
+            v3sigma2lapl[12 * g + 3]  = 0.0;
+            v3sigma2lapl[12 * g + 4]  = 0.0;
+            v3sigma2lapl[12 * g + 5]  = 0.0;
+            v3sigma2lapl[12 * g + 6]  = 0.0;
+            v3sigma2lapl[12 * g + 7]  = 0.0;
+            v3sigma2lapl[12 * g + 8]  = 0.0;
+            v3sigma2lapl[12 * g + 9]  = 0.0;
             v3sigma2lapl[12 * g + 10] = 0.0;
 
-            v3rhosigmalapl[12 * g + 0] = 0.0;
-            v3rhosigmalapl[12 * g + 1] = 0.0;
-            v3rhosigmalapl[12 * g + 2] = 0.0;
-            v3rhosigmalapl[12 * g + 3] = 0.0;
-            v3rhosigmalapl[12 * g + 4] = 0.0;
-            v3rhosigmalapl[12 * g + 5] = 0.0;
-            v3rhosigmalapl[12 * g + 6] = 0.0;
-            v3rhosigmalapl[12 * g + 7] = 0.0;
-            v3rhosigmalapl[12 * g + 8] = 0.0;
-            v3rhosigmalapl[12 * g + 9] = 0.0;
+            v3rhosigmalapl[12 * g + 0]  = 0.0;
+            v3rhosigmalapl[12 * g + 1]  = 0.0;
+            v3rhosigmalapl[12 * g + 2]  = 0.0;
+            v3rhosigmalapl[12 * g + 3]  = 0.0;
+            v3rhosigmalapl[12 * g + 4]  = 0.0;
+            v3rhosigmalapl[12 * g + 5]  = 0.0;
+            v3rhosigmalapl[12 * g + 6]  = 0.0;
+            v3rhosigmalapl[12 * g + 7]  = 0.0;
+            v3rhosigmalapl[12 * g + 8]  = 0.0;
+            v3rhosigmalapl[12 * g + 9]  = 0.0;
             v3rhosigmalapl[12 * g + 10] = 0.0;
 
-            v3rhosigmatau[12 * g + 0] = 0.0;
-            v3rhosigmatau[12 * g + 1] = 0.0;
-            v3rhosigmatau[12 * g + 2] = 0.0;
-            v3rhosigmatau[12 * g + 3] = 0.0;
-            v3rhosigmatau[12 * g + 4] = 0.0;
-            v3rhosigmatau[12 * g + 5] = 0.0;
-            v3rhosigmatau[12 * g + 6] = 0.0;
-            v3rhosigmatau[12 * g + 7] = 0.0;
-            v3rhosigmatau[12 * g + 8] = 0.0;
-            v3rhosigmatau[12 * g + 9] = 0.0;
+            v3rhosigmatau[12 * g + 0]  = 0.0;
+            v3rhosigmatau[12 * g + 1]  = 0.0;
+            v3rhosigmatau[12 * g + 2]  = 0.0;
+            v3rhosigmatau[12 * g + 3]  = 0.0;
+            v3rhosigmatau[12 * g + 4]  = 0.0;
+            v3rhosigmatau[12 * g + 5]  = 0.0;
+            v3rhosigmatau[12 * g + 6]  = 0.0;
+            v3rhosigmatau[12 * g + 7]  = 0.0;
+            v3rhosigmatau[12 * g + 8]  = 0.0;
+            v3rhosigmatau[12 * g + 9]  = 0.0;
             v3rhosigmatau[12 * g + 10] = 0.0;
 
-            v3sigma2tau[12 * g + 0] = 0.0;
-            v3sigma2tau[12 * g + 1] = 0.0;
-            v3sigma2tau[12 * g + 2] = 0.0;
-            v3sigma2tau[12 * g + 3] = 0.0;
-            v3sigma2tau[12 * g + 4] = 0.0;
-            v3sigma2tau[12 * g + 5] = 0.0;
-            v3sigma2tau[12 * g + 6] = 0.0;
-            v3sigma2tau[12 * g + 7] = 0.0;
-            v3sigma2tau[12 * g + 8] = 0.0;
-            v3sigma2tau[12 * g + 9] = 0.0;
+            v3sigma2tau[12 * g + 0]  = 0.0;
+            v3sigma2tau[12 * g + 1]  = 0.0;
+            v3sigma2tau[12 * g + 2]  = 0.0;
+            v3sigma2tau[12 * g + 3]  = 0.0;
+            v3sigma2tau[12 * g + 4]  = 0.0;
+            v3sigma2tau[12 * g + 5]  = 0.0;
+            v3sigma2tau[12 * g + 6]  = 0.0;
+            v3sigma2tau[12 * g + 7]  = 0.0;
+            v3sigma2tau[12 * g + 8]  = 0.0;
+            v3sigma2tau[12 * g + 9]  = 0.0;
             v3sigma2tau[12 * g + 10] = 0.0;
 
             v3sigmalapl2[9 * g + 0] = 0.0;
@@ -699,16 +682,16 @@ screenKxcFockForMGGA(double*       rho,
             v3sigmalapl2[9 * g + 6] = 0.0;
             v3sigmalapl2[9 * g + 7] = 0.0;
 
-            v3sigmalapltau[12 * g + 0] = 0.0;
-            v3sigmalapltau[12 * g + 1] = 0.0;
-            v3sigmalapltau[12 * g + 2] = 0.0;
-            v3sigmalapltau[12 * g + 3] = 0.0;
-            v3sigmalapltau[12 * g + 4] = 0.0;
-            v3sigmalapltau[12 * g + 5] = 0.0;
-            v3sigmalapltau[12 * g + 6] = 0.0;
-            v3sigmalapltau[12 * g + 7] = 0.0;
-            v3sigmalapltau[12 * g + 8] = 0.0;
-            v3sigmalapltau[12 * g + 9] = 0.0;
+            v3sigmalapltau[12 * g + 0]  = 0.0;
+            v3sigmalapltau[12 * g + 1]  = 0.0;
+            v3sigmalapltau[12 * g + 2]  = 0.0;
+            v3sigmalapltau[12 * g + 3]  = 0.0;
+            v3sigmalapltau[12 * g + 4]  = 0.0;
+            v3sigmalapltau[12 * g + 5]  = 0.0;
+            v3sigmalapltau[12 * g + 6]  = 0.0;
+            v3sigmalapltau[12 * g + 7]  = 0.0;
+            v3sigmalapltau[12 * g + 8]  = 0.0;
+            v3sigmalapltau[12 * g + 9]  = 0.0;
             v3sigmalapltau[12 * g + 10] = 0.0;
 
             v3sigmatau2[9 * g + 0] = 0.0;
@@ -748,16 +731,16 @@ screenKxcFockForMGGA(double*       rho,
             v3rho2sigma[9 * g + 5] = 0.0;
             v3rho2sigma[9 * g + 6] = 0.0;
 
-            v3rhosigma2[12 * g + 0] = 0.0;
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 0]  = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
 
             v3sigma3[10 * g + 0] = 0.0;
@@ -772,8 +755,7 @@ screenKxcFockForMGGA(double*       rho,
         }
 
         // rho_b, tau_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(tau[2 * g + 1]) <= densityThresholdSquared) ||
             (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             v3rho3[4 * g + 1] = 0.0;
@@ -812,51 +794,51 @@ screenKxcFockForMGGA(double*       rho,
             v3rhotau2[6 * g + 4] = 0.0;
             v3rhotau2[6 * g + 5] = 0.0;
 
-            v3sigma2lapl[12 * g + 1] = 0.0;
-            v3sigma2lapl[12 * g + 2] = 0.0;
-            v3sigma2lapl[12 * g + 3] = 0.0;
-            v3sigma2lapl[12 * g + 4] = 0.0;
-            v3sigma2lapl[12 * g + 5] = 0.0;
-            v3sigma2lapl[12 * g + 6] = 0.0;
-            v3sigma2lapl[12 * g + 7] = 0.0;
-            v3sigma2lapl[12 * g + 8] = 0.0;
-            v3sigma2lapl[12 * g + 9] = 0.0;
+            v3sigma2lapl[12 * g + 1]  = 0.0;
+            v3sigma2lapl[12 * g + 2]  = 0.0;
+            v3sigma2lapl[12 * g + 3]  = 0.0;
+            v3sigma2lapl[12 * g + 4]  = 0.0;
+            v3sigma2lapl[12 * g + 5]  = 0.0;
+            v3sigma2lapl[12 * g + 6]  = 0.0;
+            v3sigma2lapl[12 * g + 7]  = 0.0;
+            v3sigma2lapl[12 * g + 8]  = 0.0;
+            v3sigma2lapl[12 * g + 9]  = 0.0;
             v3sigma2lapl[12 * g + 10] = 0.0;
             v3sigma2lapl[12 * g + 11] = 0.0;
 
-            v3rhosigmalapl[12 * g + 1] = 0.0;
-            v3rhosigmalapl[12 * g + 2] = 0.0;
-            v3rhosigmalapl[12 * g + 3] = 0.0;
-            v3rhosigmalapl[12 * g + 4] = 0.0;
-            v3rhosigmalapl[12 * g + 5] = 0.0;
-            v3rhosigmalapl[12 * g + 6] = 0.0;
-            v3rhosigmalapl[12 * g + 7] = 0.0;
-            v3rhosigmalapl[12 * g + 8] = 0.0;
-            v3rhosigmalapl[12 * g + 9] = 0.0;
+            v3rhosigmalapl[12 * g + 1]  = 0.0;
+            v3rhosigmalapl[12 * g + 2]  = 0.0;
+            v3rhosigmalapl[12 * g + 3]  = 0.0;
+            v3rhosigmalapl[12 * g + 4]  = 0.0;
+            v3rhosigmalapl[12 * g + 5]  = 0.0;
+            v3rhosigmalapl[12 * g + 6]  = 0.0;
+            v3rhosigmalapl[12 * g + 7]  = 0.0;
+            v3rhosigmalapl[12 * g + 8]  = 0.0;
+            v3rhosigmalapl[12 * g + 9]  = 0.0;
             v3rhosigmalapl[12 * g + 10] = 0.0;
             v3rhosigmalapl[12 * g + 11] = 0.0;
 
-            v3rhosigmatau[12 * g + 1] = 0.0;
-            v3rhosigmatau[12 * g + 2] = 0.0;
-            v3rhosigmatau[12 * g + 3] = 0.0;
-            v3rhosigmatau[12 * g + 4] = 0.0;
-            v3rhosigmatau[12 * g + 5] = 0.0;
-            v3rhosigmatau[12 * g + 6] = 0.0;
-            v3rhosigmatau[12 * g + 7] = 0.0;
-            v3rhosigmatau[12 * g + 8] = 0.0;
-            v3rhosigmatau[12 * g + 9] = 0.0;
+            v3rhosigmatau[12 * g + 1]  = 0.0;
+            v3rhosigmatau[12 * g + 2]  = 0.0;
+            v3rhosigmatau[12 * g + 3]  = 0.0;
+            v3rhosigmatau[12 * g + 4]  = 0.0;
+            v3rhosigmatau[12 * g + 5]  = 0.0;
+            v3rhosigmatau[12 * g + 6]  = 0.0;
+            v3rhosigmatau[12 * g + 7]  = 0.0;
+            v3rhosigmatau[12 * g + 8]  = 0.0;
+            v3rhosigmatau[12 * g + 9]  = 0.0;
             v3rhosigmatau[12 * g + 10] = 0.0;
             v3rhosigmatau[12 * g + 11] = 0.0;
 
-            v3sigma2tau[12 * g + 1] = 0.0;
-            v3sigma2tau[12 * g + 2] = 0.0;
-            v3sigma2tau[12 * g + 3] = 0.0;
-            v3sigma2tau[12 * g + 4] = 0.0;
-            v3sigma2tau[12 * g + 5] = 0.0;
-            v3sigma2tau[12 * g + 6] = 0.0;
-            v3sigma2tau[12 * g + 7] = 0.0;
-            v3sigma2tau[12 * g + 8] = 0.0;
-            v3sigma2tau[12 * g + 9] = 0.0;
+            v3sigma2tau[12 * g + 1]  = 0.0;
+            v3sigma2tau[12 * g + 2]  = 0.0;
+            v3sigma2tau[12 * g + 3]  = 0.0;
+            v3sigma2tau[12 * g + 4]  = 0.0;
+            v3sigma2tau[12 * g + 5]  = 0.0;
+            v3sigma2tau[12 * g + 6]  = 0.0;
+            v3sigma2tau[12 * g + 7]  = 0.0;
+            v3sigma2tau[12 * g + 8]  = 0.0;
+            v3sigma2tau[12 * g + 9]  = 0.0;
             v3sigma2tau[12 * g + 10] = 0.0;
             v3sigma2tau[12 * g + 11] = 0.0;
 
@@ -869,15 +851,15 @@ screenKxcFockForMGGA(double*       rho,
             v3sigmalapl2[9 * g + 7] = 0.0;
             v3sigmalapl2[9 * g + 8] = 0.0;
 
-            v3sigmalapltau[12 * g + 1] = 0.0;
-            v3sigmalapltau[12 * g + 2] = 0.0;
-            v3sigmalapltau[12 * g + 3] = 0.0;
-            v3sigmalapltau[12 * g + 4] = 0.0;
-            v3sigmalapltau[12 * g + 5] = 0.0;
-            v3sigmalapltau[12 * g + 6] = 0.0;
-            v3sigmalapltau[12 * g + 7] = 0.0;
-            v3sigmalapltau[12 * g + 8] = 0.0;
-            v3sigmalapltau[12 * g + 9] = 0.0;
+            v3sigmalapltau[12 * g + 1]  = 0.0;
+            v3sigmalapltau[12 * g + 2]  = 0.0;
+            v3sigmalapltau[12 * g + 3]  = 0.0;
+            v3sigmalapltau[12 * g + 4]  = 0.0;
+            v3sigmalapltau[12 * g + 5]  = 0.0;
+            v3sigmalapltau[12 * g + 6]  = 0.0;
+            v3sigmalapltau[12 * g + 7]  = 0.0;
+            v3sigmalapltau[12 * g + 8]  = 0.0;
+            v3sigmalapltau[12 * g + 9]  = 0.0;
             v3sigmalapltau[12 * g + 10] = 0.0;
             v3sigmalapltau[12 * g + 11] = 0.0;
 
@@ -918,15 +900,15 @@ screenKxcFockForMGGA(double*       rho,
             v3rho2sigma[9 * g + 6] = 0.0;
             v3rho2sigma[9 * g + 7] = 0.0;
 
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
 
             v3sigma3[10 * g + 1] = 0.0;
@@ -942,12 +924,7 @@ screenKxcFockForMGGA(double*       rho,
 }
 
 void
-screenLxcFockForLDA(double*               rho,
-                    double*               v2rho2,
-                    double*               v3rho3,
-                    double*               v4rho4,
-                    const int32_t         npoints,
-                    const double          densityThreshold)
+screenLxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, double* v4rho4, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -986,32 +963,31 @@ screenLxcFockForLDA(double*               rho,
 }
 
 void
-screenLxcFockForGGA(double*               rho,
-                    double*               sigma,
-                    double*               vrho,
-                    double*               vsigma,
-                    double*               v2rho2,
-                    double*               v2rhosigma,
-                    double*               v2sigma2,
-                    double*               v3rho3,
-                    double*               v3rho2sigma,
-                    double*               v3rhosigma2,
-                    double*               v3sigma3,
-                    double*               v4rho4,
-                    double*               v4rho3sigma,
-                    double*               v4rho2sigma2,
-                    double*               v4rhosigma3,
-                    double*               v4sigma4,
-                    const int32_t         npoints,
-                    const double          densityThreshold)
+screenLxcFockForGGA(double*       rho,
+                    double*       sigma,
+                    double*       vrho,
+                    double*       vsigma,
+                    double*       v2rho2,
+                    double*       v2rhosigma,
+                    double*       v2sigma2,
+                    double*       v3rho3,
+                    double*       v3rho2sigma,
+                    double*       v3rhosigma2,
+                    double*       v3sigma3,
+                    double*       v4rho4,
+                    double*       v4rho3sigma,
+                    double*       v4rho2sigma2,
+                    double*       v4rhosigma3,
+                    double*       v4sigma4,
+                    const int32_t npoints,
+                    const double  densityThreshold)
 {
     double densityThresholdSquared = densityThreshold * densityThreshold;
 
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= densityThresholdSquared))
         {
             vrho[2 * g + 0] = 0.0;
 
@@ -1046,16 +1022,16 @@ screenLxcFockForGGA(double*               rho,
             v3rho2sigma[9 * g + 6] = 0.0;
             v3rho2sigma[9 * g + 7] = 0.0;
 
-            v3rhosigma2[12 * g + 0] = 0.0;
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 0]  = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
 
             v3sigma3[10 * g + 0] = 0.0;
@@ -1140,8 +1116,7 @@ screenLxcFockForGGA(double*               rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= densityThresholdSquared))
         {
             vrho[2 * g + 1] = 0.0;
 
@@ -1176,15 +1151,15 @@ screenLxcFockForGGA(double*               rho,
             v3rho2sigma[9 * g + 7] = 0.0;
             v3rho2sigma[9 * g + 8] = 0.0;
 
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
             v3rhosigma2[12 * g + 11] = 0.0;
 
@@ -1272,10 +1247,7 @@ screenLxcFockForGGA(double*               rho,
 }
 
 void
-copyWeights(double*       screenedWeights,
-            const int32_t gridBlockPosition,
-            const double* weights,
-            const int32_t nGridPoints)
+copyWeights(double* screenedWeights, const int32_t gridBlockPosition, const double* weights, const int32_t nGridPoints)
 {
     for (int32_t g = 0; g < nGridPoints; g++)
     {

@@ -69,8 +69,7 @@ class TestPDFT:
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
 
-    # def test_O2_ROGGA(self):
-    #     ksdft, pdft = self.run_RODFT('BLYP')
-    #     if is_mpi_master():
-    #         # does not match in GGA case when using Li-Manni's formulation
-    #         assert abs(-17.006969151998145 - pdft) < 1.0e-6
+    def test_O2_ROGGA(self):
+        ksdft, pdft = self.run_RODFT('pbe', 'ppbe')
+        if is_mpi_master():
+            assert abs(-16.88550889838203 - pdft) < 1.0e-6

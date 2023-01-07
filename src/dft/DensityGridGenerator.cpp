@@ -680,7 +680,13 @@ generatePairDensityForLDA(double*               rho,
 
     auto mat_F = denblas::multAB(densityMatrix, gtoValues);
 
-    auto MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+    auto n_active = activeMOs.getNumberOfRows();
+
+    CDenseMatrix MOs_on_grid;
+    if (n_active > 0)
+    {
+        MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+    }
 
     timer.stop("Density grid matmul");
 
@@ -689,8 +695,6 @@ generatePairDensityForLDA(double*               rho,
     timer.start("Density grid rho");
 
     auto naos = gtoValues.getNumberOfRows();
-
-    auto n_active = activeMOs.getNumberOfRows();
 
     auto nthreads = omp_get_max_threads();
 
@@ -792,11 +796,22 @@ generatePairDensityForGGA(double*               rho,
 
     auto mat_F = denblas::multAB(symmetricDensityMatrix, gtoValues);
 
-    auto MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+    auto n_active = activeMOs.getNumberOfRows();
 
-    auto MOs_on_gridX = denblas::multAB(activeMOs, gtoValuesX);
-    auto MOs_on_gridY = denblas::multAB(activeMOs, gtoValuesY);
-    auto MOs_on_gridZ = denblas::multAB(activeMOs, gtoValuesZ);
+    CDenseMatrix MOs_on_grid;
+
+    CDenseMatrix MOs_on_gridX;
+    CDenseMatrix MOs_on_gridY;
+    CDenseMatrix MOs_on_gridZ;
+
+    if (n_active > 0)
+    {
+        MOs_on_grid = denblas::multAB(activeMOs, gtoValues);
+
+        MOs_on_gridX = denblas::multAB(activeMOs, gtoValuesX);
+        MOs_on_gridY = denblas::multAB(activeMOs, gtoValuesY);
+        MOs_on_gridZ = denblas::multAB(activeMOs, gtoValuesZ);
+    }
 
     timer.stop("Density grid matmul");
 
@@ -805,8 +820,6 @@ generatePairDensityForGGA(double*               rho,
     timer.start("Density grid rho");
 
     auto naos = gtoValues.getNumberOfRows();
-
-    auto n_active = activeMOs.getNumberOfRows();
 
     auto nthreads = omp_get_max_threads();
 
@@ -900,46 +913,6 @@ generatePairDensityForGGA(double*               rho,
                         }
                     }
                 }
-            }
-        }
-
-        // Translate using the approximate formula from Li Manni 2014
-
-        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-        {
-            auto density = rho[2 * g + 0];
-
-            auto densityX = rhograd[6 * g + 0];
-            auto densityY = rhograd[6 * g + 1];
-            auto densityZ = rhograd[6 * g + 2];
-
-            auto ontop_pair_density = rho[2 * g + 1];
-
-            auto ontop_pair_densityX = rhograd[6 * g + 3];
-            auto ontop_pair_densityY = rhograd[6 * g + 4];
-            auto ontop_pair_densityZ = rhograd[6 * g + 5];
-
-            double delta = 0.0;
-
-            if (ontop_pair_density < 0)
-            {
-                delta = sqrt(-2.0 * ontop_pair_density);
-            }
-
-            rho[2 * g + 0] = 0.5 * (density + delta);
-            rho[2 * g + 1] = 0.5 * (density - delta);
-
-            if (density > 1.0e-8)
-            {
-                auto reduced_delta = delta/density;
-
-                rhograd[6 * g + 0] = 0.5 * densityX * (1.0 + reduced_delta);
-                rhograd[6 * g + 1] = 0.5 * densityY * (1.0 + reduced_delta);
-                rhograd[6 * g + 2] = 0.5 * densityZ * (1.0 + reduced_delta);
-
-                rhograd[6 * g + 3] = 0.5 * densityX * (1.0 - reduced_delta);
-                rhograd[6 * g + 4] = 0.5 * densityY * (1.0 - reduced_delta);
-                rhograd[6 * g + 5] = 0.5 * densityZ * (1.0 - reduced_delta);
             }
         }
 

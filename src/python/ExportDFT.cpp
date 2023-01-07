@@ -124,8 +124,6 @@ integrate_vxc_pdft(const CXCNewIntegrator&    self,
 
     self.integrateVxcPDFT(mat_Vxc, TwoBodyGradient, molecule, basis, aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
 
-    auto xcene = mat_Vxc.getExchangeCorrelationEnergy();
-
     return mat_Vxc;
 }
 
@@ -395,7 +393,7 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a,
              "cubeMode"_a)
-            .def("integrate_kxclxc_fock",
+        .def("integrate_kxclxc_fock",
              &CXCNewIntegrator::integrateKxcLxcFock,
              "Integrates 4rd-order exchange-correlation contribution to Fock matrix.",
              "aoFockMatrix"_a,
@@ -471,7 +469,7 @@ export_dft(py::module& m)
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
                 CDenseMatrix exc(npoints, 1);
                 CDenseMatrix vrho(npoints, 2);
-                auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 fvxc.compute_exc_vxc_for_lda(npoints, rho.data(), exc.values(), vrho.values());
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
@@ -496,7 +494,7 @@ export_dft(py::module& m)
                 CDenseMatrix exc(npoints, 1);
                 CDenseMatrix vrho(npoints, 2);
                 CDenseMatrix vsigma(npoints, 3);
-                auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 fvxc.compute_exc_vxc_for_gga(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
@@ -517,7 +515,7 @@ export_dft(py::module& m)
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_fxc_for_lda: Inconsistent array size"));
                 CDenseMatrix v2rho2(npoints, 3);
-                auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 fvxc.compute_fxc_for_lda(npoints, rho.data(), v2rho2.values());
                 return vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfElements());
             },
@@ -538,7 +536,7 @@ export_dft(py::module& m)
                 CDenseMatrix v2rho2(npoints, 3);
                 CDenseMatrix v2rhosigma(npoints, 6);
                 CDenseMatrix v2sigma2(npoints, 6);
-                auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 fvxc.compute_fxc_for_gga(npoints, rho.data(), sigma.data(), v2rho2.values(), v2rhosigma.values(), v2sigma2.values());
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfElements()));

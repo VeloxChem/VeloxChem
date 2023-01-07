@@ -35,10 +35,8 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({
-            "SLATER", "VWN_RPA", "SLDA",
-            "B88X", "LYP", "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE", "PBE0", "BP86", "PW91", "OLYP",
-            "TPSS", "TPSSH", "PKZB", "SCAN", "M06", "M06L", "M11L"});
+    return std::vector<std::string>({"SLATER", "VWN_RPA", "SLDA", "B88X", "LYP",   "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE", "PBE0",
+                                     "BP86",   "PW91",    "OLYP", "TPSS", "TPSSH", "PKZB", "SCAN",  "M06",    "M06L",      "M11L"});
 }
 
 CXCNewFunctional
@@ -112,7 +110,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 std::vector<std::string>
 getAvailablePairDensityFunctionals()
 {
-    return std::vector<std::string>({"PLDA"});
+    return std::vector<std::string>({"PLDA", "PPBE"});
 }
 
 CXCPairDensityFunctional
@@ -125,6 +123,8 @@ getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel)
         // Pair-density local density exchange-correlation functional
 
         if (fstr::upcase(xcLabel) == "PLDA") return CXCPairDensityFunctional("PLDA", {"PSLATER", "PVWN"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "PPBE") return CXCPairDensityFunctional("PPBE", {"PPBE_X", "PPBE_C"}, {1.0, 1.0});
 
         // FIX ME: add other functionals here...
     }
