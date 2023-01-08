@@ -67,15 +67,15 @@ TEST_F(CDensityGridTest, ConstructorWithFunctionalType)
     
     CDensityGrid dgridk(5, 1, xcfun::mgga, dengrid::ab);
     
-    ASSERT_EQ(dgridk, CDensityGrid(CMemBlock2D<double>(5, 13), dengrid::ab));
+    ASSERT_EQ(dgridk, CDensityGrid(CMemBlock2D<double>(5, 15), dengrid::ab));
     
     CDensityGrid dgridl(5, 1, xcfun::mgga, dengrid::lima);
     
-    ASSERT_EQ(dgridl, CDensityGrid(CMemBlock2D<double>(5, 6), dengrid::lima));
+    ASSERT_EQ(dgridl, CDensityGrid(CMemBlock2D<double>(5, 7), dengrid::lima));
     
     CDensityGrid dgridm(5, 1, xcfun::mgga, dengrid::limb);
     
-    ASSERT_EQ(dgridm, CDensityGrid(CMemBlock2D<double>(5, 6), dengrid::limb));
+    ASSERT_EQ(dgridm, CDensityGrid(CMemBlock2D<double>(5, 7), dengrid::limb));
 }
 
 TEST_F(CDensityGridTest, CopyConstructor)
