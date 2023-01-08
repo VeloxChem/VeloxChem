@@ -83,7 +83,7 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
         return _integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, newfvxc, flag);
     }
 
-    std::string errxcfuntype("XCNewIntegrator.integrateVxcFock: Only implemented for LDA/GGA/MGGA");
+    std::string errxcfuntype("XCNewIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
 
     errors::assertMsgCritical(false, errxcfuntype);
 
@@ -119,7 +119,7 @@ CXCNewIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
         }
         else
         {
-            std::string errxcfuntype("XCNewIntegrator.integrateFxcFock: Only implemented for LDA/GGA/MGGA");
+            std::string errxcfuntype("XCNewIntegrator.integrateFxcFock: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
@@ -152,18 +152,21 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
         if (xcfuntype == xcfun::lda)
         {
             _integrateKxcFockForLDA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
-
                                     molecularGrid, fvxc, quadMode);
         }
         else if (xcfuntype == xcfun::gga)
         {
             _integrateKxcFockForGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
-
                                     molecularGrid, fvxc, quadMode);
+        }
+        else if (xcfuntype == xcfun::mgga)
+        {
+            _integrateKxcFockForMGGA(aoFockMatrix, molecule, basis, rwDensityMatrix, rw2DensityMatrix, gsDensityMatrix,
+                                     molecularGrid, fvxc, quadMode);
         }
         else
         {
-            std::string errxcfuntype("XCNewIntegrator.integrateKxcFock: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCNewIntegrator.integrateKxcFock: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
@@ -2925,11 +2928,11 @@ CXCNewIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+        auto rwdengrid = dengridgen::generateDensityGridForMGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
                                                                 rw_sub_dens_mat, xcfuntype, timer);
 
-        auto rw2dengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                                                                rw2_sub_dens_mat, xcfuntype, timer);
+        auto rw2dengrid = dengridgen::generateDensityGridForMGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+                                                                 rw2_sub_dens_mat, xcfuntype, timer);
 
         // compute perturbed density
 
@@ -6617,7 +6620,6 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA(const int32_t           npoint
                             + 2.0 * v3sigma2tau_cba + 6.0 * v3sigma2tau_acb + 6.0 * v3sigma2tau_aca
                             + 4.0 * v3sigma2tau_abb + 4.0 * v3sigma2tau_aba + 4.0 * v3sigma2tau_aab + 4.0 * v3sigma2tau_aaa;
 
-
                 double xtt  = v3sigmatau2_cbb + 2.0 * v3sigmatau2_cab + v3sigmatau2_caa
                             + 2.0 * v3sigmatau2_abb + 4.0 * v3sigmatau2_aab + 2.0 * v3sigmatau2_aaa;
 
@@ -6641,23 +6643,23 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA(const int32_t           npoint
                 double rxx  = 4.0 * v3rhosigma2_acc + 8.0 * v3rhosigma2_acb + 4.0 * v3rhosigma2_abb
                             + 8.0 * v3rhosigma2_aac + 8.0 * v3rhosigma2_aab + 4.0 * v3rhosigma2_aaa;
 
-                // // laplacian
-                double lll  = v3lapl3_abb + 2.0 * v3lapl3_aab + v3lapl3_aaa;
-                double llr  = v3rholapl2_bab + v3rholapl2_baa + v3rholapl2_aab + v3rholapl2_aaa;
-                double llt  = v3lapl2tau_abb + v3lapl2tau_aba + v3lapl2tau_aab + v3lapl2tau_aaa;
-                double llx  = 2.0 * v3sigmalapl2_cab + 2.0 * v3sigmalapl2_caa + 2.0 * v3sigmalapl2_bab
-                            + 2.0 * v3sigmalapl2_baa + 2.0 * v3sigmalapl2_aab + 2.0 * v3sigmalapl2_aaa;
-                double lrr  = v3rho2lapl_bba + 2.0 * v3rho2lapl_aba + v3rho2lapl_aaa;
-                double lrt  = v3rholapltau_bab + v3rholapltau_baa + v3rholapltau_aab + v3rholapltau_aaa;
-                double lrx  = 2.0 * v3rhosigmalapl_bca + 2.0 * v3rhosigmalapl_bba + 2.0 * v3rhosigmalapl_baa
-                            + 2.0 * v3rhosigmalapl_aca + 2.0 * v3rhosigmalapl_aba + 2.0 * v3rhosigmalapl_aaa;
-                double ltt  = v3lapltau2_abb + 2.0 * v3lapltau2_aab + v3lapltau2_aaa;
-                double ltx  = 2.0 * v3sigmalapltau_cab + 2.0 * v3sigmalapltau_caa + 2.0 * v3sigmalapltau_bab
-                            + 2.0 * v3sigmalapltau_baa + 2.0 * v3sigmalapltau_aab + 2.0 * v3sigmalapltau_aaa;
-                double lxx  = 4.0 * v3sigma2lapl_cca + 8.0 * v3sigma2lapl_cba + 4.0 * v3sigma2lapl_bba
-                            + 8.0 * v3sigma2lapl_aca + 8.0 * v3sigma2lapl_aba + 4.0 * v3sigma2lapl_aaa;
+                // laplacian
+                //double lll  = v3lapl3_abb + 2.0 * v3lapl3_aab + v3lapl3_aaa;
+                //double llr  = v3rholapl2_bab + v3rholapl2_baa + v3rholapl2_aab + v3rholapl2_aaa;
+                //double llt  = v3lapl2tau_abb + v3lapl2tau_aba + v3lapl2tau_aab + v3lapl2tau_aaa;
+                //double llx  = 2.0 * v3sigmalapl2_cab + 2.0 * v3sigmalapl2_caa + 2.0 * v3sigmalapl2_bab
+                //            + 2.0 * v3sigmalapl2_baa + 2.0 * v3sigmalapl2_aab + 2.0 * v3sigmalapl2_aaa;
+                //double lrr  = v3rho2lapl_bba + 2.0 * v3rho2lapl_aba + v3rho2lapl_aaa;
+                //double lrt  = v3rholapltau_bab + v3rholapltau_baa + v3rholapltau_aab + v3rholapltau_aaa;
+                //double lrx  = 2.0 * v3rhosigmalapl_bca + 2.0 * v3rhosigmalapl_bba + 2.0 * v3rhosigmalapl_baa
+                //            + 2.0 * v3rhosigmalapl_aca + 2.0 * v3rhosigmalapl_aba + 2.0 * v3rhosigmalapl_aaa;
+                //double ltt  = v3lapltau2_abb + 2.0 * v3lapltau2_aab + v3lapltau2_aaa;
+                //double ltx  = 2.0 * v3sigmalapltau_cab + 2.0 * v3sigmalapltau_caa + 2.0 * v3sigmalapltau_bab
+                //            + 2.0 * v3sigmalapltau_baa + 2.0 * v3sigmalapltau_aab + 2.0 * v3sigmalapltau_aaa;
+                //double lxx  = 4.0 * v3sigma2lapl_cca + 8.0 * v3sigma2lapl_cba + 4.0 * v3sigma2lapl_bba
+                //            + 8.0 * v3sigma2lapl_aca + 8.0 * v3sigma2lapl_aba + 4.0 * v3sigma2lapl_aaa;
 
-                // // tau
+                // tau
                 double trr  = v3rho2tau_bba + 2.0 * v3rho2tau_aba + v3rho2tau_aaa;
                 double ttl  = v3lapltau2_bab + v3lapltau2_baa + v3lapltau2_aab + v3lapltau2_aaa;
 

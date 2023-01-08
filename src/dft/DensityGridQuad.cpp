@@ -62,9 +62,7 @@ CDensityGridQuad::CDensityGridQuad(const int32_t nGridPoints, const int32_t nDen
 
     if (xcFuncType == xcfun::gga) ncomp = (_gridType == dengrid::ab) ? 13 : 5;
 
-    // NOTE: this needs to be checked with mgga functionals implementation
-
-    if (xcFuncType == xcfun::mgga) ncomp = (_gridType == dengrid::ab) ? 13 : 6;
+    if (xcFuncType == xcfun::mgga) ncomp = (_gridType == dengrid::ab) ? 24 : 6;
 
     _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
 }
@@ -8401,231 +8399,383 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
             {
                 // Perturbed densities
 
-                auto rhow1a_r = rwDensityGrid.alphaDensity(4 * j);
+                auto rhoB_r = rwDensityGrid.alphaDensity(4 * j);
+                auto gradB_x_r = rwDensityGrid.alphaDensityGradientX(4 * j);
+                auto gradB_y_r = rwDensityGrid.alphaDensityGradientY(4 * j);
+                auto gradB_z_r = rwDensityGrid.alphaDensityGradientZ(4 * j);
 
-                auto gradw1a_x_r = rwDensityGrid.alphaDensityGradientX(4 * j);
+                auto rhoB_i = rwDensityGrid.alphaDensity(4 * j + 1);
+                auto gradB_x_i = rwDensityGrid.alphaDensityGradientX(4 * j + 1);
+                auto gradB_y_i = rwDensityGrid.alphaDensityGradientY(4 * j + 1);
+                auto gradB_z_i = rwDensityGrid.alphaDensityGradientZ(4 * j + 1);
 
-                auto gradw1a_y_r = rwDensityGrid.alphaDensityGradientY(4 * j);
+                auto rhoC_r = rwDensityGrid.alphaDensity(4 * j + 2);
+                auto gradC_x_r = rwDensityGrid.alphaDensityGradientX(4 * j + 2);
+                auto gradC_y_r = rwDensityGrid.alphaDensityGradientY(4 * j + 2);
+                auto gradC_z_r = rwDensityGrid.alphaDensityGradientZ(4 * j + 2);
 
-                auto gradw1a_z_r = rwDensityGrid.alphaDensityGradientZ(4 * j);
-
-                auto rhow1a_i = rwDensityGrid.alphaDensity(4 * j + 1);
-
-                auto gradw1a_x_i = rwDensityGrid.alphaDensityGradientX(4 * j + 1);
-
-                auto gradw1a_y_i = rwDensityGrid.alphaDensityGradientY(4 * j + 1);
-
-                auto gradw1a_z_i = rwDensityGrid.alphaDensityGradientZ(4 * j + 1);
-
-                auto rhow2a_r = rwDensityGrid.alphaDensity(4 * j + 2);
-
-                auto gradw2a_x_r = rwDensityGrid.alphaDensityGradientX(4 * j + 2);
-
-                auto gradw2a_y_r = rwDensityGrid.alphaDensityGradientY(4 * j + 2);
-
-                auto gradw2a_z_r = rwDensityGrid.alphaDensityGradientZ(4 * j + 2);
-
-                auto rhow2a_i = rwDensityGrid.alphaDensity(4 * j + 3);
-
-                auto gradw2a_x_i = rwDensityGrid.alphaDensityGradientX(4 * j + 3);
-
-                auto gradw2a_y_i = rwDensityGrid.alphaDensityGradientY(4 * j + 3);
-
-                auto gradw2a_z_i = rwDensityGrid.alphaDensityGradientZ(4 * j + 3);
+                auto rhoC_i = rwDensityGrid.alphaDensity(4 * j + 3);
+                auto gradC_x_i = rwDensityGrid.alphaDensityGradientX(4 * j + 3);
+                auto gradC_y_i = rwDensityGrid.alphaDensityGradientY(4 * j + 3);
+                auto gradC_z_i = rwDensityGrid.alphaDensityGradientZ(4 * j + 3);
 
                 // Perturbed density products to be stored
 
                 auto gam_r = gam(2 * j);
-
                 auto gam_i = gam(2 * j + 1);
 
-                // gamX
+                auto gam_x_r = gamX(2 * j);
+                auto gam_x_i = gamX(2 * j + 1);
+                auto gam_y_r = gamY(2 * j);
+                auto gam_y_i = gamY(2 * j + 1);
+                auto gam_z_r = gamZ(2 * j);
+                auto gam_z_i = gamZ(2 * j + 1);
 
-                auto gamX_r = gamX(2 * j);
-
-                auto gamX_i = gamX(2 * j + 1);
-
-                // gamY
-
-                auto gamY_r = gamY(2 * j);
-
-                auto gamY_i = gamY(2 * j + 1);
-
-                // gamZ
-
-                auto gamZ_r = gamZ(2 * j);
-
-                auto gamZ_i = gamZ(2 * j + 1);
-
-                // rAw1rBw2
-
-                auto gamXX_r = gamXX(2 * j);
-
-                auto gamXX_i = gamXX(2 * j + 1);
-
-                auto gamXY_r = gamXY(2 * j);
-
-                auto gamXY_i = gamXY(2 * j + 1);
-
-                auto gamXZ_r = gamXZ(2 * j);
-
-                auto gamXZ_i = gamXZ(2 * j + 1);
-
-                auto gamYX_r = gamYX(2 * j);
-
-                auto gamYX_i = gamYX(2 * j + 1);
-
-                auto gamYY_r = gamYY(2 * j);
-
-                auto gamYY_i = gamYY(2 * j + 1);
-
-                auto gamYZ_r = gamYZ(2 * j);
-
-                auto gamYZ_i = gamYZ(2 * j + 1);
-
-                auto gamZX_r = gamZX(2 * j);
-
-                auto gamZX_i = gamZX(2 * j + 1);
-
-                auto gamZY_r = gamZY(2 * j);
-
-                auto gamZY_i = gamZY(2 * j + 1);
-
-                auto gamZZ_r = gamZZ(2 * j);
-
-                auto gamZZ_i = gamZZ(2 * j + 1);
+                auto gam_xx_r = gamXX(2 * j);
+                auto gam_xx_i = gamXX(2 * j + 1);
+                auto gam_xy_r = gamXY(2 * j);
+                auto gam_xy_i = gamXY(2 * j + 1);
+                auto gam_xz_r = gamXZ(2 * j);
+                auto gam_xz_i = gamXZ(2 * j + 1);
+                auto gam_yx_r = gamYX(2 * j);
+                auto gam_yx_i = gamYX(2 * j + 1);
+                auto gam_yy_r = gamYY(2 * j);
+                auto gam_yy_i = gamYY(2 * j + 1);
+                auto gam_yz_r = gamYZ(2 * j);
+                auto gam_yz_i = gamYZ(2 * j + 1);
+                auto gam_zx_r = gamZX(2 * j);
+                auto gam_zx_i = gamZX(2 * j + 1);
+                auto gam_zy_r = gamZY(2 * j);
+                auto gam_zy_i = gamZY(2 * j + 1);
+                auto gam_zz_r = gamZZ(2 * j);
+                auto gam_zz_i = gamZZ(2 * j + 1);
 
                 for (int32_t i = 0; i < npoints; i++)
                 {
-                    // RW1 densities
+                    gam_r[i] += prod2_r(rhoB_r[i],rhoB_i[i],rhoC_r[i],rhoC_i[i])
+                              + prod2_r(rhoC_r[i],rhoC_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    double rxw1_r = gradw1a_x_r[i];
+                    gam_i[i] += prod2_i(rhoB_r[i],rhoB_i[i],rhoC_r[i],rhoC_i[i])
+                              + prod2_i(rhoC_r[i],rhoC_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    double ryw1_r = gradw1a_y_r[i];
+                    gam_x_r[i] += 2.0 * prod2_r(gradB_x_r[i],gradB_x_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_r(gradC_x_r[i],gradC_x_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    double rzw1_r = gradw1a_z_r[i];
+                    gam_y_r[i] += 2.0 * prod2_r(gradB_y_r[i],gradB_y_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_r(gradC_y_r[i],gradC_y_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    double rxw1_i = gradw1a_x_i[i];
+                    gam_z_r[i] += 2.0 * prod2_r(gradB_z_r[i],gradB_z_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_r(gradC_z_r[i],gradC_z_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    double ryw1_i = gradw1a_y_i[i];
+                    gam_x_i[i] += 2.0 * prod2_i(gradB_x_r[i],gradB_x_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_i(gradC_x_r[i],gradC_x_i[i],rhoB_r[i],rhoB_i[i]);
+
+                    gam_y_i[i] += 2.0 * prod2_i(gradB_y_r[i],gradB_y_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_i(gradC_y_r[i],gradC_y_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    double rzw1_i = gradw1a_z_i[i];
+                    gam_z_i[i] += 2.0 * prod2_i(gradB_z_r[i],gradB_z_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_i(gradC_z_r[i],gradC_z_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    // RW2 densities
+                    gam_xx_r[i] += prod2_r(gradB_x_r[i],gradB_x_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_r(gradC_x_r[i],gradC_x_i[i],gradB_x_r[i],gradB_x_i[i]);
+
+                    gam_xy_r[i] += prod2_r(gradB_x_r[i],gradB_x_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_r(gradC_x_r[i],gradC_x_i[i],gradB_y_r[i],gradB_y_i[i]);
+
+                    gam_xz_r[i] += prod2_r(gradB_x_r[i],gradB_x_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_r(gradC_x_r[i],gradC_x_i[i],gradB_z_r[i],gradB_z_i[i]);
+
+                    gam_yx_r[i] += prod2_r(gradB_y_r[i],gradB_y_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_r(gradC_y_r[i],gradC_y_i[i],gradB_x_r[i],gradB_x_i[i]);
+
+                    gam_yy_r[i] += prod2_r(gradB_y_r[i],gradB_y_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_r(gradC_y_r[i],gradC_y_i[i],gradB_y_r[i],gradB_y_i[i]);
+
+                    gam_yz_r[i] += prod2_r(gradB_y_r[i],gradB_y_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_r(gradC_y_r[i],gradC_y_i[i],gradB_z_r[i],gradB_z_i[i]);
+
+                    gam_zx_r[i] += prod2_r(gradB_z_r[i],gradB_z_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_r(gradC_z_r[i],gradC_z_i[i],gradB_x_r[i],gradB_x_i[i]);
+
+                    gam_zy_r[i] += prod2_r(gradB_z_r[i],gradB_z_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_r(gradC_z_r[i],gradC_z_i[i],gradB_y_r[i],gradB_y_i[i]);
+
+                    gam_zz_r[i] += prod2_r(gradB_z_r[i],gradB_z_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_r(gradC_z_r[i],gradC_z_i[i],gradB_z_r[i],gradB_z_i[i]);
+
+                    gam_xx_i[i] += prod2_i(gradB_x_r[i],gradB_x_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_i(gradC_x_r[i],gradC_x_i[i],gradB_x_r[i],gradB_x_i[i]);
+
+                    gam_xy_i[i] += prod2_i(gradB_x_r[i],gradB_x_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_i(gradC_x_r[i],gradC_x_i[i],gradB_y_r[i],gradB_y_i[i]);
+
+                    gam_xz_i[i] += prod2_i(gradB_x_r[i],gradB_x_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_i(gradC_x_r[i],gradC_x_i[i],gradB_z_r[i],gradB_z_i[i]);
+
+                    gam_yx_i[i] += prod2_i(gradB_y_r[i],gradB_y_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_i(gradC_y_r[i],gradC_y_i[i],gradB_x_r[i],gradB_x_i[i]);
+
+                    gam_yy_i[i] += prod2_i(gradB_y_r[i],gradB_y_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_i(gradC_y_r[i],gradC_y_i[i],gradB_y_r[i],gradB_y_i[i]);
+
+                    gam_yz_i[i] += prod2_i(gradB_y_r[i],gradB_y_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_i(gradC_y_r[i],gradC_y_i[i],gradB_z_r[i],gradB_z_i[i]);
+
+                    gam_zx_i[i] += prod2_i(gradB_z_r[i],gradB_z_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_i(gradC_z_r[i],gradC_z_i[i],gradB_x_r[i],gradB_x_i[i]);
+
+                    gam_zy_i[i] += prod2_i(gradB_z_r[i],gradB_z_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_i(gradC_z_r[i],gradC_z_i[i],gradB_y_r[i],gradB_y_i[i]);
+
+                    gam_zz_i[i] += prod2_i(gradB_z_r[i],gradB_z_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_i(gradC_z_r[i],gradC_z_i[i],gradB_z_r[i],gradB_z_i[i]);
+
+                }
+            }
+        }
+    }
+    if (xcFuncType == xcfun::mgga)
+    {
+        if (fstr::upcase(quadMode) == "QRF")
+        {
+            for (int32_t j = 0; j < numdens / 2; j++)
+            {
+                // Perturbed densities
+                
+                auto rhoB_r = rwDensityGrid.alphaDensity(4 * j);
+                auto tauB_r = rwDensityGrid.alphaDensitytau(4 * j);
+                auto laplB_r = rwDensityGrid.alphaDensitylapl(4 * j);
+                auto gradB_x_r = rwDensityGrid.alphaDensityGradientX(4 * j);
+                auto gradB_y_r = rwDensityGrid.alphaDensityGradientY(4 * j);
+                auto gradB_z_r = rwDensityGrid.alphaDensityGradientZ(4 * j);
+
+                auto rhoB_i = rwDensityGrid.alphaDensity(4 * j + 1);
+                auto tauB_i = rwDensityGrid.alphaDensitytau(4 * j + 1);
+                auto laplB_i = rwDensityGrid.alphaDensitylapl(4 * j + 1);
+                auto gradB_x_i = rwDensityGrid.alphaDensityGradientX(4 * j + 1);
+                auto gradB_y_i = rwDensityGrid.alphaDensityGradientY(4 * j + 1);
+                auto gradB_z_i = rwDensityGrid.alphaDensityGradientZ(4 * j + 1);
+
+                auto rhoC_r = rwDensityGrid.alphaDensity(4 * j + 2);
+                auto tauC_r = rwDensityGrid.alphaDensitytau(4 * j + 2);
+                auto laplC_r = rwDensityGrid.alphaDensitylapl(4 * j + 2);
+                auto gradC_x_r = rwDensityGrid.alphaDensityGradientX(4 * j + 2);
+                auto gradC_y_r = rwDensityGrid.alphaDensityGradientY(4 * j + 2);
+                auto gradC_z_r = rwDensityGrid.alphaDensityGradientZ(4 * j + 2);
+
+                auto rhoC_i = rwDensityGrid.alphaDensity(4 * j + 3);
+                auto tauC_i = rwDensityGrid.alphaDensitytau(4 * j + 3);
+                auto laplC_i = rwDensityGrid.alphaDensitylapl(4 * j + 3);
+                auto gradC_x_i = rwDensityGrid.alphaDensityGradientX(4 * j + 3);
+                auto gradC_y_i = rwDensityGrid.alphaDensityGradientY(4 * j + 3);
+                auto gradC_z_i = rwDensityGrid.alphaDensityGradientZ(4 * j + 3);
+
+                // Perturbed density products to be stored
+
+                auto gam_r = gam(2 * j);
+                auto rt_gam_r = rt_gam(2 * j);
+                auto rl_gam_r = rl_gam(2 * j);
+                auto tt_gam_r = tt_gam(2 * j);
+                auto tl_gam_r = tl_gam(2 * j);
+                auto ll_gam_r = ll_gam(2 * j);
+                
+                auto gam_i = gam(2 * j + 1);
+                auto rt_gam_i = rt_gam(2 * j + 1);
+                auto rl_gam_i = rl_gam(2 * j + 1);
+                auto tt_gam_i = tt_gam(2 * j + 1);
+                auto tl_gam_i = tl_gam(2 * j + 1);
+                auto ll_gam_i = ll_gam(2 * j + 1);
+
+                auto gam_x_r = gamX(2 * j);
+                auto gam_y_r = gamY(2 * j);
+                auto gam_z_r = gamZ(2 * j);
+
+                auto gam_x_i = gamX(2 * j + 1);
+                auto gam_y_i = gamY(2 * j + 1);
+                auto gam_z_i = gamZ(2 * j + 1);
+
+                auto st_gam_x_r = st_gamX(2 * j);
+                auto st_gam_y_r = st_gamY(2 * j);
+                auto st_gam_z_r = st_gamZ(2 * j);
+
+                auto sl_gam_x_r = sl_gamX(2 * j);
+                auto sl_gam_y_r = sl_gamY(2 * j);
+                auto sl_gam_z_r = sl_gamZ(2 * j);
+
+                auto st_gam_x_i = st_gamX(2 * j + 1);
+                auto st_gam_y_i = st_gamY(2 * j + 1);
+                auto st_gam_z_i = st_gamZ(2 * j + 1);
+
+                auto sl_gam_x_i = sl_gamX(2 * j + 1);
+                auto sl_gam_y_i = sl_gamY(2 * j + 1);
+                auto sl_gam_z_i = sl_gamZ(2 * j + 1);
+
+                auto gam_xx_r = gamXX(2 * j);
+                auto gam_xx_i = gamXX(2 * j + 1);
+                auto gam_xy_r = gamXY(2 * j);
+                auto gam_xy_i = gamXY(2 * j + 1);
+                auto gam_xz_r = gamXZ(2 * j);
+                auto gam_xz_i = gamXZ(2 * j + 1);
+                auto gam_yx_r = gamYX(2 * j);
+                auto gam_yx_i = gamYX(2 * j + 1);
+                auto gam_yy_r = gamYY(2 * j);
+                auto gam_yy_i = gamYY(2 * j + 1);
+                auto gam_yz_r = gamYZ(2 * j);
+                auto gam_yz_i = gamYZ(2 * j + 1);
+                auto gam_zx_r = gamZX(2 * j);
+                auto gam_zx_i = gamZX(2 * j + 1);
+                auto gam_zy_r = gamZY(2 * j);
+                auto gam_zy_i = gamZY(2 * j + 1);
+                auto gam_zz_r = gamZZ(2 * j);
+                auto gam_zz_i = gamZZ(2 * j + 1);
 
-                    double rxw2_r = gradw2a_x_r[i];
+                for (int32_t i = 0; i < npoints; i++)
+                {
 
-                    double ryw2_r = gradw2a_y_r[i];
+                    gam_r[i] = prod2_r(rhoB_r[i],rhoB_i[i],rhoC_r[i],rhoC_i[i])
+                              + prod2_r(rhoC_r[i],rhoC_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    double rzw2_r = gradw2a_z_r[i];
+                    gam_i[i] = prod2_i(rhoB_r[i],rhoB_i[i],rhoC_r[i],rhoC_i[i])
+                              + prod2_i(rhoC_r[i],rhoC_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    double rxw2_i = gradw2a_x_i[i];
+                    rt_gam_r[i] = 2.0 * (prod2_r(rhoB_r[i],rhoB_i[i],tauC_r[i],tauC_i[i])
+                                       + prod2_r(rhoC_r[i],rhoC_i[i],tauB_r[i],tauB_i[i]));
 
-                    double ryw2_i = gradw2a_y_i[i];
+                    rt_gam_i[i] = 2.0 * (prod2_i(rhoB_r[i],rhoB_i[i],tauC_r[i],tauC_i[i])
+                                      + prod2_i(rhoC_r[i],rhoC_i[i],tauB_r[i],tauB_i[i]));
 
-                    double rzw2_i = gradw2a_z_i[i];
+                    rl_gam_r[i] = 2.0 * (prod2_r(rhoB_r[i],rhoB_i[i],laplC_r[i],laplC_i[i])
+                                 + prod2_r(rhoC_r[i],rhoC_i[i],laplB_r[i],laplB_i[i]));
 
-                    // Densities for terms 1-3
+                    rl_gam_i[i] = 2.0 * (prod2_i(rhoB_r[i],rhoB_i[i],laplC_r[i],laplC_i[i])
+                                 + prod2_i(rhoC_r[i],rhoC_i[i],laplB_r[i],laplB_i[i]));
 
-                    gam_r[i] = 2.0 * (rhow1a_r[i] * rhow2a_r[i] - rhow1a_i[i] * rhow2a_i[i]);
+                    tt_gam_r[i] = prod2_r(tauB_r[i],tauB_i[i],tauC_r[i],tauC_i[i])
+                                 + prod2_r(tauC_r[i],tauC_i[i],tauB_r[i],tauB_i[i]);
 
-                    gam_i[i] = 2.0 * (rhow1a_r[i] * rhow2a_i[i] + rhow1a_i[i] * rhow2a_r[i]);
+                    tt_gam_i[i] = prod2_i(tauB_r[i],tauB_i[i],tauC_r[i],tauC_i[i])
+                                 + prod2_i(tauC_r[i],tauC_i[i],tauB_r[i],tauB_i[i]);
 
-                    gamX_r[i] = 2.0 * (rxw1_r * rhow2a_r[i] - rxw1_i * rhow2a_i[i]
+                    tl_gam_r[i] = 2.0 * (prod2_r(tauB_r[i],tauB_i[i],laplC_r[i],laplC_i[i])
+                                 + prod2_r(tauC_r[i],tauC_i[i],laplB_r[i],laplB_i[i]));
 
-                                            + rxw2_r * rhow1a_r[i] - rxw2_i * rhow1a_i[i]);
+                    tl_gam_i[i] = 2.0 * (prod2_i(tauB_r[i],tauB_i[i],laplC_r[i],laplC_i[i])
+                                 + prod2_i(tauC_r[i],tauC_i[i],laplB_r[i],laplB_i[i]));
 
-                    gamX_i[i] = 2.0 * (rxw1_r * rhow2a_i[i] + rxw1_i * rhow2a_r[i]
+                    ll_gam_r[i] = prod2_r(laplB_r[i],laplB_i[i],laplC_r[i],laplC_i[i])
+                                 + prod2_r(laplC_r[i],laplC_i[i],laplB_r[i],laplB_i[i]);
 
-                                            + rxw2_r * rhow1a_i[i] + rxw2_i * rhow1a_r[i]);
+                    ll_gam_i[i] = prod2_i(laplB_r[i],laplB_i[i],laplC_r[i],laplC_i[i])
+                                 + prod2_i(laplC_r[i],laplC_i[i],laplB_r[i],laplB_i[i]);
 
-                    gamY_r[i] = 2.0 * (ryw1_r * rhow2a_r[i] - ryw1_i * rhow2a_i[i]
+                    gam_x_r[i] = 2.0 * prod2_r(gradB_x_r[i],gradB_x_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_r(gradC_x_r[i],gradC_x_i[i],rhoB_r[i],rhoB_i[i]);
 
-                                            + ryw2_r * rhow1a_r[i] - ryw2_i * rhow1a_i[i]);
+                    gam_y_r[i] = 2.0 * prod2_r(gradB_y_r[i],gradB_y_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_r(gradC_y_r[i],gradC_y_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    gamY_i[i] = 2.0 * (ryw1_r * rhow2a_i[i] + ryw1_i * rhow2a_r[i]
+                    gam_z_r[i] = 2.0 * prod2_r(gradB_z_r[i],gradB_z_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_r(gradC_z_r[i],gradC_z_i[i],rhoB_r[i],rhoB_i[i]);
 
-                                            + ryw2_r * rhow1a_i[i] + ryw2_i * rhow1a_r[i]);
+                    gam_x_i[i] = 2.0 * prod2_i(gradB_x_r[i],gradB_x_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_i(gradC_x_r[i],gradC_x_i[i],rhoB_r[i],rhoB_i[i]);
 
-                    gamZ_r[i] = 2.0 * (rzw1_r * rhow2a_r[i] - rzw1_i * rhow2a_i[i]
+                    gam_y_i[i] = 2.0 * prod2_i(gradB_y_r[i],gradB_y_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_i(gradC_y_r[i],gradC_y_i[i],rhoB_r[i],rhoB_i[i]);
 
-                                            + rzw2_r * rhow1a_r[i] - rzw2_i * rhow1a_i[i]);
+                    gam_z_i[i] = 2.0 * prod2_i(gradB_z_r[i],gradB_z_i[i],rhoC_r[i],rhoC_i[i])
+                                + 2.0 * prod2_i(gradC_z_r[i],gradC_z_i[i],rhoB_r[i],rhoB_i[i]);
+                                
 
-                    gamZ_i[i] = 2.0 * (rzw1_r * rhow2a_i[i] + rzw1_i * rhow2a_r[i]
+                    st_gam_x_r[i] = 2.0 * prod2_r(gradB_x_r[i],gradB_x_i[i],tauC_r[i],tauC_i[i])
+                                   + 2.0 * prod2_r(gradC_x_r[i],gradC_x_i[i],tauB_r[i],tauB_i[i]);                      
 
-                                            + rzw2_r * rhow1a_i[i] + rzw2_i * rhow1a_r[i]);
+                    st_gam_y_r[i] = 2.0 * prod2_r(gradB_y_r[i],gradB_y_i[i],tauC_r[i],tauC_i[i])
+                                   + 2.0 * prod2_r(gradC_y_r[i],gradC_y_i[i],tauB_r[i],tauB_i[i]);                      
 
-                    gamXX_r[i] = rxw1_r * rxw2_r - rxw1_i * rxw2_i
+                    st_gam_z_r[i] = 2.0 * prod2_r(gradB_z_r[i],gradB_z_i[i],tauC_r[i],tauC_i[i])
+                                   + 2.0 * prod2_r(gradC_z_r[i],gradC_z_i[i],tauB_r[i],tauB_i[i]);                      
 
-                                    + rxw2_r * rxw1_r - rxw2_i * rxw1_i;
+                    sl_gam_x_r[i] = 2.0 * prod2_r(gradB_x_r[i],gradB_x_i[i],laplC_r[i],laplC_i[i])
+                                   + 2.0 * prod2_r(gradC_x_r[i],gradC_x_i[i],laplB_r[i],laplB_i[i]);                    
 
-                    gamXX_i[i] = rxw1_r * rxw2_i + rxw1_r * rxw2_i
+                    sl_gam_y_r[i] = 2.0 * prod2_r(gradB_y_r[i],gradB_y_i[i],laplC_r[i],laplC_i[i])
+                                   + 2.0 * prod2_r(gradC_y_r[i],gradC_y_i[i],laplB_r[i],laplB_i[i]);                    
 
-                                    + rxw2_r * rxw1_i + rxw2_r * rxw1_i;
+                    sl_gam_z_r[i] = 2.0 * prod2_r(gradB_z_r[i],gradB_z_i[i],laplC_r[i],laplC_i[i])
+                                   + 2.0 * prod2_r(gradC_z_r[i],gradC_z_i[i],laplB_r[i],laplB_i[i]);                    
 
-                    gamXY_r[i] = rxw1_r * ryw2_r - rxw1_i * ryw2_i
+                    st_gam_x_i[i] = 2.0 * prod2_i(gradB_x_r[i],gradB_x_i[i],tauC_r[i],tauC_i[i])
+                                   + 2.0 * prod2_i(gradC_x_r[i],gradC_x_i[i],tauB_r[i],tauB_i[i]);                      
 
-                                    + rxw2_r * ryw1_r - rxw2_i * ryw1_i;
+                    st_gam_y_i[i] = 2.0 * prod2_i(gradB_y_r[i],gradB_y_i[i],tauC_r[i],tauC_i[i])
+                                   + 2.0 * prod2_i(gradC_y_r[i],gradC_y_i[i],tauB_r[i],tauB_i[i]);                      
 
-                    gamXY_i[i] = rxw1_r * ryw2_i + rxw1_r * ryw2_i
+                    st_gam_z_i[i] = 2.0 * prod2_i(gradB_z_r[i],gradB_z_i[i],tauC_r[i],tauC_i[i])
+                                   + 2.0 * prod2_i(gradC_z_r[i],gradC_z_i[i],tauB_r[i],tauB_i[i]);                      
 
-                                    + rxw2_r * ryw1_i + rxw2_r * ryw1_i;
+                    sl_gam_x_i[i] = 2.0 * prod2_i(gradB_x_r[i],gradB_x_i[i],laplC_r[i],laplC_i[i])
+                                   + 2.0 * prod2_i(gradC_x_r[i],gradC_x_i[i],laplB_r[i],laplB_i[i]);                    
 
-                    gamXZ_r[i] = rxw1_r * rzw2_r - rxw1_i * rzw2_i
+                    sl_gam_y_i[i] = 2.0 * prod2_i(gradB_y_r[i],gradB_y_i[i],laplC_r[i],laplC_i[i])
+                                   + 2.0 * prod2_i(gradC_y_r[i],gradC_y_i[i],laplB_r[i],laplB_i[i]);                    
 
-                                    + rxw2_r * rzw1_r - rxw2_i * rzw1_i;
+                    sl_gam_z_i[i] = 2.0 * prod2_i(gradB_z_r[i],gradB_z_i[i],laplC_r[i],laplC_i[i])
+                                   + 2.0 * prod2_i(gradC_z_r[i],gradC_z_i[i],laplB_r[i],laplB_i[i]);                    
 
-                    gamXZ_i[i] = rxw1_r * rzw2_i + rxw1_r * rzw2_i
+                    gam_xx_r[i] = prod2_r(gradB_x_r[i],gradB_x_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_r(gradC_x_r[i],gradC_x_i[i],gradB_x_r[i],gradB_x_i[i]);                    
 
-                                    + rxw2_r * rzw1_i + rxw2_r * rzw1_i;
+                    gam_xy_r[i] = prod2_r(gradB_x_r[i],gradB_x_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_r(gradC_x_r[i],gradC_x_i[i],gradB_y_r[i],gradB_y_i[i]);                    
 
-                    gamYX_r[i] = ryw1_r * rxw2_r - ryw1_i * rxw2_i
+                    gam_xz_r[i] = prod2_r(gradB_x_r[i],gradB_x_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_r(gradC_x_r[i],gradC_x_i[i],gradB_z_r[i],gradB_z_i[i]);                    
 
-                                    + ryw2_r * rxw1_r - ryw2_i * rxw1_i;
+                    gam_yx_r[i] = prod2_r(gradB_y_r[i],gradB_y_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_r(gradC_y_r[i],gradC_y_i[i],gradB_x_r[i],gradB_x_i[i]);                    
 
-                    gamYX_i[i] = ryw1_r * rxw2_i + ryw1_r * rxw2_i
+                    gam_yy_r[i] = prod2_r(gradB_y_r[i],gradB_y_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_r(gradC_y_r[i],gradC_y_i[i],gradB_y_r[i],gradB_y_i[i]);                    
 
-                                    + ryw2_r * rxw1_i + ryw2_r * rxw1_i;
+                    gam_yz_r[i] = prod2_r(gradB_y_r[i],gradB_y_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_r(gradC_y_r[i],gradC_y_i[i],gradB_z_r[i],gradB_z_i[i]);                    
 
-                    gamYY_r[i] = ryw1_r * ryw2_r - ryw1_i * ryw2_i
+                    gam_zx_r[i] = prod2_r(gradB_z_r[i],gradB_z_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_r(gradC_z_r[i],gradC_z_i[i],gradB_x_r[i],gradB_x_i[i]);                    
 
-                                    + ryw2_r * ryw1_r - ryw2_i * ryw1_i;
+                    gam_zy_r[i] = prod2_r(gradB_z_r[i],gradB_z_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_r(gradC_z_r[i],gradC_z_i[i],gradB_y_r[i],gradB_y_i[i]);                    
 
-                    gamYY_i[i] = ryw1_r * ryw2_i + ryw1_r * ryw2_i
+                    gam_zz_r[i] = prod2_r(gradB_z_r[i],gradB_z_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_r(gradC_z_r[i],gradC_z_i[i],gradB_z_r[i],gradB_z_i[i]);                    
 
-                                    + ryw2_r * ryw1_i + ryw2_r * ryw1_i;
+                    gam_xx_i[i] = prod2_i(gradB_x_r[i],gradB_x_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_i(gradC_x_r[i],gradC_x_i[i],gradB_x_r[i],gradB_x_i[i]);                    
 
-                    gamYZ_r[i] = ryw1_r * rzw2_r - ryw1_i * rzw2_i
+                    gam_xy_i[i] = prod2_i(gradB_x_r[i],gradB_x_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_i(gradC_x_r[i],gradC_x_i[i],gradB_y_r[i],gradB_y_i[i]);                    
 
-                                    + ryw2_r * rzw1_r - ryw2_i * rzw1_i;
+                    gam_xz_i[i] = prod2_i(gradB_x_r[i],gradB_x_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_i(gradC_x_r[i],gradC_x_i[i],gradB_z_r[i],gradB_z_i[i]);                    
 
-                    gamYZ_i[i] = ryw1_r * rzw2_i + ryw1_r * rzw2_i
+                    gam_yx_i[i] = prod2_i(gradB_y_r[i],gradB_y_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_i(gradC_y_r[i],gradC_y_i[i],gradB_x_r[i],gradB_x_i[i]);                    
 
-                                    + ryw2_r * rzw1_i + ryw2_r * rzw1_i;
+                    gam_yy_i[i] = prod2_i(gradB_y_r[i],gradB_y_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_i(gradC_y_r[i],gradC_y_i[i],gradB_y_r[i],gradB_y_i[i]);                    
 
-                    gamZX_r[i] = rzw1_r * rxw2_r - rzw1_i * rxw2_i
+                    gam_yz_i[i] = prod2_i(gradB_y_r[i],gradB_y_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_i(gradC_y_r[i],gradC_y_i[i],gradB_z_r[i],gradB_z_i[i]);                    
 
-                                    + rzw2_r * rxw1_r - rzw2_i * rxw1_i;
+                    gam_zx_i[i] = prod2_i(gradB_z_r[i],gradB_z_i[i],gradC_x_r[i],gradC_x_i[i])
+                                +  prod2_i(gradC_z_r[i],gradC_z_i[i],gradB_x_r[i],gradB_x_i[i]);                    
 
-                    gamZX_i[i] = rzw1_r * rxw2_i + rzw1_r * rxw2_i
+                    gam_zy_i[i] = prod2_i(gradB_z_r[i],gradB_z_i[i],gradC_y_r[i],gradC_y_i[i])
+                                +  prod2_i(gradC_z_r[i],gradC_z_i[i],gradB_y_r[i],gradB_y_i[i]);                    
 
-                                    + rzw2_r * rxw1_i + rzw2_r * rxw1_i;
-
-                    gamZY_r[i] = rzw1_r * ryw2_r - rzw1_i * ryw2_i
-
-                                    + rzw2_r * ryw1_r - rzw2_i * ryw1_i;
-
-                    gamZY_i[i] = rzw1_r * ryw2_i + rzw1_r * ryw2_i
-
-                                    + rzw2_r * ryw1_i + rzw2_r * ryw1_i;
-
-                    gamZZ_r[i] = rzw1_r * rzw2_r - rzw1_i * rzw2_i
-
-                                    + rzw2_r * rzw1_r - rzw2_i * rzw1_i;
-
-                    gamZZ_i[i] = rzw1_r * rzw2_i + rzw1_r * rzw2_i
-
-                                    + rzw2_r * rzw1_i + rzw2_r * rzw1_i;
+                    gam_zz_i[i] = prod2_i(gradB_z_r[i],gradB_z_i[i],gradC_z_r[i],gradC_z_i[i])
+                                +  prod2_i(gradC_z_r[i],gradC_z_i[i],gradB_z_r[i],gradB_z_i[i]);
                 }
             }
         }
