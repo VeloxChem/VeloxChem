@@ -89,7 +89,7 @@ class TestQrfFD:
 
     def test_gga_qrf_fd(self):
 
-        self.run_qrf_fd('pbe0')
+        self.run_qrf_fd('bp86')
 
     def test_mgga_qrf_fd(self):
 
