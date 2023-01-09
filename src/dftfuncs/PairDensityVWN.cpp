@@ -25,6 +25,7 @@
 
 #include "PairDensityVWN.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
