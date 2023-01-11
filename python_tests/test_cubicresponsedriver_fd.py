@@ -101,3 +101,7 @@ class TestCrfFD:
     def test_gga_crf_fd(self):
 
         self.run_crf_fd('pbe0')
+
+    def test_mgga_crf_fd(self):
+
+        self.run_crf_fd('tpssh')
