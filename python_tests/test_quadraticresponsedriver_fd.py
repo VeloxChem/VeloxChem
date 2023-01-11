@@ -1,6 +1,8 @@
+from mpi4py import MPI
 import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.outputstream import OutputStream
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -12,6 +14,9 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 class TestQrfFD:
 
     def run_qrf_fd(self, xcfun_label):
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream(None)
 
         molecule_string = """
         O   0.0   0.0   0.0
@@ -31,11 +36,11 @@ class TestQrfFD:
         rsp_settings = {'conv_thresh': rsp_conv_thresh, 'damping': 0}
         method_settings = {'xcfun': xcfun_label}
 
-        scfdrv = ScfRestrictedDriver()
+        scfdrv = ScfRestrictedDriver(comm, ostream)
         scfdrv.update_settings(scf_settings, method_settings)
         scf_result = scfdrv.compute(molecule, basis)
 
-        quad_solver = QuadraticResponseDriver()
+        quad_solver = QuadraticResponseDriver(comm, ostream)
         quad_solver.update_settings(rsp_settings, method_settings)
         quad_result = quad_solver.compute(molecule, basis, scf_result)
 
@@ -57,20 +62,20 @@ class TestQrfFD:
         method_dict_plus['electric_field'] = efield_plus
         method_dict_minus['electric_field'] = efield_minus
 
-        scf_drv_plus = ScfRestrictedDriver()
+        scf_drv_plus = ScfRestrictedDriver(comm, ostream)
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         scf_drv_plus.compute(molecule, basis)
 
         lr_prop_plus = Polarizability(rsp_settings, method_dict_plus)
-        lr_prop_plus.init_driver()
+        lr_prop_plus.init_driver(comm, ostream)
         lr_prop_plus.compute(molecule, basis, scf_drv_plus.scf_tensors)
 
-        scf_drv_minus = ScfRestrictedDriver()
+        scf_drv_minus = ScfRestrictedDriver(comm, ostream)
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         scf_drv_minus.compute(molecule, basis)
 
         lr_prop_minus = Polarizability(rsp_settings, method_dict_minus)
-        lr_prop_minus.init_driver()
+        lr_prop_minus.init_driver(comm, ostream)
         lr_prop_minus.compute(molecule, basis, scf_drv_minus.scf_tensors)
 
         if is_mpi_master():

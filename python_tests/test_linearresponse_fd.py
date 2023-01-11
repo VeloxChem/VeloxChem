@@ -1,6 +1,8 @@
+from mpi4py import MPI
 import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.outputstream import OutputStream
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -12,6 +14,9 @@ from veloxchem.firstorderprop import FirstOrderProperties
 class TestLrfFD:
 
     def run_lrf_fd(self, xcfun_label):
+
+        comm = MPI.COMM_WORLD
+        ostream = OutputStream(None)
 
         molecule_string = """
         O   0.0   0.0   0.0
@@ -31,12 +36,12 @@ class TestLrfFD:
         rsp_settings = {'conv_thresh': rsp_conv_thresh, 'frequencies': '0'}
         method_settings = {'xcfun': xcfun_label}
 
-        scfdrv = ScfRestrictedDriver()
+        scfdrv = ScfRestrictedDriver(comm, ostream)
         scfdrv.update_settings(scf_settings, method_settings)
         scfdrv.compute(molecule, basis)
 
         lr_prop = Polarizability(rsp_settings, method_settings)
-        lr_prop.init_driver()
+        lr_prop.init_driver(comm, ostream)
         lr_prop.compute(molecule, basis, scfdrv.scf_tensors)
 
         if is_mpi_master():
@@ -54,19 +59,19 @@ class TestLrfFD:
         method_dict_plus['electric_field'] = efield_plus
         method_dict_minus['electric_field'] = efield_minus
 
-        scf_drv_plus = ScfRestrictedDriver()
+        scf_drv_plus = ScfRestrictedDriver(comm, ostream)
         scf_drv_plus.update_settings(scf_settings, method_dict_plus)
         scf_drv_plus.compute(molecule, basis)
 
-        scf_prop_plus = FirstOrderProperties()
+        scf_prop_plus = FirstOrderProperties(comm, ostream)
         scf_prop_plus.compute_scf_prop(molecule, basis,
                                        scf_drv_plus.scf_tensors)
 
-        scf_drv_minus = ScfRestrictedDriver()
+        scf_drv_minus = ScfRestrictedDriver(comm, ostream)
         scf_drv_minus.update_settings(scf_settings, method_dict_minus)
         scf_drv_minus.compute(molecule, basis)
 
-        scf_prop_minus = FirstOrderProperties()
+        scf_prop_minus = FirstOrderProperties(comm, ostream)
         scf_prop_minus.compute_scf_prop(molecule, basis,
                                         scf_drv_minus.scf_tensors)
 
