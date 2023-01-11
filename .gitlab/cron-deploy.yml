@@ -50,13 +50,15 @@ monkey:cron_deploy:
         --prefix="veloxchem/"
         "$CI_COMMIT_SHA" | bzip2 > "$TARBALL"
     - tar tf "$TARBALL"
-    # build number as last two digits of year + ISO week number (1..53)
+    # in 2022, we started computing the build number as: last two digits of year + ISO week number (1..53)
+    # to avoid going backwards when a new year kicks in, the numbering is:
+    # (year - 2022)*53 + 22 + week
     # trigger deployment
     - | 
       python .gitlab/trigger.py \
         --tarball "$TARBALL" \
         --url "$CI_API_V4_URL/projects/$CI_PROJECT_ID/jobs/$CI_JOB_ID/artifacts/$TARBALL" \
-        --commit "package={'build': '$(("$(date +"%y")" + "$(date +"%V")"))', 'label': 'main'}"
+        --commit "package={'build': '$((("$(date +"%Y")" - 2022)*53 + 22 + "$(date +"%V")"))', 'label': 'main'}"
   artifacts:
     paths:
       - "$TARBALL"
