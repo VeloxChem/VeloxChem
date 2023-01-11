@@ -37,7 +37,7 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat, fockmat, molorb
-from .veloxchemlib import parse_xc_func
+from .veloxchemlib import new_parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .distributedarray import DistributedArray
@@ -324,7 +324,7 @@ class LinearSolver:
         # check xc functional
         if self.xcfun is not None:
             if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
+                self.xcfun = new_parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'LinearSolver: Undefined XC functional')
         self._dft = (self.xcfun is not None)
@@ -866,9 +866,6 @@ class LinearSolver:
                         fock.scale(2.0, ifock)
 
                 xc_drv = XCNewIntegrator(self.comm)
-                molgrid.partition_grid_points()
-                molgrid.distribute_counts_and_displacements(
-                    self.rank, self.nodes, self.comm)
                 xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
                                           gs_density, molgrid,
                                           self.xcfun.get_func_label())

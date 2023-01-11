@@ -121,6 +121,66 @@ void generateDensityForGGA(double*             rho,
                            CMultiTimer&        timer);
 
 /**
+ Generates density for meta-GGA.
+
+ @param rho the pointer to density.
+ @param rhograd the pointer to density gradient.
+ @param sigma the pointer to dot product of density gradient.
+ @param lapl the pointer to laplacian.
+ @param tau the pointer to tau.
+ @param npoints the number of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param gtoValuesX the GTO X derivative values on grid points.
+ @param gtoValuesY the GTO Y derivative values on grid points.
+ @param gtoValuesZ the GTO Z derivative values on grid points.
+ @param densityMatrix the density matrix.
+ @param timer the timer.
+ */
+void generateDensityForMGGA(double*             rho,
+                            double*             rhograd,
+                            double*             sigma,
+                            double*             lapl,
+                            double*             tau,
+                            const int32_t       npoints,
+                            const CDenseMatrix& gtoValues,
+                            const CDenseMatrix& gtoValuesX,
+                            const CDenseMatrix& gtoValuesY,
+                            const CDenseMatrix& gtoValuesZ,
+                            const CDenseMatrix& densityMatrix,
+                            CMultiTimer&        timer);
+
+/**
+ Generates density for meta-GGA.
+
+ @param rho the pointer to density.
+ @param rhograd the pointer to density gradient.
+ @param sigma the pointer to dot product of density gradient.
+ @param lapl the pointer to laplacian.
+ @param tau the pointer to tau.
+ @param npoints the number of grid points.
+ @param gtoValues the GTO values on grid points.
+ @param gtoValuesX the GTO X derivative values on grid points.
+ @param gtoValuesY the GTO Y derivative values on grid points.
+ @param gtoValuesZ the GTO Z derivative values on grid points.
+ @param densityMatrixAlpha the alpha density matrix.
+ @param densityMatrixBeta the beta density matrix.
+ @param timer the timer.
+ */
+void generateDensityForMGGA(double*             rho,
+                            double*             rhograd,
+                            double*             sigma,
+                            double*             lapl,
+                            double*             tau,
+                            const int32_t       npoints,
+                            const CDenseMatrix& gtoValues,
+                            const CDenseMatrix& gtoValuesX,
+                            const CDenseMatrix& gtoValuesY,
+                            const CDenseMatrix& gtoValuesZ,
+                            const CDenseMatrix& densityMatrixAlpha,
+                            const CDenseMatrix& densityMatrixBeta,
+                            CMultiTimer&        timer);
+
+/**
  Generates density and on-top pair-density for LDA.
 
  @param rho the pointer to density.

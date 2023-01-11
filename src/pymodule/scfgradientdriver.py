@@ -28,7 +28,7 @@ from copy import deepcopy
 import time as tm
 import numpy as np
 
-from .veloxchemlib import (XCFunctional, MolecularGrid, mpi_master)
+from .veloxchemlib import (XCNewFunctional, MolecularGrid, mpi_master)
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
 
@@ -216,8 +216,8 @@ class ScfGradientDriver(GradientDriver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 pass
-            elif isinstance(val, XCFunctional):
-                new_grad_drv.key = XCFunctional(val)
+            elif isinstance(val, XCNewFunctional):
+                new_grad_drv.key = XCNewFunctional(val)
             elif isinstance(val, MolecularGrid):
                 new_grad_drv.key = MolecularGrid(val)
             else:

@@ -38,10 +38,7 @@
 #include "Buffer.hpp"
 #include "DensityGrid.hpp"
 #include "XCComponent.hpp"
-#include "XCCubicHessianGrid.hpp"
 #include "XCFuncType.hpp"
-#include "XCGradientGrid.hpp"
-#include "XCHessianGrid.hpp"
 
 /**
  * Class CXCNewFunctional is a wrapper to the C functions and structs provided by LibXC.
@@ -51,16 +48,19 @@
 class CXCNewFunctional
 {
    private:
-    /** The fraction of exact Hatree-Fock exchange in functional. */
+    /** Name of functional. */
+    std::string _nameOfFunctional{std::string("Undefined")};
+
+    /** The fraction of exact Hartree-Fock exchange in functional. */
     double _fractionOfExactExchange{0.0};
 
-    /** The range-separation parameter in functional. */
-    double _rangeSeparationParameter{0.0};
+    /** The range-separation parameters in functional. */
+    std::array<double, 3> _rangeSeparationParameters{0.0, 0.0, 0.0};
 
     /** Highest order of available derivatives. */
     int32_t _maxDerivOrder{0};
 
-    /** Highest order of available derivatives. */
+    /** Family of functional. */
     std::string _familyOfFunctional{std::string("LDA")};
 
     /** Leading dimension for initial allocation of staging buffer. */
@@ -81,19 +81,15 @@ class CXCNewFunctional
    public:
     /** Creates an exchange-correlation functional object.
      *
-     * @param[in] labels list of labels of component exchange and correlation functionals.
-     * @param[in] coeffs list of coefficients for the components of the functional.
+     * @param[in] nameOfFunctional name of functional.
+     * @param[in] labels list of labels of functional components.
+     * @param[in] coeffs list of coefficients for functional components.
+     * @param[in] fractionOfExactExchange fraction of exact exchange.
      */
-    CXCNewFunctional(const std::vector<std::string>& labels,
+    CXCNewFunctional(const std::string&              nameOfFunctional,
+                     const std::vector<std::string>& labels,
                      const std::vector<double>&      coeffs,
-                     const double                    fractionOfExactExchange  = 0.0,
-                     const double                    rangeSeparationParameter = 0.0);
-
-    /** Creates an exchange-correlation functional object.
-     *
-     * @param[in] label label of component exchange and correlation functional.
-     */
-    CXCNewFunctional(const std::string& label);
+                     const double                    fractionOfExactExchange = 0.0);
 
     /**
      Creates an XC functional object by copying other XC functional object.
@@ -145,9 +141,29 @@ class CXCNewFunctional
     bool operator!=(const CXCNewFunctional& other) const;
 
     /**
+     Gets XC functional name.
+     */
+    std::string getFunctionalLabel() const;
+
+    /**
      Gets XC functional type.
      */
     xcfun getFunctionalType() const;
+
+    /**
+     Determines whether the XC functional is undefined.
+     */
+    bool isUndefined() const;
+
+    /**
+     Determines whether the XC functional is hybrid.
+     */
+    bool isHybrid() const;
+
+    /**
+     Gets the fraction of exact exchange.
+     */
+    double getFractionOfExactExchange() const;
 
     /**@{ LDA computational functions. These are wrappers around `xc_lda_*` functions in LibXC. */
     /** Computes values and first derivative of LDA exchange-correlation functional on grid.

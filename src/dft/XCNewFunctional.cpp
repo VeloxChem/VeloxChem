@@ -35,15 +35,16 @@
 
 #include "ErrorHandler.hpp"
 #include "MemAlloc.hpp"
+#include "StringFormat.hpp"
 
-CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
+CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctional,
+                                   const std::vector<std::string>& labels,
                                    const std::vector<double>&      coeffs,
-                                   const double                    fractionOfExactExchange,
-                                   const double                    rangeSeparationParameter)
+                                   const double                    fractionOfExactExchange)
 
-    : _fractionOfExactExchange(fractionOfExactExchange)
+    : _nameOfFunctional(fstr::upcase(nameOfFunctional))
 
-    , _rangeSeparationParameter(rangeSeparationParameter)
+    , _fractionOfExactExchange(fractionOfExactExchange)
 {
     std::string errmsg("XCNewFunctional: Inconsistent sizes of functional labels and coefficients");
 
@@ -55,6 +56,8 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
 
     bool isLDA = false, isGGA = false, isMGGA = false;
 
+    bool needLaplacian = false;
+
     for (int32_t i = 0; i < static_cast<int32_t>(labels.size()); i++)
     {
         auto label = labels[i];
@@ -64,6 +67,8 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
         auto xccomp = CXCComponent(label, coeff);
 
         auto funcptr = xccomp.getFunctionalPointer();
+
+        // check functional kind
 
         auto kind = funcptr->info->kind;
 
@@ -83,26 +88,38 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
             errors::assertMsgCritical(false, std::string("XCNewFunctional: Unsupported functional ") + label);
         }
 
+        // check functional flags
+
         auto flags = funcptr->info->flags;
 
         // which derivative orders do we have for this x-c mixture?
-        hasExc = hasExc && (flags & XC_FLAGS_HAVE_EXC);
-        hasVxc = hasVxc && (flags & XC_FLAGS_HAVE_VXC);
-        hasFxc = hasFxc && (flags & XC_FLAGS_HAVE_FXC);
-        hasKxc = hasKxc && (flags & XC_FLAGS_HAVE_KXC);
-        hasLxc = hasLxc && (flags & XC_FLAGS_HAVE_LXC);
+        hasExc = (hasExc && (flags & XC_FLAGS_HAVE_EXC));
+        hasVxc = (hasVxc && (flags & XC_FLAGS_HAVE_VXC));
+        hasFxc = (hasFxc && (flags & XC_FLAGS_HAVE_FXC));
+        hasKxc = (hasKxc && (flags & XC_FLAGS_HAVE_KXC));
+        hasLxc = (hasLxc && (flags & XC_FLAGS_HAVE_LXC));
+
+        // whether Laplacian is needed
+        needLaplacian = (needLaplacian || (flags & XC_FLAGS_NEEDS_LAPLACIAN));
+
+        // check functional family
 
         // which family does this x-c mixture belong to?
         auto family = funcptr->info->family;
 
         // LDA, GGA, metaGGA
-        isMGGA = (isMGGA || (family == XC_FAMILY_MGGA));
-        isGGA  = ((!isMGGA) && (isGGA || (family == XC_FAMILY_GGA)));
-        isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || (family == XC_FAMILY_LDA)));
+        isMGGA = (isMGGA || (family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA));
+        isGGA  = ((!isMGGA) && (isGGA || (family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA)));
+        isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || (family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA)));
 
-        // TODO
-        // 1) figure out fraction of exact exchange from "prebaked" functional (e.g. HYB_GGA_XC_B3LYP)
-        // 2) figure out whether a functional is range-separated (e.g. HYB_GGA_XC_LRC_WPBEH)
+        // check functional hybrid type
+        // TODO use xc_hyb_type when it is available
+
+        auto hyb_exx_coeff = xc_hyb_exx_coef(funcptr);
+
+        if (hyb_exx_coeff != 0.0) _fractionOfExactExchange += coeff * hyb_exx_coeff;
+
+        // TODO figure out range-separation parameters
     }
 
     if (hasExc) _maxDerivOrder = 0;
@@ -115,20 +132,18 @@ CXCNewFunctional::CXCNewFunctional(const std::vector<std::string>& labels,
     if (isGGA) _familyOfFunctional = std::string("GGA");
     if (isMGGA) _familyOfFunctional = std::string("MGGA");
 
+    errors::assertMsgCritical(!needLaplacian, std::string("XCNewFunctional: Density Laplacian is not supported"));
+
     _allocateStagingBuffer();
-}
-
-CXCNewFunctional::CXCNewFunctional(const std::string& label)
-
-    : CXCNewFunctional({label}, {1.0})
-{
 }
 
 CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
 
-    : _fractionOfExactExchange(source._fractionOfExactExchange)
+    : _nameOfFunctional(source._nameOfFunctional)
 
-    , _rangeSeparationParameter(source._rangeSeparationParameter)
+    , _fractionOfExactExchange(source._fractionOfExactExchange)
+
+    , _rangeSeparationParameters(source._rangeSeparationParameters)
 
     , _maxDerivOrder(source._maxDerivOrder)
 
@@ -143,9 +158,11 @@ CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
 
 CXCNewFunctional::CXCNewFunctional(CXCNewFunctional&& source) noexcept
 
-    : _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
+    : _nameOfFunctional(std::move(source._nameOfFunctional))
 
-    , _rangeSeparationParameter(std::move(source._rangeSeparationParameter))
+    , _fractionOfExactExchange(std::move(source._fractionOfExactExchange))
+
+    , _rangeSeparationParameters(std::move(source._rangeSeparationParameters))
 
     , _maxDerivOrder(std::move(source._maxDerivOrder))
 
@@ -202,9 +219,11 @@ CXCNewFunctional::operator=(const CXCNewFunctional& source)
 {
     if (this == &source) return *this;
 
+    _nameOfFunctional = source._nameOfFunctional;
+
     _fractionOfExactExchange = source._fractionOfExactExchange;
 
-    _rangeSeparationParameter = source._rangeSeparationParameter;
+    _rangeSeparationParameters = source._rangeSeparationParameters;
 
     _maxDerivOrder = source._maxDerivOrder;
 
@@ -226,9 +245,11 @@ CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
 {
     if (this == &source) return *this;
 
+    _nameOfFunctional = std::move(source._nameOfFunctional);
+
     _fractionOfExactExchange = std::move(source._fractionOfExactExchange);
 
-    _rangeSeparationParameter = std::move(source._rangeSeparationParameter);
+    _rangeSeparationParameters = std::move(source._rangeSeparationParameters);
 
     _maxDerivOrder = std::move(source._maxDerivOrder);
 
@@ -250,9 +271,11 @@ CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
 bool
 CXCNewFunctional::operator==(const CXCNewFunctional& other) const
 {
+    if (_nameOfFunctional != other._nameOfFunctional) return false;
+
     if (_fractionOfExactExchange != other._fractionOfExactExchange) return false;
 
-    if (_rangeSeparationParameter != other._rangeSeparationParameter) return false;
+    if (_rangeSeparationParameters != other._rangeSeparationParameters) return false;
 
     if (_maxDerivOrder != other._maxDerivOrder) return false;
 
@@ -271,10 +294,34 @@ CXCNewFunctional::operator!=(const CXCNewFunctional& other) const
     return !(*this == other);
 }
 
+std::string
+CXCNewFunctional::getFunctionalLabel() const
+{
+    return _nameOfFunctional;
+}
+
 xcfun
 CXCNewFunctional::getFunctionalType() const
 {
     return to_xcfun(_familyOfFunctional);
+}
+
+bool
+CXCNewFunctional::isUndefined() const
+{
+    return (fstr::upcase(_nameOfFunctional) == "UNDEFINED");
+}
+
+bool
+CXCNewFunctional::isHybrid() const
+{
+    return (std::fabs(_fractionOfExactExchange) > 1.0e-13);
+}
+
+double
+CXCNewFunctional::getFractionOfExactExchange() const
+{
+    return _fractionOfExactExchange;
 }
 
 auto
@@ -332,8 +379,8 @@ CXCNewFunctional::compute_fxc_for_lda(int32_t np, const double* rho, double* v2r
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    // auto stage_exc = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    // auto stage_vrho= (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    //   stage_exc      (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    //   stage_vrho     (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_v2rho2 = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
 #pragma omp simd aligned(v2rho2 : VLX_ALIGN)
@@ -364,6 +411,53 @@ CXCNewFunctional::compute_fxc_for_lda(int32_t np, const double* rho, double* v2r
     if (alloc)
     {
         mem::free(stage_v2rho2);
+    }
+}
+
+auto
+CXCNewFunctional::compute_kxc_for_lda(int32_t np, const double* rho, double* v3rho3) const -> void
+{
+    errors::assertMsgCritical(_maxDerivOrder >= 3,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    // stage_exc        (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    // stage_vrho       (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    // stage_v2rho2     (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto stage_v3rho3 = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[6 * _ldStaging];
+
+#pragma omp simd aligned(v3rho3 : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        v3rho3[4 * g + 0] = 0.0;
+        v3rho3[4 * g + 1] = 0.0;
+        v3rho3[4 * g + 2] = 0.0;
+        v3rho3[4 * g + 3] = 0.0;
+    }
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
+
+        const auto c = xccomp.getScalingFactor();
+
+#pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
+        for (auto g = 0; g < np; ++g)
+        {
+            v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
+            v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
+            v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
+            v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_v3rho3);
     }
 }
 
@@ -401,7 +495,7 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
 
@@ -414,7 +508,7 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
@@ -461,7 +555,7 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    // auto stage_exc = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    //   stage_exc      (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
     auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
@@ -473,7 +567,7 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_vxc(funcptr, np, rho, stage_vrho);
 
@@ -484,7 +578,7 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
 
@@ -540,9 +634,9 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    // auto stage_exc     = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    // auto stage_vrho    = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    // auto stage_vsigma  = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    //   stage_exc          (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    //   stage_vrho         (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    //   stage_vsigma       (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
     auto stage_v2rho2     = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
     auto stage_v2rhosigma = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
     auto stage_v2sigma2   = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
@@ -555,7 +649,7 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
 
@@ -567,7 +661,7 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
                 v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
 
@@ -600,6 +694,154 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
         mem::free(stage_v2rho2);
         mem::free(stage_v2rhosigma);
         mem::free(stage_v2sigma2);
+    }
+}
+
+auto
+CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
+                                      const double* rho,
+                                      const double* sigma,
+                                      double*       v3rho3,
+                                      double*       v3rho2sigma,
+                                      double*       v3rhosigma2,
+                                      double*       v3sigma3) const -> void
+{
+    errors::assertMsgCritical(_maxDerivOrder >= 3,
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
+
+#pragma omp simd aligned(v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3 : VLX_ALIGN)
+    for (auto g = 0; g < np; ++g)
+    {
+        v3rho3[4 * g + 0] = 0.0;
+        v3rho3[4 * g + 1] = 0.0;
+        v3rho3[4 * g + 2] = 0.0;
+        v3rho3[4 * g + 3] = 0.0;
+
+        v3rho2sigma[9 * g + 0] = 0.0;
+        v3rho2sigma[9 * g + 1] = 0.0;
+        v3rho2sigma[9 * g + 2] = 0.0;
+        v3rho2sigma[9 * g + 3] = 0.0;
+        v3rho2sigma[9 * g + 4] = 0.0;
+        v3rho2sigma[9 * g + 5] = 0.0;
+        v3rho2sigma[9 * g + 6] = 0.0;
+        v3rho2sigma[9 * g + 7] = 0.0;
+        v3rho2sigma[9 * g + 8] = 0.0;
+
+        v3rhosigma2[12 * g + 0]  = 0.0;
+        v3rhosigma2[12 * g + 1]  = 0.0;
+        v3rhosigma2[12 * g + 2]  = 0.0;
+        v3rhosigma2[12 * g + 3]  = 0.0;
+        v3rhosigma2[12 * g + 4]  = 0.0;
+        v3rhosigma2[12 * g + 5]  = 0.0;
+        v3rhosigma2[12 * g + 6]  = 0.0;
+        v3rhosigma2[12 * g + 7]  = 0.0;
+        v3rhosigma2[12 * g + 8]  = 0.0;
+        v3rhosigma2[12 * g + 9]  = 0.0;
+        v3rhosigma2[12 * g + 10] = 0.0;
+        v3rhosigma2[12 * g + 11] = 0.0;
+
+        v3sigma3[10 * g + 0] = 0.0;
+        v3sigma3[10 * g + 1] = 0.0;
+        v3sigma3[10 * g + 2] = 0.0;
+        v3sigma3[10 * g + 3] = 0.0;
+        v3sigma3[10 * g + 4] = 0.0;
+        v3sigma3[10 * g + 5] = 0.0;
+        v3sigma3[10 * g + 6] = 0.0;
+        v3sigma3[10 * g + 7] = 0.0;
+        v3sigma3[10 * g + 8] = 0.0;
+        v3sigma3[10 * g + 9] = 0.0;
+    }
+
+    // should we allocate staging buffers? Or can we use the global one?
+    bool alloc = (np > _ldStaging);
+
+    //   stage_exc           (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
+    //   stage_vrho          (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    //   stage_vsigma        (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    //   stage_v2rho2        (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
+    //   stage_v2rhosigma    (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
+    //   stage_v2sigma2      (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
+    auto stage_v3rho3      = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[21 * _ldStaging];
+    auto stage_v3rho2sigma = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[25 * _ldStaging];
+    auto stage_v3rhosigma2 = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[34 * _ldStaging];
+    auto stage_v3sigma3    = (alloc) ? mem::malloc<double>(10 * np) : &_stagingBuffer[46 * _ldStaging];
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        const auto c = xccomp.getScalingFactor();
+
+        auto family = funcptr->info->family;
+
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        {
+            xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
+
+#pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
+                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
+                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
+                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+            }
+        }
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        {
+            xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
+
+#pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, v3rhosigma2, stage_v3rhosigma2, v3sigma3, stage_v3sigma3 : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
+                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
+                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
+                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+
+                v3rho2sigma[9 * g + 0] += c * stage_v3rho2sigma[9 * g + 0];
+                v3rho2sigma[9 * g + 1] += c * stage_v3rho2sigma[9 * g + 1];
+                v3rho2sigma[9 * g + 2] += c * stage_v3rho2sigma[9 * g + 2];
+                v3rho2sigma[9 * g + 3] += c * stage_v3rho2sigma[9 * g + 3];
+                v3rho2sigma[9 * g + 4] += c * stage_v3rho2sigma[9 * g + 4];
+                v3rho2sigma[9 * g + 5] += c * stage_v3rho2sigma[9 * g + 5];
+                v3rho2sigma[9 * g + 6] += c * stage_v3rho2sigma[9 * g + 6];
+                v3rho2sigma[9 * g + 7] += c * stage_v3rho2sigma[9 * g + 7];
+                v3rho2sigma[9 * g + 8] += c * stage_v3rho2sigma[9 * g + 8];
+
+                v3rhosigma2[12 * g + 0] += c * stage_v3rhosigma2[12 * g + 0];
+                v3rhosigma2[12 * g + 1] += c * stage_v3rhosigma2[12 * g + 1];
+                v3rhosigma2[12 * g + 2] += c * stage_v3rhosigma2[12 * g + 2];
+                v3rhosigma2[12 * g + 3] += c * stage_v3rhosigma2[12 * g + 3];
+                v3rhosigma2[12 * g + 4] += c * stage_v3rhosigma2[12 * g + 4];
+                v3rhosigma2[12 * g + 5] += c * stage_v3rhosigma2[12 * g + 5];
+                v3rhosigma2[12 * g + 6] += c * stage_v3rhosigma2[12 * g + 6];
+                v3rhosigma2[12 * g + 7] += c * stage_v3rhosigma2[12 * g + 7];
+                v3rhosigma2[12 * g + 8] += c * stage_v3rhosigma2[12 * g + 8];
+                v3rhosigma2[12 * g + 9] += c * stage_v3rhosigma2[12 * g + 9];
+                v3rhosigma2[12 * g + 10] += c * stage_v3rhosigma2[12 * g + 10];
+                v3rhosigma2[12 * g + 11] += c * stage_v3rhosigma2[12 * g + 11];
+
+                v3sigma3[10 * g + 0] += c * stage_v3sigma3[10 * g + 0];
+                v3sigma3[10 * g + 1] += c * stage_v3sigma3[10 * g + 1];
+                v3sigma3[10 * g + 2] += c * stage_v3sigma3[10 * g + 2];
+                v3sigma3[10 * g + 3] += c * stage_v3sigma3[10 * g + 3];
+                v3sigma3[10 * g + 4] += c * stage_v3sigma3[10 * g + 4];
+                v3sigma3[10 * g + 5] += c * stage_v3sigma3[10 * g + 5];
+                v3sigma3[10 * g + 6] += c * stage_v3sigma3[10 * g + 6];
+                v3sigma3[10 * g + 7] += c * stage_v3sigma3[10 * g + 7];
+                v3sigma3[10 * g + 8] += c * stage_v3sigma3[10 * g + 8];
+                v3sigma3[10 * g + 9] += c * stage_v3sigma3[10 * g + 9];
+            }
+        }
+    }
+
+    if (alloc)
+    {
+        mem::free(stage_v3rho3);
+        mem::free(stage_v3rho2sigma);
+        mem::free(stage_v3rhosigma2);
+        mem::free(stage_v3sigma3);
     }
 }
 
@@ -654,7 +896,7 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
 
@@ -667,7 +909,7 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
@@ -684,7 +926,7 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                 vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
             }
         }
-        else if (family == XC_FAMILY_MGGA)
+        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
         {
             xc_mgga_exc_vxc(funcptr, np, rho, sigma, lapl, tau, stage_exc, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
 

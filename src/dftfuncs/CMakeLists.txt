@@ -1,14 +1,10 @@
 target_sources(vlxobjs
   PRIVATE
-    Becke88Functional.cpp
-    FunctionalParser.cpp
     NewFunctionalParser.cpp
-    LYPFunctional.cpp
     PairDensitySlater.cpp
     PairDensityVWN.cpp
-    PkzbFunctional.cpp
-    SlaterFunctional.cpp
-    VWN3Functional.cpp
+    PairDensityPBE_C.cpp
+    PairDensityPBE_X.cpp
   )
 
 target_include_directories(vlxobjs

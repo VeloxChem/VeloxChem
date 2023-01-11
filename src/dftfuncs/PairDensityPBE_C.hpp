@@ -23,17 +23,23 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef PrimitiveFunctionalTest_hpp
-#define PrimitiveFunctionalTest_hpp
+#ifndef PairDensityPBE_C_hpp
+#define PairDensityPBE_C_hpp
 
-#include "gtest/gtest.h"
+#include <cstdint>
 
-class CPrimitiveFunctionalTest : public ::testing::Test
-{
-protected:
-    CPrimitiveFunctionalTest() {};
-    
-    virtual ~CPrimitiveFunctionalTest() {};
-};
+namespace pdftpbe_c {  // pdftpbe_c namespace
 
-#endif /* PrimitiveFunctionalTest_hpp */
+/**
+ Computes Exc and Vxc Fock for pair-density PBE correlation.
+
+ @param np the number of grid points.
+ @param rho the density.
+ @param exc the functional value.
+ @param vrho the 1st-order functional derivative wrt density.
+ */
+void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
+
+}  // namespace pdftpbe_c
+
+#endif /* PairDensityPBE_C_hpp */

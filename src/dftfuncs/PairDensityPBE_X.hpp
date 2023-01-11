@@ -23,17 +23,23 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef XCGradientGridTest_hpp
-#define XCGradientGridTest_hpp
+#ifndef PairDensityPBE_X_hpp
+#define PairDensityPBE_X_hpp
 
-#include "gtest/gtest.h"
+#include <cstdint>
 
-class CXCGradientGridTest : public ::testing::Test
-{
-protected:
-    CXCGradientGridTest() {};
-    
-    virtual ~CXCGradientGridTest() {};
-};
+namespace pdftpbe_x {  // pdftpbe_x namespace
 
-#endif /* XCGradientGridTest_hpp */
+/**
+ Computes Exc and Vxc Fock for pair-density PBE exchange.
+
+ @param np the number of grid points.
+ @param rho the density.
+ @param exc the functional value.
+ @param vrho the 1st-order functional derivative wrt density.
+ */
+void compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
+
+}  // namespace pdftpbe_x
+
+#endif /* PairDensityPBE_X_hpp */

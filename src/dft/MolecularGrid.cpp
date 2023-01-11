@@ -37,11 +37,8 @@
 
 #include "DenseLinearAlgebra.hpp"
 #include "ErrorHandler.hpp"
-#include "FunctionalParser.hpp"
 #include "GridPartitioner.hpp"
 #include "GtoContainer.hpp"
-#include "GtoFunc.hpp"
-#include "XCVarsType.hpp"
 
 CMolecularGrid::CMolecularGrid()
 
@@ -239,27 +236,8 @@ CMolecularGrid::getWeights()
 }
 
 void
-CMolecularGrid::distribute(int32_t rank, int32_t nodes, MPI_Comm comm)
-{
-    std::string errpartitioned("MolecularGrid.distribute: Cannot distribute partitioned molecular grid");
-
-    errors::assertMsgCritical(!_isPartitioned, errpartitioned);
-
-    if (!_isDistributed)
-    {
-        _isDistributed = true;
-
-        _gridPoints.scatter(rank, nodes, comm);
-    }
-}
-
-void
 CMolecularGrid::broadcast(int32_t rank, MPI_Comm comm)
 {
-    std::string errpartitioned("MolecularGrid.broadcast: Cannot broadcast partitioned molecular grid");
-
-    errors::assertMsgCritical(!_isPartitioned, errpartitioned);
-
     _gridPoints.broadcast(rank, comm);
 }
 
@@ -497,7 +475,7 @@ CMolecularGrid::partitionGridPoints()
 void
 CMolecularGrid::distributeCountsAndDisplacements(int32_t rank, int32_t nodes, MPI_Comm comm)
 {
-    std::string errnotpartitioned("MolecularGrid.distributeCountsAndDisplacements: Cannot broadcast unpartitioned molecular grid");
+    std::string errnotpartitioned("MolecularGrid.distributeCountsAndDisplacements: Cannot distribute unpartitioned molecular grid");
 
     errors::assertMsgCritical(_isPartitioned, errnotpartitioned);
 
@@ -596,6 +574,8 @@ operator<<(std::ostream& output, const CMolecularGrid& source)
     output << std::endl;
     
     output << "[CMolecularGrid (Object):" << &source << "]" << std::endl;
+
+    output << "_isPartitioned: " << source._isPartitioned << std::endl;
 
     output << "_isDistributed: " << source._isDistributed << std::endl;
 

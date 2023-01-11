@@ -25,6 +25,7 @@
 
 #include "PairDensitySlater.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -73,9 +74,9 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double zeta = delta / density;
 
-            double fxa = std::pow(1 + zeta, fourthird);
+            double fxa = std::pow(1.0 + zeta, fourthird);
 
-            double fxb = std::pow(1 - zeta, fourthird);
+            double fxb = std::pow(std::max(1.0 - zeta, 0.0), fourthird);
 
             f_zeta = fxa + fxb;
         }
@@ -84,11 +85,11 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
         {
             double delta = sqrt(2.0 * pair_density);
 
-            double zeta = delta / density;
+            double eta = delta / density;
 
-            double r = sqrt(1.0 + std::pow(zeta, 2));
+            double r = sqrt(1.0 + std::pow(eta, 2));
 
-            double theta = 4.0 / 3.0 * std::atan(zeta);
+            double theta = 4.0 / 3.0 * std::atan(eta);
 
             f_zeta = 2.0 * std::pow(r, 4.0 / 3.0) * std::cos(theta);
         }
