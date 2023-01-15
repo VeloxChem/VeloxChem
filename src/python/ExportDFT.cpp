@@ -380,6 +380,32 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a,
              "quadMode"_a)
+        .def("integrate_lxc_fock",
+             &CXCNewIntegrator::integrateLxcFock,
+             "Integrates 4rd-order exchange-correlation contribution to Fock matrix.",
+             "aoFockMatrix"_a,
+             "molecule"_a,
+             "basis"_a,
+             "rwDensityMatrix"_a,
+             "rw2DensityMatrix"_a,
+             "rw3DensityMatrix"_a,
+             "gsDensityMatrix"_a,
+             "molecularGrid"_a,
+             "xcFuncLabel"_a,
+             "cubeMode"_a)
+        .def("integrate_kxclxc_fock",
+             &CXCNewIntegrator::integrateKxcLxcFock,
+             "Integrates 4rd-order exchange-correlation contribution to Fock matrix.",
+             "aoFockMatrix"_a,
+             "molecule"_a,
+             "basis"_a,
+             "rwDensityMatrix"_a,
+             "rw2DensityMatrix"_a,
+             "rw3DensityMatrix"_a,
+             "gsDensityMatrix"_a,
+             "molecularGrid"_a,
+             "xcFuncLabel"_a,
+             "cubeMode"_a)
         .def("integrate_vxc_pdft", &integrate_vxc_pdft)
         .def(
             "compute_gto_values",

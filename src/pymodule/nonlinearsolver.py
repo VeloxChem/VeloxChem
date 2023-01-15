@@ -93,9 +93,9 @@ class NonLinearSolver:
         self.batch_size = None
 
         # dft
+        self._dft = False
         self.xcfun = None
         self.grid_level = 4
-        self._dft = False
 
         # polarizable embedding
         self.potfile = None
@@ -374,6 +374,7 @@ class NonLinearSolver:
                        dft_dict,
                        first_order_dens,
                        second_order_dens,
+                       third_oder_dens,
                        mode,
                        profiler=None):
         """
@@ -406,7 +407,7 @@ class NonLinearSolver:
 
         f_total = self._comp_two_el_int(mo, molecule, ao_basis, dft_dict,
                                         first_order_dens, second_order_dens,
-                                        mode, profiler)
+                                        third_oder_dens, mode, profiler)
         nrows = f_total.data.shape[0]
         half_ncols = f_total.data.shape[1] // 2
         ff_data = np.zeros((nrows, half_ncols), dtype='complex128')
@@ -427,10 +428,12 @@ class NonLinearSolver:
                          dft_dict,
                          first_order_dens,
                          second_order_dens,
+                         third_order_dens,
                          mode,
                          profiler=None):
         """
-        Computes the two-electron part of the Fock matix in MO basis.
+        Computes the two-electron (HF) and Vxc part of the two and three-time
+        perturbed Fock matrices.
 
         :param mo:
             The MO coefficients
@@ -441,11 +444,13 @@ class NonLinearSolver:
         :param dft_dict:
             The dictionary containing DFT information
         :param first_order_dens:
-            A list of first order densitiy matrices
+            A list of first-order densitiy matrices
         :param second_order_dens:
-            A list of second order densitiy matrices
+            A list of second-order densitiy matrices
+        :param third_order_dens:
+            A list of third-order densitiy matrices
         :param mode:
-            The mode for densities in quadratic response
+            The mode for densities in quadratic/cubic response
         :param profiler:
             The profiler.
 
@@ -461,11 +466,29 @@ class NonLinearSolver:
         screening = eri_driver.compute(get_qq_scheme(self.qq_type),
                                        self.eri_thresh, molecule, ao_basis)
 
+        # sanity check
+
+        mode_is_valid = mode.lower() in [
+            'crf', 'tpa', 'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf',
+            'shg', 'shg_red'
+        ]
+        assert_msg_critical(mode_is_valid,
+                            'NonlinearSolver: invalid mode ' + mode.lower())
+
+        mode_is_cubic = mode.lower() in ['crf', 'tpa']
+        mode_is_quadratic = mode.lower() in [
+            'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg', 'shg_red'
+        ]
+
         # determine number of batches
 
         if self.rank == mpi_master():
-            n_total = len(second_order_dens)
-            n_ao = second_order_dens[0].shape[0]
+            if mode_is_cubic:
+                n_total = len(third_order_dens)
+                n_ao = third_order_dens[0].shape[0]
+            elif mode_is_quadratic:
+                n_total = len(second_order_dens)
+                n_ao = second_order_dens[0].shape[0]
             norb = mo.shape[1]
         else:
             n_total = None
@@ -477,13 +500,50 @@ class NonLinearSolver:
         # double-check batch size for DFT
 
         if self._dft:
-            if self.rank == mpi_master():
-                num_1 = len(first_order_dens)
-                num_2 = len(second_order_dens)
 
-                if mode.lower() == 'shg':
-                    # 6 first-order densities
-                    # 12 second-order densities
+            if self.rank == mpi_master():
+
+                if mode.lower() == 'crf':
+                    # 6 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    # 2 third-order densities per frequency
+                    size_1, size_2, size_3 = 6, 6, 2
+
+                elif mode.lower() == 'tpa':
+                    # 12 first-order densities per frequency
+                    # 24 second-order densities per frequency
+                    # 6 third-order densities per frequency
+                    size_1, size_2, size_3 = 12, 24, 6
+
+                elif mode.lower() == 'crf_ii':
+                    # 12 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    size_1, size_2 = 12, 2
+
+                elif mode.lower() == 'tpa_ii':
+                    # 36 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    size_1, size_2 = 36, 6
+
+                elif mode.lower() == 'redtpa_i':
+                    # 36 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    size_1, size_2 = 6, 6
+
+                elif mode.lower() == 'redtpa_ii':
+                    # 36 first-order densities per frequency
+                    # 6 second-order densities per frequency
+                    size_1, size_2 = 18, 6
+
+                elif mode.lower() == 'qrf':
+                    # 4 first-order densities per frequency
+                    # 2 second-order densities per frequency
+                    # see get_densities in quadraticresponsedriver
+                    size_1, size_2 = 4, 2
+
+                elif mode.lower() == 'shg':
+                    # 6 first-order densities per frequency
+                    # 12 second-order densities per frequency
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 12
 
@@ -493,83 +553,178 @@ class NonLinearSolver:
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 6
 
-                elif mode.lower() == 'qrf':
-                    # 4 first-order densities
-                    # 2 second-order densities
-                    # see get_densities in quadraticresponsedriver
-                    size_1, size_2 = 4, 2
+                if mode_is_cubic:
+                    batch_size = max((batch_size // size_3) * size_3, size_3)
+                    batch_size_second_order = (batch_size // size_3) * size_2
+                    batch_size_first_order = (batch_size // size_3) * size_1
 
-                condition = ((num_1 % size_1 == 0) and (num_2 % size_2 == 0) and
-                             (num_1 // size_1 == num_2 // size_2))
+                    num_1 = len(first_order_dens)
+                    num_2 = len(second_order_dens)
+                    num_3 = len(third_order_dens)
 
-                batch_size = max((batch_size // size_2) * size_2, size_2)
+                    condition = ((num_1 % size_1 == 0) and
+                                 (num_2 % size_2 == 0) and
+                                 (num_3 % size_3 == 0) and
+                                 (num_1 // size_1 == num_3 // size_3) and
+                                 (num_2 // size_2 == num_3 // size_3))
 
-                batch_size_first_order = (batch_size // size_2) * size_1
+                elif mode_is_quadratic:
+                    batch_size = max((batch_size // size_2) * size_2, size_2)
+                    batch_size_first_order = (batch_size // size_2) * size_1
 
-                errmsg = 'NonLinearSolver._comp_nlr_fock: '
+                    num_1 = len(first_order_dens)
+                    num_2 = len(second_order_dens)
+
+                    condition = ((num_1 % size_1 == 0) and
+                                 (num_2 % size_2 == 0) and
+                                 (num_1 // size_1 == num_2 // size_2))
+
+                errmsg = 'NonLinearSolver: '
                 errmsg += f'inconsistent number of density matrices (mode={mode})'
                 assert_msg_critical(condition, errmsg)
+
             else:
                 batch_size = None
                 batch_size_first_order = None
+                batch_size_second_order = None
+
             batch_size = self.comm.bcast(batch_size, root=mpi_master())
-            batch_size_first_order = self.comm.bcast(batch_size_first_order,
-                                                     root=mpi_master())
             num_batches = get_number_of_batches(n_total, batch_size, self.comm)
 
         # go through batches
 
         dist_fabs = None
+        dist_fabs_2 = None
+        dist_fabs_3 = None
 
-        if self.rank == mpi_master():
-            batch_str = 'Processing Fock builds...'
-            batch_str += ' (batch size: {:d})'.format(batch_size)
-            self.ostream.print_info(batch_str)
+        batch_str = 'Processing Fock builds...'
+        batch_str += ' (batch size: {:d})'.format(batch_size)
+        self.ostream.print_info(batch_str)
 
         for batch_ind in range(num_batches):
 
-            if self.rank == mpi_master():
-                self.ostream.print_info('  batch {}/{}'.format(
-                    batch_ind + 1, num_batches))
-                self.ostream.flush()
-
-            # form density matrices
+            self.ostream.print_info('  batch {}/{}'.format(
+                batch_ind + 1, num_batches))
+            self.ostream.flush()
 
             if self.rank == mpi_master():
+
+                batch_start = batch_size * batch_ind
+                batch_end = min(batch_start + batch_size, n_total)
+
                 if self._dft:
+
+                    # DFT on MPI master process
+
                     batch_start_first_order = batch_size_first_order * batch_ind
                     batch_end_first_order = min(
                         batch_start_first_order + batch_size_first_order,
                         len(first_order_dens))
 
+                    # One, two and three-time perturbed Fock matrices all use
+                    # one-time perturbed densities
+
                     dts1 = [
                         np.ascontiguousarray(dab) for dab in first_order_dens[
                             batch_start_first_order:batch_end_first_order]
                     ]
-
                     dens1 = AODensityMatrix(dts1, denmat.rest)
 
-                batch_start = batch_size * batch_ind
-                batch_end = min(batch_start + batch_size, n_total)
+                    if mode_is_quadratic:
 
-                dts2 = [
-                    np.ascontiguousarray(dab)
-                    for dab in second_order_dens[batch_start:batch_end]
-                ]
+                        # If computing two-time perturbed Fock matrices (DFT)
+                        # then include first and second-order perturbed
+                        # densities
 
-                dens2 = AODensityMatrix(dts2, denmat.rest)
+                        dts2 = [
+                            np.ascontiguousarray(dab)
+                            for dab in second_order_dens[batch_start:batch_end]
+                        ]
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
+                        dens_for_fock = dens2
+
+                    elif mode_is_cubic:
+
+                        # If computing three-time perturbed Fock matrices (DFT)
+                        # then include first, second and third-order perturbed
+                        # densities
+
+                        batch_start_second_order = batch_size_second_order * batch_ind
+                        batch_end_second_order = min(
+                            batch_start_second_order + batch_size_second_order,
+                            len(second_order_dens))
+
+                        dts2 = [
+                            np.ascontiguousarray(dab)
+                            for dab in second_order_dens[
+                                batch_start_second_order:batch_end_second_order]
+                        ]
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
+
+                        dts3 = [
+                            np.ascontiguousarray(dab)
+                            for dab in third_order_dens[batch_start:batch_end]
+                        ]
+                        dens3 = AODensityMatrix(dts3, denmat.rest)
+
+                        # TODO separate dens2 and dens3 from dens_for_fock
+
+                        dens23 = AODensityMatrix(dts2 + dts3, denmat.rest)
+                        dens_for_fock = dens23
+
+                else:
+
+                    # Hartree-Fock on MPI master process
+
+                    if mode_is_quadratic:
+
+                        # If computing two-time perturbed Fock matrices at HF
+                        # level only second-order perturbed densities are
+                        # needed
+
+                        dts2 = [
+                            np.ascontiguousarray(dab)
+                            for dab in second_order_dens[batch_start:batch_end]
+                        ]
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
+                        dens_for_fock = dens2
+
+                    elif mode_is_cubic:
+
+                        # If computing three-time perturbed Fock matrices at HF
+                        # level only third-order perturbed densities are needed
+
+                        dts3 = [
+                            np.ascontiguousarray(dab)
+                            for dab in third_order_dens[batch_start:batch_end]
+                        ]
+                        dens3 = AODensityMatrix(dts3, denmat.rest)
+                        dens_for_fock = dens3
+
             else:
-                if self._dft:
-                    dens1 = AODensityMatrix()
+                # DFT or Hartree-Fock on non-master processes
+                dens1 = AODensityMatrix()
                 dens2 = AODensityMatrix()
+                dens3 = AODensityMatrix()
+                dens_for_fock = AODensityMatrix()
+
+            # broadcast densities
+
+            dens_for_fock.broadcast(self.rank, self.comm)
+            fock = AOFockMatrix(dens_for_fock)
 
             if self._dft:
-                dens1.broadcast(self.rank, self.comm)
-            dens2.broadcast(self.rank, self.comm)
+                if mode_is_quadratic:
+                    dens1.broadcast(self.rank, self.comm)
+                    dens2 = dens_for_fock
+                elif mode_is_cubic:
+                    dens1.broadcast(self.rank, self.comm)
+                    dens2.broadcast(self.rank, self.comm)
+                    dens3.broadcast(self.rank, self.comm)
 
-            fock = AOFockMatrix(dens2)
+            # set Fock type (including scaling factor)
+
             fock_flag = fockmat.rgenjk
-
             if self._dft:
                 if self.xcfun.is_hybrid():
                     fock_flag = fockmat.rgenjkx
@@ -584,7 +739,13 @@ class NonLinearSolver:
 
             t0 = tm.time()
 
-            eri_driver.compute(fock, dens2, molecule, ao_basis, screening)
+            # compute HF contribution to perturbed Fock matrices
+
+            eri_driver.compute(fock, dens_for_fock, molecule, ao_basis,
+                               screening)
+
+            # scale Fock for non-hybrid functional
+
             if self._dft and not self.xcfun.is_hybrid():
                 for ifock in range(fock.number_of_fock_matrices()):
                     fock.scale(2.0, ifock)
@@ -599,14 +760,29 @@ class NonLinearSolver:
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 
-                xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
-                                          dens2, gs_density, molgrid,
-                                          self.xcfun.get_func_label(), mode)
+                molgrid.partition_grid_points()
+                molgrid.distribute_counts_and_displacements(
+                    self.rank, self.nodes, self.comm)
+
+                if mode_is_quadratic:
+                    # Compute XC contribution to two-time transformed Fock matrics
+                    xc_drv.integrate_kxc_fock(fock, molecule, ao_basis, dens1,
+                                              dens2, gs_density, molgrid,
+                                              self.xcfun.get_func_label(), mode)
+                elif mode_is_cubic:
+                    # Compute XC contribution to three-time transformed Fock matrics
+                    xc_drv.integrate_kxclxc_fock(fock, molecule, ao_basis,
+                                                 dens1, dens2, dens3,
+                                                 gs_density, molgrid,
+                                                 self.xcfun.get_func_label(),
+                                                 mode)
 
                 if profiler is not None:
                     profiler.add_timing_info('FockXC', tm.time() - t0)
 
             fock.reduce_sum(self.rank, self.nodes, self.comm)
+
+            # AO-to-MO transformation
 
             t0 = tm.time()
 
@@ -622,14 +798,48 @@ class NonLinearSolver:
             if profiler is not None:
                 profiler.add_timing_info('AOtoMO', tm.time() - t0)
 
-            dist_fock_mo = DistributedArray(fock_mo, self.comm)
+            # keep track of Fock matrices
 
-            if dist_fabs is None:
-                dist_fabs = DistributedArray(dist_fock_mo.data,
-                                             self.comm,
-                                             distribute=False)
+            if self._dft and mode_is_cubic:
+                if self.rank == mpi_master():
+                    fock_mo_2 = fock_mo[:, :len(dts2)]
+                    fock_mo_3 = fock_mo[:, len(dts2):]
+                else:
+                    fock_mo_2 = None
+                    fock_mo_3 = None
+
+                dist_fock_mo_2 = DistributedArray(fock_mo_2, self.comm)
+                dist_fock_mo_3 = DistributedArray(fock_mo_3, self.comm)
+
+                if dist_fabs_2 is None:
+                    dist_fabs_2 = DistributedArray(dist_fock_mo_2.data,
+                                                   self.comm,
+                                                   distribute=False)
+                else:
+                    dist_fabs_2.append(dist_fock_mo_2, axis=1)
+
+                if dist_fabs_3 is None:
+                    dist_fabs_3 = DistributedArray(dist_fock_mo_3.data,
+                                                   self.comm,
+                                                   distribute=False)
+                else:
+                    dist_fabs_3.append(dist_fock_mo_3, axis=1)
+
             else:
-                dist_fabs.append(dist_fock_mo, axis=1)
+                dist_fock_mo = DistributedArray(fock_mo, self.comm)
+
+                if dist_fabs is None:
+                    dist_fabs = DistributedArray(dist_fock_mo.data,
+                                                 self.comm,
+                                                 distribute=False)
+                else:
+                    dist_fabs.append(dist_fock_mo, axis=1)
+
+        if self._dft and mode_is_cubic:
+            dist_fabs = DistributedArray(dist_fabs_2.data,
+                                         self.comm,
+                                         distribute=False)
+            dist_fabs.append(dist_fabs_3, axis=1)
 
         self.ostream.print_blank()
 
@@ -967,7 +1177,7 @@ class NonLinearSolver:
         A3NxNy_c = self.complex_lrmat2vec(A3NxNy, nocc, norb)
         return -(1. / 6) * A3NxNy_c
 
-    def _zi(self, kB, kC, kD, Fc, Fd, Fbc, Fcb, F0):
+    def _zi(self, kB, kC, kD, Fc, Fd, Fbc, F0):
         """
         Returns a matrix used for the E[4] contraction
 
@@ -988,7 +1198,7 @@ class NonLinearSolver:
         M1 = self.commut(kC, self.commut(kD, F0) + 3 * Fd)
         M2 = self.commut(kD, self.commut(kC, F0) + 3 * Fc)
 
-        return (self.commut(kB, M1 + M2 + 3 * (Fbc + Fcb)))
+        return (self.commut(kB, M1 + M2 + 3 * Fbc))
 
     @staticmethod
     def anti_sym(vec):

@@ -3139,7 +3139,7 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
         // pointers to perturbed density gradient norms
 
-        auto rhow1a = rwdengridquad.rhow1rhow2(0);
+        auto rhow1a = rwdengridquad.gam(0);
 
         // Note: rw2DensityMatrix is zero in KxcGradientForLDA
         // auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
@@ -3651,23 +3651,23 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         // pointers to perturbed densities
 
-        auto rhow1rhow2 = rwdengridquad.rhow1rhow2(0);
+        auto rhow1rhow2 = rwdengridquad.gam(0);
 
-        auto rxw1rhow2 = rwdengridquad.rxw1rhow2(0);
-        auto ryw1rhow2 = rwdengridquad.ryw1rhow2(0);
-        auto rzw1rhow2 = rwdengridquad.rzw1rhow2(0);
+        auto rxw1rhow2 = rwdengridquad.gamX(0);
+        auto ryw1rhow2 = rwdengridquad.gamY(0);
+        auto rzw1rhow2 = rwdengridquad.gamZ(0);
 
-        auto rxw1rxw2 = rwdengridquad.rxw1rxw2(0);
-        auto rxw1ryw2 = rwdengridquad.rxw1ryw2(0);
-        auto rxw1rzw2 = rwdengridquad.rxw1rzw2(0);
+        auto rxw1rxw2 = rwdengridquad.gamXX(0);
+        auto rxw1ryw2 = rwdengridquad.gamXY(0);
+        auto rxw1rzw2 = rwdengridquad.gamXZ(0);
 
-        auto ryw1rxw2 = rwdengridquad.ryw1rxw2(0);
-        auto ryw1ryw2 = rwdengridquad.ryw1ryw2(0);
-        auto ryw1rzw2 = rwdengridquad.ryw1rzw2(0);
+        auto ryw1rxw2 = rwdengridquad.gamYX(0);
+        auto ryw1ryw2 = rwdengridquad.gamYY(0);
+        auto ryw1rzw2 = rwdengridquad.gamYZ(0);
 
-        auto rzw1rxw2 = rwdengridquad.rzw1rxw2(0);
-        auto rzw1ryw2 = rwdengridquad.rzw1ryw2(0);
-        auto rzw1rzw2 = rwdengridquad.rzw1rzw2(0);
+        auto rzw1rxw2 = rwdengridquad.gamZX(0);
+        auto rzw1ryw2 = rwdengridquad.gamZY(0);
+        auto rzw1rzw2 = rwdengridquad.gamZZ(0);
 
         // Note: rw2DensityMatrix is zero in KxcGradientForGGA
         // auto rhow12a = rw2DensityGrid.alphaDensity(iFock);

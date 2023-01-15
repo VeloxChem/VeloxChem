@@ -315,14 +315,67 @@ class CXCNewFunctional
      * [(0,0,0,0), (0,0,0,1), (0,0,0,2), (0,0,1,1), (0,0,1,2), (0,0,2,2),
      *  (0,1,0,0), (0,1,0,1), (0,1,0,2), (0,1,1,1), (0,1,1,2), (0,1,2,2),
      *  (1,1,0,0), (1,1,0,1), (1,1,0,2), (1,1,1,1), (1,1,1,2), (1,1,2,2)]
+     *  v4rho2sigma2_aaaa (0,0,0,0)
+     *  v4rho2sigma2_aaac (0,0,0,1)
+     *  v4rho2sigma2_aaab (0,0,0,2)
+     *  v4rho2sigma2_aacc (0,0,1,1)
+     *  v4rho2sigma2_aacb (0,0,1,2)
+     *  v4rho2sigma2_aabb (0,0,2,2)
+     *  v4rho2sigma2_abaa (0,1,0,0)
+     *  v4rho2sigma2_abac (0,1,0,1)
+     *  v4rho2sigma2_abab (0,1,0,2)
+     *  v4rho2sigma2_abcc (0,1,1,1)
+     *  v4rho2sigma2_abcb (0,1,1,2)
+     *  v4rho2sigma2_acbb (0,1,2,2)
+     *  v4rho2sigma2_bbaa (1,1,0,0)
+     *  v4rho2sigma2_bbac (1,1,0,1)
+     *  v4rho2sigma2_bbab (1,1,0,2)
+     *  v4rho2sigma2_bbcc (1,1,1,1)
+     *  v4rho2sigma2_bbcb (1,1,1,2)
+     *  v4rho2sigma2_bbbb (1,1,2,2)
      * @param[in,out] v4rhosigma3 values of the fourth derivative of the
      * exchange-correlation kernel wrt contracted gradients. Size: 20*np, order:
      * [(0,0,0,0),(0,0,0,1),(0,0,0,2),(0,0,1,1),(0,0,1,2),(0,0,2,2),(0,1,1,1),(0,1,1,2),(0,1,2,2),(0,2,2,2),
      *  (1,0,0,0),(1,0,0,1),(1,0,0,2),(1,0,1,1),(1,0,1,2),(1,0,2,2),(1,1,1,1),(1,1,1,2),(1,1,2,2),(1,2,2,2)]
+     * v4rhosigma3_aaaa (0,0,0,0)
+     * v4rhosigma3_aaac (0,0,0,1)
+     * v4rhosigma3_aaab (0,0,0,2)
+     * v4rhosigma3_aacc (0,0,1,1)
+     * v4rhosigma3_aacb (0,0,1,2)
+     * v4rhosigma3_aabb (0,0,2,2)
+     * v4rhosigma3_accc (0,1,1,1)
+     * v4rhosigma3_accb (0,1,1,2)
+     * v4rhosigma3_acbb (0,1,2,2)
+     * v4rhosigma3_abbb (0,2,2,2)
+     * v4rhosigma3_baaa (1,0,0,0)
+     * v4rhosigma3_baac (1,0,0,1)
+     * v4rhosigma3_baab (1,0,0,2)
+     * v4rhosigma3_bacc (1,0,1,1)
+     * v4rhosigma3_bacb (1,0,1,2)
+     * v4rhosigma3_babb (1,0,2,2)
+     * v4rhosigma3_bbcc (1,1,1,1)
+     * v4rhosigma3_bbcb (1,1,1,2)
+     * v4rhosigma3_bbbb (1,1,2,2)
+     * v4rhosigma3_bbbb (1,2,2,2)
      * @param[in,out] v4sigma4 values of the fourth derivative of the
      * exchange-correlation kernel wrt contracted gradients. Size: 15*np, order:
      * [(0,0,0,0),(0,0,0,1),(0,0,0,2),(0,0,1,1),(0,0,1,2),(0,0,2,2),(0,1,1,1),(0,1,1,2),
      *  (0,1,2,2),(0,2,2,2),(1,1,1,1),(1,1,1,2),(1,1,2,2),(1,2,2,2),(2,2,2,2)]
+     * v4sigma4_aaaa (0,0,0,0)
+     * v4sigma4_aaac (0,0,0,1)
+     * v4sigma4_aaab (0,0,0,2)
+     * v4sigma4_aacc (0,0,1,1)
+     * v4sigma4_aacb (0,0,1,2)
+     * v4sigma4_aabb (0,0,2,2)
+     * v4sigma4_accc (0,1,1,1)
+     * v4sigma4_accb (0,1,1,2)
+     * v4sigma4_acbb (0,1,2,2)
+     * v4sigma4_abbb (0,2,2,2)
+     * v4sigma4_cccc (1,1,1,1)
+     * v4sigma4_cccb (1,1,1,2)
+     * v4sigma4_ccbb (1,1,2,2)
+     * v4sigma4_cbbb (1,2,2,2)
+     * v4sigma4_bbbb (2,2,2,2)
      *
      * @note Wrapper to `xc_gga_lxc`
      */
@@ -366,6 +419,36 @@ class CXCNewFunctional
                                   double*       vsigma,
                                   double*       vlapl,
                                   double*       vtau) const -> void;
+
+    /**@{ metaGGA computational functions. These are wrappers around `xc_mgga_*` functions in LibXC. */
+    /** Computes values and first derivative of metaGGA exchange-correlation functional on grid.
+     *
+     * @param[in] np number of grid points.
+     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
+     * @param[in] sigma values of the contracted gradient of density at grid points. Order: [(0, 0), (0, 1), (1, 1)].
+     * @param[in] lapl values of the density Laplacian at grid points. Order: [(0), (1)].
+     * @param[in] tau values of the kinetic energy density at grid points. Order: [(0), (1)].
+     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
+     * @param[in,out] vrho values of the first derivative of the
+     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
+     * @param[in,out] vsigma values of the first derivative of the
+     * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
+     * @param[in,out] vlapl values of the first derivative of the
+     * exchange-correlation kernel wrt density Laplacian. Size: 2*np, order: [(0), (1)].
+     * @param[in,out] vtau alues of the first derivative of the
+     * exchange-correlation kernel wrt kinetic energy density. Size: 2*np, order: [(0), (1)].
+     *
+     * @note Wrapper to `xc_lda_exc_vxc`, `xc_gga_exc_vxc` and `xc_mgga_exc_vxc`
+     */
+    auto compute_vxc_for_mgga(int32_t       np,
+                              const double* rho,
+                              const double* sigma,
+                              const double* lapl,
+                              const double* tau,
+                              double*       vrho,
+                              double*       vsigma,
+                              double*       vlapl,
+                              double*       vtau) const -> void;
 
     /** Computes second derivative of metaGGA exchange-correlation functional on grid.
      *

@@ -103,7 +103,11 @@ class TpaFullDriver(TpaDriver):
             A list of tranformed compounded densities
         """
 
-        density_list = []
+        density_list1 = []
+        density_list2 = []
+        density_list3 = []
+
+        one_third = 1.0 / 3.0
 
         for w in wi:
 
@@ -133,13 +137,13 @@ class TpaFullDriver(TpaDriver):
             Dyy = self.commut(ky, Dy)
             Dzz = self.commut(kz, Dz)
 
-            D_sig_xx = 2 * (3 * Dxx + Dyy + Dzz)
-            D_sig_yy = 2 * (Dxx + 3 * Dyy + Dzz)
-            D_sig_zz = 2 * (Dxx + Dyy + 3 * Dzz)
+            D_sig_xx = 6 * (3 * Dxx + Dyy + Dzz)
+            D_sig_yy = 6 * (Dxx + 3 * Dyy + Dzz)
+            D_sig_zz = 6 * (Dxx + Dyy + 3 * Dzz)
 
-            D_sig_xy = 2 * (self.commut(ky, Dx) + self.commut(kx, Dy))
-            D_sig_xz = 2 * (self.commut(kx, Dz) + self.commut(kz, Dx))
-            D_sig_yz = 2 * (self.commut(ky, Dz) + self.commut(kz, Dy))
+            D_sig_xy = 6 * (self.commut(ky, Dx) + self.commut(kx, Dy))
+            D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
+            D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
             # λ+τ terms #
 
@@ -147,43 +151,51 @@ class TpaFullDriver(TpaDriver):
             Dyy = self.commut(ky_, Dy) + self.commut(ky, Dy_)
             Dzz = self.commut(kz_, Dz) + self.commut(kz, Dz_)
 
-            D_lamtau_xx = 2 * (3 * Dxx + Dyy + Dzz)
-            D_lamtau_yy = 2 * (Dxx + 3 * Dyy + Dzz)
-            D_lamtau_zz = 2 * (Dxx + Dyy + 3 * Dzz)
+            D_lamtau_xx = 6 * (3 * Dxx + Dyy + Dzz)
+            D_lamtau_yy = 6 * (Dxx + 3 * Dyy + Dzz)
+            D_lamtau_zz = 6 * (Dxx + Dyy + 3 * Dzz)
 
-            D_lamtau_xy = 2 * (self.commut(ky_, Dx) + self.commut(kx_, Dy))
-            D_lamtau_xy += 2 * (self.commut(ky, Dx_) + self.commut(kx, Dy_))
+            D_lamtau_xy = 6 * (self.commut(ky_, Dx) + self.commut(kx_, Dy))
+            D_lamtau_xy += 6 * (self.commut(ky, Dx_) + self.commut(kx, Dy_))
 
-            D_lamtau_xz = 2 * (self.commut(kx_, Dz) + self.commut(kz_, Dx))
-            D_lamtau_xz += 2 * (self.commut(kx, Dz_) + self.commut(kz, Dx_))
+            D_lamtau_xz = 6 * (self.commut(kx_, Dz) + self.commut(kz_, Dx))
+            D_lamtau_xz += 6 * (self.commut(kx, Dz_) + self.commut(kz, Dx_))
 
-            D_lamtau_yz = 2 * (self.commut(ky_, Dz) + self.commut(kz_, Dy))
-            D_lamtau_yz += 2 * (self.commut(ky, Dz_) + self.commut(kz, Dy_))
+            D_lamtau_yz = 6 * (self.commut(ky_, Dz) + self.commut(kz_, Dy))
+            D_lamtau_yz += 6 * (self.commut(ky, Dz_) + self.commut(kz, Dy_))
 
             # Create first order three indexed Densities #
 
-            D_lam_sig_tau_x = (self.commut(kx_, D_sig_xx) +
-                               self.commut(ky_, D_sig_xy) +
-                               self.commut(kz_, D_sig_xz))
-            D_lam_sig_tau_x += (self.commut(kx, D_lamtau_xx) +
-                                self.commut(ky, D_lamtau_xy) +
-                                self.commut(kz, D_lamtau_xz))
+            D_lam_sig_tau_x = (self.commut(kx_, one_third * D_sig_xx) +
+                               self.commut(ky_, one_third * D_sig_xy) +
+                               self.commut(kz_, one_third * D_sig_xz))
 
-            D_lam_sig_tau_y = (self.commut(kx_, D_sig_xy) +
-                               self.commut(ky_, D_sig_yy) +
-                               self.commut(kz_, D_sig_yz))
-            D_lam_sig_tau_y += (self.commut(kx, D_lamtau_xy) +
-                                self.commut(ky, D_lamtau_yy) +
-                                self.commut(kz, D_lamtau_yz))
+            D_lam_sig_tau_x += (self.commut(kx, one_third * D_lamtau_xx) +
+                                self.commut(ky, one_third * D_lamtau_xy) +
+                                self.commut(kz, one_third * D_lamtau_xz))
 
-            D_lam_sig_tau_z = (self.commut(kx_, D_sig_xz) +
-                               self.commut(ky_, D_sig_yz) +
-                               self.commut(kz_, D_sig_zz))
-            D_lam_sig_tau_z += (self.commut(kx, D_lamtau_xz) +
-                                self.commut(ky, D_lamtau_yz) +
-                                self.commut(kz, D_lamtau_zz))
+            D_lam_sig_tau_y = (self.commut(kx_, one_third * D_sig_xy) +
+                               self.commut(ky_, one_third * D_sig_yy) +
+                               self.commut(kz_, one_third * D_sig_yz))
+            D_lam_sig_tau_y += (self.commut(kx, one_third * D_lamtau_xy) +
+                                self.commut(ky, one_third * D_lamtau_yy) +
+                                self.commut(kz, one_third * D_lamtau_yz))
+
+            D_lam_sig_tau_z = (self.commut(kx_, one_third * D_sig_xz) +
+                               self.commut(ky_, one_third * D_sig_yz) +
+                               self.commut(kz_, one_third * D_sig_zz))
+            D_lam_sig_tau_z += (self.commut(kx, one_third * D_lamtau_xz) +
+                                self.commut(ky, one_third * D_lamtau_yz) +
+                                self.commut(kz, one_third * D_lamtau_zz))
 
             # density transformation from MO to AO basis
+
+            Dx = np.linalg.multi_dot([mo, Dx, mo.T])
+            Dy = np.linalg.multi_dot([mo, Dy, mo.T])
+            Dz = np.linalg.multi_dot([mo, Dz, mo.T])
+            Dx_ = np.linalg.multi_dot([mo, Dx_, mo.T])
+            Dy_ = np.linalg.multi_dot([mo, Dy_, mo.T])
+            Dz_ = np.linalg.multi_dot([mo, Dz_, mo.T])
 
             D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
             D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
@@ -205,40 +217,56 @@ class TpaFullDriver(TpaDriver):
             D_lam_sig_tau_y = np.linalg.multi_dot([mo, D_lam_sig_tau_y, mo.T])
             D_lam_sig_tau_z = np.linalg.multi_dot([mo, D_lam_sig_tau_z, mo.T])
 
-            density_list.append(D_sig_xx.real)
-            density_list.append(D_sig_xx.imag)
-            density_list.append(D_sig_yy.real)
-            density_list.append(D_sig_yy.imag)
-            density_list.append(D_sig_zz.real)
-            density_list.append(D_sig_zz.imag)
-            density_list.append(D_sig_xy.real)
-            density_list.append(D_sig_xy.imag)
-            density_list.append(D_sig_xz.real)
-            density_list.append(D_sig_xz.imag)
-            density_list.append(D_sig_yz.real)
-            density_list.append(D_sig_yz.imag)
-            density_list.append(D_lamtau_xx.real)
-            density_list.append(D_lamtau_xx.imag)
-            density_list.append(D_lamtau_yy.real)
-            density_list.append(D_lamtau_yy.imag)
-            density_list.append(D_lamtau_zz.real)
-            density_list.append(D_lamtau_zz.imag)
-            density_list.append(D_lamtau_xy.real)
-            density_list.append(D_lamtau_xy.imag)
-            density_list.append(D_lamtau_xz.real)
-            density_list.append(D_lamtau_xz.imag)
-            density_list.append(D_lamtau_yz.real)
-            density_list.append(D_lamtau_yz.imag)
-            density_list.append(D_lam_sig_tau_x.real)
-            density_list.append(D_lam_sig_tau_x.imag)
-            density_list.append(D_lam_sig_tau_y.real)
-            density_list.append(D_lam_sig_tau_y.imag)
-            density_list.append(D_lam_sig_tau_z.real)
-            density_list.append(D_lam_sig_tau_z.imag)
+            density_list1.append(Dx.real)
+            density_list1.append(Dx.imag)
+            density_list1.append(Dy.real)
+            density_list1.append(Dy.imag)
+            density_list1.append(Dz.real)
+            density_list1.append(Dz.imag)
 
-        return density_list
+            density_list1.append(Dx_.real)
+            density_list1.append(Dx_.imag)
+            density_list1.append(Dy_.real)
+            density_list1.append(Dy_.imag)
+            density_list1.append(Dz_.real)
+            density_list1.append(Dz_.imag)
 
-    def get_fock_dict(self, wi, density_list, F0_a, mo, molecule, ao_basis):
+            density_list2.append(D_sig_xx.real)
+            density_list2.append(D_sig_xx.imag)
+            density_list2.append(D_sig_yy.real)
+            density_list2.append(D_sig_yy.imag)
+            density_list2.append(D_sig_zz.real)
+            density_list2.append(D_sig_zz.imag)
+            density_list2.append(D_sig_xy.real)
+            density_list2.append(D_sig_xy.imag)
+            density_list2.append(D_sig_xz.real)
+            density_list2.append(D_sig_xz.imag)
+            density_list2.append(D_sig_yz.real)
+            density_list2.append(D_sig_yz.imag)
+            density_list2.append(D_lamtau_xx.real)
+            density_list2.append(D_lamtau_xx.imag)
+            density_list2.append(D_lamtau_yy.real)
+            density_list2.append(D_lamtau_yy.imag)
+            density_list2.append(D_lamtau_zz.real)
+            density_list2.append(D_lamtau_zz.imag)
+            density_list2.append(D_lamtau_xy.real)
+            density_list2.append(D_lamtau_xy.imag)
+            density_list2.append(D_lamtau_xz.real)
+            density_list2.append(D_lamtau_xz.imag)
+            density_list2.append(D_lamtau_yz.real)
+            density_list2.append(D_lamtau_yz.imag)
+
+            density_list3.append(D_lam_sig_tau_x.real)
+            density_list3.append(D_lam_sig_tau_x.imag)
+            density_list3.append(D_lam_sig_tau_y.real)
+            density_list3.append(D_lam_sig_tau_y.imag)
+            density_list3.append(D_lam_sig_tau_z.real)
+            density_list3.append(D_lam_sig_tau_z.imag)
+
+        return density_list1, density_list2, density_list3
+
+    def get_fock_dict(self, wi, density_list1, density_list2, density_list3,
+                      F0_a, mo, molecule, ao_basis, dft_dict, profiler):
         """
         Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
@@ -299,11 +327,22 @@ class TpaFullDriver(TpaDriver):
             return focks
 
         time_start_fock = time.time()
-        dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                         'real_and_imag', None, None,
-                                         density_list, 'tpa')
-        time_end_fock = time.time()
 
+        if self._dft:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', dft_dict,
+                                             density_list1, density_list2,
+                                             density_list3, 'tpa', profiler)
+        else:
+            if self.rank == mpi_master():
+                density_list_23 = density_list2 + density_list3
+            else:
+                density_list_23 = None
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', None, None, None,
+                                             density_list_23, 'tpa', profiler)
+
+        time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
         self._print_fock_time(total_time_fock)
 
@@ -312,11 +351,38 @@ class TpaFullDriver(TpaDriver):
             focks[key] = {}
 
         fock_index = 0
-        for w in wi:
-            for key in keys:
-                focks[key][w] = DistributedArray(dist_focks.data[:, fock_index],
-                                                 self.comm,
-                                                 distribute=False)
+
+        for wb in wi:
+            for key in [
+                    'f_sig_xx',
+                    'f_sig_yy',
+                    'f_sig_zz',
+                    'f_sig_xy',
+                    'f_sig_xz',
+                    'f_sig_yz',
+                    'f_lamtau_xx',
+                    'f_lamtau_yy',
+                    'f_lamtau_zz',
+                    'f_lamtau_xy',
+                    'f_lamtau_xz',
+                    'f_lamtau_yz',
+            ]:
+                focks[key][wb] = DistributedArray(dist_focks.data[:,
+                                                                  fock_index],
+                                                  self.comm,
+                                                  distribute=False)
+                fock_index += 1
+
+        for wb in wi:
+            for key in [
+                    'F123_x',
+                    'F123_y',
+                    'F123_z',
+            ]:
+                focks[key][wb] = DistributedArray(dist_focks.data[:,
+                                                                  fock_index],
+                                                  self.comm,
+                                                  distribute=False)
                 fock_index += 1
 
         write_distributed_focks(fock_file, focks, keys, wi, self.comm,
@@ -356,18 +422,18 @@ class TpaFullDriver(TpaDriver):
                 fo['Fb'][('x', w)].data,
                 fo['Fb'][('y', w)].data,
                 fo['Fb'][('z', w)].data,
-                fo['f_lamtau_xx'][w].data * 3,
-                fo['f_lamtau_yy'][w].data * 3,
-                fo['f_lamtau_zz'][w].data * 3,
-                fo['f_lamtau_xy'][w].data * 3,
-                fo['f_lamtau_xz'][w].data * 3,
-                fo['f_lamtau_yz'][w].data * 3,
-                fo['f_sig_xx'][w].data * 3,
-                fo['f_sig_yy'][w].data * 3,
-                fo['f_sig_zz'][w].data * 3,
-                fo['f_sig_xy'][w].data * 3,
-                fo['f_sig_xz'][w].data * 3,
-                fo['f_sig_yz'][w].data * 3,
+                fo['f_lamtau_xx'][w].data,
+                fo['f_lamtau_yy'][w].data,
+                fo['f_lamtau_zz'][w].data,
+                fo['f_lamtau_xy'][w].data,
+                fo['f_lamtau_xz'][w].data,
+                fo['f_lamtau_yz'][w].data,
+                fo['f_sig_xx'][w].data,
+                fo['f_sig_yy'][w].data,
+                fo['f_sig_zz'][w].data,
+                fo['f_sig_xy'][w].data,
+                fo['f_sig_xz'][w].data,
+                fo['f_sig_yz'][w].data,
                 fo['F123_x'][w].data,
                 fo['F123_y'][w].data,
                 fo['F123_z'][w].data,
@@ -383,6 +449,10 @@ class TpaFullDriver(TpaDriver):
             (Fx, Fy, Fz, f_lamtau_xx, f_lamtau_yy, f_lamtau_zz, f_lamtau_xy,
              f_lamtau_xz, f_lamtau_yz, f_sig_xx, f_sig_yy, f_sig_zz, f_sig_xy,
              f_sig_xz, f_sig_yz, f_x, f_y, f_z) = vec_pack
+
+            # F123_x = f_x
+            # F123_y = f_y
+            # F123_z = f_z
 
             Fx_ = Fx.T.conj()  # fo['Fc'][('x', -w)]
             Fy_ = Fy.T.conj()  # fo['Fc'][('y', -w)]
@@ -551,6 +621,7 @@ class TpaFullDriver(TpaDriver):
         cpp_keywords = {
             'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
             'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
+            'xcfun', 'grid_level', 'potfile', 'electric_field',
             'program_end_time'
         }
 
@@ -562,6 +633,7 @@ class TpaFullDriver(TpaDriver):
                 Path(self.checkpoint_file).with_suffix('.tpa_2_full.h5'))
 
         # commutpute second-order response vectors
+
         N_total_results = N_total_drv.compute(molecule, ao_basis, scf_tensors,
                                               xy_dict)
 
@@ -598,24 +670,26 @@ class TpaFullDriver(TpaDriver):
 
         xy_dict = {}
 
+        one_third = 1.0 / 3.0
+
         for w in wi:
 
             vec_pack = np.array([
                 Fock['Fb'][('x', w)].data,
                 Fock['Fb'][('y', w)].data,
                 Fock['Fb'][('z', w)].data,
-                Fock['f_sig_xx'][w].data,
-                Fock['f_sig_yy'][w].data,
-                Fock['f_sig_zz'][w].data,
-                Fock['f_sig_xy'][w].data,
-                Fock['f_sig_xz'][w].data,
-                Fock['f_sig_yz'][w].data,
-                Fock['f_lamtau_xx'][w].data,
-                Fock['f_lamtau_yy'][w].data,
-                Fock['f_lamtau_zz'][w].data,
-                Fock['f_lamtau_xy'][w].data,
-                Fock['f_lamtau_xz'][w].data,
-                Fock['f_lamtau_yz'][w].data,
+                Fock['f_sig_xx'][w].data * one_third,
+                Fock['f_sig_yy'][w].data * one_third,
+                Fock['f_sig_zz'][w].data * one_third,
+                Fock['f_sig_xy'][w].data * one_third,
+                Fock['f_sig_xz'][w].data * one_third,
+                Fock['f_sig_yz'][w].data * one_third,
+                Fock['f_lamtau_xx'][w].data * one_third,
+                Fock['f_lamtau_yy'][w].data * one_third,
+                Fock['f_lamtau_zz'][w].data * one_third,
+                Fock['f_lamtau_xy'][w].data * one_third,
+                Fock['f_lamtau_xz'][w].data * one_third,
+                Fock['f_lamtau_yz'][w].data * one_third,
             ]).T.copy()
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
@@ -783,7 +857,8 @@ class TpaFullDriver(TpaDriver):
             A list of tranformed compounded densities
         """
 
-        density_list = []
+        density_list1 = []
+        density_list2 = []
 
         for w in wi:
             k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)]
@@ -898,16 +973,80 @@ class TpaFullDriver(TpaDriver):
             Dy = np.linalg.multi_dot([mo, Dy, mo.T])
             Dz = np.linalg.multi_dot([mo, Dz, mo.T])
 
-            density_list.append(Dx.real)
-            density_list.append(Dx.imag)
-            density_list.append(Dy.real)
-            density_list.append(Dy.imag)
-            density_list.append(Dz.real)
-            density_list.append(Dz.imag)
+            Dc_x = np.linalg.multi_dot([mo, Dc_x, mo.T])
+            Dc_y = np.linalg.multi_dot([mo, Dc_y, mo.T])
+            Dc_z = np.linalg.multi_dot([mo, Dc_z, mo.T])
 
-        return density_list
+            Dc_x_ = np.linalg.multi_dot([mo, Dc_x_, mo.T])
+            Dc_y_ = np.linalg.multi_dot([mo, Dc_y_, mo.T])
+            Dc_z_ = np.linalg.multi_dot([mo, Dc_z_, mo.T])
 
-    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
+            D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
+            D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
+            D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
+            D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
+            D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
+            D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
+
+            D_lamtau_xx = np.linalg.multi_dot([mo, D_lamtau_xx, mo.T])
+            D_lamtau_yy = np.linalg.multi_dot([mo, D_lamtau_yy, mo.T])
+            D_lamtau_zz = np.linalg.multi_dot([mo, D_lamtau_zz, mo.T])
+            D_lamtau_xy = np.linalg.multi_dot([mo, D_lamtau_xy, mo.T])
+            D_lamtau_xz = np.linalg.multi_dot([mo, D_lamtau_xz, mo.T])
+            D_lamtau_yz = np.linalg.multi_dot([mo, D_lamtau_yz, mo.T])
+
+            density_list1.append(Dc_x.real)
+            density_list1.append(Dc_x.imag)
+            density_list1.append(Dc_y.real)
+            density_list1.append(Dc_y.imag)
+            density_list1.append(Dc_z.real)
+            density_list1.append(Dc_z.imag)
+            density_list1.append(Dc_x_.real)
+            density_list1.append(Dc_x_.imag)
+            density_list1.append(Dc_y_.real)
+            density_list1.append(Dc_y_.imag)
+            density_list1.append(Dc_z_.real)
+            density_list1.append(Dc_z_.imag)
+
+            density_list1.append(D_sig_xx.real)
+            density_list1.append(D_sig_xx.imag)
+            density_list1.append(D_sig_yy.real)
+            density_list1.append(D_sig_yy.imag)
+            density_list1.append(D_sig_zz.real)
+            density_list1.append(D_sig_zz.imag)
+
+            density_list1.append(D_sig_xy.real)
+            density_list1.append(D_sig_xy.imag)
+            density_list1.append(D_sig_xz.real)
+            density_list1.append(D_sig_xz.imag)
+            density_list1.append(D_sig_yz.real)
+            density_list1.append(D_sig_yz.imag)
+
+            density_list1.append(D_lamtau_xx.real)
+            density_list1.append(D_lamtau_xx.imag)
+            density_list1.append(D_lamtau_yy.real)
+            density_list1.append(D_lamtau_yy.imag)
+            density_list1.append(D_lamtau_zz.real)
+            density_list1.append(D_lamtau_zz.imag)
+
+            density_list1.append(D_lamtau_xy.real)
+            density_list1.append(D_lamtau_xy.imag)
+            density_list1.append(D_lamtau_xz.real)
+            density_list1.append(D_lamtau_xz.imag)
+            density_list1.append(D_lamtau_yz.real)
+            density_list1.append(D_lamtau_yz.imag)
+
+            density_list2.append(Dx.real)
+            density_list2.append(Dx.imag)
+            density_list2.append(Dy.real)
+            density_list2.append(Dy.imag)
+            density_list2.append(Dz.real)
+            density_list2.append(Dz.imag)
+
+        return density_list1, density_list2
+
+    def get_fock_dict_II(self, wi, density_list1, density_list2, mo, molecule,
+                         ao_basis, dft_dict, profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
@@ -948,11 +1087,19 @@ class TpaFullDriver(TpaDriver):
                                           self.ostream)
 
         time_start_fock = time.time()
-        dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                         'real_and_imag', None, None,
-                                         density_list, 'tpa')
-        time_end_fock = time.time()
 
+        if self._dft:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', dft_dict,
+                                             density_list1, density_list2, None,
+                                             'tpa_ii', profiler)
+        else:
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', None, None,
+                                             density_list2, None, 'tpa_ii',
+                                             profiler)
+
+        time_end_fock = time.time()
         total_time_fock = time_end_fock - time_start_fock
         self._print_fock_time(total_time_fock)
 

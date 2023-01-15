@@ -35,8 +35,8 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN_RPA", "SLDA", "B88X", "LYP",  "BLYP",  "B3LYP", "BHANDH", "BHANDHLYP", "PBE",
-                                     "PBE0",   "BP86",    "PW91", "OLYP", "TPSS", "TPSSH", "PKZB",  "SCAN",   "M06",       "M06L"});
+    return std::vector<std::string>({"SLATER", "VWN_RPA", "SLDA", "B88X", "LYP",   "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE", "PBE0",
+                                     "BP86",   "PW91",    "OLYP", "TPSS", "TPSSH", "PKZB", "SCAN",  "M06",    "M06L",      "M11L"});
 }
 
 CXCNewFunctional
@@ -94,6 +94,8 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (fstr::upcase(xcLabel) == "M06") return CXCNewFunctional("M06", {"HYB_MGGA_X_M06", "MGGA_C_M06"}, {1.0, 1.0});
 
         if (fstr::upcase(xcLabel) == "M06L") return CXCNewFunctional("M06L", {"MGGA_X_M06_L", "MGGA_C_M06_L"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "M11L") return CXCNewFunctional("M11L", {"MGGA_X_M11_L", "MGGA_C_M11_L"}, {1.0, 1.0});
 
         // TODO add more functionals here...
     }

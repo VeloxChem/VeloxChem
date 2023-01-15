@@ -650,13 +650,14 @@ class ShgDriver(NonLinearSolver):
         if self.shg_type == 'reduced':
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
                                              dft_dict, first_order_dens,
-                                             second_order_dens, 'shg_red',
+                                             second_order_dens, None, 'shg_red',
                                              profiler)
         elif self.shg_type == 'full':
             dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
                                              'real_and_imag', dft_dict,
                                              first_order_dens,
-                                             second_order_dens, 'shg', profiler)
+                                             second_order_dens, None, 'shg',
+                                             profiler)
 
         time_end_fock = time.time()
 
