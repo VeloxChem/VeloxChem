@@ -32,6 +32,86 @@ from .veloxchemlib import bohr_in_angstroms
 
 
 @staticmethod
+def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
+    """
+    Converts SMILES string to xyz string.
+
+    :param smiles_str:
+        The SMILES string.
+
+    :return:
+        The xyz string (including number of atoms).
+    """
+
+    try:
+        from rdkit import Chem
+        from rdkit.Chem import AllChem
+
+        mol_bare = Chem.MolFromSmiles(smiles_str)
+        mol_full = Chem.AddHs(mol_bare)
+        AllChem.EmbedMolecule(mol_full)
+        if optimize:
+            AllChem.UFFOptimizeMolecule(mol_full)
+
+        if no_hydrogen:
+            return Chem.RemoveHs(mol_full)
+        else:
+            return Chem.MolToXYZBlock(mol_full)
+
+    except ImportError:
+        raise ImportError('Unable to import rdkit.')
+
+
+@staticmethod
+def _Molecule_draw_2d_svg(smiles_str, width=300, height=300):
+    """
+    Draw 2D representation for SMILES string.
+
+    :param smiles_str:
+        The SMILES string.
+    :param width:
+        The width of the drawing area.
+    :param height:
+        The height of the drawing area.
+    """
+
+    try:
+        from rdkit import Chem
+        from IPython.display import SVG
+        from IPython.display import display
+
+        mol_no_hydrogen = Molecule._smiles_to_xyz(smiles_str,
+                                                  optimize=True,
+                                                  no_hydrogen=True)
+
+        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
+        drawer.DrawMolecule(mol_no_hydrogen)
+        drawer.FinishDrawing()
+
+        display(SVG(drawer.GetDrawingText()))
+
+    except ImportError:
+        raise ImportError('Unable to import rdkit.Chem and/or IPython.display.')
+
+
+@staticmethod
+def _Molecule_read_smiles(smiles_str):
+    """
+    Reads molecule from SMILES string.
+
+    :param smiles_str:
+        The SMILES string.
+
+    :return:
+        The molecule.
+    """
+
+    xyz = Molecule._smiles_to_xyz(smiles_str, optimize=True)
+
+    return Molecule.from_xyz_string(xyz)
+
+
+@staticmethod
 def _Molecule_read_str(xyzstr, units='angstrom'):
     """
     Reads molecule from xyz string.
@@ -335,6 +415,9 @@ def _Molecule_deepcopy(self, memo):
     return Molecule(self)
 
 
+Molecule._smiles_to_xyz = _Molecule_smiles_to_xyz
+Molecule.draw_2d_svg = _Molecule_draw_2d_svg
+Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_str = _Molecule_read_str
 Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_xyz_string = _Molecule_from_xyz_string
