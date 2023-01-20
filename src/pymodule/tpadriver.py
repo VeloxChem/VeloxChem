@@ -113,6 +113,12 @@ class TpaDriver(NonLinearSolver):
               functions for TPA
         """
 
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
+        # check dft setup
+        self._dft_sanity_check()
+
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,

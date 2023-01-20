@@ -124,6 +124,9 @@ class LinearResponseSolver(LinearSolver):
         self._dist_e2bger = None
         self._dist_e2bung = None
 
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
         # check dft setup
         self._dft_sanity_check()
 

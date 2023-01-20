@@ -159,6 +159,9 @@ class TdaEigenSolver(LinearSolver):
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
         # check dft setup
         self._dft_sanity_check()
 
