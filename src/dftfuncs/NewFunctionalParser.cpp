@@ -35,8 +35,9 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN_RPA", "SLDA", "B88X", "LYP",   "BLYP", "B3LYP", "BHANDH", "BHANDHLYP", "PBE", "PBE0",
-                                     "BP86",   "PW91",    "OLYP", "TPSS", "TPSSH", "PKZB", "SCAN",  "M06",    "M06L",      "M11L"});
+    return std::vector<std::string>({"SLATER", "VWN_RPA", "SLDA",  "B88X",    "LYP",    "BLYP",   "B3LYP", "BHANDH",  "BHANDHLYP",
+                                     "PBE",    "PBE0",    "BP86",  "PW91",    "OLYP",   "TPSS",   "TPSSH", "REVTPSS", "REGTPSS",
+                                     "PKZB",   "SCAN",    "RSCAN", "R++SCAN", "R2SCAN", "R4SCAN", "M06",   "M06L",    "M11L"});
 }
 
 CXCNewFunctional
@@ -87,9 +88,21 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (fstr::upcase(xcLabel) == "TPSSH") return CXCNewFunctional("TPSSH", {"MGGA_X_TPSS", "MGGA_C_TPSS"}, {0.9, 1.0}, 0.1);
 
+        if (fstr::upcase(xcLabel) == "REVTPSS") return CXCNewFunctional("REVTPSS", {"MGGA_X_REVTPSS", "MGGA_C_REVTPSS"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "REGTPSS") return CXCNewFunctional("REGTPSS", {"MGGA_X_REGTPSS", "GGA_C_REGTPSS"}, {1.0, 1.0});
+
         if (fstr::upcase(xcLabel) == "PKZB") return CXCNewFunctional("PKZB", {"MGGA_X_PKZB", "MGGA_C_PKZB"}, {1.0, 1.0});
 
         if (fstr::upcase(xcLabel) == "SCAN") return CXCNewFunctional("SCAN", {"MGGA_X_SCAN", "MGGA_C_SCAN"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "RSCAN") return CXCNewFunctional("RSCAN", {"MGGA_X_RSCAN", "MGGA_C_RSCAN"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "R++SCAN") return CXCNewFunctional("R++SCAN", {"MGGA_X_RPPSCAN", "MGGA_C_RPPSCAN"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "R2SCAN") return CXCNewFunctional("R2SCAN", {"MGGA_X_R2SCAN", "MGGA_C_R2SCAN"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "R4SCAN") return CXCNewFunctional("R4SCAN", {"MGGA_X_R4SCAN", "MGGA_C_R2SCAN"}, {1.0, 1.0});
 
         if (fstr::upcase(xcLabel) == "M06") return CXCNewFunctional("M06", {"HYB_MGGA_X_M06", "MGGA_C_M06"}, {1.0, 1.0});
 
