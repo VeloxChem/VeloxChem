@@ -40,7 +40,7 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
         The SMILES string.
 
     :return:
-        The xyz string (including number of atoms).
+        An xyz string (including number of atoms).
     """
 
     try:
@@ -289,6 +289,29 @@ def _Molecule_get_coordinates(self):
     ]).T.copy()
 
 
+def _Molecule_get_xyz_string(self):
+    """
+    Returns xyz string of molecule.
+
+    :return:
+        An xyz string (including number of atoms).
+    """
+
+    labels = self.get_labels()
+    coords = self.get_coordinates()
+
+    natoms = len(labels)
+    xyz = f'{natoms}\n\n'
+
+    for a in range(natoms):
+        xa = coords[a][0] * bohr_in_angstroms()
+        ya = coords[a][1] * bohr_in_angstroms()
+        za = coords[a][2] * bohr_in_angstroms()
+        xyz += f'{labels[a]} {xa:.6f} {ya:.6f} {za:.6f}\n'
+
+    return xyz
+
+
 def _Molecule_write_xyz(self, xyz_filename):
     """
     Writes molecular geometry to xyz file.
@@ -426,6 +449,7 @@ Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.more_info = _Molecule_more_info
 Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates
+Molecule.get_xyz_string = _Molecule_get_xyz_string
 Molecule.write_xyz = _Molecule_write_xyz
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
