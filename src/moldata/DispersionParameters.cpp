@@ -70,18 +70,28 @@ CDispersionParameters::_setDefaultParameters()
 void
 CDispersionParameters::_setFunctionalParameters(const std::string& xcLabel)
 {
-    if (fstr::upcase(xcLabel) == "HF")
-    {
-        _setFourParameters(1.0000, 1.61679827, 0.44959224, 3.35743605);
-    }
-    else if (fstr::upcase(xcLabel) == "BLYP")
-    {
-        _setFourParameters(1.0000, 2.34076671, 0.44488865, 4.09330090);
-    }
-    else if (fstr::upcase(xcLabel) == "B3LYP")
-    {
-        _setFourParameters(1.0000, 2.02929367, 0.40868035, 4.53807137);
-    }
+    if (fstr::upcase(xcLabel) == "HF") _setFourParameters(1.0000, 1.61679827, 0.44959224, 3.35743605);
+
+    else if (fstr::upcase(xcLabel) == "BLYP") _setFourParameters(1.0000, 2.34076671, 0.44488865, 4.09330090);
+
+    else if (fstr::upcase(xcLabel) == "B3LYP") _setFourParameters(1.0000, 2.02929367, 0.40868035, 4.53807137);
+
+    else if (fstr::upcase(xcLabel) == "PBE") _setFourParameters(1.0000, 0.95948085, 0.38574991, 4.80688534);
+
+    else if (fstr::upcase(xcLabel) == "PBE0") _setFourParameters(1.0000, 1.20065498, 0.40085597, 5.02928789);
+
+    else if (fstr::upcase(xcLabel) == "OLYP") _setFourParameters(1.0000, 2.74836820, 0.60184498, 2.53292167);
+
+    else if (fstr::upcase(xcLabel) == "TPSS") _setFourParameters(1.0000, 1.76596355, 0.42822303, 4.54257102);
+
+    else if (fstr::upcase(xcLabel) == "TPSSH") _setFourParameters(1.0000, 1.85897750, 0.44286966, 4.60230534);
+
+    else if (fstr::upcase(xcLabel) == "SCAN") _setFourParameters(1.0000, 1.46126056, 0.62930855, 6.31284039);
+
+    else if (fstr::upcase(xcLabel) == "M06") _setFourParameters(1.0000, 0.16366729, 0.53456413, 6.06192174);
+
+    else if (fstr::upcase(xcLabel) == "M06L") _setFourParameters(1.0000, 0.59493760, 0.71422359, 6.35314182);
+
     else
     {
         std::string errmsg("DispersionParameters: D4 dispersion model not implemented for functional ");
