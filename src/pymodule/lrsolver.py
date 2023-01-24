@@ -638,6 +638,15 @@ class LinearResponseSolver(LinearSolver):
     def _print_results(self, freqs, a_components, b_components, results):
         """
         Prints polarizability to output stream.
+
+        :param freqs:
+            The frequencies.
+        :param a_components:
+            The Cartesian components of the A operator.
+        :param b_components:
+            The Cartesian components of the B operator.
+        :param results:
+            The dictionary containing response results.
         """
 
         width = 92
