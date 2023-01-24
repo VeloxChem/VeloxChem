@@ -35,7 +35,7 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
 from .veloxchemlib import new_parse_xc_func
 from .aodensitymatrix import AODensityMatrix
@@ -2107,3 +2107,101 @@ class LinearSolver:
             excitation_details.append(de_exc[1])
 
         return excitation_details
+
+    def _print_transition_dipoles(self, title, trans_dipoles):
+        """
+        Prints transition dipole moments to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param trans_dipoles:
+            The transition dipole moments.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = '                     '
+        valstr += '{:>13s}{:>13s}{:>13s}'.format('X', 'Y', 'Z')
+        self.ostream.print_header(valstr.ljust(92))
+        for s, r in enumerate(trans_dipoles):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r[0], r[1], r[2])
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_absorption(self, title, results):
+        """
+        Prints absorption to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, e in enumerate(results['eigenvalues']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:15.8f} a.u. '.format(e)
+            valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
+            f = results['oscillator_strengths'][s]
+            valstr += '    Osc.Str. {:9.4f}'.format(f)
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_ecd(self, title, results):
+        """
+        Prints electronic circular dichroism to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, R in enumerate(results['rotatory_strengths']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '    Rot.Str. '
+            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
+            valstr += f'{R:11.4f} [10**(-40) cgs]'
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_excitation_details(self, title, results):
+        """
+        Prints excitation details.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self.ostream.print_header(title.ljust(92))
+        self.ostream.print_blank()
+
+        nstates = results['eigenvalues'].size
+        excitation_details = results['excitation_details']
+
+        for s in range(nstates):
+            valstr = 'Excited state {}'.format(s + 1)
+            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_header(('-' * len(valstr)).ljust(92))
+
+            for exc_str in excitation_details[s]:
+                self.ostream.print_header(exc_str.ljust(92))
+            self.ostream.print_blank()
+
+        self.ostream.flush()
