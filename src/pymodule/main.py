@@ -341,18 +341,18 @@ def main():
         else:
             scf_drv = select_scf_driver(task, scf_type)
             scf_drv.update_settings(scf_dict, method_dict)
-            scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+            scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                          task.min_basis)
 
             mol_orbs = scf_drv.molecular_orbitals
             density = scf_drv.density
-            scf_tensors = scf_drv.scf_tensors
 
             if not scf_drv.is_converged:
                 return
 
             # SCF first-order properties
             scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-            scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_tensors)
+            scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_results)
             if task.mpi_rank == mpi_master():
                 scf_prop.print_properties(task.molecule)
 
@@ -460,7 +460,7 @@ def main():
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
-        rsp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
 
         if not rsp_prop.is_converged:
             return
@@ -542,7 +542,7 @@ def main():
 
         pulsed_response = PulsedResponse(task.mpi_comm, task.ostream)
         pulsed_response.update_settings(prt_dict, cpp_dict, method_dict)
-        pulsed_response.compute(task.molecule, task.ao_basis, scf_tensors)
+        pulsed_response.compute(task.molecule, task.ao_basis, scf_results)
 
     # MP2 perturbation theory
 
@@ -576,7 +576,7 @@ def main():
 
     if task_type == 'loprop':
         loprop_driver = LoPropDriver(task.mpi_comm, task.ostream)
-        loprop_driver.compute(task.molecule, task.ao_basis, scf_tensors)
+        loprop_driver.compute(task.molecule, task.ao_basis, scf_results)
 
     # RESP and ESP charges
 

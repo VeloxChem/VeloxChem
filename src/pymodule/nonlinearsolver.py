@@ -260,18 +260,58 @@ class NonLinearSolver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
+    def _check_scf_results(self, scf_results):
+        """
+        Checks SCF results for ERI, DFT and PE information.
+
+        :param scf_results:
+            A dictionary containing SCF results.
+        """
+
+        updated_scf_info = {}
+
+        if self.rank == mpi_master():
+            if scf_results.get('eri_thresh', None) is not None:
+                updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
+
+            if scf_results.get('qq_type', None) is not None:
+                updated_scf_info['qq_type'] = scf_results['qq_type']
+
+            if scf_results.get('restart', None) is not None:
+                updated_scf_info['restart'] = scf_results['restart']
+
+            if scf_results.get('xcfun', None) is not None:
+                # do not overwrite xcfun if it is already specified
+                if self.xcfun is None:
+                    updated_scf_info['xcfun'] = scf_results['xcfun']
+
+            if scf_results.get('potfile', None) is not None:
+                # do not overwrite potfile if it is already specified
+                if self.potfile is None:
+                    updated_scf_info['potfile'] = scf_results['potfile']
+
+        updated_scf_info = self.comm.bcast(updated_scf_info, root=mpi_master())
+
+        for key, val in updated_scf_info.items():
+            setattr(self, key, val)
+
     def _dft_sanity_check(self):
         """
         Checks DFT settings and updates relevant attributes.
         """
 
-        # check xc functional
-        if self.xcfun is not None:
+        # Hartree-Fock: xcfun is None or 'hf'
+        if (self.xcfun is None or
+            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
+            self._dft = False
+
+        # DFT: xcfun is functional object or string (other than 'hf')
+        else:
             if isinstance(self.xcfun, str):
                 self.xcfun = new_parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'NonLinearSolver: Undefined XC functional')
-        self._dft = (self.xcfun is not None)
+            self._dft = True
 
         # check grid level
         if self._dft and (self.grid_level < 1 or self.grid_level > 6):

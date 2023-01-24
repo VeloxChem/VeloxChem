@@ -148,6 +148,9 @@ class ShgDriver(NonLinearSolver):
               A dictonary containing the E[3], X[2], A[2] contractions
         """
 
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
         # check dft setup
         self._dft_sanity_check()
 

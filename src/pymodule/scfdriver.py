@@ -432,13 +432,18 @@ class ScfDriver:
         Checks DFT settings and updates relevant attributes.
         """
 
-        # check xc functional
-        if self.xcfun is not None:
+        # Hartree-Fock: xcfun is None or 'hf'
+        if (self.xcfun is None or
+            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
+            self._dft = False
+
+        # DFT: xcfun is functional object or string (other than 'hf')
+        else:
             if isinstance(self.xcfun, str):
                 self.xcfun = new_parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'SCF driver: Undefined XC functional')
-        self._dft = (self.xcfun is not None)
+                                'LinearSolver: Undefined XC functional')
+            self._dft = True
 
         # check grid level
         if self._dft and (self.grid_level < 1 or self.grid_level > 6):
@@ -1057,6 +1062,13 @@ class ScfDriver:
                 vxc_mat = None
 
             self._scf_tensors = {
+                # eri info
+                'eri_thresh': self.eri_thresh,
+                'qq_type': self.qq_type,
+                # scf info
+                'scf_energy': self.scf_energy,
+                'restart': self.restart,
+                # scf tensors
                 'S': S,
                 'C_alpha': C_alpha,
                 'C_beta': C_beta,
@@ -1074,6 +1086,14 @@ class ScfDriver:
                 'D': (D_alpha, D_beta),
                 'F': (F_alpha, F_beta),
             }
+
+            if self._dft:
+                # dft info
+                self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+
+            if self._pe:
+                # pe info
+                self._scf_tensors['potfile'] = self.potfile
 
             if self.is_converged:
                 self._write_final_hdf5(molecule, ao_basis)

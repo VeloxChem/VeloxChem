@@ -267,6 +267,9 @@ class ComplexResponse(LinearSolver):
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
         # check dft setup
         self._dft_sanity_check()
 
