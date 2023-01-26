@@ -634,8 +634,7 @@ class C6Driver(LinearSolver):
                     'solutions': full_solutions,
                 }
 
-                self._print_results(self.w0, self.n_points, self.a_components,
-                                    self.b_components, ret_dict)
+                self._print_results(ret_dict, self.ostream)
 
                 return ret_dict
 
@@ -741,59 +740,53 @@ class C6Driver(LinearSolver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def _print_results(self, w0, n_points, a_components, b_components, results):
+    def _print_results(self, results, ostream):
         """
         Prints response property to output stream.
 
-        :param w0:
-            A constant conversion factor.
-        :param n_points:
-            The number of integration points.
-        :param a_components:
-            The Cartesian components of the A operator.
-        :param b_components:
-            The Cartesian components of the B operator.
         :param results:
             The dictionary containing response results.
+        :param ostream:
+            The output stream.
         """
 
         width = 92
 
         title = 'Response Functions at Given Imaginary Frequencies'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('=' * len(title)).ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
 
-        points, weights = np.polynomial.legendre.leggauss(n_points)
-        imagfreqs = [w0 * (1 - t) / (1 + t) for t in points]
+        points, weights = np.polynomial.legendre.leggauss(self.n_points)
+        imagfreqs = [self.w0 * (1 - t) / (1 + t) for t in points]
         printfreqs = np.append(imagfreqs, 0.0)
 
         for iw in printfreqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
                 'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
+            ostream.print_header(title.ljust(width))
+            ostream.print_header(('-' * len(title)).ljust(width))
 
-            for a in a_components:
-                for b in b_components:
+            for a in self.a_components:
+                for b in self.b_components:
                     prop = results['response_functions'][(a, b, iw)]
                     ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
                         a.lower(), b.lower(), iw)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
                         ops_label, prop.real, prop.imag)
-                    self.ostream.print_header(output.ljust(width))
-            self.ostream.print_blank()
+                    ostream.print_header(output.ljust(width))
+            ostream.print_blank()
 
         title = 'C6 Dispersion Coefficient'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('=' * len(title)).ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
 
         title = 'Reference: '
         title += 'Amos et al., '
         title += 'J. Chem. Phys. 89, 2186 (1985).'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_blank()
 
         c6 = results['c6']
 
@@ -804,11 +797,11 @@ class C6Driver(LinearSolver):
         alpha_i0 = -(Gxx_i0 + Gyy_i0 + Gzz_i0) / 3.0
 
         output = 'Homomolecular C_6 value        :    {:10.6f} a.u.'.format(c6)
-        self.ostream.print_header(output.ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(output.ljust(width))
+        ostream.print_blank()
         output = 'Static polarizability alpha(0) :    {:10.6f} a.u.'.format(
             alpha_i0)
-        self.ostream.print_header(output.ljust(width))
+        ostream.print_header(output.ljust(width))
 
-        self.ostream.print_blank()
-        self.ostream.flush()
+        ostream.print_blank()
+        ostream.flush()

@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
-from veloxchem.rspc6 import C6
+from veloxchem.c6driver import C6Driver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.veloxchemlib import is_mpi_master
 
@@ -36,19 +36,18 @@ class TestC6:
 
         scf_tensors = self.run_scf(task)
 
-        c6_prop = C6(
+        c6_drv = C6Driver(task.mpi_comm, task.ostream)
+        c6_drv.update_settings(
             {
                 'n_points': ref_n_points,
                 'batch_size': random.choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        c6_prop.init_driver(task.mpi_comm, task.ostream)
-        c6_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        c6_results = c6_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
-        assert c6_prop.is_converged
+        assert c6_drv.is_converged
 
         if is_mpi_master(task.mpi_comm):
-            self.check_printout(c6_prop)
-            c6_results = c6_prop.rsp_property
+            self.check_printout(c6_drv, c6_results)
 
             freqs = set()
             for aop, bop, iw in c6_results['response_functions']:
@@ -95,15 +94,15 @@ class TestC6:
 
         return ref_freqs, ref_results
 
-    def check_printout(self, c6_prop):
+    def check_printout(self, c6_drv, c6_results):
 
-        rsp_func = c6_prop.rsp_property['response_functions']
+        rsp_func = c6_results['response_functions']
 
         with tempfile.TemporaryDirectory() as temp_dir:
             fname = str(Path(temp_dir, 'c6.out'))
 
             ostream = OutputStream(fname)
-            c6_prop.print_property(ostream)
+            c6_drv._print_results(c6_results, ostream)
             ostream.close()
 
             with open(fname, 'r') as f_out:
