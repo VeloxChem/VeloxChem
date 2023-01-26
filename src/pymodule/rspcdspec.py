@@ -23,12 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from .veloxchemlib import (
-    hartree_in_ev,
-    extinction_coefficient_from_beta,
-)
 from .rspproperty import ResponseProperty
-from .inputparser import parse_seq_range
 
 
 class CircularDichroismSpectrum(ResponseProperty):
@@ -91,38 +86,6 @@ class CircularDichroismSpectrum(ResponseProperty):
 
         return self._rsp_property[key]
 
-    def get_spectrum(self):
-        """
-        Gets circular dichroism spectrum.
-
-        :return:
-            A list containing the energies and extinction coefficient (Delta
-            epsilon).
-        """
-
-        spectrum = []
-
-        freqs = parse_seq_range(self._rsp_dict['frequencies'])
-
-        for w in freqs:
-            if w == 0.0:
-                continue
-
-            Gxx = -self._rsp_property['response_functions'][('x', 'x', w)].imag
-            Gyy = -self._rsp_property['response_functions'][('y', 'y', w)].imag
-            Gzz = -self._rsp_property['response_functions'][('z', 'z', w)].imag
-
-            Gxx /= w
-            Gyy /= w
-            Gzz /= w
-
-            beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
-            Delta_epsilon = beta * w**2 * extinction_coefficient_from_beta()
-
-            spectrum.append((w, Delta_epsilon))
-
-        return spectrum
-
     def print_property(self, ostream):
         """
         Prints response property to output stream.
@@ -131,59 +94,4 @@ class CircularDichroismSpectrum(ResponseProperty):
             The output stream.
         """
 
-        width = 92
-
-        title = 'Response Functions at Given Frequencies'
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('=' * len(title)).ljust(width))
-        ostream.print_blank()
-
-        freqs = parse_seq_range(self._rsp_dict['frequencies'])
-
-        for w in freqs:
-            title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'MagDip', 'LinMom', 'Frequency', 'Real', 'Imaginary')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
-
-            for a in self._rsp_dict['a_components']:
-                for b in self._rsp_dict['b_components']:
-                    prop = self._rsp_property['response_functions'][(a, b, w)]
-                    ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
-                        a.lower(), b.lower(), w)
-                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
-                    ostream.print_header(output.ljust(width))
-            ostream.print_blank()
-
-        title = self._rsp_driver.get_prop_str()
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('=' * len(title)).ljust(width))
-        ostream.print_blank()
-
-        if len(freqs) == 1 and freqs[0] == 0.0:
-            text = '*** No circular dichroism spectrum at zero frequency.'
-            ostream.print_header(text.ljust(width))
-            ostream.print_blank()
-            return
-
-        title = 'Reference: '
-        title += 'A. Jiemchooroj and P. Norman, '
-        title += 'J. Chem. Phys. 126, 134102 (2007).'
-        ostream.print_header(title.ljust(width))
-        ostream.print_blank()
-
-        title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
-                                               'Frequency[eV]',
-                                               'Delta_epsilon[L mol^-1 cm^-1]')
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('-' * len(title)).ljust(width))
-
-        spectrum = self.get_spectrum()
-
-        for w, Delta_epsilon in spectrum:
-            output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
-                w, w * hartree_in_ev(), Delta_epsilon)
-            ostream.print_header(output.ljust(width))
-
-        ostream.print_blank()
+        pass
