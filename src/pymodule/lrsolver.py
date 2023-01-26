@@ -191,8 +191,15 @@ class LinearResponseSolver(LinearSolver):
             op_freq_keys = None
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
 
-        freqs = set([w for (op, w) in op_freq_keys])
-        precond = {w: self._get_precond(orb_ene, nocc, norb, w) for w in freqs}
+        self.frequencies = []
+        for (op, w) in op_freq_keys:
+            if w not in self.frequencies:
+                self.frequencies.append(w)
+
+        precond = {
+            w: self._get_precond(orb_ene, nocc, norb, w)
+            for w in self.frequencies
+        }
 
         # distribute the right-hand side
         # dist_grad will also serve as initial guess
@@ -473,8 +480,7 @@ class LinearResponseSolver(LinearSolver):
                     'solutions': full_solutions
                 }
 
-                self._print_results(freqs, self.a_components, self.b_components,
-                                    ret_dict)
+                self._print_results(ret_dict, self.ostream)
 
                 return ret_dict
 
@@ -635,39 +641,35 @@ class LinearResponseSolver(LinearSolver):
 
         return dist_new_ger, dist_new_ung
 
-    def _print_results(self, freqs, a_components, b_components, results):
+    def _print_results(self, results, ostream):
         """
         Prints polarizability to output stream.
 
-        :param freqs:
-            The frequencies.
-        :param a_components:
-            The Cartesian components of the A operator.
-        :param b_components:
-            The Cartesian components of the B operator.
         :param results:
             The dictionary containing response results.
+        :param ostream:
+            The output stream.
         """
 
         width = 92
 
-        for w in freqs:
+        for w in self.frequencies:
             w_str = 'Polarizability (w={:.4f})'.format(w)
-            self.ostream.print_header(w_str.ljust(width))
-            self.ostream.print_header(('-' * len(w_str)).ljust(width))
+            ostream.print_header(w_str.ljust(width))
+            ostream.print_header(('-' * len(w_str)).ljust(width))
 
             valstr = '{:<5s}'.format('')
-            for b in b_components:
+            for b in self.b_components:
                 valstr += '{:>15s}'.format(b.upper())
-            self.ostream.print_header(valstr.ljust(width))
+            ostream.print_header(valstr.ljust(width))
 
-            for a in a_components:
+            for a in self.a_components:
                 valstr = '{:<5s}'.format(a.upper())
-                for b in b_components:
+                for b in self.b_components:
                     prop = -results['response_functions'][(a, b, w)]
                     valstr += '{:15.8f}'.format(prop)
-                self.ostream.print_header(valstr.ljust(width))
+                ostream.print_header(valstr.ljust(width))
 
-            self.ostream.print_blank()
+            ostream.print_blank()
 
-        self.ostream.flush()
+        ostream.flush()
