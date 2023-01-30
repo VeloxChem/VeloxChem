@@ -379,8 +379,6 @@ CXCNewFunctional::compute_fxc_for_lda(int32_t np, const double* rho, double* v2r
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    //   stage_exc      (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    //   stage_vrho     (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_v2rho2 = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
 #pragma omp simd aligned(v2rho2 : VLX_ALIGN)
@@ -423,9 +421,6 @@ CXCNewFunctional::compute_kxc_for_lda(int32_t np, const double* rho, double* v3r
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    // stage_exc        (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    // stage_vrho       (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    // stage_v2rho2     (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
     auto stage_v3rho3 = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[6 * _ldStaging];
 
 #pragma omp simd aligned(v3rho3 : VLX_ALIGN)
@@ -470,10 +465,6 @@ CXCNewFunctional::compute_lxc_for_lda(int32_t np, const double* rho, double* v4r
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    // stage_exc        (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    // stage_vrho       (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    // stage_v2rho2     (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-    // stage_v3rho3     (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[6 * _ldStaging];
     auto stage_v4rho4 = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[10 * _ldStaging];
 
 #pragma omp simd aligned(v4rho4 : VLX_ALIGN)
@@ -605,7 +596,6 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    //   stage_exc      (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
     auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
@@ -653,8 +643,12 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
 }
 
 auto
-CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const
-    -> void
+CXCNewFunctional::compute_fxc_for_gga(int32_t       np,
+                                      const double* rho,
+                                      const double* sigma,
+                                      double*       v2rho2,
+                                      double*       v2rhosigma,
+                                      double*       v2sigma2) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
@@ -684,12 +678,9 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    //   stage_exc          (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    //   stage_vrho         (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    //   stage_vsigma       (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-    auto stage_v2rho2     = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
-    auto stage_v2rhosigma = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
-    auto stage_v2sigma2   = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
+    auto stage_v2rho2             = (alloc) ? mem::malloc<double>(3  * np) : &_stagingBuffer[6   * _ldStaging];
+    auto stage_v2rhosigma         = (alloc) ? mem::malloc<double>(6  * np) : &_stagingBuffer[9   * _ldStaging];
+    auto stage_v2sigma2           = (alloc) ? mem::malloc<double>(6  * np) : &_stagingBuffer[15  * _ldStaging];
 
     for (const auto& xccomp : _components)
     {
@@ -715,7 +706,8 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
         {
             xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
 
-#pragma omp simd aligned(v2rho2, stage_v2rho2, v2rhosigma, stage_v2rhosigma, v2sigma2, stage_v2sigma2 : VLX_ALIGN)
+#pragma omp simd aligned(v2rho2, stage_v2rho2, v2rhosigma, stage_v2rhosigma, \
+                         v2sigma2, stage_v2sigma2 : VLX_ALIGN)
             for (auto g = 0; g < np; ++g)
             {
                 v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
@@ -777,16 +769,16 @@ CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
         v3rho2sigma[9 * g + 7] = 0.0;
         v3rho2sigma[9 * g + 8] = 0.0;
 
-        v3rhosigma2[12 * g + 0]  = 0.0;
-        v3rhosigma2[12 * g + 1]  = 0.0;
-        v3rhosigma2[12 * g + 2]  = 0.0;
-        v3rhosigma2[12 * g + 3]  = 0.0;
-        v3rhosigma2[12 * g + 4]  = 0.0;
-        v3rhosigma2[12 * g + 5]  = 0.0;
-        v3rhosigma2[12 * g + 6]  = 0.0;
-        v3rhosigma2[12 * g + 7]  = 0.0;
-        v3rhosigma2[12 * g + 8]  = 0.0;
-        v3rhosigma2[12 * g + 9]  = 0.0;
+        v3rhosigma2[12 * g + 0] = 0.0;
+        v3rhosigma2[12 * g + 1] = 0.0;
+        v3rhosigma2[12 * g + 2] = 0.0;
+        v3rhosigma2[12 * g + 3] = 0.0;
+        v3rhosigma2[12 * g + 4] = 0.0;
+        v3rhosigma2[12 * g + 5] = 0.0;
+        v3rhosigma2[12 * g + 6] = 0.0;
+        v3rhosigma2[12 * g + 7] = 0.0;
+        v3rhosigma2[12 * g + 8] = 0.0;
+        v3rhosigma2[12 * g + 9] = 0.0;
         v3rhosigma2[12 * g + 10] = 0.0;
         v3rhosigma2[12 * g + 11] = 0.0;
 
@@ -805,16 +797,10 @@ CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    //   stage_exc           (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    //   stage_vrho          (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    //   stage_vsigma        (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-    //   stage_v2rho2        (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
-    //   stage_v2rhosigma    (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
-    //   stage_v2sigma2      (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
-    auto stage_v3rho3      = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[21 * _ldStaging];
-    auto stage_v3rho2sigma = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[25 * _ldStaging];
-    auto stage_v3rhosigma2 = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[34 * _ldStaging];
-    auto stage_v3sigma3    = (alloc) ? mem::malloc<double>(10 * np) : &_stagingBuffer[46 * _ldStaging];
+    auto stage_v3rho3             = (alloc) ? mem::malloc<double>(4  * np) : &_stagingBuffer[21  * _ldStaging];
+    auto stage_v3rho2sigma        = (alloc) ? mem::malloc<double>(9  * np) : &_stagingBuffer[25  * _ldStaging];
+    auto stage_v3rhosigma2        = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[34  * _ldStaging];
+    auto stage_v3sigma3           = (alloc) ? mem::malloc<double>(10 * np) : &_stagingBuffer[46  * _ldStaging];
 
     for (const auto& xccomp : _components)
     {
@@ -841,7 +827,8 @@ CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
         {
             xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
 
-#pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, v3rhosigma2, stage_v3rhosigma2, v3sigma3, stage_v3sigma3 : VLX_ALIGN)
+#pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, \
+                         v3rhosigma2, stage_v3rhosigma2, v3sigma3, stage_v3sigma3 : VLX_ALIGN)
             for (auto g = 0; g < np; ++g)
             {
                 v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
@@ -917,29 +904,29 @@ CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
         v4rho4[5 * g + 3] = 0.0;
         v4rho4[5 * g + 4] = 0.0;
 
-        v4rho3sigma[12 * g + 0]  = 0.0;
-        v4rho3sigma[12 * g + 1]  = 0.0;
-        v4rho3sigma[12 * g + 2]  = 0.0;
-        v4rho3sigma[12 * g + 3]  = 0.0;
-        v4rho3sigma[12 * g + 4]  = 0.0;
-        v4rho3sigma[12 * g + 5]  = 0.0;
-        v4rho3sigma[12 * g + 6]  = 0.0;
-        v4rho3sigma[12 * g + 7]  = 0.0;
-        v4rho3sigma[12 * g + 8]  = 0.0;
-        v4rho3sigma[12 * g + 9]  = 0.0;
+        v4rho3sigma[12 * g + 0] = 0.0;
+        v4rho3sigma[12 * g + 1] = 0.0;
+        v4rho3sigma[12 * g + 2] = 0.0;
+        v4rho3sigma[12 * g + 3] = 0.0;
+        v4rho3sigma[12 * g + 4] = 0.0;
+        v4rho3sigma[12 * g + 5] = 0.0;
+        v4rho3sigma[12 * g + 6] = 0.0;
+        v4rho3sigma[12 * g + 7] = 0.0;
+        v4rho3sigma[12 * g + 8] = 0.0;
+        v4rho3sigma[12 * g + 9] = 0.0;
         v4rho3sigma[12 * g + 10] = 0.0;
         v4rho3sigma[12 * g + 11] = 0.0;
 
-        v4rho2sigma2[18 * g + 0]  = 0.0;
-        v4rho2sigma2[18 * g + 1]  = 0.0;
-        v4rho2sigma2[18 * g + 2]  = 0.0;
-        v4rho2sigma2[18 * g + 3]  = 0.0;
-        v4rho2sigma2[18 * g + 4]  = 0.0;
-        v4rho2sigma2[18 * g + 5]  = 0.0;
-        v4rho2sigma2[18 * g + 6]  = 0.0;
-        v4rho2sigma2[18 * g + 7]  = 0.0;
-        v4rho2sigma2[18 * g + 8]  = 0.0;
-        v4rho2sigma2[18 * g + 9]  = 0.0;
+        v4rho2sigma2[18 * g + 0] = 0.0;
+        v4rho2sigma2[18 * g + 1] = 0.0;
+        v4rho2sigma2[18 * g + 2] = 0.0;
+        v4rho2sigma2[18 * g + 3] = 0.0;
+        v4rho2sigma2[18 * g + 4] = 0.0;
+        v4rho2sigma2[18 * g + 5] = 0.0;
+        v4rho2sigma2[18 * g + 6] = 0.0;
+        v4rho2sigma2[18 * g + 7] = 0.0;
+        v4rho2sigma2[18 * g + 8] = 0.0;
+        v4rho2sigma2[18 * g + 9] = 0.0;
         v4rho2sigma2[18 * g + 10] = 0.0;
         v4rho2sigma2[18 * g + 11] = 0.0;
         v4rho2sigma2[18 * g + 12] = 0.0;
@@ -949,16 +936,16 @@ CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
         v4rho2sigma2[18 * g + 16] = 0.0;
         v4rho2sigma2[18 * g + 17] = 0.0;
 
-        v4rhosigma3[20 * g + 0]  = 0.0;
-        v4rhosigma3[20 * g + 1]  = 0.0;
-        v4rhosigma3[20 * g + 2]  = 0.0;
-        v4rhosigma3[20 * g + 3]  = 0.0;
-        v4rhosigma3[20 * g + 4]  = 0.0;
-        v4rhosigma3[20 * g + 5]  = 0.0;
-        v4rhosigma3[20 * g + 6]  = 0.0;
-        v4rhosigma3[20 * g + 7]  = 0.0;
-        v4rhosigma3[20 * g + 8]  = 0.0;
-        v4rhosigma3[20 * g + 9]  = 0.0;
+        v4rhosigma3[20 * g + 0] = 0.0;
+        v4rhosigma3[20 * g + 1] = 0.0;
+        v4rhosigma3[20 * g + 2] = 0.0;
+        v4rhosigma3[20 * g + 3] = 0.0;
+        v4rhosigma3[20 * g + 4] = 0.0;
+        v4rhosigma3[20 * g + 5] = 0.0;
+        v4rhosigma3[20 * g + 6] = 0.0;
+        v4rhosigma3[20 * g + 7] = 0.0;
+        v4rhosigma3[20 * g + 8] = 0.0;
+        v4rhosigma3[20 * g + 9] = 0.0;
         v4rhosigma3[20 * g + 10] = 0.0;
         v4rhosigma3[20 * g + 11] = 0.0;
         v4rhosigma3[20 * g + 12] = 0.0;
@@ -970,16 +957,16 @@ CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
         v4rhosigma3[20 * g + 18] = 0.0;
         v4rhosigma3[20 * g + 19] = 0.0;
 
-        v4sigma4[15 * g + 0]  = 0.0;
-        v4sigma4[15 * g + 1]  = 0.0;
-        v4sigma4[15 * g + 2]  = 0.0;
-        v4sigma4[15 * g + 3]  = 0.0;
-        v4sigma4[15 * g + 4]  = 0.0;
-        v4sigma4[15 * g + 5]  = 0.0;
-        v4sigma4[15 * g + 6]  = 0.0;
-        v4sigma4[15 * g + 7]  = 0.0;
-        v4sigma4[15 * g + 8]  = 0.0;
-        v4sigma4[15 * g + 9]  = 0.0;
+        v4sigma4[15 * g + 0] = 0.0;
+        v4sigma4[15 * g + 1] = 0.0;
+        v4sigma4[15 * g + 2] = 0.0;
+        v4sigma4[15 * g + 3] = 0.0;
+        v4sigma4[15 * g + 4] = 0.0;
+        v4sigma4[15 * g + 5] = 0.0;
+        v4sigma4[15 * g + 6] = 0.0;
+        v4sigma4[15 * g + 7] = 0.0;
+        v4sigma4[15 * g + 8] = 0.0;
+        v4sigma4[15 * g + 9] = 0.0;
         v4sigma4[15 * g + 10] = 0.0;
         v4sigma4[15 * g + 11] = 0.0;
         v4sigma4[15 * g + 12] = 0.0;
@@ -990,21 +977,11 @@ CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    //   stage_exc            (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    //   stage_vrho           (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    //   stage_vsigma         (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-    //   stage_v2rho2         (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
-    //   stage_v2rhosigma     (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
-    //   stage_v2sigma2       (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
-    //   stage_v3rho3         (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[21 * _ldStaging];
-    //   stage_v3rho2sigma    (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[25 * _ldStaging];
-    //   stage_v3rhosigma2    (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[34 * _ldStaging];
-    //   stage_v3sigma3       (alloc) ? mem::malloc<double>(10 * np) : &_stagingBuffer[46 * _ldStaging];
-    auto stage_v4rho4       = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[56 * _ldStaging];
-    auto stage_v4rho3sigma  = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[61 * _ldStaging];
-    auto stage_v4rho2sigma2 = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[73 * _ldStaging];
-    auto stage_v4rhosigma3  = (alloc) ? mem::malloc<double>(20 * np) : &_stagingBuffer[91 * _ldStaging];
-    auto stage_v4sigma4     = (alloc) ? mem::malloc<double>(15 * np) : &_stagingBuffer[111 * _ldStaging];
+    auto stage_v4rho4             = (alloc) ? mem::malloc<double>(5  * np) : &_stagingBuffer[56  * _ldStaging];
+    auto stage_v4rho3sigma        = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[61  * _ldStaging];
+    auto stage_v4rho2sigma2       = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[73  * _ldStaging];
+    auto stage_v4rhosigma3        = (alloc) ? mem::malloc<double>(20 * np) : &_stagingBuffer[91  * _ldStaging];
+    auto stage_v4sigma4           = (alloc) ? mem::malloc<double>(15 * np) : &_stagingBuffer[111 * _ldStaging];
 
     for (const auto& xccomp : _components)
     {
@@ -1030,11 +1007,13 @@ CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
         }
         else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
-            xc_gga_lxc(funcptr, np, rho, sigma, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4);
+            xc_gga_lxc(funcptr, np, rho, sigma,
+                       stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3,
+                       stage_v4sigma4);
 
-#pragma omp simd aligned(                                                                                                                            \
-    v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4 \
-    : VLX_ALIGN)
+#pragma omp simd aligned(v4rho4, stage_v4rho4, v4rho3sigma, stage_v4rho3sigma, \
+                         v4rho2sigma2, stage_v4rho2sigma2, v4rhosigma3, stage_v4rhosigma3, \
+                         v4sigma4, stage_v4sigma4 : VLX_ALIGN)
             for (auto g = 0; g < np; ++g)
             {
                 v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
