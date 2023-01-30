@@ -2815,7 +2815,7 @@ CXCNewFunctional::compute_lxc_for_mgga(int32_t       np,
 
         auto family = funcptr->info->family;
 
-        if (family == XC_FAMILY_LDA)
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
         {
             xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
 
@@ -2831,7 +2831,7 @@ CXCNewFunctional::compute_lxc_for_mgga(int32_t       np,
         
             }
         }
-        else if (family == XC_FAMILY_GGA)
+        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
         {
             xc_gga_lxc(funcptr, np, rho, sigma, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4);
 
@@ -2915,7 +2915,7 @@ CXCNewFunctional::compute_lxc_for_mgga(int32_t       np,
 
             }
         }
-        else if (family == XC_FAMILY_MGGA)
+        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
         {
             xc_mgga_lxc(funcptr, np, rho, sigma, lapl, tau,
                          stage_v4rho4, stage_v4rho3sigma, stage_v4rho3lapl, stage_v4rho3tau, stage_v4rho2sigma2,

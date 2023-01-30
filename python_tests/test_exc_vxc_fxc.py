@@ -82,8 +82,9 @@ class TestExcVxc:
             rho[0::2] = rho_a[:]
             rho[1::2] = rho_b[:]
 
-            exc, vrho = xc_drv.compute_exc_vxc_for_lda(xcfun_label, rho)
-            vrho_a = vrho[0::2]
+            exc_vxc = xc_drv.compute_exc_vxc_for_lda(xcfun_label, rho)
+            exc = exc_vxc['exc'][:, 0]
+            vrho_a = exc_vxc['vrho'][:, 0]
 
             gw = molgrid.w_to_numpy()
             rho_total = rho_a + rho_b
@@ -99,9 +100,9 @@ class TestExcVxc:
             Vxcmat = np.matmul(gto, Gmat.T)
             assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
 
-            v2rho2 = xc_drv.compute_fxc_for_lda(xcfun_label, rho)
-            v2rho2_a_a = v2rho2[0::3]
-            v2rho2_a_b = v2rho2[1::3]
+            fxc = xc_drv.compute_fxc_for_lda(xcfun_label, rho)
+            v2rho2_a_a = fxc['v2rho2'][:, 0]
+            v2rho2_a_b = fxc['v2rho2'][:, 1]
 
             for i in range(rhow_density.number_of_density_matrices()):
                 Fmat = np.matmul(rhow_density.alpha_to_numpy(i), gto)
@@ -203,11 +204,11 @@ class TestExcVxc:
             sigma[1::3] = sigma_a_b[:]
             sigma[2::3] = sigma_b_b[:]
 
-            exc, vrho, vsigma = xc_drv.compute_exc_vxc_for_gga(
-                xcfun_label, rho, sigma)
-            vrho_a = vrho[0::2]
-            vsigma_aa = vsigma[0::3]
-            vsigma_ab = vsigma[1::3]
+            exc_vxc = xc_drv.compute_exc_vxc_for_gga(xcfun_label, rho, sigma)
+            exc = exc_vxc['exc'][:, 0]
+            vrho_a = exc_vxc['vrho'][:, 0]
+            vsigma_aa = exc_vxc['vsigma'][:, 0]
+            vsigma_ab = exc_vxc['vsigma'][:, 1]
 
             gw = molgrid.w_to_numpy()
             rho_total = rho_a + rho_b
@@ -230,20 +231,19 @@ class TestExcVxc:
             Vxcmat = np.matmul(gto, Gmat.T) + Vxcmat_gga + Vxcmat_gga.T
             assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
 
-            v2rho2, v2rhosigma, v2sigma2 = xc_drv.compute_fxc_for_gga(
-                xcfun_label, rho, sigma)
-            v2rho2_a_a = v2rho2[0::3]
-            v2rho2_a_b = v2rho2[1::3]
-            v2rhosigma_a_aa = v2rhosigma[0::6]
-            v2rhosigma_a_ab = v2rhosigma[1::6]
-            v2rhosigma_a_bb = v2rhosigma[2::6]
-            v2rhosigma_b_aa = v2rhosigma[3::6]
-            v2rhosigma_b_ab = v2rhosigma[4::6]
-            v2sigma2_aa_aa = v2sigma2[0::6]
-            v2sigma2_aa_ab = v2sigma2[1::6]
-            v2sigma2_aa_bb = v2sigma2[2::6]
-            v2sigma2_ab_ab = v2sigma2[3::6]
-            v2sigma2_ab_bb = v2sigma2[4::6]
+            fxc = xc_drv.compute_fxc_for_gga(xcfun_label, rho, sigma)
+            v2rho2_a_a = fxc['v2rho2'][:, 0]
+            v2rho2_a_b = fxc['v2rho2'][:, 1]
+            v2rhosigma_a_aa = fxc['v2rhosigma'][:, 0]
+            v2rhosigma_a_ab = fxc['v2rhosigma'][:, 1]
+            v2rhosigma_a_bb = fxc['v2rhosigma'][:, 2]
+            v2rhosigma_b_aa = fxc['v2rhosigma'][:, 3]
+            v2rhosigma_b_ab = fxc['v2rhosigma'][:, 4]
+            v2sigma2_aa_aa = fxc['v2sigma2'][:, 0]
+            v2sigma2_aa_ab = fxc['v2sigma2'][:, 1]
+            v2sigma2_aa_bb = fxc['v2sigma2'][:, 2]
+            v2sigma2_ab_ab = fxc['v2sigma2'][:, 3]
+            v2sigma2_ab_bb = fxc['v2sigma2'][:, 4]
 
             for i in range(rhow_density.number_of_density_matrices()):
                 Dmat = rhow_density.alpha_to_numpy(i)

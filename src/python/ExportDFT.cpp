@@ -461,7 +461,7 @@ export_dft(py::module& m)
             "molecularGrid"_a)
         .def(
             "compute_exc_vxc_for_lda",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::list {
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc_for_lda: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
@@ -469,19 +469,73 @@ export_dft(py::module& m)
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
                 CDenseMatrix exc(npoints, 1);
                 CDenseMatrix vrho(npoints, 2);
-                auto         fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-                fvxc.compute_exc_vxc_for_lda(npoints, rho.data(), exc.values(), vrho.values());
-                py::list ret;
-                ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
-                ret.append(vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfElements()));
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_exc_vxc_for_lda(npoints, rho.data(), exc.values(), vrho.values());
+                py::dict ret;
+                ret["exc"]  = vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfRows(), exc.getNumberOfColumns());
+                ret["vrho"] = vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfRows(), vrho.getNumberOfColumns());
                 return ret;
             },
             "Computes Exc and Vxc for LDA.",
             "xcFuncLabel"_a,
             "rho"_a)
         .def(
+            "compute_fxc_for_lda",
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
+                auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style, std::string("compute_fxc_for_lda: Expecting C-style contiguous numpy array"));
+                auto rho_size = static_cast<int32_t>(rho.size());
+                auto npoints  = rho_size / 2;
+                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_fxc_for_lda: Inconsistent array size"));
+                CDenseMatrix v2rho2(npoints, 3);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_fxc_for_lda(npoints, rho.data(), v2rho2.values());
+                py::dict ret;
+                ret["v2rho2"] = vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfRows(), v2rho2.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Fxc for LDA.",
+            "xcFuncLabel"_a,
+            "rho"_a)
+        .def(
+            "compute_kxc_for_lda",
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
+                auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style, std::string("compute_kxc_for_lda: Expecting C-style contiguous numpy array"));
+                auto rho_size = static_cast<int32_t>(rho.size());
+                auto npoints  = rho_size / 2;
+                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_kxc_for_lda: Inconsistent array size"));
+                CDenseMatrix v3rho3(npoints, 4);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_kxc_for_lda(npoints, rho.data(), v3rho3.values());
+                py::dict ret;
+                ret["v3rho3"] = vlx_general::pointer_to_numpy(v3rho3.values(), v3rho3.getNumberOfRows(), v3rho3.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Kxc for LDA.",
+            "xcFuncLabel"_a,
+            "rho"_a)
+        .def(
+            "compute_lxc_for_lda",
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
+                auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style, std::string("compute_lxc_for_lda: Expecting C-style contiguous numpy array"));
+                auto rho_size = static_cast<int32_t>(rho.size());
+                auto npoints  = rho_size / 2;
+                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_lxc_for_lda: Inconsistent array size"));
+                CDenseMatrix v4rho4(npoints, 5);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_lxc_for_lda(npoints, rho.data(), v4rho4.values());
+                py::dict ret;
+                ret["v4rho4"] = vlx_general::pointer_to_numpy(v4rho4.values(), v4rho4.getNumberOfRows(), v4rho4.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Lxc for LDA.",
+            "xcFuncLabel"_a,
+            "rho"_a)
+        .def(
             "compute_exc_vxc_for_gga",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style && sigma_c_style,
@@ -494,12 +548,12 @@ export_dft(py::module& m)
                 CDenseMatrix exc(npoints, 1);
                 CDenseMatrix vrho(npoints, 2);
                 CDenseMatrix vsigma(npoints, 3);
-                auto         fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-                fvxc.compute_exc_vxc_for_gga(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
-                py::list ret;
-                ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
-                ret.append(vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfElements()));
-                ret.append(vlx_general::pointer_to_numpy(vsigma.values(), vsigma.getNumberOfElements()));
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_exc_vxc_for_gga(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
+                py::dict ret;
+                ret["exc"]    = vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfRows(), exc.getNumberOfColumns());
+                ret["vrho"]   = vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfRows(), vrho.getNumberOfColumns());
+                ret["vsigma"] = vlx_general::pointer_to_numpy(vsigma.values(), vsigma.getNumberOfRows(), vsigma.getNumberOfColumns());
                 return ret;
             },
             "Computes Exc and Vxc for GGA.",
@@ -507,24 +561,8 @@ export_dft(py::module& m)
             "rho"_a,
             "sigma"_a)
         .def(
-            "compute_fxc_for_lda",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::array_t<double> {
-                auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
-                errors::assertMsgCritical(rho_c_style, std::string("compute_fxc_for_lda: Expecting C-style contiguous numpy array"));
-                auto rho_size = static_cast<int32_t>(rho.size());
-                auto npoints  = rho_size / 2;
-                errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_fxc_for_lda: Inconsistent array size"));
-                CDenseMatrix v2rho2(npoints, 3);
-                auto         fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-                fvxc.compute_fxc_for_lda(npoints, rho.data(), v2rho2.values());
-                return vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfElements());
-            },
-            "Computes Fxc for LDA.",
-            "xcFuncLabel"_a,
-            "rho"_a)
-        .def(
             "compute_fxc_for_gga",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style && sigma_c_style, std::string("compute_fxc_for_gga: Expecting C-style contiguous numpy array"));
@@ -536,18 +574,486 @@ export_dft(py::module& m)
                 CDenseMatrix v2rho2(npoints, 3);
                 CDenseMatrix v2rhosigma(npoints, 6);
                 CDenseMatrix v2sigma2(npoints, 6);
-                auto         fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-                fvxc.compute_fxc_for_gga(npoints, rho.data(), sigma.data(), v2rho2.values(), v2rhosigma.values(), v2sigma2.values());
-                py::list ret;
-                ret.append(vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfElements()));
-                ret.append(vlx_general::pointer_to_numpy(v2rhosigma.values(), v2rhosigma.getNumberOfElements()));
-                ret.append(vlx_general::pointer_to_numpy(v2sigma2.values(), v2sigma2.getNumberOfElements()));
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_fxc_for_gga(npoints, rho.data(), sigma.data(), v2rho2.values(), v2rhosigma.values(), v2sigma2.values());
+                py::dict ret;
+                ret["v2rho2"]     = vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfRows(), v2rho2.getNumberOfColumns());
+                ret["v2rhosigma"] = vlx_general::pointer_to_numpy(v2rhosigma.values(), v2rhosigma.getNumberOfRows(), v2rhosigma.getNumberOfColumns());
+                ret["v2sigma2"]   = vlx_general::pointer_to_numpy(v2sigma2.values(), v2sigma2.getNumberOfRows(), v2sigma2.getNumberOfColumns());
                 return ret;
             },
             "Computes Fxc for GGA.",
             "xcFuncLabel"_a,
             "rho"_a,
-            "sigma"_a);
+            "sigma"_a)
+        .def(
+            "compute_kxc_for_gga",
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
+                auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style && sigma_c_style, std::string("compute_kxc_for_gga: Expecting C-style contiguous numpy array"));
+                auto rho_size   = static_cast<int32_t>(rho.size());
+                auto sigma_size = static_cast<int32_t>(sigma.size());
+                auto npoints    = rho_size / 2;
+                errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
+                                          std::string("compute_kxc_for_gga: Inconsistent array size"));
+                CDenseMatrix v3rho3(npoints, 4);
+                CDenseMatrix v3rho2sigma(npoints, 9);
+                CDenseMatrix v3rhosigma2(npoints, 12);
+                CDenseMatrix v3sigma3(npoints, 10);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_kxc_for_gga(
+                    npoints, rho.data(), sigma.data(), v3rho3.values(), v3rho2sigma.values(), v3rhosigma2.values(), v3sigma3.values());
+                py::dict ret;
+                ret["v3rho3"] = vlx_general::pointer_to_numpy(v3rho3.values(), v3rho3.getNumberOfRows(), v3rho3.getNumberOfColumns());
+                ret["v3rho2sigma"] =
+                    vlx_general::pointer_to_numpy(v3rho2sigma.values(), v3rho2sigma.getNumberOfRows(), v3rho2sigma.getNumberOfColumns());
+                ret["v3rhosigma2"] =
+                    vlx_general::pointer_to_numpy(v3rhosigma2.values(), v3rhosigma2.getNumberOfRows(), v3rhosigma2.getNumberOfColumns());
+                ret["v3sigma3"] = vlx_general::pointer_to_numpy(v3sigma3.values(), v3sigma3.getNumberOfRows(), v3sigma3.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Kxc for GGA.",
+            "xcFuncLabel"_a,
+            "rho"_a,
+            "sigma"_a)
+        .def(
+            "compute_lxc_for_gga",
+            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
+                auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style && sigma_c_style, std::string("compute_lxc_for_gga: Expecting C-style contiguous numpy array"));
+                auto rho_size   = static_cast<int32_t>(rho.size());
+                auto sigma_size = static_cast<int32_t>(sigma.size());
+                auto npoints    = rho_size / 2;
+                errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
+                                          std::string("compute_lxc_for_gga: Inconsistent array size"));
+                CDenseMatrix v4rho4(npoints, 5);
+                CDenseMatrix v4rho3sigma(npoints, 12);
+                CDenseMatrix v4rho2sigma2(npoints, 18);
+                CDenseMatrix v4rhosigma3(npoints, 20);
+                CDenseMatrix v4sigma4(npoints, 15);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_lxc_for_gga(npoints,
+                                         rho.data(),
+                                         sigma.data(),
+                                         v4rho4.values(),
+                                         v4rho3sigma.values(),
+                                         v4rho2sigma2.values(),
+                                         v4rhosigma3.values(),
+                                         v4sigma4.values());
+                py::dict ret;
+                ret["v4rho4"] = vlx_general::pointer_to_numpy(v4rho4.values(), v4rho4.getNumberOfRows(), v4rho4.getNumberOfColumns());
+                ret["v4rho3sigma"] =
+                    vlx_general::pointer_to_numpy(v4rho3sigma.values(), v4rho3sigma.getNumberOfRows(), v4rho3sigma.getNumberOfColumns());
+                ret["v4rho2sigma2"] =
+                    vlx_general::pointer_to_numpy(v4rho2sigma2.values(), v4rho2sigma2.getNumberOfRows(), v4rho2sigma2.getNumberOfColumns());
+                ret["v4rhosigma3"] =
+                    vlx_general::pointer_to_numpy(v4rhosigma3.values(), v4rhosigma3.getNumberOfRows(), v4rhosigma3.getNumberOfColumns());
+                ret["v4sigma4"] = vlx_general::pointer_to_numpy(v4sigma4.values(), v4sigma4.getNumberOfRows(), v4sigma4.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Lxc for GGA.",
+            "xcFuncLabel"_a,
+            "rho"_a,
+            "sigma"_a)
+        .def(
+            "compute_exc_vxc_for_mgga",
+            [](CXCNewIntegrator&          self,
+               const std::string&         xcFuncLabel,
+               const py::array_t<double>& rho,
+               const py::array_t<double>& sigma,
+               const py::array_t<double>& lapl,
+               const py::array_t<double>& tau) -> py::dict {
+                auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
+                auto lapl_c_style  = py::detail::check_flags(lapl.ptr(), py::array::c_style);
+                auto tau_c_style   = py::detail::check_flags(tau.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style && sigma_c_style && lapl_c_style && tau_c_style,
+                                          std::string("compute_exc_vxc_for_mgga: Expecting C-style contiguous numpy array"));
+                auto rho_size   = static_cast<int32_t>(rho.size());
+                auto sigma_size = static_cast<int32_t>(sigma.size());
+                auto lapl_size  = static_cast<int32_t>(lapl.size());
+                auto tau_size   = static_cast<int32_t>(tau.size());
+                auto npoints    = rho_size / 2;
+                errors::assertMsgCritical(
+                    (rho_size == npoints * 2) && (sigma_size == npoints * 3) && (lapl_size == npoints * 2) && (tau_size == npoints * 2),
+                    std::string("compute_exc_vxc_for_mgga: Inconsistent array size"));
+                CDenseMatrix exc(npoints, 1);
+                CDenseMatrix vrho(npoints, 2);
+                CDenseMatrix vsigma(npoints, 3);
+                CDenseMatrix vlapl(npoints, 2);
+                CDenseMatrix vtau(npoints, 2);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_exc_vxc_for_mgga(npoints,
+                                              rho.data(),
+                                              sigma.data(),
+                                              lapl.data(),
+                                              tau.data(),
+                                              exc.values(),
+                                              vrho.values(),
+                                              vsigma.values(),
+                                              vlapl.values(),
+                                              vtau.values());
+                py::dict ret;
+                ret["exc"]    = vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfRows(), exc.getNumberOfColumns());
+                ret["vrho"]   = vlx_general::pointer_to_numpy(vrho.values(), vrho.getNumberOfRows(), vrho.getNumberOfColumns());
+                ret["vsigma"] = vlx_general::pointer_to_numpy(vsigma.values(), vsigma.getNumberOfRows(), vsigma.getNumberOfColumns());
+                ret["vlapl"]  = vlx_general::pointer_to_numpy(vlapl.values(), vlapl.getNumberOfRows(), vlapl.getNumberOfColumns());
+                ret["vtau"]   = vlx_general::pointer_to_numpy(vtau.values(), vtau.getNumberOfRows(), vtau.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Exc and Vxc for meta-GGA.",
+            "xcFuncLabel"_a,
+            "rho"_a,
+            "sigma"_a,
+            "lapl"_a,
+            "tau"_a)
+        .def(
+            "compute_fxc_for_mgga",
+            [](CXCNewIntegrator&          self,
+               const std::string&         xcFuncLabel,
+               const py::array_t<double>& rho,
+               const py::array_t<double>& sigma,
+               const py::array_t<double>& lapl,
+               const py::array_t<double>& tau) -> py::dict {
+                auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
+                auto lapl_c_style  = py::detail::check_flags(lapl.ptr(), py::array::c_style);
+                auto tau_c_style   = py::detail::check_flags(tau.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style && sigma_c_style && lapl_c_style && tau_c_style,
+                                          std::string("compute_fxc_for_mgga: Expecting C-style contiguous numpy array"));
+                auto rho_size   = static_cast<int32_t>(rho.size());
+                auto sigma_size = static_cast<int32_t>(sigma.size());
+                auto lapl_size  = static_cast<int32_t>(lapl.size());
+                auto tau_size   = static_cast<int32_t>(tau.size());
+                auto npoints    = rho_size / 2;
+                errors::assertMsgCritical(
+                    (rho_size == npoints * 2) && (sigma_size == npoints * 3) && (lapl_size == npoints * 2) && (tau_size == npoints * 2),
+                    std::string("compute_fxc_for_mgga: Inconsistent array size"));
+                CDenseMatrix v2rho2(npoints, 3);
+                CDenseMatrix v2rhosigma(npoints, 6);
+                CDenseMatrix v2rholapl(npoints, 4);
+                CDenseMatrix v2rhotau(npoints, 4);
+                CDenseMatrix v2sigma2(npoints, 6);
+                CDenseMatrix v2sigmalapl(npoints, 6);
+                CDenseMatrix v2sigmatau(npoints, 6);
+                CDenseMatrix v2lapl2(npoints, 3);
+                CDenseMatrix v2lapltau(npoints, 4);
+                CDenseMatrix v2tau2(npoints, 3);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_fxc_for_mgga(npoints,
+                                          rho.data(),
+                                          sigma.data(),
+                                          lapl.data(),
+                                          tau.data(),
+                                          v2rho2.values(),
+                                          v2rhosigma.values(),
+                                          v2rholapl.values(),
+                                          v2rhotau.values(),
+                                          v2sigma2.values(),
+                                          v2sigmalapl.values(),
+                                          v2sigmatau.values(),
+                                          v2lapl2.values(),
+                                          v2lapltau.values(),
+                                          v2tau2.values());
+                py::dict ret;
+                ret["v2rho2"]     = vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfRows(), v2rho2.getNumberOfColumns());
+                ret["v2rhosigma"] = vlx_general::pointer_to_numpy(v2rhosigma.values(), v2rhosigma.getNumberOfRows(), v2rhosigma.getNumberOfColumns());
+                ret["v2rholapl"]  = vlx_general::pointer_to_numpy(v2rholapl.values(), v2rholapl.getNumberOfRows(), v2rholapl.getNumberOfColumns());
+                ret["v2rhotau"]   = vlx_general::pointer_to_numpy(v2rhotau.values(), v2rhotau.getNumberOfRows(), v2rhotau.getNumberOfColumns());
+                ret["v2sigma2"]   = vlx_general::pointer_to_numpy(v2sigma2.values(), v2sigma2.getNumberOfRows(), v2sigma2.getNumberOfColumns());
+                ret["v2sigmalapl"] =
+                    vlx_general::pointer_to_numpy(v2sigmalapl.values(), v2sigmalapl.getNumberOfRows(), v2sigmalapl.getNumberOfColumns());
+                ret["v2sigmatau"] = vlx_general::pointer_to_numpy(v2sigmatau.values(), v2sigmatau.getNumberOfRows(), v2sigmatau.getNumberOfColumns());
+                ret["v2lapl2"]    = vlx_general::pointer_to_numpy(v2lapl2.values(), v2lapl2.getNumberOfRows(), v2lapl2.getNumberOfColumns());
+                ret["v2lapltau"]  = vlx_general::pointer_to_numpy(v2lapltau.values(), v2lapltau.getNumberOfRows(), v2lapltau.getNumberOfColumns());
+                ret["v2tau2"]     = vlx_general::pointer_to_numpy(v2tau2.values(), v2tau2.getNumberOfRows(), v2tau2.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Fxc for meta-GGA.",
+            "xcFuncLabel"_a,
+            "rho"_a,
+            "sigma"_a,
+            "lapl"_a,
+            "tau"_a)
+        .def(
+            "compute_kxc_for_mgga",
+            [](CXCNewIntegrator&          self,
+               const std::string&         xcFuncLabel,
+               const py::array_t<double>& rho,
+               const py::array_t<double>& sigma,
+               const py::array_t<double>& lapl,
+               const py::array_t<double>& tau) -> py::dict {
+                auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
+                auto lapl_c_style  = py::detail::check_flags(lapl.ptr(), py::array::c_style);
+                auto tau_c_style   = py::detail::check_flags(tau.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style && sigma_c_style && lapl_c_style && tau_c_style,
+                                          std::string("compute_kxc_for_mgga: Expecting C-style contiguous numpy array"));
+                auto rho_size   = static_cast<int32_t>(rho.size());
+                auto sigma_size = static_cast<int32_t>(sigma.size());
+                auto lapl_size  = static_cast<int32_t>(lapl.size());
+                auto tau_size   = static_cast<int32_t>(tau.size());
+                auto npoints    = rho_size / 2;
+                errors::assertMsgCritical(
+                    (rho_size == npoints * 2) && (sigma_size == npoints * 3) && (lapl_size == npoints * 2) && (tau_size == npoints * 2),
+                    std::string("compute_kxc_for_mgga: Inconsistent array size"));
+                CDenseMatrix v3rho3(npoints, 4);
+                CDenseMatrix v3rho2sigma(npoints, 9);
+                CDenseMatrix v3rho2lapl(npoints, 6);
+                CDenseMatrix v3rho2tau(npoints, 6);
+                CDenseMatrix v3rhosigma2(npoints, 12);
+                CDenseMatrix v3rhosigmalapl(npoints, 12);
+                CDenseMatrix v3rhosigmatau(npoints, 12);
+                CDenseMatrix v3rholapl2(npoints, 6);
+                CDenseMatrix v3rholapltau(npoints, 8);
+                CDenseMatrix v3rhotau2(npoints, 6);
+                CDenseMatrix v3sigma3(npoints, 10);
+                CDenseMatrix v3sigma2lapl(npoints, 12);
+                CDenseMatrix v3sigma2tau(npoints, 12);
+                CDenseMatrix v3sigmalapl2(npoints, 9);
+                CDenseMatrix v3sigmalapltau(npoints, 12);
+                CDenseMatrix v3sigmatau2(npoints, 9);
+                CDenseMatrix v3lapl3(npoints, 4);
+                CDenseMatrix v3lapl2tau(npoints, 6);
+                CDenseMatrix v3lapltau2(npoints, 6);
+                CDenseMatrix v3tau3(npoints, 4);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_kxc_for_mgga(npoints,
+                                          rho.data(),
+                                          sigma.data(),
+                                          lapl.data(),
+                                          tau.data(),
+                                          v3rho3.values(),
+                                          v3rho2sigma.values(),
+                                          v3rho2lapl.values(),
+                                          v3rho2tau.values(),
+                                          v3rhosigma2.values(),
+                                          v3rhosigmalapl.values(),
+                                          v3rhosigmatau.values(),
+                                          v3rholapl2.values(),
+                                          v3rholapltau.values(),
+                                          v3rhotau2.values(),
+                                          v3sigma3.values(),
+                                          v3sigma2lapl.values(),
+                                          v3sigma2tau.values(),
+                                          v3sigmalapl2.values(),
+                                          v3sigmalapltau.values(),
+                                          v3sigmatau2.values(),
+                                          v3lapl3.values(),
+                                          v3lapl2tau.values(),
+                                          v3lapltau2.values(),
+                                          v3tau3.values());
+                py::dict ret;
+                ret["v3rho3"] = vlx_general::pointer_to_numpy(v3rho3.values(), v3rho3.getNumberOfRows(), v3rho3.getNumberOfColumns());
+                ret["v3rho2sigma"] =
+                    vlx_general::pointer_to_numpy(v3rho2sigma.values(), v3rho2sigma.getNumberOfRows(), v3rho2sigma.getNumberOfColumns());
+                ret["v3rho2lapl"] = vlx_general::pointer_to_numpy(v3rho2lapl.values(), v3rho2lapl.getNumberOfRows(), v3rho2lapl.getNumberOfColumns());
+                ret["v3rho2tau"]  = vlx_general::pointer_to_numpy(v3rho2tau.values(), v3rho2tau.getNumberOfRows(), v3rho2tau.getNumberOfColumns());
+                ret["v3rhosigma2"] =
+                    vlx_general::pointer_to_numpy(v3rhosigma2.values(), v3rhosigma2.getNumberOfRows(), v3rhosigma2.getNumberOfColumns());
+                ret["v3rhosigmalapl"] =
+                    vlx_general::pointer_to_numpy(v3rhosigmalapl.values(), v3rhosigmalapl.getNumberOfRows(), v3rhosigmalapl.getNumberOfColumns());
+                ret["v3rhosigmatau"] =
+                    vlx_general::pointer_to_numpy(v3rhosigmatau.values(), v3rhosigmatau.getNumberOfRows(), v3rhosigmatau.getNumberOfColumns());
+                ret["v3rholapl2"] = vlx_general::pointer_to_numpy(v3rholapl2.values(), v3rholapl2.getNumberOfRows(), v3rholapl2.getNumberOfColumns());
+                ret["v3rholapltau"] =
+                    vlx_general::pointer_to_numpy(v3rholapltau.values(), v3rholapltau.getNumberOfRows(), v3rholapltau.getNumberOfColumns());
+                ret["v3rhotau2"] = vlx_general::pointer_to_numpy(v3rhotau2.values(), v3rhotau2.getNumberOfRows(), v3rhotau2.getNumberOfColumns());
+                ret["v3sigma3"]  = vlx_general::pointer_to_numpy(v3sigma3.values(), v3sigma3.getNumberOfRows(), v3sigma3.getNumberOfColumns());
+                ret["v3sigma2lapl"] =
+                    vlx_general::pointer_to_numpy(v3sigma2lapl.values(), v3sigma2lapl.getNumberOfRows(), v3sigma2lapl.getNumberOfColumns());
+                ret["v3sigma2tau"] =
+                    vlx_general::pointer_to_numpy(v3sigma2tau.values(), v3sigma2tau.getNumberOfRows(), v3sigma2tau.getNumberOfColumns());
+                ret["v3sigmalapl2"] =
+                    vlx_general::pointer_to_numpy(v3sigmalapl2.values(), v3sigmalapl2.getNumberOfRows(), v3sigmalapl2.getNumberOfColumns());
+                ret["v3sigmalapltau"] =
+                    vlx_general::pointer_to_numpy(v3sigmalapltau.values(), v3sigmalapltau.getNumberOfRows(), v3sigmalapltau.getNumberOfColumns());
+                ret["v3sigmatau2"] =
+                    vlx_general::pointer_to_numpy(v3sigmatau2.values(), v3sigmatau2.getNumberOfRows(), v3sigmatau2.getNumberOfColumns());
+                ret["v3lapl3"]    = vlx_general::pointer_to_numpy(v3lapl3.values(), v3lapl3.getNumberOfRows(), v3lapl3.getNumberOfColumns());
+                ret["v3lapl2tau"] = vlx_general::pointer_to_numpy(v3lapl2tau.values(), v3lapl2tau.getNumberOfRows(), v3lapl2tau.getNumberOfColumns());
+                ret["v3lapltau2"] = vlx_general::pointer_to_numpy(v3lapltau2.values(), v3lapltau2.getNumberOfRows(), v3lapltau2.getNumberOfColumns());
+                ret["v3tau3"]     = vlx_general::pointer_to_numpy(v3tau3.values(), v3tau3.getNumberOfRows(), v3tau3.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Kxc for meta-GGA.",
+            "xcFuncLabel"_a,
+            "rho"_a,
+            "sigma"_a,
+            "lapl"_a,
+            "tau"_a)
+        .def(
+            "compute_lxc_for_mgga",
+            [](CXCNewIntegrator&          self,
+               const std::string&         xcFuncLabel,
+               const py::array_t<double>& rho,
+               const py::array_t<double>& sigma,
+               const py::array_t<double>& lapl,
+               const py::array_t<double>& tau) -> py::dict {
+                auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
+                auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
+                auto lapl_c_style  = py::detail::check_flags(lapl.ptr(), py::array::c_style);
+                auto tau_c_style   = py::detail::check_flags(tau.ptr(), py::array::c_style);
+                errors::assertMsgCritical(rho_c_style && sigma_c_style && lapl_c_style && tau_c_style,
+                                          std::string("compute_lxc_for_mgga: Expecting C-style contiguous numpy array"));
+                auto rho_size   = static_cast<int32_t>(rho.size());
+                auto sigma_size = static_cast<int32_t>(sigma.size());
+                auto lapl_size  = static_cast<int32_t>(lapl.size());
+                auto tau_size   = static_cast<int32_t>(tau.size());
+                auto npoints    = rho_size / 2;
+                errors::assertMsgCritical(
+                    (rho_size == npoints * 2) && (sigma_size == npoints * 3) && (lapl_size == npoints * 2) && (tau_size == npoints * 2),
+                    std::string("compute_lxc_for_mgga: Inconsistent array size"));
+                CDenseMatrix v4rho4(npoints, 5);
+                CDenseMatrix v4rho3sigma(npoints, 12);
+                CDenseMatrix v4rho3lapl(npoints, 8);
+                CDenseMatrix v4rho3tau(npoints, 8);
+                CDenseMatrix v4rho2sigma2(npoints, 18);
+                CDenseMatrix v4rho2sigmalapl(npoints, 18);
+                CDenseMatrix v4rho2sigmatau(npoints, 18);
+                CDenseMatrix v4rho2lapl2(npoints, 9);
+                CDenseMatrix v4rho2lapltau(npoints, 12);
+                CDenseMatrix v4rho2tau2(npoints, 9);
+                CDenseMatrix v4rhosigma3(npoints, 20);
+                // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24);
+                CDenseMatrix v4rhosigma2lapl(npoints, 36);
+                // v4rhosigma2tau: inconsistent size in libxc (36 vs 24);
+                CDenseMatrix v4rhosigma2tau(npoints, 36);
+                CDenseMatrix v4rhosigmalapl2(npoints, 18);
+                CDenseMatrix v4rhosigmalapltau(npoints, 24);
+                // v4rhosigmatau2: inconsistent size in libxc (36 vs 18);
+                CDenseMatrix v4rhosigmatau2(npoints, 36);
+                CDenseMatrix v4rholapl3(npoints, 8);
+                CDenseMatrix v4rholapl2tau(npoints, 12);
+                CDenseMatrix v4rholapltau2(npoints, 12);
+                CDenseMatrix v4rhotau3(npoints, 8);
+                CDenseMatrix v4sigma4(npoints, 15);
+                CDenseMatrix v4sigma3lapl(npoints, 20);
+                // v4sigma3tau: inconsistent size in libxc (30 vs 20);
+                CDenseMatrix v4sigma3tau(npoints, 30);
+                CDenseMatrix v4sigma2lapl2(npoints, 18);
+                CDenseMatrix v4sigma2lapltau(npoints, 24);
+                CDenseMatrix v4sigma2tau2(npoints, 18);
+                CDenseMatrix v4sigmalapl3(npoints, 12);
+                CDenseMatrix v4sigmalapl2tau(npoints, 18);
+                CDenseMatrix v4sigmalapltau2(npoints, 18);
+                CDenseMatrix v4sigmatau3(npoints, 12);
+                CDenseMatrix v4lapl4(npoints, 5);
+                CDenseMatrix v4lapl3tau(npoints, 8);
+                CDenseMatrix v4lapl2tau2(npoints, 9);
+                CDenseMatrix v4lapltau3(npoints, 8);
+                CDenseMatrix v4tau4(npoints, 5);
+                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                func.compute_lxc_for_mgga(npoints,
+                                          rho.data(),
+                                          sigma.data(),
+                                          lapl.data(),
+                                          tau.data(),
+                                          v4rho4.values(),
+                                          v4rho3sigma.values(),
+                                          v4rho3lapl.values(),
+                                          v4rho3tau.values(),
+                                          v4rho2sigma2.values(),
+                                          v4rho2sigmalapl.values(),
+                                          v4rho2sigmatau.values(),
+                                          v4rho2lapl2.values(),
+                                          v4rho2lapltau.values(),
+                                          v4rho2tau2.values(),
+                                          v4rhosigma3.values(),
+                                          v4rhosigma2lapl.values(),
+                                          v4rhosigma2tau.values(),
+                                          v4rhosigmalapl2.values(),
+                                          v4rhosigmalapltau.values(),
+                                          v4rhosigmatau2.values(),
+                                          v4rholapl3.values(),
+                                          v4rholapl2tau.values(),
+                                          v4rholapltau2.values(),
+                                          v4rhotau3.values(),
+                                          v4sigma4.values(),
+                                          v4sigma3lapl.values(),
+                                          v4sigma3tau.values(),
+                                          v4sigma2lapl2.values(),
+                                          v4sigma2lapltau.values(),
+                                          v4sigma2tau2.values(),
+                                          v4sigmalapl3.values(),
+                                          v4sigmalapl2tau.values(),
+                                          v4sigmalapltau2.values(),
+                                          v4sigmatau3.values(),
+                                          v4lapl4.values(),
+                                          v4lapl3tau.values(),
+                                          v4lapl2tau2.values(),
+                                          v4lapltau3.values(),
+                                          v4tau4.values());
+                py::dict ret;
+                ret["v4rho4"] = vlx_general::pointer_to_numpy(v4rho4.values(), v4rho4.getNumberOfRows(), v4rho4.getNumberOfColumns());
+                ret["v4rho3sigma"] =
+                    vlx_general::pointer_to_numpy(v4rho3sigma.values(), v4rho3sigma.getNumberOfRows(), v4rho3sigma.getNumberOfColumns());
+                ret["v4rho3lapl"] = vlx_general::pointer_to_numpy(v4rho3lapl.values(), v4rho3lapl.getNumberOfRows(), v4rho3lapl.getNumberOfColumns());
+                ret["v4rho3tau"]  = vlx_general::pointer_to_numpy(v4rho3tau.values(), v4rho3tau.getNumberOfRows(), v4rho3tau.getNumberOfColumns());
+                ret["v4rho2sigma2"] =
+                    vlx_general::pointer_to_numpy(v4rho2sigma2.values(), v4rho2sigma2.getNumberOfRows(), v4rho2sigma2.getNumberOfColumns());
+                ret["v4rho2sigmalapl"] =
+                    vlx_general::pointer_to_numpy(v4rho2sigmalapl.values(), v4rho2sigmalapl.getNumberOfRows(), v4rho2sigmalapl.getNumberOfColumns());
+                ret["v4rho2sigmatau"] =
+                    vlx_general::pointer_to_numpy(v4rho2sigmatau.values(), v4rho2sigmatau.getNumberOfRows(), v4rho2sigmatau.getNumberOfColumns());
+                ret["v4rho2lapl2"] =
+                    vlx_general::pointer_to_numpy(v4rho2lapl2.values(), v4rho2lapl2.getNumberOfRows(), v4rho2lapl2.getNumberOfColumns());
+                ret["v4rho2lapltau"] =
+                    vlx_general::pointer_to_numpy(v4rho2lapltau.values(), v4rho2lapltau.getNumberOfRows(), v4rho2lapltau.getNumberOfColumns());
+                ret["v4rho2tau2"] = vlx_general::pointer_to_numpy(v4rho2tau2.values(), v4rho2tau2.getNumberOfRows(), v4rho2tau2.getNumberOfColumns());
+                ret["v4rhosigma3"] =
+                    vlx_general::pointer_to_numpy(v4rhosigma3.values(), v4rhosigma3.getNumberOfRows(), v4rhosigma3.getNumberOfColumns());
+                ret["v4rhosigma2lapl"] =
+                    vlx_general::pointer_to_numpy(v4rhosigma2lapl.values(), v4rhosigma2lapl.getNumberOfRows(), v4rhosigma2lapl.getNumberOfColumns());
+                ret["v4rhosigma2tau"] =
+                    vlx_general::pointer_to_numpy(v4rhosigma2tau.values(), v4rhosigma2tau.getNumberOfRows(), v4rhosigma2tau.getNumberOfColumns());
+                ret["v4rhosigmalapl2"] =
+                    vlx_general::pointer_to_numpy(v4rhosigmalapl2.values(), v4rhosigmalapl2.getNumberOfRows(), v4rhosigmalapl2.getNumberOfColumns());
+                ret["v4rhosigmalapltau"] = vlx_general::pointer_to_numpy(
+                    v4rhosigmalapltau.values(), v4rhosigmalapltau.getNumberOfRows(), v4rhosigmalapltau.getNumberOfColumns());
+                ret["v4rhosigmatau2"] =
+                    vlx_general::pointer_to_numpy(v4rhosigmatau2.values(), v4rhosigmatau2.getNumberOfRows(), v4rhosigmatau2.getNumberOfColumns());
+                ret["v4rholapl3"] = vlx_general::pointer_to_numpy(v4rholapl3.values(), v4rholapl3.getNumberOfRows(), v4rholapl3.getNumberOfColumns());
+                ret["v4rholapl2tau"] =
+                    vlx_general::pointer_to_numpy(v4rholapl2tau.values(), v4rholapl2tau.getNumberOfRows(), v4rholapl2tau.getNumberOfColumns());
+                ret["v4rholapltau2"] =
+                    vlx_general::pointer_to_numpy(v4rholapltau2.values(), v4rholapltau2.getNumberOfRows(), v4rholapltau2.getNumberOfColumns());
+                ret["v4rhotau3"] = vlx_general::pointer_to_numpy(v4rhotau3.values(), v4rhotau3.getNumberOfRows(), v4rhotau3.getNumberOfColumns());
+                ret["v4sigma4"]  = vlx_general::pointer_to_numpy(v4sigma4.values(), v4sigma4.getNumberOfRows(), v4sigma4.getNumberOfColumns());
+                ret["v4sigma3lapl"] =
+                    vlx_general::pointer_to_numpy(v4sigma3lapl.values(), v4sigma3lapl.getNumberOfRows(), v4sigma3lapl.getNumberOfColumns());
+                ret["v4sigma3tau"] =
+                    vlx_general::pointer_to_numpy(v4sigma3tau.values(), v4sigma3tau.getNumberOfRows(), v4sigma3tau.getNumberOfColumns());
+                ret["v4sigma2lapl2"] =
+                    vlx_general::pointer_to_numpy(v4sigma2lapl2.values(), v4sigma2lapl2.getNumberOfRows(), v4sigma2lapl2.getNumberOfColumns());
+                ret["v4sigma2lapltau"] =
+                    vlx_general::pointer_to_numpy(v4sigma2lapltau.values(), v4sigma2lapltau.getNumberOfRows(), v4sigma2lapltau.getNumberOfColumns());
+                ret["v4sigma2tau2"] =
+                    vlx_general::pointer_to_numpy(v4sigma2tau2.values(), v4sigma2tau2.getNumberOfRows(), v4sigma2tau2.getNumberOfColumns());
+                ret["v4sigmalapl3"] =
+                    vlx_general::pointer_to_numpy(v4sigmalapl3.values(), v4sigmalapl3.getNumberOfRows(), v4sigmalapl3.getNumberOfColumns());
+                ret["v4sigmalapl2tau"] =
+                    vlx_general::pointer_to_numpy(v4sigmalapl2tau.values(), v4sigmalapl2tau.getNumberOfRows(), v4sigmalapl2tau.getNumberOfColumns());
+                ret["v4sigmalapltau2"] =
+                    vlx_general::pointer_to_numpy(v4sigmalapltau2.values(), v4sigmalapltau2.getNumberOfRows(), v4sigmalapltau2.getNumberOfColumns());
+                ret["v4sigmatau3"] =
+                    vlx_general::pointer_to_numpy(v4sigmatau3.values(), v4sigmatau3.getNumberOfRows(), v4sigmatau3.getNumberOfColumns());
+                ret["v4lapl4"]    = vlx_general::pointer_to_numpy(v4lapl4.values(), v4lapl4.getNumberOfRows(), v4lapl4.getNumberOfColumns());
+                ret["v4lapl3tau"] = vlx_general::pointer_to_numpy(v4lapl3tau.values(), v4lapl3tau.getNumberOfRows(), v4lapl3tau.getNumberOfColumns());
+                ret["v4lapl2tau2"] =
+                    vlx_general::pointer_to_numpy(v4lapl2tau2.values(), v4lapl2tau2.getNumberOfRows(), v4lapl2tau2.getNumberOfColumns());
+                ret["v4lapltau3"] = vlx_general::pointer_to_numpy(v4lapltau3.values(), v4lapltau3.getNumberOfRows(), v4lapltau3.getNumberOfColumns());
+                ret["v4tau4"]     = vlx_general::pointer_to_numpy(v4tau4.values(), v4tau4.getNumberOfRows(), v4tau4.getNumberOfColumns());
+                return ret;
+            },
+            "Computes Lxc for meta-GGA.",
+            "xcFuncLabel"_a,
+            "rho"_a,
+            "sigma"_a,
+            "lapl"_a,
+            "tau"_a);
 
     // CXCNewMolecularGradient class
 
