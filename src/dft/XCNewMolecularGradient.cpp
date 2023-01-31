@@ -980,37 +980,25 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
-
     auto rhograd = rhograd_data.data();
-
     auto sigma = sigma_data.data();
 
-    auto exc = exc_data.data();
-
     auto vrho = vrho_data.data();
-
     auto vsigma = vsigma_data.data();
 
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
 
     auto weights = molecularGrid.getWeights();
@@ -1077,21 +1065,14 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
             auto gaos_nu = gaos.data(nu);
 
             auto gaox_nu = gaox.data(nu);
-
             auto gaoy_nu = gaoy.data(nu);
-
             auto gaoz_nu = gaoz.data(nu);
 
             auto gaoxx_nu = gaoxx.data(nu);
-
             auto gaoxy_nu = gaoxy.data(nu);
-
             auto gaoxz_nu = gaoxz.data(nu);
-
             auto gaoyy_nu = gaoyy.data(nu);
-
             auto gaoyz_nu = gaoyz.data(nu);
-
             auto gaozz_nu = gaozz.data(nu);
 
             for (int32_t g = 0; g < npoints; g++)
@@ -1124,21 +1105,14 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         CDenseMatrix mat_chi(aocount, npoints);
 
         CDenseMatrix mat_chi_x(aocount, npoints);
-
         CDenseMatrix mat_chi_y(aocount, npoints);
-
         CDenseMatrix mat_chi_z(aocount, npoints);
 
         CDenseMatrix mat_chi_xx(aocount, npoints);
-
         CDenseMatrix mat_chi_xy(aocount, npoints);
-
         CDenseMatrix mat_chi_xz(aocount, npoints);
-
         CDenseMatrix mat_chi_yy(aocount, npoints);
-
         CDenseMatrix mat_chi_yz(aocount, npoints);
-
         CDenseMatrix mat_chi_zz(aocount, npoints);
 
         for (int32_t i = 0; i < aocount; i++)
@@ -1146,21 +1120,14 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_xx.row(i), gaoxx.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_xy.row(i), gaoxy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_xz.row(i), gaoxz.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_yy.row(i), gaoyy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_yz.row(i), gaoyz.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_zz.row(i), gaozz.data(aoinds[i]), npoints * sizeof(double));
         }
 
@@ -1171,7 +1138,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         timer.start("Density matrix slicing");
 
         auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
-
         auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
@@ -1179,7 +1145,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         // generate density grid
 
         dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-
                                           gs_sub_dens_mat, timer);
 
         // generate density gradient grid
@@ -1307,7 +1272,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
         timer.stop("XC functional eval.");
 
@@ -1317,7 +1282,8 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma,
+                                        npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -1466,7 +1432,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
     CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
@@ -1476,7 +1441,6 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
     auto rhograd = rhograd_data.data();
     auto sigma = sigma_data.data();
 
-    auto exc = exc_data.data();
     auto vrho = vrho_data.data();
     auto vsigma = vsigma_data.data();
 
@@ -1820,7 +1784,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
         timer.stop("XC functional eval.");
 
@@ -1830,7 +1794,8 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma,
+                                        npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -2688,8 +2653,10 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
+        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma,
+                                        npoints, _screeningThresholdForDensityValues);
 
+        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2,
                                         npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
@@ -3643,8 +3610,13 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenKxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
-                                        v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenKxcFockForGGA(rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
                                         npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");

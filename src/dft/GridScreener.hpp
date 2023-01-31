@@ -60,7 +60,7 @@ double getTauScreeningThreshold();
 void screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold);
 
 /**
- Screens Vxc Fock for GGA.
+ Screens Exc and Vxc Fock for GGA.
 
  @param rho the density.
  @param sigma the dot product of density gradient.
@@ -70,7 +70,19 @@ void screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t n
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
-void screenVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold);
+void screenExcVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold);
+
+/**
+ Screens Vxc Fock for GGA.
+
+ @param rho the density.
+ @param sigma the dot product of density gradient.
+ @param vrho the 1st-order functional derivative wrt rho.
+ @param vsigma the 1st-order functional derivative wrt sigma.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ */
+void screenVxcFockForGGA(double* rho, double* sigma, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold);
 
 /**
  Screens Exc and Vxc Fock for meta-GGA.
@@ -164,8 +176,6 @@ void screenFxcFockForLDA(double* rho, double* v2rho2, const int32_t npoints, con
 
  @param rho the density.
  @param sigma the dot product of density gradient.
- @param vrho the 1st-order functional derivative wrt rho.
- @param vsigma the 1st-order functional derivative wrt sigma.
  @param v2rho2 the 2nd-order functional derivative wrt rho.
  @param v2rhosigma the 2nd-order functional derivative wrt rho and sigma.
  @param v2sigma2 the 2nd-order functional derivative wrt sigma.
@@ -174,8 +184,6 @@ void screenFxcFockForLDA(double* rho, double* v2rho2, const int32_t npoints, con
  */
 void screenFxcFockForGGA(double*       rho,
                          double*       sigma,
-                         double*       vrho,
-                         double*       vsigma,
                          double*       v2rho2,
                          double*       v2rhosigma,
                          double*       v2sigma2,
@@ -235,11 +243,6 @@ void screenKxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, const int3
 
  @param rho the density.
  @param sigma the dot product of density gradient.
- @param vrho the 1st-order functional derivative wrt rho.
- @param vsigma the 1st-order functional derivative wrt sigma.
- @param v2rho2 the 2nd-order functional derivative wrt rho.
- @param v2rhosigma the 2nd-order functional derivative wrt rho and sigma.
- @param v2sigma2 the 2nd-order functional derivative wrt sigma.
  @param v3rho2 the 3rd-order functional derivative wrt rho.
  @param v3rho2sigma the 3rd-order functional derivative wrt rho and sigma.
  @param v3rhosigma2 the 3rd-order functional derivative wrt rho and sigma.
@@ -249,11 +252,6 @@ void screenKxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, const int3
  */
 void screenKxcFockForGGA(double*       rho,
                          double*       sigma,
-                         double*       vrho,
-                         double*       vsigma,
-                         double*       v2rho2,
-                         double*       v2rhosigma,
-                         double*       v2sigma2,
                          double*       v3rho3,
                          double*       v3rho2sigma,
                          double*       v3rhosigma2,
@@ -335,29 +333,16 @@ void screenLxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, double* v4
 
  @param rho the density.
  @param sigma the dot product of density gradient.
- @param vrho the 1st-order functional derivative wrt rho.
- @param vsigma the 1st-order functional derivative wrt sigma.
- @param v2rho2 the 2nd-order functional derivative wrt rho.
- @param v2rhosigma the 2nd-order functional derivative wrt rho and sigma.
- @param v2sigma2 the 2nd-order functional derivative wrt sigma.
- @param v3rho2 the 3rd-order functional derivative wrt rho.
- @param v3rho2sigma the 3rd-order functional derivative wrt rho and sigma.
- @param v3rhosigma2 the 3rd-order functional derivative wrt rho and sigma.
- @param v3sigma2 the 3rd-order functional derivative wrt sigma.
+ @param v4rho4 the 4th-order functional derivative wrt rho.
+ @param v4rho3sigma the 4th-order functional derivative wrt rho and sigma.
+ @param v4rho2sigma2 the 4th-order functional derivative wrt rho and sigma.
+ @param v4rhosigma3 the 4th-order functional derivative wrt rho and sigma.
+ @param v4sigma4 the 4th-order functional derivative wrt sigma.
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
 void screenLxcFockForGGA(double*       rho,
                          double*       sigma,
-                         double*       vrho,
-                         double*       vsigma,
-                         double*       v2rho2,
-                         double*       v2rhosigma,
-                         double*       v2sigma2,
-                         double*       v3rho3,
-                         double*       v3rho2sigma,
-                         double*       v3rhosigma2,
-                         double*       v3sigma3,
                          double*       v4rho4,
                          double*       v4rho3sigma,
                          double*       v4rho2sigma2,

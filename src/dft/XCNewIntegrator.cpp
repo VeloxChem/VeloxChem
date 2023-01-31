@@ -831,7 +831,8 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenExcVxcFockForGGA(rho, sigma, exc, vrho, vsigma,
+                                           npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -1698,7 +1699,10 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
+        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2,
                                         npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
@@ -2604,8 +2608,13 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenKxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
-                                        v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenKxcFockForGGA(rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
                                         npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
@@ -3593,10 +3602,17 @@ CXCNewIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenLxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
-                                        v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
-                                        v4rho4, v4rho3sigma, v4rho2sigma2,v4rhosigma3, v4sigma4,
+        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma,
                                         npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenKxcFockForGGA(rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenLxcFockForGGA(rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3,
+                                        v4sigma4, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -4207,10 +4223,17 @@ CXCNewIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatri
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenLxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
-                                        v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
-                                        v4rho4, v4rho3sigma, v4rho2sigma2,v4rhosigma3, v4sigma4,
+        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma,
                                         npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenKxcFockForGGA(rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                        npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenLxcFockForGGA(rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3,
+                                        v4sigma4, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
