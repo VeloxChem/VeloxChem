@@ -175,6 +175,15 @@ class CXCNewFunctional
      */
     auto compute_exc_vxc_for_lda(int32_t np, const double* rho, double* exc, double* vrho) const -> void;
 
+    /** Computes first derivative of LDA exchange-correlation functional on grid.
+     *
+     * @param[in] np number of grid points.
+     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
+     * @param[in,out] vrho values of the first derivative of the
+     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
+     */
+    auto compute_vxc_for_lda(int32_t np, const double* rho, double* vrho) const -> void;
+
     /** Computes second derivative of LDA exchange-correlation functional on grid.
      *
      * @param[in] np number of grid points.

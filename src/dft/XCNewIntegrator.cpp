@@ -513,7 +513,7 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenExcVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -2304,7 +2304,9 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenKxcFockForLDA(rho, v2rho2, v3rho3, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenKxcFockForLDA(rho, v3rho3, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -3280,7 +3282,11 @@ CXCNewIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenLxcFockForLDA(rho, v2rho2, v3rho3, v4rho4, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenKxcFockForLDA(rho, v3rho3, npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenLxcFockForLDA(rho, v4rho4, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -3883,13 +3889,17 @@ CXCNewIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatri
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenLxcFockForLDA(rho, v2rho2, v3rho3, v4rho4, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenKxcFockForLDA(rho, v3rho3, npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenLxcFockForLDA(rho, v4rho4, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
         // go through density matrices
 
-        for  (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
+        for (int32_t idensity = 0; idensity < numdens_rw2; idensity++)
         {
             // compute partial contribution to Kxc matrix
 

@@ -49,7 +49,7 @@ double getSigmaScreeningThreshold(const double densityThreshold);
 double getTauScreeningThreshold();
 
 /**
- Screens Vxc Fock for LDA.
+ Screens Exc and Vxc Fock for LDA.
 
  @param rho the density.
  @param exc the functional value.
@@ -57,7 +57,17 @@ double getTauScreeningThreshold();
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
-void screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold);
+void screenExcVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold);
+
+/**
+ Screens Vxc Fock for LDA.
+
+ @param rho the density.
+ @param vrho the 1st-order functional derivative wrt density.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ */
+void screenVxcFockForLDA(double* rho, double* vrho, const int32_t npoints, const double densityThreshold);
 
 /**
  Screens Exc and Vxc Fock for GGA.
@@ -231,12 +241,11 @@ void screenFxcFockForMGGA(double*       rho,
  Screens Kxc Fock for LDA.
 
  @param rho the density.
- @param v2rho2 the 2nd-order functional derivative wrt rho.
  @param v3rho3 the 3rd-order functional derivative wrt rho.
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
-void screenKxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, const int32_t npoints, const double densityThreshold);
+void screenKxcFockForLDA(double* rho, double* v3rho3, const int32_t npoints, const double densityThreshold);
 
 /**
  Screens Kxc Fock for GGA.
@@ -320,13 +329,11 @@ void screenKxcFockForMGGA(double*       rho,
  Screens Lxc Fock for LDA.
 
  @param rho the density.
- @param v2rho2 the 2nd-order functional derivative wrt rho.
- @param v3rho3 the 3rd-order functional derivative wrt rho.
  @param v4rho4 the 4rd-order functional derivative wrt rho.
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
-void screenLxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, double* v4rho4, const int32_t npoints, const double densityThreshold);
+void screenLxcFockForLDA(double* rho, double* v4rho4, const int32_t npoints, const double densityThreshold);
 
 /**
  Screens Lxc Fock for GGA.

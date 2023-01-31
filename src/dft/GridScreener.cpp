@@ -65,6 +65,57 @@ screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoint
 }
 
 void
+screenExcVxcFockForLDA(double*       rho,
+                       double*       exc,
+                       double*       vrho,
+                       const int32_t npoints,
+                       const double  densityThreshold)
+{
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        // rho
+        if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)))
+        {
+            exc[g] = 0.0;
+        }
+
+        // rho_a
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
+        {
+            vrho[2 * g + 0] = 0.0;
+        }
+
+        // rho_b
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
+        {
+            vrho[2 * g + 1] = 0.0;
+        }
+    }
+}
+
+void
+screenVxcFockForLDA(double*       rho,
+                    double*       vrho,
+                    const int32_t npoints,
+                    const double  densityThreshold)
+{
+    for (int32_t g = 0; g < npoints; g++)
+    {
+        // rho_a
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
+        {
+            vrho[2 * g + 0] = 0.0;
+        }
+
+        // rho_b
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
+        {
+            vrho[2 * g + 1] = 0.0;
+        }
+    }
+}
+
+void
 screenExcVxcFockForGGA(double*       rho,
                        double*       sigma,
                        double*       exc,
@@ -276,19 +327,22 @@ screenVxcFockForPGGA(double* rho, double* sigma, double* exc, double* vrho, doub
 }
 
 void
-screenFxcFockForLDA(double* rho, double* v2rho2, const int32_t npoints, const double densityThreshold)
+screenFxcFockForLDA(double*       rho,
+                    double*       v2rho2,
+                    const int32_t npoints,
+                    const double  densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a
-        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
         {
             v2rho2[3 * g + 0] = 0.0;
             v2rho2[3 * g + 1] = 0.0;
         }
 
         // rho_b
-        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
         {
             v2rho2[3 * g + 1] = 0.0;
             v2rho2[3 * g + 2] = 0.0;
@@ -479,27 +533,24 @@ screenFxcFockForMGGA(double*       rho,
 }
 
 void
-screenKxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, const int32_t npoints, const double densityThreshold)
+screenKxcFockForLDA(double*       rho,
+                    double*       v3rho3,
+                    const int32_t npoints,
+                    const double  densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a
-        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
         {
-            v2rho2[3 * g + 0] = 0.0;
-            v2rho2[3 * g + 1] = 0.0;
-
             v3rho3[4 * g + 0] = 0.0;
             v3rho3[4 * g + 1] = 0.0;
             v3rho3[4 * g + 2] = 0.0;
         }
 
         // rho_b
-        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
         {
-            v2rho2[3 * g + 1] = 0.0;
-            v2rho2[3 * g + 2] = 0.0;
-
             v3rho3[4 * g + 1] = 0.0;
             v3rho3[4 * g + 2] = 0.0;
             v3rho3[4 * g + 3] = 0.0;
@@ -981,20 +1032,16 @@ screenKxcFockForMGGA(double*       rho,
 }
 
 void
-screenLxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, double* v4rho4, const int32_t npoints, const double densityThreshold)
+screenLxcFockForLDA(double*       rho,
+                    double*       v4rho4,
+                    const int32_t npoints,
+                    const double  densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a
-        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
         {
-            v2rho2[3 * g + 0] = 0.0;
-            v2rho2[3 * g + 1] = 0.0;
-
-            v3rho3[4 * g + 0] = 0.0;
-            v3rho3[4 * g + 1] = 0.0;
-            v3rho3[4 * g + 2] = 0.0;
-
             v4rho4[5 * g + 0] = 0.0;
             v4rho4[5 * g + 1] = 0.0;
             v4rho4[5 * g + 2] = 0.0;
@@ -1002,15 +1049,8 @@ screenLxcFockForLDA(double* rho, double* v2rho2, double* v3rho3, double* v4rho4,
         }
 
         // rho_b
-        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
         {
-            v2rho2[3 * g + 1] = 0.0;
-            v2rho2[3 * g + 2] = 0.0;
-
-            v3rho3[4 * g + 1] = 0.0;
-            v3rho3[4 * g + 2] = 0.0;
-            v3rho3[4 * g + 3] = 0.0;
-
             v4rho4[5 * g + 1] = 0.0;
             v4rho4[5 * g + 2] = 0.0;
             v4rho4[5 * g + 3] = 0.0;

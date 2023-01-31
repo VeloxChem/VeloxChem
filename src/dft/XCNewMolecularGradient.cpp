@@ -262,13 +262,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
-    auto exc = exc_data.data();
     auto vrho = vrho_data.data();
 
     // coordinates and weights of grid points
@@ -462,7 +460,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
+        xcFunctional.compute_vxc_for_lda(npoints, rho, vrho);
 
         timer.stop("XC functional eval.");
 
@@ -472,7 +470,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenVxcFockForLDA(rho, vrho, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -603,13 +601,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
-    auto exc = exc_data.data();
     auto vrho = vrho_data.data();
 
     // coordinates and weights of grid points
@@ -821,7 +817,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
+        xcFunctional.compute_vxc_for_lda(npoints, rho, vrho);
 
         timer.stop("XC functional eval.");
 
@@ -831,7 +827,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenVxcFockForLDA(rho, vrho, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
@@ -3100,7 +3096,9 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenKxcFockForLDA(rho, v2rho2, v3rho3, npoints, _screeningThresholdForDensityValues);
+        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
+
+        gridscreen::screenKxcFockForLDA(rho, v3rho3, npoints, _screeningThresholdForDensityValues);
 
         timer.stop("Density screening");
 
