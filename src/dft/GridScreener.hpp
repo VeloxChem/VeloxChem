@@ -34,6 +34,21 @@
 namespace gridscreen {  // gridscreen namespace
 
 /**
+ Gets screening threshold for sigma.
+
+ @param densityThreshold the threshold for density grid screening.
+ @return the screening threshold for sigma.
+ */
+double getSigmaScreeningThreshold(const double densityThreshold);
+
+/**
+ Gets screening threshold for tau.
+
+ @return the screening threshold for tau.
+ */
+double getTauScreeningThreshold();
+
+/**
  Screens Vxc Fock for LDA.
 
  @param rho the density.
