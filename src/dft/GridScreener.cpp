@@ -30,13 +30,15 @@ namespace gridscreen {  // gridscreen namespace
 double
 getSigmaScreeningThreshold(const double densityThreshold)
 {
-    return std::pow(densityThreshold, 4.0 / 3.0);
+    // TODO update sigma screening threshold
+    return 1.0e-26;
 }
 
 double
 getTauScreeningThreshold()
 {
-    return 1.0e-20;
+    // TODO update tau screening threshold
+    return 1.0e-26;
 }
 
 void
@@ -314,8 +316,6 @@ screenVxcFockForPLDA(double* rho, double* exc, double* vrho, const int32_t npoin
 void
 screenVxcFockForPGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold)
 {
-    double densityThresholdSquared = densityThreshold * densityThreshold;
-
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho
