@@ -73,6 +73,33 @@ void screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t n
 void screenVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold);
 
 /**
+ Screens Exc and Vxc Fock for meta-GGA.
+
+ @param rho the density.
+ @param sigma the dot product of density gradient.
+ @param lapl ,
+ @param tau ,
+ @param exc the functional value.
+ @param vrho the 1st-order functional derivative wrt rho.
+ @param vsigma the 1st-order functional derivative wrt sigma.
+ @param vlapl the 1st-order functional derivative wrt laplacian.
+ @param vtau the 1st-order functional derivative wrt tau.
+ @param npoints the number of grid points.
+ @param densityThreshold the threshold for density grid screening.
+ */
+void screenExcVxcFockForMGGA(double*       rho,
+                             double*       sigma,
+                             double*       lapl,
+                             double*       tau,
+                             double*       exc,
+                             double*       vrho,
+                             double*       vsigma,
+                             double*       vlapl,
+                             double*       vtau,
+                             const int32_t npoints,
+                             const double  densityThreshold);
+
+/**
  Screens Vxc Fock for meta-GGA.
 
  @param rho the density.
@@ -90,7 +117,6 @@ void screenVxcFockForMGGA(double*       rho,
                           double*       sigma,
                           double*       lapl,
                           double*       tau,
-                          double*       exc,
                           double*       vrho,
                           double*       vsigma,
                           double*       vlapl,
