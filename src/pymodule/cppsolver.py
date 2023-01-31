@@ -27,9 +27,12 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 import time as tm
+import math
 import sys
 
-from .veloxchemlib import mpi_master, hartree_in_wavenumbers
+from .veloxchemlib import (mpi_master, hartree_in_wavenumbers, hartree_in_ev,
+                           fine_structure_constant,
+                           extinction_coefficient_from_beta)
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -78,6 +81,8 @@ class ComplexResponse(LinearSolver):
         self.b_operator = 'electric dipole'
         self.b_components = 'xyz'
 
+        self.cpp_flag = 'absorption'
+
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumbers()
 
@@ -104,6 +109,31 @@ class ComplexResponse(LinearSolver):
             method_dict = {}
 
         super().update_settings(rsp_dict, method_dict)
+
+    def set_cpp_flag(self, flag):
+        """
+        Sets CPP flag (absorption or ecd).
+
+        :param flag:
+            The flag (absorption or ecd).
+        """
+
+        assert_msg_critical(flag.lower() in ['absorption', 'ecd'],
+                            'ComplexResponse: invalide CPP flag')
+
+        self.cpp_flag = flag.lower()
+
+        if self.cpp_flag == 'absorption':
+            self.a_operator = 'electric dipole'
+            self.a_components = 'xyz'
+            self.b_operator = 'electric dipole'
+            self.b_components = 'xyz'
+
+        elif self.cpp_flag == 'ecd':
+            self.a_operator = 'magnetic dipole'
+            self.a_components = 'xyz'
+            self.b_operator = 'linear momentum'
+            self.b_components = 'xyz'
 
     def _get_precond(self, orb_ene, nocc, norb, w, d):
         """
@@ -267,6 +297,9 @@ class ComplexResponse(LinearSolver):
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
         # check dft setup
         self._dft_sanity_check()
 
@@ -338,9 +371,15 @@ class ComplexResponse(LinearSolver):
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
 
         d = self.damping
-        freqs = set([w for (op, w) in op_freq_keys])
+
+        self.frequencies = []
+        for (op, w) in op_freq_keys:
+            if w not in self.frequencies:
+                self.frequencies.append(w)
+
         precond = {
-            w: self._get_precond(orb_ene, nocc, norb, w, d) for w in freqs
+            w: self._get_precond(orb_ene, nocc, norb, w, d)
+            for w in self.frequencies
         }
 
         # distribute the gradient and right-hand side:
@@ -741,10 +780,14 @@ class ComplexResponse(LinearSolver):
                         self.ostream.print_info(checkpoint_text)
                         self.ostream.print_blank()
 
-                    return {
+                    ret_dict = {
                         'response_functions': rsp_funcs,
                         'solutions': full_solutions
                     }
+
+                    self._print_results(ret_dict, self.ostream)
+
+                    return ret_dict
 
         else:
             if self.is_converged:
@@ -822,3 +865,229 @@ class ComplexResponse(LinearSolver):
             self.ostream.print_blank()
 
         self.ostream.flush()
+
+    def get_spectrum(self, results):
+        """
+        Gets spectrum.
+
+        :param results:
+            The dictionary containing response results.
+
+        :return:
+            A list containing the energies and spectrum.
+        """
+
+        if self.cpp_flag == 'absorption':
+            return self._get_absorption_spectrum(results)
+
+        elif self.cpp_flag == 'ecd':
+            return self._get_ecd_spectrum(results)
+
+        return None
+
+    def _get_absorption_spectrum(self, results):
+        """
+        Gets absorption spectrum.
+
+        :param results:
+            The dictionary containing response results.
+
+        :return:
+            A list containing the energies and cross-sections in a.u.
+        """
+
+        spectrum = []
+
+        for w in self.frequencies:
+            if w == 0.0:
+                continue
+
+            axx = -results['response_functions'][('x', 'x', w)].imag
+            ayy = -results['response_functions'][('y', 'y', w)].imag
+            azz = -results['response_functions'][('z', 'z', w)].imag
+
+            alpha_bar = (axx + ayy + azz) / 3.0
+            sigma = 4.0 * math.pi * w * alpha_bar * fine_structure_constant()
+
+            spectrum.append((w, sigma))
+
+        return spectrum
+
+    def _get_ecd_spectrum(self, results):
+        """
+        Gets circular dichroism spectrum.
+
+        :param results:
+            The dictionary containing response results.
+
+        :return:
+            A list containing the energies and extinction coefficient (Delta
+            epsilon).
+        """
+
+        spectrum = []
+
+        for w in self.frequencies:
+            if w == 0.0:
+                continue
+
+            Gxx = -results['response_functions'][('x', 'x', w)].imag
+            Gyy = -results['response_functions'][('y', 'y', w)].imag
+            Gzz = -results['response_functions'][('z', 'z', w)].imag
+
+            Gxx /= w
+            Gyy /= w
+            Gzz /= w
+
+            beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
+            Delta_epsilon = beta * w**2 * extinction_coefficient_from_beta()
+
+            spectrum.append((w, Delta_epsilon))
+
+        return spectrum
+
+    def _print_results(self, results, ostream):
+        """
+        Prints response resutls to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        :param ostream:
+            The output stream.
+        """
+
+        if self.cpp_flag == 'absorption':
+            self._print_absorption_results(results, ostream)
+
+        elif self.cpp_flag == 'ecd':
+            self._print_ecd_results(results, ostream)
+
+    def _print_absorption_results(self, results, ostream):
+        """
+        Prints absorption results to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        :param ostream:
+            The output stream.
+        """
+
+        width = 92
+
+        title = 'Response Functions at Given Frequencies'
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
+
+        for w in self.frequencies:
+            title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
+                'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
+            ostream.print_header(title.ljust(width))
+            ostream.print_header(('-' * len(title)).ljust(width))
+
+            for a in self.a_components:
+                for b in self.b_components:
+                    prop = results['response_functions'][(a, b, w)]
+                    ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
+                        a.lower(), b.lower(), w)
+                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
+                        ops_label, prop.real, prop.imag)
+                    ostream.print_header(output.ljust(width))
+            ostream.print_blank()
+
+        title = 'Linear Absorption Cross-Section'
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
+
+        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
+            text = '*** No linear absorption spectrum at zero frequency.'
+            ostream.print_header(text.ljust(width))
+            ostream.print_blank()
+            return
+
+        title = 'Reference: '
+        title += 'J. Kauczor and P. Norman, '
+        title += 'J. Chem. Theory Comput. 2014, 10, 2449-2455.'
+        ostream.print_header(title.ljust(width))
+        ostream.print_blank()
+
+        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'sigma(w)[a.u.]')
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
+
+        spectrum = self.get_spectrum(results)
+
+        for w, sigma in spectrum:
+            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
+                w, w * hartree_in_ev(), sigma)
+            ostream.print_header(output.ljust(width))
+
+        ostream.print_blank()
+
+    def _print_ecd_results(self, results, ostream):
+        """
+        Prints ECD results to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        :param ostream:
+            The output stream.
+        """
+
+        width = 92
+
+        title = 'Response Functions at Given Frequencies'
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
+
+        for w in self.frequencies:
+            title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
+                'MagDip', 'LinMom', 'Frequency', 'Real', 'Imaginary')
+            ostream.print_header(title.ljust(width))
+            ostream.print_header(('-' * len(title)).ljust(width))
+
+            for a in self.a_components:
+                for b in self.b_components:
+                    prop = results['response_functions'][(a, b, w)]
+                    ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
+                        a.lower(), b.lower(), w)
+                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
+                        ops_label, prop.real, prop.imag)
+                    ostream.print_header(output.ljust(width))
+            ostream.print_blank()
+
+        title = 'Circular Dichroism Spectrum'
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
+
+        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
+            text = '*** No circular dichroism spectrum at zero frequency.'
+            ostream.print_header(text.ljust(width))
+            ostream.print_blank()
+            return
+
+        title = 'Reference: '
+        title += 'A. Jiemchooroj and P. Norman, '
+        title += 'J. Chem. Phys. 126, 134102 (2007).'
+        ostream.print_header(title.ljust(width))
+        ostream.print_blank()
+
+        title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'Delta_epsilon[L mol^-1 cm^-1]')
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
+
+        spectrum = self.get_spectrum(results)
+
+        for w, Delta_epsilon in spectrum:
+            output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
+                w, w * hartree_in_ev(), Delta_epsilon)
+            ostream.print_header(output.ljust(width))
+
+        ostream.print_blank()

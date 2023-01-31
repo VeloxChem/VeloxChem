@@ -35,7 +35,7 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
 from .veloxchemlib import new_parse_xc_func
 from .aodensitymatrix import AODensityMatrix
@@ -316,18 +316,58 @@ class LinearSolver:
             # field
             self.restart = False
 
+    def _check_scf_results(self, scf_results):
+        """
+        Checks SCF results for ERI, DFT and PE information.
+
+        :param scf_results:
+            A dictionary containing SCF results.
+        """
+
+        updated_scf_info = {}
+
+        if self.rank == mpi_master():
+            if scf_results.get('eri_thresh', None) is not None:
+                updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
+
+            if scf_results.get('qq_type', None) is not None:
+                updated_scf_info['qq_type'] = scf_results['qq_type']
+
+            if scf_results.get('restart', None) is not None:
+                updated_scf_info['restart'] = scf_results['restart']
+
+            if scf_results.get('xcfun', None) is not None:
+                # do not overwrite xcfun if it is already specified
+                if self.xcfun is None:
+                    updated_scf_info['xcfun'] = scf_results['xcfun']
+
+            if scf_results.get('potfile', None) is not None:
+                # do not overwrite potfile if it is already specified
+                if self.potfile is None:
+                    updated_scf_info['potfile'] = scf_results['potfile']
+
+        updated_scf_info = self.comm.bcast(updated_scf_info, root=mpi_master())
+
+        for key, val in updated_scf_info.items():
+            setattr(self, key, val)
+
     def _dft_sanity_check(self):
         """
         Checks DFT settings and updates relevant attributes.
         """
 
-        # check xc functional
-        if self.xcfun is not None:
+        # Hartree-Fock: xcfun is None or 'hf'
+        if (self.xcfun is None or
+            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
+            self._dft = False
+
+        # DFT: xcfun is functional object or string (other than 'hf')
+        else:
             if isinstance(self.xcfun, str):
                 self.xcfun = new_parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'LinearSolver: Undefined XC functional')
-        self._dft = (self.xcfun is not None)
+            self._dft = True
 
         # check grid level
         if self._dft and (self.grid_level < 1 or self.grid_level > 6):
@@ -2067,3 +2107,101 @@ class LinearSolver:
             excitation_details.append(de_exc[1])
 
         return excitation_details
+
+    def _print_transition_dipoles(self, title, trans_dipoles):
+        """
+        Prints transition dipole moments to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param trans_dipoles:
+            The transition dipole moments.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = '                     '
+        valstr += '{:>13s}{:>13s}{:>13s}'.format('X', 'Y', 'Z')
+        self.ostream.print_header(valstr.ljust(92))
+        for s, r in enumerate(trans_dipoles):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r[0], r[1], r[2])
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_absorption(self, title, results):
+        """
+        Prints absorption to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, e in enumerate(results['eigenvalues']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:15.8f} a.u. '.format(e)
+            valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
+            f = results['oscillator_strengths'][s]
+            valstr += '    Osc.Str. {:9.4f}'.format(f)
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_ecd(self, title, results):
+        """
+        Prints electronic circular dichroism to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, R in enumerate(results['rotatory_strengths']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '    Rot.Str. '
+            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
+            valstr += f'{R:11.4f} [10**(-40) cgs]'
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_excitation_details(self, title, results):
+        """
+        Prints excitation details.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self.ostream.print_header(title.ljust(92))
+        self.ostream.print_blank()
+
+        nstates = results['eigenvalues'].size
+        excitation_details = results['excitation_details']
+
+        for s in range(nstates):
+            valstr = 'Excited state {}'.format(s + 1)
+            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_header(('-' * len(valstr)).ljust(92))
+
+            for exc_str in excitation_details[s]:
+                self.ostream.print_header(exc_str.ljust(92))
+            self.ostream.print_blank()
+
+        self.ostream.flush()

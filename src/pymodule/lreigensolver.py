@@ -29,8 +29,7 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
@@ -147,6 +146,9 @@ class LinearResponseEigenSolver(LinearSolver):
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
 
         # check dft setup
         self._dft_sanity_check()
@@ -581,6 +583,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.ostream.print_info(checkpoint_text)
                     self.ostream.print_blank()
 
+                self._print_results(ret_dict)
+
                 return ret_dict
 
         return None
@@ -884,3 +888,27 @@ class LinearResponseEigenSolver(LinearSolver):
             return E2
         else:
             return None
+
+    def _print_results(self, results):
+        """
+        Prints results to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole length, a.u.)',
+            results['electric_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole velocity, a.u.)',
+            results['velocity_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Magnetic Transition Dipole Moments (a.u.)',
+            results['magnetic_transition_dipoles'])
+
+        self._print_absorption('One-Photon Absorption', results)
+        self._print_ecd('Electronic Circular Dichroism', results)
+        self._print_excitation_details('Character of excitations:', results)

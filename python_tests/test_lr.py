@@ -8,7 +8,7 @@ from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.rsppolarizability import Polarizability
+from veloxchem.lrsolver import LinearResponseSolver
 
 from .addons import using_cppe
 
@@ -42,27 +42,25 @@ class TestLR:
         ref_freqs_str = [str(x) for x in ref_freqs]
         ref_prop = np.array([float(x) for x in raw_data.split()])
 
-        lr_prop = Polarizability(
+        lr_drv = LinearResponseSolver(task.mpi_comm, task.ostream)
+        lr_drv.update_settings(
             {
                 'frequencies': ','.join(ref_freqs_str),
                 'batch_size': random.choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        lr_prop.init_driver(task.mpi_comm, task.ostream)
-        lr_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
         if is_mpi_master(task.mpi_comm):
-            self.check_printout(lr_prop)
-            lr_results = lr_prop.rsp_property
-
+            self.check_printout(lr_drv, lr_results)
             prop = np.array([
                 -lr_results['response_functions'][(a, b, w)] for w in ref_freqs
                 for a in 'xyz' for b in 'xyz'
             ])
             assert np.max(np.abs(prop - ref_prop)) < 1.0e-4
 
-    def check_printout(self, lr_prop):
+    def check_printout(self, lr_drv, lr_results):
 
-        rsp_func = lr_prop.rsp_property['response_functions']
+        rsp_func = lr_results['response_functions']
 
         lr_vals = []
         for (a, b, w), val in rsp_func.items():
@@ -74,7 +72,7 @@ class TestLR:
             fname = str(Path(temp_dir, 'lr.out'))
 
             ostream = OutputStream(fname)
-            lr_prop.print_property(ostream)
+            lr_drv._print_results(lr_results, ostream)
             ostream.close()
 
             with open(fname, 'r') as f_out:

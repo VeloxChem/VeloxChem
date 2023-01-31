@@ -124,6 +124,9 @@ class LinearResponseSolver(LinearSolver):
         self._dist_e2bger = None
         self._dist_e2bung = None
 
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
         # check dft setup
         self._dft_sanity_check()
 
@@ -188,8 +191,15 @@ class LinearResponseSolver(LinearSolver):
             op_freq_keys = None
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
 
-        freqs = set([w for (op, w) in op_freq_keys])
-        precond = {w: self._get_precond(orb_ene, nocc, norb, w) for w in freqs}
+        self.frequencies = []
+        for (op, w) in op_freq_keys:
+            if w not in self.frequencies:
+                self.frequencies.append(w)
+
+        precond = {
+            w: self._get_precond(orb_ene, nocc, norb, w)
+            for w in self.frequencies
+        }
 
         # distribute the right-hand side
         # dist_grad will also serve as initial guess
@@ -465,10 +475,14 @@ class LinearResponseSolver(LinearSolver):
                     self.ostream.print_info(checkpoint_text)
                     self.ostream.print_blank()
 
-                return {
+                ret_dict = {
                     'response_functions': rsp_funcs,
                     'solutions': full_solutions
                 }
+
+                self._print_results(ret_dict, self.ostream)
+
+                return ret_dict
 
         return None
 
@@ -626,3 +640,36 @@ class LinearResponseSolver(LinearSolver):
         dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
 
         return dist_new_ger, dist_new_ung
+
+    def _print_results(self, results, ostream):
+        """
+        Prints polarizability to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        :param ostream:
+            The output stream.
+        """
+
+        width = 92
+
+        for w in self.frequencies:
+            w_str = 'Polarizability (w={:.4f})'.format(w)
+            ostream.print_header(w_str.ljust(width))
+            ostream.print_header(('-' * len(w_str)).ljust(width))
+
+            valstr = '{:<5s}'.format('')
+            for b in self.b_components:
+                valstr += '{:>15s}'.format(b.upper())
+            ostream.print_header(valstr.ljust(width))
+
+            for a in self.a_components:
+                valstr = '{:<5s}'.format(a.upper())
+                for b in self.b_components:
+                    prop = -results['response_functions'][(a, b, w)]
+                    valstr += '{:15.8f}'.format(prop)
+                ostream.print_header(valstr.ljust(width))
+
+            ostream.print_blank()
+
+        ostream.flush()

@@ -4,7 +4,7 @@ import pytest
 
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
-from veloxchem.rspcdspec import CircularDichroismSpectrum
+from veloxchem.cppsolver import ComplexResponse
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.veloxchemlib import is_mpi_master
 
@@ -17,9 +17,10 @@ class TestCppEcd:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
-        return scf_drv.scf_tensors
+        return scf_results
 
     def run_cpp(self, inpfile, potfile, xcfun_label, ref_spectrum):
 
@@ -32,37 +33,38 @@ class TestCppEcd:
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
-        scf_tensors = self.run_scf(task)
+        scf_results = self.run_scf(task)
 
         ref_freqs = tuple([w for (w, Delta_epsilon) in ref_spectrum])
 
-        cpp_prop = CircularDichroismSpectrum(
+        cpp_drv = ComplexResponse(task.mpi_comm, task.ostream)
+        cpp_drv.set_cpp_flag('ecd')
+        cpp_drv.update_settings(
             {'frequencies': ref_freqs},
             task.input_dict['method_settings'],
         )
-        cpp_prop.init_driver(task.mpi_comm, task.ostream)
-        cpp_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        cpp_results = cpp_drv.compute(task.molecule, task.ao_basis, scf_results)
 
-        assert cpp_prop.is_converged
+        assert cpp_drv.is_converged
 
         if is_mpi_master(task.mpi_comm):
-            self.check_printout(cpp_prop)
+            self.check_printout(cpp_drv, cpp_results)
 
-            spectrum = cpp_prop.get_spectrum()
+            spectrum = cpp_drv.get_spectrum(cpp_results)
             for i, (w, Delta_epsilon) in enumerate(spectrum):
                 ref_w, ref_Delta_epsilon = ref_spectrum[i]
                 assert abs(w - ref_w) < 1.0e-6
                 assert abs(Delta_epsilon / ref_Delta_epsilon - 1.0) < 1.0e-6
 
-    def check_printout(self, cpp_prop):
+    def check_printout(self, cpp_drv, cpp_results):
 
-        rsp_func = cpp_prop.rsp_property['response_functions']
+        rsp_func = cpp_results['response_functions']
 
         with tempfile.TemporaryDirectory() as temp_dir:
             fname = str(Path(temp_dir, 'cpp.out'))
 
             ostream = OutputStream(fname)
-            cpp_prop.print_property(ostream)
+            cpp_drv._print_results(cpp_results, ostream)
             ostream.close()
 
             with open(fname, 'r') as f_out:
