@@ -4258,8 +4258,9 @@ CXCNewIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatri
 
             auto partial_mat_Kxc = _integratePartialKxcFockForGGA2(npoints, local_weights, mat_chi,
                                                                    mat_chi_x, mat_chi_y, mat_chi_z,
-                                                                   rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2,
-                                                                   v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                                                   rhograd, vsigma, v2rho2, v2rhosigma,
+                                                                   v2sigma2, v3rho3, v3rho2sigma,
+                                                                   v3rhosigma2, v3sigma3,
                                                                    rwdengridcube, rw2dengrid, idensity, timer);
 
             // distribute partial Kxc to full Fock matrix
@@ -7529,7 +7530,7 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA2(const int32_t            npoin
         {
             auto nu_offset = nu * npoints;
 
-            #pragma omp simd aligned(weights, v2rho2, v3rho3, rhow1a, rhow12a, rhow12b, G_val, chi_val : VLX_ALIGN)
+            #pragma omp simd aligned(weights, rhow1a, rhow12a, rhow12b, G_val, chi_val, v2rho2, v3rho3 : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 G_val[nu_offset + g] = weights[g] *
@@ -7592,35 +7593,25 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
     auto rhow1rhow2 = rwDensityGridCubic.gam2(iFock);
 
     auto rxw1rhow2 = rwDensityGridCubic.gam2X(iFock);
-
     auto ryw1rhow2 = rwDensityGridCubic.gam2Y(iFock);
-
     auto rzw1rhow2 = rwDensityGridCubic.gam2Z(iFock);
 
     auto rxw1rxw2 = rwDensityGridCubic.gam2XX(iFock);
-
     auto rxw1ryw2 = rwDensityGridCubic.gam2XY(iFock);
-
     auto rxw1rzw2 = rwDensityGridCubic.gam2XZ(iFock);
 
     auto ryw1rxw2 = rwDensityGridCubic.gam2YX(iFock);
-
     auto ryw1ryw2 = rwDensityGridCubic.gam2YY(iFock);
-
     auto ryw1rzw2 = rwDensityGridCubic.gam2YZ(iFock);
 
     auto rzw1rxw2 = rwDensityGridCubic.gam2ZX(iFock);
-
     auto rzw1ryw2 = rwDensityGridCubic.gam2ZY(iFock);
-
     auto rzw1rzw2 = rwDensityGridCubic.gam2ZZ(iFock);
 
     auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
 
     auto gradw12a_x = rw2DensityGrid.alphaDensityGradientX(iFock);
-
     auto gradw12a_y = rw2DensityGrid.alphaDensityGradientY(iFock);
-
     auto gradw12a_z = rw2DensityGrid.alphaDensityGradientZ(iFock);
 
     timer.stop("Kxc matrix prep.");
@@ -7652,17 +7643,15 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
             auto nu_offset = nu * npoints;
 
             #pragma omp simd aligned(weights, \
-                    rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2, \
-                    v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, \
                     rhow1rhow2, rxw1rhow2, ryw1rhow2, rzw1rhow2, \
                     rxw1rxw2, rxw1ryw2, rxw1rzw2, ryw1rxw2, ryw1ryw2, ryw1rzw2, rzw1rxw2, rzw1ryw2, rzw1rzw2, \
                     rhow12a, gradw12a_x, gradw12a_y, gradw12a_z, \
-                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val, \
+                    rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2, v3rho3, \
+                    v3rho2sigma, v3rhosigma2, v3sigma3 : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-
                 double w = weights[g];
-
 
                 double rxw12a = gradw12a_x[g];
                 double ryw12a = gradw12a_y[g];
@@ -7671,7 +7660,6 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
                 double grada_x_g = rhograd[6 * g + 0];
                 double grada_y_g = rhograd[6 * g + 1];
                 double grada_z_g = rhograd[6 * g + 2];
-
 
                 double l2contract = grada_x_g * rxw12a + grada_y_g * ryw12a + grada_z_g * rzw12a;
                 double l5contract_x = grada_x_g * l2contract;
@@ -7693,7 +7681,6 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
                 double q7contract_y =  grada_y_g * grada_x_g *  rxw1rhow2[g] + grada_y_g * grada_y_g *  ryw1rhow2[g] + grada_y_g * grada_z_g *  rzw1rhow2[g];
                 double q7contract_z =  grada_z_g * grada_x_g *  rxw1rhow2[g] + grada_z_g * grada_y_g *  ryw1rhow2[g] + grada_z_g * grada_z_g *  rzw1rhow2[g];
 
-
                 double q8contract_x =  grada_x_g *  rxw1rxw2[g] + grada_y_g *  rxw1ryw2[g] + grada_z_g *  rxw1rzw2[g];
                 double q8contract_y =  grada_x_g *  ryw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_z_g *  ryw1rzw2[g];
                 double q8contract_z =  grada_x_g *  rzw1rxw2[g] + grada_y_g *  rzw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
@@ -7710,10 +7697,14 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
                 double q11contract_y =  grada_y_g *  rxw1rxw2[g] + grada_y_g *  ryw1ryw2[g] + grada_y_g *  rzw1rzw2[g];
                 double q11contract_z =  grada_z_g *  rxw1rxw2[g] + grada_z_g *  ryw1ryw2[g] + grada_z_g *  rzw1rzw2[g];
 
-                // functional derivatives in libxc form
+                // functional derivatives
+
+                // first-order
 
                 auto vsigma_a = vsigma[3 * g + 0];
                 auto vsigma_c = vsigma[3 * g + 1];
+
+                // second-order
 
                 auto v2rho2_aa = v2rho2[3 * g + 0];
                 auto v2rho2_ab = v2rho2[3 * g + 1];
@@ -7729,6 +7720,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
                 auto v2sigma2_ab = v2sigma2[6 * g + 2];
                 auto v2sigma2_cc = v2sigma2[6 * g + 3];
                 auto v2sigma2_cb = v2sigma2[6 * g + 4];
+
+                // third-order
 
                 auto v3rho3_aaa = v3rho3[4 * g + 0];
                 auto v3rho3_aab = v3rho3[4 * g + 1];
@@ -7762,9 +7755,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
                 auto v3sigma3_acb = v3sigma3[10 * g + 4];
                 auto v3sigma3_abb = v3sigma3[10 * g + 5];
                 auto v3sigma3_ccc = v3sigma3[10 * g + 6];
-                auto v3sigma3_bcc = v3sigma3[10 * g + 7];
+                auto v3sigma3_ccb = v3sigma3[10 * g + 7];
                 auto v3sigma3_cbb = v3sigma3[10 * g + 8];
-
 
                 // functional derivatives
                 double rr = (v2rho2_aa + v2rho2_ab);
@@ -7782,7 +7774,7 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
                 double xxr = 2.0*v3rhosigma2_bcc + 2.0*v3rhosigma2_bcb + 6.0*v3rhosigma2_bac
                             + 4.0*v3rhosigma2_bab + 4.0*v3rhosigma2_baa + 2.0*v3rhosigma2_acc
                             + 2.0*v3rhosigma2_acb + 6.0*v3rhosigma2_aac + 4.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa;
-                double xxx = 4.0*v3sigma3_ccc + 8.0*v3sigma3_bcc + 4.0*v3sigma3_cbb + 16.0*v3sigma3_acc
+                double xxx = 4.0*v3sigma3_ccc + 8.0*v3sigma3_ccb + 4.0*v3sigma3_cbb + 16.0*v3sigma3_acc
                             + 24.0*v3sigma3_acb + 8.0*v3sigma3_abb + 20.0*v3sigma3_aac
                             + 16.0*v3sigma3_aab + 8.0*v3sigma3_aaa;
 
