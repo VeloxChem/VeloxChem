@@ -2629,8 +2629,9 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             auto partial_mat_Kxc = _integratePartialKxcFockForGGA(npoints, local_weights, mat_chi,
                                                                   mat_chi_x, mat_chi_y, mat_chi_z,
-                                                                  rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2,
-                                                                  v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
+                                                                  rhograd, vsigma, v2rho2, v2rhosigma,
+                                                                  v2sigma2, v3rho3, v3rho2sigma,
+                                                                  v3rhosigma2, v3sigma3,
                                                                   rwdengridquad, rw2dengrid, idensity, timer);
 
             // distribute partial Kxc to full Fock matrix
@@ -3910,7 +3911,7 @@ CXCNewIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatri
             // compute partial contribution to Kxc matrix
 
             auto partial_mat_Kxc = _integratePartialKxcFockForLDA2(npoints, local_weights, mat_chi, v2rho2, v3rho3,
-                                                                  rwdengridcube, rw2dengrid, idensity, timer);
+                                                                   rwdengridcube, rw2dengrid, idensity, timer);
 
             // distribute partial Kxc to full Fock matrix
 
@@ -6388,15 +6389,15 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              npoints,
-                                                 const double*              weights,
-                                                 const CDenseMatrix&        gtoValues,
-                                                 const double*              v2rho2,
-                                                 const double*              v3rho3,
-                                                 const CDensityGridQuad&    rwDensityGridQuad,
-                                                 const CDensityGrid&        rw2DensityGrid,
-                                                 const int32_t              iFock,
-                                                 CMultiTimer&               timer) const
+CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t           npoints,
+                                                 const double*           weights,
+                                                 const CDenseMatrix&     gtoValues,
+                                                 const double*           v2rho2,
+                                                 const double*           v3rho3,
+                                                 const CDensityGridQuad& rwDensityGridQuad,
+                                                 const CDensityGrid&     rw2DensityGrid,
+                                                 const int32_t           iFock,
+                                                 CMultiTimer&            timer) const
 {
     timer.start("Kxc matrix prep.");
 
@@ -6438,7 +6439,7 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t              npoi
         {
             auto nu_offset = nu * npoints;
 
-            #pragma omp simd aligned(weights, v2rho2, v3rho3, rhow1a, rhow12a, rhow12b, G_val, chi_val : VLX_ALIGN)
+            #pragma omp simd aligned(weights, rhow1a, rhow12a, rhow12b, G_val, chi_val, v2rho2, v3rho3 : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 G_val[nu_offset + g] = weights[g] *
@@ -6550,13 +6551,12 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t           npoints
         {
             auto nu_offset = nu * npoints;
 
-            #pragma omp simd aligned(weights, \
-                    rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2, \
-                    v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, \
-                    gam, gamx, gamy, gamz, \
+            #pragma omp simd aligned(weights, gam, gamx, gamy, gamz, \
                     gamxx, gamxy, gamxz, gamyx, gamyy, gamyz, gamzx, gamzy, gamzz, \
                     rhow12a, gradw12a_x, gradw12a_y, gradw12a_z, \
-                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+                    G_val, G_gga_val, chi_val, chi_x_val, chi_y_val, chi_z_val, \
+                    rhograd, vsigma, v2rho2, v2rhosigma, v2sigma2, v3rho3, \
+                    v3rho2sigma, v3rhosigma2, v3sigma3 : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 double w = weights[g];
@@ -6605,10 +6605,14 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t           npoints
                 double q11contract_y =  grada_y_g * gamxx[g] + grada_y_g * gamyy[g] + grada_y_g * gamzz[g];
                 double q11contract_z =  grada_z_g * gamxx[g] + grada_z_g * gamyy[g] + grada_z_g * gamzz[g];
 
-                // functional derivatives in libxc form
+                // functional derivatives
+
+                // first-order
 
                 auto vsigma_a = vsigma[3 * g + 0];
                 auto vsigma_c = vsigma[3 * g + 1];
+
+                // second-order
 
                 auto v2rho2_aa = v2rho2[3 * g + 0];
                 auto v2rho2_ab = v2rho2[3 * g + 1];
@@ -6624,6 +6628,8 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t           npoints
                 auto v2sigma2_ab = v2sigma2[6 * g + 2];
                 auto v2sigma2_cc = v2sigma2[6 * g + 3];
                 auto v2sigma2_cb = v2sigma2[6 * g + 4];
+
+                // third-order
 
                 auto v3rho3_aaa = v3rho3[4 * g + 0];
                 auto v3rho3_aab = v3rho3[4 * g + 1];
@@ -6657,7 +6663,7 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t           npoints
                 auto v3sigma3_acb = v3sigma3[10 * g + 4];
                 auto v3sigma3_abb = v3sigma3[10 * g + 5];
                 auto v3sigma3_ccc = v3sigma3[10 * g + 6];
-                auto v3sigma3_bcc = v3sigma3[10 * g + 7];
+                auto v3sigma3_ccb = v3sigma3[10 * g + 7];
                 auto v3sigma3_cbb = v3sigma3[10 * g + 8];
 
                 // functional derivatives
@@ -6676,7 +6682,7 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t           npoints
                 double xxr = 2.0*v3rhosigma2_bcc + 2.0*v3rhosigma2_bcb + 6.0*v3rhosigma2_bac
                             + 4.0*v3rhosigma2_bab + 4.0*v3rhosigma2_baa + 2.0*v3rhosigma2_acc
                             + 2.0*v3rhosigma2_acb + 6.0*v3rhosigma2_aac + 4.0*v3rhosigma2_aab + 4.0*v3rhosigma2_aaa;
-                double xxx = 4.0*v3sigma3_ccc + 8.0*v3sigma3_bcc + 4.0*v3sigma3_cbb + 16.0*v3sigma3_acc
+                double xxx = 4.0*v3sigma3_ccc + 8.0*v3sigma3_ccb + 4.0*v3sigma3_cbb + 16.0*v3sigma3_acc
                             + 24.0*v3sigma3_acb + 8.0*v3sigma3_abb + 20.0*v3sigma3_aac
                             + 16.0*v3sigma3_aab + 8.0*v3sigma3_aaa;
 
