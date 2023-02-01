@@ -9669,7 +9669,7 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 // vx2 contractions
 
                 double q2contract = grada_x_g * gamx[g] + grada_y_g * gamy[g] + grada_z_g * gamz[g];
-                double sl_q2contract = grada_x_g * sl_gamx[g] + grada_y_g * sl_gamy[g] + grada_z_g * sl_gamz[g];
+                //double sl_q2contract = grada_x_g * sl_gamx[g] + grada_y_g * sl_gamy[g] + grada_z_g * sl_gamz[g];
                 double st_q2contract = grada_x_g * st_gamx[g] + grada_y_g * st_gamy[g] + grada_z_g * st_gamz[g];
 
                 double q3contract =   grada_x_g * grada_x_g * gamxx[g]
@@ -9688,9 +9688,9 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 double q7contract_y =  grada_y_g * grada_x_g *  gamx[g] + grada_y_g * grada_y_g *  gamy[g] + grada_y_g * grada_z_g *  gamz[g];
                 double q7contract_z =  grada_z_g * grada_x_g *  gamx[g] + grada_z_g * grada_y_g *  gamy[g] + grada_z_g * grada_z_g *  gamz[g];
 
-                double sl_q7contract_x =  grada_x_g * grada_x_g * sl_gamx[g] + grada_x_g * grada_y_g * sl_gamy[g] + grada_x_g * grada_z_g * sl_gamz[g];
-                double sl_q7contract_y =  grada_y_g * grada_x_g * sl_gamx[g] + grada_y_g * grada_y_g * sl_gamy[g] + grada_y_g * grada_z_g * sl_gamz[g];
-                double sl_q7contract_z =  grada_z_g * grada_x_g * sl_gamx[g] + grada_z_g * grada_y_g * sl_gamy[g] + grada_z_g * grada_z_g * sl_gamz[g];
+                //double sl_q7contract_x =  grada_x_g * grada_x_g * sl_gamx[g] + grada_x_g * grada_y_g * sl_gamy[g] + grada_x_g * grada_z_g * sl_gamz[g];
+                //double sl_q7contract_y =  grada_y_g * grada_x_g * sl_gamx[g] + grada_y_g * grada_y_g * sl_gamy[g] + grada_y_g * grada_z_g * sl_gamz[g];
+                //double sl_q7contract_z =  grada_z_g * grada_x_g * sl_gamx[g] + grada_z_g * grada_y_g * sl_gamy[g] + grada_z_g * grada_z_g * sl_gamz[g];
 
                 double st_q7contract_x =  grada_x_g * grada_x_g * st_gamx[g] + grada_x_g * grada_y_g * st_gamy[g] + grada_x_g * grada_z_g * st_gamz[g];
                 double st_q7contract_y =  grada_y_g * grada_x_g * st_gamx[g] + grada_y_g * grada_y_g * st_gamy[g] + grada_y_g * grada_z_g * st_gamz[g];
@@ -9716,10 +9716,10 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 double    c2 = grada_x_g *    pix[g] + grada_y_g *    piy[g] + grada_z_g *    piz[g];
                 double rt_c2 = grada_x_g * rt_pix[g] + grada_y_g * rt_piy[g] + grada_z_g * rt_piz[g];
-                double rl_c2 = grada_x_g * rl_pix[g] + grada_y_g * rl_piy[g] + grada_z_g * rl_piz[g];
-                double ll_c2 = grada_x_g * ll_pix[g] + grada_y_g * ll_piy[g] + grada_z_g * ll_piz[g];
+                //double rl_c2 = grada_x_g * rl_pix[g] + grada_y_g * rl_piy[g] + grada_z_g * rl_piz[g];
+                //double ll_c2 = grada_x_g * ll_pix[g] + grada_y_g * ll_piy[g] + grada_z_g * ll_piz[g];
                 double tt_c2 = grada_x_g * tt_pix[g] + grada_y_g * tt_piy[g] + grada_z_g * tt_piz[g];
-                double tl_c2 = grada_x_g * tl_pix[g] + grada_y_g * tl_piy[g] + grada_z_g * tl_piz[g];
+                //double tl_c2 = grada_x_g * tl_pix[g] + grada_y_g * tl_piy[g] + grada_z_g * tl_piz[g];
 
                 double c3 =  grada_x_g * grada_x_g * pixx[g]
                            + grada_x_g * grada_y_g * pixy[g]
@@ -9731,15 +9731,15 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                            + grada_z_g * grada_y_g * pizy[g]
                            + grada_z_g * grada_z_g * pizz[g];
 
-                double l_c3 =  grada_x_g * grada_x_g * l_pixx[g]
-                             + grada_x_g * grada_y_g * l_pixy[g]
-                             + grada_x_g * grada_z_g * l_pixz[g]
-                             + grada_y_g * grada_x_g * l_piyx[g]
-                             + grada_y_g * grada_y_g * l_piyy[g]
-                             + grada_y_g * grada_z_g * l_piyz[g]
-                             + grada_z_g * grada_x_g * l_pizx[g]
-                             + grada_z_g * grada_y_g * l_pizy[g]
-                             + grada_z_g * grada_z_g * l_pizz[g];
+                //double l_c3 =  grada_x_g * grada_x_g * l_pixx[g]
+                //             + grada_x_g * grada_y_g * l_pixy[g]
+                //             + grada_x_g * grada_z_g * l_pixz[g]
+                //             + grada_y_g * grada_x_g * l_piyx[g]
+                //             + grada_y_g * grada_y_g * l_piyy[g]
+                //             + grada_y_g * grada_z_g * l_piyz[g]
+                //             + grada_z_g * grada_x_g * l_pizx[g]
+                //             + grada_z_g * grada_y_g * l_pizy[g]
+                //             + grada_z_g * grada_z_g * l_pizz[g];
 
                 double t_c3 =  grada_x_g * grada_x_g * t_pixx[g]
                              + grada_x_g * grada_y_g * t_pixy[g]
@@ -9752,7 +9752,7 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                              + grada_z_g * grada_z_g * t_pizz[g];
 
                 double   c4 =   pixx[g] +   piyy[g] +   pizz[g];
-                double l_c4 = l_pixx[g] + l_piyy[g] + l_pizz[g];
+                //double l_c4 = l_pixx[g] + l_piyy[g] + l_pizz[g];
                 double t_c4 = t_pixx[g] + t_piyy[g] + t_pizz[g];
 
                 double c5_6 = grada_x_g * (pixxx[g] + pixxx[g])
@@ -9819,9 +9819,9 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                                    + grada_y_g * (pixy[g] + piyx[g])
                                    + grada_z_g * (pixz[g] + pizx[g]);
 
-                double l_c12_c14_x =   grada_x_g * (l_pixx[g] + l_pixx[g])
-                                     + grada_y_g * (l_pixy[g] + l_piyx[g])
-                                     + grada_z_g * (l_pixz[g] + l_pizx[g]);
+                //double l_c12_c14_x =   grada_x_g * (l_pixx[g] + l_pixx[g])
+                //                     + grada_y_g * (l_pixy[g] + l_piyx[g])
+                //                     + grada_z_g * (l_pixz[g] + l_pizx[g]);
 
                 double t_c12_c14_x =   grada_x_g * (t_pixx[g] + t_pixx[g])
                                      + grada_y_g * (t_pixy[g] + t_piyx[g])
@@ -9831,9 +9831,9 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                                  + grada_y_g * (piyy[g] + piyy[g])
                                  + grada_z_g * (piyz[g] + pizy[g]);
 
-                double l_c12_c14_y=  grada_x_g * (l_piyx[g] + l_pixy[g])
-                                   + grada_y_g * (l_piyy[g] + l_piyy[g])
-                                   + grada_z_g * (l_piyz[g] + l_pizy[g]);
+                //double l_c12_c14_y=  grada_x_g * (l_piyx[g] + l_pixy[g])
+                //                   + grada_y_g * (l_piyy[g] + l_piyy[g])
+                //                   + grada_z_g * (l_piyz[g] + l_pizy[g]);
 
                 double t_c12_c14_y=  grada_x_g * (t_piyx[g] + t_pixy[g])
                                    + grada_y_g * (t_piyy[g] + t_piyy[g])
@@ -9843,9 +9843,9 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                                  + grada_y_g * (pizy[g] + piyz[g])
                                  + grada_z_g * (pizz[g] + pizz[g]);
 
-                double l_c12_c14_z=  grada_x_g * (l_pizx[g] + l_pixz[g])
-                                   + grada_y_g * (l_pizy[g] + l_piyz[g])
-                                   + grada_z_g * (l_pizz[g] + l_pizz[g]);
+                //double l_c12_c14_z=  grada_x_g * (l_pizx[g] + l_pixz[g])
+                //                   + grada_y_g * (l_pizy[g] + l_piyz[g])
+                //                   + grada_z_g * (l_pizz[g] + l_pizz[g]);
 
                 double t_c12_c14_z=  grada_x_g * (t_pizx[g] + t_pixz[g])
                                    + grada_y_g * (t_pizy[g] + t_piyz[g])
@@ -9861,15 +9861,15 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                            + grada_z_g * grada_y_g * pizy[g]
                            + grada_z_g * grada_z_g * pizz[g];
 
-                double l_c13 = grada_x_g * grada_x_g * l_pixx[g]
-                             + grada_x_g * grada_y_g * l_pixy[g]
-                             + grada_x_g * grada_z_g * l_pixz[g]
-                             + grada_y_g * grada_x_g * l_piyx[g]
-                             + grada_y_g * grada_y_g * l_piyy[g]
-                             + grada_y_g * grada_z_g * l_piyz[g]
-                             + grada_z_g * grada_x_g * l_pizx[g]
-                             + grada_z_g * grada_y_g * l_pizy[g]
-                             + grada_z_g * grada_z_g * l_pizz[g];
+                //double l_c13 = grada_x_g * grada_x_g * l_pixx[g]
+                //             + grada_x_g * grada_y_g * l_pixy[g]
+                //             + grada_x_g * grada_z_g * l_pixz[g]
+                //             + grada_y_g * grada_x_g * l_piyx[g]
+                //             + grada_y_g * grada_y_g * l_piyy[g]
+                //             + grada_y_g * grada_z_g * l_piyz[g]
+                //             + grada_z_g * grada_x_g * l_pizx[g]
+                //             + grada_z_g * grada_y_g * l_pizy[g]
+                //             + grada_z_g * grada_z_g * l_pizz[g];
 
                 double t_c13 = grada_x_g * grada_x_g * t_pixx[g]
                              + grada_x_g * grada_y_g * t_pixy[g]
@@ -9882,27 +9882,27 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                              + grada_z_g * grada_z_g * t_pizz[g];
 
                 double   c13_x =   c13 * grada_x_g;
-                double l_c13_x = l_c13 * grada_x_g;
+                //double l_c13_x = l_c13 * grada_x_g;
                 double t_c13_x = t_c13 * grada_x_g;
 
                 double   c13_y = c13 * grada_y_g;
-                double l_c13_y = l_c13 * grada_y_g;
+                //double l_c13_y = l_c13 * grada_y_g;
                 double t_c13_y = t_c13 * grada_y_g;
 
                 double   c13_z = c13 * grada_z_g;
-                double l_c13_z = l_c13 * grada_z_g;
+                //double l_c13_z = l_c13 * grada_z_g;
                 double t_c13_z = t_c13 * grada_z_g;
 
                 double   c15_x = grada_x_g * c4;
-                double l_c15_x = grada_x_g * l_c4;
+                //double l_c15_x = grada_x_g * l_c4;
                 double t_c15_x = grada_x_g * t_c4;
 
                 double   c15_y = grada_y_g * c4;
-                double l_c15_y = grada_y_g * l_c4;
+                //double l_c15_y = grada_y_g * l_c4;
                 double t_c15_y = grada_y_g * t_c4;
 
                 double   c15_z = grada_z_g * c4;
-                double l_c15_z = grada_z_g * l_c4;
+                //double l_c15_z = grada_z_g * l_c4;
                 double t_c15_z = grada_z_g * t_c4;
 
                 double c16_19_22_x = grada_x_g * grada_x_g * pixxx[g] + grada_x_g * grada_x_g * pixxx[g] + grada_x_g * grada_x_g * pixxx[g]
@@ -9983,8 +9983,8 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v2rhosigma_ba = v2rhosigma[6 * g + 3];
                 auto v2rhosigma_bc = v2rhosigma[6 * g + 4];
 
-                auto v2rholapl_aa = v2rholapl[4 * g + 0];
-                auto v2rholapl_ab = v2rholapl[4 * g + 1];
+                //auto v2rholapl_aa = v2rholapl[4 * g + 0];
+                //auto v2rholapl_ab = v2rholapl[4 * g + 1];
 
                 auto v2rhotau_aa = v2rhotau[4 * g + 0];
                 auto v2rhotau_ab = v2rhotau[4 * g + 1];
@@ -9996,10 +9996,10 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v2sigma2_cc = v2sigma2[6 * g + 3];
                 auto v2sigma2_cb = v2sigma2[6 * g + 4];
 
-                auto v2sigmalapl_aa = v2sigmalapl[6 * g + 0];
-                auto v2sigmalapl_ab = v2sigmalapl[6 * g + 1];
-                auto v2sigmalapl_ca = v2sigmalapl[6 * g + 2];
-                auto v2sigmalapl_cb = v2sigmalapl[6 * g + 3];
+                //auto v2sigmalapl_aa = v2sigmalapl[6 * g + 0];
+                //auto v2sigmalapl_ab = v2sigmalapl[6 * g + 1];
+                //auto v2sigmalapl_ca = v2sigmalapl[6 * g + 2];
+                //auto v2sigmalapl_cb = v2sigmalapl[6 * g + 3];
 
                 auto v2sigmatau_aa = v2sigmatau[6 * g + 0];
                 auto v2sigmatau_ab = v2sigmatau[6 * g + 1];
@@ -10007,11 +10007,11 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v2sigmatau_cb = v2sigmatau[6 * g + 3];
                 auto v2sigmatau_ba = v2sigmatau[6 * g + 4];
 
-                auto v2lapl2_aa = v2lapl2[3 * g + 0];
-                auto v2lapl2_ab = v2lapl2[3 * g + 1];
+                //auto v2lapl2_aa = v2lapl2[3 * g + 0];
+                //auto v2lapl2_ab = v2lapl2[3 * g + 1];
 
-                auto v2lapltau_aa = v2lapltau[4 * g + 0];
-                auto v2lapltau_ba = v2lapltau[4 * g + 2];
+                //auto v2lapltau_aa = v2lapltau[4 * g + 0];
+                //auto v2lapltau_ba = v2lapltau[4 * g + 2];
 
                 auto v2tau2_aa = v2tau2[3 * g + 0];
                 auto v2tau2_ab = v2tau2[3 * g + 1];
@@ -10031,10 +10031,10 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v3rho2sigma_bba = v3rho2sigma[9 * g + 6];
                 auto v3rho2sigma_bbc = v3rho2sigma[9 * g + 7];
 
-                auto v3rho2lapl_aaa = v3rho2lapl[6 * g + 0];
-                auto v3rho2lapl_aab = v3rho2lapl[6 * g + 1];
-                auto v3rho2lapl_aba = v3rho2lapl[6 * g + 2];
-                auto v3rho2lapl_abb = v3rho2lapl[6 * g + 3];
+                //auto v3rho2lapl_aaa = v3rho2lapl[6 * g + 0];
+                //auto v3rho2lapl_aab = v3rho2lapl[6 * g + 1];
+                //auto v3rho2lapl_aba = v3rho2lapl[6 * g + 2];
+                //auto v3rho2lapl_abb = v3rho2lapl[6 * g + 3];
 
                 auto v3rho2tau_aaa = v3rho2tau[6 * g + 0];
                 auto v3rho2tau_aab = v3rho2tau[6 * g + 1];
@@ -10054,16 +10054,16 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v3rhosigma2_bcc = v3rhosigma2[12 * g + 9];
                 auto v3rhosigma2_bcb = v3rhosigma2[12 * g + 10];
 
-                auto v3rhosigmalapl_aaa = v3rhosigmalapl[12 * g + 0];
-                auto v3rhosigmalapl_aab = v3rhosigmalapl[12 * g + 1];
-                auto v3rhosigmalapl_aca = v3rhosigmalapl[12 * g + 2];
-                auto v3rhosigmalapl_acb = v3rhosigmalapl[12 * g + 3];
-                auto v3rhosigmalapl_aba = v3rhosigmalapl[12 * g + 4];
-                auto v3rhosigmalapl_abb = v3rhosigmalapl[12 * g + 5];
-                auto v3rhosigmalapl_baa = v3rhosigmalapl[12 * g + 6];
-                auto v3rhosigmalapl_bab = v3rhosigmalapl[12 * g + 7];
-                auto v3rhosigmalapl_bca = v3rhosigmalapl[12 * g + 8];
-                auto v3rhosigmalapl_bcb = v3rhosigmalapl[12 * g + 9];
+                //auto v3rhosigmalapl_aaa = v3rhosigmalapl[12 * g + 0];
+                //auto v3rhosigmalapl_aab = v3rhosigmalapl[12 * g + 1];
+                //auto v3rhosigmalapl_aca = v3rhosigmalapl[12 * g + 2];
+                //auto v3rhosigmalapl_acb = v3rhosigmalapl[12 * g + 3];
+                //auto v3rhosigmalapl_aba = v3rhosigmalapl[12 * g + 4];
+                //auto v3rhosigmalapl_abb = v3rhosigmalapl[12 * g + 5];
+                //auto v3rhosigmalapl_baa = v3rhosigmalapl[12 * g + 6];
+                //auto v3rhosigmalapl_bab = v3rhosigmalapl[12 * g + 7];
+                //auto v3rhosigmalapl_bca = v3rhosigmalapl[12 * g + 8];
+                //auto v3rhosigmalapl_bcb = v3rhosigmalapl[12 * g + 9];
 
                 auto v3rhosigmatau_aaa = v3rhosigmatau[12 * g + 0];
                 auto v3rhosigmatau_aab = v3rhosigmatau[12 * g + 1];
@@ -10077,16 +10077,16 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v3rhosigmatau_bcb = v3rhosigmatau[12 * g + 9];
                 auto v3rhosigmatau_bba = v3rhosigmatau[12 * g + 10];
 
-                auto v3rholapl2_aaa = v3rholapl2[6 * g + 0];
-                auto v3rholapl2_aab = v3rholapl2[6 * g + 1];
-                auto v3rholapl2_abb = v3rholapl2[6 * g + 2];
+                //auto v3rholapl2_aaa = v3rholapl2[6 * g + 0];
+                //auto v3rholapl2_aab = v3rholapl2[6 * g + 1];
+                //auto v3rholapl2_abb = v3rholapl2[6 * g + 2];
 
-                auto v3rholapltau_aaa = v3rholapltau[8 * g + 0];
-                auto v3rholapltau_aab = v3rholapltau[8 * g + 1];
-                auto v3rholapltau_aba = v3rholapltau[8 * g + 2];
-                auto v3rholapltau_abb = v3rholapltau[8 * g + 3];
-                auto v3rholapltau_baa = v3rholapltau[8 * g + 4];
-                auto v3rholapltau_bba = v3rholapltau[8 * g + 6];
+                //auto v3rholapltau_aaa = v3rholapltau[8 * g + 0];
+                //auto v3rholapltau_aab = v3rholapltau[8 * g + 1];
+                //auto v3rholapltau_aba = v3rholapltau[8 * g + 2];
+                //auto v3rholapltau_abb = v3rholapltau[8 * g + 3];
+                //auto v3rholapltau_baa = v3rholapltau[8 * g + 4];
+                //auto v3rholapltau_bba = v3rholapltau[8 * g + 6];
 
                 auto v3rhotau2_aaa = v3rhotau2[6 * g + 0];
                 auto v3rhotau2_aab = v3rhotau2[6 * g + 1];
@@ -10104,16 +10104,16 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v3sigma3_ccb = v3sigma3[10 * g + 7];
                 auto v3sigma3_cbb = v3sigma3[10 * g + 8];
 
-                auto v3sigma2lapl_aaa = v3sigma2lapl[12 * g + 0];
-                auto v3sigma2lapl_aab = v3sigma2lapl[12 * g + 1];
-                auto v3sigma2lapl_aca = v3sigma2lapl[12 * g + 2];
-                auto v3sigma2lapl_acb = v3sigma2lapl[12 * g + 3];
-                auto v3sigma2lapl_aba = v3sigma2lapl[12 * g + 4];
-                auto v3sigma2lapl_abb = v3sigma2lapl[12 * g + 5];
-                auto v3sigma2lapl_cca = v3sigma2lapl[12 * g + 6];
-                auto v3sigma2lapl_ccb = v3sigma2lapl[12 * g + 7];
-                auto v3sigma2lapl_cba = v3sigma2lapl[12 * g + 8];
-                auto v3sigma2lapl_cbb = v3sigma2lapl[12 * g + 9];
+                //auto v3sigma2lapl_aaa = v3sigma2lapl[12 * g + 0];
+                //auto v3sigma2lapl_aab = v3sigma2lapl[12 * g + 1];
+                //auto v3sigma2lapl_aca = v3sigma2lapl[12 * g + 2];
+                //auto v3sigma2lapl_acb = v3sigma2lapl[12 * g + 3];
+                //auto v3sigma2lapl_aba = v3sigma2lapl[12 * g + 4];
+                //auto v3sigma2lapl_abb = v3sigma2lapl[12 * g + 5];
+                //auto v3sigma2lapl_cca = v3sigma2lapl[12 * g + 6];
+                //auto v3sigma2lapl_ccb = v3sigma2lapl[12 * g + 7];
+                //auto v3sigma2lapl_cba = v3sigma2lapl[12 * g + 8];
+                //auto v3sigma2lapl_cbb = v3sigma2lapl[12 * g + 9];
 
                 auto v3sigma2tau_aaa = v3sigma2tau[12 * g + 0];
                 auto v3sigma2tau_aab = v3sigma2tau[12 * g + 1];
@@ -10127,23 +10127,23 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v3sigma2tau_cbb = v3sigma2tau[12 * g + 9];
                 auto v3sigma2tau_bba = v3sigma2tau[12 * g + 10];
 
-                auto v3sigmalapl2_aaa = v3sigmalapl2[9 * g + 0];
-                auto v3sigmalapl2_aab = v3sigmalapl2[9 * g + 1];
-                auto v3sigmalapl2_abb = v3sigmalapl2[9 * g + 2];
-                auto v3sigmalapl2_caa = v3sigmalapl2[9 * g + 3];
-                auto v3sigmalapl2_cab = v3sigmalapl2[9 * g + 4];
-                auto v3sigmalapl2_cbb = v3sigmalapl2[9 * g + 5];
+                //auto v3sigmalapl2_aaa = v3sigmalapl2[9 * g + 0];
+                //auto v3sigmalapl2_aab = v3sigmalapl2[9 * g + 1];
+                //auto v3sigmalapl2_abb = v3sigmalapl2[9 * g + 2];
+                //auto v3sigmalapl2_caa = v3sigmalapl2[9 * g + 3];
+                //auto v3sigmalapl2_cab = v3sigmalapl2[9 * g + 4];
+                //auto v3sigmalapl2_cbb = v3sigmalapl2[9 * g + 5];
 
-                auto v3sigmalapltau_aaa = v3sigmalapltau[12 * g + 0];
-                auto v3sigmalapltau_aab = v3sigmalapltau[12 * g + 1];
-                auto v3sigmalapltau_aba = v3sigmalapltau[12 * g + 2];
-                auto v3sigmalapltau_abb = v3sigmalapltau[12 * g + 3];
-                auto v3sigmalapltau_caa = v3sigmalapltau[12 * g + 4];
-                auto v3sigmalapltau_cab = v3sigmalapltau[12 * g + 5];
-                auto v3sigmalapltau_cba = v3sigmalapltau[12 * g + 6];
-                auto v3sigmalapltau_cbb = v3sigmalapltau[12 * g + 7];
-                auto v3sigmalapltau_baa = v3sigmalapltau[12 * g + 8];
-                auto v3sigmalapltau_bba = v3sigmalapltau[12 * g + 10];
+                //auto v3sigmalapltau_aaa = v3sigmalapltau[12 * g + 0];
+                //auto v3sigmalapltau_aab = v3sigmalapltau[12 * g + 1];
+                //auto v3sigmalapltau_aba = v3sigmalapltau[12 * g + 2];
+                //auto v3sigmalapltau_abb = v3sigmalapltau[12 * g + 3];
+                //auto v3sigmalapltau_caa = v3sigmalapltau[12 * g + 4];
+                //auto v3sigmalapltau_cab = v3sigmalapltau[12 * g + 5];
+                //auto v3sigmalapltau_cba = v3sigmalapltau[12 * g + 6];
+                //auto v3sigmalapltau_cbb = v3sigmalapltau[12 * g + 7];
+                //auto v3sigmalapltau_baa = v3sigmalapltau[12 * g + 8];
+                //auto v3sigmalapltau_bba = v3sigmalapltau[12 * g + 10];
 
                 auto v3sigmatau2_aaa = v3sigmatau2[9 * g + 0];
                 auto v3sigmatau2_aab = v3sigmatau2[9 * g + 1];
@@ -10154,18 +10154,18 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v3sigmatau2_baa = v3sigmatau2[9 * g + 6];
                 auto v3sigmatau2_bab = v3sigmatau2[9 * g + 7];
 
-                auto v3lapl3_aaa = v3lapl3[4 * g + 0];
-                auto v3lapl3_aab = v3lapl3[4 * g + 1];
-                auto v3lapl3_abb = v3lapl3[4 * g + 2];
+                //auto v3lapl3_aaa = v3lapl3[4 * g + 0];
+                //auto v3lapl3_aab = v3lapl3[4 * g + 1];
+                //auto v3lapl3_abb = v3lapl3[4 * g + 2];
 
-                auto v3lapl2tau_aaa = v3lapl2tau[6 * g + 0];
-                auto v3lapl2tau_aba = v3lapl2tau[6 * g + 2];
-                auto v3lapl2tau_bba = v3lapl2tau[6 * g + 4];
+                //auto v3lapl2tau_aaa = v3lapl2tau[6 * g + 0];
+                //auto v3lapl2tau_aba = v3lapl2tau[6 * g + 2];
+                //auto v3lapl2tau_bba = v3lapl2tau[6 * g + 4];
 
-                auto v3lapltau2_aaa = v3lapltau2[6 * g + 0];
-                auto v3lapltau2_aab = v3lapltau2[6 * g + 1];
-                auto v3lapltau2_baa = v3lapltau2[6 * g + 3];
-                auto v3lapltau2_bab = v3lapltau2[6 * g + 4];
+                //auto v3lapltau2_aaa = v3lapltau2[6 * g + 0];
+                //auto v3lapltau2_aab = v3lapltau2[6 * g + 1];
+                //auto v3lapltau2_baa = v3lapltau2[6 * g + 3];
+                //auto v3lapltau2_bab = v3lapltau2[6 * g + 4];
 
                 auto v3tau3_aaa = v3tau3[4 * g + 0];
                 auto v3tau3_aab = v3tau3[4 * g + 1];
@@ -10190,13 +10190,13 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4rho3sigma_bbba = v4rho3sigma[12 * g + 9];
                 auto v4rho3sigma_bbbc = v4rho3sigma[12 * g + 10];
 
-                auto v4rho3lapl_aaaa = v4rho3lapl[8 * g + 0];
-                auto v4rho3lapl_aaab = v4rho3lapl[8 * g + 1];
-                auto v4rho3lapl_aaba = v4rho3lapl[8 * g + 2];
-                auto v4rho3lapl_aabb = v4rho3lapl[8 * g + 3];
-                auto v4rho3lapl_abba = v4rho3lapl[8 * g + 4];
-                auto v4rho3lapl_abbb = v4rho3lapl[8 * g + 5];
-                auto v4rho3lapl_bbba = v4rho3lapl[8 * g + 6];
+                //auto v4rho3lapl_aaaa = v4rho3lapl[8 * g + 0];
+                //auto v4rho3lapl_aaab = v4rho3lapl[8 * g + 1];
+                //auto v4rho3lapl_aaba = v4rho3lapl[8 * g + 2];
+                //auto v4rho3lapl_aabb = v4rho3lapl[8 * g + 3];
+                //auto v4rho3lapl_abba = v4rho3lapl[8 * g + 4];
+                //auto v4rho3lapl_abbb = v4rho3lapl[8 * g + 5];
+                //auto v4rho3lapl_bbba = v4rho3lapl[8 * g + 6];
 
                 auto v4rho3tau_aaaa = v4rho3tau[8 * g + 0];
                 auto v4rho3tau_aaab = v4rho3tau[8 * g + 1];
@@ -10224,23 +10224,23 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4rho2sigma2_bbcc = v4rho2sigma2[18 * g + 15];
                 auto v4rho2sigma2_bbcb = v4rho2sigma2[18 * g + 16];
 
-                auto v4rho2sigmalapl_aaaa = v4rho2sigmalapl[18 * g + 0];
-                auto v4rho2sigmalapl_aaab = v4rho2sigmalapl[18 * g + 1];
-                auto v4rho2sigmalapl_aaca = v4rho2sigmalapl[18 * g + 2];
-                auto v4rho2sigmalapl_aacb = v4rho2sigmalapl[18 * g + 3];
-                auto v4rho2sigmalapl_aaba = v4rho2sigmalapl[18 * g + 4];
-                auto v4rho2sigmalapl_aabb = v4rho2sigmalapl[18 * g + 5];
-                auto v4rho2sigmalapl_abaa = v4rho2sigmalapl[18 * g + 6];
-                auto v4rho2sigmalapl_abab = v4rho2sigmalapl[18 * g + 7];
-                auto v4rho2sigmalapl_abca = v4rho2sigmalapl[18 * g + 8];
-                auto v4rho2sigmalapl_abcb = v4rho2sigmalapl[18 * g + 9];
-                auto v4rho2sigmalapl_abba = v4rho2sigmalapl[18 * g + 10];
-                auto v4rho2sigmalapl_abbb = v4rho2sigmalapl[18 * g + 11];
-                auto v4rho2sigmalapl_bbaa = v4rho2sigmalapl[18 * g + 12];
-                auto v4rho2sigmalapl_bbab = v4rho2sigmalapl[18 * g + 13];
-                auto v4rho2sigmalapl_bbca = v4rho2sigmalapl[18 * g + 14];
-                auto v4rho2sigmalapl_bbcb = v4rho2sigmalapl[18 * g + 15];
-                auto v4rho2sigmalapl_bbba = v4rho2sigmalapl[18 * g + 16];
+                //auto v4rho2sigmalapl_aaaa = v4rho2sigmalapl[18 * g + 0];
+                //auto v4rho2sigmalapl_aaab = v4rho2sigmalapl[18 * g + 1];
+                //auto v4rho2sigmalapl_aaca = v4rho2sigmalapl[18 * g + 2];
+                //auto v4rho2sigmalapl_aacb = v4rho2sigmalapl[18 * g + 3];
+                //auto v4rho2sigmalapl_aaba = v4rho2sigmalapl[18 * g + 4];
+                //auto v4rho2sigmalapl_aabb = v4rho2sigmalapl[18 * g + 5];
+                //auto v4rho2sigmalapl_abaa = v4rho2sigmalapl[18 * g + 6];
+                //auto v4rho2sigmalapl_abab = v4rho2sigmalapl[18 * g + 7];
+                //auto v4rho2sigmalapl_abca = v4rho2sigmalapl[18 * g + 8];
+                //auto v4rho2sigmalapl_abcb = v4rho2sigmalapl[18 * g + 9];
+                //auto v4rho2sigmalapl_abba = v4rho2sigmalapl[18 * g + 10];
+                //auto v4rho2sigmalapl_abbb = v4rho2sigmalapl[18 * g + 11];
+                //auto v4rho2sigmalapl_bbaa = v4rho2sigmalapl[18 * g + 12];
+                //auto v4rho2sigmalapl_bbab = v4rho2sigmalapl[18 * g + 13];
+                //auto v4rho2sigmalapl_bbca = v4rho2sigmalapl[18 * g + 14];
+                //auto v4rho2sigmalapl_bbcb = v4rho2sigmalapl[18 * g + 15];
+                //auto v4rho2sigmalapl_bbba = v4rho2sigmalapl[18 * g + 16];
 
                 auto v4rho2sigmatau_aaaa = v4rho2sigmatau[18 * g + 0];
                 auto v4rho2sigmatau_aaab = v4rho2sigmatau[18 * g + 1];
@@ -10260,26 +10260,26 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4rho2sigmatau_bbcb = v4rho2sigmatau[18 * g + 15];
                 auto v4rho2sigmatau_bbba = v4rho2sigmatau[18 * g + 16];
 
-                auto v4rho2lapl2_aaaa = v4rho2lapl2[9 * g + 0];
-                auto v4rho2lapl2_aaab = v4rho2lapl2[9 * g + 1];
-                auto v4rho2lapl2_aabb = v4rho2lapl2[9 * g + 2];
-                auto v4rho2lapl2_abaa = v4rho2lapl2[9 * g + 3];
-                auto v4rho2lapl2_abab = v4rho2lapl2[9 * g + 4];
-                auto v4rho2lapl2_abbb = v4rho2lapl2[9 * g + 5];
-                auto v4rho2lapl2_bbaa = v4rho2lapl2[9 * g + 6];
-                auto v4rho2lapl2_bbab = v4rho2lapl2[9 * g + 7];
+                //auto v4rho2lapl2_aaaa = v4rho2lapl2[9 * g + 0];
+                //auto v4rho2lapl2_aaab = v4rho2lapl2[9 * g + 1];
+                //auto v4rho2lapl2_aabb = v4rho2lapl2[9 * g + 2];
+                //auto v4rho2lapl2_abaa = v4rho2lapl2[9 * g + 3];
+                //auto v4rho2lapl2_abab = v4rho2lapl2[9 * g + 4];
+                //auto v4rho2lapl2_abbb = v4rho2lapl2[9 * g + 5];
+                //auto v4rho2lapl2_bbaa = v4rho2lapl2[9 * g + 6];
+                //auto v4rho2lapl2_bbab = v4rho2lapl2[9 * g + 7];
 
-                auto v4rho2lapltau_aaaa = v4rho2lapltau[12 * g + 0];
-                auto v4rho2lapltau_aaab = v4rho2lapltau[12 * g + 1];
-                auto v4rho2lapltau_aaba = v4rho2lapltau[12 * g + 2];
-                auto v4rho2lapltau_aabb = v4rho2lapltau[12 * g + 3];
-                auto v4rho2lapltau_abaa = v4rho2lapltau[12 * g + 4];
-                auto v4rho2lapltau_abab = v4rho2lapltau[12 * g + 5];
-                auto v4rho2lapltau_abba = v4rho2lapltau[12 * g + 6];
-                auto v4rho2lapltau_abbb = v4rho2lapltau[12 * g + 7];
-                auto v4rho2lapltau_bbaa = v4rho2lapltau[12 * g + 8];
-                auto v4rho2lapltau_bbab = v4rho2lapltau[12 * g + 9];
-                auto v4rho2lapltau_bbba = v4rho2lapltau[12 * g + 10];
+                //auto v4rho2lapltau_aaaa = v4rho2lapltau[12 * g + 0];
+                //auto v4rho2lapltau_aaab = v4rho2lapltau[12 * g + 1];
+                //auto v4rho2lapltau_aaba = v4rho2lapltau[12 * g + 2];
+                //auto v4rho2lapltau_aabb = v4rho2lapltau[12 * g + 3];
+                //auto v4rho2lapltau_abaa = v4rho2lapltau[12 * g + 4];
+                //auto v4rho2lapltau_abab = v4rho2lapltau[12 * g + 5];
+                //auto v4rho2lapltau_abba = v4rho2lapltau[12 * g + 6];
+                //auto v4rho2lapltau_abbb = v4rho2lapltau[12 * g + 7];
+                //auto v4rho2lapltau_bbaa = v4rho2lapltau[12 * g + 8];
+                //auto v4rho2lapltau_bbab = v4rho2lapltau[12 * g + 9];
+                //auto v4rho2lapltau_bbba = v4rho2lapltau[12 * g + 10];
 
                 auto v4rho2tau2_aaaa = v4rho2tau2[9 * g + 0];
                 auto v4rho2tau2_aaab = v4rho2tau2[9 * g + 1];
@@ -10311,29 +10311,29 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4rhosigma3_bcbb = v4rhosigma3[20 * g + 18];
 
                 // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24)
-                auto v4rhosigma2lapl_aaaa = v4rhosigma2lapl[36 * g + 0];
-                auto v4rhosigma2lapl_aaab = v4rhosigma2lapl[36 * g + 1];
-                auto v4rhosigma2lapl_aaca = v4rhosigma2lapl[36 * g + 2];
-                auto v4rhosigma2lapl_aacb = v4rhosigma2lapl[36 * g + 3];
-                auto v4rhosigma2lapl_aaba = v4rhosigma2lapl[36 * g + 4];
-                auto v4rhosigma2lapl_aabb = v4rhosigma2lapl[36 * g + 5];
-                auto v4rhosigma2lapl_acca = v4rhosigma2lapl[36 * g + 6];
-                auto v4rhosigma2lapl_accb = v4rhosigma2lapl[36 * g + 7];
-                auto v4rhosigma2lapl_acba = v4rhosigma2lapl[36 * g + 8];
-                auto v4rhosigma2lapl_acbb = v4rhosigma2lapl[36 * g + 9];
-                auto v4rhosigma2lapl_abba = v4rhosigma2lapl[36 * g + 10];
-                auto v4rhosigma2lapl_abbb = v4rhosigma2lapl[36 * g + 11];
-                auto v4rhosigma2lapl_baaa = v4rhosigma2lapl[36 * g + 12];
-                auto v4rhosigma2lapl_baab = v4rhosigma2lapl[36 * g + 13];
-                auto v4rhosigma2lapl_baca = v4rhosigma2lapl[36 * g + 14];
-                auto v4rhosigma2lapl_bacb = v4rhosigma2lapl[36 * g + 15];
-                auto v4rhosigma2lapl_baba = v4rhosigma2lapl[36 * g + 16];
-                auto v4rhosigma2lapl_babb = v4rhosigma2lapl[36 * g + 17];
-                auto v4rhosigma2lapl_bcca = v4rhosigma2lapl[36 * g + 18];
-                auto v4rhosigma2lapl_bccb = v4rhosigma2lapl[36 * g + 19];
-                auto v4rhosigma2lapl_bcba = v4rhosigma2lapl[36 * g + 20];
-                auto v4rhosigma2lapl_bcbb = v4rhosigma2lapl[36 * g + 21];
-                auto v4rhosigma2lapl_bbba = v4rhosigma2lapl[36 * g + 22];
+                //auto v4rhosigma2lapl_aaaa = v4rhosigma2lapl[36 * g + 0];
+                //auto v4rhosigma2lapl_aaab = v4rhosigma2lapl[36 * g + 1];
+                //auto v4rhosigma2lapl_aaca = v4rhosigma2lapl[36 * g + 2];
+                //auto v4rhosigma2lapl_aacb = v4rhosigma2lapl[36 * g + 3];
+                //auto v4rhosigma2lapl_aaba = v4rhosigma2lapl[36 * g + 4];
+                //auto v4rhosigma2lapl_aabb = v4rhosigma2lapl[36 * g + 5];
+                //auto v4rhosigma2lapl_acca = v4rhosigma2lapl[36 * g + 6];
+                //auto v4rhosigma2lapl_accb = v4rhosigma2lapl[36 * g + 7];
+                //auto v4rhosigma2lapl_acba = v4rhosigma2lapl[36 * g + 8];
+                //auto v4rhosigma2lapl_acbb = v4rhosigma2lapl[36 * g + 9];
+                //auto v4rhosigma2lapl_abba = v4rhosigma2lapl[36 * g + 10];
+                //auto v4rhosigma2lapl_abbb = v4rhosigma2lapl[36 * g + 11];
+                //auto v4rhosigma2lapl_baaa = v4rhosigma2lapl[36 * g + 12];
+                //auto v4rhosigma2lapl_baab = v4rhosigma2lapl[36 * g + 13];
+                //auto v4rhosigma2lapl_baca = v4rhosigma2lapl[36 * g + 14];
+                //auto v4rhosigma2lapl_bacb = v4rhosigma2lapl[36 * g + 15];
+                //auto v4rhosigma2lapl_baba = v4rhosigma2lapl[36 * g + 16];
+                //auto v4rhosigma2lapl_babb = v4rhosigma2lapl[36 * g + 17];
+                //auto v4rhosigma2lapl_bcca = v4rhosigma2lapl[36 * g + 18];
+                //auto v4rhosigma2lapl_bccb = v4rhosigma2lapl[36 * g + 19];
+                //auto v4rhosigma2lapl_bcba = v4rhosigma2lapl[36 * g + 20];
+                //auto v4rhosigma2lapl_bcbb = v4rhosigma2lapl[36 * g + 21];
+                //auto v4rhosigma2lapl_bbba = v4rhosigma2lapl[36 * g + 22];
 
                 // v4rhosigma2tau: inconsistent size in libxc (36 vs 24)
                 auto v4rhosigma2tau_aaaa = v4rhosigma2tau[36 * g + 0];
@@ -10360,47 +10360,47 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4rhosigma2tau_bcbb = v4rhosigma2tau[36 * g + 21];
                 auto v4rhosigma2tau_bbba = v4rhosigma2tau[36 * g + 22];
 
-                auto v4rhosigmalapl2_aaaa = v4rhosigmalapl2[18 * g + 0];
-                auto v4rhosigmalapl2_aaab = v4rhosigmalapl2[18 * g + 1];
-                auto v4rhosigmalapl2_aabb = v4rhosigmalapl2[18 * g + 2];
-                auto v4rhosigmalapl2_acaa = v4rhosigmalapl2[18 * g + 3];
-                auto v4rhosigmalapl2_acab = v4rhosigmalapl2[18 * g + 4];
-                auto v4rhosigmalapl2_acbb = v4rhosigmalapl2[18 * g + 5];
-                auto v4rhosigmalapl2_abaa = v4rhosigmalapl2[18 * g + 6];
-                auto v4rhosigmalapl2_abab = v4rhosigmalapl2[18 * g + 7];
-                auto v4rhosigmalapl2_abbb = v4rhosigmalapl2[18 * g + 8];
-                auto v4rhosigmalapl2_baaa = v4rhosigmalapl2[18 * g + 9];
-                auto v4rhosigmalapl2_baab = v4rhosigmalapl2[18 * g + 10];
-                auto v4rhosigmalapl2_babb = v4rhosigmalapl2[18 * g + 11];
-                auto v4rhosigmalapl2_bcaa = v4rhosigmalapl2[18 * g + 12];
-                auto v4rhosigmalapl2_bcab = v4rhosigmalapl2[18 * g + 13];
-                auto v4rhosigmalapl2_bcbb = v4rhosigmalapl2[18 * g + 14];
-                auto v4rhosigmalapl2_bbaa = v4rhosigmalapl2[18 * g + 15];
-                auto v4rhosigmalapl2_bbab = v4rhosigmalapl2[18 * g + 16];
+                //auto v4rhosigmalapl2_aaaa = v4rhosigmalapl2[18 * g + 0];
+                //auto v4rhosigmalapl2_aaab = v4rhosigmalapl2[18 * g + 1];
+                //auto v4rhosigmalapl2_aabb = v4rhosigmalapl2[18 * g + 2];
+                //auto v4rhosigmalapl2_acaa = v4rhosigmalapl2[18 * g + 3];
+                //auto v4rhosigmalapl2_acab = v4rhosigmalapl2[18 * g + 4];
+                //auto v4rhosigmalapl2_acbb = v4rhosigmalapl2[18 * g + 5];
+                //auto v4rhosigmalapl2_abaa = v4rhosigmalapl2[18 * g + 6];
+                //auto v4rhosigmalapl2_abab = v4rhosigmalapl2[18 * g + 7];
+                //auto v4rhosigmalapl2_abbb = v4rhosigmalapl2[18 * g + 8];
+                //auto v4rhosigmalapl2_baaa = v4rhosigmalapl2[18 * g + 9];
+                //auto v4rhosigmalapl2_baab = v4rhosigmalapl2[18 * g + 10];
+                //auto v4rhosigmalapl2_babb = v4rhosigmalapl2[18 * g + 11];
+                //auto v4rhosigmalapl2_bcaa = v4rhosigmalapl2[18 * g + 12];
+                //auto v4rhosigmalapl2_bcab = v4rhosigmalapl2[18 * g + 13];
+                //auto v4rhosigmalapl2_bcbb = v4rhosigmalapl2[18 * g + 14];
+                //auto v4rhosigmalapl2_bbaa = v4rhosigmalapl2[18 * g + 15];
+                //auto v4rhosigmalapl2_bbab = v4rhosigmalapl2[18 * g + 16];
 
-                auto v4rhosigmalapltau_aaaa = v4rhosigmalapltau[24 * g + 0];
-                auto v4rhosigmalapltau_aaab = v4rhosigmalapltau[24 * g + 1];
-                auto v4rhosigmalapltau_aaba = v4rhosigmalapltau[24 * g + 2];
-                auto v4rhosigmalapltau_aabb = v4rhosigmalapltau[24 * g + 3];
-                auto v4rhosigmalapltau_acaa = v4rhosigmalapltau[24 * g + 4];
-                auto v4rhosigmalapltau_acab = v4rhosigmalapltau[24 * g + 5];
-                auto v4rhosigmalapltau_acba = v4rhosigmalapltau[24 * g + 6];
-                auto v4rhosigmalapltau_acbb = v4rhosigmalapltau[24 * g + 7];
-                auto v4rhosigmalapltau_abaa = v4rhosigmalapltau[24 * g + 8];
-                auto v4rhosigmalapltau_abab = v4rhosigmalapltau[24 * g + 9];
-                auto v4rhosigmalapltau_abba = v4rhosigmalapltau[24 * g + 10];
-                auto v4rhosigmalapltau_abbb = v4rhosigmalapltau[24 * g + 11];
-                auto v4rhosigmalapltau_baaa = v4rhosigmalapltau[24 * g + 12];
-                auto v4rhosigmalapltau_baab = v4rhosigmalapltau[24 * g + 13];
-                auto v4rhosigmalapltau_baba = v4rhosigmalapltau[24 * g + 14];
-                auto v4rhosigmalapltau_babb = v4rhosigmalapltau[24 * g + 15];
-                auto v4rhosigmalapltau_bcaa = v4rhosigmalapltau[24 * g + 16];
-                auto v4rhosigmalapltau_bcab = v4rhosigmalapltau[24 * g + 17];
-                auto v4rhosigmalapltau_bcba = v4rhosigmalapltau[24 * g + 18];
-                auto v4rhosigmalapltau_bcbb = v4rhosigmalapltau[24 * g + 19];
-                auto v4rhosigmalapltau_bbaa = v4rhosigmalapltau[24 * g + 20];
-                auto v4rhosigmalapltau_bbab = v4rhosigmalapltau[24 * g + 21];
-                auto v4rhosigmalapltau_bbba = v4rhosigmalapltau[24 * g + 22];
+                //auto v4rhosigmalapltau_aaaa = v4rhosigmalapltau[24 * g + 0];
+                //auto v4rhosigmalapltau_aaab = v4rhosigmalapltau[24 * g + 1];
+                //auto v4rhosigmalapltau_aaba = v4rhosigmalapltau[24 * g + 2];
+                //auto v4rhosigmalapltau_aabb = v4rhosigmalapltau[24 * g + 3];
+                //auto v4rhosigmalapltau_acaa = v4rhosigmalapltau[24 * g + 4];
+                //auto v4rhosigmalapltau_acab = v4rhosigmalapltau[24 * g + 5];
+                //auto v4rhosigmalapltau_acba = v4rhosigmalapltau[24 * g + 6];
+                //auto v4rhosigmalapltau_acbb = v4rhosigmalapltau[24 * g + 7];
+                //auto v4rhosigmalapltau_abaa = v4rhosigmalapltau[24 * g + 8];
+                //auto v4rhosigmalapltau_abab = v4rhosigmalapltau[24 * g + 9];
+                //auto v4rhosigmalapltau_abba = v4rhosigmalapltau[24 * g + 10];
+                //auto v4rhosigmalapltau_abbb = v4rhosigmalapltau[24 * g + 11];
+                //auto v4rhosigmalapltau_baaa = v4rhosigmalapltau[24 * g + 12];
+                //auto v4rhosigmalapltau_baab = v4rhosigmalapltau[24 * g + 13];
+                //auto v4rhosigmalapltau_baba = v4rhosigmalapltau[24 * g + 14];
+                //auto v4rhosigmalapltau_babb = v4rhosigmalapltau[24 * g + 15];
+                //auto v4rhosigmalapltau_bcaa = v4rhosigmalapltau[24 * g + 16];
+                //auto v4rhosigmalapltau_bcab = v4rhosigmalapltau[24 * g + 17];
+                //auto v4rhosigmalapltau_bcba = v4rhosigmalapltau[24 * g + 18];
+                //auto v4rhosigmalapltau_bcbb = v4rhosigmalapltau[24 * g + 19];
+                //auto v4rhosigmalapltau_bbaa = v4rhosigmalapltau[24 * g + 20];
+                //auto v4rhosigmalapltau_bbab = v4rhosigmalapltau[24 * g + 21];
+                //auto v4rhosigmalapltau_bbba = v4rhosigmalapltau[24 * g + 22];
 
                 // v4rhosigmatau2: inconsistent size in libxc (36 vs 18)
                 auto v4rhosigmatau2_aaaa = v4rhosigmatau2[36 * g + 0];
@@ -10421,37 +10421,37 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4rhosigmatau2_bbaa = v4rhosigmatau2[36 * g + 15];
                 auto v4rhosigmatau2_bbab = v4rhosigmatau2[36 * g + 16];
 
-                auto v4rholapl3_aaaa = v4rholapl3[8 * g + 0];
-                auto v4rholapl3_aaab = v4rholapl3[8 * g + 1];
-                auto v4rholapl3_aabb = v4rholapl3[8 * g + 2];
-                auto v4rholapl3_abbb = v4rholapl3[8 * g + 3];
-                auto v4rholapl3_baaa = v4rholapl3[8 * g + 4];
-                auto v4rholapl3_baab = v4rholapl3[8 * g + 5];
-                auto v4rholapl3_babb = v4rholapl3[8 * g + 6];
+                //auto v4rholapl3_aaaa = v4rholapl3[8 * g + 0];
+                //auto v4rholapl3_aaab = v4rholapl3[8 * g + 1];
+                //auto v4rholapl3_aabb = v4rholapl3[8 * g + 2];
+                //auto v4rholapl3_abbb = v4rholapl3[8 * g + 3];
+                //auto v4rholapl3_baaa = v4rholapl3[8 * g + 4];
+                //auto v4rholapl3_baab = v4rholapl3[8 * g + 5];
+                //auto v4rholapl3_babb = v4rholapl3[8 * g + 6];
 
-                auto v4rholapl2tau_aaaa = v4rholapl2tau[12 * g + 0];
-                auto v4rholapl2tau_aaab = v4rholapl2tau[12 * g + 1];
-                auto v4rholapl2tau_aaba = v4rholapl2tau[12 * g + 2];
-                auto v4rholapl2tau_aabb = v4rholapl2tau[12 * g + 3];
-                auto v4rholapl2tau_abba = v4rholapl2tau[12 * g + 4];
-                auto v4rholapl2tau_abbb = v4rholapl2tau[12 * g + 5];
-                auto v4rholapl2tau_baaa = v4rholapl2tau[12 * g + 6];
-                auto v4rholapl2tau_baab = v4rholapl2tau[12 * g + 7];
-                auto v4rholapl2tau_baba = v4rholapl2tau[12 * g + 8];
-                auto v4rholapl2tau_babb = v4rholapl2tau[12 * g + 9];
-                auto v4rholapl2tau_bbba = v4rholapl2tau[12 * g + 10];
+                //auto v4rholapl2tau_aaaa = v4rholapl2tau[12 * g + 0];
+                //auto v4rholapl2tau_aaab = v4rholapl2tau[12 * g + 1];
+                //auto v4rholapl2tau_aaba = v4rholapl2tau[12 * g + 2];
+                //auto v4rholapl2tau_aabb = v4rholapl2tau[12 * g + 3];
+                //auto v4rholapl2tau_abba = v4rholapl2tau[12 * g + 4];
+                //auto v4rholapl2tau_abbb = v4rholapl2tau[12 * g + 5];
+                //auto v4rholapl2tau_baaa = v4rholapl2tau[12 * g + 6];
+                //auto v4rholapl2tau_baab = v4rholapl2tau[12 * g + 7];
+                //auto v4rholapl2tau_baba = v4rholapl2tau[12 * g + 8];
+                //auto v4rholapl2tau_babb = v4rholapl2tau[12 * g + 9];
+                //auto v4rholapl2tau_bbba = v4rholapl2tau[12 * g + 10];
 
-                auto v4rholapltau2_aaaa = v4rholapltau2[12 * g + 0];
-                auto v4rholapltau2_aaab = v4rholapltau2[12 * g + 1];
-                auto v4rholapltau2_aabb = v4rholapltau2[12 * g + 2];
-                auto v4rholapltau2_abaa = v4rholapltau2[12 * g + 3];
-                auto v4rholapltau2_abab = v4rholapltau2[12 * g + 4];
-                auto v4rholapltau2_abbb = v4rholapltau2[12 * g + 5];
-                auto v4rholapltau2_baaa = v4rholapltau2[12 * g + 6];
-                auto v4rholapltau2_baab = v4rholapltau2[12 * g + 7];
-                auto v4rholapltau2_babb = v4rholapltau2[12 * g + 8];
-                auto v4rholapltau2_bbaa = v4rholapltau2[12 * g + 9];
-                auto v4rholapltau2_bbab = v4rholapltau2[12 * g + 10];
+                //auto v4rholapltau2_aaaa = v4rholapltau2[12 * g + 0];
+                //auto v4rholapltau2_aaab = v4rholapltau2[12 * g + 1];
+                //auto v4rholapltau2_aabb = v4rholapltau2[12 * g + 2];
+                //auto v4rholapltau2_abaa = v4rholapltau2[12 * g + 3];
+                //auto v4rholapltau2_abab = v4rholapltau2[12 * g + 4];
+                //auto v4rholapltau2_abbb = v4rholapltau2[12 * g + 5];
+                //auto v4rholapltau2_baaa = v4rholapltau2[12 * g + 6];
+                //auto v4rholapltau2_baab = v4rholapltau2[12 * g + 7];
+                //auto v4rholapltau2_babb = v4rholapltau2[12 * g + 8];
+                //auto v4rholapltau2_bbaa = v4rholapltau2[12 * g + 9];
+                //auto v4rholapltau2_bbab = v4rholapltau2[12 * g + 10];
 
                 auto v4rhotau3_aaaa = v4rhotau3[8 * g + 0];
                 auto v4rhotau3_aaab = v4rhotau3[8 * g + 1];
@@ -10476,25 +10476,25 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4sigma4_ccbb = v4sigma4[15 * g + 12];
                 auto v4sigma4_cbbb = v4sigma4[15 * g + 13];
 
-                auto v4sigma3lapl_aaaa = v4sigma3lapl[20 * g + 0];
-                auto v4sigma3lapl_aaab = v4sigma3lapl[20 * g + 1];
-                auto v4sigma3lapl_aaca = v4sigma3lapl[20 * g + 2];
-                auto v4sigma3lapl_aacb = v4sigma3lapl[20 * g + 3];
-                auto v4sigma3lapl_aaba = v4sigma3lapl[20 * g + 4];
-                auto v4sigma3lapl_aabb = v4sigma3lapl[20 * g + 5];
-                auto v4sigma3lapl_acca = v4sigma3lapl[20 * g + 6];
-                auto v4sigma3lapl_accb = v4sigma3lapl[20 * g + 7];
-                auto v4sigma3lapl_acba = v4sigma3lapl[20 * g + 8];
-                auto v4sigma3lapl_acbb = v4sigma3lapl[20 * g + 9];
-                auto v4sigma3lapl_abba = v4sigma3lapl[20 * g + 10];
-                auto v4sigma3lapl_abbb = v4sigma3lapl[20 * g + 11];
-                auto v4sigma3lapl_ccca = v4sigma3lapl[20 * g + 12];
-                auto v4sigma3lapl_cccb = v4sigma3lapl[20 * g + 13];
-                auto v4sigma3lapl_ccba = v4sigma3lapl[20 * g + 14];
-                auto v4sigma3lapl_ccbb = v4sigma3lapl[20 * g + 15];
-                auto v4sigma3lapl_cbba = v4sigma3lapl[20 * g + 16];
-                auto v4sigma3lapl_cbbb = v4sigma3lapl[20 * g + 17];
-                auto v4sigma3lapl_bbba = v4sigma3lapl[20 * g + 18];
+                //auto v4sigma3lapl_aaaa = v4sigma3lapl[20 * g + 0];
+                //auto v4sigma3lapl_aaab = v4sigma3lapl[20 * g + 1];
+                //auto v4sigma3lapl_aaca = v4sigma3lapl[20 * g + 2];
+                //auto v4sigma3lapl_aacb = v4sigma3lapl[20 * g + 3];
+                //auto v4sigma3lapl_aaba = v4sigma3lapl[20 * g + 4];
+                //auto v4sigma3lapl_aabb = v4sigma3lapl[20 * g + 5];
+                //auto v4sigma3lapl_acca = v4sigma3lapl[20 * g + 6];
+                //auto v4sigma3lapl_accb = v4sigma3lapl[20 * g + 7];
+                //auto v4sigma3lapl_acba = v4sigma3lapl[20 * g + 8];
+                //auto v4sigma3lapl_acbb = v4sigma3lapl[20 * g + 9];
+                //auto v4sigma3lapl_abba = v4sigma3lapl[20 * g + 10];
+                //auto v4sigma3lapl_abbb = v4sigma3lapl[20 * g + 11];
+                //auto v4sigma3lapl_ccca = v4sigma3lapl[20 * g + 12];
+                //auto v4sigma3lapl_cccb = v4sigma3lapl[20 * g + 13];
+                //auto v4sigma3lapl_ccba = v4sigma3lapl[20 * g + 14];
+                //auto v4sigma3lapl_ccbb = v4sigma3lapl[20 * g + 15];
+                //auto v4sigma3lapl_cbba = v4sigma3lapl[20 * g + 16];
+                //auto v4sigma3lapl_cbbb = v4sigma3lapl[20 * g + 17];
+                //auto v4sigma3lapl_bbba = v4sigma3lapl[20 * g + 18];
 
                 // v4sigma3tau: inconsistent size in libxc (30 vs 20)
                 auto v4sigma3tau_aaaa = v4sigma3tau[30 * g + 0];
@@ -10517,47 +10517,47 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4sigma3tau_cbbb = v4sigma3tau[30 * g + 17];
                 auto v4sigma3tau_bbba = v4sigma3tau[30 * g + 18];
 
-                auto v4sigma2lapl2_aaaa = v4sigma2lapl2[18 * g + 0];
-                auto v4sigma2lapl2_aaab = v4sigma2lapl2[18 * g + 1];
-                auto v4sigma2lapl2_aabb = v4sigma2lapl2[18 * g + 2];
-                auto v4sigma2lapl2_acaa = v4sigma2lapl2[18 * g + 3];
-                auto v4sigma2lapl2_acab = v4sigma2lapl2[18 * g + 4];
-                auto v4sigma2lapl2_acbb = v4sigma2lapl2[18 * g + 5];
-                auto v4sigma2lapl2_abaa = v4sigma2lapl2[18 * g + 6];
-                auto v4sigma2lapl2_abab = v4sigma2lapl2[18 * g + 7];
-                auto v4sigma2lapl2_abbb = v4sigma2lapl2[18 * g + 8];
-                auto v4sigma2lapl2_ccaa = v4sigma2lapl2[18 * g + 9];
-                auto v4sigma2lapl2_ccab = v4sigma2lapl2[18 * g + 10];
-                auto v4sigma2lapl2_ccbb = v4sigma2lapl2[18 * g + 11];
-                auto v4sigma2lapl2_cbaa = v4sigma2lapl2[18 * g + 12];
-                auto v4sigma2lapl2_cbab = v4sigma2lapl2[18 * g + 13];
-                auto v4sigma2lapl2_cbbb = v4sigma2lapl2[18 * g + 14];
-                auto v4sigma2lapl2_bbaa = v4sigma2lapl2[18 * g + 15];
-                auto v4sigma2lapl2_bbab = v4sigma2lapl2[18 * g + 16];
+                //auto v4sigma2lapl2_aaaa = v4sigma2lapl2[18 * g + 0];
+                //auto v4sigma2lapl2_aaab = v4sigma2lapl2[18 * g + 1];
+                //auto v4sigma2lapl2_aabb = v4sigma2lapl2[18 * g + 2];
+                //auto v4sigma2lapl2_acaa = v4sigma2lapl2[18 * g + 3];
+                //auto v4sigma2lapl2_acab = v4sigma2lapl2[18 * g + 4];
+                //auto v4sigma2lapl2_acbb = v4sigma2lapl2[18 * g + 5];
+                //auto v4sigma2lapl2_abaa = v4sigma2lapl2[18 * g + 6];
+                //auto v4sigma2lapl2_abab = v4sigma2lapl2[18 * g + 7];
+                //auto v4sigma2lapl2_abbb = v4sigma2lapl2[18 * g + 8];
+                //auto v4sigma2lapl2_ccaa = v4sigma2lapl2[18 * g + 9];
+                //auto v4sigma2lapl2_ccab = v4sigma2lapl2[18 * g + 10];
+                //auto v4sigma2lapl2_ccbb = v4sigma2lapl2[18 * g + 11];
+                //auto v4sigma2lapl2_cbaa = v4sigma2lapl2[18 * g + 12];
+                //auto v4sigma2lapl2_cbab = v4sigma2lapl2[18 * g + 13];
+                //auto v4sigma2lapl2_cbbb = v4sigma2lapl2[18 * g + 14];
+                //auto v4sigma2lapl2_bbaa = v4sigma2lapl2[18 * g + 15];
+                //auto v4sigma2lapl2_bbab = v4sigma2lapl2[18 * g + 16];
 
-                auto v4sigma2lapltau_aaaa = v4sigma2lapltau[24 * g + 0];
-                auto v4sigma2lapltau_aaab = v4sigma2lapltau[24 * g + 1];
-                auto v4sigma2lapltau_aaba = v4sigma2lapltau[24 * g + 2];
-                auto v4sigma2lapltau_aabb = v4sigma2lapltau[24 * g + 3];
-                auto v4sigma2lapltau_acaa = v4sigma2lapltau[24 * g + 4];
-                auto v4sigma2lapltau_acab = v4sigma2lapltau[24 * g + 5];
-                auto v4sigma2lapltau_acba = v4sigma2lapltau[24 * g + 6];
-                auto v4sigma2lapltau_acbb = v4sigma2lapltau[24 * g + 7];
-                auto v4sigma2lapltau_abaa = v4sigma2lapltau[24 * g + 8];
-                auto v4sigma2lapltau_abab = v4sigma2lapltau[24 * g + 9];
-                auto v4sigma2lapltau_abba = v4sigma2lapltau[24 * g + 10];
-                auto v4sigma2lapltau_abbb = v4sigma2lapltau[24 * g + 11];
-                auto v4sigma2lapltau_ccaa = v4sigma2lapltau[24 * g + 12];
-                auto v4sigma2lapltau_ccab = v4sigma2lapltau[24 * g + 13];
-                auto v4sigma2lapltau_ccba = v4sigma2lapltau[24 * g + 14];
-                auto v4sigma2lapltau_ccbb = v4sigma2lapltau[24 * g + 15];
-                auto v4sigma2lapltau_cbaa = v4sigma2lapltau[24 * g + 16];
-                auto v4sigma2lapltau_cbab = v4sigma2lapltau[24 * g + 17];
-                auto v4sigma2lapltau_cbba = v4sigma2lapltau[24 * g + 18];
-                auto v4sigma2lapltau_cbbb = v4sigma2lapltau[24 * g + 19];
-                auto v4sigma2lapltau_bbaa = v4sigma2lapltau[24 * g + 20];
-                auto v4sigma2lapltau_bbab = v4sigma2lapltau[24 * g + 21];
-                auto v4sigma2lapltau_bbba = v4sigma2lapltau[24 * g + 22];
+                //auto v4sigma2lapltau_aaaa = v4sigma2lapltau[24 * g + 0];
+                //auto v4sigma2lapltau_aaab = v4sigma2lapltau[24 * g + 1];
+                //auto v4sigma2lapltau_aaba = v4sigma2lapltau[24 * g + 2];
+                //auto v4sigma2lapltau_aabb = v4sigma2lapltau[24 * g + 3];
+                //auto v4sigma2lapltau_acaa = v4sigma2lapltau[24 * g + 4];
+                //auto v4sigma2lapltau_acab = v4sigma2lapltau[24 * g + 5];
+                //auto v4sigma2lapltau_acba = v4sigma2lapltau[24 * g + 6];
+                //auto v4sigma2lapltau_acbb = v4sigma2lapltau[24 * g + 7];
+                //auto v4sigma2lapltau_abaa = v4sigma2lapltau[24 * g + 8];
+                //auto v4sigma2lapltau_abab = v4sigma2lapltau[24 * g + 9];
+                //auto v4sigma2lapltau_abba = v4sigma2lapltau[24 * g + 10];
+                //auto v4sigma2lapltau_abbb = v4sigma2lapltau[24 * g + 11];
+                //auto v4sigma2lapltau_ccaa = v4sigma2lapltau[24 * g + 12];
+                //auto v4sigma2lapltau_ccab = v4sigma2lapltau[24 * g + 13];
+                //auto v4sigma2lapltau_ccba = v4sigma2lapltau[24 * g + 14];
+                //auto v4sigma2lapltau_ccbb = v4sigma2lapltau[24 * g + 15];
+                //auto v4sigma2lapltau_cbaa = v4sigma2lapltau[24 * g + 16];
+                //auto v4sigma2lapltau_cbab = v4sigma2lapltau[24 * g + 17];
+                //auto v4sigma2lapltau_cbba = v4sigma2lapltau[24 * g + 18];
+                //auto v4sigma2lapltau_cbbb = v4sigma2lapltau[24 * g + 19];
+                //auto v4sigma2lapltau_bbaa = v4sigma2lapltau[24 * g + 20];
+                //auto v4sigma2lapltau_bbab = v4sigma2lapltau[24 * g + 21];
+                //auto v4sigma2lapltau_bbba = v4sigma2lapltau[24 * g + 22];
 
                 auto v4sigma2tau2_aaaa = v4sigma2tau2[18 * g + 0];
                 auto v4sigma2tau2_aaab = v4sigma2tau2[18 * g + 1];
@@ -10577,53 +10577,53 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4sigma2tau2_bbaa = v4sigma2tau2[18 * g + 15];
                 auto v4sigma2tau2_bbab = v4sigma2tau2[18 * g + 16];
 
-                auto v4sigmalapl3_aaaa = v4sigmalapl3[12 * g + 0];
-                auto v4sigmalapl3_aaab = v4sigmalapl3[12 * g + 1];
-                auto v4sigmalapl3_aabb = v4sigmalapl3[12 * g + 2];
-                auto v4sigmalapl3_abbb = v4sigmalapl3[12 * g + 3];
-                auto v4sigmalapl3_caaa = v4sigmalapl3[12 * g + 4];
-                auto v4sigmalapl3_caab = v4sigmalapl3[12 * g + 5];
-                auto v4sigmalapl3_cabb = v4sigmalapl3[12 * g + 6];
-                auto v4sigmalapl3_cbbb = v4sigmalapl3[12 * g + 7];
-                auto v4sigmalapl3_baaa = v4sigmalapl3[12 * g + 8];
-                auto v4sigmalapl3_baab = v4sigmalapl3[12 * g + 9];
-                auto v4sigmalapl3_babb = v4sigmalapl3[12 * g + 10];
+                //auto v4sigmalapl3_aaaa = v4sigmalapl3[12 * g + 0];
+                //auto v4sigmalapl3_aaab = v4sigmalapl3[12 * g + 1];
+                //auto v4sigmalapl3_aabb = v4sigmalapl3[12 * g + 2];
+                //auto v4sigmalapl3_abbb = v4sigmalapl3[12 * g + 3];
+                //auto v4sigmalapl3_caaa = v4sigmalapl3[12 * g + 4];
+                //auto v4sigmalapl3_caab = v4sigmalapl3[12 * g + 5];
+                //auto v4sigmalapl3_cabb = v4sigmalapl3[12 * g + 6];
+                //auto v4sigmalapl3_cbbb = v4sigmalapl3[12 * g + 7];
+                //auto v4sigmalapl3_baaa = v4sigmalapl3[12 * g + 8];
+                //auto v4sigmalapl3_baab = v4sigmalapl3[12 * g + 9];
+                //auto v4sigmalapl3_babb = v4sigmalapl3[12 * g + 10];
 
-                auto v4sigmalapl2tau_aaaa = v4sigmalapl2tau[18 * g + 0];
-                auto v4sigmalapl2tau_aaab = v4sigmalapl2tau[18 * g + 1];
-                auto v4sigmalapl2tau_aaba = v4sigmalapl2tau[18 * g + 2];
-                auto v4sigmalapl2tau_aabb = v4sigmalapl2tau[18 * g + 3];
-                auto v4sigmalapl2tau_abba = v4sigmalapl2tau[18 * g + 4];
-                auto v4sigmalapl2tau_abbb = v4sigmalapl2tau[18 * g + 5];
-                auto v4sigmalapl2tau_caaa = v4sigmalapl2tau[18 * g + 6];
-                auto v4sigmalapl2tau_caab = v4sigmalapl2tau[18 * g + 7];
-                auto v4sigmalapl2tau_caba = v4sigmalapl2tau[18 * g + 8];
-                auto v4sigmalapl2tau_cabb = v4sigmalapl2tau[18 * g + 9];
-                auto v4sigmalapl2tau_cbba = v4sigmalapl2tau[18 * g + 10];
-                auto v4sigmalapl2tau_cbbb = v4sigmalapl2tau[18 * g + 11];
-                auto v4sigmalapl2tau_baaa = v4sigmalapl2tau[18 * g + 12];
-                auto v4sigmalapl2tau_baab = v4sigmalapl2tau[18 * g + 13];
-                auto v4sigmalapl2tau_baba = v4sigmalapl2tau[18 * g + 14];
-                auto v4sigmalapl2tau_babb = v4sigmalapl2tau[18 * g + 15];
-                auto v4sigmalapl2tau_bbba = v4sigmalapl2tau[18 * g + 16];
+                //auto v4sigmalapl2tau_aaaa = v4sigmalapl2tau[18 * g + 0];
+                //auto v4sigmalapl2tau_aaab = v4sigmalapl2tau[18 * g + 1];
+                //auto v4sigmalapl2tau_aaba = v4sigmalapl2tau[18 * g + 2];
+                //auto v4sigmalapl2tau_aabb = v4sigmalapl2tau[18 * g + 3];
+                //auto v4sigmalapl2tau_abba = v4sigmalapl2tau[18 * g + 4];
+                //auto v4sigmalapl2tau_abbb = v4sigmalapl2tau[18 * g + 5];
+                //auto v4sigmalapl2tau_caaa = v4sigmalapl2tau[18 * g + 6];
+                //auto v4sigmalapl2tau_caab = v4sigmalapl2tau[18 * g + 7];
+                //auto v4sigmalapl2tau_caba = v4sigmalapl2tau[18 * g + 8];
+                //auto v4sigmalapl2tau_cabb = v4sigmalapl2tau[18 * g + 9];
+                //auto v4sigmalapl2tau_cbba = v4sigmalapl2tau[18 * g + 10];
+                //auto v4sigmalapl2tau_cbbb = v4sigmalapl2tau[18 * g + 11];
+                //auto v4sigmalapl2tau_baaa = v4sigmalapl2tau[18 * g + 12];
+                //auto v4sigmalapl2tau_baab = v4sigmalapl2tau[18 * g + 13];
+                //auto v4sigmalapl2tau_baba = v4sigmalapl2tau[18 * g + 14];
+                //auto v4sigmalapl2tau_babb = v4sigmalapl2tau[18 * g + 15];
+                //auto v4sigmalapl2tau_bbba = v4sigmalapl2tau[18 * g + 16];
 
-                auto v4sigmalapltau2_aaaa = v4sigmalapltau2[18 * g + 0];
-                auto v4sigmalapltau2_aaab = v4sigmalapltau2[18 * g + 1];
-                auto v4sigmalapltau2_aabb = v4sigmalapltau2[18 * g + 2];
-                auto v4sigmalapltau2_abaa = v4sigmalapltau2[18 * g + 3];
-                auto v4sigmalapltau2_abab = v4sigmalapltau2[18 * g + 4];
-                auto v4sigmalapltau2_abbb = v4sigmalapltau2[18 * g + 5];
-                auto v4sigmalapltau2_caaa = v4sigmalapltau2[18 * g + 6];
-                auto v4sigmalapltau2_caab = v4sigmalapltau2[18 * g + 7];
-                auto v4sigmalapltau2_cabb = v4sigmalapltau2[18 * g + 8];
-                auto v4sigmalapltau2_cbaa = v4sigmalapltau2[18 * g + 9];
-                auto v4sigmalapltau2_cbab = v4sigmalapltau2[18 * g + 10];
-                auto v4sigmalapltau2_cbbb = v4sigmalapltau2[18 * g + 11];
-                auto v4sigmalapltau2_baaa = v4sigmalapltau2[18 * g + 12];
-                auto v4sigmalapltau2_baab = v4sigmalapltau2[18 * g + 13];
-                auto v4sigmalapltau2_babb = v4sigmalapltau2[18 * g + 14];
-                auto v4sigmalapltau2_bbaa = v4sigmalapltau2[18 * g + 15];
-                auto v4sigmalapltau2_bbab = v4sigmalapltau2[18 * g + 16];
+                //auto v4sigmalapltau2_aaaa = v4sigmalapltau2[18 * g + 0];
+                //auto v4sigmalapltau2_aaab = v4sigmalapltau2[18 * g + 1];
+                //auto v4sigmalapltau2_aabb = v4sigmalapltau2[18 * g + 2];
+                //auto v4sigmalapltau2_abaa = v4sigmalapltau2[18 * g + 3];
+                //auto v4sigmalapltau2_abab = v4sigmalapltau2[18 * g + 4];
+                //auto v4sigmalapltau2_abbb = v4sigmalapltau2[18 * g + 5];
+                //auto v4sigmalapltau2_caaa = v4sigmalapltau2[18 * g + 6];
+                //auto v4sigmalapltau2_caab = v4sigmalapltau2[18 * g + 7];
+                //auto v4sigmalapltau2_cabb = v4sigmalapltau2[18 * g + 8];
+                //auto v4sigmalapltau2_cbaa = v4sigmalapltau2[18 * g + 9];
+                //auto v4sigmalapltau2_cbab = v4sigmalapltau2[18 * g + 10];
+                //auto v4sigmalapltau2_cbbb = v4sigmalapltau2[18 * g + 11];
+                //auto v4sigmalapltau2_baaa = v4sigmalapltau2[18 * g + 12];
+                //auto v4sigmalapltau2_baab = v4sigmalapltau2[18 * g + 13];
+                //auto v4sigmalapltau2_babb = v4sigmalapltau2[18 * g + 14];
+                //auto v4sigmalapltau2_bbaa = v4sigmalapltau2[18 * g + 15];
+                //auto v4sigmalapltau2_bbab = v4sigmalapltau2[18 * g + 16];
 
                 auto v4sigmatau3_aaaa = v4sigmatau3[12 * g + 0];
                 auto v4sigmatau3_aaab = v4sigmatau3[12 * g + 1];
@@ -10637,35 +10637,35 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 auto v4sigmatau3_baab = v4sigmatau3[12 * g + 9];
                 auto v4sigmatau3_babb = v4sigmatau3[12 * g + 10];
 
-                auto v4lapl4_aaaa = v4lapl4[5 * g + 0];
-                auto v4lapl4_aaab = v4lapl4[5 * g + 1];
-                auto v4lapl4_aabb = v4lapl4[5 * g + 2];
-                auto v4lapl4_abbb = v4lapl4[5 * g + 3];
+                //auto v4lapl4_aaaa = v4lapl4[5 * g + 0];
+                //auto v4lapl4_aaab = v4lapl4[5 * g + 1];
+                //auto v4lapl4_aabb = v4lapl4[5 * g + 2];
+                //auto v4lapl4_abbb = v4lapl4[5 * g + 3];
 
-                auto v4lapl3tau_aaaa = v4lapl3tau[8 * g + 0];
-                auto v4lapl3tau_aaab = v4lapl3tau[8 * g + 1];
-                auto v4lapl3tau_aaba = v4lapl3tau[8 * g + 2];
-                auto v4lapl3tau_aabb = v4lapl3tau[8 * g + 3];
-                auto v4lapl3tau_abba = v4lapl3tau[8 * g + 4];
-                auto v4lapl3tau_abbb = v4lapl3tau[8 * g + 5];
-                auto v4lapl3tau_bbba = v4lapl3tau[8 * g + 6];
+                //auto v4lapl3tau_aaaa = v4lapl3tau[8 * g + 0];
+                //auto v4lapl3tau_aaab = v4lapl3tau[8 * g + 1];
+                //auto v4lapl3tau_aaba = v4lapl3tau[8 * g + 2];
+                //auto v4lapl3tau_aabb = v4lapl3tau[8 * g + 3];
+                //auto v4lapl3tau_abba = v4lapl3tau[8 * g + 4];
+                //auto v4lapl3tau_abbb = v4lapl3tau[8 * g + 5];
+                //auto v4lapl3tau_bbba = v4lapl3tau[8 * g + 6];
 
-                auto v4lapl2tau2_aaaa = v4lapl2tau2[9 * g + 0];
-                auto v4lapl2tau2_aaab = v4lapl2tau2[9 * g + 1];
-                auto v4lapl2tau2_aabb = v4lapl2tau2[9 * g + 2];
-                auto v4lapl2tau2_abaa = v4lapl2tau2[9 * g + 3];
-                auto v4lapl2tau2_abab = v4lapl2tau2[9 * g + 4];
-                auto v4lapl2tau2_abbb = v4lapl2tau2[9 * g + 5];
-                auto v4lapl2tau2_bbaa = v4lapl2tau2[9 * g + 6];
-                auto v4lapl2tau2_bbab = v4lapl2tau2[9 * g + 7];
+                //auto v4lapl2tau2_aaaa = v4lapl2tau2[9 * g + 0];
+                //auto v4lapl2tau2_aaab = v4lapl2tau2[9 * g + 1];
+                //auto v4lapl2tau2_aabb = v4lapl2tau2[9 * g + 2];
+                //auto v4lapl2tau2_abaa = v4lapl2tau2[9 * g + 3];
+                //auto v4lapl2tau2_abab = v4lapl2tau2[9 * g + 4];
+                //auto v4lapl2tau2_abbb = v4lapl2tau2[9 * g + 5];
+                //auto v4lapl2tau2_bbaa = v4lapl2tau2[9 * g + 6];
+                //auto v4lapl2tau2_bbab = v4lapl2tau2[9 * g + 7];
 
-                auto v4lapltau3_aaaa = v4lapltau3[8 * g + 0];
-                auto v4lapltau3_aaab = v4lapltau3[8 * g + 1];
-                auto v4lapltau3_aabb = v4lapltau3[8 * g + 2];
-                auto v4lapltau3_abbb = v4lapltau3[8 * g + 3];
-                auto v4lapltau3_baaa = v4lapltau3[8 * g + 4];
-                auto v4lapltau3_baab = v4lapltau3[8 * g + 5];
-                auto v4lapltau3_babb = v4lapltau3[8 * g + 6];
+                //auto v4lapltau3_aaaa = v4lapltau3[8 * g + 0];
+                //auto v4lapltau3_aaab = v4lapltau3[8 * g + 1];
+                //auto v4lapltau3_aabb = v4lapltau3[8 * g + 2];
+                //auto v4lapltau3_abbb = v4lapltau3[8 * g + 3];
+                //auto v4lapltau3_baaa = v4lapltau3[8 * g + 4];
+                //auto v4lapltau3_baab = v4lapltau3[8 * g + 5];
+                //auto v4lapltau3_babb = v4lapltau3[8 * g + 6];
 
                 auto v4tau4_aaaa = v4tau4[5 * g + 0];
                 auto v4tau4_aaab = v4tau4[5 * g + 1];
@@ -10682,19 +10682,19 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 double rr = v2rho2_aa + v2rho2_ab;
                 double rx = 2.0*v2rhosigma_ac + 2.0*v2rhosigma_ab + 2.0*v2rhosigma_aa;
                 double rt = v2rhotau_aa + v2rhotau_ab;
-                double rl = v2rholapl_aa + v2rholapl_ab;
+                //double rl = v2rholapl_aa + v2rholapl_ab;
 
                 // sigma and gamma
                 double xr = v2rhosigma_bc + 2.0*v2rhosigma_ba + v2rhosigma_ac + 2.0 * v2rhosigma_aa;
                 double xt = v2sigmatau_cb + 2.0*v2sigmatau_ab + v2sigmatau_ca + 2.0 * v2sigmatau_aa;
-                double xl = v2sigmalapl_cb + 2.0*v2sigmalapl_ab + v2sigmalapl_ca + 2.0 * v2sigmalapl_aa;
+                //double xl = v2sigmalapl_cb + 2.0*v2sigmalapl_ab + v2sigmalapl_ca + 2.0 * v2sigmalapl_aa;
                 double xx = 2.0*v2sigma2_cc + 2.0*v2sigma2_cb + 6.0*v2sigma2_ac + 4.0*v2sigma2_ab + 4.0 * v2sigma2_aa;
 
                 // tau
                 double tt = v2tau2_aa + v2tau2_ab;
                 double tx = 2.0 * v2sigmatau_ca + 2.0 * v2sigmatau_ba + 2.0 * v2sigmatau_aa;
                 double tr = v2rhotau_aa + v2rhotau_ba;
-                double tl = v2lapltau_aa + v2lapltau_ba;
+                //double tl = v2lapltau_aa + v2lapltau_ba;
 
                 // lapl
                 //double ll = v2lapl2_aa + v2lapl2_ab;
@@ -10714,20 +10714,20 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                             + 2.0 * v3rhosigmatau_bab + 2.0 * v3rhosigmatau_baa
                             + 2.0 * v3rhosigmatau_aab + 2.0 * v3rhosigmatau_aaa
                             + v3rhosigmatau_acb + v3rhosigmatau_aca;
-                double xxl  = 2.0 * v3sigma2lapl_ccb + 2.0 * v3sigma2lapl_cca + 2.0 * v3sigma2lapl_cbb
-                            + 2.0 * v3sigma2lapl_cba + 6.0 * v3sigma2lapl_acb + 6.0 * v3sigma2lapl_aca
-                            + 4.0 * v3sigma2lapl_abb + 4.0 * v3sigma2lapl_aba + 4.0 * v3sigma2lapl_aab + 4.0 * v3sigma2lapl_aaa;
+                //double xxl  = 2.0 * v3sigma2lapl_ccb + 2.0 * v3sigma2lapl_cca + 2.0 * v3sigma2lapl_cbb
+                //            + 2.0 * v3sigma2lapl_cba + 6.0 * v3sigma2lapl_acb + 6.0 * v3sigma2lapl_aca
+                //            + 4.0 * v3sigma2lapl_abb + 4.0 * v3sigma2lapl_aba + 4.0 * v3sigma2lapl_aab + 4.0 * v3sigma2lapl_aaa;
                 double xrr  = v3rho2sigma_bbc + 2.0 * v3rho2sigma_bba
                             + 2.0 * v3rho2sigma_abc + 4.0 * v3rho2sigma_aba
                             + v3rho2sigma_aac + 2.0 * v3rho2sigma_aaa;
-                double xrl  = v3rhosigmalapl_bcb + v3rhosigmalapl_bca + 2.0 * v3rhosigmalapl_bab
-                            + 2.0 * v3rhosigmalapl_baa + v3rhosigmalapl_acb + v3rhosigmalapl_aca
-                            + 2.0 * v3rhosigmalapl_aab + 2.0 * v3rhosigmalapl_aaa;
-                double xtl  = v3sigmalapltau_cbb + v3sigmalapltau_cba + v3sigmalapltau_cab
-                            + v3sigmalapltau_caa + 2.0 * v3sigmalapltau_abb + 2.0 * v3sigmalapltau_aba
-                            + 2.0 * v3sigmalapltau_aab + 2.0 * v3sigmalapltau_aaa;
-                double xll  = v3sigmalapl2_cbb + 2.0 * v3sigmalapl2_cab + v3sigmalapl2_caa
-                            + 2.0 * v3sigmalapl2_abb + 4.0 * v3sigmalapl2_aab + 2.0 * v3sigmalapl2_aaa;
+                //double xrl  = v3rhosigmalapl_bcb + v3rhosigmalapl_bca + 2.0 * v3rhosigmalapl_bab
+                //            + 2.0 * v3rhosigmalapl_baa + v3rhosigmalapl_acb + v3rhosigmalapl_aca
+                //            + 2.0 * v3rhosigmalapl_aab + 2.0 * v3rhosigmalapl_aaa;
+                //double xtl  = v3sigmalapltau_cbb + v3sigmalapltau_cba + v3sigmalapltau_cab
+                //            + v3sigmalapltau_caa + 2.0 * v3sigmalapltau_abb + 2.0 * v3sigmalapltau_aba
+                //            + 2.0 * v3sigmalapltau_aab + 2.0 * v3sigmalapltau_aaa;
+                //double xll  = v3sigmalapl2_cbb + 2.0 * v3sigmalapl2_cab + v3sigmalapl2_caa
+                //            + 2.0 * v3sigmalapl2_abb + 4.0 * v3sigmalapl2_aab + 2.0 * v3sigmalapl2_aaa;
                 double xxt  = 2.0 * v3sigma2tau_ccb + 2.0 * v3sigma2tau_cca + 2.0 * v3sigma2tau_cbb
                             + 2.0 * v3sigma2tau_cba + 6.0 * v3sigma2tau_acb + 6.0 * v3sigma2tau_aca
                             + 4.0 * v3sigma2tau_abb + 4.0 * v3sigma2tau_aba + 4.0 * v3sigma2tau_aab + 4.0 * v3sigma2tau_aaa;
@@ -10740,15 +10740,15 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 double rtx  = 2.0 * v3rhosigmatau_acb + 2.0 * v3rhosigmatau_aca
                             + 2.0 * v3rhosigmatau_abb + 2.0 * v3rhosigmatau_aba
                             + 2.0 * v3rhosigmatau_aab + 2.0 * v3rhosigmatau_aaa;
-                double rrl  = v3rho2lapl_abb + v3rho2lapl_aba + v3rho2lapl_aab + v3rho2lapl_aaa;
+                //double rrl  = v3rho2lapl_abb + v3rho2lapl_aba + v3rho2lapl_aab + v3rho2lapl_aaa;
                 double rrx  = 2.0 * v3rho2sigma_abc + 2.0 * v3rho2sigma_abb
                             + 2.0 * v3rho2sigma_aba + 2.0 * v3rho2sigma_aac
                             + 2.0 * v3rho2sigma_aab + 2.0 * v3rho2sigma_aaa;
-                double rtl  = v3rholapltau_abb + v3rholapltau_aba + v3rholapltau_aab + v3rholapltau_aaa;
+                //double rtl  = v3rholapltau_abb + v3rholapltau_aba + v3rholapltau_aab + v3rholapltau_aaa;
                 double rtt  = v3rhotau2_abb + 2.0 * v3rhotau2_aab + v3rhotau2_aaa;
-                double rll  = v3rholapl2_abb + 2.0 * v3rholapl2_aab + v3rholapl2_aaa;
-                double rlx  = 2.0 * v3rhosigmalapl_acb + 2.0 * v3rhosigmalapl_aca + 2.0 * v3rhosigmalapl_abb
-                            + 2.0 * v3rhosigmalapl_aba + 2.0 * v3rhosigmalapl_aab + 2.0 * v3rhosigmalapl_aaa;
+                //double rll  = v3rholapl2_abb + 2.0 * v3rholapl2_aab + v3rholapl2_aaa;
+                //double rlx  = 2.0 * v3rhosigmalapl_acb + 2.0 * v3rhosigmalapl_aca + 2.0 * v3rhosigmalapl_abb
+                //            + 2.0 * v3rhosigmalapl_aba + 2.0 * v3rhosigmalapl_aab + 2.0 * v3rhosigmalapl_aaa;
                 double rxx  = 4.0 * v3rhosigma2_acc + 8.0 * v3rhosigma2_acb + 4.0 * v3rhosigma2_abb
                             + 8.0 * v3rhosigma2_aac + 8.0 * v3rhosigma2_aab + 4.0 * v3rhosigma2_aaa;
 
@@ -10770,11 +10770,11 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 // tau
                 double trr  = v3rho2tau_bba + 2.0 * v3rho2tau_aba + v3rho2tau_aaa;
-                double ttl  = v3lapltau2_bab + v3lapltau2_baa + v3lapltau2_aab + v3lapltau2_aaa;
-                double trl  = v3rholapltau_bba + v3rholapltau_baa + v3rholapltau_aba + v3rholapltau_aaa;
-                double tll  = v3lapl2tau_bba + 2.0 * v3lapl2tau_aba + v3lapl2tau_aaa;
-                double tlx  = 2.0 * v3sigmalapltau_cba + 2.0 * v3sigmalapltau_caa + 2.0 * v3sigmalapltau_bba
-                            + 2.0 * v3sigmalapltau_baa + 2.0 * v3sigmalapltau_aba + 2.0 * v3sigmalapltau_aaa;
+                //double ttl  = v3lapltau2_bab + v3lapltau2_baa + v3lapltau2_aab + v3lapltau2_aaa;
+                //double trl  = v3rholapltau_bba + v3rholapltau_baa + v3rholapltau_aba + v3rholapltau_aaa;
+                //double tll  = v3lapl2tau_bba + 2.0 * v3lapl2tau_aba + v3lapl2tau_aaa;
+                //double tlx  = 2.0 * v3sigmalapltau_cba + 2.0 * v3sigmalapltau_caa + 2.0 * v3sigmalapltau_bba
+                //            + 2.0 * v3sigmalapltau_baa + 2.0 * v3sigmalapltau_aba + 2.0 * v3sigmalapltau_aaa;
                 double ttt  = v3tau3_abb + 2.0 * v3tau3_aab + v3tau3_aaa;
                 double ttr  = v3rhotau2_bab + v3rhotau2_baa + v3rhotau2_aab + v3rhotau2_aaa;
                 double trx  = 2.0 * v3rhosigmatau_bca + 2.0 * v3rhosigmatau_bba
@@ -10790,43 +10790,43 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 double rrrr  = v4rho4_abbb + 3.0 * v4rho4_aabb + 3.0 * v4rho4_aaab + v4rho4_aaaa;
                 double rrrx  = 2.0 * v4rho3sigma_abbc + 2.0 * v4rho3sigma_abbb + 2.0 * v4rho3sigma_abba + 4.0 * v4rho3sigma_aabc
                              + 4.0 * v4rho3sigma_aabb + 4.0 * v4rho3sigma_aaba + 2.0 * v4rho3sigma_aaac + 2.0 * v4rho3sigma_aaab + 2.0 * v4rho3sigma_aaaa;
-                double rrrl  = v4rho3lapl_abbb + v4rho3lapl_abba + 2.0 * v4rho3lapl_aabb + 2.0 * v4rho3lapl_aaba + v4rho3lapl_aaab + v4rho3lapl_aaaa;
+                //double rrrl  = v4rho3lapl_abbb + v4rho3lapl_abba + 2.0 * v4rho3lapl_aabb + 2.0 * v4rho3lapl_aaba + v4rho3lapl_aaab + v4rho3lapl_aaaa;
                 double rrrt  = v4rho3tau_abbb + v4rho3tau_abba + 2.0 * v4rho3tau_aabb + 2.0 * v4rho3tau_aaba + v4rho3tau_aaab + v4rho3tau_aaaa;
                 double rrxx  = 4.0 * v4rho2sigma2_abcc + 8.0 * v4rho2sigma2_abcb + 4.0 * v4rho2sigma2_abbb + 8.0 * v4rho2sigma2_abac
                              + 8.0 * v4rho2sigma2_abab + 4.0 * v4rho2sigma2_abaa + 4.0 * v4rho2sigma2_aacc + 8.0 * v4rho2sigma2_aacb
                              + 4.0 * v4rho2sigma2_aabb + 8.0 * v4rho2sigma2_aaac + 8.0 * v4rho2sigma2_aaab + 4.0 * v4rho2sigma2_aaaa;
-                double rrxl  = 2.0 * v4rho2sigmalapl_abcb + 2.0 * v4rho2sigmalapl_abca + 2.0 * v4rho2sigmalapl_abbb + 2.0 * v4rho2sigmalapl_abba + 2.0 * v4rho2sigmalapl_abab + 2.0 * v4rho2sigmalapl_abaa + 2.0 * v4rho2sigmalapl_aacb + 2.0 * v4rho2sigmalapl_aaca + 2.0 * v4rho2sigmalapl_aabb + 2.0 * v4rho2sigmalapl_aaba + 2.0 * v4rho2sigmalapl_aaab + 2.0 * v4rho2sigmalapl_aaaa;
+                //double rrxl  = 2.0 * v4rho2sigmalapl_abcb + 2.0 * v4rho2sigmalapl_abca + 2.0 * v4rho2sigmalapl_abbb + 2.0 * v4rho2sigmalapl_abba + 2.0 * v4rho2sigmalapl_abab + 2.0 * v4rho2sigmalapl_abaa + 2.0 * v4rho2sigmalapl_aacb + 2.0 * v4rho2sigmalapl_aaca + 2.0 * v4rho2sigmalapl_aabb + 2.0 * v4rho2sigmalapl_aaba + 2.0 * v4rho2sigmalapl_aaab + 2.0 * v4rho2sigmalapl_aaaa;
                 double rrxt  = 2.0 * v4rho2sigmatau_abcb + 2.0 * v4rho2sigmatau_abca + 2.0 * v4rho2sigmatau_abbb + 2.0 * v4rho2sigmatau_abba + 2.0 * v4rho2sigmatau_abab + 2.0 * v4rho2sigmatau_abaa + 2.0 * v4rho2sigmatau_aacb + 2.0 * v4rho2sigmatau_aaca + 2.0 * v4rho2sigmatau_aabb + 2.0 * v4rho2sigmatau_aaba + 2.0 * v4rho2sigmatau_aaab + 2.0 * v4rho2sigmatau_aaaa;
-                double rrll  = v4rho2lapl2_abbb + 2.0 * v4rho2lapl2_abab + v4rho2lapl2_abaa + v4rho2lapl2_aabb + 2.0 * v4rho2lapl2_aaab + v4rho2lapl2_aaaa;
-                double rrlt  = v4rho2lapltau_abbb + v4rho2lapltau_abba + v4rho2lapltau_abab + v4rho2lapltau_abaa + v4rho2lapltau_aabb + v4rho2lapltau_aaba + v4rho2lapltau_aaab + v4rho2lapltau_aaaa;
+                //double rrll  = v4rho2lapl2_abbb + 2.0 * v4rho2lapl2_abab + v4rho2lapl2_abaa + v4rho2lapl2_aabb + 2.0 * v4rho2lapl2_aaab + v4rho2lapl2_aaaa;
+                //double rrlt  = v4rho2lapltau_abbb + v4rho2lapltau_abba + v4rho2lapltau_abab + v4rho2lapltau_abaa + v4rho2lapltau_aabb + v4rho2lapltau_aaba + v4rho2lapltau_aaab + v4rho2lapltau_aaaa;
                 double rrtt  = v4rho2tau2_abbb + 2.0 * v4rho2tau2_abab + v4rho2tau2_abaa + v4rho2tau2_aabb + 2.0 * v4rho2tau2_aaab + v4rho2tau2_aaaa;
                 double rxxx  = 8.0 * v4rhosigma3_accc + 24.0 * v4rhosigma3_accb + 24.0 * v4rhosigma3_acbb + 8.0 * v4rhosigma3_abbb
                              + 24.0 * v4rhosigma3_aacc + 48.0 * v4rhosigma3_aacb + 24.0 * v4rhosigma3_aabb + 24.0 * v4rhosigma3_aaac
                              + 24.0 * v4rhosigma3_aaab + 8.0 * v4rhosigma3_aaaa;
-                double rxxl  = 4.0 * v4rhosigma2lapl_accb + 4.0 * v4rhosigma2lapl_acca + 8.0 * v4rhosigma2lapl_acbb
-                             + 8.0 * v4rhosigma2lapl_acba + 4.0 * v4rhosigma2lapl_abbb + 4.0 * v4rhosigma2lapl_abba
-                             + 8.0 * v4rhosigma2lapl_aacb + 8.0 * v4rhosigma2lapl_aaca + 8.0 * v4rhosigma2lapl_aabb
-                             + 8.0 * v4rhosigma2lapl_aaba + 4.0 * v4rhosigma2lapl_aaab + 4.0 * v4rhosigma2lapl_aaaa;
+                //double rxxl  = 4.0 * v4rhosigma2lapl_accb + 4.0 * v4rhosigma2lapl_acca + 8.0 * v4rhosigma2lapl_acbb
+                //             + 8.0 * v4rhosigma2lapl_acba + 4.0 * v4rhosigma2lapl_abbb + 4.0 * v4rhosigma2lapl_abba
+                //             + 8.0 * v4rhosigma2lapl_aacb + 8.0 * v4rhosigma2lapl_aaca + 8.0 * v4rhosigma2lapl_aabb
+                //             + 8.0 * v4rhosigma2lapl_aaba + 4.0 * v4rhosigma2lapl_aaab + 4.0 * v4rhosigma2lapl_aaaa;
                 double rxxt  = 4.0 * v4rhosigma2tau_accb + 4.0 * v4rhosigma2tau_acca + 8.0 * v4rhosigma2tau_acbb
                              + 8.0 * v4rhosigma2tau_acba + 4.0 * v4rhosigma2tau_abbb + 4.0 * v4rhosigma2tau_abba
                              + 8.0 * v4rhosigma2tau_aacb + 8.0 * v4rhosigma2tau_aaca + 8.0 * v4rhosigma2tau_aabb
                              + 8.0 * v4rhosigma2tau_aaba + 4.0 * v4rhosigma2tau_aaab + 4.0 * v4rhosigma2tau_aaaa;
-                double rxll  = 2.0 * v4rhosigmalapl2_acbb + 4.0 * v4rhosigmalapl2_acab + 2.0 * v4rhosigmalapl2_acaa
-                             + 2.0 * v4rhosigmalapl2_abbb + 4.0 * v4rhosigmalapl2_abab + 2.0 * v4rhosigmalapl2_abaa
-                             + 2.0 * v4rhosigmalapl2_aabb + 4.0 * v4rhosigmalapl2_aaab + 2.0 * v4rhosigmalapl2_aaaa;
-                double rxlt  = 2.0 * v4rhosigmalapltau_acbb + 2.0 * v4rhosigmalapltau_acba + 2.0 * v4rhosigmalapltau_acab
-                             + 2.0 * v4rhosigmalapltau_acaa + 2.0 * v4rhosigmalapltau_abbb + 2.0 * v4rhosigmalapltau_abba
-                             + 2.0 * v4rhosigmalapltau_abab + 2.0 * v4rhosigmalapltau_abaa + 2.0 * v4rhosigmalapltau_aabb
-                             + 2.0 * v4rhosigmalapltau_aaba + 2.0 * v4rhosigmalapltau_aaab + 2.0 * v4rhosigmalapltau_aaaa;
+                //double rxll  = 2.0 * v4rhosigmalapl2_acbb + 4.0 * v4rhosigmalapl2_acab + 2.0 * v4rhosigmalapl2_acaa
+                //             + 2.0 * v4rhosigmalapl2_abbb + 4.0 * v4rhosigmalapl2_abab + 2.0 * v4rhosigmalapl2_abaa
+                //             + 2.0 * v4rhosigmalapl2_aabb + 4.0 * v4rhosigmalapl2_aaab + 2.0 * v4rhosigmalapl2_aaaa;
+                //double rxlt  = 2.0 * v4rhosigmalapltau_acbb + 2.0 * v4rhosigmalapltau_acba + 2.0 * v4rhosigmalapltau_acab
+                //             + 2.0 * v4rhosigmalapltau_acaa + 2.0 * v4rhosigmalapltau_abbb + 2.0 * v4rhosigmalapltau_abba
+                //             + 2.0 * v4rhosigmalapltau_abab + 2.0 * v4rhosigmalapltau_abaa + 2.0 * v4rhosigmalapltau_aabb
+                //             + 2.0 * v4rhosigmalapltau_aaba + 2.0 * v4rhosigmalapltau_aaab + 2.0 * v4rhosigmalapltau_aaaa;
                 double rxtt  = 2.0 * v4rhosigmatau2_acbb + 4.0 * v4rhosigmatau2_acab + 2.0 * v4rhosigmatau2_acaa
                              + 2.0 * v4rhosigmatau2_abbb + 4.0 * v4rhosigmatau2_abab + 2.0 * v4rhosigmatau2_abaa
                              + 2.0 * v4rhosigmatau2_aabb + 4.0 * v4rhosigmatau2_aaab + 2.0 * v4rhosigmatau2_aaaa;
-                double rlll  = v4rholapl3_abbb + 3.0 * v4rholapl3_aabb + 3.0 * v4rholapl3_aaab + v4rholapl3_aaaa;
-                double rllt  = v4rholapl2tau_abbb + v4rholapl2tau_abba
-                             + 2.0 * v4rholapl2tau_aabb + 2.0 * v4rholapl2tau_aaba
-                            + v4rholapl2tau_aaab + v4rholapl2tau_aaaa;
-                double rltt  = v4rholapltau2_abbb + 2.0 * v4rholapltau2_abab + v4rholapltau2_abaa
-                             + v4rholapltau2_aabb + 2.0 * v4rholapltau2_aaab + v4rholapltau2_aaaa;
+                //double rlll  = v4rholapl3_abbb + 3.0 * v4rholapl3_aabb + 3.0 * v4rholapl3_aaab + v4rholapl3_aaaa;
+                //double rllt  = v4rholapl2tau_abbb + v4rholapl2tau_abba
+                //             + 2.0 * v4rholapl2tau_aabb + 2.0 * v4rholapl2tau_aaba
+                //            + v4rholapl2tau_aaab + v4rholapl2tau_aaaa;
+                //double rltt  = v4rholapltau2_abbb + 2.0 * v4rholapltau2_abab + v4rholapltau2_abaa
+                //             + v4rholapltau2_aabb + 2.0 * v4rholapltau2_aaab + v4rholapltau2_aaaa;
                 double rttt  = v4rhotau3_abbb + 3.0 * v4rhotau3_aabb + 3.0 * v4rhotau3_aaab + v4rhotau3_aaaa;
                 double xxxx  = 8.0*v4sigma4_cccc + 24.0*v4sigma4_cccb + 24.0*v4sigma4_ccbb + 8.0*v4sigma4_cbbb + 40.0*v4sigma4_accc
                              + 96.0*v4sigma4_accb + 72.0*v4sigma4_acbb + 16.0*v4sigma4_abbb + 72.0*v4sigma4_aacc + 120.0*v4sigma4_aacb
@@ -10836,11 +10836,11 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                             + 8.0 * v4rhosigma3_baaa + 4.0 * v4rhosigma3_accc + 8.0 * v4rhosigma3_accb + 4.0 * v4rhosigma3_acbb
                             + 16.0 * v4rhosigma3_aacc + 24.0 * v4rhosigma3_aacb + 8.0 * v4rhosigma3_aabb + 20.0 * v4rhosigma3_aaac
                             + 16.0 * v4rhosigma3_aaab + 8.0 * v4rhosigma3_aaaa;
-                double xxxl  = 4.0 * v4sigma3lapl_cccb + 4.0 * v4sigma3lapl_ccca + 8.0 * v4sigma3lapl_ccbb + 8.0 * v4sigma3lapl_ccba
-                             + 4.0 * v4sigma3lapl_cbbb + 4.0 * v4sigma3lapl_cbba + 16.0 * v4sigma3lapl_accb + 16.0 * v4sigma3lapl_acca
-                             + 24.0 * v4sigma3lapl_acbb + 24.0 * v4sigma3lapl_acba + 8.0 * v4sigma3lapl_abbb + 8.0 * v4sigma3lapl_abba
-                             + 20.0 * v4sigma3lapl_aacb + 20.0 * v4sigma3lapl_aaca + 16.0 * v4sigma3lapl_aabb + 16.0 * v4sigma3lapl_aaba
-                             + 8.0 * v4sigma3lapl_aaab + 8.0 * v4sigma3lapl_aaaa;
+                //double xxxl  = 4.0 * v4sigma3lapl_cccb + 4.0 * v4sigma3lapl_ccca + 8.0 * v4sigma3lapl_ccbb + 8.0 * v4sigma3lapl_ccba
+                //             + 4.0 * v4sigma3lapl_cbbb + 4.0 * v4sigma3lapl_cbba + 16.0 * v4sigma3lapl_accb + 16.0 * v4sigma3lapl_acca
+                //             + 24.0 * v4sigma3lapl_acbb + 24.0 * v4sigma3lapl_acba + 8.0 * v4sigma3lapl_abbb + 8.0 * v4sigma3lapl_abba
+                //             + 20.0 * v4sigma3lapl_aacb + 20.0 * v4sigma3lapl_aaca + 16.0 * v4sigma3lapl_aabb + 16.0 * v4sigma3lapl_aaba
+                //             + 8.0 * v4sigma3lapl_aaab + 8.0 * v4sigma3lapl_aaaa;
                 double xxxt  = 4.0 * v4sigma3tau_cccb + 4.0 * v4sigma3tau_ccca + 8.0 * v4sigma3tau_ccbb
                              + 8.0 * v4sigma3tau_ccba + 4.0 * v4sigma3tau_cbbb + 4.0 * v4sigma3tau_cbba
                             + 16.0 * v4sigma3tau_accb + 16.0 * v4sigma3tau_acca + 24.0 * v4sigma3tau_acbb
@@ -10852,74 +10852,74 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                              + 4.0 * v4rho2sigma2_abcb + 12.0 * v4rho2sigma2_abac + 8.0 * v4rho2sigma2_abab
                              + 8.0 * v4rho2sigma2_abaa + 2.0 * v4rho2sigma2_aacc + 2.0 * v4rho2sigma2_aacb
                              + 6.0 * v4rho2sigma2_aaac + 4.0 * v4rho2sigma2_aaab + 4.0 * v4rho2sigma2_aaaa;
-                double xxrl  = 2.0 * v4rhosigma2lapl_bccb + 2.0 * v4rhosigma2lapl_bcca + 2.0 * v4rhosigma2lapl_bcbb
-                             + 2.0 * v4rhosigma2lapl_bcba + 6.0 * v4rhosigma2lapl_bacb + 6.0 * v4rhosigma2lapl_baca
-                             + 4.0 * v4rhosigma2lapl_babb + 4.0 * v4rhosigma2lapl_baba + 4.0 * v4rhosigma2lapl_baab
-                             + 4.0 * v4rhosigma2lapl_baaa + 2.0 * v4rhosigma2lapl_accb + 2.0 * v4rhosigma2lapl_acca
-                             + 2.0 * v4rhosigma2lapl_acbb + 2.0 * v4rhosigma2lapl_acba + 6.0 * v4rhosigma2lapl_aacb
-                             + 6.0 * v4rhosigma2lapl_aaca + 4.0 * v4rhosigma2lapl_aabb + 4.0 * v4rhosigma2lapl_aaba
-                             + 4.0 * v4rhosigma2lapl_aaab + 4.0 * v4rhosigma2lapl_aaaa;
+                //double xxrl  = 2.0 * v4rhosigma2lapl_bccb + 2.0 * v4rhosigma2lapl_bcca + 2.0 * v4rhosigma2lapl_bcbb
+                //             + 2.0 * v4rhosigma2lapl_bcba + 6.0 * v4rhosigma2lapl_bacb + 6.0 * v4rhosigma2lapl_baca
+                //             + 4.0 * v4rhosigma2lapl_babb + 4.0 * v4rhosigma2lapl_baba + 4.0 * v4rhosigma2lapl_baab
+                //             + 4.0 * v4rhosigma2lapl_baaa + 2.0 * v4rhosigma2lapl_accb + 2.0 * v4rhosigma2lapl_acca
+                //             + 2.0 * v4rhosigma2lapl_acbb + 2.0 * v4rhosigma2lapl_acba + 6.0 * v4rhosigma2lapl_aacb
+                //             + 6.0 * v4rhosigma2lapl_aaca + 4.0 * v4rhosigma2lapl_aabb + 4.0 * v4rhosigma2lapl_aaba
+                //             + 4.0 * v4rhosigma2lapl_aaab + 4.0 * v4rhosigma2lapl_aaaa;
                 double xxrt  = 2.0 * v4rhosigma2tau_bccb + 2.0 * v4rhosigma2tau_bcca + 2.0 * v4rhosigma2tau_bcbb + 2.0 * v4rhosigma2tau_bcba + 6.0 * v4rhosigma2tau_bacb + 6.0 * v4rhosigma2tau_baca + 4.0 * v4rhosigma2tau_babb + 4.0 * v4rhosigma2tau_baba + 4.0 * v4rhosigma2tau_baab + 4.0 * v4rhosigma2tau_baaa + 2.0 * v4rhosigma2tau_accb + 2.0 * v4rhosigma2tau_acca + 2.0 * v4rhosigma2tau_acbb + 2.0 * v4rhosigma2tau_acba + 6.0 * v4rhosigma2tau_aacb + 6.0 * v4rhosigma2tau_aaca + 4.0 * v4rhosigma2tau_aabb + 4.0 * v4rhosigma2tau_aaba + 4.0 * v4rhosigma2tau_aaab + 4.0 * v4rhosigma2tau_aaaa;
-                double xxll  = 2.0 * v4sigma2lapl2_ccbb + 4.0 * v4sigma2lapl2_ccab + 2.0 * v4sigma2lapl2_ccaa + 2.0 * v4sigma2lapl2_cbbb + 4.0 * v4sigma2lapl2_cbab + 2.0 * v4sigma2lapl2_cbaa + 6.0 * v4sigma2lapl2_acbb + 12.0 * v4sigma2lapl2_acab + 6.0 * v4sigma2lapl2_acaa + 4.0 * v4sigma2lapl2_abbb + 8.0 * v4sigma2lapl2_abab + 4.0 * v4sigma2lapl2_abaa + 4.0 * v4sigma2lapl2_aabb + 8.0 * v4sigma2lapl2_aaab + 4.0 * v4sigma2lapl2_aaaa;
-                double xxlt  = 2.0 * v4sigma2lapltau_ccbb + 2.0 * v4sigma2lapltau_ccba + 2.0 * v4sigma2lapltau_ccab + 2.0 * v4sigma2lapltau_ccaa + 2.0 * v4sigma2lapltau_cbbb + 2.0 * v4sigma2lapltau_cbba + 2.0 * v4sigma2lapltau_cbab + 2.0 * v4sigma2lapltau_cbaa + 6.0 * v4sigma2lapltau_acbb + 6.0 * v4sigma2lapltau_acba + 6.0 * v4sigma2lapltau_acab + 6.0 * v4sigma2lapltau_acaa + 4.0 * v4sigma2lapltau_abbb + 4.0 * v4sigma2lapltau_abba + 4.0 * v4sigma2lapltau_abab + 4.0 * v4sigma2lapltau_abaa + 4.0 * v4sigma2lapltau_aabb + 4.0 * v4sigma2lapltau_aaba + 4.0 * v4sigma2lapltau_aaab + 4.0 * v4sigma2lapltau_aaaa;
+                //double xxll  = 2.0 * v4sigma2lapl2_ccbb + 4.0 * v4sigma2lapl2_ccab + 2.0 * v4sigma2lapl2_ccaa + 2.0 * v4sigma2lapl2_cbbb + 4.0 * v4sigma2lapl2_cbab + 2.0 * v4sigma2lapl2_cbaa + 6.0 * v4sigma2lapl2_acbb + 12.0 * v4sigma2lapl2_acab + 6.0 * v4sigma2lapl2_acaa + 4.0 * v4sigma2lapl2_abbb + 8.0 * v4sigma2lapl2_abab + 4.0 * v4sigma2lapl2_abaa + 4.0 * v4sigma2lapl2_aabb + 8.0 * v4sigma2lapl2_aaab + 4.0 * v4sigma2lapl2_aaaa;
+                //double xxlt  = 2.0 * v4sigma2lapltau_ccbb + 2.0 * v4sigma2lapltau_ccba + 2.0 * v4sigma2lapltau_ccab + 2.0 * v4sigma2lapltau_ccaa + 2.0 * v4sigma2lapltau_cbbb + 2.0 * v4sigma2lapltau_cbba + 2.0 * v4sigma2lapltau_cbab + 2.0 * v4sigma2lapltau_cbaa + 6.0 * v4sigma2lapltau_acbb + 6.0 * v4sigma2lapltau_acba + 6.0 * v4sigma2lapltau_acab + 6.0 * v4sigma2lapltau_acaa + 4.0 * v4sigma2lapltau_abbb + 4.0 * v4sigma2lapltau_abba + 4.0 * v4sigma2lapltau_abab + 4.0 * v4sigma2lapltau_abaa + 4.0 * v4sigma2lapltau_aabb + 4.0 * v4sigma2lapltau_aaba + 4.0 * v4sigma2lapltau_aaab + 4.0 * v4sigma2lapltau_aaaa;
                 double xxtt  = 2.0 * v4sigma2tau2_ccbb + 4.0 * v4sigma2tau2_ccab + 2.0 * v4sigma2tau2_ccaa + 2.0 * v4sigma2tau2_cbbb + 4.0 * v4sigma2tau2_cbab + 2.0 * v4sigma2tau2_cbaa + 6.0 * v4sigma2tau2_acbb + 12.0 * v4sigma2tau2_acab + 6.0 * v4sigma2tau2_acaa + 4.0 * v4sigma2tau2_abbb + 8.0 * v4sigma2tau2_abab + 4.0 * v4sigma2tau2_abaa + 4.0 * v4sigma2tau2_aabb + 8.0 * v4sigma2tau2_aaab + 4.0 * v4sigma2tau2_aaaa;
                 double xrrr  = v4rho3sigma_bbbc + 2.0 * v4rho3sigma_bbba + 3.0 * v4rho3sigma_abbc + 6.0 * v4rho3sigma_abba + 3.0 * v4rho3sigma_aabc
                              + 6.0 * v4rho3sigma_aaba + v4rho3sigma_aaac + 2.0 * v4rho3sigma_aaaa;
-                double xrrl  = v4rho2sigmalapl_bbcb + v4rho2sigmalapl_bbca + 2.0 * v4rho2sigmalapl_bbab + 2.0 * v4rho2sigmalapl_bbaa + 2.0 * v4rho2sigmalapl_abcb + 2.0 * v4rho2sigmalapl_abca + 4.0 * v4rho2sigmalapl_abab + 4.0 * v4rho2sigmalapl_abaa + v4rho2sigmalapl_aacb + v4rho2sigmalapl_aaca + 2.0 * v4rho2sigmalapl_aaab + 2.0 * v4rho2sigmalapl_aaaa;
+                //double xrrl  = v4rho2sigmalapl_bbcb + v4rho2sigmalapl_bbca + 2.0 * v4rho2sigmalapl_bbab + 2.0 * v4rho2sigmalapl_bbaa + 2.0 * v4rho2sigmalapl_abcb + 2.0 * v4rho2sigmalapl_abca + 4.0 * v4rho2sigmalapl_abab + 4.0 * v4rho2sigmalapl_abaa + v4rho2sigmalapl_aacb + v4rho2sigmalapl_aaca + 2.0 * v4rho2sigmalapl_aaab + 2.0 * v4rho2sigmalapl_aaaa;
                 double xrrt  = v4rho2sigmatau_bbcb + v4rho2sigmatau_bbca + 2.0 * v4rho2sigmatau_bbab + 2.0 * v4rho2sigmatau_bbaa + 2.0 * v4rho2sigmatau_abcb + 2.0 * v4rho2sigmatau_abca + 4.0 * v4rho2sigmatau_abab + 4.0 * v4rho2sigmatau_abaa + v4rho2sigmatau_aacb + v4rho2sigmatau_aaca + 2.0 * v4rho2sigmatau_aaab + 2.0 * v4rho2sigmatau_aaaa;
-                double xrll  = v4rhosigmalapl2_bcbb + 2.0 * v4rhosigmalapl2_bcab + v4rhosigmalapl2_bcaa + 2.0 * v4rhosigmalapl2_babb + 4.0 * v4rhosigmalapl2_baab + 2.0 * v4rhosigmalapl2_baaa + v4rhosigmalapl2_acbb + 2.0 * v4rhosigmalapl2_acab + v4rhosigmalapl2_acaa + 2.0 * v4rhosigmalapl2_aabb + 4.0 * v4rhosigmalapl2_aaab + 2.0 * v4rhosigmalapl2_aaaa;
-                double xrlt  = v4rhosigmalapltau_bcbb + v4rhosigmalapltau_bcba + v4rhosigmalapltau_bcab + v4rhosigmalapltau_bcaa + 2.0 * v4rhosigmalapltau_babb + 2.0 * v4rhosigmalapltau_baba + 2.0 * v4rhosigmalapltau_baab + 2.0 * v4rhosigmalapltau_baaa + v4rhosigmalapltau_acbb + v4rhosigmalapltau_acba + v4rhosigmalapltau_acab + v4rhosigmalapltau_acaa + 2.0 * v4rhosigmalapltau_aabb + 2.0 * v4rhosigmalapltau_aaba + 2.0 * v4rhosigmalapltau_aaab + 2.0 * v4rhosigmalapltau_aaaa;
+                //double xrll  = v4rhosigmalapl2_bcbb + 2.0 * v4rhosigmalapl2_bcab + v4rhosigmalapl2_bcaa + 2.0 * v4rhosigmalapl2_babb + 4.0 * v4rhosigmalapl2_baab + 2.0 * v4rhosigmalapl2_baaa + v4rhosigmalapl2_acbb + 2.0 * v4rhosigmalapl2_acab + v4rhosigmalapl2_acaa + 2.0 * v4rhosigmalapl2_aabb + 4.0 * v4rhosigmalapl2_aaab + 2.0 * v4rhosigmalapl2_aaaa;
+                //double xrlt  = v4rhosigmalapltau_bcbb + v4rhosigmalapltau_bcba + v4rhosigmalapltau_bcab + v4rhosigmalapltau_bcaa + 2.0 * v4rhosigmalapltau_babb + 2.0 * v4rhosigmalapltau_baba + 2.0 * v4rhosigmalapltau_baab + 2.0 * v4rhosigmalapltau_baaa + v4rhosigmalapltau_acbb + v4rhosigmalapltau_acba + v4rhosigmalapltau_acab + v4rhosigmalapltau_acaa + 2.0 * v4rhosigmalapltau_aabb + 2.0 * v4rhosigmalapltau_aaba + 2.0 * v4rhosigmalapltau_aaab + 2.0 * v4rhosigmalapltau_aaaa;
                 double xrtt  = v4rhosigmatau2_bcbb + 2.0 * v4rhosigmatau2_bcab + v4rhosigmatau2_bcaa + 2.0 * v4rhosigmatau2_babb + 4.0 * v4rhosigmatau2_baab + 2.0 * v4rhosigmatau2_baaa + v4rhosigmatau2_acbb + 2.0 * v4rhosigmatau2_acab + v4rhosigmatau2_acaa + 2.0 * v4rhosigmatau2_aabb + 4.0 * v4rhosigmatau2_aaab + 2.0 * v4rhosigmatau2_aaaa;
-                double xlll  = v4sigmalapl3_cbbb + 3.0 * v4sigmalapl3_cabb + 3.0 * v4sigmalapl3_caab + v4sigmalapl3_caaa + 2.0 * v4sigmalapl3_abbb + 6.0 * v4sigmalapl3_aabb + 6.0 * v4sigmalapl3_aaab + 2.0 * v4sigmalapl3_aaaa;
-                double xllt  = v4sigmalapl2tau_cbbb + v4sigmalapl2tau_cbba + 2.0 * v4sigmalapl2tau_cabb + 2.0 * v4sigmalapl2tau_caba
-                             + v4sigmalapl2tau_caab + v4sigmalapl2tau_caaa + 2.0 * v4sigmalapl2tau_abbb + 2.0 * v4sigmalapl2tau_abba
-                             + 4.0 * v4sigmalapl2tau_aabb + 4.0 * v4sigmalapl2tau_aaba + 2.0 * v4sigmalapl2tau_aaab + 2.0 * v4sigmalapl2tau_aaaa;
-                double xltt  = v4sigmalapltau2_cbbb + 2.0 * v4sigmalapltau2_cbab + v4sigmalapltau2_cbaa + v4sigmalapltau2_cabb + 2.0 * v4sigmalapltau2_caab + v4sigmalapltau2_caaa + 2.0 * v4sigmalapltau2_abbb + 4.0 * v4sigmalapltau2_abab + 2.0 * v4sigmalapltau2_abaa + 2.0 * v4sigmalapltau2_aabb + 4.0 * v4sigmalapltau2_aaab + 2.0 * v4sigmalapltau2_aaaa;
+                //double xlll  = v4sigmalapl3_cbbb + 3.0 * v4sigmalapl3_cabb + 3.0 * v4sigmalapl3_caab + v4sigmalapl3_caaa + 2.0 * v4sigmalapl3_abbb + 6.0 * v4sigmalapl3_aabb + 6.0 * v4sigmalapl3_aaab + 2.0 * v4sigmalapl3_aaaa;
+                //double xllt  = v4sigmalapl2tau_cbbb + v4sigmalapl2tau_cbba + 2.0 * v4sigmalapl2tau_cabb + 2.0 * v4sigmalapl2tau_caba
+                //             + v4sigmalapl2tau_caab + v4sigmalapl2tau_caaa + 2.0 * v4sigmalapl2tau_abbb + 2.0 * v4sigmalapl2tau_abba
+                //             + 4.0 * v4sigmalapl2tau_aabb + 4.0 * v4sigmalapl2tau_aaba + 2.0 * v4sigmalapl2tau_aaab + 2.0 * v4sigmalapl2tau_aaaa;
+                //double xltt  = v4sigmalapltau2_cbbb + 2.0 * v4sigmalapltau2_cbab + v4sigmalapltau2_cbaa + v4sigmalapltau2_cabb + 2.0 * v4sigmalapltau2_caab + v4sigmalapltau2_caaa + 2.0 * v4sigmalapltau2_abbb + 4.0 * v4sigmalapltau2_abab + 2.0 * v4sigmalapltau2_abaa + 2.0 * v4sigmalapltau2_aabb + 4.0 * v4sigmalapltau2_aaab + 2.0 * v4sigmalapltau2_aaaa;
                 double xttt  = v4sigmatau3_cbbb + 3.0 * v4sigmatau3_cabb + 3.0 * v4sigmatau3_caab + v4sigmatau3_caaa + 2.0 * v4sigmatau3_abbb + 6.0 * v4sigmatau3_aabb + 6.0 * v4sigmatau3_aaab + 2.0 * v4sigmatau3_aaaa;
-                double llll  = v4lapl4_abbb + 3.0 * v4lapl4_aabb + 3.0 * v4lapl4_aaab + v4lapl4_aaaa;
-                double lllr  = v4rholapl3_babb + 2.0 * v4rholapl3_baab + v4rholapl3_baaa + v4rholapl3_aabb + 2.0 * v4rholapl3_aaab + v4rholapl3_aaaa;
-                double lllx  = 2.0 * v4sigmalapl3_cabb + 4.0 * v4sigmalapl3_caab + 2.0 * v4sigmalapl3_caaa + 2.0 * v4sigmalapl3_babb + 4.0 * v4sigmalapl3_baab + 2.0 * v4sigmalapl3_baaa + 2.0 * v4sigmalapl3_aabb + 4.0 * v4sigmalapl3_aaab + 2.0 * v4sigmalapl3_aaaa;
-                double lllt  = v4lapl3tau_abbb + v4lapl3tau_abba + 2.0 * v4lapl3tau_aabb + 2.0 * v4lapl3tau_aaba + v4lapl3tau_aaab + v4lapl3tau_aaaa;
-                double llrr  = v4rho2lapl2_bbab + v4rho2lapl2_bbaa + 2.0 * v4rho2lapl2_abab + 2.0 * v4rho2lapl2_abaa + v4rho2lapl2_aaab + v4rho2lapl2_aaaa;
-                double llrx  = 2.0 * v4rhosigmalapl2_bcab + 2.0 * v4rhosigmalapl2_bcaa + 2.0 * v4rhosigmalapl2_bbab + 2.0 * v4rhosigmalapl2_bbaa + 2.0 * v4rhosigmalapl2_baab + 2.0 * v4rhosigmalapl2_baaa + 2.0 * v4rhosigmalapl2_acab + 2.0 * v4rhosigmalapl2_acaa + 2.0 * v4rhosigmalapl2_abab + 2.0 * v4rhosigmalapl2_abaa + 2.0 * v4rhosigmalapl2_aaab + 2.0 * v4rhosigmalapl2_aaaa;
-                double llrt  = v4rholapl2tau_babb + v4rholapl2tau_baba + v4rholapl2tau_baab + v4rholapl2tau_baaa + v4rholapl2tau_aabb + v4rholapl2tau_aaba + v4rholapl2tau_aaab + v4rholapl2tau_aaaa;
-                double llxx  = 4.0 * v4sigma2lapl2_ccab + 4.0 * v4sigma2lapl2_ccaa + 8.0 * v4sigma2lapl2_cbab + 8.0 * v4sigma2lapl2_cbaa + 4.0 * v4sigma2lapl2_bbab + 4.0 * v4sigma2lapl2_bbaa + 8.0 * v4sigma2lapl2_acab + 8.0 * v4sigma2lapl2_acaa + 8.0 * v4sigma2lapl2_abab + 8.0 * v4sigma2lapl2_abaa + 4.0 * v4sigma2lapl2_aaab + 4.0 * v4sigma2lapl2_aaaa;
-                double llxt  = 2.0 * v4sigmalapl2tau_cabb + 2.0 * v4sigmalapl2tau_caba + 2.0 * v4sigmalapl2tau_caab + 2.0 * v4sigmalapl2tau_caaa + 2.0 * v4sigmalapl2tau_babb + 2.0 * v4sigmalapl2tau_baba + 2.0 * v4sigmalapl2tau_baab + 2.0 * v4sigmalapl2tau_baaa + 2.0 * v4sigmalapl2tau_aabb + 2.0 * v4sigmalapl2tau_aaba + 2.0 * v4sigmalapl2tau_aaab + 2.0 * v4sigmalapl2tau_aaaa;
-                double lltt  = v4lapl2tau2_abbb + 2.0 * v4lapl2tau2_abab + v4lapl2tau2_abaa + v4lapl2tau2_aabb + 2.0 * v4lapl2tau2_aaab + v4lapl2tau2_aaaa;
-                double lrrr  = v4rho3lapl_bbba + 3.0 * v4rho3lapl_abba + 3.0 * v4rho3lapl_aaba + v4rho3lapl_aaaa;
-                double lrrx  = 2.0 * v4rho2sigmalapl_bbca + 2.0 * v4rho2sigmalapl_bbba + 2.0 * v4rho2sigmalapl_bbaa + 4.0 * v4rho2sigmalapl_abca + 4.0 * v4rho2sigmalapl_abba + 4.0 * v4rho2sigmalapl_abaa + 2.0 * v4rho2sigmalapl_aaca + 2.0 * v4rho2sigmalapl_aaba + 2.0 * v4rho2sigmalapl_aaaa;
-                double lrrt  = v4rho2lapltau_bbab + v4rho2lapltau_bbaa + 2.0 * v4rho2lapltau_abab + 2.0 * v4rho2lapltau_abaa + v4rho2lapltau_aaab + v4rho2lapltau_aaaa;
-                double lrxx  = 4.0 * v4rhosigma2lapl_bcca + 8.0 * v4rhosigma2lapl_bcba + 4.0 * v4rhosigma2lapl_bbba + 8.0 * v4rhosigma2lapl_baca
-                             + 8.0 * v4rhosigma2lapl_baba + 4.0 * v4rhosigma2lapl_baaa + 4.0 * v4rhosigma2lapl_acca + 8.0 * v4rhosigma2lapl_acba
-                             + 4.0 * v4rhosigma2lapl_abba + 8.0 * v4rhosigma2lapl_aaca + 8.0 * v4rhosigma2lapl_aaba + 4.0 * v4rhosigma2lapl_aaaa;
-                double lrxt  = 2.0 * v4rhosigmalapltau_bcab + 2.0 * v4rhosigmalapltau_bcaa + 2.0 * v4rhosigmalapltau_bbab + 2.0 * v4rhosigmalapltau_bbaa + 2.0 * v4rhosigmalapltau_baab + 2.0 * v4rhosigmalapltau_baaa + 2.0 * v4rhosigmalapltau_acab + 2.0 * v4rhosigmalapltau_acaa + 2.0 * v4rhosigmalapltau_abab + 2.0 * v4rhosigmalapltau_abaa + 2.0 * v4rhosigmalapltau_aaab + 2.0 * v4rhosigmalapltau_aaaa;
-                double lrtt  = v4rholapltau2_babb + 2.0 * v4rholapltau2_baab + v4rholapltau2_baaa + v4rholapltau2_aabb + 2.0 * v4rholapltau2_aaab + v4rholapltau2_aaaa;
-                double lxxx  = 8.0 * v4sigma3lapl_ccca + 24.0 * v4sigma3lapl_ccba + 24.0 * v4sigma3lapl_cbba + 8.0 * v4sigma3lapl_bbba + 24.0 * v4sigma3lapl_acca + 48.0 * v4sigma3lapl_acba + 24.0 * v4sigma3lapl_abba + 24.0 * v4sigma3lapl_aaca + 24.0 * v4sigma3lapl_aaba + 8.0 * v4sigma3lapl_aaaa;
-                double lxxt  = 4.0 * v4sigma2lapltau_ccab + 4.0 * v4sigma2lapltau_ccaa + 8.0 * v4sigma2lapltau_cbab + 8.0 * v4sigma2lapltau_cbaa + 4.0 * v4sigma2lapltau_bbab + 4.0 * v4sigma2lapltau_bbaa + 8.0 * v4sigma2lapltau_acab + 8.0 * v4sigma2lapltau_acaa + 8.0 * v4sigma2lapltau_abab + 8.0 * v4sigma2lapltau_abaa + 4.0 * v4sigma2lapltau_aaab + 4.0 * v4sigma2lapltau_aaaa;
-                double lxtt  = 2.0 * v4sigmalapltau2_cabb + 4.0 * v4sigmalapltau2_caab + 2.0 * v4sigmalapltau2_caaa + 2.0 * v4sigmalapltau2_babb
-                             + 4.0 * v4sigmalapltau2_baab + 2.0 * v4sigmalapltau2_baaa + 2.0 * v4sigmalapltau2_aabb + 4.0 * v4sigmalapltau2_aaab
-                             + 2.0 * v4sigmalapltau2_aaaa;
-                double lttt  = v4lapltau3_abbb + 3.0 * v4lapltau3_aabb + 3.0 * v4lapltau3_aaab + v4lapltau3_aaaa;
+                //double llll  = v4lapl4_abbb + 3.0 * v4lapl4_aabb + 3.0 * v4lapl4_aaab + v4lapl4_aaaa;
+                //double lllr  = v4rholapl3_babb + 2.0 * v4rholapl3_baab + v4rholapl3_baaa + v4rholapl3_aabb + 2.0 * v4rholapl3_aaab + v4rholapl3_aaaa;
+                //double lllx  = 2.0 * v4sigmalapl3_cabb + 4.0 * v4sigmalapl3_caab + 2.0 * v4sigmalapl3_caaa + 2.0 * v4sigmalapl3_babb + 4.0 * v4sigmalapl3_baab + 2.0 * v4sigmalapl3_baaa + 2.0 * v4sigmalapl3_aabb + 4.0 * v4sigmalapl3_aaab + 2.0 * v4sigmalapl3_aaaa;
+                //double lllt  = v4lapl3tau_abbb + v4lapl3tau_abba + 2.0 * v4lapl3tau_aabb + 2.0 * v4lapl3tau_aaba + v4lapl3tau_aaab + v4lapl3tau_aaaa;
+                //double llrr  = v4rho2lapl2_bbab + v4rho2lapl2_bbaa + 2.0 * v4rho2lapl2_abab + 2.0 * v4rho2lapl2_abaa + v4rho2lapl2_aaab + v4rho2lapl2_aaaa;
+                //double llrx  = 2.0 * v4rhosigmalapl2_bcab + 2.0 * v4rhosigmalapl2_bcaa + 2.0 * v4rhosigmalapl2_bbab + 2.0 * v4rhosigmalapl2_bbaa + 2.0 * v4rhosigmalapl2_baab + 2.0 * v4rhosigmalapl2_baaa + 2.0 * v4rhosigmalapl2_acab + 2.0 * v4rhosigmalapl2_acaa + 2.0 * v4rhosigmalapl2_abab + 2.0 * v4rhosigmalapl2_abaa + 2.0 * v4rhosigmalapl2_aaab + 2.0 * v4rhosigmalapl2_aaaa;
+                //double llrt  = v4rholapl2tau_babb + v4rholapl2tau_baba + v4rholapl2tau_baab + v4rholapl2tau_baaa + v4rholapl2tau_aabb + v4rholapl2tau_aaba + v4rholapl2tau_aaab + v4rholapl2tau_aaaa;
+                //double llxx  = 4.0 * v4sigma2lapl2_ccab + 4.0 * v4sigma2lapl2_ccaa + 8.0 * v4sigma2lapl2_cbab + 8.0 * v4sigma2lapl2_cbaa + 4.0 * v4sigma2lapl2_bbab + 4.0 * v4sigma2lapl2_bbaa + 8.0 * v4sigma2lapl2_acab + 8.0 * v4sigma2lapl2_acaa + 8.0 * v4sigma2lapl2_abab + 8.0 * v4sigma2lapl2_abaa + 4.0 * v4sigma2lapl2_aaab + 4.0 * v4sigma2lapl2_aaaa;
+                //double llxt  = 2.0 * v4sigmalapl2tau_cabb + 2.0 * v4sigmalapl2tau_caba + 2.0 * v4sigmalapl2tau_caab + 2.0 * v4sigmalapl2tau_caaa + 2.0 * v4sigmalapl2tau_babb + 2.0 * v4sigmalapl2tau_baba + 2.0 * v4sigmalapl2tau_baab + 2.0 * v4sigmalapl2tau_baaa + 2.0 * v4sigmalapl2tau_aabb + 2.0 * v4sigmalapl2tau_aaba + 2.0 * v4sigmalapl2tau_aaab + 2.0 * v4sigmalapl2tau_aaaa;
+                //double lltt  = v4lapl2tau2_abbb + 2.0 * v4lapl2tau2_abab + v4lapl2tau2_abaa + v4lapl2tau2_aabb + 2.0 * v4lapl2tau2_aaab + v4lapl2tau2_aaaa;
+                //double lrrr  = v4rho3lapl_bbba + 3.0 * v4rho3lapl_abba + 3.0 * v4rho3lapl_aaba + v4rho3lapl_aaaa;
+                //double lrrx  = 2.0 * v4rho2sigmalapl_bbca + 2.0 * v4rho2sigmalapl_bbba + 2.0 * v4rho2sigmalapl_bbaa + 4.0 * v4rho2sigmalapl_abca + 4.0 * v4rho2sigmalapl_abba + 4.0 * v4rho2sigmalapl_abaa + 2.0 * v4rho2sigmalapl_aaca + 2.0 * v4rho2sigmalapl_aaba + 2.0 * v4rho2sigmalapl_aaaa;
+                //double lrrt  = v4rho2lapltau_bbab + v4rho2lapltau_bbaa + 2.0 * v4rho2lapltau_abab + 2.0 * v4rho2lapltau_abaa + v4rho2lapltau_aaab + v4rho2lapltau_aaaa;
+                //double lrxx  = 4.0 * v4rhosigma2lapl_bcca + 8.0 * v4rhosigma2lapl_bcba + 4.0 * v4rhosigma2lapl_bbba + 8.0 * v4rhosigma2lapl_baca
+                //             + 8.0 * v4rhosigma2lapl_baba + 4.0 * v4rhosigma2lapl_baaa + 4.0 * v4rhosigma2lapl_acca + 8.0 * v4rhosigma2lapl_acba
+                //             + 4.0 * v4rhosigma2lapl_abba + 8.0 * v4rhosigma2lapl_aaca + 8.0 * v4rhosigma2lapl_aaba + 4.0 * v4rhosigma2lapl_aaaa;
+                //double lrxt  = 2.0 * v4rhosigmalapltau_bcab + 2.0 * v4rhosigmalapltau_bcaa + 2.0 * v4rhosigmalapltau_bbab + 2.0 * v4rhosigmalapltau_bbaa + 2.0 * v4rhosigmalapltau_baab + 2.0 * v4rhosigmalapltau_baaa + 2.0 * v4rhosigmalapltau_acab + 2.0 * v4rhosigmalapltau_acaa + 2.0 * v4rhosigmalapltau_abab + 2.0 * v4rhosigmalapltau_abaa + 2.0 * v4rhosigmalapltau_aaab + 2.0 * v4rhosigmalapltau_aaaa;
+                //double lrtt  = v4rholapltau2_babb + 2.0 * v4rholapltau2_baab + v4rholapltau2_baaa + v4rholapltau2_aabb + 2.0 * v4rholapltau2_aaab + v4rholapltau2_aaaa;
+                //double lxxx  = 8.0 * v4sigma3lapl_ccca + 24.0 * v4sigma3lapl_ccba + 24.0 * v4sigma3lapl_cbba + 8.0 * v4sigma3lapl_bbba + 24.0 * v4sigma3lapl_acca + 48.0 * v4sigma3lapl_acba + 24.0 * v4sigma3lapl_abba + 24.0 * v4sigma3lapl_aaca + 24.0 * v4sigma3lapl_aaba + 8.0 * v4sigma3lapl_aaaa;
+                //double lxxt  = 4.0 * v4sigma2lapltau_ccab + 4.0 * v4sigma2lapltau_ccaa + 8.0 * v4sigma2lapltau_cbab + 8.0 * v4sigma2lapltau_cbaa + 4.0 * v4sigma2lapltau_bbab + 4.0 * v4sigma2lapltau_bbaa + 8.0 * v4sigma2lapltau_acab + 8.0 * v4sigma2lapltau_acaa + 8.0 * v4sigma2lapltau_abab + 8.0 * v4sigma2lapltau_abaa + 4.0 * v4sigma2lapltau_aaab + 4.0 * v4sigma2lapltau_aaaa;
+                //double lxtt  = 2.0 * v4sigmalapltau2_cabb + 4.0 * v4sigmalapltau2_caab + 2.0 * v4sigmalapltau2_caaa + 2.0 * v4sigmalapltau2_babb
+                //             + 4.0 * v4sigmalapltau2_baab + 2.0 * v4sigmalapltau2_baaa + 2.0 * v4sigmalapltau2_aabb + 4.0 * v4sigmalapltau2_aaab
+                //             + 2.0 * v4sigmalapltau2_aaaa;
+                //double lttt  = v4lapltau3_abbb + 3.0 * v4lapltau3_aabb + 3.0 * v4lapltau3_aaab + v4lapltau3_aaaa;
                 double tttt  = v4tau4_abbb + 3.0 * v4tau4_aabb + 3.0 * v4tau4_aaab + v4tau4_aaaa;
                 double tttr  = v4rhotau3_babb + 2.0 * v4rhotau3_baab + v4rhotau3_baaa + v4rhotau3_aabb + 2.0 * v4rhotau3_aaab + v4rhotau3_aaaa;
                 double tttx  = 2.0 * v4sigmatau3_cabb + 4.0 * v4sigmatau3_caab + 2.0 * v4sigmatau3_caaa + 2.0 * v4sigmatau3_babb + 4.0 * v4sigmatau3_baab + 2.0 * v4sigmatau3_baaa + 2.0 * v4sigmatau3_aabb + 4.0 * v4sigmatau3_aaab + 2.0 * v4sigmatau3_aaaa;
-                double tttl  = v4lapltau3_babb + 2.0 * v4lapltau3_baab + v4lapltau3_baaa + v4lapltau3_aabb + 2.0 * v4lapltau3_aaab + v4lapltau3_aaaa;
+                //double tttl  = v4lapltau3_babb + 2.0 * v4lapltau3_baab + v4lapltau3_baaa + v4lapltau3_aabb + 2.0 * v4lapltau3_aaab + v4lapltau3_aaaa;
                 double ttrr  = v4rho2tau2_bbab + v4rho2tau2_bbaa + 2.0 * v4rho2tau2_abab + 2.0 * v4rho2tau2_abaa + v4rho2tau2_aaab + v4rho2tau2_aaaa;
                 double ttrx  = 2.0 * v4rhosigmatau2_bcab + 2.0 * v4rhosigmatau2_bcaa + 2.0 * v4rhosigmatau2_bbab + 2.0 * v4rhosigmatau2_bbaa + 2.0 * v4rhosigmatau2_baab + 2.0 * v4rhosigmatau2_baaa + 2.0 * v4rhosigmatau2_acab + 2.0 * v4rhosigmatau2_acaa + 2.0 * v4rhosigmatau2_abab + 2.0 * v4rhosigmatau2_abaa + 2.0 * v4rhosigmatau2_aaab + 2.0 * v4rhosigmatau2_aaaa;
-                double ttrl  = v4rholapltau2_bbab + v4rholapltau2_bbaa + v4rholapltau2_baab + v4rholapltau2_baaa + v4rholapltau2_abab + v4rholapltau2_abaa + v4rholapltau2_aaab + v4rholapltau2_aaaa;
+                //double ttrl  = v4rholapltau2_bbab + v4rholapltau2_bbaa + v4rholapltau2_baab + v4rholapltau2_baaa + v4rholapltau2_abab + v4rholapltau2_abaa + v4rholapltau2_aaab + v4rholapltau2_aaaa;
                 double ttxx  = 4.0 * v4sigma2tau2_ccab + 4.0 * v4sigma2tau2_ccaa + 8.0 * v4sigma2tau2_cbab + 8.0 * v4sigma2tau2_cbaa + 4.0 * v4sigma2tau2_bbab + 4.0 * v4sigma2tau2_bbaa + 8.0 * v4sigma2tau2_acab + 8.0 * v4sigma2tau2_acaa + 8.0 * v4sigma2tau2_abab + 8.0 * v4sigma2tau2_abaa + 4.0 * v4sigma2tau2_aaab + 4.0 * v4sigma2tau2_aaaa;
-                double ttxl  = 2.0 * v4sigmalapltau2_cbab + 2.0 * v4sigmalapltau2_cbaa + 2.0 * v4sigmalapltau2_caab + 2.0 * v4sigmalapltau2_caaa + 2.0 * v4sigmalapltau2_bbab + 2.0 * v4sigmalapltau2_bbaa + 2.0 * v4sigmalapltau2_baab + 2.0 * v4sigmalapltau2_baaa + 2.0 * v4sigmalapltau2_abab + 2.0 * v4sigmalapltau2_abaa + 2.0 * v4sigmalapltau2_aaab + 2.0 * v4sigmalapltau2_aaaa;
-                double ttll  = v4lapl2tau2_bbab + v4lapl2tau2_bbaa + 2.0 * v4lapl2tau2_abab + 2.0 * v4lapl2tau2_abaa + v4lapl2tau2_aaab + v4lapl2tau2_aaaa;
+                //double ttxl  = 2.0 * v4sigmalapltau2_cbab + 2.0 * v4sigmalapltau2_cbaa + 2.0 * v4sigmalapltau2_caab + 2.0 * v4sigmalapltau2_caaa + 2.0 * v4sigmalapltau2_bbab + 2.0 * v4sigmalapltau2_bbaa + 2.0 * v4sigmalapltau2_baab + 2.0 * v4sigmalapltau2_baaa + 2.0 * v4sigmalapltau2_abab + 2.0 * v4sigmalapltau2_abaa + 2.0 * v4sigmalapltau2_aaab + 2.0 * v4sigmalapltau2_aaaa;
+                //double ttll  = v4lapl2tau2_bbab + v4lapl2tau2_bbaa + 2.0 * v4lapl2tau2_abab + 2.0 * v4lapl2tau2_abaa + v4lapl2tau2_aaab + v4lapl2tau2_aaaa;
                 double trrr  = v4rho3tau_bbba + 3.0 * v4rho3tau_abba + 3.0 * v4rho3tau_aaba + v4rho3tau_aaaa;
                 double trrx  = 2.0 * v4rho2sigmatau_bbca + 2.0 * v4rho2sigmatau_bbba + 2.0 * v4rho2sigmatau_bbaa + 4.0 * v4rho2sigmatau_abca + 4.0 * v4rho2sigmatau_abba + 4.0 * v4rho2sigmatau_abaa + 2.0 * v4rho2sigmatau_aaca + 2.0 * v4rho2sigmatau_aaba + 2.0 * v4rho2sigmatau_aaaa;
-                double trrl  = v4rho2lapltau_bbba + v4rho2lapltau_bbaa + 2.0 * v4rho2lapltau_abba + 2.0 * v4rho2lapltau_abaa + v4rho2lapltau_aaba + v4rho2lapltau_aaaa;
+                //double trrl  = v4rho2lapltau_bbba + v4rho2lapltau_bbaa + 2.0 * v4rho2lapltau_abba + 2.0 * v4rho2lapltau_abaa + v4rho2lapltau_aaba + v4rho2lapltau_aaaa;
                 double trxx  = 4.0 * v4rhosigma2tau_bcca + 8.0 * v4rhosigma2tau_bcba + 4.0 * v4rhosigma2tau_bbba + 8.0 * v4rhosigma2tau_baca + 8.0 * v4rhosigma2tau_baba + 4.0 * v4rhosigma2tau_baaa + 4.0 * v4rhosigma2tau_acca + 8.0 * v4rhosigma2tau_acba + 4.0 * v4rhosigma2tau_abba + 8.0 * v4rhosigma2tau_aaca + 8.0 * v4rhosigma2tau_aaba + 4.0 * v4rhosigma2tau_aaaa;
-                double trxl  = 2.0 * v4rhosigmalapltau_bcba + 2.0 * v4rhosigmalapltau_bcaa + 2.0 * v4rhosigmalapltau_bbba + 2.0 * v4rhosigmalapltau_bbaa + 2.0 * v4rhosigmalapltau_baba + 2.0 * v4rhosigmalapltau_baaa + 2.0 * v4rhosigmalapltau_acba + 2.0 * v4rhosigmalapltau_acaa + 2.0 * v4rhosigmalapltau_abba + 2.0 * v4rhosigmalapltau_abaa + 2.0 * v4rhosigmalapltau_aaba + 2.0 * v4rhosigmalapltau_aaaa;
-                double trll  = v4rholapl2tau_bbba + 2.0 * v4rholapl2tau_baba + v4rholapl2tau_baaa + v4rholapl2tau_abba + 2.0 * v4rholapl2tau_aaba + v4rholapl2tau_aaaa;
+                //double trxl  = 2.0 * v4rhosigmalapltau_bcba + 2.0 * v4rhosigmalapltau_bcaa + 2.0 * v4rhosigmalapltau_bbba + 2.0 * v4rhosigmalapltau_bbaa + 2.0 * v4rhosigmalapltau_baba + 2.0 * v4rhosigmalapltau_baaa + 2.0 * v4rhosigmalapltau_acba + 2.0 * v4rhosigmalapltau_acaa + 2.0 * v4rhosigmalapltau_abba + 2.0 * v4rhosigmalapltau_abaa + 2.0 * v4rhosigmalapltau_aaba + 2.0 * v4rhosigmalapltau_aaaa;
+                //double trll  = v4rholapl2tau_bbba + 2.0 * v4rholapl2tau_baba + v4rholapl2tau_baaa + v4rholapl2tau_abba + 2.0 * v4rholapl2tau_aaba + v4rholapl2tau_aaaa;
                 double txxx  = 8.0 * v4sigma3tau_ccca + 24.0 * v4sigma3tau_ccba + 24.0 * v4sigma3tau_cbba + 8.0 * v4sigma3tau_bbba + 24.0 * v4sigma3tau_acca + 48.0 * v4sigma3tau_acba + 24.0 * v4sigma3tau_abba + 24.0 * v4sigma3tau_aaca + 24.0 * v4sigma3tau_aaba + 8.0 * v4sigma3tau_aaaa;
-                double txxl  = 4.0 * v4sigma2lapltau_ccba + 4.0 * v4sigma2lapltau_ccaa + 8.0 * v4sigma2lapltau_cbba + 8.0 * v4sigma2lapltau_cbaa + 4.0 * v4sigma2lapltau_bbba + 4.0 * v4sigma2lapltau_bbaa + 8.0 * v4sigma2lapltau_acba + 8.0 * v4sigma2lapltau_acaa + 8.0 * v4sigma2lapltau_abba + 8.0 * v4sigma2lapltau_abaa + 4.0 * v4sigma2lapltau_aaba + 4.0 * v4sigma2lapltau_aaaa;
-                double txll  = 2.0 * v4sigmalapl2tau_cbba + 4.0 * v4sigmalapl2tau_caba + 2.0 * v4sigmalapl2tau_caaa + 2.0 * v4sigmalapl2tau_bbba + 4.0 * v4sigmalapl2tau_baba + 2.0 * v4sigmalapl2tau_baaa + 2.0 * v4sigmalapl2tau_abba + 4.0 * v4sigmalapl2tau_aaba + 2.0 * v4sigmalapl2tau_aaaa;
-                double tlll  = v4lapl3tau_bbba + 3.0 * v4lapl3tau_abba + 3.0 * v4lapl3tau_aaba + v4lapl3tau_aaaa;
+                //double txxl  = 4.0 * v4sigma2lapltau_ccba + 4.0 * v4sigma2lapltau_ccaa + 8.0 * v4sigma2lapltau_cbba + 8.0 * v4sigma2lapltau_cbaa + 4.0 * v4sigma2lapltau_bbba + 4.0 * v4sigma2lapltau_bbaa + 8.0 * v4sigma2lapltau_acba + 8.0 * v4sigma2lapltau_acaa + 8.0 * v4sigma2lapltau_abba + 8.0 * v4sigma2lapltau_abaa + 4.0 * v4sigma2lapltau_aaba + 4.0 * v4sigma2lapltau_aaaa;
+                //double txll  = 2.0 * v4sigmalapl2tau_cbba + 4.0 * v4sigmalapl2tau_caba + 2.0 * v4sigmalapl2tau_caaa + 2.0 * v4sigmalapl2tau_bbba + 4.0 * v4sigmalapl2tau_baba + 2.0 * v4sigmalapl2tau_baaa + 2.0 * v4sigmalapl2tau_abba + 4.0 * v4sigmalapl2tau_aaba + 2.0 * v4sigmalapl2tau_aaaa;
+                //double tlll  = v4lapl3tau_bbba + 3.0 * v4lapl3tau_abba + 3.0 * v4lapl3tau_aaba + v4lapl3tau_aaaa;
 
                 // Scalar contribution
 
@@ -10931,8 +10931,8 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 rho_0 +=  rr * rhow[g]
                         + rx * l2contract
-                        + rt * tauw[g]
-                        + rl * laplw[g];
+                        + rt * tauw[g];
+                        //+ rl * laplw[g];
 
                 //lap_0 +=   lr * rhow[g]
                 //         + lx * l2contract
@@ -10941,19 +10941,19 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 tau_0 +=    tr * rhow[g]
                           + tx * l2contract
-                          + tt * tauw[g]
-                          + tl * laplw[g];
+                          + tt * tauw[g];
+                          //+ tl * laplw[g];
 
                 // vxc 2 contributions
 
                 rho_0 += rrr * gam[g]
                        + rrt * rt_gam[g]
-                       + rrl * rl_gam[g]
-                       + rll * ll_gam[g]
+                       //+ rrl * rl_gam[g]
+                       //+ rll * ll_gam[g]
                        + rtt * tt_gam[g]
-                       + rtl * tl_gam[g]
+                       //+ rtl * tl_gam[g]
                        + rrx * q2contract
-                       + rlx * sl_q2contract
+                       //+ rlx * sl_q2contract
                        + rtx * st_q2contract
                        + rxx * q3contract
                        + rx  * q4contract;
@@ -10972,12 +10972,12 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 tau_0 += trr * gam[g]
                        + ttr * rt_gam[g]
-                       + trl * rl_gam[g]
-                       + tll * ll_gam[g]
+                       //+ trl * rl_gam[g]
+                       //+ tll * ll_gam[g]
                        + ttt * tt_gam[g]
-                       + ttl * tl_gam[g]
+                       //+ ttl * tl_gam[g]
                        + trx * q2contract
-                       + tlx * sl_q2contract
+                       //+ tlx * sl_q2contract
                        + ttx * st_q2contract
                        + txx * q3contract
                        + tx  * q4contract;
@@ -10986,28 +10986,28 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 rho_0 += + rrrr * pi[g]
                          + rrrt * rrt_pi[g]
-                         + rrrl * rrl_pi[g]
+                         //+ rrrl * rrl_pi[g]
                          + rrtt * rtt_pi[g]
-                         + rrlt * rtl_pi[g]
-                         + rrll * rll_pi[g]
+                         //+ rrlt * rtl_pi[g]
+                         //+ rrll * rll_pi[g]
                          + rttt * ttt_pi[g]
-                         + rltt * ttl_pi[g]
-                         + rllt * tll_pi[g]
-                         + rlll * lll_pi[g]
+                         //+ rltt * ttl_pi[g]
+                         //+ rllt * tll_pi[g]
+                         //+ rlll * lll_pi[g]
 
                          + rrrx * c2
                          + rrxt * rt_c2
-                         + rrxl * rl_c2
-                         + rxll * ll_c2
+                         //+ rrxl * rl_c2
+                         //+ rxll * ll_c2
                          + rxtt * tt_c2
-                         + rxlt * tl_c2
+                         //+ rxlt * tl_c2
 
                          + rrxx * c3
-                         + rxxl * l_c3
+                         //+ rxxl * l_c3
                          + rxxt * t_c3
 
                          + rrx * c4
-                         + rlx * l_c4
+                         //+ rlx * l_c4
                          + rtx * t_c4
 
                          + rxx * (c5_6 + c8)
@@ -11044,32 +11044,31 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 tau_0 += tttt * ttt_pi[g]
                        + tttr * rtt_pi[g]
-                       + tttl * ttl_pi[g]
+                       //+ tttl * ttl_pi[g]
                        + ttrr * rrt_pi[g]
-                       + ttrl * rtl_pi[g]
-                       + ttll * tll_pi[g]
+                       //+ ttrl * rtl_pi[g]
+                       //+ ttll * tll_pi[g]
                        + trrr * pi[g]
-                       + trrl * rrl_pi[g]
-                       + trll * rll_pi[g]
+                       //+ trrl * rrl_pi[g]
+                       //+ trll * rll_pi[g]
 
                        + trrx *c2
                        + ttrx *rt_c2
-                       + trxl *rl_c2
-                       + txll *ll_c2
+                       //+ trxl *rl_c2
+                       //+ txll *ll_c2
                        + tttx *tt_c2
-                       + ttxl *tl_c2
+                       //+ ttxl *tl_c2
 
                        + trxx * c3
-                       + txxl * l_c3
+                       //+ txxl * l_c3
                        + ttxx * t_c3
 
                        + trx * c4
-                       + tlx * l_c4
+                       //+ tlx * l_c4
                        + ttx * t_c4
 
                        + txx * (c5_6 + c8)
                        + txxx * c7;
-
 
                 // vector contribution
 
@@ -11079,65 +11078,65 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 xcomp +=  xr * grada_x_g * rhow[g]
                         + xt * grada_x_g * tauw[g]
-                        + xl * grada_x_g * laplw[g]
+                        //+ xl * grada_x_g * laplw[g]
                         +  x * gradw_x[g]
                         + xx * l5contract_x;
 
                 ycomp +=  xr * grada_y_g * rhow[g]
                         + xt * grada_y_g * tauw[g]
-                        + xl * grada_y_g * laplw[g]
+                        //+ xl * grada_y_g * laplw[g]
                         +  x * gradw_y[g]
                         + xx * l5contract_y;
 
                 zcomp +=  xr * grada_z_g * rhow[g]
                         + xt * grada_z_g * tauw[g]
-                        + xl * grada_z_g * laplw[g]
+                        //+ xl * grada_z_g * laplw[g]
                         +  x * gradw_z[g]
                         + xx * l5contract_z;
 
-                // // vxc 2 contributions
+                // vxc 2 contributions
 
                 xcomp +=  xrr * grada_x_g *    gam[g]
                         + xrt * grada_x_g * rt_gam[g]
-                        + xrl * grada_x_g * rl_gam[g]
-                        + xll * grada_x_g * ll_gam[g]
+                        //+ xrl * grada_x_g * rl_gam[g]
+                        //+ xll * grada_x_g * ll_gam[g]
                         + xtt * grada_x_g * tt_gam[g]
-                        + xtl * grada_x_g * tl_gam[g]
+                        //+ xtl * grada_x_g * tl_gam[g]
                         + xr * gamx[g] // q6
-                        + xl * sl_gamx[g]
+                        //+ xl * sl_gamx[g]
                         + xt * st_gamx[g]
                         + xxr * q7contract_x
-                        + xxl * sl_q7contract_x
+                        //+ xxl * sl_q7contract_x
                         + xxt * st_q7contract_x
                         + xx * (q8contract_x + q10contract_x + q11contract_x)
                         + xxx * q9contract_x;
 
                 ycomp +=  xrr * grada_y_g *    gam[g] // q5
                         + xrt * grada_y_g * rt_gam[g]
-                        + xrl * grada_y_g * rl_gam[g]
-                        + xll * grada_y_g * ll_gam[g]
+                        //+ xrl * grada_y_g * rl_gam[g]
+                        //+ xll * grada_y_g * ll_gam[g]
                         + xtt * grada_y_g * tt_gam[g]
-                        + xtl * grada_y_g * tl_gam[g]
+                        //+ xtl * grada_y_g * tl_gam[g]
                         + xr * gamy[g] // q6
-                        + xl * sl_gamy[g]
+                        //+ xl * sl_gamy[g]
                         + xt * st_gamy[g]
                         + xxr * q7contract_y
-                        + xxl * sl_q7contract_y
+                        //+ xxl * sl_q7contract_y
                         + xxt * st_q7contract_y
                         + xx * (q8contract_y + q10contract_y + q11contract_y)
                         + xxx * q9contract_y;
 
                 zcomp +=  xrr * grada_z_g *    gam[g] // q5
                         + xrt * grada_z_g * rt_gam[g]
-                        + xrl * grada_z_g * rl_gam[g]
-                        + xll * grada_z_g * ll_gam[g]
+                        //+ xrl * grada_z_g * rl_gam[g]
+                        //+ xll * grada_z_g * ll_gam[g]
                         + xtt * grada_z_g * tt_gam[g]
-                        + xtl * grada_z_g * tl_gam[g]
+                        //+ xtl * grada_z_g * tl_gam[g]
                         + xr * gamz[g] // q6
-                        + xl * sl_gamz[g]
+                        //+ xl * sl_gamz[g]
                         + xt * st_gamz[g]
                         + xxr * q7contract_z
-                        + xxl * sl_q7contract_z
+                        //+ xxl * sl_q7contract_z
                         + xxt * st_q7contract_z
                         + xx * (q8contract_z + q10contract_z + q11contract_z)
                         + xxx * q9contract_z;
@@ -11146,35 +11145,35 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 xcomp +=  xrrr * grada_x_g * pi[g]  // c9 terms
                         + xrrt * grada_x_g * rrt_pi[g]
-                        + xrrl * grada_x_g * rrl_pi[g]
+                        //+ xrrl * grada_x_g * rrl_pi[g]
                         + xrtt * grada_x_g * rtt_pi[g]
-                        + xrlt * grada_x_g * rtl_pi[g]
-                        + xrll * grada_x_g * rll_pi[g]
+                        //+ xrlt * grada_x_g * rtl_pi[g]
+                        //+ xrll * grada_x_g * rll_pi[g]
                         + xttt * grada_x_g * ttt_pi[g]
-                        + xltt * grada_x_g * ttl_pi[g]
-                        + xllt * grada_x_g * tll_pi[g]
-                        + xlll * grada_x_g * lll_pi[g]
+                        //+ xltt * grada_x_g * ttl_pi[g]
+                        //+ xllt * grada_x_g * tll_pi[g]
+                        //+ xlll * grada_x_g * lll_pi[g]
 
                         + xrr * pix[g] // c10 terms
                         + xrt * rt_pix[g]
-                        + xrl * rl_pix[g]
-                        + xll * ll_pix[g]
+                        //+ xrl * rl_pix[g]
+                        //+ xll * ll_pix[g]
                         + xtt * tt_pix[g]
-                        + xtl * tl_pix[g]
+                        //+ xtl * tl_pix[g]
 
                         + xxrr *    c2 * grada_x_g   // c11 terms
                         + xxrt * rt_c2 * grada_x_g
-                        + xxrl * rl_c2 * grada_x_g
-                        + xxll * ll_c2 * grada_x_g
+                        //+ xxrl * rl_c2 * grada_x_g
+                        //+ xxll * ll_c2 * grada_x_g
                         + xxtt * tt_c2 * grada_x_g
-                        + xxlt * tl_c2 * grada_x_g
+                        //+ xxlt * tl_c2 * grada_x_g
 
                         + xxr * (c12_c14_x + c15_x)
-                        + xxl * (l_c12_c14_x + l_c15_x)
+                        //+ xxl * (l_c12_c14_x + l_c15_x)
                         + xxt * (t_c12_c14_x + t_c15_x)
 
                         + xxxr * c13_x
-                        + xxxl * l_c13_x
+                        //+ xxxl * l_c13_x
                         + xxxt * t_c13_x
 
                         + xx * c17_24_25_x
@@ -11183,37 +11182,36 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 ycomp +=  xrrr * grada_y_g * pi[g]  // c9 terms
                         + xrrt * grada_y_g * rrt_pi[g]
-                        + xrrl * grada_y_g * rrl_pi[g]
+                        //+ xrrl * grada_y_g * rrl_pi[g]
                         + xrtt * grada_y_g * rtt_pi[g]
-                        + xrlt * grada_y_g * rtl_pi[g]
-                        + xrll * grada_y_g * rll_pi[g]
+                        //+ xrlt * grada_y_g * rtl_pi[g]
+                        //+ xrll * grada_y_g * rll_pi[g]
                         + xttt * grada_y_g * ttt_pi[g]
-                        + xltt * grada_y_g * ttl_pi[g]
-                        + xllt * grada_y_g * tll_pi[g]
-                        + xlll * grada_y_g * lll_pi[g]
+                        //+ xltt * grada_y_g * ttl_pi[g]
+                        //+ xllt * grada_y_g * tll_pi[g]
+                        //+ xlll * grada_y_g * lll_pi[g]
 
                         + xrr * piy[g] // c10 terms
                         + xrt * rt_piy[g]
-                        + xrl * rl_piy[g]
-                        + xll * ll_piy[g]
+                        //+ xrl * rl_piy[g]
+                        //+ xll * ll_piy[g]
                         + xtt * tt_piy[g]
-                        + xtl * tl_piy[g]
+                        //+ xtl * tl_piy[g]
 
                         + xxrr *    c2 * grada_y_g   // c11 terms
                         + xxrt * rt_c2 * grada_y_g
-                        + xxrl * rl_c2 * grada_y_g
-                        + xxll * ll_c2 * grada_y_g
+                        //+ xxrl * rl_c2 * grada_y_g
+                        //+ xxll * ll_c2 * grada_y_g
                         + xxtt * tt_c2 * grada_y_g
-                        + xxlt * tl_c2 * grada_y_g
+                        //+ xxlt * tl_c2 * grada_y_g
 
                         + xxr * (c12_c14_y + c15_y)
-                        + xxl * (l_c12_c14_y + l_c15_y)
+                        //+ xxl * (l_c12_c14_y + l_c15_y)
                         + xxt * (t_c12_c14_y + t_c15_y)
 
                         + xxxr * c13_y
-                        + xxxl * l_c13_y
+                        //+ xxxl * l_c13_y
                         + xxxt * t_c13_y
-
 
                         + xx * c17_24_25_y
                         + xxxx * c18_y
@@ -11221,35 +11219,35 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 
                 zcomp +=  xrrr * grada_z_g * pi[g]  // c9 terms
                         + xrrt * grada_z_g * rrt_pi[g]
-                        + xrrl * grada_z_g * rrl_pi[g]
+                        //+ xrrl * grada_z_g * rrl_pi[g]
                         + xrtt * grada_z_g * rtt_pi[g]
-                        + xrlt * grada_z_g * rtl_pi[g]
-                        + xrll * grada_z_g * rll_pi[g]
+                        //+ xrlt * grada_z_g * rtl_pi[g]
+                        //+ xrll * grada_z_g * rll_pi[g]
                         + xttt * grada_z_g * ttt_pi[g]
-                        + xltt * grada_z_g * ttl_pi[g]
-                        + xllt * grada_z_g * tll_pi[g]
-                        + xlll * grada_z_g * lll_pi[g]
+                        //+ xltt * grada_z_g * ttl_pi[g]
+                        //+ xllt * grada_z_g * tll_pi[g]
+                        //+ xlll * grada_z_g * lll_pi[g]
 
                         + xrr * piz[g] // c10 terms
                         + xrt * rt_piz[g]
-                        + xrl * rl_piz[g]
-                        + xll * ll_piz[g]
+                        //+ xrl * rl_piz[g]
+                        //+ xll * ll_piz[g]
                         + xtt * tt_piz[g]
-                        + xtl * tl_piz[g]
+                        //+ xtl * tl_piz[g]
 
                         + xxrr *    c2 * grada_z_g   // c11 terms
                         + xxrt * rt_c2 * grada_z_g
-                        + xxrl * rl_c2 * grada_z_g
-                        + xxll * ll_c2 * grada_z_g
+                        //+ xxrl * rl_c2 * grada_z_g
+                        //+ xxll * ll_c2 * grada_z_g
                         + xxtt * tt_c2 * grada_z_g
-                        + xxlt * tl_c2 * grada_z_g
+                        //+ xxlt * tl_c2 * grada_z_g
 
                         + xxr * (c12_c14_z + c15_z)
-                        + xxl * (l_c12_c14_z + l_c15_z)
+                        //+ xxl * (l_c12_c14_z + l_c15_z)
                         + xxt * (t_c12_c14_z + t_c15_z)
 
                         + xxxr * c13_z
-                        + xxxl * l_c13_z
+                        //+ xxxl * l_c13_z
                         + xxxt * t_c13_z
 
                         + xx * c17_24_25_z
