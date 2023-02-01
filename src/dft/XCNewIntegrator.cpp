@@ -4774,13 +4774,18 @@ CXCNewIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&      aoFockMatrix,
         {
             // compute partial contribution to Kxc matrix
 
-           auto partial_mat_Kxc = _integratePartialKxcFockForMGGA2(npoints,local_weights,mat_chi,mat_chi_x,mat_chi_y,mat_chi_z,
-                                                                   rhograd,vsigma,v2rho2,v2lapl2,v2tau2,v2rholapl,v2rhotau,
-                                                                   v2lapltau,v2rhosigma,v2sigmalapl,v2sigmatau,v2sigma2,
-                                                                   v3rho3,v3rho2sigma,v3rho2lapl,v3rho2tau,v3rhosigma2,
-                                                                   v3rhosigmalapl,v3rhosigmatau,v3rholapl2,v3rholapltau,v3rhotau2,
-                                                                   v3sigma3,v3sigma2lapl,v3sigma2tau,v3sigmalapl2,v3sigmalapltau,
-                                                                   v3sigmatau2,v3lapl3,v3lapl2tau,v3lapltau2,v3tau3,
+           auto partial_mat_Kxc = _integratePartialKxcFockForMGGA2(npoints,local_weights,mat_chi,
+                                                                   mat_chi_x,mat_chi_y,mat_chi_z,
+                                                                   rhograd, vsigma, v2rho2, v2rhosigma,
+                                                                   v2rholapl, v2rhotau, v2sigma2,
+                                                                   v2sigmalapl, v2sigmatau, v2lapl2,
+                                                                   v2lapltau, v2tau2, v3rho3,
+                                                                   v3rho2sigma, v3rho2lapl, v3rho2tau,
+                                                                   v3rhosigma2, v3rhosigmalapl, v3rhosigmatau,
+                                                                   v3rholapl2, v3rholapltau, v3rhotau2,
+                                                                   v3sigma3, v3sigma2lapl, v3sigma2tau,
+                                                                   v3sigmalapl2, v3sigmalapltau, v3sigmatau2,
+                                                                   v3lapl3, v3lapl2tau, v3lapltau2, v3tau3,
                                                                    rwdengridcube,rw2dengrid,idensity,timer);
 
             // distribute partial Kxc to full Fock matrix
@@ -7874,15 +7879,15 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
                                                    const double*            rhograd,
                                                    const double*            vsigma,
                                                    const double*            v2rho2,
-                                                   const double*            v2lapl2,
-                                                   const double*            v2tau2,
+                                                   const double*            v2rhosigma,
                                                    const double*            v2rholapl,
                                                    const double*            v2rhotau,
-                                                   const double*            v2lapltau,
-                                                   const double*            v2rhosigma,
+                                                   const double*            v2sigma2,
                                                    const double*            v2sigmalapl,
                                                    const double*            v2sigmatau,
-                                                   const double*            v2sigma2,
+                                                   const double*            v2lapl2,
+                                                   const double*            v2lapltau,
+                                                   const double*            v2tau2,
                                                    const double*            v3rho3,
                                                    const double*            v3rho2sigma,
                                                    const double*            v3rho2lapl,
@@ -7996,82 +8001,93 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
             auto nu_offset = nu * npoints;
 
 #pragma omp simd aligned(weights, \
-                         rhograd, vsigma,\
-                         v2rho2,v2lapl2, v2tau2, v2rholapl, v2rhotau,v2lapltau, v2rhosigma,\
-                         v2sigmalapl, v2sigmatau,v2sigma2,\
-                         v3rho3,v3rho2sigma,v3rho2lapl,v3rho2tau,v3rhosigma2,v3rhosigmalapl,\
-                         v3rhosigmatau,v3rholapl2,v3rholapltau,\
-                         v3rhotau2,v3sigma3,v3sigma2lapl,v3sigma2tau,v3sigmalapl2,v3sigmalapltau,\
-                         v3sigmatau2,v3lapl3,v3lapl2tau,v3lapltau2,v3tau3,\
                          gam,rt_gam ,rl_gam ,tt_gam ,tl_gam ,ll_gam ,gamx ,gamy ,gamz, \
                          st_gamx,st_gamy,st_gamz,sl_gamx,sl_gamy,sl_gamz, \
                          gamxx, gamxy, gamxz, gamyx, gamyy, gamyz, gamzx, gamzy, gamzz, \
                          rhow, gradw_x, gradw_y, gradw_z, tauw, laplw, \
                          G_val, G_gga_val, G_gga_x_val, G_gga_y_val, G_gga_z_val,\
-                         chi_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+                         chi_val, chi_x_val, chi_y_val, chi_z_val, \
+                         rhograd, vsigma, v2rho2, v2rhosigma, v2rholapl, \
+                         v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, \
+                         v2lapl2, v2lapltau, v2tau2, v3rho3, \
+                         v3rho2sigma, v3rho2lapl, v3rho2tau, v3rhosigma2, \
+                         v3rhosigmalapl, v3rhosigmatau, v3rholapl2, v3rholapltau, \
+                         v3rhotau2, v3sigma3, v3sigma2lapl, v3sigma2tau, \
+                         v3sigmalapl2, v3sigmalapltau, v3sigmatau2, v3lapl3, \
+                         v3lapl2tau, v3lapltau2, v3tau3 : VLX_ALIGN)
+
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
+                // functional derivatives
+
                 // first-order
-                double vsigma_a = vsigma[3 * g + 0];
-                double vsigma_c = vsigma[3 * g + 1];
+
+                auto vsigma_a = vsigma[3 * g + 0];
+                auto vsigma_c = vsigma[3 * g + 1];
 
                 // second-order
-                double v2rho2_aa = v2rho2[3 * g + 0];
-                double v2rho2_ab = v2rho2[3 * g + 1];
 
-                double v2rhosigma_aa = v2rhosigma[6 * g + 0];
-                double v2rhosigma_ac = v2rhosigma[6 * g + 1];
-                double v2rhosigma_ab = v2rhosigma[6 * g + 2];
-                double v2rhosigma_ba = v2rhosigma[6 * g + 3];
-                double v2rhosigma_bc = v2rhosigma[6 * g + 4];
+                auto v2rho2_aa = v2rho2[3 * g + 0];
+                auto v2rho2_ab = v2rho2[3 * g + 1];
 
-                double v2sigma2_aa = v2sigma2[6 * g + 0];
-                double v2sigma2_ac = v2sigma2[6 * g + 1];
-                double v2sigma2_ab = v2sigma2[6 * g + 2];
-                double v2sigma2_cc = v2sigma2[6 * g + 3];
-                double v2sigma2_cb = v2sigma2[6 * g + 4];
+                auto v2rhosigma_aa = v2rhosigma[6 * g + 0];
+                auto v2rhosigma_ac = v2rhosigma[6 * g + 1];
+                auto v2rhosigma_ab = v2rhosigma[6 * g + 2];
+                auto v2rhosigma_ba = v2rhosigma[6 * g + 3];
+                auto v2rhosigma_bc = v2rhosigma[6 * g + 4];
 
-                double v2rholapl_aa = v2rholapl[4 * g + 0];
-                double v2rholapl_ab = v2rholapl[4 * g + 1];
-                double v2rholapl_ba = v2rholapl[4 * g + 2];
+                auto v2rholapl_aa = v2rholapl[4 * g + 0];
+                auto v2rholapl_ab = v2rholapl[4 * g + 1];
 
-                double v2rhotau_aa = v2rhotau[4 * g + 0];
-                double v2rhotau_ab = v2rhotau[4 * g + 1];
-                double v2rhotau_ba = v2rhotau[4 * g + 2];
+                auto v2rhotau_aa = v2rhotau[4 * g + 0];
+                auto v2rhotau_ab = v2rhotau[4 * g + 1];
+                auto v2rhotau_ba = v2rhotau[4 * g + 2];
 
-                double v2lapltau_aa = v2lapltau[4 * g + 0];
-                double v2lapltau_ab = v2lapltau[4 * g + 1];
-                double v2lapltau_ba = v2lapltau[4 * g + 2];
+                auto v2sigma2_aa = v2sigma2[6 * g + 0];
+                auto v2sigma2_ac = v2sigma2[6 * g + 1];
+                auto v2sigma2_ab = v2sigma2[6 * g + 2];
+                auto v2sigma2_cc = v2sigma2[6 * g + 3];
+                auto v2sigma2_cb = v2sigma2[6 * g + 4];
 
-                double v2lapl2_aa = v2lapl2[3 * g + 0];
-                double v2lapl2_ab = v2lapl2[3 * g + 1];
+                auto v2sigmalapl_aa = v2sigmalapl[6 * g + 0];
+                auto v2sigmalapl_ab = v2sigmalapl[6 * g + 1];
+                auto v2sigmalapl_ca = v2sigmalapl[6 * g + 2];
+                auto v2sigmalapl_cb = v2sigmalapl[6 * g + 3];
 
-                double v2tau2_aa = v2tau2[3 * g + 0];
-                double v2tau2_ab = v2tau2[3 * g + 1];
+                auto v2sigmatau_aa = v2sigmatau[6 * g + 0];
+                auto v2sigmatau_ab = v2sigmatau[6 * g + 1];
+                auto v2sigmatau_ca = v2sigmatau[6 * g + 2];
+                auto v2sigmatau_cb = v2sigmatau[6 * g + 3];
+                auto v2sigmatau_ba = v2sigmatau[6 * g + 4];
 
-                double v2sigmalapl_aa = v2sigmalapl[6 * g + 0];
-                double v2sigmalapl_ab = v2sigmalapl[6 * g + 1];
-                double v2sigmalapl_ca = v2sigmalapl[6 * g + 2];
-                double v2sigmalapl_cb = v2sigmalapl[6 * g + 3];
-                double v2sigmalapl_ba = v2sigmalapl[6 * g + 4];
+                auto v2lapl2_aa = v2lapl2[3 * g + 0];
+                auto v2lapl2_ab = v2lapl2[3 * g + 1];
 
-                double v2sigmatau_aa = v2sigmatau[6 * g + 0];
-                double v2sigmatau_ab = v2sigmatau[6 * g + 1];
-                double v2sigmatau_ca = v2sigmatau[6 * g + 2];
-                double v2sigmatau_cb = v2sigmatau[6 * g + 3];
-                double v2sigmatau_ba = v2sigmatau[6 * g + 4];
+                auto v2lapltau_aa = v2lapltau[4 * g + 0];
+                auto v2lapltau_ba = v2lapltau[4 * g + 2];
 
-                // Third-order terms
+                auto v2tau2_aa = v2tau2[3 * g + 0];
+                auto v2tau2_ab = v2tau2[3 * g + 1];
+
+                // third-order
 
                 auto v3rho3_aaa = v3rho3[4 * g + 0];
                 auto v3rho3_aab = v3rho3[4 * g + 1];
                 auto v3rho3_abb = v3rho3[4 * g + 2];
 
+                auto v3rho2sigma_aaa = v3rho2sigma[9 * g + 0];
+                auto v3rho2sigma_aac = v3rho2sigma[9 * g + 1];
+                auto v3rho2sigma_aab = v3rho2sigma[9 * g + 2];
+                auto v3rho2sigma_aba = v3rho2sigma[9 * g + 3];
+                auto v3rho2sigma_abc = v3rho2sigma[9 * g + 4];
+                auto v3rho2sigma_abb = v3rho2sigma[9 * g + 5];
+                auto v3rho2sigma_bba = v3rho2sigma[9 * g + 6];
+                auto v3rho2sigma_bbc = v3rho2sigma[9 * g + 7];
+
                 auto v3rho2lapl_aaa = v3rho2lapl[6 * g + 0];
                 auto v3rho2lapl_aab = v3rho2lapl[6 * g + 1];
                 auto v3rho2lapl_aba = v3rho2lapl[6 * g + 2];
                 auto v3rho2lapl_abb = v3rho2lapl[6 * g + 3];
-                auto v3rho2lapl_bba = v3rho2lapl[6 * g + 4];
 
                 auto v3rho2tau_aaa = v3rho2tau[6 * g + 0];
                 auto v3rho2tau_aab = v3rho2tau[6 * g + 1];
@@ -8079,37 +8095,17 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
                 auto v3rho2tau_abb = v3rho2tau[6 * g + 3];
                 auto v3rho2tau_bba = v3rho2tau[6 * g + 4];
 
-                auto v3rholapl2_aaa = v3rholapl2[6 * g + 0];
-                auto v3rholapl2_aab = v3rholapl2[6 * g + 1];
-                auto v3rholapl2_abb = v3rholapl2[6 * g + 2];
-                auto v3rholapl2_baa = v3rholapl2[6 * g + 3];
-                auto v3rholapl2_bab = v3rholapl2[6 * g + 4];
-
-                auto v3rholapltau_aaa = v3rholapltau[8 * g + 0];
-                auto v3rholapltau_aab = v3rholapltau[8 * g + 1];
-                auto v3rholapltau_aba = v3rholapltau[8 * g + 2];
-                auto v3rholapltau_abb = v3rholapltau[8 * g + 3];
-                auto v3rholapltau_baa = v3rholapltau[8 * g + 4];
-                auto v3rholapltau_bab = v3rholapltau[8 * g + 5];
-                auto v3rholapltau_bba = v3rholapltau[8 * g + 6];
-
-                auto v3rhotau2_aaa = v3rhotau2[6 * g + 0];
-                auto v3rhotau2_aab = v3rhotau2[6 * g + 1];
-                auto v3rhotau2_abb = v3rhotau2[6 * g + 2];
-                auto v3rhotau2_baa = v3rhotau2[6 * g + 3];
-                auto v3rhotau2_bab = v3rhotau2[6 * g + 4];
-
-                auto v3sigma2lapl_aaa = v3sigma2lapl[12 * g + 0];
-                auto v3sigma2lapl_aab = v3sigma2lapl[12 * g + 1];
-                auto v3sigma2lapl_aca = v3sigma2lapl[12 * g + 2];
-                auto v3sigma2lapl_acb = v3sigma2lapl[12 * g + 3];
-                auto v3sigma2lapl_aba = v3sigma2lapl[12 * g + 4];
-                auto v3sigma2lapl_abb = v3sigma2lapl[12 * g + 5];
-                auto v3sigma2lapl_cca = v3sigma2lapl[12 * g + 6];
-                auto v3sigma2lapl_ccb = v3sigma2lapl[12 * g + 7];
-                auto v3sigma2lapl_cba = v3sigma2lapl[12 * g + 8];
-                auto v3sigma2lapl_cbb = v3sigma2lapl[12 * g + 9];
-                auto v3sigma2lapl_bba = v3sigma2lapl[12 * g + 10];
+                auto v3rhosigma2_aaa = v3rhosigma2[12 * g + 0];
+                auto v3rhosigma2_aac = v3rhosigma2[12 * g + 1];
+                auto v3rhosigma2_aab = v3rhosigma2[12 * g + 2];
+                auto v3rhosigma2_acc = v3rhosigma2[12 * g + 3];
+                auto v3rhosigma2_acb = v3rhosigma2[12 * g + 4];
+                auto v3rhosigma2_abb = v3rhosigma2[12 * g + 5];
+                auto v3rhosigma2_baa = v3rhosigma2[12 * g + 6];
+                auto v3rhosigma2_bac = v3rhosigma2[12 * g + 7];
+                auto v3rhosigma2_bab = v3rhosigma2[12 * g + 8];
+                auto v3rhosigma2_bcc = v3rhosigma2[12 * g + 9];
+                auto v3rhosigma2_bcb = v3rhosigma2[12 * g + 10];
 
                 auto v3rhosigmalapl_aaa = v3rhosigmalapl[12 * g + 0];
                 auto v3rhosigmalapl_aab = v3rhosigmalapl[12 * g + 1];
@@ -8121,7 +8117,6 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
                 auto v3rhosigmalapl_bab = v3rhosigmalapl[12 * g + 7];
                 auto v3rhosigmalapl_bca = v3rhosigmalapl[12 * g + 8];
                 auto v3rhosigmalapl_bcb = v3rhosigmalapl[12 * g + 9];
-                auto v3rhosigmalapl_bba = v3rhosigmalapl[12 * g + 10];
 
                 auto v3rhosigmatau_aaa = v3rhosigmatau[12 * g + 0];
                 auto v3rhosigmatau_aab = v3rhosigmatau[12 * g + 1];
@@ -8134,6 +8129,44 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
                 auto v3rhosigmatau_bca = v3rhosigmatau[12 * g + 8];
                 auto v3rhosigmatau_bcb = v3rhosigmatau[12 * g + 9];
                 auto v3rhosigmatau_bba = v3rhosigmatau[12 * g + 10];
+
+                auto v3rholapl2_aaa = v3rholapl2[6 * g + 0];
+                auto v3rholapl2_aab = v3rholapl2[6 * g + 1];
+                auto v3rholapl2_abb = v3rholapl2[6 * g + 2];
+
+                auto v3rholapltau_aaa = v3rholapltau[8 * g + 0];
+                auto v3rholapltau_aab = v3rholapltau[8 * g + 1];
+                auto v3rholapltau_aba = v3rholapltau[8 * g + 2];
+                auto v3rholapltau_abb = v3rholapltau[8 * g + 3];
+                auto v3rholapltau_baa = v3rholapltau[8 * g + 4];
+                auto v3rholapltau_bba = v3rholapltau[8 * g + 6];
+
+                auto v3rhotau2_aaa = v3rhotau2[6 * g + 0];
+                auto v3rhotau2_aab = v3rhotau2[6 * g + 1];
+                auto v3rhotau2_abb = v3rhotau2[6 * g + 2];
+                auto v3rhotau2_baa = v3rhotau2[6 * g + 3];
+                auto v3rhotau2_bab = v3rhotau2[6 * g + 4];
+
+                auto v3sigma3_aaa = v3sigma3[10 * g + 0];
+                auto v3sigma3_aac = v3sigma3[10 * g + 1];
+                auto v3sigma3_aab = v3sigma3[10 * g + 2];
+                auto v3sigma3_acc = v3sigma3[10 * g + 3];
+                auto v3sigma3_acb = v3sigma3[10 * g + 4];
+                auto v3sigma3_abb = v3sigma3[10 * g + 5];
+                auto v3sigma3_ccc = v3sigma3[10 * g + 6];
+                auto v3sigma3_ccb = v3sigma3[10 * g + 7];
+                auto v3sigma3_cbb = v3sigma3[10 * g + 8];
+
+                auto v3sigma2lapl_aaa = v3sigma2lapl[12 * g + 0];
+                auto v3sigma2lapl_aab = v3sigma2lapl[12 * g + 1];
+                auto v3sigma2lapl_aca = v3sigma2lapl[12 * g + 2];
+                auto v3sigma2lapl_acb = v3sigma2lapl[12 * g + 3];
+                auto v3sigma2lapl_aba = v3sigma2lapl[12 * g + 4];
+                auto v3sigma2lapl_abb = v3sigma2lapl[12 * g + 5];
+                auto v3sigma2lapl_cca = v3sigma2lapl[12 * g + 6];
+                auto v3sigma2lapl_ccb = v3sigma2lapl[12 * g + 7];
+                auto v3sigma2lapl_cba = v3sigma2lapl[12 * g + 8];
+                auto v3sigma2lapl_cbb = v3sigma2lapl[12 * g + 9];
 
                 auto v3sigma2tau_aaa = v3sigma2tau[12 * g + 0];
                 auto v3sigma2tau_aab = v3sigma2tau[12 * g + 1];
@@ -8153,8 +8186,6 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
                 auto v3sigmalapl2_caa = v3sigmalapl2[9 * g + 3];
                 auto v3sigmalapl2_cab = v3sigmalapl2[9 * g + 4];
                 auto v3sigmalapl2_cbb = v3sigmalapl2[9 * g + 5];
-                auto v3sigmalapl2_baa = v3sigmalapl2[9 * g + 6];
-                auto v3sigmalapl2_bab = v3sigmalapl2[9 * g + 7];
 
                 auto v3sigmalapltau_aaa = v3sigmalapltau[12 * g + 0];
                 auto v3sigmalapltau_aab = v3sigmalapltau[12 * g + 1];
@@ -8165,7 +8196,6 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
                 auto v3sigmalapltau_cba = v3sigmalapltau[12 * g + 6];
                 auto v3sigmalapltau_cbb = v3sigmalapltau[12 * g + 7];
                 auto v3sigmalapltau_baa = v3sigmalapltau[12 * g + 8];
-                auto v3sigmalapltau_bab = v3sigmalapltau[12 * g + 9];
                 auto v3sigmalapltau_bba = v3sigmalapltau[12 * g + 10];
 
                 auto v3sigmatau2_aaa = v3sigmatau2[9 * g + 0];
@@ -8182,52 +8212,17 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
                 auto v3lapl3_abb = v3lapl3[4 * g + 2];
 
                 auto v3lapl2tau_aaa = v3lapl2tau[6 * g + 0];
-                auto v3lapl2tau_aab = v3lapl2tau[6 * g + 1];
                 auto v3lapl2tau_aba = v3lapl2tau[6 * g + 2];
-                auto v3lapl2tau_abb = v3lapl2tau[6 * g + 3];
                 auto v3lapl2tau_bba = v3lapl2tau[6 * g + 4];
 
                 auto v3lapltau2_aaa = v3lapltau2[6 * g + 0];
                 auto v3lapltau2_aab = v3lapltau2[6 * g + 1];
-                auto v3lapltau2_abb = v3lapltau2[6 * g + 2];
                 auto v3lapltau2_baa = v3lapltau2[6 * g + 3];
                 auto v3lapltau2_bab = v3lapltau2[6 * g + 4];
 
                 auto v3tau3_aaa = v3tau3[4 * g + 0];
                 auto v3tau3_aab = v3tau3[4 * g + 1];
                 auto v3tau3_abb = v3tau3[4 * g + 2];
-                auto v3tau3_bbb = v3tau3[4 * g + 3];
-
-                auto v3rho2sigma_aaa = v3rho2sigma[9 * g + 0];
-                auto v3rho2sigma_aac = v3rho2sigma[9 * g + 1];
-                auto v3rho2sigma_aab = v3rho2sigma[9 * g + 2];
-                auto v3rho2sigma_aba = v3rho2sigma[9 * g + 3];
-                auto v3rho2sigma_abc = v3rho2sigma[9 * g + 4];
-                auto v3rho2sigma_abb = v3rho2sigma[9 * g + 5];
-                auto v3rho2sigma_bba = v3rho2sigma[9 * g + 6];
-                auto v3rho2sigma_bbc = v3rho2sigma[9 * g + 7];
-
-                auto v3rhosigma2_aaa = v3rhosigma2[12 * g + 0];
-                auto v3rhosigma2_aac = v3rhosigma2[12 * g + 1];
-                auto v3rhosigma2_aab = v3rhosigma2[12 * g + 2];
-                auto v3rhosigma2_acc = v3rhosigma2[12 * g + 3];
-                auto v3rhosigma2_acb = v3rhosigma2[12 * g + 4];
-                auto v3rhosigma2_abb = v3rhosigma2[12 * g + 5];
-                auto v3rhosigma2_baa = v3rhosigma2[12 * g + 6];
-                auto v3rhosigma2_bac = v3rhosigma2[12 * g + 7];
-                auto v3rhosigma2_bab = v3rhosigma2[12 * g + 8];
-                auto v3rhosigma2_bcc = v3rhosigma2[12 * g + 9];
-                auto v3rhosigma2_bcb = v3rhosigma2[12 * g + 10];
-
-                auto v3sigma3_aaa = v3sigma3[10 * g + 0];
-                auto v3sigma3_aac = v3sigma3[10 * g + 1];
-                auto v3sigma3_aab = v3sigma3[10 * g + 2];
-                auto v3sigma3_acc = v3sigma3[10 * g + 3];
-                auto v3sigma3_acb = v3sigma3[10 * g + 4];
-                auto v3sigma3_abb = v3sigma3[10 * g + 5];
-                auto v3sigma3_ccc = v3sigma3[10 * g + 6];
-                auto v3sigma3_ccb = v3sigma3[10 * g + 7];
-                auto v3sigma3_cbb = v3sigma3[10 * g + 8];
 
                 // functional derivatives
 
