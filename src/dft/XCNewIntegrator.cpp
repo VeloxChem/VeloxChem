@@ -6367,15 +6367,16 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
 
     // eq.(31), JCTC 2021, 17, 1512-1521
 
-    // Note that we use matrix-matrix multiplication only once, and symmetrize
-    // the result. This is because the density matrix is symmetric, and the
-    // Kohn-Sham matrix from mat_G is also symmetric. Formally only the
-    // mat_G_gga contribution should be symmetrized.
-
     timer.start("Fxc matrix matmul");
 
     // LDA and GGA contribution
-    auto mat_Fxc = denblas::multABt(gtoValues, denblas::addAB(mat_G, mat_G_gga, 2.0));
+    auto mat_Fxc = denblas::multABt(gtoValues, mat_G);
+
+    auto mat_Fxc_gga = denblas::multABt(gtoValues, mat_G_gga);
+
+    mat_Fxc_gga.symmetrize();  // (matrix + matrix.T)
+
+    mat_Fxc = denblas::addAB(mat_Fxc, mat_Fxc_gga, 1.0);
 
     // tau contribution
     auto mat_Fxc_x = denblas::multABt(gtoValuesX, mat_G_gga_x);
@@ -6385,8 +6386,6 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
     mat_Fxc = denblas::addAB(mat_Fxc, mat_Fxc_x, 0.5);
     mat_Fxc = denblas::addAB(mat_Fxc, mat_Fxc_y, 0.5);
     mat_Fxc = denblas::addAB(mat_Fxc, mat_Fxc_z, 0.5);
-
-    mat_Fxc.symmetrizeAndScale(0.5);
 
     timer.stop("Fxc matrix matmul");
 
@@ -7469,7 +7468,13 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA(const int32_t           npoint
     timer.start("Kxc matrix matmul");
 
     // LDA and GGA contribution
-    auto mat_Kxc = denblas::multABt(gtoValues, denblas::addAB(mat_G, mat_G_gga, 2.0));
+    auto mat_Kxc = denblas::multABt(gtoValues, mat_G);
+
+    auto mat_Kxc_gga = denblas::multABt(gtoValues, mat_G_gga);
+
+    mat_Kxc_gga.symmetrize();  // (matrix + matrix.T)
+
+    mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_gga, 1.0);
 
     // tau contribution
     auto mat_Kxc_x = denblas::multABt(gtoValuesX, mat_G_gga_x);
@@ -7479,8 +7484,6 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA(const int32_t           npoint
     mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_x, 0.5);
     mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_y, 0.5);
     mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_z, 0.5);
-
-    mat_Kxc.symmetrizeAndScale(0.5);
 
     timer.stop("Kxc matrix matmul");
 
@@ -8563,7 +8566,13 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
     timer.start("Kxc matrix matmul");
 
     // LDA and GGA contribution
-    auto mat_Kxc = denblas::multABt(gtoValues, denblas::addAB(mat_G, mat_G_gga, 2.0));
+    auto mat_Kxc = denblas::multABt(gtoValues, mat_G);
+
+    auto mat_Kxc_gga = denblas::multABt(gtoValues, mat_G_gga);
+
+    mat_Kxc_gga.symmetrize();  // (matrix + matrix.T)
+
+    mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_gga, 1.0);
 
     // tau contribution
     auto mat_Kxc_x = denblas::multABt(gtoValuesX, mat_G_gga_x);
@@ -8573,8 +8582,6 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
     mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_x, 0.5);
     mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_y, 0.5);
     mat_Kxc = denblas::addAB(mat_Kxc, mat_Kxc_z, 0.5);
-
-    mat_Kxc.symmetrizeAndScale(0.5);
 
     timer.stop("Kxc matrix matmul");
 
@@ -11284,7 +11291,13 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
     timer.start("Lxc matrix matmul");
 
     // LDA and GGA contribution
-    auto mat_Lxc = denblas::multABt(gtoValues, denblas::addAB(mat_G, mat_G_gga, 2.0));
+    auto mat_Lxc = denblas::multABt(gtoValues, mat_G);
+
+    auto mat_Lxc_gga = denblas::multABt(gtoValues, mat_G_gga);
+
+    mat_Lxc_gga.symmetrize();  // (matrix + matrix.T)
+
+    mat_Lxc = denblas::addAB(mat_Lxc, mat_Lxc_gga, 1.0);
 
     // tau contribution
     auto mat_Lxc_x = denblas::multABt(gtoValuesX, mat_G_gga_x);
@@ -11294,8 +11307,6 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
     mat_Lxc = denblas::addAB(mat_Lxc, mat_Lxc_x, 0.5);
     mat_Lxc = denblas::addAB(mat_Lxc, mat_Lxc_y, 0.5);
     mat_Lxc = denblas::addAB(mat_Lxc, mat_Lxc_z, 0.5);
-
-    mat_Lxc.symmetrizeAndScale(0.5);
 
     timer.stop("Lxc matrix matmul");
 
