@@ -6247,29 +6247,29 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                 double v2sigma2_cb = v2sigma2[6 * g + 4];
 
                 // second-order meta-gga
-                double v2rholapl_aa = v2rholapl[4 * g + 0];
-                double v2rholapl_ab = v2rholapl[4 * g + 1];
-                double v2rholapl_ba = v2rholapl[4 * g + 2];
+                //double v2rholapl_aa = v2rholapl[4 * g + 0];
+                //double v2rholapl_ab = v2rholapl[4 * g + 1];
+                //double v2rholapl_ba = v2rholapl[4 * g + 2];
 
                 double v2rhotau_aa = v2rhotau[4 * g + 0]; 
                 double v2rhotau_ab = v2rhotau[4 * g + 1];
                 double v2rhotau_ba = v2rhotau[4 * g + 2]; 
 
-                double v2lapltau_aa = v2lapltau[4 * g + 0];
-                double v2lapltau_ab = v2lapltau[4 * g + 1];
-                double v2lapltau_ba = v2lapltau[4 * g + 2];
+                //double v2lapltau_aa = v2lapltau[4 * g + 0];
+                //double v2lapltau_ab = v2lapltau[4 * g + 1];
+                //double v2lapltau_ba = v2lapltau[4 * g + 2];
 
-                double v2lapl2_aa = v2lapl2[3 * g + 0]; 
-                double v2lapl2_ab = v2lapl2[3 * g + 1]; 
+                //double v2lapl2_aa = v2lapl2[3 * g + 0]; 
+                //double v2lapl2_ab = v2lapl2[3 * g + 1]; 
 
                 double v2tau2_aa = v2tau2[3 * g + 0]; 
                 double v2tau2_ab = v2tau2[3 * g + 1]; 
 
-                double v2sigmalapl_aa = v2sigmalapl[6 * g + 0];
-                double v2sigmalapl_ab = v2sigmalapl[6 * g + 1];
-                double v2sigmalapl_ca = v2sigmalapl[6 * g + 2];
-                double v2sigmalapl_cb = v2sigmalapl[6 * g + 3];
-                double v2sigmalapl_ba = v2sigmalapl[6 * g + 4];
+                //double v2sigmalapl_aa = v2sigmalapl[6 * g + 0];
+                //double v2sigmalapl_ab = v2sigmalapl[6 * g + 1];
+                //double v2sigmalapl_ca = v2sigmalapl[6 * g + 2];
+                //double v2sigmalapl_cb = v2sigmalapl[6 * g + 3];
+                //double v2sigmalapl_ba = v2sigmalapl[6 * g + 4];
 
                 double v2sigmatau_aa = v2sigmatau[6 * g + 0]; 
                 double v2sigmatau_ab = v2sigmatau[6 * g + 1]; 
@@ -6285,19 +6285,19 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                 double rr = v2rho2_aa + v2rho2_ab;
                 double rx = 2.0*v2rhosigma_ac + 2.0*v2rhosigma_ab + 2.0*v2rhosigma_aa;
                 double rt = v2rhotau_aa + v2rhotau_ab;
-                double rl = v2rholapl_aa + v2rholapl_ab;
+                //double rl = v2rholapl_aa + v2rholapl_ab;
 
                 // sigma and gamma
                 double xr = v2rhosigma_bc + 2.0*v2rhosigma_ba + v2rhosigma_ac + 2.0 * v2rhosigma_aa;
                 double xt = v2sigmatau_cb + 2.0*v2sigmatau_ab + v2sigmatau_ca + 2.0 * v2sigmatau_aa;
-                double xl = v2sigmalapl_cb + 2.0*v2sigmalapl_ab + v2sigmalapl_ca + 2.0 * v2sigmalapl_aa;
+                //double xl = v2sigmalapl_cb + 2.0*v2sigmalapl_ab + v2sigmalapl_ca + 2.0 * v2sigmalapl_aa;
                 double xx = 2.0*v2sigma2_cc + 2.0*v2sigma2_cb + 6.0*v2sigma2_ac + 4.0*v2sigma2_ab + 4.0 * v2sigma2_aa;
 
                 // tau
                 double tt = v2tau2_aa + v2tau2_ab;
                 double tx = 2.0 * v2sigmatau_ca + 2.0 * v2sigmatau_ba + 2.0 * v2sigmatau_aa;
                 double tr = v2rhotau_aa + v2rhotau_ba;
-                double tl = v2lapltau_aa + v2lapltau_ba;
+                //double tl = v2lapltau_aa + v2lapltau_ba;
 
                 // lapl
                 //double ll = v2lapl2_aa + v2lapl2_ab;
@@ -6311,8 +6311,8 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                 // rho-operator
                 double r_0 =  rr * rwa 
                             + rx * contract 
-                            + rt * tauwa 
-                            + rl * laplwa; 
+                            + rt * tauwa;
+                            //+ rl * laplwa; 
 
                 G_val[nu_offset + g] = w * r_0 * chi_val[nu_offset + g];
 
@@ -6324,15 +6324,18 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
 
                 // grad-operator 
 
-                xcomp +=  grada_x_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                //xcomp +=  grada_x_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                xcomp +=  grada_x_g * ( xr * rwa + xt * tauwa )
                         + x * rwa_x 
                         + xx * grada_x_g * contract;
 
-                ycomp += grada_y_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                //ycomp += grada_y_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                ycomp += grada_y_g * ( xr * rwa + xt * tauwa )
                         + x * rwa_y 
                         + xx * grada_y_g * contract;
 
-                zcomp += grada_z_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                //zcomp += grada_z_g * ( xr * rwa + xt * tauwa + xl * laplwa)
+                zcomp += grada_z_g * ( xr * rwa + xt * tauwa )
                         + x * rwa_z 
                         + xx * grada_z_g * contract;
 
@@ -6353,8 +6356,8 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                 // tau contribution (will be scaled by 0.5 later)
                 double tau_0 =    tr * rwa 
                                 + tx * contract
-                                + tt * tauwa 
-                                + tl * laplwa;   
+                                + tt * tauwa;
+                                //+ tl * laplwa;   
 
                 G_gga_x_val[nu_offset + g] = w * tau_0 * chi_x_val[nu_offset + g];
                 G_gga_y_val[nu_offset + g] = w * tau_0 * chi_y_val[nu_offset + g];
