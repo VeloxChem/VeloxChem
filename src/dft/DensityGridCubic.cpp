@@ -28,6 +28,7 @@
 #include <cmath>
 #include <iostream>
 
+#include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 
 CDensityGridCubic::CDensityGridCubic()
@@ -2567,11 +2568,9 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
 
 
                 }
-
             }
-
         }
-        if (fstr::upcase(CubeMode) == "CRF")
+        else if (fstr::upcase(CubeMode) == "CRF")
         {
             for (int32_t j = 0; j < numdens / 8; j++)
             {
@@ -2660,6 +2659,11 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + fstr::upcase(CubeMode) +
+                                      std::string(" not implemented for LDA"));
+        }
     }
     if (xcFuncType == xcfun::gga)
     {   
@@ -2667,7 +2671,6 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
         {
             for (int32_t j = 0; j < numdens / 30; j++)
             {
-
                 auto gam_sig_xx_r = gam2(24 * j);
                 auto gam_sig_xx_i = gam2(24 * j + 1);
                 auto gam_sig_yy_r = gam2(24 * j + 2);
@@ -7159,7 +7162,7 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
 
             }
         }
-        if (fstr::upcase(CubeMode) == "CRF")
+        else if (fstr::upcase(CubeMode) == "CRF")
         {
             for (int32_t j = 0; j < numdens / 8; j++)
             {
@@ -8150,6 +8153,11 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
 
             }
         }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + fstr::upcase(CubeMode) +
+                                      std::string(" not implemented for GGA"));
+        }
     }
     if (xcFuncType == xcfun::mgga)
     {
@@ -8157,7 +8165,6 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
         {
             for (int32_t j = 0; j < numdens / 8; j++)
             {
-                
                 auto gam_bc_r = gam2(6 * j);
                 auto gam_bc_i = gam2(6 * j + 1);
                 auto gam_bd_r = gam2(6 * j + 2);
@@ -9932,10 +9939,13 @@ CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + fstr::upcase(CubeMode) +
+                                      std::string(" not implemented for meta-GGA"));
+        }
     }
-
 }
-
 
 std::ostream&
 operator<<(std::ostream& output, const CDensityGridCubic& source)

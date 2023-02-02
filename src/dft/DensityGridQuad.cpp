@@ -28,6 +28,7 @@
 #include <cmath>
 #include <iostream>
 
+#include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 
 CDensityGridQuad::CDensityGridQuad()
@@ -689,7 +690,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "SHG_RED")
+        else if (fstr::upcase(quadMode) == "SHG_RED")
         {
             for (int32_t j = 0; j < numdens / 6; j++)
             {
@@ -745,7 +746,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "TPA_II") 
+        else if (fstr::upcase(quadMode) == "TPA_II") 
         {
             // This code is inteded to compute F_b_sigma fock matrices for the final E3 contraction for tpa calculations.
             for (int32_t j = 0; j < numdens / 6; j++)
@@ -925,7 +926,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "REDTPA_I")
+        else if (fstr::upcase(quadMode) == "REDTPA_I")
         {
 
             // This routine computes the first-order two-times transformed Fock matrices for the E[4] contraction for TPA calculations
@@ -970,7 +971,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "REDTPA_II")  
+        else if (fstr::upcase(quadMode) == "REDTPA_II")  
         {
             // This code is inteded to compute F_b_cd fock matrices for the final E3 contraction for tpa calculations.
 
@@ -1049,7 +1050,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "CRF_II")
+        else if (fstr::upcase(quadMode) == "CRF_II")
         {
             // This routine is for computing the second-order fock matrices for the E[3] contraction of the general cubic response function routine
 
@@ -1102,7 +1103,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "QRF")
+        else if (fstr::upcase(quadMode) == "QRF")
         {
             // This routine computes the Fcb for the general quadratic response function
 
@@ -1127,6 +1128,11 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                     rhorho_i[i] = 2.0 * (rhow1a_r[i] * rhow2a_i[i] + rhow1a_i[i] * rhow2a_r[i]);
                 }
             }
+        }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + fstr::upcase(quadMode) +
+                                      std::string(" not implemented for LDA"));
         }
     }
     if (xcFuncType == xcfun::gga)
@@ -1497,7 +1503,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "REDTPA_II") 
+        else if (fstr::upcase(quadMode) == "REDTPA_II") 
         {
             for (int32_t j = 0; j < numdens / 6; j++)
             {
@@ -3094,9 +3100,9 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
 
 
                 }
+            }
         }
-        }
-        if (fstr::upcase(quadMode) == "TPA_II") 
+        else if (fstr::upcase(quadMode) == "TPA_II") 
         {
             // This code is inteded to compute F_b_sigma fock matrices for the final E3 contraction for tpa calculations.
 
@@ -6264,8 +6270,8 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
 
                 }
             }
-    }    
-        if (fstr::upcase(quadMode) == "CRF_II")
+        }    
+        else if (fstr::upcase(quadMode) == "CRF_II")
         {
             for (int32_t j = 0; j < numdens / 2; j++)
             {
@@ -6547,7 +6553,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "SHG")
+        else if (fstr::upcase(quadMode) == "SHG")
         {
             for (int32_t j = 0; j < numdens / 12; j++)
 
@@ -7520,7 +7526,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "SHG_RED")
+        else if (fstr::upcase(quadMode) == "SHG_RED")
         {
             for (int32_t j = 0; j < numdens / 6; j++)
             {
@@ -8078,7 +8084,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "QRF")
+        else if (fstr::upcase(quadMode) == "QRF")
         {
             for (int32_t j = 0; j < numdens / 2; j++)
             {
@@ -8217,6 +8223,11 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
 
                 }
             }
+        }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + fstr::upcase(quadMode) +
+                                      std::string(" not implemented for GGA"));
         }
     }
     if (xcFuncType == xcfun::mgga)
@@ -8464,7 +8475,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "CRF_II")
+        else if (fstr::upcase(quadMode) == "CRF_II")
         {
             for (int32_t j = 0; j < numdens / 2; j++)
             {
@@ -8922,7 +8933,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "SHG")
+        else if (fstr::upcase(quadMode) == "SHG")
         {
             for (int32_t j = 0; j < numdens / 12; j++)
 
@@ -10233,6 +10244,11 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                                            + gradzw_kz_r[i] * gradzw_ky_i[i] + gradzw_kz_i[i] * gradzw_ky_r[i];
                 }
             }
+        }
+        else
+        {
+            errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + fstr::upcase(quadMode) +
+                                      std::string(" not implemented for meta-GGA"));
         }
     }
 }
