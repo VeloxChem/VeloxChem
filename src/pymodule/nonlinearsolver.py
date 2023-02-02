@@ -278,7 +278,9 @@ class NonLinearSolver:
                 updated_scf_info['qq_type'] = scf_results['qq_type']
 
             if scf_results.get('restart', None) is not None:
-                updated_scf_info['restart'] = scf_results['restart']
+                # do not restart if scf is not restarted from checkpoint
+                if not scf_results['restart']:
+                    updated_scf_info['restart'] = scf_results['restart']
 
             if scf_results.get('xcfun', None) is not None:
                 # do not overwrite xcfun if it is already specified
