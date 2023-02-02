@@ -30,15 +30,13 @@ namespace gridscreen {  // gridscreen namespace
 double
 getSigmaScreeningThreshold(const double densityThreshold)
 {
-    // TODO update sigma screening threshold
-    return 1.0e-26;
+    return std::pow(densityThreshold, 4.0 / 3.0);
 }
 
 double
 getTauScreeningThreshold()
 {
-    // TODO update tau screening threshold
-    return 1.0e-26;
+    return 1.0e-20;
 }
 
 void
