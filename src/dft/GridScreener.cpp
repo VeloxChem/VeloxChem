@@ -67,11 +67,7 @@ screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoint
 }
 
 void
-screenExcVxcFockForLDA(double*       rho,
-                       double*       exc,
-                       double*       vrho,
-                       const int32_t npoints,
-                       const double  densityThreshold)
+screenExcVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -96,10 +92,7 @@ screenExcVxcFockForLDA(double*       rho,
 }
 
 void
-screenVxcFockForLDA(double*       rho,
-                    double*       vrho,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenVxcFockForLDA(double* rho, double* vrho, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -118,13 +111,7 @@ screenVxcFockForLDA(double*       rho,
 }
 
 void
-screenExcVxcFockForGGA(double*       rho,
-                       double*       sigma,
-                       double*       exc,
-                       double*       vrho,
-                       double*       vsigma,
-                       const int32_t npoints,
-                       const double  densityThreshold)
+screenExcVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold)
 {
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
@@ -138,8 +125,7 @@ screenExcVxcFockForGGA(double*       rho,
         }
 
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
             vrho[2 * g + 0] = 0.0;
 
@@ -148,8 +134,7 @@ screenExcVxcFockForGGA(double*       rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
             vrho[2 * g + 1] = 0.0;
 
@@ -160,20 +145,14 @@ screenExcVxcFockForGGA(double*       rho,
 }
 
 void
-screenVxcFockForGGA(double*       rho,
-                    double*       sigma,
-                    double*       vrho,
-                    double*       vsigma,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenVxcFockForGGA(double* rho, double* sigma, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold)
 {
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
             vrho[2 * g + 0] = 0.0;
 
@@ -182,8 +161,7 @@ screenVxcFockForGGA(double*       rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
             vrho[2 * g + 1] = 0.0;
 
@@ -207,7 +185,7 @@ screenExcVxcFockForMGGA(double*       rho,
                         const double  densityThreshold)
 {
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold = getTauScreeningThreshold();
+    double tauThreshold   = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -220,8 +198,7 @@ screenExcVxcFockForMGGA(double*       rho,
         }
 
         // rho_a, sigma_aa and tau_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
             vrho[2 * g + 0] = 0.0;
@@ -235,8 +212,7 @@ screenExcVxcFockForMGGA(double*       rho,
         }
 
         // rho_b, sigma_bb and tau_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
             vrho[2 * g + 1] = 0.0;
@@ -264,13 +240,12 @@ screenVxcFockForMGGA(double*       rho,
                      const double  densityThreshold)
 {
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold = getTauScreeningThreshold();
+    double tauThreshold   = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a, sigma_aa and tau_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
             vrho[2 * g + 0] = 0.0;
@@ -284,8 +259,7 @@ screenVxcFockForMGGA(double*       rho,
         }
 
         // rho_b, sigma_bb and tau_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
             vrho[2 * g + 1] = 0.0;
@@ -327,10 +301,7 @@ screenVxcFockForPGGA(double* rho, double* sigma, double* exc, double* vrho, doub
 }
 
 void
-screenFxcFockForLDA(double*       rho,
-                    double*       v2rho2,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenFxcFockForLDA(double* rho, double* v2rho2, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -364,8 +335,7 @@ screenFxcFockForGGA(double*       rho,
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
             v2rho2[3 * g + 0] = 0.0;
             v2rho2[3 * g + 1] = 0.0;
@@ -384,8 +354,7 @@ screenFxcFockForGGA(double*       rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
             v2rho2[3 * g + 1] = 0.0;
             v2rho2[3 * g + 2] = 0.0;
@@ -424,13 +393,12 @@ screenFxcFockForMGGA(double*       rho,
                      const double  densityThreshold)
 {
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold = getTauScreeningThreshold();
+    double tauThreshold   = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a, sigma_aa and tau_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
             v2rho2[3 * g + 0] = 0.0;
@@ -480,8 +448,7 @@ screenFxcFockForMGGA(double*       rho,
         }
 
         // rho_b, sigma_bb and tau_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
             v2rho2[3 * g + 1] = 0.0;
@@ -533,10 +500,7 @@ screenFxcFockForMGGA(double*       rho,
 }
 
 void
-screenKxcFockForLDA(double*       rho,
-                    double*       v3rho3,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenKxcFockForLDA(double* rho, double* v3rho3, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -573,8 +537,7 @@ screenKxcFockForGGA(double*       rho,
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
             v3rho3[4 * g + 0] = 0.0;
             v3rho3[4 * g + 1] = 0.0;
@@ -589,16 +552,16 @@ screenKxcFockForGGA(double*       rho,
             v3rho2sigma[9 * g + 6] = 0.0;
             v3rho2sigma[9 * g + 7] = 0.0;
 
-            v3rhosigma2[12 * g + 0] = 0.0;
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 0]  = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
 
             v3sigma3[10 * g + 0] = 0.0;
@@ -613,8 +576,7 @@ screenKxcFockForGGA(double*       rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
             v3rho3[4 * g + 1] = 0.0;
             v3rho3[4 * g + 2] = 0.0;
@@ -629,15 +591,15 @@ screenKxcFockForGGA(double*       rho,
             v3rho2sigma[9 * g + 7] = 0.0;
             v3rho2sigma[9 * g + 8] = 0.0;
 
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
             v3rhosigma2[12 * g + 11] = 0.0;
 
@@ -683,13 +645,12 @@ screenKxcFockForMGGA(double*       rho,
                      const double  densityThreshold)
 {
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold = getTauScreeningThreshold();
+    double tauThreshold   = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a, sigma_aa and tau_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
             v3rho3[4 * g + 0] = 0.0;
@@ -717,40 +678,40 @@ screenKxcFockForMGGA(double*       rho,
             v3rho2tau[6 * g + 3] = 0.0;
             v3rho2tau[6 * g + 4] = 0.0;
 
-            v3rhosigma2[12 * g + 0] = 0.0;
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 0]  = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
 
-            v3rhosigmalapl[12 * g + 0] = 0.0;
-            v3rhosigmalapl[12 * g + 1] = 0.0;
-            v3rhosigmalapl[12 * g + 2] = 0.0;
-            v3rhosigmalapl[12 * g + 3] = 0.0;
-            v3rhosigmalapl[12 * g + 4] = 0.0;
-            v3rhosigmalapl[12 * g + 5] = 0.0;
-            v3rhosigmalapl[12 * g + 6] = 0.0;
-            v3rhosigmalapl[12 * g + 7] = 0.0;
-            v3rhosigmalapl[12 * g + 8] = 0.0;
-            v3rhosigmalapl[12 * g + 9] = 0.0;
+            v3rhosigmalapl[12 * g + 0]  = 0.0;
+            v3rhosigmalapl[12 * g + 1]  = 0.0;
+            v3rhosigmalapl[12 * g + 2]  = 0.0;
+            v3rhosigmalapl[12 * g + 3]  = 0.0;
+            v3rhosigmalapl[12 * g + 4]  = 0.0;
+            v3rhosigmalapl[12 * g + 5]  = 0.0;
+            v3rhosigmalapl[12 * g + 6]  = 0.0;
+            v3rhosigmalapl[12 * g + 7]  = 0.0;
+            v3rhosigmalapl[12 * g + 8]  = 0.0;
+            v3rhosigmalapl[12 * g + 9]  = 0.0;
             v3rhosigmalapl[12 * g + 10] = 0.0;
 
-            v3rhosigmatau[12 * g + 0] = 0.0;
-            v3rhosigmatau[12 * g + 1] = 0.0;
-            v3rhosigmatau[12 * g + 2] = 0.0;
-            v3rhosigmatau[12 * g + 3] = 0.0;
-            v3rhosigmatau[12 * g + 4] = 0.0;
-            v3rhosigmatau[12 * g + 5] = 0.0;
-            v3rhosigmatau[12 * g + 6] = 0.0;
-            v3rhosigmatau[12 * g + 7] = 0.0;
-            v3rhosigmatau[12 * g + 8] = 0.0;
-            v3rhosigmatau[12 * g + 9] = 0.0;
+            v3rhosigmatau[12 * g + 0]  = 0.0;
+            v3rhosigmatau[12 * g + 1]  = 0.0;
+            v3rhosigmatau[12 * g + 2]  = 0.0;
+            v3rhosigmatau[12 * g + 3]  = 0.0;
+            v3rhosigmatau[12 * g + 4]  = 0.0;
+            v3rhosigmatau[12 * g + 5]  = 0.0;
+            v3rhosigmatau[12 * g + 6]  = 0.0;
+            v3rhosigmatau[12 * g + 7]  = 0.0;
+            v3rhosigmatau[12 * g + 8]  = 0.0;
+            v3rhosigmatau[12 * g + 9]  = 0.0;
             v3rhosigmatau[12 * g + 10] = 0.0;
 
             v3rholapl2[6 * g + 0] = 0.0;
@@ -783,28 +744,28 @@ screenKxcFockForMGGA(double*       rho,
             v3sigma3[10 * g + 7] = 0.0;
             v3sigma3[10 * g + 8] = 0.0;
 
-            v3sigma2lapl[12 * g + 0] = 0.0;
-            v3sigma2lapl[12 * g + 1] = 0.0;
-            v3sigma2lapl[12 * g + 2] = 0.0;
-            v3sigma2lapl[12 * g + 3] = 0.0;
-            v3sigma2lapl[12 * g + 4] = 0.0;
-            v3sigma2lapl[12 * g + 5] = 0.0;
-            v3sigma2lapl[12 * g + 6] = 0.0;
-            v3sigma2lapl[12 * g + 7] = 0.0;
-            v3sigma2lapl[12 * g + 8] = 0.0;
-            v3sigma2lapl[12 * g + 9] = 0.0;
+            v3sigma2lapl[12 * g + 0]  = 0.0;
+            v3sigma2lapl[12 * g + 1]  = 0.0;
+            v3sigma2lapl[12 * g + 2]  = 0.0;
+            v3sigma2lapl[12 * g + 3]  = 0.0;
+            v3sigma2lapl[12 * g + 4]  = 0.0;
+            v3sigma2lapl[12 * g + 5]  = 0.0;
+            v3sigma2lapl[12 * g + 6]  = 0.0;
+            v3sigma2lapl[12 * g + 7]  = 0.0;
+            v3sigma2lapl[12 * g + 8]  = 0.0;
+            v3sigma2lapl[12 * g + 9]  = 0.0;
             v3sigma2lapl[12 * g + 10] = 0.0;
 
-            v3sigma2tau[12 * g + 0] = 0.0;
-            v3sigma2tau[12 * g + 1] = 0.0;
-            v3sigma2tau[12 * g + 2] = 0.0;
-            v3sigma2tau[12 * g + 3] = 0.0;
-            v3sigma2tau[12 * g + 4] = 0.0;
-            v3sigma2tau[12 * g + 5] = 0.0;
-            v3sigma2tau[12 * g + 6] = 0.0;
-            v3sigma2tau[12 * g + 7] = 0.0;
-            v3sigma2tau[12 * g + 8] = 0.0;
-            v3sigma2tau[12 * g + 9] = 0.0;
+            v3sigma2tau[12 * g + 0]  = 0.0;
+            v3sigma2tau[12 * g + 1]  = 0.0;
+            v3sigma2tau[12 * g + 2]  = 0.0;
+            v3sigma2tau[12 * g + 3]  = 0.0;
+            v3sigma2tau[12 * g + 4]  = 0.0;
+            v3sigma2tau[12 * g + 5]  = 0.0;
+            v3sigma2tau[12 * g + 6]  = 0.0;
+            v3sigma2tau[12 * g + 7]  = 0.0;
+            v3sigma2tau[12 * g + 8]  = 0.0;
+            v3sigma2tau[12 * g + 9]  = 0.0;
             v3sigma2tau[12 * g + 10] = 0.0;
 
             v3sigmalapl2[9 * g + 0] = 0.0;
@@ -816,16 +777,16 @@ screenKxcFockForMGGA(double*       rho,
             v3sigmalapl2[9 * g + 6] = 0.0;
             v3sigmalapl2[9 * g + 7] = 0.0;
 
-            v3sigmalapltau[12 * g + 0] = 0.0;
-            v3sigmalapltau[12 * g + 1] = 0.0;
-            v3sigmalapltau[12 * g + 2] = 0.0;
-            v3sigmalapltau[12 * g + 3] = 0.0;
-            v3sigmalapltau[12 * g + 4] = 0.0;
-            v3sigmalapltau[12 * g + 5] = 0.0;
-            v3sigmalapltau[12 * g + 6] = 0.0;
-            v3sigmalapltau[12 * g + 7] = 0.0;
-            v3sigmalapltau[12 * g + 8] = 0.0;
-            v3sigmalapltau[12 * g + 9] = 0.0;
+            v3sigmalapltau[12 * g + 0]  = 0.0;
+            v3sigmalapltau[12 * g + 1]  = 0.0;
+            v3sigmalapltau[12 * g + 2]  = 0.0;
+            v3sigmalapltau[12 * g + 3]  = 0.0;
+            v3sigmalapltau[12 * g + 4]  = 0.0;
+            v3sigmalapltau[12 * g + 5]  = 0.0;
+            v3sigmalapltau[12 * g + 6]  = 0.0;
+            v3sigmalapltau[12 * g + 7]  = 0.0;
+            v3sigmalapltau[12 * g + 8]  = 0.0;
+            v3sigmalapltau[12 * g + 9]  = 0.0;
             v3sigmalapltau[12 * g + 10] = 0.0;
 
             v3sigmatau2[9 * g + 0] = 0.0;
@@ -859,8 +820,7 @@ screenKxcFockForMGGA(double*       rho,
         }
 
         // rho_b, sigma_bb and tau_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
             v3rho3[4 * g + 1] = 0.0;
@@ -888,39 +848,39 @@ screenKxcFockForMGGA(double*       rho,
             v3rho2tau[6 * g + 4] = 0.0;
             v3rho2tau[6 * g + 5] = 0.0;
 
-            v3rhosigma2[12 * g + 1] = 0.0;
-            v3rhosigma2[12 * g + 2] = 0.0;
-            v3rhosigma2[12 * g + 3] = 0.0;
-            v3rhosigma2[12 * g + 4] = 0.0;
-            v3rhosigma2[12 * g + 5] = 0.0;
-            v3rhosigma2[12 * g + 6] = 0.0;
-            v3rhosigma2[12 * g + 7] = 0.0;
-            v3rhosigma2[12 * g + 8] = 0.0;
-            v3rhosigma2[12 * g + 9] = 0.0;
+            v3rhosigma2[12 * g + 1]  = 0.0;
+            v3rhosigma2[12 * g + 2]  = 0.0;
+            v3rhosigma2[12 * g + 3]  = 0.0;
+            v3rhosigma2[12 * g + 4]  = 0.0;
+            v3rhosigma2[12 * g + 5]  = 0.0;
+            v3rhosigma2[12 * g + 6]  = 0.0;
+            v3rhosigma2[12 * g + 7]  = 0.0;
+            v3rhosigma2[12 * g + 8]  = 0.0;
+            v3rhosigma2[12 * g + 9]  = 0.0;
             v3rhosigma2[12 * g + 10] = 0.0;
             v3rhosigma2[12 * g + 11] = 0.0;
 
-            v3rhosigmalapl[12 * g + 1] = 0.0;
-            v3rhosigmalapl[12 * g + 2] = 0.0;
-            v3rhosigmalapl[12 * g + 3] = 0.0;
-            v3rhosigmalapl[12 * g + 4] = 0.0;
-            v3rhosigmalapl[12 * g + 5] = 0.0;
-            v3rhosigmalapl[12 * g + 6] = 0.0;
-            v3rhosigmalapl[12 * g + 7] = 0.0;
-            v3rhosigmalapl[12 * g + 8] = 0.0;
-            v3rhosigmalapl[12 * g + 9] = 0.0;
+            v3rhosigmalapl[12 * g + 1]  = 0.0;
+            v3rhosigmalapl[12 * g + 2]  = 0.0;
+            v3rhosigmalapl[12 * g + 3]  = 0.0;
+            v3rhosigmalapl[12 * g + 4]  = 0.0;
+            v3rhosigmalapl[12 * g + 5]  = 0.0;
+            v3rhosigmalapl[12 * g + 6]  = 0.0;
+            v3rhosigmalapl[12 * g + 7]  = 0.0;
+            v3rhosigmalapl[12 * g + 8]  = 0.0;
+            v3rhosigmalapl[12 * g + 9]  = 0.0;
             v3rhosigmalapl[12 * g + 10] = 0.0;
             v3rhosigmalapl[12 * g + 11] = 0.0;
 
-            v3rhosigmatau[12 * g + 1] = 0.0;
-            v3rhosigmatau[12 * g + 2] = 0.0;
-            v3rhosigmatau[12 * g + 3] = 0.0;
-            v3rhosigmatau[12 * g + 4] = 0.0;
-            v3rhosigmatau[12 * g + 5] = 0.0;
-            v3rhosigmatau[12 * g + 6] = 0.0;
-            v3rhosigmatau[12 * g + 7] = 0.0;
-            v3rhosigmatau[12 * g + 8] = 0.0;
-            v3rhosigmatau[12 * g + 9] = 0.0;
+            v3rhosigmatau[12 * g + 1]  = 0.0;
+            v3rhosigmatau[12 * g + 2]  = 0.0;
+            v3rhosigmatau[12 * g + 3]  = 0.0;
+            v3rhosigmatau[12 * g + 4]  = 0.0;
+            v3rhosigmatau[12 * g + 5]  = 0.0;
+            v3rhosigmatau[12 * g + 6]  = 0.0;
+            v3rhosigmatau[12 * g + 7]  = 0.0;
+            v3rhosigmatau[12 * g + 8]  = 0.0;
+            v3rhosigmatau[12 * g + 9]  = 0.0;
             v3rhosigmatau[12 * g + 10] = 0.0;
             v3rhosigmatau[12 * g + 11] = 0.0;
 
@@ -954,27 +914,27 @@ screenKxcFockForMGGA(double*       rho,
             v3sigma3[10 * g + 8] = 0.0;
             v3sigma3[10 * g + 9] = 0.0;
 
-            v3sigma2lapl[12 * g + 1] = 0.0;
-            v3sigma2lapl[12 * g + 2] = 0.0;
-            v3sigma2lapl[12 * g + 3] = 0.0;
-            v3sigma2lapl[12 * g + 4] = 0.0;
-            v3sigma2lapl[12 * g + 5] = 0.0;
-            v3sigma2lapl[12 * g + 6] = 0.0;
-            v3sigma2lapl[12 * g + 7] = 0.0;
-            v3sigma2lapl[12 * g + 8] = 0.0;
-            v3sigma2lapl[12 * g + 9] = 0.0;
+            v3sigma2lapl[12 * g + 1]  = 0.0;
+            v3sigma2lapl[12 * g + 2]  = 0.0;
+            v3sigma2lapl[12 * g + 3]  = 0.0;
+            v3sigma2lapl[12 * g + 4]  = 0.0;
+            v3sigma2lapl[12 * g + 5]  = 0.0;
+            v3sigma2lapl[12 * g + 6]  = 0.0;
+            v3sigma2lapl[12 * g + 7]  = 0.0;
+            v3sigma2lapl[12 * g + 8]  = 0.0;
+            v3sigma2lapl[12 * g + 9]  = 0.0;
             v3sigma2lapl[12 * g + 10] = 0.0;
             v3sigma2lapl[12 * g + 11] = 0.0;
 
-            v3sigma2tau[12 * g + 1] = 0.0;
-            v3sigma2tau[12 * g + 2] = 0.0;
-            v3sigma2tau[12 * g + 3] = 0.0;
-            v3sigma2tau[12 * g + 4] = 0.0;
-            v3sigma2tau[12 * g + 5] = 0.0;
-            v3sigma2tau[12 * g + 6] = 0.0;
-            v3sigma2tau[12 * g + 7] = 0.0;
-            v3sigma2tau[12 * g + 8] = 0.0;
-            v3sigma2tau[12 * g + 9] = 0.0;
+            v3sigma2tau[12 * g + 1]  = 0.0;
+            v3sigma2tau[12 * g + 2]  = 0.0;
+            v3sigma2tau[12 * g + 3]  = 0.0;
+            v3sigma2tau[12 * g + 4]  = 0.0;
+            v3sigma2tau[12 * g + 5]  = 0.0;
+            v3sigma2tau[12 * g + 6]  = 0.0;
+            v3sigma2tau[12 * g + 7]  = 0.0;
+            v3sigma2tau[12 * g + 8]  = 0.0;
+            v3sigma2tau[12 * g + 9]  = 0.0;
             v3sigma2tau[12 * g + 10] = 0.0;
             v3sigma2tau[12 * g + 11] = 0.0;
 
@@ -987,15 +947,15 @@ screenKxcFockForMGGA(double*       rho,
             v3sigmalapl2[9 * g + 7] = 0.0;
             v3sigmalapl2[9 * g + 8] = 0.0;
 
-            v3sigmalapltau[12 * g + 1] = 0.0;
-            v3sigmalapltau[12 * g + 2] = 0.0;
-            v3sigmalapltau[12 * g + 3] = 0.0;
-            v3sigmalapltau[12 * g + 4] = 0.0;
-            v3sigmalapltau[12 * g + 5] = 0.0;
-            v3sigmalapltau[12 * g + 6] = 0.0;
-            v3sigmalapltau[12 * g + 7] = 0.0;
-            v3sigmalapltau[12 * g + 8] = 0.0;
-            v3sigmalapltau[12 * g + 9] = 0.0;
+            v3sigmalapltau[12 * g + 1]  = 0.0;
+            v3sigmalapltau[12 * g + 2]  = 0.0;
+            v3sigmalapltau[12 * g + 3]  = 0.0;
+            v3sigmalapltau[12 * g + 4]  = 0.0;
+            v3sigmalapltau[12 * g + 5]  = 0.0;
+            v3sigmalapltau[12 * g + 6]  = 0.0;
+            v3sigmalapltau[12 * g + 7]  = 0.0;
+            v3sigmalapltau[12 * g + 8]  = 0.0;
+            v3sigmalapltau[12 * g + 9]  = 0.0;
             v3sigmalapltau[12 * g + 10] = 0.0;
             v3sigmalapltau[12 * g + 11] = 0.0;
 
@@ -1032,10 +992,7 @@ screenKxcFockForMGGA(double*       rho,
 }
 
 void
-screenLxcFockForLDA(double*       rho,
-                    double*       v4rho4,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenLxcFockForLDA(double* rho, double* v4rho4, const int32_t npoints, const double densityThreshold)
 {
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -1075,36 +1032,35 @@ screenLxcFockForGGA(double*       rho,
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a and sigma_aa
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
             v4rho4[5 * g + 0] = 0.0;
             v4rho4[5 * g + 1] = 0.0;
             v4rho4[5 * g + 2] = 0.0;
             v4rho4[5 * g + 3] = 0.0;
 
-            v4rho3sigma[12 * g + 0] = 0.0;
-            v4rho3sigma[12 * g + 1] = 0.0;
-            v4rho3sigma[12 * g + 2] = 0.0;
-            v4rho3sigma[12 * g + 3] = 0.0;
-            v4rho3sigma[12 * g + 4] = 0.0;
-            v4rho3sigma[12 * g + 5] = 0.0;
-            v4rho3sigma[12 * g + 6] = 0.0;
-            v4rho3sigma[12 * g + 7] = 0.0;
-            v4rho3sigma[12 * g + 8] = 0.0;
-            v4rho3sigma[12 * g + 9] = 0.0;
+            v4rho3sigma[12 * g + 0]  = 0.0;
+            v4rho3sigma[12 * g + 1]  = 0.0;
+            v4rho3sigma[12 * g + 2]  = 0.0;
+            v4rho3sigma[12 * g + 3]  = 0.0;
+            v4rho3sigma[12 * g + 4]  = 0.0;
+            v4rho3sigma[12 * g + 5]  = 0.0;
+            v4rho3sigma[12 * g + 6]  = 0.0;
+            v4rho3sigma[12 * g + 7]  = 0.0;
+            v4rho3sigma[12 * g + 8]  = 0.0;
+            v4rho3sigma[12 * g + 9]  = 0.0;
             v4rho3sigma[12 * g + 10] = 0.0;
 
-            v4rho2sigma2[18 * g + 0] = 0.0;
-            v4rho2sigma2[18 * g + 1] = 0.0;
-            v4rho2sigma2[18 * g + 2] = 0.0;
-            v4rho2sigma2[18 * g + 3] = 0.0;
-            v4rho2sigma2[18 * g + 4] = 0.0;
-            v4rho2sigma2[18 * g + 5] = 0.0;
-            v4rho2sigma2[18 * g + 6] = 0.0;
-            v4rho2sigma2[18 * g + 7] = 0.0;
-            v4rho2sigma2[18 * g + 8] = 0.0;
-            v4rho2sigma2[18 * g + 9] = 0.0;
+            v4rho2sigma2[18 * g + 0]  = 0.0;
+            v4rho2sigma2[18 * g + 1]  = 0.0;
+            v4rho2sigma2[18 * g + 2]  = 0.0;
+            v4rho2sigma2[18 * g + 3]  = 0.0;
+            v4rho2sigma2[18 * g + 4]  = 0.0;
+            v4rho2sigma2[18 * g + 5]  = 0.0;
+            v4rho2sigma2[18 * g + 6]  = 0.0;
+            v4rho2sigma2[18 * g + 7]  = 0.0;
+            v4rho2sigma2[18 * g + 8]  = 0.0;
+            v4rho2sigma2[18 * g + 9]  = 0.0;
             v4rho2sigma2[18 * g + 10] = 0.0;
             v4rho2sigma2[18 * g + 11] = 0.0;
             v4rho2sigma2[18 * g + 12] = 0.0;
@@ -1113,16 +1069,16 @@ screenLxcFockForGGA(double*       rho,
             v4rho2sigma2[18 * g + 15] = 0.0;
             v4rho2sigma2[18 * g + 16] = 0.0;
 
-            v4rhosigma3[20 * g + 0] = 0.0;
-            v4rhosigma3[20 * g + 1] = 0.0;
-            v4rhosigma3[20 * g + 2] = 0.0;
-            v4rhosigma3[20 * g + 3] = 0.0;
-            v4rhosigma3[20 * g + 4] = 0.0;
-            v4rhosigma3[20 * g + 5] = 0.0;
-            v4rhosigma3[20 * g + 6] = 0.0;
-            v4rhosigma3[20 * g + 7] = 0.0;
-            v4rhosigma3[20 * g + 8] = 0.0;
-            v4rhosigma3[20 * g + 9] = 0.0;
+            v4rhosigma3[20 * g + 0]  = 0.0;
+            v4rhosigma3[20 * g + 1]  = 0.0;
+            v4rhosigma3[20 * g + 2]  = 0.0;
+            v4rhosigma3[20 * g + 3]  = 0.0;
+            v4rhosigma3[20 * g + 4]  = 0.0;
+            v4rhosigma3[20 * g + 5]  = 0.0;
+            v4rhosigma3[20 * g + 6]  = 0.0;
+            v4rhosigma3[20 * g + 7]  = 0.0;
+            v4rhosigma3[20 * g + 8]  = 0.0;
+            v4rhosigma3[20 * g + 9]  = 0.0;
             v4rhosigma3[20 * g + 10] = 0.0;
             v4rhosigma3[20 * g + 11] = 0.0;
             v4rhosigma3[20 * g + 12] = 0.0;
@@ -1133,16 +1089,16 @@ screenLxcFockForGGA(double*       rho,
             v4rhosigma3[20 * g + 17] = 0.0;
             v4rhosigma3[20 * g + 18] = 0.0;
 
-            v4sigma4[15 * g + 0] = 0.0;
-            v4sigma4[15 * g + 1] = 0.0;
-            v4sigma4[15 * g + 2] = 0.0;
-            v4sigma4[15 * g + 3] = 0.0;
-            v4sigma4[15 * g + 4] = 0.0;
-            v4sigma4[15 * g + 5] = 0.0;
-            v4sigma4[15 * g + 6] = 0.0;
-            v4sigma4[15 * g + 7] = 0.0;
-            v4sigma4[15 * g + 8] = 0.0;
-            v4sigma4[15 * g + 9] = 0.0;
+            v4sigma4[15 * g + 0]  = 0.0;
+            v4sigma4[15 * g + 1]  = 0.0;
+            v4sigma4[15 * g + 2]  = 0.0;
+            v4sigma4[15 * g + 3]  = 0.0;
+            v4sigma4[15 * g + 4]  = 0.0;
+            v4sigma4[15 * g + 5]  = 0.0;
+            v4sigma4[15 * g + 6]  = 0.0;
+            v4sigma4[15 * g + 7]  = 0.0;
+            v4sigma4[15 * g + 8]  = 0.0;
+            v4sigma4[15 * g + 9]  = 0.0;
             v4sigma4[15 * g + 10] = 0.0;
             v4sigma4[15 * g + 11] = 0.0;
             v4sigma4[15 * g + 12] = 0.0;
@@ -1150,35 +1106,34 @@ screenLxcFockForGGA(double*       rho,
         }
 
         // rho_b and sigma_bb
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
             v4rho4[5 * g + 1] = 0.0;
             v4rho4[5 * g + 2] = 0.0;
             v4rho4[5 * g + 3] = 0.0;
             v4rho4[5 * g + 4] = 0.0;
 
-            v4rho3sigma[12 * g + 1] = 0.0;
-            v4rho3sigma[12 * g + 2] = 0.0;
-            v4rho3sigma[12 * g + 3] = 0.0;
-            v4rho3sigma[12 * g + 4] = 0.0;
-            v4rho3sigma[12 * g + 5] = 0.0;
-            v4rho3sigma[12 * g + 6] = 0.0;
-            v4rho3sigma[12 * g + 7] = 0.0;
-            v4rho3sigma[12 * g + 8] = 0.0;
-            v4rho3sigma[12 * g + 9] = 0.0;
+            v4rho3sigma[12 * g + 1]  = 0.0;
+            v4rho3sigma[12 * g + 2]  = 0.0;
+            v4rho3sigma[12 * g + 3]  = 0.0;
+            v4rho3sigma[12 * g + 4]  = 0.0;
+            v4rho3sigma[12 * g + 5]  = 0.0;
+            v4rho3sigma[12 * g + 6]  = 0.0;
+            v4rho3sigma[12 * g + 7]  = 0.0;
+            v4rho3sigma[12 * g + 8]  = 0.0;
+            v4rho3sigma[12 * g + 9]  = 0.0;
             v4rho3sigma[12 * g + 10] = 0.0;
             v4rho3sigma[12 * g + 11] = 0.0;
 
-            v4rho2sigma2[18 * g + 1] = 0.0;
-            v4rho2sigma2[18 * g + 2] = 0.0;
-            v4rho2sigma2[18 * g + 3] = 0.0;
-            v4rho2sigma2[18 * g + 4] = 0.0;
-            v4rho2sigma2[18 * g + 5] = 0.0;
-            v4rho2sigma2[18 * g + 6] = 0.0;
-            v4rho2sigma2[18 * g + 7] = 0.0;
-            v4rho2sigma2[18 * g + 8] = 0.0;
-            v4rho2sigma2[18 * g + 9] = 0.0;
+            v4rho2sigma2[18 * g + 1]  = 0.0;
+            v4rho2sigma2[18 * g + 2]  = 0.0;
+            v4rho2sigma2[18 * g + 3]  = 0.0;
+            v4rho2sigma2[18 * g + 4]  = 0.0;
+            v4rho2sigma2[18 * g + 5]  = 0.0;
+            v4rho2sigma2[18 * g + 6]  = 0.0;
+            v4rho2sigma2[18 * g + 7]  = 0.0;
+            v4rho2sigma2[18 * g + 8]  = 0.0;
+            v4rho2sigma2[18 * g + 9]  = 0.0;
             v4rho2sigma2[18 * g + 10] = 0.0;
             v4rho2sigma2[18 * g + 11] = 0.0;
             v4rho2sigma2[18 * g + 12] = 0.0;
@@ -1188,15 +1143,15 @@ screenLxcFockForGGA(double*       rho,
             v4rho2sigma2[18 * g + 16] = 0.0;
             v4rho2sigma2[18 * g + 17] = 0.0;
 
-            v4rhosigma3[20 * g + 1] = 0.0;
-            v4rhosigma3[20 * g + 2] = 0.0;
-            v4rhosigma3[20 * g + 3] = 0.0;
-            v4rhosigma3[20 * g + 4] = 0.0;
-            v4rhosigma3[20 * g + 5] = 0.0;
-            v4rhosigma3[20 * g + 6] = 0.0;
-            v4rhosigma3[20 * g + 7] = 0.0;
-            v4rhosigma3[20 * g + 8] = 0.0;
-            v4rhosigma3[20 * g + 9] = 0.0;
+            v4rhosigma3[20 * g + 1]  = 0.0;
+            v4rhosigma3[20 * g + 2]  = 0.0;
+            v4rhosigma3[20 * g + 3]  = 0.0;
+            v4rhosigma3[20 * g + 4]  = 0.0;
+            v4rhosigma3[20 * g + 5]  = 0.0;
+            v4rhosigma3[20 * g + 6]  = 0.0;
+            v4rhosigma3[20 * g + 7]  = 0.0;
+            v4rhosigma3[20 * g + 8]  = 0.0;
+            v4rhosigma3[20 * g + 9]  = 0.0;
             v4rhosigma3[20 * g + 10] = 0.0;
             v4rhosigma3[20 * g + 11] = 0.0;
             v4rhosigma3[20 * g + 12] = 0.0;
@@ -1208,15 +1163,15 @@ screenLxcFockForGGA(double*       rho,
             v4rhosigma3[20 * g + 18] = 0.0;
             v4rhosigma3[20 * g + 19] = 0.0;
 
-            v4sigma4[15 * g + 1] = 0.0;
-            v4sigma4[15 * g + 2] = 0.0;
-            v4sigma4[15 * g + 3] = 0.0;
-            v4sigma4[15 * g + 4] = 0.0;
-            v4sigma4[15 * g + 5] = 0.0;
-            v4sigma4[15 * g + 6] = 0.0;
-            v4sigma4[15 * g + 7] = 0.0;
-            v4sigma4[15 * g + 8] = 0.0;
-            v4sigma4[15 * g + 9] = 0.0;
+            v4sigma4[15 * g + 1]  = 0.0;
+            v4sigma4[15 * g + 2]  = 0.0;
+            v4sigma4[15 * g + 3]  = 0.0;
+            v4sigma4[15 * g + 4]  = 0.0;
+            v4sigma4[15 * g + 5]  = 0.0;
+            v4sigma4[15 * g + 6]  = 0.0;
+            v4sigma4[15 * g + 7]  = 0.0;
+            v4sigma4[15 * g + 8]  = 0.0;
+            v4sigma4[15 * g + 9]  = 0.0;
             v4sigma4[15 * g + 10] = 0.0;
             v4sigma4[15 * g + 11] = 0.0;
             v4sigma4[15 * g + 12] = 0.0;
@@ -1270,13 +1225,12 @@ screenLxcFockForMGGA(double*       rho,
                      const double  densityThreshold)
 {
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold = getTauScreeningThreshold();
+    double tauThreshold   = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a, sigma_aa and tau_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
             v4rho4[5 * g + 0] = 0.0;
@@ -1284,16 +1238,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rho4[5 * g + 2] = 0.0;
             v4rho4[5 * g + 3] = 0.0;
 
-            v4rho3sigma[12 * g + 0] = 0.0;
-            v4rho3sigma[12 * g + 1] = 0.0;
-            v4rho3sigma[12 * g + 2] = 0.0;
-            v4rho3sigma[12 * g + 3] = 0.0;
-            v4rho3sigma[12 * g + 4] = 0.0;
-            v4rho3sigma[12 * g + 5] = 0.0;
-            v4rho3sigma[12 * g + 6] = 0.0;
-            v4rho3sigma[12 * g + 7] = 0.0;
-            v4rho3sigma[12 * g + 8] = 0.0;
-            v4rho3sigma[12 * g + 9] = 0.0;
+            v4rho3sigma[12 * g + 0]  = 0.0;
+            v4rho3sigma[12 * g + 1]  = 0.0;
+            v4rho3sigma[12 * g + 2]  = 0.0;
+            v4rho3sigma[12 * g + 3]  = 0.0;
+            v4rho3sigma[12 * g + 4]  = 0.0;
+            v4rho3sigma[12 * g + 5]  = 0.0;
+            v4rho3sigma[12 * g + 6]  = 0.0;
+            v4rho3sigma[12 * g + 7]  = 0.0;
+            v4rho3sigma[12 * g + 8]  = 0.0;
+            v4rho3sigma[12 * g + 9]  = 0.0;
             v4rho3sigma[12 * g + 10] = 0.0;
 
             v4rho3lapl[8 * g + 0] = 0.0;
@@ -1312,16 +1266,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rho3tau[8 * g + 5] = 0.0;
             v4rho3tau[8 * g + 6] = 0.0;
 
-            v4rho2sigma2[18 * g + 0] = 0.0;
-            v4rho2sigma2[18 * g + 1] = 0.0;
-            v4rho2sigma2[18 * g + 2] = 0.0;
-            v4rho2sigma2[18 * g + 3] = 0.0;
-            v4rho2sigma2[18 * g + 4] = 0.0;
-            v4rho2sigma2[18 * g + 5] = 0.0;
-            v4rho2sigma2[18 * g + 6] = 0.0;
-            v4rho2sigma2[18 * g + 7] = 0.0;
-            v4rho2sigma2[18 * g + 8] = 0.0;
-            v4rho2sigma2[18 * g + 9] = 0.0;
+            v4rho2sigma2[18 * g + 0]  = 0.0;
+            v4rho2sigma2[18 * g + 1]  = 0.0;
+            v4rho2sigma2[18 * g + 2]  = 0.0;
+            v4rho2sigma2[18 * g + 3]  = 0.0;
+            v4rho2sigma2[18 * g + 4]  = 0.0;
+            v4rho2sigma2[18 * g + 5]  = 0.0;
+            v4rho2sigma2[18 * g + 6]  = 0.0;
+            v4rho2sigma2[18 * g + 7]  = 0.0;
+            v4rho2sigma2[18 * g + 8]  = 0.0;
+            v4rho2sigma2[18 * g + 9]  = 0.0;
             v4rho2sigma2[18 * g + 10] = 0.0;
             v4rho2sigma2[18 * g + 11] = 0.0;
             v4rho2sigma2[18 * g + 12] = 0.0;
@@ -1330,16 +1284,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rho2sigma2[18 * g + 15] = 0.0;
             v4rho2sigma2[18 * g + 16] = 0.0;
 
-            v4rho2sigmalapl[18 * g + 0] = 0.0;
-            v4rho2sigmalapl[18 * g + 1] = 0.0;
-            v4rho2sigmalapl[18 * g + 2] = 0.0;
-            v4rho2sigmalapl[18 * g + 3] = 0.0;
-            v4rho2sigmalapl[18 * g + 4] = 0.0;
-            v4rho2sigmalapl[18 * g + 5] = 0.0;
-            v4rho2sigmalapl[18 * g + 6] = 0.0;
-            v4rho2sigmalapl[18 * g + 7] = 0.0;
-            v4rho2sigmalapl[18 * g + 8] = 0.0;
-            v4rho2sigmalapl[18 * g + 9] = 0.0;
+            v4rho2sigmalapl[18 * g + 0]  = 0.0;
+            v4rho2sigmalapl[18 * g + 1]  = 0.0;
+            v4rho2sigmalapl[18 * g + 2]  = 0.0;
+            v4rho2sigmalapl[18 * g + 3]  = 0.0;
+            v4rho2sigmalapl[18 * g + 4]  = 0.0;
+            v4rho2sigmalapl[18 * g + 5]  = 0.0;
+            v4rho2sigmalapl[18 * g + 6]  = 0.0;
+            v4rho2sigmalapl[18 * g + 7]  = 0.0;
+            v4rho2sigmalapl[18 * g + 8]  = 0.0;
+            v4rho2sigmalapl[18 * g + 9]  = 0.0;
             v4rho2sigmalapl[18 * g + 10] = 0.0;
             v4rho2sigmalapl[18 * g + 11] = 0.0;
             v4rho2sigmalapl[18 * g + 12] = 0.0;
@@ -1348,16 +1302,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rho2sigmalapl[18 * g + 15] = 0.0;
             v4rho2sigmalapl[18 * g + 16] = 0.0;
 
-            v4rho2sigmatau[18 * g + 0] = 0.0;
-            v4rho2sigmatau[18 * g + 1] = 0.0;
-            v4rho2sigmatau[18 * g + 2] = 0.0;
-            v4rho2sigmatau[18 * g + 3] = 0.0;
-            v4rho2sigmatau[18 * g + 4] = 0.0;
-            v4rho2sigmatau[18 * g + 5] = 0.0;
-            v4rho2sigmatau[18 * g + 6] = 0.0;
-            v4rho2sigmatau[18 * g + 7] = 0.0;
-            v4rho2sigmatau[18 * g + 8] = 0.0;
-            v4rho2sigmatau[18 * g + 9] = 0.0;
+            v4rho2sigmatau[18 * g + 0]  = 0.0;
+            v4rho2sigmatau[18 * g + 1]  = 0.0;
+            v4rho2sigmatau[18 * g + 2]  = 0.0;
+            v4rho2sigmatau[18 * g + 3]  = 0.0;
+            v4rho2sigmatau[18 * g + 4]  = 0.0;
+            v4rho2sigmatau[18 * g + 5]  = 0.0;
+            v4rho2sigmatau[18 * g + 6]  = 0.0;
+            v4rho2sigmatau[18 * g + 7]  = 0.0;
+            v4rho2sigmatau[18 * g + 8]  = 0.0;
+            v4rho2sigmatau[18 * g + 9]  = 0.0;
             v4rho2sigmatau[18 * g + 10] = 0.0;
             v4rho2sigmatau[18 * g + 11] = 0.0;
             v4rho2sigmatau[18 * g + 12] = 0.0;
@@ -1375,16 +1329,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rho2lapl2[9 * g + 6] = 0.0;
             v4rho2lapl2[9 * g + 7] = 0.0;
 
-            v4rho2lapltau[12 * g + 0] = 0.0;
-            v4rho2lapltau[12 * g + 1] = 0.0;
-            v4rho2lapltau[12 * g + 2] = 0.0;
-            v4rho2lapltau[12 * g + 3] = 0.0;
-            v4rho2lapltau[12 * g + 4] = 0.0;
-            v4rho2lapltau[12 * g + 5] = 0.0;
-            v4rho2lapltau[12 * g + 6] = 0.0;
-            v4rho2lapltau[12 * g + 7] = 0.0;
-            v4rho2lapltau[12 * g + 8] = 0.0;
-            v4rho2lapltau[12 * g + 9] = 0.0;
+            v4rho2lapltau[12 * g + 0]  = 0.0;
+            v4rho2lapltau[12 * g + 1]  = 0.0;
+            v4rho2lapltau[12 * g + 2]  = 0.0;
+            v4rho2lapltau[12 * g + 3]  = 0.0;
+            v4rho2lapltau[12 * g + 4]  = 0.0;
+            v4rho2lapltau[12 * g + 5]  = 0.0;
+            v4rho2lapltau[12 * g + 6]  = 0.0;
+            v4rho2lapltau[12 * g + 7]  = 0.0;
+            v4rho2lapltau[12 * g + 8]  = 0.0;
+            v4rho2lapltau[12 * g + 9]  = 0.0;
             v4rho2lapltau[12 * g + 10] = 0.0;
 
             v4rho2tau2[9 * g + 0] = 0.0;
@@ -1396,16 +1350,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rho2tau2[9 * g + 6] = 0.0;
             v4rho2tau2[9 * g + 7] = 0.0;
 
-            v4rhosigma3[20 * g + 0] = 0.0;
-            v4rhosigma3[20 * g + 1] = 0.0;
-            v4rhosigma3[20 * g + 2] = 0.0;
-            v4rhosigma3[20 * g + 3] = 0.0;
-            v4rhosigma3[20 * g + 4] = 0.0;
-            v4rhosigma3[20 * g + 5] = 0.0;
-            v4rhosigma3[20 * g + 6] = 0.0;
-            v4rhosigma3[20 * g + 7] = 0.0;
-            v4rhosigma3[20 * g + 8] = 0.0;
-            v4rhosigma3[20 * g + 9] = 0.0;
+            v4rhosigma3[20 * g + 0]  = 0.0;
+            v4rhosigma3[20 * g + 1]  = 0.0;
+            v4rhosigma3[20 * g + 2]  = 0.0;
+            v4rhosigma3[20 * g + 3]  = 0.0;
+            v4rhosigma3[20 * g + 4]  = 0.0;
+            v4rhosigma3[20 * g + 5]  = 0.0;
+            v4rhosigma3[20 * g + 6]  = 0.0;
+            v4rhosigma3[20 * g + 7]  = 0.0;
+            v4rhosigma3[20 * g + 8]  = 0.0;
+            v4rhosigma3[20 * g + 9]  = 0.0;
             v4rhosigma3[20 * g + 10] = 0.0;
             v4rhosigma3[20 * g + 11] = 0.0;
             v4rhosigma3[20 * g + 12] = 0.0;
@@ -1417,16 +1371,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigma3[20 * g + 18] = 0.0;
 
             // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24)
-            v4rhosigma2lapl[36 * g + 0] = 0.0;
-            v4rhosigma2lapl[36 * g + 1] = 0.0;
-            v4rhosigma2lapl[36 * g + 2] = 0.0;
-            v4rhosigma2lapl[36 * g + 3] = 0.0;
-            v4rhosigma2lapl[36 * g + 4] = 0.0;
-            v4rhosigma2lapl[36 * g + 5] = 0.0;
-            v4rhosigma2lapl[36 * g + 6] = 0.0;
-            v4rhosigma2lapl[36 * g + 7] = 0.0;
-            v4rhosigma2lapl[36 * g + 8] = 0.0;
-            v4rhosigma2lapl[36 * g + 9] = 0.0;
+            v4rhosigma2lapl[36 * g + 0]  = 0.0;
+            v4rhosigma2lapl[36 * g + 1]  = 0.0;
+            v4rhosigma2lapl[36 * g + 2]  = 0.0;
+            v4rhosigma2lapl[36 * g + 3]  = 0.0;
+            v4rhosigma2lapl[36 * g + 4]  = 0.0;
+            v4rhosigma2lapl[36 * g + 5]  = 0.0;
+            v4rhosigma2lapl[36 * g + 6]  = 0.0;
+            v4rhosigma2lapl[36 * g + 7]  = 0.0;
+            v4rhosigma2lapl[36 * g + 8]  = 0.0;
+            v4rhosigma2lapl[36 * g + 9]  = 0.0;
             v4rhosigma2lapl[36 * g + 10] = 0.0;
             v4rhosigma2lapl[36 * g + 11] = 0.0;
             v4rhosigma2lapl[36 * g + 12] = 0.0;
@@ -1442,16 +1396,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigma2lapl[36 * g + 22] = 0.0;
 
             // v4rhosigma2tau: inconsistent size in libxc (36 vs 24)
-            v4rhosigma2tau[36 * g + 0] = 0.0;
-            v4rhosigma2tau[36 * g + 1] = 0.0;
-            v4rhosigma2tau[36 * g + 2] = 0.0;
-            v4rhosigma2tau[36 * g + 3] = 0.0;
-            v4rhosigma2tau[36 * g + 4] = 0.0;
-            v4rhosigma2tau[36 * g + 5] = 0.0;
-            v4rhosigma2tau[36 * g + 6] = 0.0;
-            v4rhosigma2tau[36 * g + 7] = 0.0;
-            v4rhosigma2tau[36 * g + 8] = 0.0;
-            v4rhosigma2tau[36 * g + 9] = 0.0;
+            v4rhosigma2tau[36 * g + 0]  = 0.0;
+            v4rhosigma2tau[36 * g + 1]  = 0.0;
+            v4rhosigma2tau[36 * g + 2]  = 0.0;
+            v4rhosigma2tau[36 * g + 3]  = 0.0;
+            v4rhosigma2tau[36 * g + 4]  = 0.0;
+            v4rhosigma2tau[36 * g + 5]  = 0.0;
+            v4rhosigma2tau[36 * g + 6]  = 0.0;
+            v4rhosigma2tau[36 * g + 7]  = 0.0;
+            v4rhosigma2tau[36 * g + 8]  = 0.0;
+            v4rhosigma2tau[36 * g + 9]  = 0.0;
             v4rhosigma2tau[36 * g + 10] = 0.0;
             v4rhosigma2tau[36 * g + 11] = 0.0;
             v4rhosigma2tau[36 * g + 12] = 0.0;
@@ -1466,16 +1420,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigma2tau[36 * g + 21] = 0.0;
             v4rhosigma2tau[36 * g + 22] = 0.0;
 
-            v4rhosigmalapl2[18 * g + 0] = 0.0;
-            v4rhosigmalapl2[18 * g + 1] = 0.0;
-            v4rhosigmalapl2[18 * g + 2] = 0.0;
-            v4rhosigmalapl2[18 * g + 3] = 0.0;
-            v4rhosigmalapl2[18 * g + 4] = 0.0;
-            v4rhosigmalapl2[18 * g + 5] = 0.0;
-            v4rhosigmalapl2[18 * g + 6] = 0.0;
-            v4rhosigmalapl2[18 * g + 7] = 0.0;
-            v4rhosigmalapl2[18 * g + 8] = 0.0;
-            v4rhosigmalapl2[18 * g + 9] = 0.0;
+            v4rhosigmalapl2[18 * g + 0]  = 0.0;
+            v4rhosigmalapl2[18 * g + 1]  = 0.0;
+            v4rhosigmalapl2[18 * g + 2]  = 0.0;
+            v4rhosigmalapl2[18 * g + 3]  = 0.0;
+            v4rhosigmalapl2[18 * g + 4]  = 0.0;
+            v4rhosigmalapl2[18 * g + 5]  = 0.0;
+            v4rhosigmalapl2[18 * g + 6]  = 0.0;
+            v4rhosigmalapl2[18 * g + 7]  = 0.0;
+            v4rhosigmalapl2[18 * g + 8]  = 0.0;
+            v4rhosigmalapl2[18 * g + 9]  = 0.0;
             v4rhosigmalapl2[18 * g + 10] = 0.0;
             v4rhosigmalapl2[18 * g + 11] = 0.0;
             v4rhosigmalapl2[18 * g + 12] = 0.0;
@@ -1484,16 +1438,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigmalapl2[18 * g + 15] = 0.0;
             v4rhosigmalapl2[18 * g + 16] = 0.0;
 
-            v4rhosigmalapltau[24 * g + 0] = 0.0;
-            v4rhosigmalapltau[24 * g + 1] = 0.0;
-            v4rhosigmalapltau[24 * g + 2] = 0.0;
-            v4rhosigmalapltau[24 * g + 3] = 0.0;
-            v4rhosigmalapltau[24 * g + 4] = 0.0;
-            v4rhosigmalapltau[24 * g + 5] = 0.0;
-            v4rhosigmalapltau[24 * g + 6] = 0.0;
-            v4rhosigmalapltau[24 * g + 7] = 0.0;
-            v4rhosigmalapltau[24 * g + 8] = 0.0;
-            v4rhosigmalapltau[24 * g + 9] = 0.0;
+            v4rhosigmalapltau[24 * g + 0]  = 0.0;
+            v4rhosigmalapltau[24 * g + 1]  = 0.0;
+            v4rhosigmalapltau[24 * g + 2]  = 0.0;
+            v4rhosigmalapltau[24 * g + 3]  = 0.0;
+            v4rhosigmalapltau[24 * g + 4]  = 0.0;
+            v4rhosigmalapltau[24 * g + 5]  = 0.0;
+            v4rhosigmalapltau[24 * g + 6]  = 0.0;
+            v4rhosigmalapltau[24 * g + 7]  = 0.0;
+            v4rhosigmalapltau[24 * g + 8]  = 0.0;
+            v4rhosigmalapltau[24 * g + 9]  = 0.0;
             v4rhosigmalapltau[24 * g + 10] = 0.0;
             v4rhosigmalapltau[24 * g + 11] = 0.0;
             v4rhosigmalapltau[24 * g + 12] = 0.0;
@@ -1509,16 +1463,16 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigmalapltau[24 * g + 22] = 0.0;
 
             // v4rhosigmatau2: inconsistent size in libxc (36 vs 18)
-            v4rhosigmatau2[36 * g + 0] = 0.0;
-            v4rhosigmatau2[36 * g + 1] = 0.0;
-            v4rhosigmatau2[36 * g + 2] = 0.0;
-            v4rhosigmatau2[36 * g + 3] = 0.0;
-            v4rhosigmatau2[36 * g + 4] = 0.0;
-            v4rhosigmatau2[36 * g + 5] = 0.0;
-            v4rhosigmatau2[36 * g + 6] = 0.0;
-            v4rhosigmatau2[36 * g + 7] = 0.0;
-            v4rhosigmatau2[36 * g + 8] = 0.0;
-            v4rhosigmatau2[36 * g + 9] = 0.0;
+            v4rhosigmatau2[36 * g + 0]  = 0.0;
+            v4rhosigmatau2[36 * g + 1]  = 0.0;
+            v4rhosigmatau2[36 * g + 2]  = 0.0;
+            v4rhosigmatau2[36 * g + 3]  = 0.0;
+            v4rhosigmatau2[36 * g + 4]  = 0.0;
+            v4rhosigmatau2[36 * g + 5]  = 0.0;
+            v4rhosigmatau2[36 * g + 6]  = 0.0;
+            v4rhosigmatau2[36 * g + 7]  = 0.0;
+            v4rhosigmatau2[36 * g + 8]  = 0.0;
+            v4rhosigmatau2[36 * g + 9]  = 0.0;
             v4rhosigmatau2[36 * g + 10] = 0.0;
             v4rhosigmatau2[36 * g + 11] = 0.0;
             v4rhosigmatau2[36 * g + 12] = 0.0;
@@ -1535,28 +1489,28 @@ screenLxcFockForMGGA(double*       rho,
             v4rholapl3[8 * g + 5] = 0.0;
             v4rholapl3[8 * g + 6] = 0.0;
 
-            v4rholapl2tau[12 * g + 0] = 0.0;
-            v4rholapl2tau[12 * g + 1] = 0.0;
-            v4rholapl2tau[12 * g + 2] = 0.0;
-            v4rholapl2tau[12 * g + 3] = 0.0;
-            v4rholapl2tau[12 * g + 4] = 0.0;
-            v4rholapl2tau[12 * g + 5] = 0.0;
-            v4rholapl2tau[12 * g + 6] = 0.0;
-            v4rholapl2tau[12 * g + 7] = 0.0;
-            v4rholapl2tau[12 * g + 8] = 0.0;
-            v4rholapl2tau[12 * g + 9] = 0.0;
+            v4rholapl2tau[12 * g + 0]  = 0.0;
+            v4rholapl2tau[12 * g + 1]  = 0.0;
+            v4rholapl2tau[12 * g + 2]  = 0.0;
+            v4rholapl2tau[12 * g + 3]  = 0.0;
+            v4rholapl2tau[12 * g + 4]  = 0.0;
+            v4rholapl2tau[12 * g + 5]  = 0.0;
+            v4rholapl2tau[12 * g + 6]  = 0.0;
+            v4rholapl2tau[12 * g + 7]  = 0.0;
+            v4rholapl2tau[12 * g + 8]  = 0.0;
+            v4rholapl2tau[12 * g + 9]  = 0.0;
             v4rholapl2tau[12 * g + 10] = 0.0;
 
-            v4rholapltau2[12 * g + 0] = 0.0;
-            v4rholapltau2[12 * g + 1] = 0.0;
-            v4rholapltau2[12 * g + 2] = 0.0;
-            v4rholapltau2[12 * g + 3] = 0.0;
-            v4rholapltau2[12 * g + 4] = 0.0;
-            v4rholapltau2[12 * g + 5] = 0.0;
-            v4rholapltau2[12 * g + 6] = 0.0;
-            v4rholapltau2[12 * g + 7] = 0.0;
-            v4rholapltau2[12 * g + 8] = 0.0;
-            v4rholapltau2[12 * g + 9] = 0.0;
+            v4rholapltau2[12 * g + 0]  = 0.0;
+            v4rholapltau2[12 * g + 1]  = 0.0;
+            v4rholapltau2[12 * g + 2]  = 0.0;
+            v4rholapltau2[12 * g + 3]  = 0.0;
+            v4rholapltau2[12 * g + 4]  = 0.0;
+            v4rholapltau2[12 * g + 5]  = 0.0;
+            v4rholapltau2[12 * g + 6]  = 0.0;
+            v4rholapltau2[12 * g + 7]  = 0.0;
+            v4rholapltau2[12 * g + 8]  = 0.0;
+            v4rholapltau2[12 * g + 9]  = 0.0;
             v4rholapltau2[12 * g + 10] = 0.0;
 
             v4rhotau3[8 * g + 0] = 0.0;
@@ -1567,31 +1521,31 @@ screenLxcFockForMGGA(double*       rho,
             v4rhotau3[8 * g + 5] = 0.0;
             v4rhotau3[8 * g + 6] = 0.0;
 
-            v4sigma4[15 * g + 0] = 0.0;
-            v4sigma4[15 * g + 1] = 0.0;
-            v4sigma4[15 * g + 2] = 0.0;
-            v4sigma4[15 * g + 3] = 0.0;
-            v4sigma4[15 * g + 4] = 0.0;
-            v4sigma4[15 * g + 5] = 0.0;
-            v4sigma4[15 * g + 6] = 0.0;
-            v4sigma4[15 * g + 7] = 0.0;
-            v4sigma4[15 * g + 8] = 0.0;
-            v4sigma4[15 * g + 9] = 0.0;
+            v4sigma4[15 * g + 0]  = 0.0;
+            v4sigma4[15 * g + 1]  = 0.0;
+            v4sigma4[15 * g + 2]  = 0.0;
+            v4sigma4[15 * g + 3]  = 0.0;
+            v4sigma4[15 * g + 4]  = 0.0;
+            v4sigma4[15 * g + 5]  = 0.0;
+            v4sigma4[15 * g + 6]  = 0.0;
+            v4sigma4[15 * g + 7]  = 0.0;
+            v4sigma4[15 * g + 8]  = 0.0;
+            v4sigma4[15 * g + 9]  = 0.0;
             v4sigma4[15 * g + 10] = 0.0;
             v4sigma4[15 * g + 11] = 0.0;
             v4sigma4[15 * g + 12] = 0.0;
             v4sigma4[15 * g + 13] = 0.0;
 
-            v4sigma3lapl[20 * g + 0] = 0.0;
-            v4sigma3lapl[20 * g + 1] = 0.0;
-            v4sigma3lapl[20 * g + 2] = 0.0;
-            v4sigma3lapl[20 * g + 3] = 0.0;
-            v4sigma3lapl[20 * g + 4] = 0.0;
-            v4sigma3lapl[20 * g + 5] = 0.0;
-            v4sigma3lapl[20 * g + 6] = 0.0;
-            v4sigma3lapl[20 * g + 7] = 0.0;
-            v4sigma3lapl[20 * g + 8] = 0.0;
-            v4sigma3lapl[20 * g + 9] = 0.0;
+            v4sigma3lapl[20 * g + 0]  = 0.0;
+            v4sigma3lapl[20 * g + 1]  = 0.0;
+            v4sigma3lapl[20 * g + 2]  = 0.0;
+            v4sigma3lapl[20 * g + 3]  = 0.0;
+            v4sigma3lapl[20 * g + 4]  = 0.0;
+            v4sigma3lapl[20 * g + 5]  = 0.0;
+            v4sigma3lapl[20 * g + 6]  = 0.0;
+            v4sigma3lapl[20 * g + 7]  = 0.0;
+            v4sigma3lapl[20 * g + 8]  = 0.0;
+            v4sigma3lapl[20 * g + 9]  = 0.0;
             v4sigma3lapl[20 * g + 10] = 0.0;
             v4sigma3lapl[20 * g + 11] = 0.0;
             v4sigma3lapl[20 * g + 12] = 0.0;
@@ -1603,16 +1557,16 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma3lapl[20 * g + 18] = 0.0;
 
             // v4sigma3tau: inconsistent size in libxc (30 vs 20)
-            v4sigma3tau[30 * g + 0] = 0.0;
-            v4sigma3tau[30 * g + 1] = 0.0;
-            v4sigma3tau[30 * g + 2] = 0.0;
-            v4sigma3tau[30 * g + 3] = 0.0;
-            v4sigma3tau[30 * g + 4] = 0.0;
-            v4sigma3tau[30 * g + 5] = 0.0;
-            v4sigma3tau[30 * g + 6] = 0.0;
-            v4sigma3tau[30 * g + 7] = 0.0;
-            v4sigma3tau[30 * g + 8] = 0.0;
-            v4sigma3tau[30 * g + 9] = 0.0;
+            v4sigma3tau[30 * g + 0]  = 0.0;
+            v4sigma3tau[30 * g + 1]  = 0.0;
+            v4sigma3tau[30 * g + 2]  = 0.0;
+            v4sigma3tau[30 * g + 3]  = 0.0;
+            v4sigma3tau[30 * g + 4]  = 0.0;
+            v4sigma3tau[30 * g + 5]  = 0.0;
+            v4sigma3tau[30 * g + 6]  = 0.0;
+            v4sigma3tau[30 * g + 7]  = 0.0;
+            v4sigma3tau[30 * g + 8]  = 0.0;
+            v4sigma3tau[30 * g + 9]  = 0.0;
             v4sigma3tau[30 * g + 10] = 0.0;
             v4sigma3tau[30 * g + 11] = 0.0;
             v4sigma3tau[30 * g + 12] = 0.0;
@@ -1623,16 +1577,16 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma3tau[30 * g + 17] = 0.0;
             v4sigma3tau[30 * g + 18] = 0.0;
 
-            v4sigma2lapl2[18 * g + 0] = 0.0;
-            v4sigma2lapl2[18 * g + 1] = 0.0;
-            v4sigma2lapl2[18 * g + 2] = 0.0;
-            v4sigma2lapl2[18 * g + 3] = 0.0;
-            v4sigma2lapl2[18 * g + 4] = 0.0;
-            v4sigma2lapl2[18 * g + 5] = 0.0;
-            v4sigma2lapl2[18 * g + 6] = 0.0;
-            v4sigma2lapl2[18 * g + 7] = 0.0;
-            v4sigma2lapl2[18 * g + 8] = 0.0;
-            v4sigma2lapl2[18 * g + 9] = 0.0;
+            v4sigma2lapl2[18 * g + 0]  = 0.0;
+            v4sigma2lapl2[18 * g + 1]  = 0.0;
+            v4sigma2lapl2[18 * g + 2]  = 0.0;
+            v4sigma2lapl2[18 * g + 3]  = 0.0;
+            v4sigma2lapl2[18 * g + 4]  = 0.0;
+            v4sigma2lapl2[18 * g + 5]  = 0.0;
+            v4sigma2lapl2[18 * g + 6]  = 0.0;
+            v4sigma2lapl2[18 * g + 7]  = 0.0;
+            v4sigma2lapl2[18 * g + 8]  = 0.0;
+            v4sigma2lapl2[18 * g + 9]  = 0.0;
             v4sigma2lapl2[18 * g + 10] = 0.0;
             v4sigma2lapl2[18 * g + 11] = 0.0;
             v4sigma2lapl2[18 * g + 12] = 0.0;
@@ -1641,16 +1595,16 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma2lapl2[18 * g + 15] = 0.0;
             v4sigma2lapl2[18 * g + 16] = 0.0;
 
-            v4sigma2lapltau[24 * g + 0] = 0.0;
-            v4sigma2lapltau[24 * g + 1] = 0.0;
-            v4sigma2lapltau[24 * g + 2] = 0.0;
-            v4sigma2lapltau[24 * g + 3] = 0.0;
-            v4sigma2lapltau[24 * g + 4] = 0.0;
-            v4sigma2lapltau[24 * g + 5] = 0.0;
-            v4sigma2lapltau[24 * g + 6] = 0.0;
-            v4sigma2lapltau[24 * g + 7] = 0.0;
-            v4sigma2lapltau[24 * g + 8] = 0.0;
-            v4sigma2lapltau[24 * g + 9] = 0.0;
+            v4sigma2lapltau[24 * g + 0]  = 0.0;
+            v4sigma2lapltau[24 * g + 1]  = 0.0;
+            v4sigma2lapltau[24 * g + 2]  = 0.0;
+            v4sigma2lapltau[24 * g + 3]  = 0.0;
+            v4sigma2lapltau[24 * g + 4]  = 0.0;
+            v4sigma2lapltau[24 * g + 5]  = 0.0;
+            v4sigma2lapltau[24 * g + 6]  = 0.0;
+            v4sigma2lapltau[24 * g + 7]  = 0.0;
+            v4sigma2lapltau[24 * g + 8]  = 0.0;
+            v4sigma2lapltau[24 * g + 9]  = 0.0;
             v4sigma2lapltau[24 * g + 10] = 0.0;
             v4sigma2lapltau[24 * g + 11] = 0.0;
             v4sigma2lapltau[24 * g + 12] = 0.0;
@@ -1665,16 +1619,16 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma2lapltau[24 * g + 21] = 0.0;
             v4sigma2lapltau[24 * g + 22] = 0.0;
 
-            v4sigma2tau2[18 * g + 0] = 0.0;
-            v4sigma2tau2[18 * g + 1] = 0.0;
-            v4sigma2tau2[18 * g + 2] = 0.0;
-            v4sigma2tau2[18 * g + 3] = 0.0;
-            v4sigma2tau2[18 * g + 4] = 0.0;
-            v4sigma2tau2[18 * g + 5] = 0.0;
-            v4sigma2tau2[18 * g + 6] = 0.0;
-            v4sigma2tau2[18 * g + 7] = 0.0;
-            v4sigma2tau2[18 * g + 8] = 0.0;
-            v4sigma2tau2[18 * g + 9] = 0.0;
+            v4sigma2tau2[18 * g + 0]  = 0.0;
+            v4sigma2tau2[18 * g + 1]  = 0.0;
+            v4sigma2tau2[18 * g + 2]  = 0.0;
+            v4sigma2tau2[18 * g + 3]  = 0.0;
+            v4sigma2tau2[18 * g + 4]  = 0.0;
+            v4sigma2tau2[18 * g + 5]  = 0.0;
+            v4sigma2tau2[18 * g + 6]  = 0.0;
+            v4sigma2tau2[18 * g + 7]  = 0.0;
+            v4sigma2tau2[18 * g + 8]  = 0.0;
+            v4sigma2tau2[18 * g + 9]  = 0.0;
             v4sigma2tau2[18 * g + 10] = 0.0;
             v4sigma2tau2[18 * g + 11] = 0.0;
             v4sigma2tau2[18 * g + 12] = 0.0;
@@ -1683,28 +1637,28 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma2tau2[18 * g + 15] = 0.0;
             v4sigma2tau2[18 * g + 16] = 0.0;
 
-            v4sigmalapl3[12 * g + 0] = 0.0;
-            v4sigmalapl3[12 * g + 1] = 0.0;
-            v4sigmalapl3[12 * g + 2] = 0.0;
-            v4sigmalapl3[12 * g + 3] = 0.0;
-            v4sigmalapl3[12 * g + 4] = 0.0;
-            v4sigmalapl3[12 * g + 5] = 0.0;
-            v4sigmalapl3[12 * g + 6] = 0.0;
-            v4sigmalapl3[12 * g + 7] = 0.0;
-            v4sigmalapl3[12 * g + 8] = 0.0;
-            v4sigmalapl3[12 * g + 9] = 0.0;
+            v4sigmalapl3[12 * g + 0]  = 0.0;
+            v4sigmalapl3[12 * g + 1]  = 0.0;
+            v4sigmalapl3[12 * g + 2]  = 0.0;
+            v4sigmalapl3[12 * g + 3]  = 0.0;
+            v4sigmalapl3[12 * g + 4]  = 0.0;
+            v4sigmalapl3[12 * g + 5]  = 0.0;
+            v4sigmalapl3[12 * g + 6]  = 0.0;
+            v4sigmalapl3[12 * g + 7]  = 0.0;
+            v4sigmalapl3[12 * g + 8]  = 0.0;
+            v4sigmalapl3[12 * g + 9]  = 0.0;
             v4sigmalapl3[12 * g + 10] = 0.0;
 
-            v4sigmalapl2tau[18 * g + 0] = 0.0;
-            v4sigmalapl2tau[18 * g + 1] = 0.0;
-            v4sigmalapl2tau[18 * g + 2] = 0.0;
-            v4sigmalapl2tau[18 * g + 3] = 0.0;
-            v4sigmalapl2tau[18 * g + 4] = 0.0;
-            v4sigmalapl2tau[18 * g + 5] = 0.0;
-            v4sigmalapl2tau[18 * g + 6] = 0.0;
-            v4sigmalapl2tau[18 * g + 7] = 0.0;
-            v4sigmalapl2tau[18 * g + 8] = 0.0;
-            v4sigmalapl2tau[18 * g + 9] = 0.0;
+            v4sigmalapl2tau[18 * g + 0]  = 0.0;
+            v4sigmalapl2tau[18 * g + 1]  = 0.0;
+            v4sigmalapl2tau[18 * g + 2]  = 0.0;
+            v4sigmalapl2tau[18 * g + 3]  = 0.0;
+            v4sigmalapl2tau[18 * g + 4]  = 0.0;
+            v4sigmalapl2tau[18 * g + 5]  = 0.0;
+            v4sigmalapl2tau[18 * g + 6]  = 0.0;
+            v4sigmalapl2tau[18 * g + 7]  = 0.0;
+            v4sigmalapl2tau[18 * g + 8]  = 0.0;
+            v4sigmalapl2tau[18 * g + 9]  = 0.0;
             v4sigmalapl2tau[18 * g + 10] = 0.0;
             v4sigmalapl2tau[18 * g + 11] = 0.0;
             v4sigmalapl2tau[18 * g + 12] = 0.0;
@@ -1713,16 +1667,16 @@ screenLxcFockForMGGA(double*       rho,
             v4sigmalapl2tau[18 * g + 15] = 0.0;
             v4sigmalapl2tau[18 * g + 16] = 0.0;
 
-            v4sigmalapltau2[18 * g + 0] = 0.0;
-            v4sigmalapltau2[18 * g + 1] = 0.0;
-            v4sigmalapltau2[18 * g + 2] = 0.0;
-            v4sigmalapltau2[18 * g + 3] = 0.0;
-            v4sigmalapltau2[18 * g + 4] = 0.0;
-            v4sigmalapltau2[18 * g + 5] = 0.0;
-            v4sigmalapltau2[18 * g + 6] = 0.0;
-            v4sigmalapltau2[18 * g + 7] = 0.0;
-            v4sigmalapltau2[18 * g + 8] = 0.0;
-            v4sigmalapltau2[18 * g + 9] = 0.0;
+            v4sigmalapltau2[18 * g + 0]  = 0.0;
+            v4sigmalapltau2[18 * g + 1]  = 0.0;
+            v4sigmalapltau2[18 * g + 2]  = 0.0;
+            v4sigmalapltau2[18 * g + 3]  = 0.0;
+            v4sigmalapltau2[18 * g + 4]  = 0.0;
+            v4sigmalapltau2[18 * g + 5]  = 0.0;
+            v4sigmalapltau2[18 * g + 6]  = 0.0;
+            v4sigmalapltau2[18 * g + 7]  = 0.0;
+            v4sigmalapltau2[18 * g + 8]  = 0.0;
+            v4sigmalapltau2[18 * g + 9]  = 0.0;
             v4sigmalapltau2[18 * g + 10] = 0.0;
             v4sigmalapltau2[18 * g + 11] = 0.0;
             v4sigmalapltau2[18 * g + 12] = 0.0;
@@ -1731,16 +1685,16 @@ screenLxcFockForMGGA(double*       rho,
             v4sigmalapltau2[18 * g + 15] = 0.0;
             v4sigmalapltau2[18 * g + 16] = 0.0;
 
-            v4sigmatau3[12 * g + 0] = 0.0;
-            v4sigmatau3[12 * g + 1] = 0.0;
-            v4sigmatau3[12 * g + 2] = 0.0;
-            v4sigmatau3[12 * g + 3] = 0.0;
-            v4sigmatau3[12 * g + 4] = 0.0;
-            v4sigmatau3[12 * g + 5] = 0.0;
-            v4sigmatau3[12 * g + 6] = 0.0;
-            v4sigmatau3[12 * g + 7] = 0.0;
-            v4sigmatau3[12 * g + 8] = 0.0;
-            v4sigmatau3[12 * g + 9] = 0.0;
+            v4sigmatau3[12 * g + 0]  = 0.0;
+            v4sigmatau3[12 * g + 1]  = 0.0;
+            v4sigmatau3[12 * g + 2]  = 0.0;
+            v4sigmatau3[12 * g + 3]  = 0.0;
+            v4sigmatau3[12 * g + 4]  = 0.0;
+            v4sigmatau3[12 * g + 5]  = 0.0;
+            v4sigmatau3[12 * g + 6]  = 0.0;
+            v4sigmatau3[12 * g + 7]  = 0.0;
+            v4sigmatau3[12 * g + 8]  = 0.0;
+            v4sigmatau3[12 * g + 9]  = 0.0;
             v4sigmatau3[12 * g + 10] = 0.0;
 
             v4lapl4[5 * g + 0] = 0.0;
@@ -1780,8 +1734,7 @@ screenLxcFockForMGGA(double*       rho,
         }
 
         // rho_b, sigma_bb and tau_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) ||
-            (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
             v4rho4[5 * g + 1] = 0.0;
@@ -1789,15 +1742,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rho4[5 * g + 3] = 0.0;
             v4rho4[5 * g + 4] = 0.0;
 
-            v4rho3sigma[12 * g + 1] = 0.0;
-            v4rho3sigma[12 * g + 2] = 0.0;
-            v4rho3sigma[12 * g + 3] = 0.0;
-            v4rho3sigma[12 * g + 4] = 0.0;
-            v4rho3sigma[12 * g + 5] = 0.0;
-            v4rho3sigma[12 * g + 6] = 0.0;
-            v4rho3sigma[12 * g + 7] = 0.0;
-            v4rho3sigma[12 * g + 8] = 0.0;
-            v4rho3sigma[12 * g + 9] = 0.0;
+            v4rho3sigma[12 * g + 1]  = 0.0;
+            v4rho3sigma[12 * g + 2]  = 0.0;
+            v4rho3sigma[12 * g + 3]  = 0.0;
+            v4rho3sigma[12 * g + 4]  = 0.0;
+            v4rho3sigma[12 * g + 5]  = 0.0;
+            v4rho3sigma[12 * g + 6]  = 0.0;
+            v4rho3sigma[12 * g + 7]  = 0.0;
+            v4rho3sigma[12 * g + 8]  = 0.0;
+            v4rho3sigma[12 * g + 9]  = 0.0;
             v4rho3sigma[12 * g + 10] = 0.0;
             v4rho3sigma[12 * g + 11] = 0.0;
 
@@ -1817,15 +1770,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rho3tau[8 * g + 6] = 0.0;
             v4rho3tau[8 * g + 7] = 0.0;
 
-            v4rho2sigma2[18 * g + 1] = 0.0;
-            v4rho2sigma2[18 * g + 2] = 0.0;
-            v4rho2sigma2[18 * g + 3] = 0.0;
-            v4rho2sigma2[18 * g + 4] = 0.0;
-            v4rho2sigma2[18 * g + 5] = 0.0;
-            v4rho2sigma2[18 * g + 6] = 0.0;
-            v4rho2sigma2[18 * g + 7] = 0.0;
-            v4rho2sigma2[18 * g + 8] = 0.0;
-            v4rho2sigma2[18 * g + 9] = 0.0;
+            v4rho2sigma2[18 * g + 1]  = 0.0;
+            v4rho2sigma2[18 * g + 2]  = 0.0;
+            v4rho2sigma2[18 * g + 3]  = 0.0;
+            v4rho2sigma2[18 * g + 4]  = 0.0;
+            v4rho2sigma2[18 * g + 5]  = 0.0;
+            v4rho2sigma2[18 * g + 6]  = 0.0;
+            v4rho2sigma2[18 * g + 7]  = 0.0;
+            v4rho2sigma2[18 * g + 8]  = 0.0;
+            v4rho2sigma2[18 * g + 9]  = 0.0;
             v4rho2sigma2[18 * g + 10] = 0.0;
             v4rho2sigma2[18 * g + 11] = 0.0;
             v4rho2sigma2[18 * g + 12] = 0.0;
@@ -1835,15 +1788,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rho2sigma2[18 * g + 16] = 0.0;
             v4rho2sigma2[18 * g + 17] = 0.0;
 
-            v4rho2sigmalapl[18 * g + 1] = 0.0;
-            v4rho2sigmalapl[18 * g + 2] = 0.0;
-            v4rho2sigmalapl[18 * g + 3] = 0.0;
-            v4rho2sigmalapl[18 * g + 4] = 0.0;
-            v4rho2sigmalapl[18 * g + 5] = 0.0;
-            v4rho2sigmalapl[18 * g + 6] = 0.0;
-            v4rho2sigmalapl[18 * g + 7] = 0.0;
-            v4rho2sigmalapl[18 * g + 8] = 0.0;
-            v4rho2sigmalapl[18 * g + 9] = 0.0;
+            v4rho2sigmalapl[18 * g + 1]  = 0.0;
+            v4rho2sigmalapl[18 * g + 2]  = 0.0;
+            v4rho2sigmalapl[18 * g + 3]  = 0.0;
+            v4rho2sigmalapl[18 * g + 4]  = 0.0;
+            v4rho2sigmalapl[18 * g + 5]  = 0.0;
+            v4rho2sigmalapl[18 * g + 6]  = 0.0;
+            v4rho2sigmalapl[18 * g + 7]  = 0.0;
+            v4rho2sigmalapl[18 * g + 8]  = 0.0;
+            v4rho2sigmalapl[18 * g + 9]  = 0.0;
             v4rho2sigmalapl[18 * g + 10] = 0.0;
             v4rho2sigmalapl[18 * g + 11] = 0.0;
             v4rho2sigmalapl[18 * g + 12] = 0.0;
@@ -1853,15 +1806,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rho2sigmalapl[18 * g + 16] = 0.0;
             v4rho2sigmalapl[18 * g + 17] = 0.0;
 
-            v4rho2sigmatau[18 * g + 1] = 0.0;
-            v4rho2sigmatau[18 * g + 2] = 0.0;
-            v4rho2sigmatau[18 * g + 3] = 0.0;
-            v4rho2sigmatau[18 * g + 4] = 0.0;
-            v4rho2sigmatau[18 * g + 5] = 0.0;
-            v4rho2sigmatau[18 * g + 6] = 0.0;
-            v4rho2sigmatau[18 * g + 7] = 0.0;
-            v4rho2sigmatau[18 * g + 8] = 0.0;
-            v4rho2sigmatau[18 * g + 9] = 0.0;
+            v4rho2sigmatau[18 * g + 1]  = 0.0;
+            v4rho2sigmatau[18 * g + 2]  = 0.0;
+            v4rho2sigmatau[18 * g + 3]  = 0.0;
+            v4rho2sigmatau[18 * g + 4]  = 0.0;
+            v4rho2sigmatau[18 * g + 5]  = 0.0;
+            v4rho2sigmatau[18 * g + 6]  = 0.0;
+            v4rho2sigmatau[18 * g + 7]  = 0.0;
+            v4rho2sigmatau[18 * g + 8]  = 0.0;
+            v4rho2sigmatau[18 * g + 9]  = 0.0;
             v4rho2sigmatau[18 * g + 10] = 0.0;
             v4rho2sigmatau[18 * g + 11] = 0.0;
             v4rho2sigmatau[18 * g + 12] = 0.0;
@@ -1880,15 +1833,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rho2lapl2[9 * g + 7] = 0.0;
             v4rho2lapl2[9 * g + 8] = 0.0;
 
-            v4rho2lapltau[12 * g + 1] = 0.0;
-            v4rho2lapltau[12 * g + 2] = 0.0;
-            v4rho2lapltau[12 * g + 3] = 0.0;
-            v4rho2lapltau[12 * g + 4] = 0.0;
-            v4rho2lapltau[12 * g + 5] = 0.0;
-            v4rho2lapltau[12 * g + 6] = 0.0;
-            v4rho2lapltau[12 * g + 7] = 0.0;
-            v4rho2lapltau[12 * g + 8] = 0.0;
-            v4rho2lapltau[12 * g + 9] = 0.0;
+            v4rho2lapltau[12 * g + 1]  = 0.0;
+            v4rho2lapltau[12 * g + 2]  = 0.0;
+            v4rho2lapltau[12 * g + 3]  = 0.0;
+            v4rho2lapltau[12 * g + 4]  = 0.0;
+            v4rho2lapltau[12 * g + 5]  = 0.0;
+            v4rho2lapltau[12 * g + 6]  = 0.0;
+            v4rho2lapltau[12 * g + 7]  = 0.0;
+            v4rho2lapltau[12 * g + 8]  = 0.0;
+            v4rho2lapltau[12 * g + 9]  = 0.0;
             v4rho2lapltau[12 * g + 10] = 0.0;
             v4rho2lapltau[12 * g + 11] = 0.0;
 
@@ -1901,15 +1854,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rho2tau2[9 * g + 7] = 0.0;
             v4rho2tau2[9 * g + 8] = 0.0;
 
-            v4rhosigma3[20 * g + 1] = 0.0;
-            v4rhosigma3[20 * g + 2] = 0.0;
-            v4rhosigma3[20 * g + 3] = 0.0;
-            v4rhosigma3[20 * g + 4] = 0.0;
-            v4rhosigma3[20 * g + 5] = 0.0;
-            v4rhosigma3[20 * g + 6] = 0.0;
-            v4rhosigma3[20 * g + 7] = 0.0;
-            v4rhosigma3[20 * g + 8] = 0.0;
-            v4rhosigma3[20 * g + 9] = 0.0;
+            v4rhosigma3[20 * g + 1]  = 0.0;
+            v4rhosigma3[20 * g + 2]  = 0.0;
+            v4rhosigma3[20 * g + 3]  = 0.0;
+            v4rhosigma3[20 * g + 4]  = 0.0;
+            v4rhosigma3[20 * g + 5]  = 0.0;
+            v4rhosigma3[20 * g + 6]  = 0.0;
+            v4rhosigma3[20 * g + 7]  = 0.0;
+            v4rhosigma3[20 * g + 8]  = 0.0;
+            v4rhosigma3[20 * g + 9]  = 0.0;
             v4rhosigma3[20 * g + 10] = 0.0;
             v4rhosigma3[20 * g + 11] = 0.0;
             v4rhosigma3[20 * g + 12] = 0.0;
@@ -1922,15 +1875,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigma3[20 * g + 19] = 0.0;
 
             // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24)
-            v4rhosigma2lapl[36 * g + 1] = 0.0;
-            v4rhosigma2lapl[36 * g + 2] = 0.0;
-            v4rhosigma2lapl[36 * g + 3] = 0.0;
-            v4rhosigma2lapl[36 * g + 4] = 0.0;
-            v4rhosigma2lapl[36 * g + 5] = 0.0;
-            v4rhosigma2lapl[36 * g + 6] = 0.0;
-            v4rhosigma2lapl[36 * g + 7] = 0.0;
-            v4rhosigma2lapl[36 * g + 8] = 0.0;
-            v4rhosigma2lapl[36 * g + 9] = 0.0;
+            v4rhosigma2lapl[36 * g + 1]  = 0.0;
+            v4rhosigma2lapl[36 * g + 2]  = 0.0;
+            v4rhosigma2lapl[36 * g + 3]  = 0.0;
+            v4rhosigma2lapl[36 * g + 4]  = 0.0;
+            v4rhosigma2lapl[36 * g + 5]  = 0.0;
+            v4rhosigma2lapl[36 * g + 6]  = 0.0;
+            v4rhosigma2lapl[36 * g + 7]  = 0.0;
+            v4rhosigma2lapl[36 * g + 8]  = 0.0;
+            v4rhosigma2lapl[36 * g + 9]  = 0.0;
             v4rhosigma2lapl[36 * g + 10] = 0.0;
             v4rhosigma2lapl[36 * g + 11] = 0.0;
             v4rhosigma2lapl[36 * g + 12] = 0.0;
@@ -1947,15 +1900,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigma2lapl[36 * g + 23] = 0.0;
 
             // v4rhosigma2tau: inconsistent size in libxc (36 vs 24)
-            v4rhosigma2tau[36 * g + 1] = 0.0;
-            v4rhosigma2tau[36 * g + 2] = 0.0;
-            v4rhosigma2tau[36 * g + 3] = 0.0;
-            v4rhosigma2tau[36 * g + 4] = 0.0;
-            v4rhosigma2tau[36 * g + 5] = 0.0;
-            v4rhosigma2tau[36 * g + 6] = 0.0;
-            v4rhosigma2tau[36 * g + 7] = 0.0;
-            v4rhosigma2tau[36 * g + 8] = 0.0;
-            v4rhosigma2tau[36 * g + 9] = 0.0;
+            v4rhosigma2tau[36 * g + 1]  = 0.0;
+            v4rhosigma2tau[36 * g + 2]  = 0.0;
+            v4rhosigma2tau[36 * g + 3]  = 0.0;
+            v4rhosigma2tau[36 * g + 4]  = 0.0;
+            v4rhosigma2tau[36 * g + 5]  = 0.0;
+            v4rhosigma2tau[36 * g + 6]  = 0.0;
+            v4rhosigma2tau[36 * g + 7]  = 0.0;
+            v4rhosigma2tau[36 * g + 8]  = 0.0;
+            v4rhosigma2tau[36 * g + 9]  = 0.0;
             v4rhosigma2tau[36 * g + 10] = 0.0;
             v4rhosigma2tau[36 * g + 11] = 0.0;
             v4rhosigma2tau[36 * g + 12] = 0.0;
@@ -1971,15 +1924,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigma2tau[36 * g + 22] = 0.0;
             v4rhosigma2tau[36 * g + 23] = 0.0;
 
-            v4rhosigmalapl2[18 * g + 1] = 0.0;
-            v4rhosigmalapl2[18 * g + 2] = 0.0;
-            v4rhosigmalapl2[18 * g + 3] = 0.0;
-            v4rhosigmalapl2[18 * g + 4] = 0.0;
-            v4rhosigmalapl2[18 * g + 5] = 0.0;
-            v4rhosigmalapl2[18 * g + 6] = 0.0;
-            v4rhosigmalapl2[18 * g + 7] = 0.0;
-            v4rhosigmalapl2[18 * g + 8] = 0.0;
-            v4rhosigmalapl2[18 * g + 9] = 0.0;
+            v4rhosigmalapl2[18 * g + 1]  = 0.0;
+            v4rhosigmalapl2[18 * g + 2]  = 0.0;
+            v4rhosigmalapl2[18 * g + 3]  = 0.0;
+            v4rhosigmalapl2[18 * g + 4]  = 0.0;
+            v4rhosigmalapl2[18 * g + 5]  = 0.0;
+            v4rhosigmalapl2[18 * g + 6]  = 0.0;
+            v4rhosigmalapl2[18 * g + 7]  = 0.0;
+            v4rhosigmalapl2[18 * g + 8]  = 0.0;
+            v4rhosigmalapl2[18 * g + 9]  = 0.0;
             v4rhosigmalapl2[18 * g + 10] = 0.0;
             v4rhosigmalapl2[18 * g + 11] = 0.0;
             v4rhosigmalapl2[18 * g + 12] = 0.0;
@@ -1989,15 +1942,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigmalapl2[18 * g + 16] = 0.0;
             v4rhosigmalapl2[18 * g + 17] = 0.0;
 
-            v4rhosigmalapltau[24 * g + 1] = 0.0;
-            v4rhosigmalapltau[24 * g + 2] = 0.0;
-            v4rhosigmalapltau[24 * g + 3] = 0.0;
-            v4rhosigmalapltau[24 * g + 4] = 0.0;
-            v4rhosigmalapltau[24 * g + 5] = 0.0;
-            v4rhosigmalapltau[24 * g + 6] = 0.0;
-            v4rhosigmalapltau[24 * g + 7] = 0.0;
-            v4rhosigmalapltau[24 * g + 8] = 0.0;
-            v4rhosigmalapltau[24 * g + 9] = 0.0;
+            v4rhosigmalapltau[24 * g + 1]  = 0.0;
+            v4rhosigmalapltau[24 * g + 2]  = 0.0;
+            v4rhosigmalapltau[24 * g + 3]  = 0.0;
+            v4rhosigmalapltau[24 * g + 4]  = 0.0;
+            v4rhosigmalapltau[24 * g + 5]  = 0.0;
+            v4rhosigmalapltau[24 * g + 6]  = 0.0;
+            v4rhosigmalapltau[24 * g + 7]  = 0.0;
+            v4rhosigmalapltau[24 * g + 8]  = 0.0;
+            v4rhosigmalapltau[24 * g + 9]  = 0.0;
             v4rhosigmalapltau[24 * g + 10] = 0.0;
             v4rhosigmalapltau[24 * g + 11] = 0.0;
             v4rhosigmalapltau[24 * g + 12] = 0.0;
@@ -2014,15 +1967,15 @@ screenLxcFockForMGGA(double*       rho,
             v4rhosigmalapltau[24 * g + 23] = 0.0;
 
             // v4rhosigmatau2: inconsistent size in libxc (36 vs 18)
-            v4rhosigmatau2[36 * g + 1] = 0.0;
-            v4rhosigmatau2[36 * g + 2] = 0.0;
-            v4rhosigmatau2[36 * g + 3] = 0.0;
-            v4rhosigmatau2[36 * g + 4] = 0.0;
-            v4rhosigmatau2[36 * g + 5] = 0.0;
-            v4rhosigmatau2[36 * g + 6] = 0.0;
-            v4rhosigmatau2[36 * g + 7] = 0.0;
-            v4rhosigmatau2[36 * g + 8] = 0.0;
-            v4rhosigmatau2[36 * g + 9] = 0.0;
+            v4rhosigmatau2[36 * g + 1]  = 0.0;
+            v4rhosigmatau2[36 * g + 2]  = 0.0;
+            v4rhosigmatau2[36 * g + 3]  = 0.0;
+            v4rhosigmatau2[36 * g + 4]  = 0.0;
+            v4rhosigmatau2[36 * g + 5]  = 0.0;
+            v4rhosigmatau2[36 * g + 6]  = 0.0;
+            v4rhosigmatau2[36 * g + 7]  = 0.0;
+            v4rhosigmatau2[36 * g + 8]  = 0.0;
+            v4rhosigmatau2[36 * g + 9]  = 0.0;
             v4rhosigmatau2[36 * g + 10] = 0.0;
             v4rhosigmatau2[36 * g + 11] = 0.0;
             v4rhosigmatau2[36 * g + 12] = 0.0;
@@ -2040,27 +1993,27 @@ screenLxcFockForMGGA(double*       rho,
             v4rholapl3[8 * g + 6] = 0.0;
             v4rholapl3[8 * g + 7] = 0.0;
 
-            v4rholapl2tau[12 * g + 1] = 0.0;
-            v4rholapl2tau[12 * g + 2] = 0.0;
-            v4rholapl2tau[12 * g + 3] = 0.0;
-            v4rholapl2tau[12 * g + 4] = 0.0;
-            v4rholapl2tau[12 * g + 5] = 0.0;
-            v4rholapl2tau[12 * g + 6] = 0.0;
-            v4rholapl2tau[12 * g + 7] = 0.0;
-            v4rholapl2tau[12 * g + 8] = 0.0;
-            v4rholapl2tau[12 * g + 9] = 0.0;
+            v4rholapl2tau[12 * g + 1]  = 0.0;
+            v4rholapl2tau[12 * g + 2]  = 0.0;
+            v4rholapl2tau[12 * g + 3]  = 0.0;
+            v4rholapl2tau[12 * g + 4]  = 0.0;
+            v4rholapl2tau[12 * g + 5]  = 0.0;
+            v4rholapl2tau[12 * g + 6]  = 0.0;
+            v4rholapl2tau[12 * g + 7]  = 0.0;
+            v4rholapl2tau[12 * g + 8]  = 0.0;
+            v4rholapl2tau[12 * g + 9]  = 0.0;
             v4rholapl2tau[12 * g + 10] = 0.0;
             v4rholapl2tau[12 * g + 11] = 0.0;
 
-            v4rholapltau2[12 * g + 1] = 0.0;
-            v4rholapltau2[12 * g + 2] = 0.0;
-            v4rholapltau2[12 * g + 3] = 0.0;
-            v4rholapltau2[12 * g + 4] = 0.0;
-            v4rholapltau2[12 * g + 5] = 0.0;
-            v4rholapltau2[12 * g + 6] = 0.0;
-            v4rholapltau2[12 * g + 7] = 0.0;
-            v4rholapltau2[12 * g + 8] = 0.0;
-            v4rholapltau2[12 * g + 9] = 0.0;
+            v4rholapltau2[12 * g + 1]  = 0.0;
+            v4rholapltau2[12 * g + 2]  = 0.0;
+            v4rholapltau2[12 * g + 3]  = 0.0;
+            v4rholapltau2[12 * g + 4]  = 0.0;
+            v4rholapltau2[12 * g + 5]  = 0.0;
+            v4rholapltau2[12 * g + 6]  = 0.0;
+            v4rholapltau2[12 * g + 7]  = 0.0;
+            v4rholapltau2[12 * g + 8]  = 0.0;
+            v4rholapltau2[12 * g + 9]  = 0.0;
             v4rholapltau2[12 * g + 10] = 0.0;
             v4rholapltau2[12 * g + 11] = 0.0;
 
@@ -2072,30 +2025,30 @@ screenLxcFockForMGGA(double*       rho,
             v4rhotau3[8 * g + 6] = 0.0;
             v4rhotau3[8 * g + 7] = 0.0;
 
-            v4sigma4[15 * g + 1] = 0.0;
-            v4sigma4[15 * g + 2] = 0.0;
-            v4sigma4[15 * g + 3] = 0.0;
-            v4sigma4[15 * g + 4] = 0.0;
-            v4sigma4[15 * g + 5] = 0.0;
-            v4sigma4[15 * g + 6] = 0.0;
-            v4sigma4[15 * g + 7] = 0.0;
-            v4sigma4[15 * g + 8] = 0.0;
-            v4sigma4[15 * g + 9] = 0.0;
+            v4sigma4[15 * g + 1]  = 0.0;
+            v4sigma4[15 * g + 2]  = 0.0;
+            v4sigma4[15 * g + 3]  = 0.0;
+            v4sigma4[15 * g + 4]  = 0.0;
+            v4sigma4[15 * g + 5]  = 0.0;
+            v4sigma4[15 * g + 6]  = 0.0;
+            v4sigma4[15 * g + 7]  = 0.0;
+            v4sigma4[15 * g + 8]  = 0.0;
+            v4sigma4[15 * g + 9]  = 0.0;
             v4sigma4[15 * g + 10] = 0.0;
             v4sigma4[15 * g + 11] = 0.0;
             v4sigma4[15 * g + 12] = 0.0;
             v4sigma4[15 * g + 13] = 0.0;
             v4sigma4[15 * g + 14] = 0.0;
 
-            v4sigma3lapl[20 * g + 1] = 0.0;
-            v4sigma3lapl[20 * g + 2] = 0.0;
-            v4sigma3lapl[20 * g + 3] = 0.0;
-            v4sigma3lapl[20 * g + 4] = 0.0;
-            v4sigma3lapl[20 * g + 5] = 0.0;
-            v4sigma3lapl[20 * g + 6] = 0.0;
-            v4sigma3lapl[20 * g + 7] = 0.0;
-            v4sigma3lapl[20 * g + 8] = 0.0;
-            v4sigma3lapl[20 * g + 9] = 0.0;
+            v4sigma3lapl[20 * g + 1]  = 0.0;
+            v4sigma3lapl[20 * g + 2]  = 0.0;
+            v4sigma3lapl[20 * g + 3]  = 0.0;
+            v4sigma3lapl[20 * g + 4]  = 0.0;
+            v4sigma3lapl[20 * g + 5]  = 0.0;
+            v4sigma3lapl[20 * g + 6]  = 0.0;
+            v4sigma3lapl[20 * g + 7]  = 0.0;
+            v4sigma3lapl[20 * g + 8]  = 0.0;
+            v4sigma3lapl[20 * g + 9]  = 0.0;
             v4sigma3lapl[20 * g + 10] = 0.0;
             v4sigma3lapl[20 * g + 11] = 0.0;
             v4sigma3lapl[20 * g + 12] = 0.0;
@@ -2108,15 +2061,15 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma3lapl[20 * g + 19] = 0.0;
 
             // v4sigma3tau: inconsistent size in libxc (30 vs 20)
-            v4sigma3tau[30 * g + 1] = 0.0;
-            v4sigma3tau[30 * g + 2] = 0.0;
-            v4sigma3tau[30 * g + 3] = 0.0;
-            v4sigma3tau[30 * g + 4] = 0.0;
-            v4sigma3tau[30 * g + 5] = 0.0;
-            v4sigma3tau[30 * g + 6] = 0.0;
-            v4sigma3tau[30 * g + 7] = 0.0;
-            v4sigma3tau[30 * g + 8] = 0.0;
-            v4sigma3tau[30 * g + 9] = 0.0;
+            v4sigma3tau[30 * g + 1]  = 0.0;
+            v4sigma3tau[30 * g + 2]  = 0.0;
+            v4sigma3tau[30 * g + 3]  = 0.0;
+            v4sigma3tau[30 * g + 4]  = 0.0;
+            v4sigma3tau[30 * g + 5]  = 0.0;
+            v4sigma3tau[30 * g + 6]  = 0.0;
+            v4sigma3tau[30 * g + 7]  = 0.0;
+            v4sigma3tau[30 * g + 8]  = 0.0;
+            v4sigma3tau[30 * g + 9]  = 0.0;
             v4sigma3tau[30 * g + 10] = 0.0;
             v4sigma3tau[30 * g + 11] = 0.0;
             v4sigma3tau[30 * g + 12] = 0.0;
@@ -2128,15 +2081,15 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma3tau[30 * g + 18] = 0.0;
             v4sigma3tau[30 * g + 19] = 0.0;
 
-            v4sigma2lapl2[18 * g + 1] = 0.0;
-            v4sigma2lapl2[18 * g + 2] = 0.0;
-            v4sigma2lapl2[18 * g + 3] = 0.0;
-            v4sigma2lapl2[18 * g + 4] = 0.0;
-            v4sigma2lapl2[18 * g + 5] = 0.0;
-            v4sigma2lapl2[18 * g + 6] = 0.0;
-            v4sigma2lapl2[18 * g + 7] = 0.0;
-            v4sigma2lapl2[18 * g + 8] = 0.0;
-            v4sigma2lapl2[18 * g + 9] = 0.0;
+            v4sigma2lapl2[18 * g + 1]  = 0.0;
+            v4sigma2lapl2[18 * g + 2]  = 0.0;
+            v4sigma2lapl2[18 * g + 3]  = 0.0;
+            v4sigma2lapl2[18 * g + 4]  = 0.0;
+            v4sigma2lapl2[18 * g + 5]  = 0.0;
+            v4sigma2lapl2[18 * g + 6]  = 0.0;
+            v4sigma2lapl2[18 * g + 7]  = 0.0;
+            v4sigma2lapl2[18 * g + 8]  = 0.0;
+            v4sigma2lapl2[18 * g + 9]  = 0.0;
             v4sigma2lapl2[18 * g + 10] = 0.0;
             v4sigma2lapl2[18 * g + 11] = 0.0;
             v4sigma2lapl2[18 * g + 12] = 0.0;
@@ -2146,15 +2099,15 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma2lapl2[18 * g + 16] = 0.0;
             v4sigma2lapl2[18 * g + 17] = 0.0;
 
-            v4sigma2lapltau[24 * g + 1] = 0.0;
-            v4sigma2lapltau[24 * g + 2] = 0.0;
-            v4sigma2lapltau[24 * g + 3] = 0.0;
-            v4sigma2lapltau[24 * g + 4] = 0.0;
-            v4sigma2lapltau[24 * g + 5] = 0.0;
-            v4sigma2lapltau[24 * g + 6] = 0.0;
-            v4sigma2lapltau[24 * g + 7] = 0.0;
-            v4sigma2lapltau[24 * g + 8] = 0.0;
-            v4sigma2lapltau[24 * g + 9] = 0.0;
+            v4sigma2lapltau[24 * g + 1]  = 0.0;
+            v4sigma2lapltau[24 * g + 2]  = 0.0;
+            v4sigma2lapltau[24 * g + 3]  = 0.0;
+            v4sigma2lapltau[24 * g + 4]  = 0.0;
+            v4sigma2lapltau[24 * g + 5]  = 0.0;
+            v4sigma2lapltau[24 * g + 6]  = 0.0;
+            v4sigma2lapltau[24 * g + 7]  = 0.0;
+            v4sigma2lapltau[24 * g + 8]  = 0.0;
+            v4sigma2lapltau[24 * g + 9]  = 0.0;
             v4sigma2lapltau[24 * g + 10] = 0.0;
             v4sigma2lapltau[24 * g + 11] = 0.0;
             v4sigma2lapltau[24 * g + 12] = 0.0;
@@ -2170,15 +2123,15 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma2lapltau[24 * g + 22] = 0.0;
             v4sigma2lapltau[24 * g + 23] = 0.0;
 
-            v4sigma2tau2[18 * g + 1] = 0.0;
-            v4sigma2tau2[18 * g + 2] = 0.0;
-            v4sigma2tau2[18 * g + 3] = 0.0;
-            v4sigma2tau2[18 * g + 4] = 0.0;
-            v4sigma2tau2[18 * g + 5] = 0.0;
-            v4sigma2tau2[18 * g + 6] = 0.0;
-            v4sigma2tau2[18 * g + 7] = 0.0;
-            v4sigma2tau2[18 * g + 8] = 0.0;
-            v4sigma2tau2[18 * g + 9] = 0.0;
+            v4sigma2tau2[18 * g + 1]  = 0.0;
+            v4sigma2tau2[18 * g + 2]  = 0.0;
+            v4sigma2tau2[18 * g + 3]  = 0.0;
+            v4sigma2tau2[18 * g + 4]  = 0.0;
+            v4sigma2tau2[18 * g + 5]  = 0.0;
+            v4sigma2tau2[18 * g + 6]  = 0.0;
+            v4sigma2tau2[18 * g + 7]  = 0.0;
+            v4sigma2tau2[18 * g + 8]  = 0.0;
+            v4sigma2tau2[18 * g + 9]  = 0.0;
             v4sigma2tau2[18 * g + 10] = 0.0;
             v4sigma2tau2[18 * g + 11] = 0.0;
             v4sigma2tau2[18 * g + 12] = 0.0;
@@ -2188,27 +2141,27 @@ screenLxcFockForMGGA(double*       rho,
             v4sigma2tau2[18 * g + 16] = 0.0;
             v4sigma2tau2[18 * g + 17] = 0.0;
 
-            v4sigmalapl3[12 * g + 1] = 0.0;
-            v4sigmalapl3[12 * g + 2] = 0.0;
-            v4sigmalapl3[12 * g + 3] = 0.0;
-            v4sigmalapl3[12 * g + 4] = 0.0;
-            v4sigmalapl3[12 * g + 5] = 0.0;
-            v4sigmalapl3[12 * g + 6] = 0.0;
-            v4sigmalapl3[12 * g + 7] = 0.0;
-            v4sigmalapl3[12 * g + 8] = 0.0;
-            v4sigmalapl3[12 * g + 9] = 0.0;
+            v4sigmalapl3[12 * g + 1]  = 0.0;
+            v4sigmalapl3[12 * g + 2]  = 0.0;
+            v4sigmalapl3[12 * g + 3]  = 0.0;
+            v4sigmalapl3[12 * g + 4]  = 0.0;
+            v4sigmalapl3[12 * g + 5]  = 0.0;
+            v4sigmalapl3[12 * g + 6]  = 0.0;
+            v4sigmalapl3[12 * g + 7]  = 0.0;
+            v4sigmalapl3[12 * g + 8]  = 0.0;
+            v4sigmalapl3[12 * g + 9]  = 0.0;
             v4sigmalapl3[12 * g + 10] = 0.0;
             v4sigmalapl3[12 * g + 11] = 0.0;
 
-            v4sigmalapl2tau[18 * g + 1] = 0.0;
-            v4sigmalapl2tau[18 * g + 2] = 0.0;
-            v4sigmalapl2tau[18 * g + 3] = 0.0;
-            v4sigmalapl2tau[18 * g + 4] = 0.0;
-            v4sigmalapl2tau[18 * g + 5] = 0.0;
-            v4sigmalapl2tau[18 * g + 6] = 0.0;
-            v4sigmalapl2tau[18 * g + 7] = 0.0;
-            v4sigmalapl2tau[18 * g + 8] = 0.0;
-            v4sigmalapl2tau[18 * g + 9] = 0.0;
+            v4sigmalapl2tau[18 * g + 1]  = 0.0;
+            v4sigmalapl2tau[18 * g + 2]  = 0.0;
+            v4sigmalapl2tau[18 * g + 3]  = 0.0;
+            v4sigmalapl2tau[18 * g + 4]  = 0.0;
+            v4sigmalapl2tau[18 * g + 5]  = 0.0;
+            v4sigmalapl2tau[18 * g + 6]  = 0.0;
+            v4sigmalapl2tau[18 * g + 7]  = 0.0;
+            v4sigmalapl2tau[18 * g + 8]  = 0.0;
+            v4sigmalapl2tau[18 * g + 9]  = 0.0;
             v4sigmalapl2tau[18 * g + 10] = 0.0;
             v4sigmalapl2tau[18 * g + 11] = 0.0;
             v4sigmalapl2tau[18 * g + 12] = 0.0;
@@ -2218,15 +2171,15 @@ screenLxcFockForMGGA(double*       rho,
             v4sigmalapl2tau[18 * g + 16] = 0.0;
             v4sigmalapl2tau[18 * g + 17] = 0.0;
 
-            v4sigmalapltau2[18 * g + 1] = 0.0;
-            v4sigmalapltau2[18 * g + 2] = 0.0;
-            v4sigmalapltau2[18 * g + 3] = 0.0;
-            v4sigmalapltau2[18 * g + 4] = 0.0;
-            v4sigmalapltau2[18 * g + 5] = 0.0;
-            v4sigmalapltau2[18 * g + 6] = 0.0;
-            v4sigmalapltau2[18 * g + 7] = 0.0;
-            v4sigmalapltau2[18 * g + 8] = 0.0;
-            v4sigmalapltau2[18 * g + 9] = 0.0;
+            v4sigmalapltau2[18 * g + 1]  = 0.0;
+            v4sigmalapltau2[18 * g + 2]  = 0.0;
+            v4sigmalapltau2[18 * g + 3]  = 0.0;
+            v4sigmalapltau2[18 * g + 4]  = 0.0;
+            v4sigmalapltau2[18 * g + 5]  = 0.0;
+            v4sigmalapltau2[18 * g + 6]  = 0.0;
+            v4sigmalapltau2[18 * g + 7]  = 0.0;
+            v4sigmalapltau2[18 * g + 8]  = 0.0;
+            v4sigmalapltau2[18 * g + 9]  = 0.0;
             v4sigmalapltau2[18 * g + 10] = 0.0;
             v4sigmalapltau2[18 * g + 11] = 0.0;
             v4sigmalapltau2[18 * g + 12] = 0.0;
@@ -2236,15 +2189,15 @@ screenLxcFockForMGGA(double*       rho,
             v4sigmalapltau2[18 * g + 16] = 0.0;
             v4sigmalapltau2[18 * g + 17] = 0.0;
 
-            v4sigmatau3[12 * g + 1] = 0.0;
-            v4sigmatau3[12 * g + 2] = 0.0;
-            v4sigmatau3[12 * g + 3] = 0.0;
-            v4sigmatau3[12 * g + 4] = 0.0;
-            v4sigmatau3[12 * g + 5] = 0.0;
-            v4sigmatau3[12 * g + 6] = 0.0;
-            v4sigmatau3[12 * g + 7] = 0.0;
-            v4sigmatau3[12 * g + 8] = 0.0;
-            v4sigmatau3[12 * g + 9] = 0.0;
+            v4sigmatau3[12 * g + 1]  = 0.0;
+            v4sigmatau3[12 * g + 2]  = 0.0;
+            v4sigmatau3[12 * g + 3]  = 0.0;
+            v4sigmatau3[12 * g + 4]  = 0.0;
+            v4sigmatau3[12 * g + 5]  = 0.0;
+            v4sigmatau3[12 * g + 6]  = 0.0;
+            v4sigmatau3[12 * g + 7]  = 0.0;
+            v4sigmatau3[12 * g + 8]  = 0.0;
+            v4sigmatau3[12 * g + 9]  = 0.0;
             v4sigmatau3[12 * g + 10] = 0.0;
             v4sigmatau3[12 * g + 11] = 0.0;
 

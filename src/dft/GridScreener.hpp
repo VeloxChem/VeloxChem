@@ -80,7 +80,8 @@ void screenVxcFockForLDA(double* rho, double* vrho, const int32_t npoints, const
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
-void screenExcVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold);
+void
+screenExcVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold);
 
 /**
  Screens Vxc Fock for GGA.
@@ -403,9 +404,9 @@ void screenLxcFockForGGA(double*       rho,
  @param npoints the number of grid points.
  @param densityThreshold the threshold for density grid screening.
  */
-void screenLxcFockForMGGA(double*       rho, 
+void screenLxcFockForMGGA(double*       rho,
                           double*       sigma,
-                          double*       lapl, 
+                          double*       lapl,
                           double*       tau,
                           double*       v4rho4,
                           double*       v4rho3sigma,
