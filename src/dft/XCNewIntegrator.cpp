@@ -48,7 +48,7 @@ CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
 
     : _screeningThresholdForGTOValues(1.0e-12)
 
-    , _screeningThresholdForDensityValues(1.0e-13)
+    , _screeningThresholdForDensityValues(1.0e-15)
 {
     _locRank = mpi::rank(comm);
 

@@ -63,10 +63,10 @@ class TestTPA:
                 if key in tpa_result and key in ref_result:
                     if tpa_result[key] is None:
                         continue
-                    assert abs(tpa_result[key][(w, -w, w)].real -
-                               ref_result[key].real) < 1.0e-4
-                    assert abs(tpa_result[key][(w, -w, w)].imag -
-                               ref_result[key].imag) < 1.0e-4
+                    assert abs(tpa_result[key][
+                        (w, -w, w)].real / ref_result[key].real - 1.0) < 1.0e-5
+                    assert abs(tpa_result[key][
+                        (w, -w, w)].imag / ref_result[key].imag - 1.0) < 1.0e-5
 
     def test_tpa_full(self):
 
