@@ -35,7 +35,7 @@ from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .nonlinearsolver import NonLinearSolver
+from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .firstorderprop import FirstOrderProperties
 from .errorhandler import assert_msg_critical
@@ -43,7 +43,7 @@ from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
 
-class ShgDriver(NonLinearSolver):
+class ShgDriver(NonlinearSolver):
     """
     Implements a quadratic response driver for SHG calculations
 
@@ -146,7 +146,7 @@ class ShgDriver(NonLinearSolver):
         self._check_scf_results(scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check()
+        self._dft_sanity_check_nonlinrsp()
 
         profiler = Profiler({
             'timing': self.timing,
