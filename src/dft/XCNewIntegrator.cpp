@@ -47,8 +47,6 @@
 CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
 
     : _screeningThresholdForGTOValues(1.0e-12)
-
-    , _screeningThresholdForDensityValues(1.0e-15)
 {
     _locRank = mpi::rank(comm);
 
@@ -6291,7 +6289,7 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                 // perturbed density and its gradients
                 double rwa    = rhow[2 * g + 0];
                 double tauwa  = tauw[2 * g + 0];
-                double laplwa = laplw[2 * g + 0];
+                // double laplwa = laplw[2 * g + 0];
 
                 double rwa_x = rhowgrad[6 * g + 0];
                 double rwa_y = rhowgrad[6 * g + 1];
@@ -9618,17 +9616,17 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
                 double c8 = grada_x_g * pixxx[g] + grada_y_g * pixxy[g] + grada_z_g * pixxz[g] + grada_x_g * piyyx[g] + grada_y_g * piyyy[g] +
                             grada_z_g * piyyz[g] + grada_x_g * pizzx[g] + grada_y_g * pizzy[g] + grada_z_g * pizzz[g];
 
-                double c9_x = grada_x_g * pi[g];
-                double c9_y = grada_y_g * pi[g];
-                double c9_z = grada_z_g * pi[g];
+                // double c9_x = grada_x_g * pi[g];
+                // double c9_y = grada_y_g * pi[g];
+                // double c9_z = grada_z_g * pi[g];
 
-                double c10_x = pix[g];
-                double c10_y = piy[g];
-                double c10_z = piz[g];
+                // double c10_x = pix[g];
+                // double c10_y = piy[g];
+                // double c10_z = piz[g];
 
-                double c11_x = c2 * grada_x_g;
-                double c11_y = c2 * grada_y_g;
-                double c11_z = c2 * grada_z_g;
+                // double c11_x = c2 * grada_x_g;
+                // double c11_y = c2 * grada_y_g;
+                // double c11_z = c2 * grada_z_g;
 
                 double c12_c14_x = grada_x_g * (pixx[g] + pixx[g]) + grada_y_g * (pixy[g] + piyx[g]) + grada_z_g * (pixz[g] + pizx[g]);
 

@@ -592,10 +592,6 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
 
     auto npoints = getNumberOfGridPoints();
 
-    // set up pointers to source density
-
-    auto rwdenptr = &rwDensityGrid;
-
     // set up pointers to destination density
 
     if (xcFuncType == xcfun::lda)
@@ -8485,16 +8481,16 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
 
                 auto gam_r = gam(2 * j);
                 auto rt_gam_r = rt_gam(2 * j);
-                auto rl_gam_r = rl_gam(2 * j);
+                // auto rl_gam_r = rl_gam(2 * j);
                 auto tt_gam_r = tt_gam(2 * j);
-                auto tl_gam_r = tl_gam(2 * j);
+                // auto tl_gam_r = tl_gam(2 * j);
                 auto ll_gam_r = ll_gam(2 * j);
                 
                 auto gam_i = gam(2 * j + 1);
                 auto rt_gam_i = rt_gam(2 * j + 1);
-                auto rl_gam_i = rl_gam(2 * j + 1);
+                // auto rl_gam_i = rl_gam(2 * j + 1);
                 auto tt_gam_i = tt_gam(2 * j + 1);
-                auto tl_gam_i = tl_gam(2 * j + 1);
+                // auto tl_gam_i = tl_gam(2 * j + 1);
                 auto ll_gam_i = ll_gam(2 * j + 1);
 
                 auto gam_X_r = gamX(2 * j);

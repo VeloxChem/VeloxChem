@@ -74,11 +74,6 @@ class CXCNewIntegrator
     double _screeningThresholdForGTOValues;
 
     /**
-     Screening threshold for density values on grid points.
-     */
-    double _screeningThresholdForDensityValues;
-
-    /**
      Integrates first-order LDA exchange-correlation functional contribution to
      AO Kohn-Sham matrix.
 

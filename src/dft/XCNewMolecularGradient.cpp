@@ -47,8 +47,6 @@
 CXCNewMolecularGradient::CXCNewMolecularGradient(MPI_Comm comm)
 
     : _screeningThresholdForGTOValues(1.0e-12)
-
-    , _screeningThresholdForDensityValues(1.0e-13)
 {
     _locRank = mpi::rank(comm);
 
