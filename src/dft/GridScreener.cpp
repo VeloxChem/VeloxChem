@@ -28,9 +28,15 @@
 namespace gridscreen {  // gridscreen namespace
 
 double
+getDensityScreeningThreshold()
+{
+    return 1.0e-15;
+}
+
+double
 getSigmaScreeningThreshold(const double densityThreshold)
 {
-    return std::pow(densityThreshold, 4.0 / 3.0);
+    return 1.0e-20;  // std::pow(densityThreshold, 4.0 / 3.0)
 }
 
 double
@@ -40,8 +46,10 @@ getTauScreeningThreshold()
 }
 
 void
-screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold)
+screenVxcForLDA(const int32_t npoints, const double* rho, double* exc, double* vrho)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a
@@ -65,8 +73,10 @@ screenVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoint
 }
 
 void
-screenExcVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold)
+screenExcVxcForLDA(const int32_t npoints, const double* rho, double* exc, double* vrho)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho
@@ -90,8 +100,10 @@ screenExcVxcFockForLDA(double* rho, double* exc, double* vrho, const int32_t npo
 }
 
 void
-screenVxcFockForLDA(double* rho, double* vrho, const int32_t npoints, const double densityThreshold)
+screenVxcForLDA(const int32_t npoints, const double* rho, double* vrho)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a
@@ -109,8 +121,10 @@ screenVxcFockForLDA(double* rho, double* vrho, const int32_t npoints, const doub
 }
 
 void
-screenExcVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold)
+screenExcVxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
     for (int32_t g = 0; g < npoints; g++)
@@ -143,8 +157,10 @@ screenExcVxcFockForGGA(double* rho, double* sigma, double* exc, double* vrho, do
 }
 
 void
-screenVxcFockForGGA(double* rho, double* sigma, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold)
+screenVxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* vrho, double* vsigma)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
     for (int32_t g = 0; g < npoints; g++)
@@ -170,20 +186,22 @@ screenVxcFockForGGA(double* rho, double* sigma, double* vrho, double* vsigma, co
 }
 
 void
-screenExcVxcFockForMGGA(double*       rho,
-                        double*       sigma,
-                        double*       lapl,
-                        double*       tau,
-                        double*       exc,
-                        double*       vrho,
-                        double*       vsigma,
-                        double*       vlapl,
-                        double*       vtau,
-                        const int32_t npoints,
-                        const double  densityThreshold)
+screenExcVxcForMGGA(const int32_t npoints,
+                    const double* rho,
+                    const double* sigma,
+                    const double* lapl,
+                    const double* tau,
+                    double*       exc,
+                    double*       vrho,
+                    double*       vsigma,
+                    double*       vlapl,
+                    double*       vtau)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold   = getTauScreeningThreshold();
+
+    double tauThreshold = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -226,19 +244,21 @@ screenExcVxcFockForMGGA(double*       rho,
 }
 
 void
-screenVxcFockForMGGA(double*       rho,
-                     double*       sigma,
-                     double*       lapl,
-                     double*       tau,
-                     double*       vrho,
-                     double*       vsigma,
-                     double*       vlapl,
-                     double*       vtau,
-                     const int32_t npoints,
-                     const double  densityThreshold)
+screenVxcForMGGA(const int32_t npoints,
+                 const double* rho,
+                 const double* sigma,
+                 const double* lapl,
+                 const double* tau,
+                 double*       vrho,
+                 double*       vsigma,
+                 double*       vlapl,
+                 double*       vtau)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold   = getTauScreeningThreshold();
+
+    double tauThreshold = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -273,8 +293,10 @@ screenVxcFockForMGGA(double*       rho,
 }
 
 void
-screenVxcFockForPLDA(double* rho, double* exc, double* vrho, const int32_t npoints, const double densityThreshold)
+screenVxcForPLDA(const int32_t npoints, const double* rho, double* exc, double* vrho)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho
@@ -286,8 +308,10 @@ screenVxcFockForPLDA(double* rho, double* exc, double* vrho, const int32_t npoin
 }
 
 void
-screenVxcFockForPGGA(double* rho, double* sigma, double* exc, double* vrho, double* vsigma, const int32_t npoints, const double densityThreshold)
+screenVxcForPGGA(const int32_t npoints, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho
@@ -299,8 +323,10 @@ screenVxcFockForPGGA(double* rho, double* sigma, double* exc, double* vrho, doub
 }
 
 void
-screenFxcFockForLDA(double* rho, double* v2rho2, const int32_t npoints, const double densityThreshold)
+screenFxcForLDA(const int32_t npoints, const double* rho, double* v2rho2)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a
@@ -320,14 +346,10 @@ screenFxcFockForLDA(double* rho, double* v2rho2, const int32_t npoints, const do
 }
 
 void
-screenFxcFockForGGA(double*       rho,
-                    double*       sigma,
-                    double*       v2rho2,
-                    double*       v2rhosigma,
-                    double*       v2sigma2,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenFxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
     for (int32_t g = 0; g < npoints; g++)
@@ -373,25 +395,27 @@ screenFxcFockForGGA(double*       rho,
 }
 
 void
-screenFxcFockForMGGA(double*       rho,
-                     double*       sigma,
-                     double*       lapl,
-                     double*       tau,
-                     double*       v2rho2,
-                     double*       v2rhosigma,
-                     double*       v2rholapl,
-                     double*       v2rhotau,
-                     double*       v2sigma2,
-                     double*       v2sigmalapl,
-                     double*       v2sigmatau,
-                     double*       v2lapl2,
-                     double*       v2lapltau,
-                     double*       v2tau2,
-                     const int32_t npoints,
-                     const double  densityThreshold)
+screenFxcForMGGA(const int32_t npoints,
+                 const double* rho,
+                 const double* sigma,
+                 const double* lapl,
+                 const double* tau,
+                 double*       v2rho2,
+                 double*       v2rhosigma,
+                 double*       v2rholapl,
+                 double*       v2rhotau,
+                 double*       v2sigma2,
+                 double*       v2sigmalapl,
+                 double*       v2sigmatau,
+                 double*       v2lapl2,
+                 double*       v2lapltau,
+                 double*       v2tau2)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold   = getTauScreeningThreshold();
+
+    double tauThreshold = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -498,8 +522,10 @@ screenFxcFockForMGGA(double*       rho,
 }
 
 void
-screenKxcFockForLDA(double* rho, double* v3rho3, const int32_t npoints, const double densityThreshold)
+screenKxcForLDA(const int32_t npoints, const double* rho, double* v3rho3)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a
@@ -521,15 +547,16 @@ screenKxcFockForLDA(double* rho, double* v3rho3, const int32_t npoints, const do
 }
 
 void
-screenKxcFockForGGA(double*       rho,
-                    double*       sigma,
-                    double*       v3rho3,
-                    double*       v3rho2sigma,
-                    double*       v3rhosigma2,
-                    double*       v3sigma3,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenKxcForGGA(const int32_t npoints,
+                const double* rho,
+                const double* sigma,
+                double*       v3rho3,
+                double*       v3rho2sigma,
+                double*       v3rhosigma2,
+                double*       v3sigma3)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
     for (int32_t g = 0; g < npoints; g++)
@@ -615,35 +642,37 @@ screenKxcFockForGGA(double*       rho,
 }
 
 void
-screenKxcFockForMGGA(double*       rho,
-                     double*       sigma,
-                     double*       lapl,
-                     double*       tau,
-                     double*       v3rho3,
-                     double*       v3rho2sigma,
-                     double*       v3rho2lapl,
-                     double*       v3rho2tau,
-                     double*       v3rhosigma2,
-                     double*       v3rhosigmalapl,
-                     double*       v3rhosigmatau,
-                     double*       v3rholapl2,
-                     double*       v3rholapltau,
-                     double*       v3rhotau2,
-                     double*       v3sigma3,
-                     double*       v3sigma2lapl,
-                     double*       v3sigma2tau,
-                     double*       v3sigmalapl2,
-                     double*       v3sigmalapltau,
-                     double*       v3sigmatau2,
-                     double*       v3lapl3,
-                     double*       v3lapl2tau,
-                     double*       v3lapltau2,
-                     double*       v3tau3,
-                     const int32_t npoints,
-                     const double  densityThreshold)
+screenKxcForMGGA(const int32_t npoints,
+                 const double* rho,
+                 const double* sigma,
+                 const double* lapl,
+                 const double* tau,
+                 double*       v3rho3,
+                 double*       v3rho2sigma,
+                 double*       v3rho2lapl,
+                 double*       v3rho2tau,
+                 double*       v3rhosigma2,
+                 double*       v3rhosigmalapl,
+                 double*       v3rhosigmatau,
+                 double*       v3rholapl2,
+                 double*       v3rholapltau,
+                 double*       v3rhotau2,
+                 double*       v3sigma3,
+                 double*       v3sigma2lapl,
+                 double*       v3sigma2tau,
+                 double*       v3sigmalapl2,
+                 double*       v3sigmalapltau,
+                 double*       v3sigmatau2,
+                 double*       v3lapl3,
+                 double*       v3lapl2tau,
+                 double*       v3lapltau2,
+                 double*       v3tau3)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold   = getTauScreeningThreshold();
+
+    double tauThreshold = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -990,8 +1019,10 @@ screenKxcFockForMGGA(double*       rho,
 }
 
 void
-screenLxcFockForLDA(double* rho, double* v4rho4, const int32_t npoints, const double densityThreshold)
+screenLxcForLDA(const int32_t npoints, const double* rho, double* v4rho4)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     for (int32_t g = 0; g < npoints; g++)
     {
         // rho_a
@@ -1015,16 +1046,17 @@ screenLxcFockForLDA(double* rho, double* v4rho4, const int32_t npoints, const do
 }
 
 void
-screenLxcFockForGGA(double*       rho,
-                    double*       sigma,
-                    double*       v4rho4,
-                    double*       v4rho3sigma,
-                    double*       v4rho2sigma2,
-                    double*       v4rhosigma3,
-                    double*       v4sigma4,
-                    const int32_t npoints,
-                    const double  densityThreshold)
+screenLxcForGGA(const int32_t npoints,
+                const double* rho,
+                const double* sigma,
+                double*       v4rho4,
+                double*       v4rho3sigma,
+                double*       v4rho2sigma2,
+                double*       v4rhosigma3,
+                double*       v4sigma4)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
     for (int32_t g = 0; g < npoints; g++)
@@ -1180,50 +1212,52 @@ screenLxcFockForGGA(double*       rho,
 }
 
 void
-screenLxcFockForMGGA(double*       rho,
-                     double*       sigma,
-                     double*       lapl,
-                     double*       tau,
-                     double*       v4rho4,
-                     double*       v4rho3sigma,
-                     double*       v4rho3lapl,
-                     double*       v4rho3tau,
-                     double*       v4rho2sigma2,
-                     double*       v4rho2sigmalapl,
-                     double*       v4rho2sigmatau,
-                     double*       v4rho2lapl2,
-                     double*       v4rho2lapltau,
-                     double*       v4rho2tau2,
-                     double*       v4rhosigma3,
-                     double*       v4rhosigma2lapl,
-                     double*       v4rhosigma2tau,
-                     double*       v4rhosigmalapl2,
-                     double*       v4rhosigmalapltau,
-                     double*       v4rhosigmatau2,
-                     double*       v4rholapl3,
-                     double*       v4rholapl2tau,
-                     double*       v4rholapltau2,
-                     double*       v4rhotau3,
-                     double*       v4sigma4,
-                     double*       v4sigma3lapl,
-                     double*       v4sigma3tau,
-                     double*       v4sigma2lapl2,
-                     double*       v4sigma2lapltau,
-                     double*       v4sigma2tau2,
-                     double*       v4sigmalapl3,
-                     double*       v4sigmalapl2tau,
-                     double*       v4sigmalapltau2,
-                     double*       v4sigmatau3,
-                     double*       v4lapl4,
-                     double*       v4lapl3tau,
-                     double*       v4lapl2tau2,
-                     double*       v4lapltau3,
-                     double*       v4tau4,
-                     const int32_t npoints,
-                     const double  densityThreshold)
+screenLxcForMGGA(const int32_t npoints,
+                 const double* rho,
+                 const double* sigma,
+                 const double* lapl,
+                 const double* tau,
+                 double*       v4rho4,
+                 double*       v4rho3sigma,
+                 double*       v4rho3lapl,
+                 double*       v4rho3tau,
+                 double*       v4rho2sigma2,
+                 double*       v4rho2sigmalapl,
+                 double*       v4rho2sigmatau,
+                 double*       v4rho2lapl2,
+                 double*       v4rho2lapltau,
+                 double*       v4rho2tau2,
+                 double*       v4rhosigma3,
+                 double*       v4rhosigma2lapl,
+                 double*       v4rhosigma2tau,
+                 double*       v4rhosigmalapl2,
+                 double*       v4rhosigmalapltau,
+                 double*       v4rhosigmatau2,
+                 double*       v4rholapl3,
+                 double*       v4rholapl2tau,
+                 double*       v4rholapltau2,
+                 double*       v4rhotau3,
+                 double*       v4sigma4,
+                 double*       v4sigma3lapl,
+                 double*       v4sigma3tau,
+                 double*       v4sigma2lapl2,
+                 double*       v4sigma2lapltau,
+                 double*       v4sigma2tau2,
+                 double*       v4sigmalapl3,
+                 double*       v4sigmalapl2tau,
+                 double*       v4sigmalapltau2,
+                 double*       v4sigmatau3,
+                 double*       v4lapl4,
+                 double*       v4lapl3tau,
+                 double*       v4lapl2tau2,
+                 double*       v4lapltau3,
+                 double*       v4tau4)
 {
+    double densityThreshold = getDensityScreeningThreshold();
+
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-    double tauThreshold   = getTauScreeningThreshold();
+
+    double tauThreshold = getTauScreeningThreshold();
 
     for (int32_t g = 0; g < npoints; g++)
     {

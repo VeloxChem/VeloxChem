@@ -173,7 +173,7 @@ class CXCNewFunctional
      * @param[in,out] vrho values of the first derivative of the
      * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
      */
-    auto compute_exc_vxc_for_lda(int32_t np, const double* rho, double* exc, double* vrho) const -> void;
+    auto compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* exc, double* vrho) const -> void;
 
     /** Computes first derivative of LDA exchange-correlation functional on grid.
      *
@@ -182,7 +182,7 @@ class CXCNewFunctional
      * @param[in,out] vrho values of the first derivative of the
      * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
      */
-    auto compute_vxc_for_lda(int32_t np, const double* rho, double* vrho) const -> void;
+    auto compute_vxc_for_lda(const int32_t np, const double* rho, double* vrho) const -> void;
 
     /** Computes second derivative of LDA exchange-correlation functional on grid.
      *
@@ -192,7 +192,7 @@ class CXCNewFunctional
      * exchange-correlation kernel wrt density. Size: 3*np, order:
      * [(0, 0), (0, 1), (1, 1)].
      */
-    auto compute_fxc_for_lda(int32_t np, const double* rho, double* v2rho2) const -> void;
+    auto compute_fxc_for_lda(const int32_t np, const double* rho, double* v2rho2) const -> void;
 
     /** Computes third derivative of LDA exchange-correlation functional on grid.
      *
@@ -202,7 +202,7 @@ class CXCNewFunctional
      * exchange-correlation kernel wrt density. Size: 4*np, order:
      * [(0, 0, 0), (0, 0, 1), (0, 1, 1), (1, 1, 1)].
      */
-    auto compute_kxc_for_lda(int32_t np, const double* rho, double* v3rho3) const -> void;
+    auto compute_kxc_for_lda(const int32_t np, const double* rho, double* v3rho3) const -> void;
 
     /** Computes fourth derivative of LDA exchange-correlation functional on grid.
      *
@@ -212,7 +212,7 @@ class CXCNewFunctional
      * exchange-correlation kernel wrt density. Size: 5*np, order:
      * [(0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 1), (0, 1, 1, 1), (1, 1, 1, 1)].
      */
-    auto compute_lxc_for_lda(int32_t np, const double* rho, double* v4rho4) const -> void;
+    auto compute_lxc_for_lda(const int32_t np, const double* rho, double* v4rho4) const -> void;
 
     /** Computes values and first derivative of GGA exchange-correlation functional on grid.
      *
@@ -225,7 +225,7 @@ class CXCNewFunctional
      * @param[in,out] vsigma values of the first derivative of the
      * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
      */
-    auto compute_exc_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void;
+    auto compute_exc_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void;
 
     /** Computes first derivative of GGA exchange-correlation functional on grid.
      *
@@ -237,7 +237,7 @@ class CXCNewFunctional
      * @param[in,out] vsigma values of the first derivative of the
      * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
      */
-    auto compute_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void;
+    auto compute_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void;
 
     /** Computes second derivative of GGA exchange-correlation functional on grid.
      *
@@ -254,7 +254,8 @@ class CXCNewFunctional
      * exchange-correlation kernel wrt contracted gradients. Size: 6*np, order:
      * [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)].
      */
-    auto compute_fxc_for_gga(int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const -> void;
+    auto compute_fxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const
+        -> void;
 
     /** Computes third derivative of GGA exchange-correlation functional on grid.
      *

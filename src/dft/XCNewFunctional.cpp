@@ -34,6 +34,7 @@
 #include <string>
 
 #include "ErrorHandler.hpp"
+#include "GridScreener.hpp"
 #include "MemAlloc.hpp"
 #include "StringFormat.hpp"
 
@@ -325,7 +326,7 @@ CXCNewFunctional::getFractionOfExactExchange() const
 }
 
 auto
-CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double* exc, double* vrho) const -> void
+CXCNewFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* exc, double* vrho) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
@@ -368,10 +369,12 @@ CXCNewFunctional::compute_exc_vxc_for_lda(int32_t np, const double* rho, double*
         mem::free(stage_exc);
         mem::free(stage_vrho);
     }
+
+    gridscreen::screenExcVxcForLDA(np, rho, exc, vrho);
 }
 
 auto
-CXCNewFunctional::compute_vxc_for_lda(int32_t np, const double* rho, double* vrho) const -> void
+CXCNewFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* vrho) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
@@ -408,10 +411,12 @@ CXCNewFunctional::compute_vxc_for_lda(int32_t np, const double* rho, double* vrh
     {
         mem::free(stage_vrho);
     }
+
+    gridscreen::screenVxcForLDA(np, rho, vrho);
 }
 
 auto
-CXCNewFunctional::compute_fxc_for_lda(int32_t np, const double* rho, double* v2rho2) const -> void
+CXCNewFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* v2rho2) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
@@ -450,10 +455,12 @@ CXCNewFunctional::compute_fxc_for_lda(int32_t np, const double* rho, double* v2r
     {
         mem::free(stage_v2rho2);
     }
+
+    gridscreen::screenFxcForLDA(np, rho, v2rho2);
 }
 
 auto
-CXCNewFunctional::compute_kxc_for_lda(int32_t np, const double* rho, double* v3rho3) const -> void
+CXCNewFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* v3rho3) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
@@ -494,10 +501,12 @@ CXCNewFunctional::compute_kxc_for_lda(int32_t np, const double* rho, double* v3r
     {
         mem::free(stage_v3rho3);
     }
+
+    gridscreen::screenKxcForLDA(np, rho, v3rho3);
 }
 
 auto
-CXCNewFunctional::compute_lxc_for_lda(int32_t np, const double* rho, double* v4rho4) const -> void
+CXCNewFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* v4rho4) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
@@ -540,10 +549,13 @@ CXCNewFunctional::compute_lxc_for_lda(int32_t np, const double* rho, double* v4r
     {
         mem::free(stage_v4rho4);
     }
+
+    gridscreen::screenLxcForLDA(np, rho, v4rho4);
 }
 
 auto
-CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const -> void
+CXCNewFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const
+    -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
@@ -614,10 +626,12 @@ CXCNewFunctional::compute_exc_vxc_for_gga(int32_t np, const double* rho, const d
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
     }
+
+    gridscreen::screenExcVxcForGGA(np, rho, sigma, exc, vrho, vsigma);
 }
 
 auto
-CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
+CXCNewFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
@@ -680,11 +694,13 @@ CXCNewFunctional::compute_vxc_for_gga(int32_t np, const double* rho, const doubl
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
     }
+
+    gridscreen::screenVxcForGGA(np, rho, sigma, vrho, vsigma);
 }
 
 auto
-CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const
-    -> void
+CXCNewFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2)
+    const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
@@ -773,6 +789,8 @@ CXCNewFunctional::compute_fxc_for_gga(int32_t np, const double* rho, const doubl
         mem::free(stage_v2rhosigma);
         mem::free(stage_v2sigma2);
     }
+
+    gridscreen::screenFxcForGGA(np, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 }
 
 auto
@@ -916,6 +934,8 @@ CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
         mem::free(stage_v3rhosigma2);
         mem::free(stage_v3sigma3);
     }
+
+    gridscreen::screenKxcForGGA(np, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
 }
 
 auto
@@ -1136,6 +1156,8 @@ CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
         mem::free(stage_v4rhosigma3);
         mem::free(stage_v4sigma4);
     }
+
+    gridscreen::screenLxcForGGA(np, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4);
 }
 
 auto
@@ -1253,6 +1275,8 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
         mem::free(stage_vlapl);
         mem::free(stage_vtau);
     }
+
+    gridscreen::screenExcVxcForMGGA(np, rho, sigma, lapl, tau, exc, vrho, vsigma, vlapl, vtau);
 }
 
 auto
@@ -1358,6 +1382,8 @@ CXCNewFunctional::compute_vxc_for_mgga(int32_t       np,
         mem::free(stage_vlapl);
         mem::free(stage_vtau);
     }
+
+    gridscreen::screenVxcForMGGA(np, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
 }
 
 auto
@@ -1599,6 +1625,9 @@ CXCNewFunctional::compute_fxc_for_mgga(int32_t       np,
         mem::free(stage_v2lapltau);
         mem::free(stage_v2tau2);
     }
+
+    gridscreen::screenFxcForMGGA(
+        np, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
 }
 
 auto
@@ -2169,6 +2198,32 @@ CXCNewFunctional::compute_kxc_for_mgga(int32_t       np,
         mem::free(stage_v3lapltau2);
         mem::free(stage_v3tau3);
     }
+
+    gridscreen::screenKxcForMGGA(np,
+                                 rho,
+                                 sigma,
+                                 lapl,
+                                 tau,
+                                 v3rho3,
+                                 v3rho2sigma,
+                                 v3rho2lapl,
+                                 v3rho2tau,
+                                 v3rhosigma2,
+                                 v3rhosigmalapl,
+                                 v3rhosigmatau,
+                                 v3rholapl2,
+                                 v3rholapltau,
+                                 v3rhotau2,
+                                 v3sigma3,
+                                 v3sigma2lapl,
+                                 v3sigma2tau,
+                                 v3sigmalapl2,
+                                 v3sigmalapltau,
+                                 v3sigmatau2,
+                                 v3lapl3,
+                                 v3lapl2tau,
+                                 v3lapltau2,
+                                 v3tau3);
 }
 
 auto
@@ -3547,4 +3602,45 @@ CXCNewFunctional::compute_lxc_for_mgga(int32_t       np,
         mem::free(stage_v4lapltau3);
         mem::free(stage_v4tau4);
     }
+
+    gridscreen::screenLxcForMGGA(np,
+                                 rho,
+                                 sigma,
+                                 lapl,
+                                 tau,
+                                 v4rho4,
+                                 v4rho3sigma,
+                                 v4rho3lapl,
+                                 v4rho3tau,
+                                 v4rho2sigma2,
+                                 v4rho2sigmalapl,
+                                 v4rho2sigmatau,
+                                 v4rho2lapl2,
+                                 v4rho2lapltau,
+                                 v4rho2tau2,
+                                 v4rhosigma3,
+                                 v4rhosigma2lapl,
+                                 v4rhosigma2tau,
+                                 v4rhosigmalapl2,
+                                 v4rhosigmalapltau,
+                                 v4rhosigmatau2,
+                                 v4rholapl3,
+                                 v4rholapl2tau,
+                                 v4rholapltau2,
+                                 v4rhotau3,
+                                 v4sigma4,
+                                 v4sigma3lapl,
+                                 v4sigma3tau,
+                                 v4sigma2lapl2,
+                                 v4sigma2lapltau,
+                                 v4sigma2tau2,
+                                 v4sigmalapl3,
+                                 v4sigmalapl2tau,
+                                 v4sigmalapltau2,
+                                 v4sigmatau3,
+                                 v4lapl4,
+                                 v4lapl3tau,
+                                 v4lapl2tau2,
+                                 v4lapltau3,
+                                 v4tau4);
 }

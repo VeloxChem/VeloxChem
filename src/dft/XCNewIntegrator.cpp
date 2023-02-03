@@ -510,17 +510,9 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenExcVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -835,17 +827,9 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenExcVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -1143,17 +1127,9 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
         xcFunctional.compute_exc_vxc_for_mgga(npoints, rho, sigma, lapl, tau, exc, vrho, vsigma, vlapl, vtau);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenExcVxcFockForMGGA(rho, sigma, lapl, tau, exc, vrho, vsigma, vlapl, vtau, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -1406,17 +1382,9 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         xcFunctional.compute_fxc_for_lda(npoints, rho, v2rho2);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through rhow density matrices
 
@@ -1709,19 +1677,9 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through rhow density matrices
 
@@ -2034,34 +1992,9 @@ CXCNewIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
         xcFunctional.compute_fxc_for_mgga(
             npoints, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForMGGA(rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForMGGA(rho,
-                                         sigma,
-                                         lapl,
-                                         tau,
-                                         v2rho2,
-                                         v2rhosigma,
-                                         v2rholapl,
-                                         v2rhotau,
-                                         v2sigma2,
-                                         v2sigmalapl,
-                                         v2sigmatau,
-                                         v2lapl2,
-                                         v2lapltau,
-                                         v2tau2,
-                                         npoints,
-                                         _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through rhow density matrices
 
@@ -2351,19 +2284,9 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         xcFunctional.compute_kxc_for_lda(npoints, rho, v3rho3);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForLDA(rho, v3rho3, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through density matrices
 
@@ -2663,21 +2586,9 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         xcFunctional.compute_kxc_for_gga(npoints, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForGGA(rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through density matrices
 
@@ -3069,61 +2980,9 @@ CXCNewIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
                                           v3lapltau2,
                                           v3tau3);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForMGGA(rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForMGGA(rho,
-                                         sigma,
-                                         lapl,
-                                         tau,
-                                         v2rho2,
-                                         v2rhosigma,
-                                         v2rholapl,
-                                         v2rhotau,
-                                         v2sigma2,
-                                         v2sigmalapl,
-                                         v2sigmatau,
-                                         v2lapl2,
-                                         v2lapltau,
-                                         v2tau2,
-                                         npoints,
-                                         _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForMGGA(rho,
-                                         sigma,
-                                         lapl,
-                                         tau,
-                                         v3rho3,
-                                         v3rho2sigma,
-                                         v3rho2lapl,
-                                         v3rho2tau,
-                                         v3rhosigma2,
-                                         v3rhosigmalapl,
-                                         v3rhosigmatau,
-                                         v3rholapl2,
-                                         v3rholapltau,
-                                         v3rhotau2,
-                                         v3sigma3,
-                                         v3sigma2lapl,
-                                         v3sigma2tau,
-                                         v3sigmalapl2,
-                                         v3sigmalapltau,
-                                         v3sigmatau2,
-                                         v3lapl3,
-                                         v3lapl2tau,
-                                         v3lapltau2,
-                                         v3tau3,
-                                         npoints,
-                                         _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through density matrices
 
@@ -3425,21 +3284,9 @@ CXCNewIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         xcFunctional.compute_lxc_for_lda(npoints, rho, v4rho4);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForLDA(rho, v3rho3, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenLxcFockForLDA(rho, v4rho4, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through density matrices
 
@@ -3757,24 +3604,9 @@ CXCNewIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         xcFunctional.compute_lxc_for_gga(npoints, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForGGA(rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenLxcFockForGGA(
-            rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through density matrices
 
@@ -4060,21 +3892,9 @@ CXCNewIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatri
 
         xcFunctional.compute_lxc_for_lda(npoints, rho, v4rho4);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForLDA(rho, v3rho3, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenLxcFockForLDA(rho, v4rho4, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through density matrices
 
@@ -4410,24 +4230,9 @@ CXCNewIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatri
 
         xcFunctional.compute_lxc_for_gga(npoints, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForGGA(rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenLxcFockForGGA(
-            rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through density matrices
 
@@ -4980,103 +4785,9 @@ CXCNewIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatr
                                           v4lapltau3,
                                           v4tau4);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForMGGA(rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForMGGA(rho,
-                                         sigma,
-                                         lapl,
-                                         tau,
-                                         v2rho2,
-                                         v2rhosigma,
-                                         v2rholapl,
-                                         v2rhotau,
-                                         v2sigma2,
-                                         v2sigmalapl,
-                                         v2sigmatau,
-                                         v2lapl2,
-                                         v2lapltau,
-                                         v2tau2,
-                                         npoints,
-                                         _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForMGGA(rho,
-                                         sigma,
-                                         lapl,
-                                         tau,
-                                         v3rho3,
-                                         v3rho2sigma,
-                                         v3rho2lapl,
-                                         v3rho2tau,
-                                         v3rhosigma2,
-                                         v3rhosigmalapl,
-                                         v3rhosigmatau,
-                                         v3rholapl2,
-                                         v3rholapltau,
-                                         v3rhotau2,
-                                         v3sigma3,
-                                         v3sigma2lapl,
-                                         v3sigma2tau,
-                                         v3sigmalapl2,
-                                         v3sigmalapltau,
-                                         v3sigmatau2,
-                                         v3lapl3,
-                                         v3lapl2tau,
-                                         v3lapltau2,
-                                         v3tau3,
-                                         npoints,
-                                         _screeningThresholdForDensityValues);
-
-        gridscreen::screenLxcFockForMGGA(rho,
-                                         sigma,
-                                         lapl,
-                                         tau,
-                                         v4rho4,
-                                         v4rho3sigma,
-                                         v4rho3lapl,
-                                         v4rho3tau,
-                                         v4rho2sigma2,
-                                         v4rho2sigmalapl,
-                                         v4rho2sigmatau,
-                                         v4rho2lapl2,
-                                         v4rho2lapltau,
-                                         v4rho2tau2,
-                                         v4rhosigma3,
-                                         v4rhosigma2lapl,
-                                         v4rhosigma2tau,
-                                         v4rhosigmalapl2,
-                                         v4rhosigmalapltau,
-                                         v4rhosigmatau2,
-                                         v4rholapl3,
-                                         v4rholapl2tau,
-                                         v4rholapltau2,
-                                         v4rhotau3,
-                                         v4sigma4,
-                                         v4sigma3lapl,
-                                         v4sigma3tau,
-                                         v4sigma2lapl2,
-                                         v4sigma2lapltau,
-                                         v4sigma2tau2,
-                                         v4sigmalapl3,
-                                         v4sigmalapl2tau,
-                                         v4sigmalapltau2,
-                                         v4sigmatau3,
-                                         v4lapl4,
-                                         v4lapl3tau,
-                                         v4lapl2tau2,
-                                         v4lapltau3,
-                                         v4tau4,
-                                         npoints,
-                                         _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // go through density matrices
 
@@ -5438,17 +5149,9 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFock
 
         xcFunctional.compute_exc_vxc_for_plda(npoints, rho, exc, vrho);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForPLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
 
@@ -5709,17 +5412,9 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFock
 
         xcFunctional.compute_exc_vxc_for_pgga(npoints, rho, sigma, exc, vrho, vsigma);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForPGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         auto partial_mat_Vxc =
             _integratePartialVxcFockForGGA(npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer);

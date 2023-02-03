@@ -468,17 +468,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         xcFunctional.compute_vxc_for_lda(npoints, rho, vrho);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, vrho, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -823,17 +815,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
 
         xcFunctional.compute_vxc_for_lda(npoints, rho, vrho);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, vrho, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -1283,17 +1267,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -1804,17 +1780,9 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 
         xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -2203,17 +2171,9 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
         xcFunctional.compute_fxc_for_lda(npoints, rho, v2rho2);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -2695,19 +2655,9 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
         xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
-        timer.stop("XC functional eval.");
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -3126,19 +3076,9 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
         xcFunctional.compute_kxc_for_lda(npoints, rho, v3rho3);
 
-        timer.stop("XC functional eval.");
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForLDA(rho, v3rho3, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // pointers to perturbed density gradient norms
 
@@ -3646,21 +3586,9 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         xcFunctional.compute_kxc_for_gga(npoints, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
 
-        timer.stop("XC functional eval.");
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenFxcFockForGGA(rho, sigma, v2rho2, v2rhosigma, v2sigma2, npoints, _screeningThresholdForDensityValues);
-
-        gridscreen::screenKxcFockForGGA(rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // pointers to perturbed densities
 
