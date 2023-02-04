@@ -90,7 +90,7 @@ CDispersionParameters::_setFunctionalParameters(const std::string& xcLabel)
 
     else if (fstr::upcase(xcLabel) == "M06") _setFourParameters(1.0000, 0.16366729, 0.53456413, 6.06192174);
 
-    else if (fstr::upcase(xcLabel) == "M06L") _setFourParameters(1.0000, 0.59493760, 0.71422359, 6.35314182);
+    else if (fstr::upcase(xcLabel) == "M06-L") _setFourParameters(1.0000, 0.59493760, 0.71422359, 6.35314182);
 
     else
     {
