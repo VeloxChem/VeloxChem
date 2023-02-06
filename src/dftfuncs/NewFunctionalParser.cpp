@@ -144,7 +144,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         // TODO add more functionals here...
     }
 
-    std::string errmsg(std::string("getExchangeCorrelationFunctional: Cannot find functional ") + xcLabel);
+    std::string errmsg(std::string("getExchangeCorrelationFunctional: ") + xcLabel + std::string(" is not available"));
 
     errors::assertMsgCritical(false, errmsg);
 
@@ -173,7 +173,7 @@ getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel)
         // FIX ME: add other functionals here...
     }
 
-    std::string errmsg(std::string("getPairDensityExchangeCorrelationFunctional: Cannot find functional ") + xcLabel);
+    std::string errmsg(std::string("getPairDensityExchangeCorrelationFunctional: ") + xcLabel + std::string(" is not available"));
 
     errors::assertMsgCritical(false, errmsg);
 
