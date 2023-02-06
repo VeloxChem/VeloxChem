@@ -35,10 +35,10 @@ namespace newvxcfuncs {  // newvxcfuncs namespace
 std::vector<std::string>
 getAvailableFunctionals()
 {
-    return std::vector<std::string>({"SLATER", "VWN_RPA", "SLDA",    "B88X",   "LYP",   "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",
-                                     "PBE0",   "BP86",    "PW91",    "MPW1K",  "OLYP",  "B97",   "B97-1",   "B97-2",  "B97-3",     "TPSS",
-                                     "TPSSH",  "REVTPSS", "REGTPSS", "PKZB",   "SCAN",  "RSCAN", "R++SCAN", "R2SCAN", "R4SCAN",    "M05",
-                                     "M05-2X", "M06",     "M06-2X",  "M06-HF", "M06-L", "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
+    return std::vector<std::string>({"SLATER", "VWN_RPA", "SLDA",   "B88X",   "LYP",     "BLYP",  "B3LYP",   "BHANDH", "BHANDHLYP", "PBE",
+                                     "PBE0",   "REVPBE",  "BP86",   "PW91",   "MPW1K",   "OLYP",  "O3LYP",   "X3LYP",  "B97",       "B97-1",
+                                     "B97-2",  "B97-3",   "TPSS",   "TPSSH",  "REVTPSS", "PKZB",  "SCAN",    "RSCAN",  "R2SCAN",    "M05",
+                                     "M05-2X", "M06",     "M06-2X", "M06-HF", "M06-L",   "M11-L", "MPW1B95", "MPWB1K", "PW6B95",    "PWB6K"});
 }
 
 CXCNewFunctional
@@ -75,6 +75,8 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (fstr::upcase(xcLabel) == "PBE") return CXCNewFunctional("PBE", {"GGA_X_PBE", "GGA_C_PBE"}, {1.0, 1.0});
 
+        if (fstr::upcase(xcLabel) == "REVPBE") return CXCNewFunctional("REVPBE", {"GGA_X_PBE_R", "GGA_C_PBE"}, {1.0, 1.0});
+
         if (fstr::upcase(xcLabel) == "PBE0") return CXCNewFunctional("PBE0", {"GGA_X_PBE", "GGA_C_PBE"}, {0.75, 1.0}, 0.25);
 
         if (fstr::upcase(xcLabel) == "BP86") return CXCNewFunctional("BP86", {"GGA_X_B88", "GGA_C_P86"}, {1.0, 1.0});
@@ -84,6 +86,14 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
         if (fstr::upcase(xcLabel) == "MPW1K") return CXCNewFunctional("MPW1K", {"HYB_GGA_XC_MPW1K"}, {1.0});
 
         if (fstr::upcase(xcLabel) == "OLYP") return CXCNewFunctional("OLYP", {"GGA_X_OPTX", "GGA_C_LYP"}, {1.0, 1.0});
+
+        if (fstr::upcase(xcLabel) == "O3LYP") return CXCNewFunctional("O3LYP", {"HYB_GGA_XC_O3LYP"}, {1.0});
+
+        if (fstr::upcase(xcLabel) == "X3LYP")
+        {
+            return CXCNewFunctional(
+                "X3LYP", {"LDA_X", "GGA_X_B88", "LDA_C_VWN_RPA", "GGA_C_LYP", "GGA_X_PW91_MOD"}, {0.073, 0.542, 0.129, 0.871, 0.167}, 0.218);
+        }
 
         if (fstr::upcase(xcLabel) == "B97") return CXCNewFunctional("B97", {"HYB_GGA_XC_B97"}, {1.0});
 
@@ -101,19 +111,13 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (fstr::upcase(xcLabel) == "REVTPSS") return CXCNewFunctional("REVTPSS", {"MGGA_X_REVTPSS", "MGGA_C_REVTPSS"}, {1.0, 1.0});
 
-        if (fstr::upcase(xcLabel) == "REGTPSS") return CXCNewFunctional("REGTPSS", {"MGGA_X_REGTPSS", "GGA_C_REGTPSS"}, {1.0, 1.0});
-
         if (fstr::upcase(xcLabel) == "PKZB") return CXCNewFunctional("PKZB", {"MGGA_X_PKZB", "MGGA_C_PKZB"}, {1.0, 1.0});
 
         if (fstr::upcase(xcLabel) == "SCAN") return CXCNewFunctional("SCAN", {"MGGA_X_SCAN", "MGGA_C_SCAN"}, {1.0, 1.0});
 
         if (fstr::upcase(xcLabel) == "RSCAN") return CXCNewFunctional("RSCAN", {"MGGA_X_RSCAN", "MGGA_C_RSCAN"}, {1.0, 1.0});
 
-        if (fstr::upcase(xcLabel) == "R++SCAN") return CXCNewFunctional("R++SCAN", {"MGGA_X_RPPSCAN", "MGGA_C_RPPSCAN"}, {1.0, 1.0});
-
         if (fstr::upcase(xcLabel) == "R2SCAN") return CXCNewFunctional("R2SCAN", {"MGGA_X_R2SCAN", "MGGA_C_R2SCAN"}, {1.0, 1.0});
-
-        if (fstr::upcase(xcLabel) == "R4SCAN") return CXCNewFunctional("R4SCAN", {"MGGA_X_R4SCAN", "MGGA_C_R2SCAN"}, {1.0, 1.0});
 
         if (fstr::upcase(xcLabel) == "M05") return CXCNewFunctional("M05", {"HYB_MGGA_X_M05", "MGGA_C_M05"}, {1.0, 1.0});
 
