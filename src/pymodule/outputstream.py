@@ -78,6 +78,8 @@ class OutputStream:
             errio = f'OutputStream: invalid argument {stream}'
             assert_msg_critical(self.state, errio)
 
+        self._state_backup = self.state
+
     def __del__(self):
         """
         Deletes the output stream.
@@ -96,6 +98,22 @@ class OutputStream:
             if self.stream is not sys.stdout:
                 self.stream.close()
             self.state = False
+
+    def mute(self):
+        """
+        Mutes the output stream.
+        """
+
+        self._state_backup = self.state
+        self.state = False
+
+    def unmute(self):
+        """
+        "Unmutes" the output stream. Note that this only restores the original
+        state of the output stream.
+        """
+
+        self.state = self._state_backup
 
     def get_state(self):
         """

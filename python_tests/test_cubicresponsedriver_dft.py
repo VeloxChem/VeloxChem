@@ -29,7 +29,7 @@ class TestCrf:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
         method_settings = {'xcfun': 'SLDA', 'grid_level': 4}
         scf_drv.update_settings(scf_settings, method_settings)
         scf_drv.compute(molecule, basis)
@@ -57,7 +57,7 @@ class TestCrf:
         }
 
         crf_prop = CubicResponseDriver()
-        crf_prop.ostream.state = False
+        crf_prop.ostream.mute()
         crf_prop.update_settings(rsp_settings, method_settings)
         crf_result_yyzz = crf_prop.compute(molecule, ao_basis, scf_tensors)
 

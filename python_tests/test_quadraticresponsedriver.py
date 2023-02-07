@@ -23,7 +23,7 @@ class TestQrf:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
         scf_drv.compute(molecule, basis)
 
         return molecule, basis, scf_drv.scf_tensors
@@ -33,7 +33,7 @@ class TestQrf:
         molecule, basis, scf_tensors = self.run_scf()
 
         qrf_drv = QuadraticResponseDriver()
-        qrf_drv.ostream.state = False
+        qrf_drv.ostream.mute()
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,

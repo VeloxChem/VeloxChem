@@ -74,13 +74,12 @@ class ScfGradientDriver(GradientDriver):
         start_time = tm.time()
         self.print_header()
 
-        scf_ostream_state = self.scf_drv.ostream.state
-        self.scf_drv.ostream.state = False
+        self.scf_drv.ostream.mute()
 
         # Currently, only numerical gradients activated
         self.compute_numerical(molecule, ao_basis, min_basis)
 
-        self.scf_drv.ostream.state = scf_ostream_state
+        self.scf_drv.ostream.unmute()
 
         # print gradient
         self.print_geometry(molecule)

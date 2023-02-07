@@ -147,8 +147,7 @@ class ScfHessianDriver(HessianDriver):
             The minimal AO basis set.
         """
 
-        scf_ostream_state = self.scf_drv.ostream.state
-        self.scf_drv.ostream.state = False
+        self.scf_drv.ostream.mute()
 
         # atom labels
         labels = molecule.get_labels()
@@ -282,4 +281,4 @@ class ScfHessianDriver(HessianDriver):
 
         # restore scf_drv to initial state
         self.scf_drv.compute(molecule, ao_basis, min_basis)
-        self.scf_drv.ostream.state = scf_ostream_state
+        self.scf_drv.ostream.unmute()

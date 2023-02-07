@@ -23,7 +23,7 @@ class TestPDFT:
 
         # Optimize ROHF wavefunction
         scfdrv = ScfRestrictedOpenDriver()
-        scfdrv.ostream.state = False
+        scfdrv.ostream.mute()
         scfdrv.compute(molecule, basis)
 
         # Compute SLDA correction

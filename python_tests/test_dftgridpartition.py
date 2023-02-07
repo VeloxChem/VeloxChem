@@ -20,7 +20,7 @@ class TestDftGridPartition:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
         scf_drv.compute(molecule, basis)
         density = scf_drv.density
 

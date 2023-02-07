@@ -29,7 +29,7 @@ class TestShgFromQrf:
         method_settings = {'xcfun': xcfun_label, 'grid_level': 1}
 
         scfdrv = ScfRestrictedDriver()
-        scfdrv.ostream.state = False
+        scfdrv.ostream.mute()
         scfdrv.update_settings(scf_settings, method_settings)
         scfdrv.compute(molecule, basis)
 
@@ -44,7 +44,7 @@ class TestShgFromQrf:
         ref_shg_results = np.zeros(3, dtype='complex128')
 
         qrf = QuadraticResponseDriver()
-        qrf.ostream.state = False
+        qrf.ostream.mute()
         rsp_settings = {}
 
         for ind, a in enumerate(components):
@@ -97,7 +97,7 @@ class TestShgFromQrf:
         }
 
         shg = ShgDriver()
-        shg.ostream.state = False
+        shg.ostream.mute()
         shg.update_settings(rsp_settings, method_settings)
         shg_results = shg.compute(molecule, basis, scfdrv.scf_tensors)
 
