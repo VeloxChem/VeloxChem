@@ -120,7 +120,13 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
 
         if (hyb_exx_coeff != 0.0) _fractionOfExactExchange += coeff * hyb_exx_coeff;
 
-        // TODO figure out range-separation parameters
+        // TODO process range-separation parameters when range-separted functional is supported
+
+        double omega = 0.0, alpha = 0.0, beta = 0.0;
+
+        xc_hyb_cam_coef(funcptr, &omega, &alpha, &beta);
+
+        errors::assertMsgCritical(std::fabs(beta) < 1.0e-13, std::string("XCNewFunctional: Range-separated functional is not yet supported"));
     }
 
     if (hasExc) _maxDerivOrder = 0;
