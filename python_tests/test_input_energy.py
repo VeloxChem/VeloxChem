@@ -147,9 +147,9 @@ class TestInputEnergy:
 
         ref_data = {
             'wf_model': 'Spin-Restricted Kohn-Sham',
-            'e_scf': -76.3571498354,
+            'e_scf': -76.3571447881,
             'n_iterations': 7,
-            'dipole': 0.780568,
+            'dipole': 0.780569,
         }
 
         self.run_input_energy(capsys, xcfun, scf_type, ref_data)
@@ -163,9 +163,9 @@ class TestInputEnergy:
 
         ref_data = {
             'wf_model': 'Spin-Unrestricted Kohn-Sham',
-            'e_scf': -76.0761283703,
+            'e_scf': -76.0761244587,
             'n_iterations': 8,
-            'dipole': 0.300485,
+            'dipole': 0.300483,
         }
 
         self.run_input_energy(capsys, xcfun, scf_type, ref_data)
@@ -179,9 +179,9 @@ class TestInputEnergy:
 
         ref_data = {
             'wf_model': 'Spin-Restricted Open-Shell Kohn-Sham',
-            'e_scf': -76.0744709571,
+            'e_scf': -76.0744670640,
             'n_iterations': 7,
-            'dipole': 0.298955,
+            'dipole': 0.298953,
         }
 
         self.run_input_energy(capsys, xcfun, scf_type, ref_data)

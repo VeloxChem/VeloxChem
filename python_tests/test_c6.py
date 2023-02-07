@@ -70,7 +70,7 @@ class TestC6:
             assert diff_prop < 1.0e-4
 
             c6_value = c6_results['c6']
-            assert abs(c6_value - ref_c6_value) < 1.0e-4
+            assert abs(c6_value / ref_c6_value - 1.0) < 1.0e-5
 
     @staticmethod
     def get_ref_data(data_lines):

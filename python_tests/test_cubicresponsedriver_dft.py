@@ -59,37 +59,24 @@ class TestCrf:
         crf_prop = CubicResponseDriver()
         crf_prop.ostream.mute()
         crf_prop.update_settings(rsp_settings, method_settings)
-        crf_result_yyzz = crf_prop.compute(molecule, ao_basis, scf_tensors)
+        crf_result = crf_prop.compute(molecule, ao_basis, scf_tensors)
 
         if is_mpi_master():
-
-            assert abs(crf_result_yyzz[('T4', wb, wc, wd)].real -
-                       ref_result['T4'].real) < 1.0e-6
-
-            assert abs(crf_result_yyzz[('T4', wb, wc, wd)].imag -
-                       ref_result['T4'].imag) < 1.0e-6
-
-            assert abs(crf_result_yyzz[('X3', wb, wc, wd)].real -
-                       ref_result['X3'].real) < 1.0e-6
-
-            assert abs(crf_result_yyzz[('X3', wb, wc, wd)].imag -
-                       ref_result['X3'].imag) < 1.0e-6
-
-            assert abs(crf_result_yyzz[('A3', wb, wc, wd)].real -
-                       ref_result['A3'].real) < 1.0e-6
-
-            assert abs(crf_result_yyzz[('A3', wb, wc, wd)].imag -
-                       ref_result['A3'].imag) < 1.0e-6
+            for key in ref_result:
+                assert abs(crf_result[(key, wb, wc, wd)].real -
+                           ref_result[key].real) < 1.0e-6
+                assert abs(crf_result[(key, wb, wc, wd)].imag -
+                           ref_result[key].imag) < 1.0e-6
 
     def test_crf(self):
 
         ref_result = {
-            'E3': 103.05627199,
-            'T4': 58.87127176,
-            'X2': -505.15579639,
-            'X3': 133.84179900,
-            'A2': -505.15579639,
-            'A3': 44.61393300,
+            'E3': 103.05625002,
+            'T4': 58.87171313,
+            'X2': -505.15455288,
+            'X3': 133.84194721,
+            'A2': -505.15455288,
+            'A3': 44.61398240,
         }
 
         self.run_crf(ref_result)

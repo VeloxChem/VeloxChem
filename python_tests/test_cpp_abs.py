@@ -75,7 +75,7 @@ class TestCppAbs:
             for i, (w, sigma) in enumerate(spectrum):
                 ref_w, ref_sigma = ref_spectrum[i]
                 assert abs(w - ref_w) < 1.0e-6
-                assert abs(sigma / ref_sigma - 1.0) < 5.0e-5
+                assert abs(sigma - ref_sigma) < 1.0e-7
 
     def check_printout(self, cpp_drv, cpp_results):
 

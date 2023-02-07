@@ -56,7 +56,7 @@ class TestDftGridPartition:
         basis_label = 'def2-svp'
         xcfun_label = 'slater'
         grid_level = 4
-        tol = 1.0e-7
+        tol = 1.0e-10
         ref_h5file = 'vxc_lda.h5'
 
         self.run_dft_grid_partition(mol_str, basis_label, xcfun_label,
@@ -75,7 +75,7 @@ class TestDftGridPartition:
         basis_label = 'def2-svp'
         xcfun_label = 'b3lyp'
         grid_level = 4
-        tol = 1.0e-7
+        tol = 1.0e-10
         ref_h5file = 'vxc_gga.h5'
 
         self.run_dft_grid_partition(mol_str, basis_label, xcfun_label,

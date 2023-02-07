@@ -54,7 +54,7 @@ class TestCppEcd:
             for i, (w, Delta_epsilon) in enumerate(spectrum):
                 ref_w, ref_Delta_epsilon = ref_spectrum[i]
                 assert abs(w - ref_w) < 1.0e-6
-                assert abs(Delta_epsilon / ref_Delta_epsilon - 1.0) < 1.0e-6
+                assert abs(Delta_epsilon - ref_Delta_epsilon) < 1.0e-8
 
     def check_printout(self, cpp_drv, cpp_results):
 

@@ -168,13 +168,13 @@ class TestInputUVVis:
 
         ref_data = {
             'wf_model': 'Spin-Restricted Kohn-Sham',
-            'e_scf': -76.4435551612,
+            'e_scf': -76.4435484737,
             'n_scf_iterations': 7,
-            'dipole': 0.731256,
+            'dipole': 0.731257,
             'nstates': 5,
             'n_uvvis_iterations': 6,
             'exc_ene': np.array(
-                [0.25719730, 0.30975371, 0.33858914, 0.37852621, 0.39052591]),
+                [0.25720123, 0.30977192, 0.33859452, 0.37854004, 0.39054751]),
             'osc_str': np.array([0.0537, 0.0000, 0.0906, 0.0000, 0.0127]),
         }
 
@@ -189,13 +189,13 @@ class TestInputUVVis:
 
         ref_data = {
             'wf_model': 'Spin-Restricted Kohn-Sham',
-            'e_scf': -76.4435551612,
+            'e_scf': -76.4435484737,
             'n_scf_iterations': 7,
-            'dipole': 0.731256,
+            'dipole': 0.731257,
             'nstates': 5,
             'n_uvvis_iterations': 7,
             'exc_ene': np.array(
-                [0.25674877, 0.30969350, 0.33793671, 0.37842938, 0.39023439]),
+                [0.25675266, 0.30971169, 0.33794203, 0.37844329, 0.39025586]),
             'osc_str': np.array([0.0520, 0.0000, 0.0848, 0.0000, 0.0116]),
         }
 
