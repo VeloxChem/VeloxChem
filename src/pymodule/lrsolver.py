@@ -446,7 +446,7 @@ class LinearResponseSolver(LinearSolver):
                 full_solutions = {}
 
                 # create h5 file for response solutions
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     final_h5_fname = str(
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
                     create_hdf5(final_h5_fname, molecule, basis,
@@ -462,14 +462,15 @@ class LinearResponseSolver(LinearSolver):
                         full_solutions[(bop, w)] = x
 
                         # write to h5 file for response solutions
-                        if self.checkpoint_file is not None:
+                        if (self.save_solutions and
+                                self.checkpoint_file is not None):
                             write_rsp_solution(
                                 final_h5_fname,
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     checkpoint_text = 'Response solution vectors written to file: '
                     checkpoint_text += final_h5_fname
                     self.ostream.print_info(checkpoint_text)

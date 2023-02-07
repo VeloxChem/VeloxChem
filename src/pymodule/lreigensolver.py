@@ -458,7 +458,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 eigvecs = np.zeros((x_0.size, self.nstates))
 
                 # create h5 file for response solutions
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     final_h5_fname = str(
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
                     create_hdf5(final_h5_fname, molecule, basis,
@@ -540,7 +540,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     eigvecs[:, s] = eigvec[:]
 
                     # write to h5 file for response solutions
-                    if self.checkpoint_file is not None:
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}'.format(s + 1), eigvec)
 
@@ -577,7 +578,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.detach_attach:
                     ret_dict['density_cubes'] = dens_cube_files
 
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     checkpoint_text = 'Response solution vectors written to file: '
                     checkpoint_text += final_h5_fname
                     self.ostream.print_info(checkpoint_text)

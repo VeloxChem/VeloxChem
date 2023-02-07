@@ -746,7 +746,7 @@ class TdaEigenSolver(LinearSolver):
             The TDA eigenvectors (in columns).
         """
 
-        if self.checkpoint_file is None:
+        if (not self.save_solutions) or (self.checkpoint_file is None):
             return
 
         final_h5_fname = str(

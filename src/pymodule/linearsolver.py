@@ -150,6 +150,7 @@ class LinearSolver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+        self.save_solutions = True
 
         # timing and profiling
         self.timing = False
@@ -188,6 +189,7 @@ class LinearSolver:
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
+                'save_solutions': ('str', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
