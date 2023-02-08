@@ -108,8 +108,8 @@ class NonlinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.norm_thresh = 1.0e-10
-        self.lindep_thresh = 1.0e-10
+        self.norm_thresh = None
+        self.lindep_thresh = None
         self._is_converged = False
 
         # mpi information

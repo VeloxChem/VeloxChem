@@ -108,6 +108,11 @@ class TpaDriver(NonlinearSolver):
               functions for TPA
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-6
+
         # double check SCF information
         self._check_scf_results(scf_tensors)
 

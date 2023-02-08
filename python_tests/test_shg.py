@@ -43,14 +43,14 @@ class TestSHG:
 
             for ind, comp in enumerate('xyz'):
                 assert abs(shg_result['beta'][freq][ind].real -
-                           ref_result[comp].real) < 1.0e-6
+                           ref_result[comp].real) < 1.0e-5
                 assert abs(shg_result['beta'][freq][ind].imag -
-                           ref_result[comp].imag) < 1.0e-6
+                           ref_result[comp].imag) < 1.0e-5
 
             assert abs(shg_result['beta_bar'][freq].real -
-                       ref_result['beta_bar'].real) < 1.0e-6
+                       ref_result['beta_bar'].real) < 1.0e-5
             assert abs(shg_result['beta_bar'][freq].imag -
-                       ref_result['beta_bar'].imag) < 1.0e-6
+                       ref_result['beta_bar'].imag) < 1.0e-5
 
     def test_shg_hf(self):
 
