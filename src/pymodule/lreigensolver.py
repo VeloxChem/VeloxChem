@@ -142,6 +142,11 @@ class LinearResponseEigenSolver(LinearSolver):
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
+
         self._dist_bger = None
         self._dist_bung = None
         self._dist_e2bger = None
@@ -811,6 +816,11 @@ class LinearResponseEigenSolver(LinearSolver):
         :return:
             The E[2] matrix as numpy array.
         """
+
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         self._dist_bger = None
         self._dist_bung = None

@@ -134,8 +134,8 @@ class LinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.norm_thresh = 1.0e-10
-        self.lindep_thresh = 1.0e-6
+        self.norm_thresh = None
+        self.lindep_thresh = None
         self._cur_iter = 0
         self._is_converged = False
 

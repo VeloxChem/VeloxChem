@@ -119,6 +119,11 @@ class LinearResponseSolver(LinearSolver):
             a non-linear response module.
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
+
         self._dist_bger = None
         self._dist_bung = None
         self._dist_e2bger = None

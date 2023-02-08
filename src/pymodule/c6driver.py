@@ -83,7 +83,6 @@ class C6Driver(LinearSolver):
         self.w0 = 0.3
 
         self.conv_thresh = 1.0e-3
-        self.lindep_thresh = 1.0e-10
 
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
@@ -231,6 +230,11 @@ class C6Driver(LinearSolver):
         :return:
             A dictionary containing response functions and solutions.
         """
+
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-6
 
         self._dist_bger = None
         self._dist_bung = None
