@@ -43,35 +43,24 @@ class TestTPA:
         if is_mpi_master(task.mpi_comm):
             tpa_result = tpa_prop.rsp_property
 
-            for key in [
-                    't4_dict',
-                    't3_dict',
-                    'NaX3NyNz',
-                    'NaA3NxNy',
-                    'NaX2Nyz',
-                    'NxA2Nyz',
-                    'gamma',
-            ]:
-                if key in tpa_result and key in ref_result:
-                    if tpa_result[key] is None:
-                        continue
-                    assert abs(tpa_result[key][
-                        (w, -w, w)].real / ref_result[key].real - 1.0) < 5.0e-5
-                    assert abs(tpa_result[key][
-                        (w, -w, w)].imag / ref_result[key].imag - 1.0) < 5.0e-5
+            for key in ref_result:
+                assert abs(tpa_result[key][
+                    (w, -w, w)].real / ref_result[key].real - 1.0) < 1.0e-6
+                assert abs(tpa_result[key][
+                    (w, -w, w)].imag / ref_result[key].imag - 1.0) < 1.0e-6
 
     def test_tpa_full(self):
 
         w = 0.05
 
         ref_result = {
-            't4_dict': -39.80683343 - 0.37934801j,
-            't3_dict': -92.30911828 - 1.15693267j,
-            'NaX3NyNz': -154.10953954 - 1.18508642j,
-            'NaA3NxNy': -51.38824383 - 0.10346367j,
-            'NaX2Nyz': 621.18409570 + 10.77095784j,
-            'NxA2Nyz': 621.79842988 + 2.18029474j,
-            'gamma': 905.36879049 + 10.12642181j,
+            't4_dict': -39.81102482 - 0.37943318j,
+            't3_dict': -92.30945471 - 1.15690967j,
+            'NaX3NyNz': -154.11176435 - 1.18509718j,
+            'NaA3NxNy': -51.38898554 - 0.10346488j,
+            'NaX2Nyz': 621.17712859 + 10.77037598j,
+            'NxA2Nyz': 621.79142488 + 2.18017301j,
+            'gamma': 905.34732406 + 10.12564409j,
         }
 
         here = Path(__file__).parent
@@ -84,10 +73,10 @@ class TestTPA:
         w = 0.05
 
         ref_result = {
-            't3_dict': -35.37821846 - 0.92780165j,
-            'NaX2Nyz': 230.17509800 + 7.10707465j,
-            'NxA2Nyz': 230.43689707 + 2.16398432j,
-            'gamma': 425.23377660 + 8.34325731j,
+            't3_dict': -35.37827126 - 0.92778160j,
+            'NaX2Nyz': 230.17180603 + 7.10669620j,
+            'NxA2Nyz': 230.43358578 + 2.16388980j,
+            'gamma': 425.22712055 + 8.34280441j,
         }
 
         here = Path(__file__).parent

@@ -87,23 +87,23 @@ class TestScfRestricted:
 
         xcfun_label = 'slda'
         electric_field = None
-        ref_e_scf = -76.074208234637
-        ref_dip = np.array([0.000000, 0.000000, 0.731291])
+        ref_e_scf = -76.074208655329
+        ref_dip = np.array([0.000000, 0.000000, 0.731288])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
         xcfun_label = 'slda'
         electric_field = '0.001, 0, 0'
-        ref_e_scf = -76.0742203744
-        ref_dip = np.array([0.009288, 0.000000, 0.731285])
+        ref_e_scf = -76.0742132904
+        ref_dip = np.array([0.009288, 0.000000, 0.731345])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
         xcfun_label = 'b3lyp'
         electric_field = None
-        ref_e_scf = -76.443545741524
+        ref_e_scf = -76.443546270423
         ref_dip = np.array([0.000000, 0.000000, 0.731257])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
@@ -111,16 +111,17 @@ class TestScfRestricted:
 
         xcfun_label = 'tpssh'
         electric_field = None
-        ref_e_scf = -76.436746
-        ref_dip = np.array([0.000000, 0.000000, 0.723062])
+        ref_e_scf = -76.436760570286
+        ref_dip = np.array([0.000000, 0.000000, 0.723071])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
 
         xcfun_label = 'm06'
         electric_field = None
-        ref_e_scf = -76.406200
-        ref_dip = np.array([0.000000, 0.000000, 0.748126])
+        ref_e_scf = -76.405960204758
+        ref_dip = np.array([0.000000, 0.000000, 0.748155])
+        # note: reference dipole moment with finer grid is 0.748301
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
@@ -155,8 +156,8 @@ class TestScfRestricted:
         xcfun_label = 'b3lyp'
         electric_field = None
 
-        ref_e_scf = -76.468733754150
-        ref_dip = np.array([-0.048195, 0.098715, 0.902822])
+        ref_e_scf = -76.4687342577
+        ref_dip = np.array([-0.048191, 0.098718, 0.902823])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)
