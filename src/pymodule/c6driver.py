@@ -199,13 +199,13 @@ class C6Driver(LinearSolver):
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
-            if vn > self._small_thresh:
+            if vn > self.norm_thresh:
                 norms = np.sqrt(norms_2)
                 # real ungerade
-                if norms[0] > self._small_thresh:
+                if norms[0] > self.norm_thresh:
                     trials_ung.append(v.data[:, 0])
                 # imaginary gerade
-                if norms[1] > self._small_thresh:
+                if norms[1] > self.norm_thresh:
                     trials_ger.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T

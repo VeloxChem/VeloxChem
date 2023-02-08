@@ -55,8 +55,6 @@ class CubicResponseDriver(NonlinearSolver):
         - is_converged: The flag for convergence.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
-        - lindep_thresh: The threshold for removing linear dependence in the
-          trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
     """
@@ -83,9 +81,6 @@ class CubicResponseDriver(NonlinearSolver):
         self.d_frequencies = (0,)
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumbers()
-        self.lindep_thresh = 1.0e-10
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
 
         self.a_components = 'z'
         self.b_components = 'z'
@@ -260,10 +255,10 @@ class CubicResponseDriver(NonlinearSolver):
         N_drv = ComplexResponse(self.comm, self.ostream)
 
         cpp_keywords = {
-            'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
-            'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'xcfun', 'grid_level', 'potfile', 'electric_field',
-            'program_end_time'
+            'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
+            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
+            'electric_field', 'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -1208,10 +1203,10 @@ class CubicResponseDriver(NonlinearSolver):
         Nxy_drv = ComplexResponse(self.comm, self.ostream)
 
         cpp_keywords = {
-            'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
-            'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'xcfun', 'grid_level', 'potfile', 'electric_field',
-            'program_end_time'
+            'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
+            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
+            'electric_field', 'program_end_time'
         }
 
         for key in cpp_keywords:

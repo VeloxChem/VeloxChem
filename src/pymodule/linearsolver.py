@@ -78,7 +78,7 @@ class LinearSolver:
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
         - cur_iter: Index of the current iteration.
-        - small_thresh: The norm threshold for a vector to be considered a zero
+        - norm_thresh: The norm threshold for a vector to be considered a zero
           vector.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
@@ -134,8 +134,8 @@ class LinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
+        self.norm_thresh = 1.0e-10
         self.lindep_thresh = 1.0e-6
-        self._small_thresh = 1.0e-10
         self._cur_iter = 0
         self._is_converged = False
 
@@ -186,6 +186,7 @@ class LinearSolver:
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
+                'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
