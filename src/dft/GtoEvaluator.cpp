@@ -2084,16 +2084,16 @@ computeGtosValuesForThirdOrder(CMemBlock2D<double>&      gtoValues,
 
                         f0_xx[g] += f0_x * dx;
 
-                        fx_xx[g] += f0_x * (2.0 + fg_0 * dx * dx);
-                        fy_xx[g] += f0_x * fg_0 * dx * dy;
-                        fz_xx[g] += f0_x * fg_0 * dx * dz;
+                        fx_xx[g] += fg_1 * dx * dx * dx + 2.0 * f0_0 * dx;
+                        fy_xx[g] += fg_1 * dx * dx * dy;
+                        fz_xx[g] += fg_1 * dx * dx * dz;
 
                         fxx_xx[g] += fg_2 * dx * dx * dx * dx + 5.0 * fg_1 * dx * dx + 2.0 * f0_0;
                         fxy_xx[g] += fg_2 * dx * dx * dx * dy + 2.0 * fg_1 * dx * dy;
                         fxz_xx[g] += fg_2 * dx * dx * dx * dz + 2.0 * fg_1 * dx * dz;
-                        fyy_xx[g] += fg_2 * dx * dx * dy * dy + 1.0 * fg_1 * dx * dx;
+                        fyy_xx[g] += fg_2 * dx * dx * dy * dy + fg_1 * dx * dx;
                         fyz_xx[g] += fg_2 * dx * dx * dy * dz;
-                        fzz_xx[g] += fg_2 * dx * dx * dz * dz + 1.0 * fg_1 * dx * dx;
+                        fzz_xx[g] += fg_2 * dx * dx * dz * dz + fg_1 * dx * dx;
 
                         fxxx_xx[g] += fg_3 * dx * dx * dx * dx * dx + 9.0 * fg_2 * dx * dx * dx + 12.0 * fg_1 * dx;
                         fxxy_xx[g] += fg_3 * dx * dx * dx * dx * dy + 5.0 * fg_2 * dx * dx * dy + 2.0 * fg_1 * dy;
@@ -2112,16 +2112,16 @@ computeGtosValuesForThirdOrder(CMemBlock2D<double>&      gtoValues,
 
                         f0_xy[g] += f0_x * dy;
 
-                        fx_xy[g] += f0_y * (1.0 + fg_0 * dx * dx);
-                        fy_xy[g] += f0_x * (1.0 + fg_0 * dy * dy);
-                        fz_xy[g] += f0_x * fg_0 * dy * dz;
+                        fx_xy[g] += fg_1 * dx * dx * dy + f0_0 * dy;
+                        fy_xy[g] += fg_1 * dx * dy * dy + f0_0 * dx;
+                        fz_xy[g] += fg_1 * dx * dy * dz;
 
                         fxx_xy[g] += fg_2 * dx * dx * dx * dy + 3.0 * fg_1 * dx * dy;
-                        fxy_xy[g] += fg_2 * dx * dx * dy * dy + 1.0 * fg_1 * (dx * dx + dy * dy) + f0_0;
-                        fxz_xy[g] += fg_2 * dx * dx * dy * dz + 1.0 * fg_1 * dy * dz;
-                        fyy_xy[g] += fg_2 * dy * dy * dy * dx + 3.0 * fg_1 * dy * dx;
-                        fyz_xy[g] += fg_2 * dy * dy * dx * dz + 1.0 * fg_1 * dx * dz;
-                        fzz_xy[g] += fg_2 * dx * dy * dz * dz + 1.0 * fg_1 * dx * dy;
+                        fxy_xy[g] += fg_2 * dx * dx * dy * dy + fg_1 * dx * dx + fg_1 * dy * dy + f0_0;
+                        fxz_xy[g] += fg_2 * dx * dx * dy * dz + fg_1 * dy * dz;
+                        fyy_xy[g] += fg_2 * dx * dy * dy * dy + 3.0 * fg_1 * dx * dy;
+                        fyz_xy[g] += fg_2 * dx * dy * dy * dz + fg_1 * dx * dz;
+                        fzz_xy[g] += fg_2 * dx * dy * dz * dz + fg_1 * dx * dy;
 
                         fxxx_xy[g] += fg_3 * dx * dx * dx * dx * dy + 6.0 * fg_2 * dx * dx * dy + 3.0 * fg_1 * dy;
                         fxxy_xy[g] += fg_3 * dx * dx * dx * dy * dy + fg_2 * dx * dx * dx + 3.0 * fg_2 * dx * dy * dy + 3.0 * fg_1 * dx;
@@ -2140,16 +2140,16 @@ computeGtosValuesForThirdOrder(CMemBlock2D<double>&      gtoValues,
 
                         f0_xz[g] += f0_x * dz;
 
-                        fx_xz[g] += f0_z * (1.0 + fg_0 * dx * dx);
-                        fy_xz[g] += f0_x * fg_0 * dz * dy;
-                        fz_xz[g] += f0_x * (1.0 + fg_0 * dz * dz);
+                        fx_xz[g] += fg_1 * dx * dx * dz + f0_0 * dz;
+                        fy_xz[g] += fg_1 * dx * dy * dz;
+                        fz_xz[g] += fg_1 * dx * dz * dz + f0_0 * dx;
 
                         fxx_xz[g] += fg_2 * dx * dx * dx * dz + 3.0 * fg_1 * dx * dz;
-                        fxy_xz[g] += fg_2 * dx * dx * dz * dy + 1.0 * fg_1 * dz * dy;
-                        fxz_xz[g] += fg_2 * dx * dx * dz * dz + 1.0 * fg_1 * (dx * dx + dz * dz) + f0_0;
-                        fyy_xz[g] += fg_2 * dx * dz * dy * dy + 1.0 * fg_1 * dx * dz;
-                        fyz_xz[g] += fg_2 * dz * dz * dx * dy + 1.0 * fg_1 * dx * dy;
-                        fzz_xz[g] += fg_2 * dz * dz * dz * dx + 3.0 * fg_1 * dz * dx;
+                        fxy_xz[g] += fg_2 * dx * dx * dy * dz + fg_1 * dy * dz;
+                        fxz_xz[g] += fg_2 * dx * dx * dz * dz + fg_1 * dx * dx + fg_1 * dz * dz + f0_0;
+                        fyy_xz[g] += fg_2 * dx * dy * dy * dz + fg_1 * dx * dz;
+                        fyz_xz[g] += fg_2 * dx * dy * dz * dz + fg_1 * dx * dy;
+                        fzz_xz[g] += fg_2 * dx * dz * dz * dz + 3.0 * fg_1 * dx * dz;
 
                         fxxx_xz[g] += fg_3 * dx * dx * dx * dx * dz + 6.0 * fg_2 * dx * dx * dz + 3.0 * fg_1 * dz;
                         fxxy_xz[g] += fg_3 * dx * dx * dx * dy * dz + 3.0 * fg_2 * dx * dy * dz;
@@ -2166,19 +2166,19 @@ computeGtosValuesForThirdOrder(CMemBlock2D<double>&      gtoValues,
 
                         f0_yy[g] += f0_y * dy;
 
-                        fx_yy[g] += f0_y * fg_0 * dy * dx;
-                        fy_yy[g] += f0_y * (2.0 + fg_0 * dy * dy);
-                        fz_yy[g] += f0_y * fg_0 * dy * dz;
+                        fx_yy[g] += fg_1 * dx * dy * dy;
+                        fy_yy[g] += fg_1 * dy * dy * dy + 2.0 * f0_0 * dy;
+                        fz_yy[g] += fg_1 * dy * dy * dz;
 
-                        fxx_yy[g] += fg_2 * dy * dy * dx * dx + 1.0 * fg_1 * dy * dy;
-                        fxy_yy[g] += fg_2 * dy * dy * dy * dx + 2.0 * fg_1 * dy * dx;
-                        fxz_yy[g] += fg_2 * dy * dy * dx * dz;
+                        fxx_yy[g] += fg_2 * dx * dx * dy * dy + fg_1 * dy * dy;
+                        fxy_yy[g] += fg_2 * dx * dy * dy * dy + 2.0 * fg_1 * dx * dy;
+                        fxz_yy[g] += fg_2 * dx * dy * dy * dz;
                         fyy_yy[g] += fg_2 * dy * dy * dy * dy + 5.0 * fg_1 * dy * dy + 2.0 * f0_0;
                         fyz_yy[g] += fg_2 * dy * dy * dy * dz + 2.0 * fg_1 * dy * dz;
-                        fzz_yy[g] += fg_2 * dy * dy * dz * dz + 1.0 * fg_1 * dy * dy;
+                        fzz_yy[g] += fg_2 * dy * dy * dz * dz + fg_1 * dy * dy;
 
                         fxxx_yy[g] += fg_3 * dx * dx * dx * dy * dy + 3.0 * fg_2 * dx * dy * dy;
-                        fxxy_yy[g] += fg_3 * dx * dx * dy * dy * dy + 2.0 * fg_2 * dx * dx * dy + fg_2 * dy * dy * dy + 2 * fg_1 * dy;
+                        fxxy_yy[g] += fg_3 * dx * dx * dy * dy * dy + 2.0 * fg_2 * dx * dx * dy + fg_2 * dy * dy * dy + 2.0 * fg_1 * dy;
                         fxxz_yy[g] += fg_3 * dx * dx * dy * dy * dz + fg_2 * dy * dy * dz;
                         fxyy_yy[g] += fg_3 * dx * dy * dy * dy * dy + 5.0 * fg_2 * dx * dy * dy + 2.0 * fg_1 * dx;
                         fxyz_yy[g] += fg_3 * dx * dy * dy * dy * dz + 2.0 * fg_2 * dx * dy * dz;
@@ -2192,16 +2192,16 @@ computeGtosValuesForThirdOrder(CMemBlock2D<double>&      gtoValues,
 
                         f0_yz[g] += f0_y * dz;
 
-                        fx_yz[g] += f0_y * fg_0 * dz * dx;
-                        fy_yz[g] += f0_z * (1.0 + fg_0 * dy * dy);
-                        fz_yz[g] += f0_y * (1.0 + fg_0 * dz * dz);
+                        fx_yz[g] += fg_1 * dx * dy * dz;
+                        fy_yz[g] += fg_1 * dy * dy * dz + f0_0 * dz;
+                        fz_yz[g] += fg_1 * dy * dz * dz + f0_0 * dy;
 
-                        fxx_yz[g] += fg_2 * dz * dy * dx * dx + 1.0 * fg_1 * dz * dy;
-                        fxy_yz[g] += fg_2 * dy * dy * dz * dx + 1.0 * fg_1 * dz * dx;
-                        fxz_yz[g] += fg_2 * dz * dz * dy * dx + 1.0 * fg_1 * dy * dx;
+                        fxx_yz[g] += fg_2 * dx * dx * dy * dz + fg_1 * dy * dz;
+                        fxy_yz[g] += fg_2 * dx * dy * dy * dz + fg_1 * dx * dz;
+                        fxz_yz[g] += fg_2 * dx * dy * dz * dz + fg_1 * dx * dy;
                         fyy_yz[g] += fg_2 * dy * dy * dy * dz + 3.0 * fg_1 * dy * dz;
-                        fyz_yz[g] += fg_2 * dz * dz * dy * dy + 1.0 * fg_1 * (dz * dz + dy * dy) + f0_0;
-                        fzz_yz[g] += fg_2 * dz * dz * dz * dy + 3.0 * fg_1 * dz * dy;
+                        fyz_yz[g] += fg_2 * dy * dy * dz * dz + fg_1 * dy * dy + fg_1 * dz * dz + f0_0;
+                        fzz_yz[g] += fg_2 * dy * dz * dz * dz + 3.0 * fg_1 * dy * dz;
 
                         fxxx_yz[g] += fg_3 * dx * dx * dx * dy * dz + 3.0 * fg_2 * dx * dy * dz;
                         fxxy_yz[g] += fg_3 * dx * dx * dy * dy * dz + fg_2 * dx * dx * dz + fg_2 * dy * dy * dz + fg_1 * dz;
@@ -2218,15 +2218,15 @@ computeGtosValuesForThirdOrder(CMemBlock2D<double>&      gtoValues,
 
                         f0_zz[g] += f0_z * dz;
 
-                        fx_zz[g] += f0_z * fg_0 * dz * dx;
-                        fy_zz[g] += f0_z * fg_0 * dz * dy;
-                        fz_zz[g] += f0_z * (2.0 + fg_0 * dz * dz);
+                        fx_zz[g] += fg_1 * dx * dz * dz;
+                        fy_zz[g] += fg_1 * dy * dz * dz;
+                        fz_zz[g] += fg_1 * dz * dz * dz + 2.0 * f0_0 * dz;
 
-                        fxx_zz[g] += fg_2 * dz * dz * dx * dx + 1.0 * fg_1 * dz * dz;
-                        fxy_zz[g] += fg_2 * dz * dz * dy * dx;
-                        fxz_zz[g] += fg_2 * dz * dz * dz * dx + 2.0 * fg_1 * dz * dx;
-                        fyy_zz[g] += fg_2 * dz * dz * dy * dy + 1.0 * fg_1 * dz * dz;
-                        fyz_zz[g] += fg_2 * dz * dz * dz * dy + 2.0 * fg_1 * dz * dy;
+                        fxx_zz[g] += fg_2 * dx * dx * dz * dz + fg_1 * dz * dz;
+                        fxy_zz[g] += fg_2 * dx * dy * dz * dz;
+                        fxz_zz[g] += fg_2 * dx * dz * dz * dz + 2.0 * fg_1 * dx * dz;
+                        fyy_zz[g] += fg_2 * dy * dy * dz * dz + fg_1 * dz * dz;
+                        fyz_zz[g] += fg_2 * dy * dz * dz * dz + 2.0 * fg_1 * dy * dz;
                         fzz_zz[g] += fg_2 * dz * dz * dz * dz + 5.0 * fg_1 * dz * dz + 2.0 * f0_0;
 
                         fxxx_zz[g] += fg_3 * dx * dx * dx * dz * dz + 3.0 * fg_2 * dx * dz * dz;
