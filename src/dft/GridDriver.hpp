@@ -173,8 +173,8 @@ class CGridDriver
     ~CGridDriver();
 
     /**
-     Sets accuracy level for grid generation. Level: 1-6, where 1 is coarse
-     grid, 5 is ultrafine grid, 6 special benchmarking grid.
+     Sets accuracy level for grid generation. Level: 1-7, where 1 is coarse
+     grid, 5 is ultrafine grid, 7 special benchmarking grid.
 
      @param gridLevel the accuracy level of generated grid.
      */
