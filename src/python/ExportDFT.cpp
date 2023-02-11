@@ -44,6 +44,7 @@
 #include "XCNewFunctional.hpp"
 #include "XCNewIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
+#include "XCMolecularHessian.hpp"
 #include "XCPairDensityFunctional.hpp"
 
 namespace py = pybind11;
@@ -1136,6 +1137,45 @@ export_dft(py::module& m)
             "basis"_a,
             "rwDensityMatrixOne"_a,
             "rwDensityMatrixTwo"_a,
+            "gsDensityMatrix"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a);
+
+    // CXCMolecularHessian class
+
+    PyClass<CXCMolecularHessian>(m, "XCMolecularHessian")
+        .def(py::init(&vlx_general::create<CXCMolecularHessian>), "comm"_a = py::none())
+        .def(
+            "integrate_vxc_hessian",
+            [](CXCMolecularHessian& self,
+               const CMolecule&         molecule,
+               const CMolecularBasis&   basis,
+               const CAODensityMatrix&  gsDensityMatrix,
+               const CMolecularGrid&    molecularGrid,
+               const std::string&       xcFuncLabel) -> py::array_t<double> {
+                auto molgrad = self.integrateVxcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates Vxc contribution to molecular Hessian.",
+            "molecule"_a,
+            "basis"_a,
+            "gsDensityMatrix"_a,
+            "molecularGrid"_a,
+            "xcFuncLabel"_a)
+        .def(
+            "integrate_fxc_hessian",
+            [](CXCMolecularHessian& self,
+               const CMolecule&         molecule,
+               const CMolecularBasis&   basis,
+               const CAODensityMatrix&  gsDensityMatrix,
+               const CMolecularGrid&    molecularGrid,
+               const std::string&       xcFuncLabel) -> py::array_t<double> {
+                auto molgrad = self.integrateFxcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
+            },
+            "Integrates Fxc contribution to molecular Hessian.",
+            "molecule"_a,
+            "basis"_a,
             "gsDensityMatrix"_a,
             "molecularGrid"_a,
             "xcFuncLabel"_a);

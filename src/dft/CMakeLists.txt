@@ -18,6 +18,7 @@ target_sources(vlxobjs
     XCNewFunctional.cpp
     XCNewIntegrator.cpp
     XCMolecularGradient.cpp
+    XCMolecularHessian.cpp
     DensityGridCubic.cpp
     XCPairDensityFunctional.cpp
   )
