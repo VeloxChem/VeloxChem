@@ -43,7 +43,7 @@
 #include "XCFuncType.hpp"
 #include "XCNewFunctional.hpp"
 #include "XCNewIntegrator.hpp"
-#include "XCNewMolecularGradient.hpp"
+#include "XCMolecularGradient.hpp"
 #include "XCPairDensityFunctional.hpp"
 
 namespace py = pybind11;
@@ -1055,13 +1055,13 @@ export_dft(py::module& m)
             "lapl"_a,
             "tau"_a);
 
-    // CXCNewMolecularGradient class
+    // CXCMolecularGradient class
 
-    PyClass<CXCNewMolecularGradient>(m, "XCNewMolecularGradient")
-        .def(py::init(&vlx_general::create<CXCNewMolecularGradient>), "comm"_a = py::none())
+    PyClass<CXCMolecularGradient>(m, "XCMolecularGradient")
+        .def(py::init(&vlx_general::create<CXCMolecularGradient>), "comm"_a = py::none())
         .def(
             "integrate_vxc_gradient",
-            [](CXCNewMolecularGradient& self,
+            [](CXCMolecularGradient& self,
                const CMolecule&         molecule,
                const CMolecularBasis&   basis,
                const CAODensityMatrix&  gsDensityMatrix,
@@ -1078,7 +1078,7 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_vxc_gradient",
-            [](CXCNewMolecularGradient& self,
+            [](CXCMolecularGradient& self,
                const CMolecule&         molecule,
                const CMolecularBasis&   basis,
                const CAODensityMatrix&  rwDensityMatrix,
@@ -1097,7 +1097,7 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_fxc_gradient",
-            [](CXCNewMolecularGradient& self,
+            [](CXCMolecularGradient& self,
                const CMolecule&         molecule,
                const CMolecularBasis&   basis,
                const CAODensityMatrix&  rwDensityMatrixOne,
@@ -1119,7 +1119,7 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_kxc_gradient",
-            [](CXCNewMolecularGradient& self,
+            [](CXCMolecularGradient& self,
                const CMolecule&         molecule,
                const CMolecularBasis&   basis,
                const CAODensityMatrix&  rwDensityMatrixOne,
