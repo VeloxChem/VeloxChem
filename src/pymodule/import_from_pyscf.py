@@ -2096,14 +2096,14 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
             pyscf_mo_coeff = pyscf_scf.mo_coeff
             pyscf_mo_occ = pyscf_scf.mo_occ
             max_memory = 2000
-            vxc_deriv = pyscf_rks_hessian._get_vxc_deriv1(pyscf_hessian,
+            vxc_deriv1 = pyscf_rks_hessian._get_vxc_deriv1(pyscf_hessian,
                                                           pyscf_mo_coeff,
                                                           pyscf_mo_occ,
                                                           max_memory)
- 
 
+            #print(vxc_deriv1)
             # select derivatives wrt. atom i
-            vxc_deriv_atom_i = vxc_deriv[i]
+            vxc_deriv_atom_i = vxc_deriv1[i]
             fock_deriv_atom_i += vxc_deriv_atom_i
 
             # check fraction of exact exchange
@@ -2141,7 +2141,7 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
     return vlx_fock_deriv_atom_i
 
 
-def vxc_deriv(molecule, basis, density, xcfun, i=0, grid_level=4, unit="au"):
+def vxc_deriv(molecule, basis, scfdrv, unit="au"):
     """
     Imports the derivatives of the Vxc matrix
     from pyscf and converts it to veloxchem format
@@ -2152,39 +2152,38 @@ def vxc_deriv(molecule, basis, density, xcfun, i=0, grid_level=4, unit="au"):
         the vlx basis object
     :param density:
         the SCF density matrix (alpha part) in AO basis
-    :param xcfun:
-        the label of the exchange-correlation functional
-    :param grid_level:
-        the grid level for numerical integration of xc kernel
-    :param i:
-        the index of the atom for which the derivatives
-        are computed.
+    :param scfdrv:
+        the ScfDriver
     :param unit:
         the units to be used for the molecular geometry;
         possible values: "au" (default), "Angstrom"
 
     :return:
-        a numpy array of shape 3 x nao x nao
+        a numpy array of shape natm x 3 x nao x nao
         (nao = number of atomic orbitals)
-        corresponding to the derivative of the Fock matrix
-        with respect to the x, y and z coords. of atom i.
+        corresponding to the derivative of the Vxc matrix
+        with respect to the x, y and z coords. of all atoms.
     """
     molecule_string = get_molecule_string(molecule)
+    natm = molecule.number_of_atoms()
     basis_set_label = basis.get_label()
     pyscf_basis = translate_to_pyscf(basis_set_label)
     pyscf_molecule = pyscf.gto.M(atom=molecule_string,
                                  basis=pyscf_basis, unit=unit,
                                  charge=molecule.get_charge())
     pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
+    pyscf_scf.conv_tol = scfdrv.conv_thresh
+    # some functional are parametrized differently in PYSCF
+    pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
+    if scfdrv.grid_level == 6:
+        pyscf_scf.grids.level = 9
+    else:
+        pyscf_scf.grids.level = scfdrv.grid_level
+    pyscf_scf.kernel()
+    pyscf_hessian = pyscf.hessian.rks.Hessian(pyscf_scf)
 
-    # TODO: some functional are parametrized differently in PYSCF
-    # TODO: adjust the grid level -- default used right now.
-    pyscf_scf.xc = translate_to_pyscf(xcfun)
-    #pyscf_scf.kernel()
-    #nocc = pyscf_molecule.nelec[0]
+    density = scfdrv.scf_tensors['D_alpha']
     gs_dm = ao_matrix_to_dalton(DenseMatrix(density), basis, molecule).to_numpy()
-    #gs_dm = np.einsum('mi,ni->mn', pyscf_scf.mo_coeff[:,:nocc],
-    #                   pyscf_scf.mo_coeff[:,:nocc])
     nao = density.shape[0]
     
     if nao != pyscf_molecule.nao:
@@ -2192,54 +2191,34 @@ def vxc_deriv(molecule, basis, density, xcfun, i=0, grid_level=4, unit="au"):
         error_text +="\nCheck if the basis sets are defined the same way."
         raise ValueError(error_text)    
 
-    pyscf_grad = pyscf_scf.Gradients()
-    pyscf_mf = pyscf_grad.base 
-    pyscf_ni = pyscf_mf._numint # Pyscf object for numerical integration
-    if pyscf_grad.grids is not None:
-        pyscf_grids = pyscf_grad.grids
-    else:
-        pyscf_grids = pyscf_mf.grids
-    if pyscf_grids.coords is None:
-        pyscf_grids.build(with_non0tab=True)
+    pyscf_mo_coeff = pyscf_scf.mo_coeff
+    pyscf_mo_occ = pyscf_scf.mo_occ
+    max_memory = 2000
+    vxc_deriv1 = pyscf_rks_hessian._get_vxc_deriv1(pyscf_hessian,
+                                                   pyscf_mo_coeff,
+                                                   pyscf_mo_occ,
+                                                   max_memory)
 
-    pyscf_grids.level = grid_level
-    pyscf_exc, pyscf_vxc_deriv = pyscf_rks_grad.get_vxc(pyscf_ni,
-                                             pyscf_molecule,
-                                             pyscf_grids, pyscf_mf.xc,
-                                             2*gs_dm)
-
-    ao_slices = pyscf_molecule.aoslice_by_atom()
-
-    # Get the AO indices corresponding to atom i
-    ki, kf = ao_slices[i, 2:]
-
-    vxc_deriv_atom_i = np.zeros((3,nao,nao))
-
-    vxc_deriv_atom_i[:,ki:kf] = pyscf_vxc_deriv[:,ki:kf]
-
-    # (nabla m | vxc | n) + (m | vxc |nabla n)
-    vxc_deriv_atom_i += vxc_deriv_atom_i.transpose(0,2,1)
-
-    vlx_vxc_deriv_atom_i = np.zeros(vxc_deriv_atom_i.shape)
-
+    vlx_vxc_deriv = np.zeros(vxc_deriv1.shape)
 
     # Transform each compnent (x,y,z) to veloxchem format
-    vlx_vxc_deriv_atom_i[0] = ( ao_matrix_to_veloxchem(
-                                 DenseMatrix(vxc_deriv_atom_i[0]),
-                                 basis, molecule).to_numpy()
-                                )
+    for i in range(natm):
+        vlx_vxc_deriv[i,0] = ( ao_matrix_to_veloxchem(
+                                       DenseMatrix(vxc_deriv1[i,0]),
+                                       basis, molecule).to_numpy()
+                                    )
 
-    vlx_vxc_deriv_atom_i[1] = ( ao_matrix_to_veloxchem(
-                                 DenseMatrix(vxc_deriv_atom_i[1]),
-                                 basis, molecule).to_numpy()
-                                )
+        vlx_vxc_deriv[i,1] = ( ao_matrix_to_veloxchem(
+                                     DenseMatrix(vxc_deriv1[i,1]),
+                                     basis, molecule).to_numpy()
+                                    )
 
-    vlx_vxc_deriv_atom_i[2] = ( ao_matrix_to_veloxchem(
-                                 DenseMatrix(vxc_deriv_atom_i[2]),
-                                 basis, molecule).to_numpy()
-                                )
+        vlx_vxc_deriv[i,2] = ( ao_matrix_to_veloxchem(
+                                     DenseMatrix(vxc_deriv1[i,2]),
+                                     basis, molecule).to_numpy()
+                                    )
 
-    return vlx_vxc_deriv_atom_i
+    return vlx_vxc_deriv
 
 
 def eri_deriv(molecule, basis, i=0, full_deriv=True, unit="au",
