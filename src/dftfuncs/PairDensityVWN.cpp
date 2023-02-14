@@ -88,7 +88,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
     double f16 = -1.0 / 6.0;
 
-    double f76 = -7.0 / 6.0;
+    // double f76 = -7.0 / 6.0;
 
     double DCRS = std::pow(3.0 / (4.0 * mathconst::getPiValue()), -f16);
 
@@ -111,7 +111,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double x = DCRS * std::pow(density, f16);
 
-        double xrho = DCRS * f16 * std::pow(density, f76);
+        // double xrho = DCRS * f16 * std::pow(density, f76);
 
         double f_zeta;
 
@@ -160,21 +160,21 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         // ep_p1
 
-        double ex1 = 2.0 / x + ACON * xfx / xf - BCON / (x - px0) - CCON * (2.0 * yf / xfx) / (1.0 + yf * yf);
+        // double ex1 = 2.0 / x + ACON * xfx / xf - BCON / (x - px0) - CCON * (2.0 * yf / xfx) / (1.0 + yf * yf);
 
-        double ex1_f = 2.0 / x + ACON_f * xfx_f / xf_f - BCON_f / (x - px0_f) - CCON_f * (2.0 * yf_f / xfx_f) / (1.0 + yf_f * yf_f);
+        // double ex1_f = 2.0 / x + ACON_f * xfx_f / xf_f - BCON_f / (x - px0_f) - CCON_f * (2.0 * yf_f / xfx_f) / (1.0 + yf_f * yf_f);
 
-        double ep_p1 = 0.5 * pa * (e1 + density * ex1 * xrho);
+        // double ep_p1 = 0.5 * pa * (e1 + density * ex1 * xrho);
 
-        double ep_f1 = 0.5 * pa_f * (e1_f + density * ex1_f * xrho);
+        // double ep_f1 = 0.5 * pa_f * (e1_f + density * ex1_f * xrho);
 
         // Potential
 
         double ef0 = ep_f0 - ep_p0;
 
-        double ef1 = ep_f1 - ep_p1;
+        // double ef1 = ep_f1 - ep_p1;
 
-        double vcfp = f_zeta * ef1;
+        // double vcfp = f_zeta * ef1;
 
         // double delta = f_zet1 * ef0;
 

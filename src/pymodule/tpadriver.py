@@ -32,12 +32,12 @@ from .veloxchemlib import mpi_master, hartree_in_wavenumbers
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .nonlinearsolver import NonLinearSolver
+from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 
 
-class TpaDriver(NonLinearSolver):
+class TpaDriver(NonlinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
@@ -52,8 +52,6 @@ class TpaDriver(NonLinearSolver):
         - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
-        - lindep_thresh: The threshold for removing linear dependence in the
-          trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
     """
@@ -70,9 +68,6 @@ class TpaDriver(NonLinearSolver):
         self.frequencies = (0,)
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumbers()
-        self.lindep_thresh = 1.0e-10
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
 
         # input keywords
         self._input_keywords['response'].update({
@@ -113,11 +108,16 @@ class TpaDriver(NonLinearSolver):
               functions for TPA
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-6
+
         # double check SCF information
         self._check_scf_results(scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check()
+        self._dft_sanity_check_nonlinrsp()
 
         profiler = Profiler({
             'timing': self.timing,
@@ -193,10 +193,10 @@ class TpaDriver(NonLinearSolver):
         Nb_drv = ComplexResponse(self.comm, self.ostream)
 
         cpp_keywords = {
-            'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
-            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
-            'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
-            'electric_field', 'program_end_time'
+            'frequencies', 'damping', 'norm_thresh', 'lindep_thresh',
+            'conv_thresh', 'max_iter', 'eri_thresh', 'qq_type', 'timing',
+            'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
+            'potfile', 'electric_field', 'program_end_time'
         }
 
         for key in cpp_keywords:

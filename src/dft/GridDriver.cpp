@@ -106,7 +106,7 @@ CGridDriver::_getNumberOfRadialPoints(const int32_t idElemental) const
 
     if ((idElemental == 1) || (idElemental == 2))
     {
-        const std::array<int32_t, 6> nPoints{{20, 25, 30, 35, 45, 200}};
+        const std::array<int32_t, 6> nPoints{{20, 25, 30, 40, 45, 200}};
 
         return nPoints[_gridLevel - 1];
     }
@@ -115,7 +115,7 @@ CGridDriver::_getNumberOfRadialPoints(const int32_t idElemental) const
 
     if ((idElemental > 2) && (idElemental < 11))
     {
-        const std::array<int32_t, 6> nPoints{{25, 30, 35, 40, 50, 200}};
+        const std::array<int32_t, 6> nPoints{{25, 30, 35, 45, 50, 200}};
 
         return nPoints[_gridLevel - 1];
     }
@@ -124,7 +124,7 @@ CGridDriver::_getNumberOfRadialPoints(const int32_t idElemental) const
 
     if ((idElemental > 10) && (idElemental < 19))
     {
-        const std::array<int32_t, 6> nPoints{{30, 35, 40, 45, 55, 200}};
+        const std::array<int32_t, 6> nPoints{{30, 35, 40, 50, 55, 200}};
 
         return nPoints[_gridLevel - 1];
     }
@@ -133,7 +133,7 @@ CGridDriver::_getNumberOfRadialPoints(const int32_t idElemental) const
 
     if ((idElemental > 18) && (idElemental < 37))
     {
-        const std::array<int32_t, 6> nPoints{{35, 40, 45, 50, 60, 200}};
+        const std::array<int32_t, 6> nPoints{{35, 40, 45, 55, 60, 200}};
 
         return nPoints[_gridLevel - 1];
     }
@@ -142,7 +142,7 @@ CGridDriver::_getNumberOfRadialPoints(const int32_t idElemental) const
 
     if ((idElemental > 36) && (idElemental < 87))
     {
-        const std::array<int32_t, 6> nPoints{{40, 45, 50, 55, 65, 200}};
+        const std::array<int32_t, 6> nPoints{{40, 45, 50, 60, 65, 200}};
 
         return nPoints[_gridLevel - 1];
     }

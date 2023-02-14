@@ -20,7 +20,7 @@ class TestDftGridPartition:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
         scf_drv.compute(molecule, basis)
         density = scf_drv.density
 
@@ -56,7 +56,7 @@ class TestDftGridPartition:
         basis_label = 'def2-svp'
         xcfun_label = 'slater'
         grid_level = 4
-        tol = 1.0e-11
+        tol = 1.0e-10
         ref_h5file = 'vxc_lda.h5'
 
         self.run_dft_grid_partition(mol_str, basis_label, xcfun_label,

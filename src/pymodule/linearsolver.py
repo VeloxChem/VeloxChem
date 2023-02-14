@@ -35,7 +35,7 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
-from .veloxchemlib import mpi_master
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
 from .veloxchemlib import new_parse_xc_func
 from .aodensitymatrix import AODensityMatrix
@@ -78,7 +78,7 @@ class LinearSolver:
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
         - cur_iter: Index of the current iteration.
-        - small_thresh: The norm threshold for a vector to be considered a zero
+        - norm_thresh: The norm threshold for a vector to be considered a zero
           vector.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
@@ -134,8 +134,8 @@ class LinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.lindep_thresh = 1.0e-6
-        self._small_thresh = 1.0e-10
+        self.norm_thresh = None
+        self.lindep_thresh = None
         self._cur_iter = 0
         self._is_converged = False
 
@@ -150,6 +150,7 @@ class LinearSolver:
         # restart information
         self.restart = False
         self.checkpoint_file = None
+        self.save_solutions = True
 
         # timing and profiling
         self.timing = False
@@ -185,9 +186,11 @@ class LinearSolver:
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
+                'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
+                'save_solutions': ('str', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
@@ -334,7 +337,9 @@ class LinearSolver:
                 updated_scf_info['qq_type'] = scf_results['qq_type']
 
             if scf_results.get('restart', None) is not None:
-                updated_scf_info['restart'] = scf_results['restart']
+                # do not restart if scf is not restarted from checkpoint
+                if not scf_results['restart']:
+                    updated_scf_info['restart'] = scf_results['restart']
 
             if scf_results.get('xcfun', None) is not None:
                 # do not overwrite xcfun if it is already specified
@@ -2107,3 +2112,101 @@ class LinearSolver:
             excitation_details.append(de_exc[1])
 
         return excitation_details
+
+    def _print_transition_dipoles(self, title, trans_dipoles):
+        """
+        Prints transition dipole moments to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param trans_dipoles:
+            The transition dipole moments.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = '                     '
+        valstr += '{:>13s}{:>13s}{:>13s}'.format('X', 'Y', 'Z')
+        self.ostream.print_header(valstr.ljust(92))
+        for s, r in enumerate(trans_dipoles):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r[0], r[1], r[2])
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_absorption(self, title, results):
+        """
+        Prints absorption to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, e in enumerate(results['eigenvalues']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:15.8f} a.u. '.format(e)
+            valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
+            f = results['oscillator_strengths'][s]
+            valstr += '    Osc.Str. {:9.4f}'.format(f)
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_ecd(self, title, results):
+        """
+        Prints electronic circular dichroism to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, R in enumerate(results['rotatory_strengths']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '    Rot.Str. '
+            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
+            valstr += f'{R:11.4f} [10**(-40) cgs]'
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_excitation_details(self, title, results):
+        """
+        Prints excitation details.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self.ostream.print_header(title.ljust(92))
+        self.ostream.print_blank()
+
+        nstates = results['eigenvalues'].size
+        excitation_details = results['excitation_details']
+
+        for s in range(nstates):
+            valstr = 'Excited state {}'.format(s + 1)
+            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_header(('-' * len(valstr)).ljust(92))
+
+            for exc_str in excitation_details[s]:
+                self.ostream.print_header(exc_str.ljust(92))
+            self.ostream.print_blank()
+
+        self.ostream.flush()

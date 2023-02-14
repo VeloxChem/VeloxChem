@@ -99,10 +99,9 @@ class ScfGradientDriver(GradientDriver):
         # compute gradient
 
         if self.numerical:
-            scf_ostream_state = self.scf_drv.ostream.state
-            self.scf_drv.ostream.state = False
+            self.scf_drv.ostream.mute()
             self.compute_numerical(molecule, ao_basis, min_basis)
-            self.scf_drv.ostream.state = scf_ostream_state
+            self.scf_drv.ostream.unmute()
         else:
             self.compute_analytical(molecule, ao_basis)
 

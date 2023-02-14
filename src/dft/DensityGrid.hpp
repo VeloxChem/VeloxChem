@@ -363,37 +363,36 @@ class CDensityGrid
     double* betaDensityGradientZ(const int32_t iDensityMatrix);
 
     /**
-     Gets constant pointer to alpha density tau norm values.
+     Gets constant pointer to alpha density tau values.
 
      @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient norm values.
+     @return the pointer to alpha tau values.
      */
     const double* alphaDensitytau(const int32_t iDensityMatrix) const;
 
     /**
-     Gets pointer to alpha density tau norm values.
+     Gets pointer to alpha density tau values.
 
      @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient norm values.
+     @return the pointer to alpha tau values.
      */
     double* alphaDensitytau(const int32_t iDensityMatrix);
 
     /**
-    Gets constant pointer to beta density tau norm values.
+    Gets constant pointer to beta density tau values.
 
     @param iDensityMatrix the index of density matrix.
-    @return the pointer to beta density gradient norm values.
+    @return the pointer to beta tau values.
     */
     const double* betaDensitytau(const int32_t iDensityMatrix) const;
 
     /**
-     Gets pointer to beta density tau norm values.
+     Gets pointer to beta density tauvalues.
 
      @param iDensityMatrix the index of density matrix.
-     @return the pointer to beta density gradient norm values.
+     @return the pointer to beta tau values.
      */
     double* betaDensitytau(const int32_t iDensityMatrix);
-
 
     /**
      Gets constant pointer to alpha density laplacian values.

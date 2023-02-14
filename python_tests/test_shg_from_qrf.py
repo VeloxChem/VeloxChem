@@ -13,7 +13,7 @@ from veloxchem.shgdriver import ShgDriver
 @pytest.mark.solvers
 class TestShgFromQrf:
 
-    def test_shg_from_qrf(self):
+    def run_shg_from_qrf(self, xcfun_label):
 
         molecule_string = """
             O   0.0   0.0   0.0
@@ -26,10 +26,10 @@ class TestShgFromQrf:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_settings = {}
-        method_settings = {'xcfun': 'pbe0', 'grid_level': 1}
+        method_settings = {'xcfun': xcfun_label, 'grid_level': 1}
 
         scfdrv = ScfRestrictedDriver()
-        scfdrv.ostream.state = False
+        scfdrv.ostream.mute()
         scfdrv.update_settings(scf_settings, method_settings)
         scfdrv.compute(molecule, basis)
 
@@ -44,7 +44,7 @@ class TestShgFromQrf:
         ref_shg_results = np.zeros(3, dtype='complex128')
 
         qrf = QuadraticResponseDriver()
-        qrf.ostream.state = False
+        qrf.ostream.mute()
         rsp_settings = {}
 
         for ind, a in enumerate(components):
@@ -97,7 +97,7 @@ class TestShgFromQrf:
         }
 
         shg = ShgDriver()
-        shg.ostream.state = False
+        shg.ostream.mute()
         shg.update_settings(rsp_settings, method_settings)
         shg_results = shg.compute(molecule, basis, scfdrv.scf_tensors)
 
@@ -126,3 +126,15 @@ class TestShgFromQrf:
 
             assert abs(abs(calc_beta_bar.real / ref_beta_bar.real) - 1.0) < tol
             assert abs(abs(calc_beta_bar.imag / ref_beta_bar.imag) - 1.0) < tol
+
+    def test_shg_from_qrf_lda(self):
+
+        self.run_shg_from_qrf('slda')
+
+    def test_shg_from_qrf_gga(self):
+
+        self.run_shg_from_qrf('pbe0')
+
+    def test_shg_from_qrf_mgga(self):
+
+        self.run_shg_from_qrf('tpssh')

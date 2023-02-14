@@ -293,10 +293,10 @@ class TpaReducedDriver(TpaDriver):
         N_total_drv.frequencies = freq
 
         cpp_keywords = {
-            'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
-            'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'xcfun', 'grid_level', 'potfile', 'electric_field',
-            'program_end_time'
+            'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
+            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
+            'electric_field', 'program_end_time'
         }
 
         for key in cpp_keywords:

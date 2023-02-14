@@ -162,7 +162,7 @@ class TestNumerov:
             ref_osc[b] = [float(line.split()[2]) for line in data_lines[b]]
 
         num_drv = NumerovDriver()
-        num_drv.ostream.state = False
+        num_drv.ostream.mute()
         num_drv.update_settings(numerov_dict)
 
         self.read_data(num_drv)

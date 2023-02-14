@@ -30,14 +30,11 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import LinearMomentumIntegralsDriver
-from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import mpi_master
-from .veloxchemlib import rotatory_strength_in_cgs
-from .veloxchemlib import molorb
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
+from .veloxchemlib import (ElectricDipoleIntegralsDriver,
+                           LinearMomentumIntegralsDriver,
+                           AngularMomentumIntegralsDriver)
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
+from .veloxchemlib import molorb, denmat, fockmat
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .outputstream import OutputStream
@@ -195,7 +192,7 @@ class TdaEigenSolver(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'TDAExciDriver: not implemented for unrestricted case')
+            'TdaEigenSolver: not implemented for unrestricted case')
 
         # prepare molecular orbitals
 
@@ -213,7 +210,7 @@ class TdaEigenSolver(LinearSolver):
             nocc = molecule.number_of_alpha_electrons()
             norb = mol_orbs.number_mos()
             assert_msg_critical(self.nstates <= nocc * (norb - nocc),
-                                'TDAExciDriver: too many excited states')
+                                'TdaEigenSolver: too many excited states')
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -443,6 +440,8 @@ class TdaEigenSolver(LinearSolver):
 
             self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
                                    pe_dict['potfile_text'], eigvecs)
+
+            self._print_results(ret_dict)
 
             return ret_dict
         else:
@@ -747,7 +746,7 @@ class TdaEigenSolver(LinearSolver):
             The TDA eigenvectors (in columns).
         """
 
-        if self.checkpoint_file is None:
+        if (not self.save_solutions) or (self.checkpoint_file is None):
             return
 
         final_h5_fname = str(
@@ -764,3 +763,27 @@ class TdaEigenSolver(LinearSolver):
         checkpoint_text += final_h5_fname
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
+
+    def _print_results(self, results):
+        """
+        Prints results to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole length, a.u.)',
+            results['electric_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole velocity, a.u.)',
+            results['velocity_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Magnetic Transition Dipole Moments (a.u.)',
+            results['magnetic_transition_dipoles'])
+
+        self._print_absorption('One-Photon Absorption', results)
+        self._print_ecd('Electronic Circular Dichroism', results)
+        self._print_excitation_details('Character of excitations:', results)

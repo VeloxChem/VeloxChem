@@ -23,11 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import math
-
-from .veloxchemlib import hartree_in_ev, fine_structure_constant
 from .rspproperty import ResponseProperty
-from .inputparser import parse_seq_range
 
 
 class LinearAbsorptionCrossSection(ResponseProperty):
@@ -90,33 +86,6 @@ class LinearAbsorptionCrossSection(ResponseProperty):
 
         return self._rsp_property[key]
 
-    def get_spectrum(self):
-        """
-        Gets absorption spectrum.
-
-        :return:
-            A list containing the energies and cross-sections in a.u.
-        """
-
-        spectrum = []
-
-        freqs = parse_seq_range(self._rsp_dict['frequencies'])
-
-        for w in freqs:
-            if w == 0.0:
-                continue
-
-            axx = -self._rsp_property['response_functions'][('x', 'x', w)].imag
-            ayy = -self._rsp_property['response_functions'][('y', 'y', w)].imag
-            azz = -self._rsp_property['response_functions'][('z', 'z', w)].imag
-
-            alpha_bar = (axx + ayy + azz) / 3.0
-            sigma = 4.0 * math.pi * w * alpha_bar * fine_structure_constant()
-
-            spectrum.append((w, sigma))
-
-        return spectrum
-
     def print_property(self, ostream):
         """
         Prints response property to output stream.
@@ -125,59 +94,4 @@ class LinearAbsorptionCrossSection(ResponseProperty):
             The output stream.
         """
 
-        width = 92
-
-        title = 'Response Functions at Given Frequencies'
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('=' * len(title)).ljust(width))
-        ostream.print_blank()
-
-        freqs = parse_seq_range(self._rsp_dict['frequencies'])
-
-        for w in freqs:
-            title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
-
-            for a in self._rsp_dict['a_components']:
-                for b in self._rsp_dict['b_components']:
-                    prop = self._rsp_property['response_functions'][(a, b, w)]
-                    ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
-                        a.lower(), b.lower(), w)
-                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
-                    ostream.print_header(output.ljust(width))
-            ostream.print_blank()
-
-        title = self._rsp_driver.get_prop_str()
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('=' * len(title)).ljust(width))
-        ostream.print_blank()
-
-        if len(freqs) == 1 and freqs[0] == 0.0:
-            text = '*** No linear absorption spectrum at zero frequency.'
-            ostream.print_header(text.ljust(width))
-            ostream.print_blank()
-            return
-
-        title = 'Reference: '
-        title += 'J. Kauczor and P. Norman, '
-        title += 'J. Chem. Theory Comput. 2014, 10, 2449-2455.'
-        ostream.print_header(title.ljust(width))
-        ostream.print_blank()
-
-        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
-                                               'Frequency[eV]',
-                                               'sigma(w)[a.u.]')
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('-' * len(title)).ljust(width))
-
-        spectrum = self.get_spectrum()
-
-        for w, sigma in spectrum:
-            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
-                w, w * hartree_in_ev(), sigma)
-            ostream.print_header(output.ljust(width))
-
-        ostream.print_blank()
+        pass

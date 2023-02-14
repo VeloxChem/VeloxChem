@@ -35,14 +35,14 @@ from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .nonlinearsolver import NonLinearSolver
+from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
 
 
-class QuadraticResponseDriver(NonLinearSolver):
+class QuadraticResponseDriver(NonlinearSolver):
     """
     Implements a general quadratic response driver.
 
@@ -55,8 +55,6 @@ class QuadraticResponseDriver(NonLinearSolver):
         - is_converged: The flag for convergence.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
-        - lindep_thresh: The threshold for removing linear dependence in the
-          trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
         - a_components: Cartesian components of the A operator.
@@ -85,9 +83,6 @@ class QuadraticResponseDriver(NonLinearSolver):
         self.c_frequencies = (0,)
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumbers()
-        self.lindep_thresh = 1.0e-10
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
 
         self.a_components = 'z'
         self.b_components = 'z'
@@ -133,11 +128,16 @@ class QuadraticResponseDriver(NonLinearSolver):
               A dictonary containing the E[3], X[2], A[2] contractions
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-6
+
         # double check SCF information
         self._check_scf_results(scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check()
+        self._dft_sanity_check_nonlinrsp()
 
         profiler = Profiler({
             'timing': False,
@@ -236,10 +236,10 @@ class QuadraticResponseDriver(NonLinearSolver):
         N_drv = ComplexResponse(self.comm, self.ostream)
 
         cpp_keywords = [
-            'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
-            'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'xcfun', 'grid_level', 'potfile', 'electric_field',
-            'program_end_time'
+            'damping', 'norm_thresh', 'lindep_thresh', 'conv_thresh',
+            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
+            'batch_size', 'restart', 'xcfun', 'grid_level', 'potfile',
+            'electric_field', 'program_end_time'
         ]
 
         for key in cpp_keywords:

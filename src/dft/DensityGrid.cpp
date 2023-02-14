@@ -60,9 +60,7 @@ CDensityGrid::CDensityGrid(const int32_t nGridPoints, const int32_t nDensityMatr
 
     if (xcFuncType == xcfun::gga) ncomp = (_gridType == dengrid::ab) ? 11 : 5;
 
-    // NOTE: this needs to be checked with mgga functionals implementation
-
-    if (xcFuncType == xcfun::mgga) ncomp = (_gridType == dengrid::ab) ? 13 : 6;
+    if (xcFuncType == xcfun::mgga) ncomp = (_gridType == dengrid::ab) ? 15 : 7;
 
     _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
 }

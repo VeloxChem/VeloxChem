@@ -12,7 +12,7 @@ class TestXCMolGrad:
     def run_xc_mol_grad(self, molecule, basis, xcfun, ref_grad):
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
 
         scf_drv.dft = True
         scf_drv.xcfun = xcfun

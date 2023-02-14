@@ -46,7 +46,7 @@ from .veloxchemlib import new_parse_xc_func
 from .veloxchemlib import XCNewIntegrator
 
 
-class NonLinearSolver:
+class NonlinearSolver:
     """
     Implements nonlinear solver.
 
@@ -65,6 +65,8 @@ class NonLinearSolver:
         - electric_field: The static electric field.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
+        - norm_thresh: The norm threshold for a vector to be considered a zero
+          vector.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
         - is_converged: The flag for convergence.
@@ -106,7 +108,8 @@ class NonLinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.lindep_thresh = 1.0e-6
+        self.norm_thresh = None
+        self.lindep_thresh = None
         self._is_converged = False
 
         # mpi information
@@ -141,6 +144,7 @@ class NonLinearSolver:
                 'batch_size': ('int', 'batch size for Fock build'),
                 'max_iter': ('int', 'maximum number of iterations'),
                 'conv_thresh': ('float', 'convergence threshold'),
+                'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
@@ -246,16 +250,16 @@ class NonLinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        self._dft_sanity_check()
+        self._dft_sanity_check_nonlinrsp()
 
         if self.potfile is not None:
-            errmsg = 'NonLinearSolver: The \'potfile\' keyword is not supported '
+            errmsg = 'NonlinearSolver: The \'potfile\' keyword is not supported '
             errmsg += 'in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
         if self.electric_field is not None:
-            errmsg = 'NonLinearSolver: The \'electric field\' keyword is not '
+            errmsg = 'NonlinearSolver: The \'electric field\' keyword is not '
             errmsg += 'supported in nonlinear response calculation.'
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
@@ -278,7 +282,9 @@ class NonLinearSolver:
                 updated_scf_info['qq_type'] = scf_results['qq_type']
 
             if scf_results.get('restart', None) is not None:
-                updated_scf_info['restart'] = scf_results['restart']
+                # do not restart if scf is not restarted from checkpoint
+                if not scf_results['restart']:
+                    updated_scf_info['restart'] = scf_results['restart']
 
             if scf_results.get('xcfun', None) is not None:
                 # do not overwrite xcfun if it is already specified
@@ -295,7 +301,7 @@ class NonLinearSolver:
         for key, val in updated_scf_info.items():
             setattr(self, key, val)
 
-    def _dft_sanity_check(self):
+    def _dft_sanity_check_nonlinrsp(self):
         """
         Checks DFT settings and updates relevant attributes.
         """
@@ -310,7 +316,7 @@ class NonLinearSolver:
             if isinstance(self.xcfun, str):
                 self.xcfun = new_parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'NonLinearSolver: Undefined XC functional')
+                                'NonlinearSolver: Undefined XC functional')
             self._dft = True
 
         # check grid level
@@ -322,6 +328,13 @@ class NonLinearSolver:
             self.ostream.print_blank()
             self.ostream.flush()
             self.grid_level = 4
+
+        # check if SCAN family of functional is used in nonliear response
+        if self._dft:
+            err_msg_scan = 'NonlinearSolver: Nonlinear response with '
+            err_msg_scan += 'SCAN family of functional is not supported'
+            assert_msg_critical(
+                'scan' not in self.xcfun.get_func_label().lower(), err_msg_scan)
 
     def _init_eri(self, molecule, basis):
         """
@@ -513,7 +526,7 @@ class NonLinearSolver:
             'shg', 'shg_red'
         ]
         assert_msg_critical(mode_is_valid,
-                            'NonlinearSolver: invalid mode ' + mode.lower())
+                            'NonlinearSolver: Invalid mode ' + mode.lower())
 
         mode_is_cubic = mode.lower() in ['crf', 'tpa']
         mode_is_quadratic = mode.lower() in [
@@ -619,7 +632,7 @@ class NonLinearSolver:
                                  (num_2 % size_2 == 0) and
                                  (num_1 // size_1 == num_2 // size_2))
 
-                errmsg = 'NonLinearSolver: '
+                errmsg = 'NonlinearSolver: '
                 errmsg += f'inconsistent number of density matrices (mode={mode})'
                 assert_msg_critical(condition, errmsg)
 

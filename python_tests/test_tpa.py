@@ -51,22 +51,11 @@ class TestTPA:
         if is_mpi_master(task.mpi_comm):
             tpa_result = tpa_prop.rsp_property
 
-            for key in [
-                    't4_dict',
-                    't3_dict',
-                    'NaX3NyNz',
-                    'NaA3NxNy',
-                    'NaX2Nyz',
-                    'NxA2Nyz',
-                    'gamma',
-            ]:
-                if key in tpa_result and key in ref_result:
-                    if tpa_result[key] is None:
-                        continue
-                    assert abs(tpa_result[key][(w, -w, w)].real -
-                               ref_result[key].real) < 1.0e-4
-                    assert abs(tpa_result[key][(w, -w, w)].imag -
-                               ref_result[key].imag) < 1.0e-4
+            for key in ref_result:
+                assert abs(tpa_result[key][
+                    (w, -w, w)].real / ref_result[key].real - 1.0) < 1.0e-6
+                assert abs(tpa_result[key][
+                    (w, -w, w)].imag / ref_result[key].imag - 1.0) < 1.0e-6
 
     def test_tpa_full(self):
 

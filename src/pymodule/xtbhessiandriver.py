@@ -109,8 +109,7 @@ class XtbHessianDriver(HessianDriver):
             The molecule.
         """
 
-        xtb_ostream_state = self.ostream.state
-        self.ostream.state = False
+        self.ostream.mute()
 
         # atom labels
         labels = molecule.get_labels()
@@ -233,4 +232,4 @@ class XtbHessianDriver(HessianDriver):
         else:
             self.hessian = None
 
-        self.ostream.state = xtb_ostream_state
+        self.ostream.unmute()

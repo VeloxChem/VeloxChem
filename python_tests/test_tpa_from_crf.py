@@ -27,7 +27,7 @@ class TestTpaFromCrf:
         method_settings = {'xcfun': 'pbe0', 'grid_level': 1}
 
         scfdrv = ScfRestrictedDriver()
-        scfdrv.ostream.state = False
+        scfdrv.ostream.mute()
         scfdrv.update_settings(scf_settings, method_settings)
         scfdrv.compute(molecule, basis)
 
@@ -48,7 +48,7 @@ class TestTpaFromCrf:
         }
 
         crf = CubicResponseDriver()
-        crf.ostream.state = False
+        crf.ostream.mute()
         rsp_settings = {}
 
         for a in components:
@@ -129,7 +129,7 @@ class TestTpaFromCrf:
         }
 
         tpa = TpaFullDriver()
-        tpa.ostream.state = False
+        tpa.ostream.mute()
         tpa.update_settings(rsp_settings, method_settings)
         tpa_results = tpa.compute(molecule, basis, scfdrv.scf_tensors)
 

@@ -29,8 +29,7 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
@@ -142,6 +141,11 @@ class LinearResponseEigenSolver(LinearSolver):
             A dictionary containing eigenvalues, eigenvectors, transition
             dipole moments, oscillator strengths and rotatory strengths.
         """
+
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         self._dist_bger = None
         self._dist_bung = None
@@ -459,7 +463,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 eigvecs = np.zeros((x_0.size, self.nstates))
 
                 # create h5 file for response solutions
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     final_h5_fname = str(
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
                     create_hdf5(final_h5_fname, molecule, basis,
@@ -541,7 +545,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     eigvecs[:, s] = eigvec[:]
 
                     # write to h5 file for response solutions
-                    if self.checkpoint_file is not None:
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}'.format(s + 1), eigvec)
 
@@ -578,11 +583,13 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.detach_attach:
                     ret_dict['density_cubes'] = dens_cube_files
 
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     checkpoint_text = 'Response solution vectors written to file: '
                     checkpoint_text += final_h5_fname
                     self.ostream.print_info(checkpoint_text)
                     self.ostream.print_blank()
+
+                self._print_results(ret_dict)
 
                 return ret_dict
 
@@ -712,13 +719,13 @@ class LinearResponseEigenSolver(LinearSolver):
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
-            if vn > self._small_thresh:
+            if vn > self.norm_thresh:
                 norms = np.sqrt(norms_2)
                 # gerade
-                if norms[0] > self._small_thresh:
+                if norms[0] > self.norm_thresh:
                     trials_ger.append(v.data[:, 0])
                 # ungerade
-                if norms[1] > self._small_thresh:
+                if norms[1] > self.norm_thresh:
                     trials_ung.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T
@@ -810,6 +817,11 @@ class LinearResponseEigenSolver(LinearSolver):
             The E[2] matrix as numpy array.
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
+
         self._dist_bger = None
         self._dist_bung = None
         self._dist_e2bger = None
@@ -887,3 +899,27 @@ class LinearResponseEigenSolver(LinearSolver):
             return E2
         else:
             return None
+
+    def _print_results(self, results):
+        """
+        Prints results to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole length, a.u.)',
+            results['electric_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole velocity, a.u.)',
+            results['velocity_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Magnetic Transition Dipole Moments (a.u.)',
+            results['magnetic_transition_dipoles'])
+
+        self._print_absorption('One-Photon Absorption', results)
+        self._print_ecd('Electronic Circular Dichroism', results)
+        self._print_excitation_details('Character of excitations:', results)

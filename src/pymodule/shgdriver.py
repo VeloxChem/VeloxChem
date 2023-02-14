@@ -35,7 +35,7 @@ from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .nonlinearsolver import NonLinearSolver
+from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .firstorderprop import FirstOrderProperties
 from .errorhandler import assert_msg_critical
@@ -49,7 +49,7 @@ from .veloxchemlib import XCNewIntegrator as XCIntegrator
 from .veloxchemlib import new_parse_xc_func
 
 
-class ShgDriver(NonLinearSolver):
+class ShgDriver(NonlinearSolver):
     """
     Implements a quadratic response driver for SHG calculations
 
@@ -63,8 +63,6 @@ class ShgDriver(NonLinearSolver):
         - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
-        - lindep_thresh: The threshold for removing linear dependence in the
-          trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
         - a_operator: The A operator.
@@ -95,9 +93,6 @@ class ShgDriver(NonLinearSolver):
         self.frequencies = (0,)
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumbers()
-        self.lindep_thresh = 1.0e-10
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
 
         self.a_operator = 'dipole'
         self.b_operator = 'dipole'
@@ -148,11 +143,16 @@ class ShgDriver(NonLinearSolver):
               A dictonary containing the E[3], X[2], A[2] contractions
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-6
+
         # double check SCF information
         self._check_scf_results(scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check()
+        self._dft_sanity_check_nonlinrsp()
 
         profiler = Profiler({
             'timing': self.timing,
@@ -240,10 +240,10 @@ class ShgDriver(NonLinearSolver):
         N_drv = ComplexResponse(self.comm, self.ostream)
 
         cpp_keywords = [
-            'damping', 'lindep_thresh', 'conv_thresh', 'max_iter', 'eri_thresh',
-            'qq_type', 'timing', 'memory_profiling', 'batch_size', 'restart',
-            'xcfun', 'grid_level', 'potfile', 'electric_field',
-            'program_end_time'
+            'frequencies', 'damping', 'norm_thresh', 'lindep_thresh',
+            'conv_thresh', 'max_iter', 'eri_thresh', 'qq_type', 'timing',
+            'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
+            'potfile', 'electric_field', 'program_end_time'
         ]
 
         for key in cpp_keywords:

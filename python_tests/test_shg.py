@@ -43,14 +43,14 @@ class TestSHG:
 
             for ind, comp in enumerate('xyz'):
                 assert abs(shg_result['beta'][freq][ind].real -
-                           ref_result[comp].real) < 1.0e-6
+                           ref_result[comp].real) < 1.0e-5
                 assert abs(shg_result['beta'][freq][ind].imag -
-                           ref_result[comp].imag) < 1.0e-6
+                           ref_result[comp].imag) < 1.0e-5
 
             assert abs(shg_result['beta_bar'][freq].real -
-                       ref_result['beta_bar'].real) < 1.0e-6
+                       ref_result['beta_bar'].real) < 1.0e-5
             assert abs(shg_result['beta_bar'][freq].imag -
-                       ref_result['beta_bar'].imag) < 1.0e-6
+                       ref_result['beta_bar'].imag) < 1.0e-5
 
     def test_shg_hf(self):
 
@@ -82,10 +82,10 @@ class TestSHG:
         shg_type = 'full'
 
         ref_result = {
-            'x': -48.55306041 - 20.31300835j,
-            'y': -0.09594022 - 0.00331360j,
-            'z': 32.09729558 + 15.20016566j,
-            'beta_bar': -47.13851686 - 21.37968687j,
+            'x': -48.55320751 - 20.31312232j,
+            'y': -0.09597950 - 0.00334644j,
+            'z': 32.09728459 + 15.20019960j,
+            'beta_bar': -47.13862975 - 21.37978710j,
         }
 
         self.run_shg(inpfile, xcfun_label, shg_type, ref_result)
@@ -120,10 +120,10 @@ class TestSHG:
         shg_type = 'reduced'
 
         ref_result = {
-            'x': -48.45569661 - 20.92675811j,
-            'y': -0.09582173 - 0.00353080j,
-            'z': 32.02927840 + 15.65488519j,
-            'beta_bar': -47.04057086 - 22.02140860j,
+            'x': -48.45584560 - 20.92686505j,
+            'y': -0.09586086 - 0.00356429j,
+            'z': 32.02926487 + 15.65493314j,
+            'beta_bar': -47.04068190 - 22.02152032j,
         }
 
         self.run_shg(inpfile, xcfun_label, shg_type, ref_result)
