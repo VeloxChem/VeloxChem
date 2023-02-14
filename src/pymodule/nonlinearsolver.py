@@ -945,6 +945,45 @@ class NonlinearSolver:
         self.ostream.print_blank()
         self.ostream.flush()
 
+    def _print_header(self, title):
+        """
+        Prints nonlinear solver setup header to output stream.
+
+        :param title:
+            The title.
+        """
+
+        self.ostream.print_blank()
+
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        width = 60
+
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
+            self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Convergance Threshold           : {:.1e}'.format(
+            self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Damping Parameter               : {:.6e}'.format(
+            self.damping)
+        self.ostream.print_header(cur_str.ljust(width))
+
+        if self._dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(width))
+            cur_str = 'Molecular Grid Level            : ' + str(
+                self.grid_level)
+            self.ostream.print_header(cur_str.ljust(width))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
+
     def _s4(self, k1, k2, k3, D, nocc, norb):
         """
         Used for the contraction of the S[4] tensor with three response vectors

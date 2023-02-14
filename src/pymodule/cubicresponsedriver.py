@@ -148,7 +148,7 @@ class CubicResponseDriver(NonlinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header()
+            self._print_header('Cubic Response Driver Setup')
 
         start_time = time.time()
 
@@ -1229,35 +1229,6 @@ class CubicResponseDriver(NonlinearSolver):
         Focks = Nxy_results['focks']
 
         return kX, Focks
-
-    def print_header(self):
-        """
-        Prints CRF setup header to output stream.
-        """
-
-        self.ostream.print_blank()
-
-        title = 'Cubic Response Driver Setup'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        width = 50
-
-        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
-            self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Convergance Threshold           : {:.1e}'.format(
-            self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Damping Parameter               : {:.6e}'.format(
-            self.damping)
-        self.ostream.print_header(cur_str.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     def _print_component(self, label, value, width):
         """
