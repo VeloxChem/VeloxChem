@@ -147,7 +147,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         })
 
         if self.rank == mpi_master():
-            self.print_header()
+            self._print_header('Quadratic Response Driver Setup')
 
         start_time = time.time()
 
@@ -589,35 +589,6 @@ class QuadraticResponseDriver(NonlinearSolver):
                 -2 * LinearSolver.lrmat2vec(e3fock, nocc, norb))
 
         return e3vec
-
-    def print_header(self):
-        """
-        Prints QRF setup header to output stream.
-        """
-
-        self.ostream.print_blank()
-
-        title = 'Quadratic Response Driver Setup'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        width = 50
-
-        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
-            self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Convergance Threshold           : {:.1e}'.format(
-            self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Damping Parameter               : {:.6e}'.format(
-            self.damping)
-        self.ostream.print_header(cur_str.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     def _print_component(self, label, freq, value, width):
         """
