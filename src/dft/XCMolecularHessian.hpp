@@ -94,6 +94,13 @@ class CXCMolecularHessian
                                             const CMolecularGrid&   molecularGrid,
                                             const CXCNewFunctional& xcFunctional) const;
 
+    std::vector<CDenseMatrix> _integrateVxcFockGradientForLDA(const CMolecule&        molecule,
+                                                              const CMolecularBasis&  basis,
+                                                              const CAODensityMatrix& gsDensityMatrix,
+                                                              const CMolecularGrid&   molecularGrid,
+                                                              const CXCNewFunctional& xcFunctional,
+                                                              const int32_t           atomIdx) const;
+
     /**
      Computes AO-to-atom mapping.
 
@@ -135,6 +142,13 @@ class CXCMolecularHessian
                                      const CAODensityMatrix& gsDensityMatrix,
                                      const CMolecularGrid&   molecularGrid,
                                      const std::string&      xcFuncLabel) const;
+
+    std::vector<CDenseMatrix> integrateVxcFockGradient(const CMolecule&        molecule,
+                                                       const CMolecularBasis&  basis,
+                                                       const CAODensityMatrix& gsDensityMatrix,
+                                                       const CMolecularGrid&   molecularGrid,
+                                                       const std::string&      xcFuncLabel,
+                                                       const int32_t           atomIdx) const;
 };
 
 #endif /* XCMolecularHessian_hpp */
