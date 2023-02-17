@@ -997,69 +997,15 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
         dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat, timer);
 
-        // generate density gradient grid
+        // compute exchange-correlation functional derivative
 
-        timer.start("Density grad. grid prep.");
+        timer.start("XC functional eval.");
 
-        // pairwise hessian contribution: only store the upper triangular part (iatom <= jatom)
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
-        auto n2_upper_triang = natoms * (natoms + 1) / 2;
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        CDenseMatrix dengradxx(n2_upper_triang, npoints);
-        CDenseMatrix dengradxy(n2_upper_triang, npoints);
-        CDenseMatrix dengradxz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradyx(n2_upper_triang, npoints);
-        CDenseMatrix dengradyy(n2_upper_triang, npoints);
-        CDenseMatrix dengradyz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradzx(n2_upper_triang, npoints);
-        CDenseMatrix dengradzy(n2_upper_triang, npoints);
-        CDenseMatrix dengradzz(n2_upper_triang, npoints);
-
-        // === x ===
-
-        CDenseMatrix dengradxxx(n2_upper_triang, npoints);
-        CDenseMatrix dengradxxy(n2_upper_triang, npoints);
-        CDenseMatrix dengradxxz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradyxx(n2_upper_triang, npoints);
-        CDenseMatrix dengradyxy(n2_upper_triang, npoints);
-        CDenseMatrix dengradyxz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradzxx(n2_upper_triang, npoints);
-        CDenseMatrix dengradzxy(n2_upper_triang, npoints);
-        CDenseMatrix dengradzxz(n2_upper_triang, npoints);
-
-        // === y ===
-
-        CDenseMatrix dengradxyx(n2_upper_triang, npoints);
-        CDenseMatrix dengradxyy(n2_upper_triang, npoints);
-        CDenseMatrix dengradxyz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradyyx(n2_upper_triang, npoints);
-        CDenseMatrix dengradyyy(n2_upper_triang, npoints);
-        CDenseMatrix dengradyyz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradzyx(n2_upper_triang, npoints);
-        CDenseMatrix dengradzyy(n2_upper_triang, npoints);
-        CDenseMatrix dengradzyz(n2_upper_triang, npoints);
-
-        // === z ===
-
-        CDenseMatrix dengradxzx(n2_upper_triang, npoints);
-        CDenseMatrix dengradxzy(n2_upper_triang, npoints);
-        CDenseMatrix dengradxzz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradyzx(n2_upper_triang, npoints);
-        CDenseMatrix dengradyzy(n2_upper_triang, npoints);
-        CDenseMatrix dengradyzz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradzzx(n2_upper_triang, npoints);
-        CDenseMatrix dengradzzy(n2_upper_triang, npoints);
-        CDenseMatrix dengradzzz(n2_upper_triang, npoints);
-
-        timer.stop("Density grad. grid prep.");
+        timer.stop("XC functional eval.");
 
         // eq.(26), JCTC 2021, 17, 1512-1521
 
@@ -1098,10 +1044,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
         auto chi_yz_val = mat_chi_yz.values();
         auto chi_zz_val = mat_chi_zz.values();
 
-        auto chi_yx_val = chi_xy_val;
-        auto chi_zx_val = chi_xz_val;
-        auto chi_zy_val = chi_yz_val;
-
         auto chi_xxx_val = mat_chi_xxx.values();
         auto chi_xxy_val = mat_chi_xxy.values();
         auto chi_xxz_val = mat_chi_xxz.values();
@@ -1113,268 +1055,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
         auto chi_yzz_val = mat_chi_yzz.values();
         auto chi_zzz_val = mat_chi_zzz.values();
 
-        auto gdenxx = dengradxx.values();
-        auto gdenxy = dengradxy.values();
-        auto gdenxz = dengradxz.values();
-
-        auto gdenyx = dengradyx.values();
-        auto gdenyy = dengradyy.values();
-        auto gdenyz = dengradyz.values();
-
-        auto gdenzx = dengradzx.values();
-        auto gdenzy = dengradzy.values();
-        auto gdenzz = dengradzz.values();
-
-        // === x ===
-
-        auto gdenxxx = dengradxxx.values();
-        auto gdenxxy = dengradxxy.values();
-        auto gdenxxz = dengradxxz.values();
-
-        auto gdenyxx = dengradyxx.values();
-        auto gdenyxy = dengradyxy.values();
-        auto gdenyxz = dengradyxz.values();
-
-        auto gdenzxx = dengradzxx.values();
-        auto gdenzxy = dengradzxy.values();
-        auto gdenzxz = dengradzxz.values();
-
-        // === y ===
-
-        auto gdenxyx = dengradxyx.values();
-        auto gdenxyy = dengradxyy.values();
-        auto gdenxyz = dengradxyz.values();
-
-        auto gdenyyx = dengradyyx.values();
-        auto gdenyyy = dengradyyy.values();
-        auto gdenyyz = dengradyyz.values();
-
-        auto gdenzyx = dengradzyx.values();
-        auto gdenzyy = dengradzyy.values();
-        auto gdenzyz = dengradzyz.values();
-
-        // === z ===
-
-        auto gdenxzx = dengradxzx.values();
-        auto gdenxzy = dengradxzy.values();
-        auto gdenxzz = dengradxzz.values();
-
-        auto gdenyzx = dengradyzx.values();
-        auto gdenyzy = dengradyzy.values();
-        auto gdenyzz = dengradyzz.values();
-
-        auto gdenzzx = dengradzzx.values();
-        auto gdenzzy = dengradzzy.values();
-        auto gdenzzz = dengradzzz.values();
-
-        #pragma omp parallel
-        {
-            auto thread_id = omp_get_thread_num();
-
-            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
-
-            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
-
-            for (int32_t mu = 0; mu < naos; mu++)
-            {
-                auto iatom = ao_to_atom_ids[aoinds[mu]];
-
-                // upper triangular index for diagonal i: i * N + i - i * (i + 1) / 2
-
-                auto ii_upper_triang_index = iatom * natoms + iatom - iatom * (iatom + 1) / 2;
-
-                auto ii_offset = ii_upper_triang_index * npoints;
-
-                auto mu_offset = mu * npoints;
-
-                #pragma omp simd aligned(F_val, chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val, \
-                        gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-                {
-                    auto ii_g = ii_offset + g;
-
-                    auto mu_g = mu_offset + g;
-
-                    gdenxx[ii_g] += 2.0 * F_val[mu_g] * chi_xx_val[mu_g];
-                    gdenxy[ii_g] += 2.0 * F_val[mu_g] * chi_xy_val[mu_g];
-                    gdenxz[ii_g] += 2.0 * F_val[mu_g] * chi_xz_val[mu_g];
-
-                    gdenyx[ii_g] += 2.0 * F_val[mu_g] * chi_xy_val[mu_g];
-                    gdenyy[ii_g] += 2.0 * F_val[mu_g] * chi_yy_val[mu_g];
-                    gdenyz[ii_g] += 2.0 * F_val[mu_g] * chi_yz_val[mu_g];
-
-                    gdenzx[ii_g] += 2.0 * F_val[mu_g] * chi_xz_val[mu_g];
-                    gdenzy[ii_g] += 2.0 * F_val[mu_g] * chi_yz_val[mu_g];
-                    gdenzz[ii_g] += 2.0 * F_val[mu_g] * chi_zz_val[mu_g];
-
-                    // === x ===
-
-                    gdenxxx[ii_g] += 2.0 * (F_x_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxx_val[mu_g]);
-                    gdenxxy[ii_g] += 2.0 * (F_x_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g]);
-                    gdenxxz[ii_g] += 2.0 * (F_x_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g]);
-
-                    gdenyxx[ii_g] += 2.0 * (F_y_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g]);
-                    gdenyxy[ii_g] += 2.0 * (F_y_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g]);
-                    gdenyxz[ii_g] += 2.0 * (F_y_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
-
-                    gdenzxx[ii_g] += 2.0 * (F_z_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g]);
-                    gdenzxy[ii_g] += 2.0 * (F_z_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
-                    gdenzxz[ii_g] += 2.0 * (F_z_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g]);
-
-                    // === y ===
-
-                    gdenxyx[ii_g] += 2.0 * (F_x_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g]);
-                    gdenxyy[ii_g] += 2.0 * (F_x_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g]);
-                    gdenxyz[ii_g] += 2.0 * (F_x_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
-
-                    gdenyyx[ii_g] += 2.0 * (F_y_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g]);
-                    gdenyyy[ii_g] += 2.0 * (F_y_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_yyy_val[mu_g]);
-                    gdenyyz[ii_g] += 2.0 * (F_y_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g]);
-
-                    gdenzyx[ii_g] += 2.0 * (F_z_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
-                    gdenzyy[ii_g] += 2.0 * (F_z_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g]);
-                    gdenzyz[ii_g] += 2.0 * (F_z_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g]);
-
-                    // === z ===
-
-                    gdenxzx[ii_g] += 2.0 * (F_x_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g]);
-                    gdenxzy[ii_g] += 2.0 * (F_x_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
-                    gdenxzz[ii_g] += 2.0 * (F_x_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g]);
-
-                    gdenyzx[ii_g] += 2.0 * (F_y_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
-                    gdenyzy[ii_g] += 2.0 * (F_y_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g]);
-                    gdenyzz[ii_g] += 2.0 * (F_y_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g]);
-
-                    gdenzzx[ii_g] += 2.0 * (F_z_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g]);
-                    gdenzzy[ii_g] += 2.0 * (F_z_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g]);
-                    gdenzzz[ii_g] += 2.0 * (F_z_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_zzz_val[mu_g]);
-                }
-
-                for (int32_t nu = 0; nu < naos; nu++)
-                {
-                    auto jatom = ao_to_atom_ids[aoinds[nu]];
-
-                    // only consider the upper triangular part, e.g. iatom <= jatom
-
-                    if (iatom > jatom) continue;
-
-                    // upper triangular index for i<=j: i * N + j - i * (i + 1) / 2
-
-                    auto ij_upper_triang_index = iatom * natoms + jatom - iatom * (iatom + 1) / 2;
-
-                    auto ij_offset = ij_upper_triang_index * npoints;
-
-                    auto nu_offset = nu * npoints;
-
-                    auto D_mn = D_val[mu * naos + nu];
-
-                    #pragma omp simd aligned(chi_x_val, chi_y_val, chi_z_val, \
-                            gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-                    {
-                        auto ij_g = ij_offset + g;
-
-                        auto mu_g = mu_offset + g;
-                        auto nu_g = nu_offset + g;
-
-                        gdenxx[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenxy[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenxz[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_z_val[nu_g] * D_mn);
-
-                        gdenyx[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenyy[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenyz[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_z_val[nu_g] * D_mn);
-
-                        gdenzx[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenzy[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenzz[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_z_val[nu_g] * D_mn);
-
-                        // === x ===
-
-                        gdenxxx[ij_g] += 2.0 * (chi_xx_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenxxy[ij_g] += 2.0 * (chi_xx_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenxxz[ij_g] += 2.0 * (chi_xx_val[mu_g] * chi_z_val[nu_g] * D_mn);
-                        gdenyxx[ij_g] += 2.0 * (chi_yx_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenyxy[ij_g] += 2.0 * (chi_yx_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenyxz[ij_g] += 2.0 * (chi_yx_val[mu_g] * chi_z_val[nu_g] * D_mn);
-                        gdenzxx[ij_g] += 2.0 * (chi_zx_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenzxy[ij_g] += 2.0 * (chi_zx_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenzxz[ij_g] += 2.0 * (chi_zx_val[mu_g] * chi_z_val[nu_g] * D_mn);
-
-                        gdenxxx[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_xx_val[nu_g] * D_mn);
-                        gdenxxy[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_xy_val[nu_g] * D_mn);
-                        gdenxxz[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_xz_val[nu_g] * D_mn);
-                        gdenyxx[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_yx_val[nu_g] * D_mn);
-                        gdenyxy[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_yy_val[nu_g] * D_mn);
-                        gdenyxz[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_yz_val[nu_g] * D_mn);
-                        gdenzxx[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_zx_val[nu_g] * D_mn);
-                        gdenzxy[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_zy_val[nu_g] * D_mn);
-                        gdenzxz[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_zz_val[nu_g] * D_mn);
-
-                        // === y ===
-
-                        gdenxyx[ij_g] += 2.0 * (chi_xy_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenxyy[ij_g] += 2.0 * (chi_xy_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenxyz[ij_g] += 2.0 * (chi_xy_val[mu_g] * chi_z_val[nu_g] * D_mn);
-                        gdenyyx[ij_g] += 2.0 * (chi_yy_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenyyy[ij_g] += 2.0 * (chi_yy_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenyyz[ij_g] += 2.0 * (chi_yy_val[mu_g] * chi_z_val[nu_g] * D_mn);
-                        gdenzyx[ij_g] += 2.0 * (chi_zy_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenzyy[ij_g] += 2.0 * (chi_zy_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenzyz[ij_g] += 2.0 * (chi_zy_val[mu_g] * chi_z_val[nu_g] * D_mn);
-
-                        gdenxyx[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_xx_val[nu_g] * D_mn);
-                        gdenxyy[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_xy_val[nu_g] * D_mn);
-                        gdenxyz[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_xz_val[nu_g] * D_mn);
-                        gdenyyx[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_yx_val[nu_g] * D_mn);
-                        gdenyyy[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_yy_val[nu_g] * D_mn);
-                        gdenyyz[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_yz_val[nu_g] * D_mn);
-                        gdenzyx[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_zx_val[nu_g] * D_mn);
-                        gdenzyy[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_zy_val[nu_g] * D_mn);
-                        gdenzyz[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_zz_val[nu_g] * D_mn);
-
-                        // === z ===
-
-                        gdenxzx[ij_g] += 2.0 * (chi_xz_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenxzy[ij_g] += 2.0 * (chi_xz_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenxzz[ij_g] += 2.0 * (chi_xz_val[mu_g] * chi_z_val[nu_g] * D_mn);
-                        gdenyzx[ij_g] += 2.0 * (chi_yz_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenyzy[ij_g] += 2.0 * (chi_yz_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenyzz[ij_g] += 2.0 * (chi_yz_val[mu_g] * chi_z_val[nu_g] * D_mn);
-                        gdenzzx[ij_g] += 2.0 * (chi_zz_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenzzy[ij_g] += 2.0 * (chi_zz_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenzzz[ij_g] += 2.0 * (chi_zz_val[mu_g] * chi_z_val[nu_g] * D_mn);
-
-                        gdenxzx[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_xx_val[nu_g] * D_mn);
-                        gdenxzy[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_xy_val[nu_g] * D_mn);
-                        gdenxzz[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_xz_val[nu_g] * D_mn);
-                        gdenyzx[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_yx_val[nu_g] * D_mn);
-                        gdenyzy[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_yy_val[nu_g] * D_mn);
-                        gdenyzz[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_yz_val[nu_g] * D_mn);
-                        gdenzzx[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_zx_val[nu_g] * D_mn);
-                        gdenzzy[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_zy_val[nu_g] * D_mn);
-                        gdenzzz[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_zz_val[nu_g] * D_mn);
-                    }
-                }
-            }
-        }
-
-        timer.stop("Density grad. grid rho");
-
-        // compute exchange-correlation functional derivative
-
-        timer.start("XC functional eval.");
-
-        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
-
-        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
-
-        timer.stop("XC functional eval.");
-
-        // eq.(32), JCTC 2021, 17, 1512-1521
-
-        timer.start("Accumulate gradient");
-
         #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
@@ -1385,63 +1065,306 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
             auto gatm = molhess_threads.data(thread_id);
 
-            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            for (int32_t mu = 0; mu < naos; mu++)
             {
+                auto iatom = ao_to_atom_ids[aoinds[mu]];
+
                 auto ix = iatom * 3 + 0;
                 auto iy = iatom * 3 + 1;
                 auto iz = iatom * 3 + 2;
 
-                for (int32_t jatom = iatom; jatom < natoms; jatom++)
+                auto mu_offset = mu * npoints;
+
+                double gatmxx = 0.0, gatmxy = 0.0, gatmxz = 0.0;
+                double gatmyx = 0.0, gatmyy = 0.0, gatmyz = 0.0;
+                double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
+
+                #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) \
+                        aligned(local_weights, rhograd, vrho, vsigma, F_val, F_x_val, F_y_val, F_z_val, \
+                        chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val, \
+                        chi_xxx_val, chi_xxy_val, chi_xxz_val, chi_xyy_val, chi_xyz_val, \
+                        chi_xzz_val, chi_yyy_val, chi_yyz_val, chi_yzz_val, chi_zzz_val : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
+                    auto mu_g = mu_offset + g;
+
+                    double gdenxx = 0.0, gdenxy = 0.0, gdenxz = 0.0;
+                    double gdenyx = 0.0, gdenyy = 0.0, gdenyz = 0.0;
+                    double gdenzx = 0.0, gdenzy = 0.0, gdenzz = 0.0;
+
+                    gdenxx += 2.0 * F_val[mu_g] * chi_xx_val[mu_g];
+                    gdenxy += 2.0 * F_val[mu_g] * chi_xy_val[mu_g];
+                    gdenxz += 2.0 * F_val[mu_g] * chi_xz_val[mu_g];
+
+                    gdenyx += 2.0 * F_val[mu_g] * chi_xy_val[mu_g];
+                    gdenyy += 2.0 * F_val[mu_g] * chi_yy_val[mu_g];
+                    gdenyz += 2.0 * F_val[mu_g] * chi_yz_val[mu_g];
+
+                    gdenzx += 2.0 * F_val[mu_g] * chi_xz_val[mu_g];
+                    gdenzy += 2.0 * F_val[mu_g] * chi_yz_val[mu_g];
+                    gdenzz += 2.0 * F_val[mu_g] * chi_zz_val[mu_g];
+
+                    // === x ===
+
+                    double gdenxxx = 0.0, gdenxxy = 0.0, gdenxxz = 0.0;
+                    double gdenyxx = 0.0, gdenyxy = 0.0, gdenyxz = 0.0;
+                    double gdenzxx = 0.0, gdenzxy = 0.0, gdenzxz = 0.0;
+
+                    gdenxxx += 2.0 * (F_x_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxx_val[mu_g]);
+                    gdenxxy += 2.0 * (F_x_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g]);
+                    gdenxxz += 2.0 * (F_x_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g]);
+
+                    gdenyxx += 2.0 * (F_y_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g]);
+                    gdenyxy += 2.0 * (F_y_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g]);
+                    gdenyxz += 2.0 * (F_y_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
+
+                    gdenzxx += 2.0 * (F_z_val[mu_g] * chi_xx_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g]);
+                    gdenzxy += 2.0 * (F_z_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
+                    gdenzxz += 2.0 * (F_z_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g]);
+
+                    // === y ===
+
+                    double gdenxyx = 0.0, gdenxyy = 0.0, gdenxyz = 0.0;
+                    double gdenyyx = 0.0, gdenyyy = 0.0, gdenyyz = 0.0;
+                    double gdenzyx = 0.0, gdenzyy = 0.0, gdenzyz = 0.0;
+
+                    gdenxyx += 2.0 * (F_x_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xxy_val[mu_g]);
+                    gdenxyy += 2.0 * (F_x_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g]);
+                    gdenxyz += 2.0 * (F_x_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
+
+                    gdenyyx += 2.0 * (F_y_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyy_val[mu_g]);
+                    gdenyyy += 2.0 * (F_y_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_yyy_val[mu_g]);
+                    gdenyyz += 2.0 * (F_y_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g]);
+
+                    gdenzyx += 2.0 * (F_z_val[mu_g] * chi_xy_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
+                    gdenzyy += 2.0 * (F_z_val[mu_g] * chi_yy_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g]);
+                    gdenzyz += 2.0 * (F_z_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g]);
+
+                    // === z ===
+
+                    double gdenxzx = 0.0, gdenxzy = 0.0, gdenxzz = 0.0;
+                    double gdenyzx = 0.0, gdenyzy = 0.0, gdenyzz = 0.0;
+                    double gdenzzx = 0.0, gdenzzy = 0.0, gdenzzz = 0.0;
+
+                    gdenxzx += 2.0 * (F_x_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xxz_val[mu_g]);
+                    gdenxzy += 2.0 * (F_x_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
+                    gdenxzz += 2.0 * (F_x_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g]);
+
+                    gdenyzx += 2.0 * (F_y_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xyz_val[mu_g]);
+                    gdenyzy += 2.0 * (F_y_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yyz_val[mu_g]);
+                    gdenyzz += 2.0 * (F_y_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g]);
+
+                    gdenzzx += 2.0 * (F_z_val[mu_g] * chi_xz_val[mu_g] + F_val[mu_g] * chi_xzz_val[mu_g]);
+                    gdenzzy += 2.0 * (F_z_val[mu_g] * chi_yz_val[mu_g] + F_val[mu_g] * chi_yzz_val[mu_g]);
+                    gdenzzz += 2.0 * (F_z_val[mu_g] * chi_zz_val[mu_g] + F_val[mu_g] * chi_zzz_val[mu_g]);
+
+                    double prefac = local_weights[g] * vrho[2 * g + 0];
+
+                    gatmxx += prefac * gdenxx;
+                    gatmxy += prefac * gdenxy;
+                    gatmxz += prefac * gdenxz;
+
+                    gatmyx += prefac * gdenyx;
+                    gatmyy += prefac * gdenyy;
+                    gatmyz += prefac * gdenyz;
+
+                    gatmzx += prefac * gdenzx;
+                    gatmzy += prefac * gdenzy;
+                    gatmzz += prefac * gdenzz;
+
+                    auto vx = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
+                    auto vy = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
+                    auto vz = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 2] + vsigma[3 * g + 1] * rhograd[6 * g + 5];
+
+                    gatmxx += local_weights[g] * (vx * gdenxxx + vy * gdenyxx + vz * gdenzxx);
+                    gatmxy += local_weights[g] * (vx * gdenxxy + vy * gdenyxy + vz * gdenzxy);
+                    gatmxz += local_weights[g] * (vx * gdenxxz + vy * gdenyxz + vz * gdenzxz);
+
+                    gatmyx += local_weights[g] * (vx * gdenxyx + vy * gdenyyx + vz * gdenzyx);
+                    gatmyy += local_weights[g] * (vx * gdenxyy + vy * gdenyyy + vz * gdenzyy);
+                    gatmyz += local_weights[g] * (vx * gdenxyz + vy * gdenyyz + vz * gdenzyz);
+
+                    gatmzx += local_weights[g] * (vx * gdenxzx + vy * gdenyzx + vz * gdenzzx);
+                    gatmzy += local_weights[g] * (vx * gdenxzy + vy * gdenyzy + vz * gdenzzy);
+                    gatmzz += local_weights[g] * (vx * gdenxzz + vy * gdenyzz + vz * gdenzzz);
+                }
+
+                // factor of 2 from sum of alpha and beta contributions
+
+                gatm[ix * (natoms * 3) + ix] += 2.0 * gatmxx;
+                gatm[ix * (natoms * 3) + iy] += 2.0 * gatmxy;
+                gatm[ix * (natoms * 3) + iz] += 2.0 * gatmxz;
+
+                gatm[iy * (natoms * 3) + ix] += 2.0 * gatmyx;
+                gatm[iy * (natoms * 3) + iy] += 2.0 * gatmyy;
+                gatm[iy * (natoms * 3) + iz] += 2.0 * gatmyz;
+
+                gatm[iz * (natoms * 3) + ix] += 2.0 * gatmzx;
+                gatm[iz * (natoms * 3) + iy] += 2.0 * gatmzy;
+                gatm[iz * (natoms * 3) + iz] += 2.0 * gatmzz;
+            }
+
+            for (int32_t mu = 0; mu < naos; mu++)
+            {
+                auto iatom = ao_to_atom_ids[aoinds[mu]];
+
+                auto ix = iatom * 3 + 0;
+                auto iy = iatom * 3 + 1;
+                auto iz = iatom * 3 + 2;
+
+                auto mu_offset = mu * npoints;
+
+                for (int32_t nu = 0; nu < naos; nu++)
+                {
+                    auto jatom = ao_to_atom_ids[aoinds[nu]];
+
+                    // only consider the upper triangular part, e.g. iatom <= jatom
+
+                    if (iatom > jatom) continue;
+
                     auto jx = jatom * 3 + 0;
                     auto jy = jatom * 3 + 1;
                     auto jz = jatom * 3 + 2;
 
-                    // upper triangular index for i<=j: i * N + j - i * (i + 1) / 2
+                    auto nu_offset = nu * npoints;
 
-                    auto ij_upper_triang_index = iatom * natoms + jatom - iatom * (iatom + 1) / 2;
-
-                    auto ij_offset = ij_upper_triang_index * npoints;
+                    auto D_mn = D_val[mu * naos + nu];
 
                     double gatmxx = 0.0, gatmxy = 0.0, gatmxz = 0.0;
                     double gatmyx = 0.0, gatmyy = 0.0, gatmyz = 0.0;
                     double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
 
-                    #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) aligned(local_weights, \
-                            vrho, gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
+                    #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) \
+                            aligned(local_weights, rhograd, vrho, vsigma, chi_x_val, chi_y_val, chi_z_val, \
+                            chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val : VLX_ALIGN)
                     for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
-                        auto ij_g = ij_offset + g;
+                        auto mu_g = mu_offset + g;
+                        auto nu_g = nu_offset + g;
+
+                        double gdenxx = 0.0, gdenxy = 0.0, gdenxz = 0.0;
+                        double gdenyx = 0.0, gdenyy = 0.0, gdenyz = 0.0;
+                        double gdenzx = 0.0, gdenzy = 0.0, gdenzz = 0.0;
+
+                        gdenxx += 2.0 * (chi_x_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenxy += 2.0 * (chi_x_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenxz += 2.0 * (chi_x_val[mu_g] * chi_z_val[nu_g] * D_mn);
+
+                        gdenyx += 2.0 * (chi_y_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenyy += 2.0 * (chi_y_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenyz += 2.0 * (chi_y_val[mu_g] * chi_z_val[nu_g] * D_mn);
+
+                        gdenzx += 2.0 * (chi_z_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenzy += 2.0 * (chi_z_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenzz += 2.0 * (chi_z_val[mu_g] * chi_z_val[nu_g] * D_mn);
+
+                        // === x ===
+
+                        double gdenxxx = 0.0, gdenxxy = 0.0, gdenxxz = 0.0;
+                        double gdenyxx = 0.0, gdenyxy = 0.0, gdenyxz = 0.0;
+                        double gdenzxx = 0.0, gdenzxy = 0.0, gdenzxz = 0.0;
+
+                        gdenxxx += 2.0 * (chi_xx_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenxxy += 2.0 * (chi_xx_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenxxz += 2.0 * (chi_xx_val[mu_g] * chi_z_val[nu_g] * D_mn);
+                        gdenyxx += 2.0 * (chi_xy_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenyxy += 2.0 * (chi_xy_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenyxz += 2.0 * (chi_xy_val[mu_g] * chi_z_val[nu_g] * D_mn);
+                        gdenzxx += 2.0 * (chi_xz_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenzxy += 2.0 * (chi_xz_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenzxz += 2.0 * (chi_xz_val[mu_g] * chi_z_val[nu_g] * D_mn);
+
+                        gdenxxx += 2.0 * (chi_x_val[mu_g] * chi_xx_val[nu_g] * D_mn);
+                        gdenxxy += 2.0 * (chi_x_val[mu_g] * chi_xy_val[nu_g] * D_mn);
+                        gdenxxz += 2.0 * (chi_x_val[mu_g] * chi_xz_val[nu_g] * D_mn);
+                        gdenyxx += 2.0 * (chi_x_val[mu_g] * chi_xy_val[nu_g] * D_mn);
+                        gdenyxy += 2.0 * (chi_x_val[mu_g] * chi_yy_val[nu_g] * D_mn);
+                        gdenyxz += 2.0 * (chi_x_val[mu_g] * chi_yz_val[nu_g] * D_mn);
+                        gdenzxx += 2.0 * (chi_x_val[mu_g] * chi_xz_val[nu_g] * D_mn);
+                        gdenzxy += 2.0 * (chi_x_val[mu_g] * chi_yz_val[nu_g] * D_mn);
+                        gdenzxz += 2.0 * (chi_x_val[mu_g] * chi_zz_val[nu_g] * D_mn);
+
+                        // === y ===
+
+                        double gdenxyx = 0.0, gdenxyy = 0.0, gdenxyz = 0.0;
+                        double gdenyyx = 0.0, gdenyyy = 0.0, gdenyyz = 0.0;
+                        double gdenzyx = 0.0, gdenzyy = 0.0, gdenzyz = 0.0;
+
+                        gdenxyx += 2.0 * (chi_xy_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenxyy += 2.0 * (chi_xy_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenxyz += 2.0 * (chi_xy_val[mu_g] * chi_z_val[nu_g] * D_mn);
+                        gdenyyx += 2.0 * (chi_yy_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenyyy += 2.0 * (chi_yy_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenyyz += 2.0 * (chi_yy_val[mu_g] * chi_z_val[nu_g] * D_mn);
+                        gdenzyx += 2.0 * (chi_yz_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenzyy += 2.0 * (chi_yz_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenzyz += 2.0 * (chi_yz_val[mu_g] * chi_z_val[nu_g] * D_mn);
+
+                        gdenxyx += 2.0 * (chi_y_val[mu_g] * chi_xx_val[nu_g] * D_mn);
+                        gdenxyy += 2.0 * (chi_y_val[mu_g] * chi_xy_val[nu_g] * D_mn);
+                        gdenxyz += 2.0 * (chi_y_val[mu_g] * chi_xz_val[nu_g] * D_mn);
+                        gdenyyx += 2.0 * (chi_y_val[mu_g] * chi_xy_val[nu_g] * D_mn);
+                        gdenyyy += 2.0 * (chi_y_val[mu_g] * chi_yy_val[nu_g] * D_mn);
+                        gdenyyz += 2.0 * (chi_y_val[mu_g] * chi_yz_val[nu_g] * D_mn);
+                        gdenzyx += 2.0 * (chi_y_val[mu_g] * chi_xz_val[nu_g] * D_mn);
+                        gdenzyy += 2.0 * (chi_y_val[mu_g] * chi_yz_val[nu_g] * D_mn);
+                        gdenzyz += 2.0 * (chi_y_val[mu_g] * chi_zz_val[nu_g] * D_mn);
+
+                        // === z ===
+
+                        double gdenxzx = 0.0, gdenxzy = 0.0, gdenxzz = 0.0;
+                        double gdenyzx = 0.0, gdenyzy = 0.0, gdenyzz = 0.0;
+                        double gdenzzx = 0.0, gdenzzy = 0.0, gdenzzz = 0.0;
+
+                        gdenxzx += 2.0 * (chi_xz_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenxzy += 2.0 * (chi_xz_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenxzz += 2.0 * (chi_xz_val[mu_g] * chi_z_val[nu_g] * D_mn);
+                        gdenyzx += 2.0 * (chi_yz_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenyzy += 2.0 * (chi_yz_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenyzz += 2.0 * (chi_yz_val[mu_g] * chi_z_val[nu_g] * D_mn);
+                        gdenzzx += 2.0 * (chi_zz_val[mu_g] * chi_x_val[nu_g] * D_mn);
+                        gdenzzy += 2.0 * (chi_zz_val[mu_g] * chi_y_val[nu_g] * D_mn);
+                        gdenzzz += 2.0 * (chi_zz_val[mu_g] * chi_z_val[nu_g] * D_mn);
+
+                        gdenxzx += 2.0 * (chi_z_val[mu_g] * chi_xx_val[nu_g] * D_mn);
+                        gdenxzy += 2.0 * (chi_z_val[mu_g] * chi_xy_val[nu_g] * D_mn);
+                        gdenxzz += 2.0 * (chi_z_val[mu_g] * chi_xz_val[nu_g] * D_mn);
+                        gdenyzx += 2.0 * (chi_z_val[mu_g] * chi_xy_val[nu_g] * D_mn);
+                        gdenyzy += 2.0 * (chi_z_val[mu_g] * chi_yy_val[nu_g] * D_mn);
+                        gdenyzz += 2.0 * (chi_z_val[mu_g] * chi_yz_val[nu_g] * D_mn);
+                        gdenzzx += 2.0 * (chi_z_val[mu_g] * chi_xz_val[nu_g] * D_mn);
+                        gdenzzy += 2.0 * (chi_z_val[mu_g] * chi_yz_val[nu_g] * D_mn);
+                        gdenzzz += 2.0 * (chi_z_val[mu_g] * chi_zz_val[nu_g] * D_mn);
 
                         double prefac = local_weights[g] * vrho[2 * g + 0];
 
-                        gatmxx += prefac * gdenxx[ij_g];
-                        gatmxy += prefac * gdenxy[ij_g];
-                        gatmxz += prefac * gdenxz[ij_g];
+                        gatmxx += prefac * gdenxx;
+                        gatmxy += prefac * gdenxy;
+                        gatmxz += prefac * gdenxz;
 
-                        gatmyx += prefac * gdenyx[ij_g];
-                        gatmyy += prefac * gdenyy[ij_g];
-                        gatmyz += prefac * gdenyz[ij_g];
+                        gatmyx += prefac * gdenyx;
+                        gatmyy += prefac * gdenyy;
+                        gatmyz += prefac * gdenyz;
 
-                        gatmzx += prefac * gdenzx[ij_g];
-                        gatmzy += prefac * gdenzy[ij_g];
-                        gatmzz += prefac * gdenzz[ij_g];
+                        gatmzx += prefac * gdenzx;
+                        gatmzy += prefac * gdenzy;
+                        gatmzz += prefac * gdenzz;
 
                         auto vx = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
                         auto vy = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
                         auto vz = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 2] + vsigma[3 * g + 1] * rhograd[6 * g + 5];
 
-                        gatmxx += local_weights[g] * (vx * gdenxxx[ij_g] + vy * gdenyxx[ij_g] + vz * gdenzxx[ij_g]);
-                        gatmxy += local_weights[g] * (vx * gdenxxy[ij_g] + vy * gdenyxy[ij_g] + vz * gdenzxy[ij_g]);
-                        gatmxz += local_weights[g] * (vx * gdenxxz[ij_g] + vy * gdenyxz[ij_g] + vz * gdenzxz[ij_g]);
+                        gatmxx += local_weights[g] * (vx * gdenxxx + vy * gdenyxx + vz * gdenzxx);
+                        gatmxy += local_weights[g] * (vx * gdenxxy + vy * gdenyxy + vz * gdenzxy);
+                        gatmxz += local_weights[g] * (vx * gdenxxz + vy * gdenyxz + vz * gdenzxz);
 
-                        gatmyx += local_weights[g] * (vx * gdenxyx[ij_g] + vy * gdenyyx[ij_g] + vz * gdenzyx[ij_g]);
-                        gatmyy += local_weights[g] * (vx * gdenxyy[ij_g] + vy * gdenyyy[ij_g] + vz * gdenzyy[ij_g]);
-                        gatmyz += local_weights[g] * (vx * gdenxyz[ij_g] + vy * gdenyyz[ij_g] + vz * gdenzyz[ij_g]);
+                        gatmyx += local_weights[g] * (vx * gdenxyx + vy * gdenyyx + vz * gdenzyx);
+                        gatmyy += local_weights[g] * (vx * gdenxyy + vy * gdenyyy + vz * gdenzyy);
+                        gatmyz += local_weights[g] * (vx * gdenxyz + vy * gdenyyz + vz * gdenzyz);
 
-                        gatmzx += local_weights[g] * (vx * gdenxzx[ij_g] + vy * gdenyzx[ij_g] + vz * gdenzzx[ij_g]);
-                        gatmzy += local_weights[g] * (vx * gdenxzy[ij_g] + vy * gdenyzy[ij_g] + vz * gdenzzy[ij_g]);
-                        gatmzz += local_weights[g] * (vx * gdenxzz[ij_g] + vy * gdenyzz[ij_g] + vz * gdenzzz[ij_g]);
+                        gatmzx += local_weights[g] * (vx * gdenxzx + vy * gdenyzx + vz * gdenzzx);
+                        gatmzy += local_weights[g] * (vx * gdenxzy + vy * gdenyzy + vz * gdenzzy);
+                        gatmzz += local_weights[g] * (vx * gdenxzz + vy * gdenyzz + vz * gdenzzz);
                     }
 
                     // factor of 2 from sum of alpha and beta contributions
@@ -1461,7 +1384,7 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
             }
         }
 
-        timer.stop("Accumulate gradient");
+        timer.stop("Density grad. grid rho");
     }
 
     // destroy GTOs container
