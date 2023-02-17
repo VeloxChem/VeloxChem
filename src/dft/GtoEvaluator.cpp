@@ -147,26 +147,73 @@ preScreenGtos(CMemBlock<int32_t>&          skipCgtoIds,
                 // gto   : 2alpha (2ang+1) r^{ang}   |C| exp(-alpha r^2)
                 // gto_p2:        4alpha^2 r^{ang+2} |C| exp(-alpha r^2)
 
-                auto gtolimit = maxcoef * std::exp(-minexp * r2);
+                // 3rd-order derivative
+                // gto_m3: ang (ang-1) (ang-2) r^{ang-3} |C| exp(-alpha r^2)
+                // gto_m1: 2alpha 3ang^2       r^{ang-1} |C| exp(-alpha r^2)
+                // gto_p1: 4alpha^2 (3ang+3)   r^{ang+1} |C| exp(-alpha r^2)
+                // gto_p3: 8alpha^3            r^{ang+3} |C| exp(-alpha r^2)
+
+                auto gtolimit_base = maxcoef * std::exp(-minexp * r2);
 
                 auto r = std::sqrt(r2);
 
-                for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit *= r;
+                for (int32_t ipow = 0; ipow < bang; ipow++) gtolimit_base *= r;
+
+                auto gtolimit = gtolimit_base;
 
                 if (gtoDeriv > 0)
                 {
-                    gtolimit = std::max(gtolimit, 2.0 * maxexp * r * gtolimit);
+                    auto gtolimit_p = 2.0 * maxexp * r * gtolimit_base;  // gto_p
 
-                    if (bang > 0) gtolimit = std::max(gtolimit, gtolimit / r * bang);
+                    gtolimit = std::max(gtolimit, gtolimit_p);
+
+                    if (bang > 0)
+                    {
+                        auto gtolimit_m = gtolimit_base / r * bang;  // gto_m
+
+                        gtolimit = std::max(gtolimit, gtolimit_m);
+                    }
                 }
 
                 if (gtoDeriv > 1)
                 {
-                    gtolimit = std::max({gtolimit, 4.0 * maxexp * maxexp * r2 * gtolimit,
+                    auto gtolimit_p2 = 4.0 * maxexp * maxexp * r2 * gtolimit_base;  // gto_p2
 
-                                         2.0 * maxexp * (2 * bang + 1) * gtolimit});
+                    auto gtolimit_0 = 2.0 * maxexp * (2 * bang + 1) * gtolimit_base;  // gto
 
-                    if (bang > 1) gtolimit = std::max(gtolimit, gtolimit / r2 * bang * (bang - 1));
+                    gtolimit = std::max({gtolimit, gtolimit_0, gtolimit_p2});
+
+                    if (bang > 1)
+                    {
+                        auto gtolimit_m2 = gtolimit_base / r2 * bang * (bang - 1);  // gto_m2
+
+                        gtolimit = std::max(gtolimit, gtolimit_m2);
+                    }
+                }
+
+                if (gtoDeriv > 2)
+                {
+                    auto r3 = r * r2;
+
+                    auto gtolimit_p3 = 8.0 * maxexp * maxexp * maxexp * r3 * gtolimit_base;  // gto_p3
+
+                    auto gtolimit_p1 = 4.0 * maxexp * maxexp * (3 * bang + 3) * r * gtolimit_base;  // gto_p1
+
+                    gtolimit = std::max({gtolimit, gtolimit_p1, gtolimit_p3});
+
+                    if (bang > 0)
+                    {
+                        auto gtolimit_m1 = 2.0 * maxexp * gtolimit_base / r * (3 * bang * bang);  // gto_m1
+
+                        gtolimit = std::max(gtolimit, gtolimit_m1);
+                    }
+
+                    if (bang > 2)
+                    {
+                        auto gtolimit_m3 = gtolimit_base / r3 * bang * (bang - 1) * (bang - 2);  // gto_m3
+
+                        gtolimit = std::max(gtolimit, gtolimit_m3);
+                    }
                 }
 
                 if (gtolimit < gtoThreshold)
