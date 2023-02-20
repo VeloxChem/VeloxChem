@@ -23,8 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef XCNewMolecularGradient_hpp
-#define XCNewMolecularGradient_hpp
+#ifndef XCMolecularGradient_hpp
+#define XCMolecularGradient_hpp
 
 #include <array>
 #include <list>
@@ -45,11 +45,11 @@
 #include "XCNewFunctional.hpp"
 
 /**
- Class CXCNewMolecularGradient implements XC molecular gradient.
+ Class CXCMolecularGradient implements XC molecular gradient.
 
  @author X. Li
  */
-class CXCNewMolecularGradient
+class CXCMolecularGradient
 {
     /**
      The rank of associated local MPI process.
@@ -254,7 +254,7 @@ class CXCNewMolecularGradient
 
      @param comm the MPI communicator.
      */
-    CXCNewMolecularGradient(MPI_Comm comm);
+    CXCMolecularGradient(MPI_Comm comm);
 
     /**
      Integrates first-order exchnage-correlation functional contribution to
@@ -338,4 +338,4 @@ class CXCNewMolecularGradient
                                       const std::string&      xcFuncLabel) const;
 };
 
-#endif /* XCNewMolecularGradient_hpp */
+#endif /* XCMolecularGradient_hpp */

@@ -27,7 +27,7 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-from .veloxchemlib import GridDriver, XCNewMolecularGradient
+from .veloxchemlib import GridDriver, XCMolecularGradient
 from .veloxchemlib import mpi_master
 from .veloxchemlib import new_parse_xc_func
 from .outputstream import OutputStream
@@ -231,7 +231,7 @@ class GradientDriver:
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCNewMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_density, gs_density, mol_grid, xcfun_label)
         vxc_contrib = self.comm.reduce(vxc_contrib, root=mpi_master())
@@ -264,7 +264,7 @@ class GradientDriver:
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCNewMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, mol_grid,
             xcfun_label)
@@ -300,7 +300,7 @@ class GradientDriver:
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCNewMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, mol_grid,
             xcfun_label)
@@ -334,7 +334,7 @@ class GradientDriver:
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xcgrad_drv = XCNewMolecularGradient(self.comm)
+        xcgrad_drv = XCMolecularGradient(self.comm)
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
         tddft_xcgrad += xcgrad_drv.integrate_fxc_gradient(

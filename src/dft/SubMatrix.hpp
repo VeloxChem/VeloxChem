@@ -113,7 +113,7 @@ void distributeSubMatrixToKohnSham(CAOKohnShamMatrix&               aoKohnShamMa
 
  @param aoFockMatrix the AO Fock matrix.
  @param fockIndex the index of Fock matrix.
- @param partialMatFxc the partial Fxc or Kxc matrix.
+ @param subMatrix the partial Fxc or Kxc matrix.
  @param aoIndices the index mapping from partial matrix to full matrix.
  @param aoCount the number of indices in partial matrix.
  @param nAOs the number of indices in full matrix.
@@ -124,6 +124,21 @@ void distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
                                const std::vector<int32_t>& aoIndices,
                                const int32_t               aoCount,
                                const int32_t               nAOs);
+
+/**
+ Distributes partial matrix to full matrix.
+
+ @param matrix the full matrix.
+ @param subMatrix the partial matrix.
+ @param aoIndices the index mapping from partial matrix to full matrix.
+ @param aoCount the number of indices in partial matrix.
+ @param nAOs the number of indices in full matrix.
+ */
+void distributeSubMatrixToDenseMatrix(CDenseMatrix&               matrix,
+                                      const CDenseMatrix&         subMatrix,
+                                      const std::vector<int32_t>& aoIndices,
+                                      const int32_t               aoCount,
+                                      const int32_t               nAOs);
 
 }  // namespace submat
 

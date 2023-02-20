@@ -80,17 +80,35 @@ CDispersionParameters::_setFunctionalParameters(const std::string& xcLabel)
 
     else if (fstr::upcase(xcLabel) == "PBE0") _setFourParameters(1.0000, 1.20065498, 0.40085597, 5.02928789);
 
+    else if (fstr::upcase(xcLabel) == "REVPBE") _setFourParameters(1.0000, 1.74676530, 0.53634900, 3.07261485);
+
+    else if (fstr::upcase(xcLabel) == "PW91") _setFourParameters(1.0000, 0.77283111, 0.39581542, 4.93405761);
+
     else if (fstr::upcase(xcLabel) == "OLYP") _setFourParameters(1.0000, 2.74836820, 0.60184498, 2.53292167);
+
+    else if (fstr::upcase(xcLabel) == "O3LYP") _setFourParameters(1.0000, 1.75762508, 0.10348980, 6.16233282);
+
+    else if (fstr::upcase(xcLabel) == "X3LYP") _setFourParameters(1.0000, 1.54701429, 0.20318443, 5.61852648);
+
+    else if (fstr::upcase(xcLabel) == "B97") _setFourParameters(1.0000, 0.87854260, 0.29319126, 4.51647719);
 
     else if (fstr::upcase(xcLabel) == "TPSS") _setFourParameters(1.0000, 1.76596355, 0.42822303, 4.54257102);
 
     else if (fstr::upcase(xcLabel) == "TPSSH") _setFourParameters(1.0000, 1.85897750, 0.44286966, 4.60230534);
+
+    else if (fstr::upcase(xcLabel) == "REVTPSS") _setFourParameters(1.0000, 1.53089454, 0.44880597, 4.64042317);
 
     else if (fstr::upcase(xcLabel) == "SCAN") _setFourParameters(1.0000, 1.46126056, 0.62930855, 6.31284039);
 
     else if (fstr::upcase(xcLabel) == "M06") _setFourParameters(1.0000, 0.16366729, 0.53456413, 6.06192174);
 
     else if (fstr::upcase(xcLabel) == "M06-L") _setFourParameters(1.0000, 0.59493760, 0.71422359, 6.35314182);
+
+    else if (fstr::upcase(xcLabel) == "MPW1B95") _setFourParameters(1.0000, 0.50093024, 0.41585097, 4.99154869);
+
+    else if (fstr::upcase(xcLabel) == "MPWB1K") _setFourParameters(1.0000, 0.57338313, 0.44687975, 5.21266777);
+
+    else if (fstr::upcase(xcLabel) == "PW6B95") _setFourParameters(1.0000, -0.31926054, 0.04142919, 5.84655608);
 
     else
     {

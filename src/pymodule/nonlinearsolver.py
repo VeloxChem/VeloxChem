@@ -320,7 +320,7 @@ class NonlinearSolver:
             self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 6):
+        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
             warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
             warn_msg += ' Using default value. ***'
             self.ostream.print_blank()
@@ -942,6 +942,45 @@ class NonlinearSolver:
 
         cur_str = 'Time spent in Fock matrices: {:.2f} sec'.format(time)
         self.ostream.print_info(cur_str)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+    def _print_header(self, title):
+        """
+        Prints nonlinear solver setup header to output stream.
+
+        :param title:
+            The title.
+        """
+
+        self.ostream.print_blank()
+
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
+        self.ostream.print_blank()
+
+        width = 60
+
+        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
+            self.eri_thresh)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Convergance Threshold           : {:.1e}'.format(
+            self.conv_thresh)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
+        self.ostream.print_header(cur_str.ljust(width))
+        cur_str = 'Damping Parameter               : {:.6e}'.format(
+            self.damping)
+        self.ostream.print_header(cur_str.ljust(width))
+
+        if self._dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(width))
+            cur_str = 'Molecular Grid Level            : ' + str(
+                self.grid_level)
+            self.ostream.print_header(cur_str.ljust(width))
+
         self.ostream.print_blank()
         self.ostream.flush()
 

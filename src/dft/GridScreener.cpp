@@ -46,33 +46,6 @@ getTauScreeningThreshold()
 }
 
 void
-screenVxcForLDA(const int32_t npoints, const double* rho, double* exc, double* vrho)
-{
-    double densityThreshold = getDensityScreeningThreshold();
-
-    for (int32_t g = 0; g < npoints; g++)
-    {
-        // rho_a
-        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
-        {
-            vrho[2 * g + 0] = 0.0;
-        }
-
-        // rho_b
-        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
-        {
-            vrho[2 * g + 1] = 0.0;
-        }
-
-        // rho
-        if (std::fabs(rho[2 * g + 0] + rho[2 * g + 1]) <= densityThreshold)
-        {
-            exc[g] = 0.0;
-        }
-    }
-}
-
-void
 screenExcVxcForLDA(const int32_t npoints, const double* rho, double* exc, double* vrho)
 {
     double densityThreshold = getDensityScreeningThreshold();
