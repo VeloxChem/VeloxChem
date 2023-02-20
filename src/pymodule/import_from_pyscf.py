@@ -6,6 +6,9 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import ao_matrix_to_veloxchem
 from .veloxchemlib import ao_matrix_to_dalton
 from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import xcfun
+from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import GridDriver
 import numpy as np
 import sys
 import h5py
@@ -1467,7 +1470,7 @@ def import_xc_contrib_tddft(molecule, basis, scfdrv, xmy_ao, rel_dm_ao,
     # set functional, convergence threshold and grid level 
     pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
     pyscf_scf.conv_tol = scfdrv.conv_thresh
-    if scfdrv.grid_level == 6:
+    if scfdrv.grid_level == 6 or scfdrv.grid_level == 7:
         pyscf_scf.grids.level = 9
     else:
         pyscf_scf.grids.level = scfdrv.grid_level
@@ -2021,14 +2024,27 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
             # set functional, convergence threshold and grid level 
             pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
             pyscf_scf.conv_tol = scfdrv.conv_thresh
-            if scfdrv.grid_level == 6:
+            if scfdrv.grid_level == 6 or scfdrv.grid_level == 7:
                 pyscf_scf.grids.level = 9
             else:
                 pyscf_scf.grids.level = scfdrv.grid_level
 
-            pyscf_scf.kernel()
+            if scfdrv.xcfun.get_func_type() == xcfun.lda:
+                grid_drv = GridDriver()
+                grid_drv.set_level(scfdrv.grid_level)
+                xc_mol_hess = XCMolecularHessian()
+                mol_grid = grid_drv.generate(molecule)
+                vlx_density = scfdrv.density
+                vlx_vxc_deriv_atom_i = xc_mol_hess.integrate_vxc_fock_gradient(
+                                        molecule, basis, vlx_density, mol_grid,
+                                        scfdrv.xcfun.get_func_label(), i)
+                vlx_vxc_deriv_atom_i += xc_mol_hess.integrate_fxc_fock_gradient(
+                                        molecule, basis, vlx_density, mol_grid,
+                                        scfdrv.xcfun.get_func_label(), i)
+            else:
+                pyscf_scf.kernel()
 
-            pyscf_hessian = pyscf.hessian.rks.Hessian(pyscf_scf)
+                pyscf_hessian = pyscf.hessian.rks.Hessian(pyscf_scf)
         else:
             pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
     else:
@@ -2093,18 +2109,20 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
             #print(vxc_deriv_atom_i)
 
             # This one works!
-            pyscf_mo_coeff = pyscf_scf.mo_coeff
-            pyscf_mo_occ = pyscf_scf.mo_occ
-            max_memory = 2000
-            vxc_deriv1 = pyscf_rks_hessian._get_vxc_deriv1(pyscf_hessian,
+
+            if scfdrv.xcfun.get_func_type() != xcfun.lda:
+                pyscf_mo_coeff = pyscf_scf.mo_coeff
+                pyscf_mo_occ = pyscf_scf.mo_occ
+                max_memory = 2000
+                vxc_deriv1 = pyscf_rks_hessian._get_vxc_deriv1(pyscf_hessian,
                                                           pyscf_mo_coeff,
                                                           pyscf_mo_occ,
                                                           max_memory)
 
-            #print(vxc_deriv1)
-            # select derivatives wrt. atom i
-            vxc_deriv_atom_i = vxc_deriv1[i]
-            fock_deriv_atom_i += vxc_deriv_atom_i
+                #print(vxc_deriv1)
+                # select derivatives wrt. atom i
+                vxc_deriv_atom_i = vxc_deriv1[i]
+                fock_deriv_atom_i += vxc_deriv_atom_i
 
             # check fraction of exact exchange
             if scfdrv.xcfun.is_hybrid():
@@ -2138,7 +2156,10 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
                                  basis, molecule).to_numpy()
                                 )
 
-    return vlx_fock_deriv_atom_i
+    if scfdrv.xcfun.get_func_type() == xcfun.lda:
+        return vlx_fock_deriv_atom_i + vlx_vxc_deriv_atom_i 
+    else:
+        return vlx_fock_deriv_atom_i
 
 
 def vxc_deriv(molecule, basis, scfdrv, unit="au"):
@@ -2175,7 +2196,7 @@ def vxc_deriv(molecule, basis, scfdrv, unit="au"):
     pyscf_scf.conv_tol = scfdrv.conv_thresh
     # some functional are parametrized differently in PYSCF
     pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
-    if scfdrv.grid_level == 6:
+    if scfdrv.grid_level == 6 or scfdrv.grid_level == 7:
         pyscf_scf.grids.level = 9
     else:
         pyscf_scf.grids.level = scfdrv.grid_level
@@ -2518,7 +2539,7 @@ def dft_xc_second_deriv(molecule, basis, scf_drv, unit="au"):
     # set functional, convergence threshold and grid level 
     pyscf_scf.xc = translate_to_pyscf(scf_drv.xcfun.get_func_label())
     pyscf_scf.conv_tol = scf_drv.conv_thresh
-    if scf_drv.grid_level == 6:
+    if scf_drv.grid_level == 6 or scf_drv.grid_level == 7:
         pyscf_scf.grids.level = 9
     else:
         pyscf_scf.grids.level = scf_drv.grid_level

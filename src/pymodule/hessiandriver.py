@@ -190,12 +190,13 @@ class HessianDriver:
             #if key in ['yes', 'y']:
                 #self.numerical = True
 
-        if self._dft:
-            self.ostream.print_blank()
-            warn_msg = '*** Warning: Analytical Hessian is '
-            warn_msg += 'not yet fully implemented for DFT methods.'
-            self.ostream.print_header(warn_msg.ljust(56))
-            self.ostream.flush()
+        # TODO: remove commented out code
+        #if self._dft:
+        #    self.ostream.print_blank()
+        #    warn_msg = '*** Warning: Analytical Hessian is '
+        #    warn_msg += 'not yet fully implemented for DFT methods.'
+        #    self.ostream.print_header(warn_msg.ljust(56))
+        #    self.ostream.flush()
 
         # print vibrational analysis (frequencies and normal modes)
         if 'print_vib_analysis' in freq_dict:

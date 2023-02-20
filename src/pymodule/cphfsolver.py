@@ -151,7 +151,10 @@ class CphfSolver(LinearSolver):
             'CphfSolver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
-            self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
+            if self._dft:
+                self.print_cphf_header('Coupled-Perturbed Kohn-Sham Solver')
+            else:
+                self.print_cphf_header('Coupled-Perturbed Hartree-Fock Solver')
 
         if self.use_subspace_solver:
             self.cphf_results = self.compute_subspace_solver(molecule, basis, scf_tensors, *args)
@@ -568,7 +571,7 @@ class CphfSolver(LinearSolver):
             dist_trials_proj = old_trials.matmul_AB_no_gather(bT_new_trials)
             dist_trials.data -= dist_trials_proj.data
 
-			# TODO: remove commented out code!!
+            # TODO: remove commented out code!!
             ### b b.T
             ###bT_new_trials = np.matmul(old_trials.data, old_trials.data.T)
             ##bT_new = np.matmul(old_trials.data.T, dist_trials.data)
@@ -707,7 +710,10 @@ class CphfSolver(LinearSolver):
 
         if self.rank == mpi_master():
             self.ostream.print_blank()
-            self._print_convergence('Coupled-Perturbed Hartree-Fock')
+            if self._dft:
+                self._print_convergence('Coupled-Perturbed Kohn-Sham')
+            else:
+                self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
             # merge the rhs dict with the solution
             cphf_ov_dict = {**cphf_rhs_dict, 'cphf_ov': cphf_ov}

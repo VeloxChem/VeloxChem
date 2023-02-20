@@ -13,7 +13,7 @@ from .veloxchemlib import XCNewIntegrator as XCIntegrator
 from .veloxchemlib import XCNewFunctional
 from .veloxchemlib import MolecularGrid
 from .veloxchemlib import new_parse_xc_func
-from .veloxchemlib import GridDriver, XCNewMolecularGradient
+from .veloxchemlib import GridDriver, XCMolecularGradient
 from .cphfsolver import CphfSolver
 from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
@@ -181,7 +181,7 @@ class PolarizabilityGradient():
 
 
             # loop over atoms and contract integral derivatives
-			# with density matrices
+            # with density matrices
             # add the corresponding contribution to the gradient
             for i in range(natm):
                 # taking integral derivatives from pyscf
@@ -192,28 +192,28 @@ class PolarizabilityGradient():
 
                 # Calculate the analytic polarizability gradient
                 pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya',
-												      2.0 * rel_dm_ao, d_hcore)
+                                                      2.0 * rel_dm_ao, d_hcore)
                     + 1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
-            		+ 2.0 * np.einsum('mt,xynp,amtnp->xya',
-									   gs_dm, 2.0 * rel_dm_ao, d_eri)
+                    + 2.0 * np.einsum('mt,xynp,amtnp->xya',
+                                       gs_dm, 2.0 * rel_dm_ao, d_eri)
                     - 1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya',
-											    gs_dm, 2.0 * rel_dm_ao, d_eri)
+                                                gs_dm, 2.0 * rel_dm_ao, d_eri)
                     + 1.0 * np.einsum('xmn,ypt,atpmn->xya',
-									   xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                                       xpy, xpy - xpy.transpose(0,2,1), d_eri)
                     - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya',
-										xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                                        xpy, xpy - xpy.transpose(0,2,1), d_eri)
                     + 1.0 * np.einsum('xmn,ypt,atpmn->xya',
-									   xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                                       xmy, xmy + xmy.transpose(0,2,1), d_eri)
                     - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya',
-										xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                                        xmy, xmy + xmy.transpose(0,2,1), d_eri)
                     + 1.0 * np.einsum('xmn,ypt,atpmn->yxa',
-									xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                                    xpy, xpy - xpy.transpose(0,2,1), d_eri)
                     - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa',
-										xpy, xpy - xpy.transpose(0,2,1), d_eri)
+                                        xpy, xpy - xpy.transpose(0,2,1), d_eri)
                     + 1.0 * np.einsum('xmn,ypt,atpmn->yxa',
-									   xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                                       xmy, xmy + xmy.transpose(0,2,1), d_eri)
                     - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa',
-									xmy, xmy + xmy.transpose(0,2,1), d_eri)
+                                    xmy, xmy + xmy.transpose(0,2,1), d_eri)
                     - 2.0 * np.einsum('xmn,yamn->xya', xmy, d_dipole)
                     - 2.0 * np.einsum('xmn,yamn->yxa', xmy, d_dipole)
                                 )
@@ -224,22 +224,22 @@ class PolarizabilityGradient():
                 xcfun_label = self.xcfun.get_func_label()
                 for i in range(dof):
                     # for j in range(dof): 
-					# TODO:  include as soon as non-diagonal terms are available
+                    # TODO:  include as soon as non-diagonal terms are available
                     if self.rank == mpi_master():
                         gs_density = AODensityMatrix([gs_dm], denmat.rest)
 
                         rhow_dm = 1.0 * rel_dm_ao[i,i]
                         rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
                         rhow_den_sym = AODensityMatrix([rhow_dm_sym],
-													   denmat.rest)
+                                                       denmat.rest)
 
                         # Takes only one vector type, but two are needed
-						# to account for the different {x,y,z} components
-						# of the response vectors so we are doing only
-						# diagonal components for now.
+                        # to account for the different {x,y,z} components
+                        # of the response vectors so we are doing only
+                        # diagonal components for now.
                         # The sqrt2 takes into account the fact that we need to
                         # symmetrize with respect to the polarizability
-						# components.
+                        # components.
                         # (see contraction with two-electron integrals above).
                         xmy_sym = np.sqrt(2) * 0.5 * (xmy[i] + xmy[i].T)
                         xmy_den_sym = AODensityMatrix([xmy_sym], denmat.rest)
@@ -254,7 +254,7 @@ class PolarizabilityGradient():
                     xmy_den_sym.broadcast(self.rank, self.comm)
 
                     polgrad_xcgrad = self.grad_polgrad_xc_contrib(molecule,
-											basis, rhow_den_sym, xmy_den_sym,
+                                            basis, rhow_den_sym, xmy_den_sym,
                                                      gs_density, xcfun_label)
 
                     if self.rank == mpi_master():
@@ -290,12 +290,22 @@ class PolarizabilityGradient():
         grid_drv = GridDriver(self.comm)
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
-        mol_grid.distribute(self.rank, self.nodes, self.comm)
 
-        xcgrad_drv = XCNewMolecularGradient(self.comm)
-        polgrad_xcgrad = xcgrad_drv.integrate_tddft_gradient(
-            rhow_den, xmy_den, gs_density, molecule, ao_basis, mol_grid,
+        xcgrad_drv = XCMolecularGradient(self.comm)
+        polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
+            molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
+        polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
+            molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
             xcfun_label)
+        polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
+            molecule, ao_basis, xmy_den, xmy_den, gs_density, mol_grid,
+            xcfun_label)
+        polgrad_xcgrad += xcgrad_drv.integrate_kxc_gradient(
+            molecule, ao_basis, xmy_den, xmy_den, gs_density, mol_grid,
+            xcfun_label)
+        #polgrad_xcgrad = xcgrad_drv.integrate_tddft_gradient(
+        #    rhow_den, xmy_den, gs_density, molecule, ao_basis, mol_grid,
+        #    xcfun_label)
         polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
 
         return polgrad_xcgrad
@@ -334,7 +344,7 @@ class PolarizabilityGradient():
             else:
                 gs_density = AODensityMatrix()
             gs_density.broadcast(self.rank, self.comm)
-            molgrid.broadcast(self.rank, self.comm) # TODO duble check
+            #molgrid.broadcast(self.rank, self.comm) # TODO duble check
 
             dft_func_label = self.xcfun.get_func_label().upper()
         else:
@@ -576,14 +586,17 @@ class PolOrbitalResponse(CphfSolver):
                 for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
                     fock_gxc_ao.scale(2.0, ifock)
             xc_drv = XCIntegrator(self.comm)
-            molgrid.distribute(self.rank, self.nodes, self.comm)
+            #molgrid.distribute(self.rank, self.nodes, self.comm)
             # Linear response routine for f^xc
             #xc_drv.integrate(fock_ao_rhs, dm_ao_rhs, gs_density,
             #                 molecule, basis, molgrid,
             #                 self.xcfun.get_func_label())
             # Quadratic response routine for TDDFT E[3] term g^xc
-            xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
-                             gs_density, molecule, basis, molgrid,
+            #xc_drv.integrate(fock_gxc_ao, perturbed_dm_ao, zero_dm_ao,
+            #                 gs_density, molecule, basis, molgrid,
+            #                 self.xcfun.get_func_label(), "qrf")
+            xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
+                             perturbed_dm_ao, zero_dm_ao, gs_density, molgrid,
                              self.xcfun.get_func_label(), "qrf")
 
             fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)

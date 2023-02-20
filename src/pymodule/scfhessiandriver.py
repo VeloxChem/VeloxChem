@@ -47,6 +47,9 @@ from .veloxchemlib import fockmat
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ElectricDipoleIntegralsDriver
+from .veloxchemlib import xcfun
+from .veloxchemlib import XCMolecularHessian
+from .veloxchemlib import GridDriver
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -281,10 +284,10 @@ class ScfHessianDriver(HessianDriver):
                             for ind_bop, bop in enumerate('xyz'):
                                 comp_plus = (
                                     lr_results_p['response_functions'][aop, bop,
-                                                                       self.frequency])
+                                                               self.frequency])
                                 comp_minus = (
                                     lr_results_m['response_functions'][aop, bop,
-                                                                       self.frequency])
+                                                               self.frequency])
                                 self.polarizability_gradient[
                                     ind_aop, ind_bop,
                                     3 * i + x] = ((comp_plus - comp_minus) /
@@ -422,8 +425,26 @@ class ScfHessianDriver(HessianDriver):
             else:
                 frac_K = 0.0
 
-            # DFT exchange and correlation contribution
-            hessian_dft_xc = dft_xc_second_deriv(molecule, ao_basis, self.scf_drv)
+            # TODO: use native veloxchem derivative for Exc when
+            # they are available.
+            if self.scf_drv.xcfun.get_func_type() == xcfun.lda:
+                grid_drv = GridDriver()
+                grid_drv.set_level(self.scf_drv.grid_level)
+
+                xc_mol_hess = XCMolecularHessian()
+                mol_grid = grid_drv.generate(molecule)
+
+                gs_density = self.scf_drv.density
+                hessian_dft_xc = xc_mol_hess.integrate_vxc_hessian(molecule,
+                                            ao_basis, gs_density, mol_grid,
+                                            self.scf_drv.xcfun.get_func_label())
+                hessian_dft_xc += xc_mol_hess.integrate_fxc_hessian(molecule,
+                                            ao_basis, gs_density, mol_grid,
+                                            self.scf_drv.xcfun.get_func_label())
+            else:
+                # DFT exchange and correlation contribution
+                hessian_dft_xc = dft_xc_second_deriv(molecule, ao_basis,
+                        self.scf_drv).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
@@ -457,7 +478,7 @@ class ScfHessianDriver(HessianDriver):
                        + hessian_nuclear_nuclear ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
         if self._dft:
-            self.hessian += hessian_dft_xc.transpose(0,2,1,3).reshape(3*natm, 3*natm)
+            self.hessian += hessian_dft_xc
 
         # Calculate the gradient of the dipole moment, needed for IR intensities
         self.compute_dipole_gradient(molecule, ao_basis, perturbed_density)
