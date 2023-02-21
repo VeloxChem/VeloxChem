@@ -100,6 +100,12 @@ class CXCMolecularHessian
                                             const CMolecularGrid&   molecularGrid,
                                             const CXCNewFunctional& xcFunctional) const;
 
+    CDenseMatrix _integrateFxcHessianForGGA(const CMolecule&        molecule,
+                                            const CMolecularBasis&  basis,
+                                            const CAODensityMatrix& gsDensityMatrix,
+                                            const CMolecularGrid&   molecularGrid,
+                                            const CXCNewFunctional& xcFunctional) const;
+
     std::vector<CDenseMatrix> _integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                                                               const CMolecularBasis&  basis,
                                                               const CAODensityMatrix& gsDensityMatrix,
