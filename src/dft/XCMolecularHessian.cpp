@@ -268,10 +268,14 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
+    CMemBlock<double> weighted_vrho(molecularGrid.getMaxNumberOfGridPointsPerBox());
+
     auto local_weights = local_weights_data.data();
 
     auto rho  = rho_data.data();
     auto vrho = vrho_data.data();
+
+    auto w0 = weighted_vrho.data();
 
     // coordinates and weights of grid points
 
@@ -421,27 +425,15 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
 
         dengridgen::generateDensityForLDA(rho, npoints, mat_chi, gs_sub_dens_mat, timer);
 
-        // generate density gradient grid
+        // compute exchange-correlation functional derivative
 
-        timer.start("Density grad. grid prep.");
+        timer.start("XC functional eval.");
 
-        // pairwise hessian contribution: only store the upper triangular part (iatom <= jatom)
+        xcFunctional.compute_vxc_for_lda(npoints, rho, vrho);
 
-        auto n2_upper_triang = natoms * (natoms + 1) / 2;
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        CDenseMatrix dengradxx(n2_upper_triang, npoints);
-        CDenseMatrix dengradxy(n2_upper_triang, npoints);
-        CDenseMatrix dengradxz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradyx(n2_upper_triang, npoints);
-        CDenseMatrix dengradyy(n2_upper_triang, npoints);
-        CDenseMatrix dengradyz(n2_upper_triang, npoints);
-
-        CDenseMatrix dengradzx(n2_upper_triang, npoints);
-        CDenseMatrix dengradzy(n2_upper_triang, npoints);
-        CDenseMatrix dengradzz(n2_upper_triang, npoints);
-
-        timer.stop("Density grad. grid prep.");
+        timer.stop("XC functional eval.");
 
         // eq.(26), JCTC 2021, 17, 1512-1521
 
@@ -472,118 +464,6 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
         auto chi_yz_val = mat_chi_yz.values();
         auto chi_zz_val = mat_chi_zz.values();
 
-        auto gdenxx = dengradxx.values();
-        auto gdenxy = dengradxy.values();
-        auto gdenxz = dengradxz.values();
-
-        auto gdenyx = dengradyx.values();
-        auto gdenyy = dengradyy.values();
-        auto gdenyz = dengradyz.values();
-
-        auto gdenzx = dengradzx.values();
-        auto gdenzy = dengradzy.values();
-        auto gdenzz = dengradzz.values();
-
-        #pragma omp parallel
-        {
-            auto thread_id = omp_get_thread_num();
-
-            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
-
-            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
-
-            for (int32_t mu = 0; mu < naos; mu++)
-            {
-                auto iatom = ao_to_atom_ids[aoinds[mu]];
-
-                // upper triangular index for diagonal i: i * N + i - i * (i + 1) / 2
-
-                auto ii_upper_triang_index = iatom * natoms + iatom - iatom * (iatom + 1) / 2;
-
-                auto ii_offset = ii_upper_triang_index * npoints;
-
-                auto mu_offset = mu * npoints;
-
-                #pragma omp simd aligned(F_val, chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val, \
-                        gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-                {
-                    auto ii_g = ii_offset + g;
-
-                    auto mu_g = mu_offset + g;
-
-                    gdenxx[ii_g] += 2.0 * (F_val[mu_g] * chi_xx_val[mu_g]);
-                    gdenxy[ii_g] += 2.0 * (F_val[mu_g] * chi_xy_val[mu_g]);
-                    gdenxz[ii_g] += 2.0 * (F_val[mu_g] * chi_xz_val[mu_g]);
-
-                    gdenyx[ii_g] += 2.0 * (F_val[mu_g] * chi_xy_val[mu_g]);
-                    gdenyy[ii_g] += 2.0 * (F_val[mu_g] * chi_yy_val[mu_g]);
-                    gdenyz[ii_g] += 2.0 * (F_val[mu_g] * chi_yz_val[mu_g]);
-
-                    gdenzx[ii_g] += 2.0 * (F_val[mu_g] * chi_xz_val[mu_g]);
-                    gdenzy[ii_g] += 2.0 * (F_val[mu_g] * chi_yz_val[mu_g]);
-                    gdenzz[ii_g] += 2.0 * (F_val[mu_g] * chi_zz_val[mu_g]);
-                }
-
-                for (int32_t nu = 0; nu < naos; nu++)
-                {
-                    auto jatom = ao_to_atom_ids[aoinds[nu]];
-
-                    // only consider the upper triangular part, e.g. iatom <= jatom
-
-                    if (iatom > jatom) continue;
-
-                    // upper triangular index for i<=j: i * N + j - i * (i + 1) / 2
-
-                    auto ij_upper_triang_index = iatom * natoms + jatom - iatom * (iatom + 1) / 2;
-
-                    auto ij_offset = ij_upper_triang_index * npoints;
-
-                    auto nu_offset = nu * npoints;
-
-                    auto D_mn = D_val[mu * naos + nu];
-
-                    #pragma omp simd aligned(chi_x_val, chi_y_val, chi_z_val, \
-                            gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
-                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-                    {
-                        auto ij_g = ij_offset + g;
-
-                        auto mu_g = mu_offset + g;
-                        auto nu_g = nu_offset + g;
-
-                        gdenxx[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenxy[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenxz[ij_g] += 2.0 * (chi_x_val[mu_g] * chi_z_val[nu_g] * D_mn);
-
-                        gdenyx[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenyy[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenyz[ij_g] += 2.0 * (chi_y_val[mu_g] * chi_z_val[nu_g] * D_mn);
-
-                        gdenzx[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_x_val[nu_g] * D_mn);
-                        gdenzy[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_y_val[nu_g] * D_mn);
-                        gdenzz[ij_g] += 2.0 * (chi_z_val[mu_g] * chi_z_val[nu_g] * D_mn);
-                    }
-                }
-            }
-        }
-
-        timer.stop("Density grad. grid rho");
-
-        // compute exchange-correlation functional derivative
-
-        timer.start("XC functional eval.");
-
-        xcFunctional.compute_vxc_for_lda(npoints, rho, vrho);
-
-        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
-
-        timer.stop("XC functional eval.");
-
-        // eq.(32), JCTC 2021, 17, 1512-1521
-
-        timer.start("Accumulate gradient");
-
         #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
@@ -594,67 +474,130 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
 
             auto gatm = molhess_threads.data(thread_id);
 
-            for (int32_t iatom = 0; iatom < natoms; iatom++)
+            #pragma omp simd aligned(local_weights, vrho, w0 : VLX_ALIGN)
+            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
+                w0[g] = local_weights[g] * vrho[2 * g + 0];
+            }
+
+            for (int32_t mu = 0; mu < naos; mu++)
+            {
+                auto iatom = ao_to_atom_ids[aoinds[mu]];
+
                 auto ix = iatom * 3 + 0;
                 auto iy = iatom * 3 + 1;
                 auto iz = iatom * 3 + 2;
 
-                for (int32_t jatom = iatom; jatom < natoms; jatom++)
+                auto mu_offset = mu * npoints;
+
+                double gatmxx = 0.0, gatmxy = 0.0, gatmxz = 0.0;
+                double gatmyx = 0.0, gatmyy = 0.0, gatmyz = 0.0;
+                double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
+
+                #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) \
+                        aligned(w0, F_val, chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
+                    auto mu_g = mu_offset + g;
+
+                    gatmxx += w0[g] * (F_val[mu_g] * chi_xx_val[mu_g]);
+                    gatmxy += w0[g] * (F_val[mu_g] * chi_xy_val[mu_g]);
+                    gatmxz += w0[g] * (F_val[mu_g] * chi_xz_val[mu_g]);
+
+                    gatmyx += w0[g] * (F_val[mu_g] * chi_xy_val[mu_g]);
+                    gatmyy += w0[g] * (F_val[mu_g] * chi_yy_val[mu_g]);
+                    gatmyz += w0[g] * (F_val[mu_g] * chi_yz_val[mu_g]);
+
+                    gatmzx += w0[g] * (F_val[mu_g] * chi_xz_val[mu_g]);
+                    gatmzy += w0[g] * (F_val[mu_g] * chi_yz_val[mu_g]);
+                    gatmzz += w0[g] * (F_val[mu_g] * chi_zz_val[mu_g]);
+                }
+
+                // factor of 2 from differentiation
+                // factor of 2 from sum of alpha and beta contributions
+
+                gatm[ix * (natoms * 3) + ix] += 4.0 * gatmxx;
+                gatm[ix * (natoms * 3) + iy] += 4.0 * gatmxy;
+                gatm[ix * (natoms * 3) + iz] += 4.0 * gatmxz;
+
+                gatm[iy * (natoms * 3) + ix] += 4.0 * gatmyx;
+                gatm[iy * (natoms * 3) + iy] += 4.0 * gatmyy;
+                gatm[iy * (natoms * 3) + iz] += 4.0 * gatmyz;
+
+                gatm[iz * (natoms * 3) + ix] += 4.0 * gatmzx;
+                gatm[iz * (natoms * 3) + iy] += 4.0 * gatmzy;
+                gatm[iz * (natoms * 3) + iz] += 4.0 * gatmzz;
+            }
+
+            for (int32_t mu = 0; mu < naos; mu++)
+            {
+                auto iatom = ao_to_atom_ids[aoinds[mu]];
+
+                auto ix = iatom * 3 + 0;
+                auto iy = iatom * 3 + 1;
+                auto iz = iatom * 3 + 2;
+
+                auto mu_offset = mu * npoints;
+
+                for (int32_t nu = 0; nu < naos; nu++)
+                {
+                    auto jatom = ao_to_atom_ids[aoinds[nu]];
+
+                    // only consider the upper triangular part, e.g. iatom <= jatom
+
+                    if (iatom > jatom) continue;
+
                     auto jx = jatom * 3 + 0;
                     auto jy = jatom * 3 + 1;
                     auto jz = jatom * 3 + 2;
 
-                    // upper triangular index for i<=j: i * N + j - i * (i + 1) / 2
+                    auto nu_offset = nu * npoints;
 
-                    auto ij_upper_triang_index = iatom * natoms + jatom - iatom * (iatom + 1) / 2;
-
-                    auto ij_offset = ij_upper_triang_index * npoints;
+                    auto D_mn = D_val[mu * naos + nu];
 
                     double gatmxx = 0.0, gatmxy = 0.0, gatmxz = 0.0;
                     double gatmyx = 0.0, gatmyy = 0.0, gatmyz = 0.0;
                     double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
 
-                    #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) aligned(local_weights, \
-                            vrho, gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
+                    #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) \
+                            aligned(w0, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
                     for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
-                        auto ij_g = ij_offset + g;
+                        auto mu_g = mu_offset + g;
+                        auto nu_g = nu_offset + g;
 
-                        double prefac = local_weights[g] * vrho[2 * g + 0];
+                        gatmxx += w0[g] * chi_x_val[mu_g] * chi_x_val[nu_g];
+                        gatmxy += w0[g] * chi_x_val[mu_g] * chi_y_val[nu_g];
+                        gatmxz += w0[g] * chi_x_val[mu_g] * chi_z_val[nu_g];
 
-                        gatmxx += prefac * gdenxx[ij_g];
-                        gatmxy += prefac * gdenxy[ij_g];
-                        gatmxz += prefac * gdenxz[ij_g];
+                        gatmyx += w0[g] * chi_y_val[mu_g] * chi_x_val[nu_g];
+                        gatmyy += w0[g] * chi_y_val[mu_g] * chi_y_val[nu_g];
+                        gatmyz += w0[g] * chi_y_val[mu_g] * chi_z_val[nu_g];
 
-                        gatmyx += prefac * gdenyx[ij_g];
-                        gatmyy += prefac * gdenyy[ij_g];
-                        gatmyz += prefac * gdenyz[ij_g];
-
-                        gatmzx += prefac * gdenzx[ij_g];
-                        gatmzy += prefac * gdenzy[ij_g];
-                        gatmzz += prefac * gdenzz[ij_g];
+                        gatmzx += w0[g] * chi_z_val[mu_g] * chi_x_val[nu_g];
+                        gatmzy += w0[g] * chi_z_val[mu_g] * chi_y_val[nu_g];
+                        gatmzz += w0[g] * chi_z_val[mu_g] * chi_z_val[nu_g];
                     }
 
+                    // factor of 2 from differentiation
                     // factor of 2 from sum of alpha and beta contributions
 
-                    gatm[ix * (natoms * 3) + jx] += 2.0 * gatmxx;
-                    gatm[ix * (natoms * 3) + jy] += 2.0 * gatmxy;
-                    gatm[ix * (natoms * 3) + jz] += 2.0 * gatmxz;
+                    gatm[ix * (natoms * 3) + jx] += 4.0 * gatmxx * D_mn;
+                    gatm[ix * (natoms * 3) + jy] += 4.0 * gatmxy * D_mn;
+                    gatm[ix * (natoms * 3) + jz] += 4.0 * gatmxz * D_mn;
 
-                    gatm[iy * (natoms * 3) + jx] += 2.0 * gatmyx;
-                    gatm[iy * (natoms * 3) + jy] += 2.0 * gatmyy;
-                    gatm[iy * (natoms * 3) + jz] += 2.0 * gatmyz;
+                    gatm[iy * (natoms * 3) + jx] += 4.0 * gatmyx * D_mn;
+                    gatm[iy * (natoms * 3) + jy] += 4.0 * gatmyy * D_mn;
+                    gatm[iy * (natoms * 3) + jz] += 4.0 * gatmyz * D_mn;
 
-                    gatm[iz * (natoms * 3) + jx] += 2.0 * gatmzx;
-                    gatm[iz * (natoms * 3) + jy] += 2.0 * gatmzy;
-                    gatm[iz * (natoms * 3) + jz] += 2.0 * gatmzz;
+                    gatm[iz * (natoms * 3) + jx] += 4.0 * gatmzx * D_mn;
+                    gatm[iz * (natoms * 3) + jy] += 4.0 * gatmzy * D_mn;
+                    gatm[iz * (natoms * 3) + jz] += 4.0 * gatmzz * D_mn;
                 }
             }
         }
 
-        timer.stop("Accumulate gradient");
+        timer.stop("Density grad. grid rho");
     }
 
     // destroy GTOs container
@@ -1108,11 +1051,10 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                 double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
 
                 #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) \
-                        aligned(local_weights, rhograd, vrho, vsigma, F_val, F_x_val, F_y_val, F_z_val, \
+                        aligned(w0, wx, wy, wz, F_val, F_x_val, F_y_val, F_z_val, \
                         chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val, \
                         chi_xxx_val, chi_xxy_val, chi_xxz_val, chi_xyy_val, chi_xyz_val, \
-                        chi_xzz_val, chi_yyy_val, chi_yyz_val, chi_yzz_val, chi_zzz_val, \
-                        w0, wx, wy, wz : VLX_ALIGN)
+                        chi_xzz_val, chi_yyy_val, chi_yyz_val, chi_yzz_val, chi_zzz_val : VLX_ALIGN)
                 for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto mu_g = mu_offset + g;
@@ -1247,9 +1189,8 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                     double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
 
                     #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) \
-                            aligned(local_weights, rhograd, vrho, vsigma, chi_x_val, chi_y_val, chi_z_val, \
-                            chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val, \
-                            w0, wx, wy, wz : VLX_ALIGN)
+                            aligned(w0, wx, wy, wz, chi_x_val, chi_y_val, chi_z_val, \
+                            chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val : VLX_ALIGN)
                     for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         auto mu_g = mu_offset + g;
