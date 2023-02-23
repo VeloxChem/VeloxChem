@@ -55,6 +55,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
     Instance variables
         - nstates: Number of excited states.
+        - core_excitation: The flag for computing core-excited states.
+        - num_core_orbitals: The number of core-orbitals involved in
+          the core-excited states.
         - nto: The flag for natural transition orbital analysis.
         - nto_pairs: The number of NTO pairs in NTO analysis.
         - detach_attach: The flag for detachment/attachment density analysis.
@@ -82,6 +85,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nstates = 3
 
+        self.core_excitation = False
+        self.num_core_orbitals = 0
+
         self.nto = False
         self.nto_pairs = None
         self.detach_attach = False
@@ -91,6 +97,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
+            'core_excitation': ('bool', 'compute core-excited states'),
+            'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
@@ -480,10 +488,19 @@ class LinearResponseEigenSolver(LinearSolver):
                 eigvec = self._get_full_solution_vector(excitations[s][1])
 
                 if self.rank == mpi_master():
-                    mo_occ = scf_tensors['C_alpha'][:, :nocc]
-                    mo_vir = scf_tensors['C_alpha'][:, nocc:]
-                    z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
-                    y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
+                    if self.core_excitation:
+                        mo_occ = scf_tensors['C_alpha'][:, :self.
+                                                        num_core_orbitals]
+                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
+                        z_mat = eigvec[:eigvec.size // 2].reshape(
+                            self.num_core_orbitals, -1)
+                        y_mat = eigvec[eigvec.size // 2:].reshape(
+                            self.num_core_orbitals, -1)
+                    else:
+                        mo_occ = scf_tensors['C_alpha'][:, :nocc]
+                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
+                        z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
+                        y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -663,11 +680,19 @@ class LinearResponseEigenSolver(LinearSolver):
             vector).
         """
 
-        excitations = [(i, a) for i in range(nocc) for a in range(nocc, norb)]
+        if self.core_excitation:
+            excitations = [(i, a)
+                           for i in range(self.num_core_orbitals)
+                           for a in range(nocc, norb)]
+        else:
+            excitations = [
+                (i, a) for i in range(nocc) for a in range(nocc, norb)
+            ]
+
         excitation_energies = [ea[a] - ea[i] for i, a in excitations]
 
         w = {ia: w for ia, w in zip(excitations, excitation_energies)}
-        n_exc = nocc * (norb - nocc)
+        n_exc = len(excitations)
 
         final = {}
         for k, (i, a) in enumerate(sorted(w, key=w.get)[:nstates]):
@@ -755,7 +780,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # spawning needed components
 
-        ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
+        if self.core_excitation:
+            ediag, sdiag = self.construct_ediag_sdiag_half(
+                orb_ene, nocc, norb, self.num_core_orbitals)
+        else:
+            ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
