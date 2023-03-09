@@ -43,7 +43,7 @@ from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
 from .veloxchemlib import new_parse_xc_func
-from .veloxchemlib import XCNewIntegrator
+from .veloxchemlib import XCIntegrator
 
 
 class NonlinearSolver:
@@ -809,7 +809,7 @@ class NonlinearSolver:
             if self._dft:
                 t0 = tm.time()
 
-                xc_drv = XCNewIntegrator(self.comm)
+                xc_drv = XCIntegrator(self.comm)
                 molgrid = dft_dict['molgrid']
                 gs_density = dft_dict['gs_density']
 

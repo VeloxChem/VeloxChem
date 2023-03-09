@@ -41,10 +41,10 @@
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
 #include "XCFuncType.hpp"
+#include "XCIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
 #include "XCMolecularHessian.hpp"
 #include "XCNewFunctional.hpp"
-#include "XCNewIntegrator.hpp"
 #include "XCPairDensityFunctional.hpp"
 
 namespace py = pybind11;
@@ -53,7 +53,7 @@ using namespace py::literals;
 namespace vlx_dft {  // vlx_dft namespace
 
 CAOKohnShamMatrix
-integrate_vxc_pdft(const CXCNewIntegrator&    self,
+integrate_vxc_pdft(const CXCIntegrator&       self,
                    const CAODensityMatrix&    aoDensityMatrix,
                    const py::array_t<double>& Active2DM,
                    const py::array_t<double>& ActiveMOs,
@@ -347,12 +347,12 @@ export_dft(py::module& m)
              "Sets accuracy level for grid generation. Level: 1-6, where 1 is coarse grid, 5 is ultrafine grid, 6 special benchmarking grid.",
              "gridLevel"_a);
 
-    // CXCNewIntegrator class
+    // CXCIntegrator class
 
-    PyClass<CXCNewIntegrator>(m, "XCNewIntegrator")
-        .def(py::init(&vlx_general::create<CXCNewIntegrator>), "comm"_a = py::none())
+    PyClass<CXCIntegrator>(m, "XCIntegrator")
+        .def(py::init(&vlx_general::create<CXCIntegrator>), "comm"_a = py::none())
         .def("integrate_vxc_fock",
-             &CXCNewIntegrator::integrateVxcFock,
+             &CXCIntegrator::integrateVxcFock,
              "Integrates 1st-order exchange-correlation contribution to Kohn-Sham matrix.",
              "molecule"_a,
              "basis"_a,
@@ -360,7 +360,7 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a)
         .def("integrate_fxc_fock",
-             &CXCNewIntegrator::integrateFxcFock,
+             &CXCIntegrator::integrateFxcFock,
              "Integrates 2nd-order exchange-correlation contribution to Fock matrix.",
              "aoFockMatrix"_a,
              "molecule"_a,
@@ -370,7 +370,7 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a)
         .def("integrate_kxc_fock",
-             &CXCNewIntegrator::integrateKxcFock,
+             &CXCIntegrator::integrateKxcFock,
              "Integrates 3rd-order exchange-correlation contribution to Fock matrix.",
              "aoFockMatrix"_a,
              "molecule"_a,
@@ -382,7 +382,7 @@ export_dft(py::module& m)
              "xcFuncLabel"_a,
              "quadMode"_a)
         .def("integrate_lxc_fock",
-             &CXCNewIntegrator::integrateLxcFock,
+             &CXCIntegrator::integrateLxcFock,
              "Integrates 4rd-order exchange-correlation contribution to Fock matrix.",
              "aoFockMatrix"_a,
              "molecule"_a,
@@ -395,7 +395,7 @@ export_dft(py::module& m)
              "xcFuncLabel"_a,
              "cubeMode"_a)
         .def("integrate_kxclxc_fock",
-             &CXCNewIntegrator::integrateKxcLxcFock,
+             &CXCIntegrator::integrateKxcLxcFock,
              "Integrates 4rd-order exchange-correlation contribution to Fock matrix.",
              "aoFockMatrix"_a,
              "molecule"_a,
@@ -410,7 +410,7 @@ export_dft(py::module& m)
         .def("integrate_vxc_pdft", &integrate_vxc_pdft)
         .def(
             "compute_gto_values",
-            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
+            [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
                 -> py::array_t<double> {
                 auto gtovalues = self.computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
                 return vlx_general::pointer_to_numpy(gtovalues.values(), gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns());
@@ -421,7 +421,7 @@ export_dft(py::module& m)
             "molecularGrid"_a)
         .def(
             "compute_gto_values_and_derivatives",
-            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> py::list {
+            [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> py::list {
                 auto     gtovaluesderivs = self.computeGtoValuesAndDerivativesOnGridPoints(molecule, basis, molecularGrid);
                 py::list ret;
                 for (int32_t i = 0; i < static_cast<int32_t>(gtovaluesderivs.size()); i++)
@@ -437,7 +437,7 @@ export_dft(py::module& m)
             "molecularGrid"_a)
         .def(
             "compute_gto_values_and_derivatives",
-            [](CXCNewIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const py::array_t<double>& points) -> py::list {
+            [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const py::array_t<double>& points) -> py::list {
                 auto points_c_style = py::detail::check_flags(points.ptr(), py::array::c_style);
                 errors::assertMsgCritical(points_c_style,
                                           std::string("compute_gto_values_and_derivatives_on_points: Expecting C-style contiguous numpy array"));
@@ -462,7 +462,7 @@ export_dft(py::module& m)
             "molecularGrid"_a)
         .def(
             "compute_exc_vxc_for_lda",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
+            [](CXCIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc_for_lda: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
@@ -482,7 +482,7 @@ export_dft(py::module& m)
             "rho"_a)
         .def(
             "compute_fxc_for_lda",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
+            [](CXCIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style, std::string("compute_fxc_for_lda: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
@@ -500,7 +500,7 @@ export_dft(py::module& m)
             "rho"_a)
         .def(
             "compute_kxc_for_lda",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
+            [](CXCIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style, std::string("compute_kxc_for_lda: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
@@ -518,7 +518,7 @@ export_dft(py::module& m)
             "rho"_a)
         .def(
             "compute_lxc_for_lda",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
+            [](CXCIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho) -> py::dict {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style, std::string("compute_lxc_for_lda: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
@@ -536,7 +536,7 @@ export_dft(py::module& m)
             "rho"_a)
         .def(
             "compute_exc_vxc_for_gga",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
+            [](CXCIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style && sigma_c_style,
@@ -563,7 +563,7 @@ export_dft(py::module& m)
             "sigma"_a)
         .def(
             "compute_fxc_for_gga",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
+            [](CXCIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style && sigma_c_style, std::string("compute_fxc_for_gga: Expecting C-style contiguous numpy array"));
@@ -589,7 +589,7 @@ export_dft(py::module& m)
             "sigma"_a)
         .def(
             "compute_kxc_for_gga",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
+            [](CXCIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style && sigma_c_style, std::string("compute_kxc_for_gga: Expecting C-style contiguous numpy array"));
@@ -620,7 +620,7 @@ export_dft(py::module& m)
             "sigma"_a)
         .def(
             "compute_lxc_for_gga",
-            [](CXCNewIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
+            [](CXCIntegrator& self, const std::string& xcFuncLabel, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::dict {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style && sigma_c_style, std::string("compute_lxc_for_gga: Expecting C-style contiguous numpy array"));
@@ -660,7 +660,7 @@ export_dft(py::module& m)
             "sigma"_a)
         .def(
             "compute_exc_vxc_for_mgga",
-            [](CXCNewIntegrator&          self,
+            [](CXCIntegrator&             self,
                const std::string&         xcFuncLabel,
                const py::array_t<double>& rho,
                const py::array_t<double>& sigma,
@@ -712,7 +712,7 @@ export_dft(py::module& m)
             "tau"_a)
         .def(
             "compute_fxc_for_mgga",
-            [](CXCNewIntegrator&          self,
+            [](CXCIntegrator&             self,
                const std::string&         xcFuncLabel,
                const py::array_t<double>& rho,
                const py::array_t<double>& sigma,
@@ -780,7 +780,7 @@ export_dft(py::module& m)
             "tau"_a)
         .def(
             "compute_kxc_for_mgga",
-            [](CXCNewIntegrator&          self,
+            [](CXCIntegrator&             self,
                const std::string&         xcFuncLabel,
                const py::array_t<double>& rho,
                const py::array_t<double>& sigma,
@@ -887,7 +887,7 @@ export_dft(py::module& m)
             "tau"_a)
         .def(
             "compute_lxc_for_mgga",
-            [](CXCNewIntegrator&          self,
+            [](CXCIntegrator&             self,
                const std::string&         xcFuncLabel,
                const py::array_t<double>& rho,
                const py::array_t<double>& sigma,

@@ -34,7 +34,7 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
+from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
 from .veloxchemlib import new_parse_xc_func
@@ -944,7 +944,7 @@ class LinearSolver:
                     for ifock in range(fock.number_of_fock_matrices()):
                         fock.scale(2.0, ifock)
 
-                xc_drv = XCNewIntegrator(self.comm)
+                xc_drv = XCIntegrator(self.comm)
                 xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
                                           gs_density, molgrid,
                                           self.xcfun.get_func_label())
@@ -1066,7 +1066,7 @@ class LinearSolver:
 
         # calculate Fxc on DFT nodes
         if dft_comm:
-            xc_drv = XCNewIntegrator(local_comm)
+            xc_drv = XCIntegrator(local_comm)
             molgrid.re_distribute_counts_and_displacements(
                 local_comm.Get_rank(), local_comm.Get_size(), local_comm)
             xc_drv.integrate_fxc_fock(fock, molecule, basis, dens, gs_density,

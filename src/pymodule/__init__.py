@@ -40,9 +40,8 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import XCNewIntegrator
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import XCNewFunctional
-from .veloxchemlib import XCNewIntegrator as XCIntegrator
 from .veloxchemlib import XCNewFunctional as XCFunctional
 
 # C++ functions
@@ -129,6 +128,7 @@ from .xtbhessiandriver import XtbHessianDriver
 from .numerovdriver import NumerovDriver
 
 # for backward compatibility
+from .veloxchemlib import XCIntegrator as XCNewIntegrator
 from .xtbdriver import XtbDriver as XTBDriver
 from .tdaeigensolver import TdaEigenSolver as TDAExciDriver
 from .shgdriver import ShgDriver as SHGDriver

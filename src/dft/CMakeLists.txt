@@ -16,7 +16,7 @@ target_sources(vlxobjs
     SubMatrix.cpp
     XCComponent.cpp
     XCNewFunctional.cpp
-    XCNewIntegrator.cpp
+    XCIntegrator.cpp
     XCMolecularGradient.cpp
     XCMolecularHessian.cpp
     DensityGridCubic.cpp

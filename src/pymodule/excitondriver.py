@@ -37,7 +37,7 @@ from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import GridDriver
-from .veloxchemlib import XCNewIntegrator
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import denmat, fockmat, mpi_master
 from .veloxchemlib import (hartree_in_ev, bohr_in_angstroms,
                            rotatory_strength_in_cgs)
@@ -1178,7 +1178,7 @@ class ExcitonModelDriver:
             if not xcfun.is_hybrid():
                 fock_mat.scale(2.0, 0)
 
-            xc_drv = XCNewIntegrator(self.comm)
+            xc_drv = XCIntegrator(self.comm)
             vxc_mat = xc_drv.integrate_vxc_fock(dimer, basis, dens_mat,
                                                 dimer_molgrid, self.xcfun_label)
             vxc_mat.reduce_sum(self.rank, self.nodes, self.comm)
@@ -1467,7 +1467,7 @@ class ExcitonModelDriver:
             dens_mat = dimer_prop['density']
             dimer_molgrid = dimer_prop['molgrid']
 
-            xc_drv = XCNewIntegrator(self.comm)
+            xc_drv = XCIntegrator(self.comm)
             xc_drv.integrate_fxc_fock(tfock_mat, dimer, basis, tdens_mat,
                                       dens_mat, dimer_molgrid, self.xcfun_label)
 

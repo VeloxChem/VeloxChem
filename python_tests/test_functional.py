@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import GridDriver, XCNewIntegrator, XCNewFunctional
+from veloxchem.veloxchemlib import GridDriver, XCIntegrator, XCNewFunctional
 from veloxchem.veloxchemlib import is_single_node, mpi_master, new_parse_xc_func
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -40,7 +40,7 @@ class TestFunctionalExcVxc:
         grid_drv.set_level(grid_level)
         molgrid = grid_drv.generate(molecule)
 
-        xc_drv = XCNewIntegrator()
+        xc_drv = XCIntegrator()
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
@@ -112,7 +112,7 @@ class TestFunctionalExcVxc:
         grid_drv.set_level(grid_level)
         molgrid = grid_drv.generate(molecule)
 
-        xc_drv = XCNewIntegrator()
+        xc_drv = XCIntegrator()
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
