@@ -62,19 +62,19 @@ CXCMolecularHessian::integrateVxcHessian(const CMolecule&        molecule,
                                          const CMolecularGrid&   molecularGrid,
                                          const std::string&      xcFuncLabel) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     if (gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -100,19 +100,19 @@ CXCMolecularHessian::integrateFxcHessian(const CMolecule&        molecule,
                                          const CMolecularGrid&   molecularGrid,
                                          const std::string&      xcFuncLabel) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     if (gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateFxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateFxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateFxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateFxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -139,15 +139,15 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
                                               const std::string&      xcFuncLabel,
                                               const int32_t           atomIdx) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     if (gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcFockGradientForLDA(molecule, basis, gsDensityMatrix, molecularGrid, newfvxc, atomIdx);
+            return _integrateVxcFockGradientForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc, atomIdx);
         }
         else
         {
@@ -174,15 +174,15 @@ CXCMolecularHessian::integrateFxcFockGradient(const CMolecule&        molecule,
                                               const std::string&      xcFuncLabel,
                                               const int32_t           atomIdx) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     if (gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateFxcFockGradientForLDA(molecule, basis, gsDensityMatrix, molecularGrid, newfvxc, atomIdx);
+            return _integrateFxcFockGradientForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc, atomIdx);
         }
         else
         {
@@ -325,9 +325,24 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForMetaGGA(
-                gaos, gaox, gaoy, gaoz, gaoxx, gaoxy, gaoxz, gaoyy, gaoyz, gaozz, gtovec, xcoords, ycoords, zcoords,
-                gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForMetaGGA(gaos,
+                                                 gaox,
+                                                 gaoy,
+                                                 gaoz,
+                                                 gaoxx,
+                                                 gaoxy,
+                                                 gaoxz,
+                                                 gaoyy,
+                                                 gaoyz,
+                                                 gaozz,
+                                                 gtovec,
+                                                 xcoords,
+                                                 ycoords,
+                                                 zcoords,
+                                                 gridblockpos,
+                                                 grid_batch_offset,
+                                                 grid_batch_size,
+                                                 skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -357,16 +372,11 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -808,12 +818,34 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForThirdOrder(
-                gaos, gaox, gaoy, gaoz,
-                gaoxx, gaoxy, gaoxz, gaoyy, gaoyz, gaozz,
-                gaoxxx, gaoxxy, gaoxxz, gaoxyy, gaoxyz, gaoxzz, gaoyyy, gaoyyz, gaoyzz, gaozzz,
-                gtovec, xcoords, ycoords, zcoords,
-                gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForThirdOrder(gaos,
+                                                    gaox,
+                                                    gaoy,
+                                                    gaoz,
+                                                    gaoxx,
+                                                    gaoxy,
+                                                    gaoxz,
+                                                    gaoyy,
+                                                    gaoyz,
+                                                    gaozz,
+                                                    gaoxxx,
+                                                    gaoxxy,
+                                                    gaoxxz,
+                                                    gaoxyy,
+                                                    gaoxyz,
+                                                    gaoxzz,
+                                                    gaoyyy,
+                                                    gaoyyz,
+                                                    gaoyzz,
+                                                    gaozzz,
+                                                    gtovec,
+                                                    xcoords,
+                                                    ycoords,
+                                                    zcoords,
+                                                    gridblockpos,
+                                                    grid_batch_offset,
+                                                    grid_batch_size,
+                                                    skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -854,26 +886,16 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxxx_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxxy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxxz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxzz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyzz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaozzz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxxx_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxxy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxxz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxyy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxyz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxzz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyyy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoyyz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyzz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaozzz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -1445,7 +1467,7 @@ CXCMolecularHessian::_integrateFxcHessianForLDA(const CMolecule&        molecule
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
+    auto rho    = rho_data.data();
     auto v2rho2 = v2rho2_data.data();
 
     // coordinates and weights of grid points
@@ -1496,18 +1518,8 @@ CXCMolecularHessian::_integrateFxcHessianForLDA(const CMolecule&        molecule
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos,
-                                             gaox,
-                                             gaoy,
-                                             gaoz,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -1864,9 +1876,9 @@ CXCMolecularHessian::_integrateFxcHessianForGGA(const CMolecule&        molecule
 
     auto local_weights = local_weights_data.data();
 
-    auto rho  = rho_data.data();
-    auto rhograd  = rhograd_data.data();
-    auto sigma = sigma_data.data();
+    auto rho     = rho_data.data();
+    auto rhograd = rhograd_data.data();
+    auto sigma   = sigma_data.data();
 
     auto vrho   = vrho_data.data();
     auto vsigma = vsigma_data.data();
@@ -2030,16 +2042,7 @@ CXCMolecularHessian::_integrateFxcHessianForGGA(const CMolecule&        molecule
 
         // generate density grid
 
-        dengridgen::generateDensityForGGA(rho,
-                                          rhograd,
-                                          sigma,
-                                          npoints,
-                                          mat_chi,
-                                          mat_chi_x,
-                                          mat_chi_y,
-                                          mat_chi_z,
-                                          gs_sub_dens_mat,
-                                          timer);
+        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat, timer);
 
         // generate density gradient grid
 
@@ -2382,7 +2385,7 @@ CXCMolecularHessian::_integrateVxcFockGradientForLDA(const CMolecule&        mol
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
+    auto rho  = rho_data.data();
     auto vrho = vrho_data.data();
 
     // coordinates and weights of grid points
@@ -2435,18 +2438,8 @@ CXCMolecularHessian::_integrateVxcFockGradientForLDA(const CMolecule&        mol
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos,
-                                             gaox,
-                                             gaoy,
-                                             gaoz,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -2684,7 +2677,7 @@ CXCMolecularHessian::_integrateFxcFockGradientForLDA(const CMolecule&        mol
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
+    auto rho    = rho_data.data();
     auto v2rho2 = v2rho2_data.data();
 
     // coordinates and weights of grid points
@@ -2735,18 +2728,8 @@ CXCMolecularHessian::_integrateFxcFockGradientForLDA(const CMolecule&        mol
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos,
-                                             gaox,
-                                             gaoy,
-                                             gaoz,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");

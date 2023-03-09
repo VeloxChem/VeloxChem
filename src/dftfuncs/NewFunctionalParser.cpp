@@ -30,7 +30,7 @@
 #include "ErrorHandler.hpp"
 #include "StringFormat.hpp"
 
-namespace newvxcfuncs {  // newvxcfuncs namespace
+namespace vxcfuncs {  // vxcfuncs namespace
 
 std::vector<std::string>
 getAvailableFunctionals()
@@ -180,4 +180,4 @@ getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel)
     return CXCPairDensityFunctional("Undefined", {}, {});
 }
 
-}  // namespace newvxcfuncs
+}  // namespace vxcfuncs

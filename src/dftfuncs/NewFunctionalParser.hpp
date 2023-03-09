@@ -32,7 +32,7 @@
 #include "XCNewFunctional.hpp"
 #include "XCPairDensityFunctional.hpp"
 
-namespace newvxcfuncs {  // newvxcfuncs namespace
+namespace vxcfuncs {  // vxcfuncs namespace
 
 /**
  Gets labels of available exchange-correlation functional.
@@ -66,6 +66,6 @@ std::vector<std::string> getAvailablePairDensityFunctionals();
  */
 CXCPairDensityFunctional getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel);
 
-}  // namespace newvxcfuncs
+}  // namespace vxcfuncs
 
 #endif /* NewFunctionalParser_hpp */

@@ -73,19 +73,19 @@ CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
                                            const CMolecularGrid&   molecularGrid,
                                            const std::string&      xcFuncLabel) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     if (rwDensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -98,11 +98,11 @@ CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcGradientForLDAOpenShell(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcGradientForLDAOpenShell(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcGradientForGGAOpenShell(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcGradientForGGAOpenShell(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -124,33 +124,19 @@ CXCMolecularGradient::integrateFxcGradient(const CMolecule&        molecule,
                                            const CMolecularGrid&   molecularGrid,
                                            const std::string&      xcFuncLabel) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     if (rwDensityMatrixOne.isClosedShell() && rwDensityMatrixTwo.isClosedShell() && gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateFxcGradientForLDA(molecule,
-                                               basis,
-                                               rwDensityMatrixOne,
-                                               rwDensityMatrixTwo,
-
-                                               gsDensityMatrix,
-                                               molecularGrid,
-                                               newfvxc);
+            return _integrateFxcGradientForLDA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateFxcGradientForGGA(molecule,
-                                               basis,
-                                               rwDensityMatrixOne,
-                                               rwDensityMatrixTwo,
-
-                                               gsDensityMatrix,
-                                               molecularGrid,
-                                               newfvxc);
+            return _integrateFxcGradientForGGA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -178,7 +164,7 @@ CXCMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
                                            const CMolecularGrid&   molecularGrid,
                                            const std::string&      xcFuncLabel) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 

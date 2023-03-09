@@ -62,23 +62,23 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
                                    const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     auto flag = densityMatrix.isClosedShell() ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
 
     if (xcfuntype == xcfun::lda)
     {
-        return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, newfvxc, flag);
+        return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
     }
     else if (xcfuntype == xcfun::gga)
     {
-        return _integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, newfvxc, flag);
+        return _integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
     }
     else if (xcfuntype == xcfun::mgga)
     {
-        return _integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, newfvxc, flag);
+        return _integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
     }
 
     std::string errxcfuntype("XCNewIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
@@ -97,7 +97,7 @@ CXCNewIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
                                    const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -141,7 +141,7 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
                                    const std::string&      xcFuncLabel,
                                    const std::string&      quadMode) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -187,7 +187,7 @@ CXCNewIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
                                    const std::string&      xcFuncLabel,
                                    const std::string&      cubeMode) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -230,7 +230,7 @@ CXCNewIntegrator::integrateKxcLxcFock(CAOFockMatrix&          aoFockMatrix,
                                       const std::string&      xcFuncLabel,
                                       const std::string&      cubeMode) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -277,7 +277,7 @@ CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
                                    const CMolecularGrid&   molecularGrid,
                                    const std::string&      xcFuncLabel) const
 {
-    auto fvxc = newvxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -6287,8 +6287,8 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                 double grada_z_g = rhograd[6 * g + 2];
 
                 // perturbed density and its gradients
-                double rwa    = rhow[2 * g + 0];
-                double tauwa  = tauw[2 * g + 0];
+                double rwa   = rhow[2 * g + 0];
+                double tauwa = tauw[2 * g + 0];
                 // double laplwa = laplw[2 * g + 0];
 
                 double rwa_x = rhowgrad[6 * g + 0];

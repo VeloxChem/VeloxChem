@@ -41,10 +41,10 @@
 #include "MolecularGrid.hpp"
 #include "NewFunctionalParser.hpp"
 #include "XCFuncType.hpp"
-#include "XCNewFunctional.hpp"
-#include "XCNewIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
 #include "XCMolecularHessian.hpp"
+#include "XCNewFunctional.hpp"
+#include "XCNewIntegrator.hpp"
 #include "XCPairDensityFunctional.hpp"
 
 namespace py = pybind11;
@@ -470,7 +470,7 @@ export_dft(py::module& m)
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
                 CDenseMatrix exc(npoints, 1);
                 CDenseMatrix vrho(npoints, 2);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_exc_vxc_for_lda(npoints, rho.data(), exc.values(), vrho.values());
                 py::dict ret;
                 ret["exc"]  = vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfRows(), exc.getNumberOfColumns());
@@ -489,7 +489,7 @@ export_dft(py::module& m)
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_fxc_for_lda: Inconsistent array size"));
                 CDenseMatrix v2rho2(npoints, 3);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_fxc_for_lda(npoints, rho.data(), v2rho2.values());
                 py::dict ret;
                 ret["v2rho2"] = vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfRows(), v2rho2.getNumberOfColumns());
@@ -507,7 +507,7 @@ export_dft(py::module& m)
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_kxc_for_lda: Inconsistent array size"));
                 CDenseMatrix v3rho3(npoints, 4);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_kxc_for_lda(npoints, rho.data(), v3rho3.values());
                 py::dict ret;
                 ret["v3rho3"] = vlx_general::pointer_to_numpy(v3rho3.values(), v3rho3.getNumberOfRows(), v3rho3.getNumberOfColumns());
@@ -525,7 +525,7 @@ export_dft(py::module& m)
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_lxc_for_lda: Inconsistent array size"));
                 CDenseMatrix v4rho4(npoints, 5);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_lxc_for_lda(npoints, rho.data(), v4rho4.values());
                 py::dict ret;
                 ret["v4rho4"] = vlx_general::pointer_to_numpy(v4rho4.values(), v4rho4.getNumberOfRows(), v4rho4.getNumberOfColumns());
@@ -549,7 +549,7 @@ export_dft(py::module& m)
                 CDenseMatrix exc(npoints, 1);
                 CDenseMatrix vrho(npoints, 2);
                 CDenseMatrix vsigma(npoints, 3);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_exc_vxc_for_gga(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
                 py::dict ret;
                 ret["exc"]    = vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfRows(), exc.getNumberOfColumns());
@@ -575,7 +575,7 @@ export_dft(py::module& m)
                 CDenseMatrix v2rho2(npoints, 3);
                 CDenseMatrix v2rhosigma(npoints, 6);
                 CDenseMatrix v2sigma2(npoints, 6);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_fxc_for_gga(npoints, rho.data(), sigma.data(), v2rho2.values(), v2rhosigma.values(), v2sigma2.values());
                 py::dict ret;
                 ret["v2rho2"]     = vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfRows(), v2rho2.getNumberOfColumns());
@@ -602,7 +602,7 @@ export_dft(py::module& m)
                 CDenseMatrix v3rho2sigma(npoints, 9);
                 CDenseMatrix v3rhosigma2(npoints, 12);
                 CDenseMatrix v3sigma3(npoints, 10);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_kxc_for_gga(
                     npoints, rho.data(), sigma.data(), v3rho3.values(), v3rho2sigma.values(), v3rhosigma2.values(), v3sigma3.values());
                 py::dict ret;
@@ -634,7 +634,7 @@ export_dft(py::module& m)
                 CDenseMatrix v4rho2sigma2(npoints, 18);
                 CDenseMatrix v4rhosigma3(npoints, 20);
                 CDenseMatrix v4sigma4(npoints, 15);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_lxc_for_gga(npoints,
                                          rho.data(),
                                          sigma.data(),
@@ -685,7 +685,7 @@ export_dft(py::module& m)
                 CDenseMatrix vsigma(npoints, 3);
                 CDenseMatrix vlapl(npoints, 2);
                 CDenseMatrix vtau(npoints, 2);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_exc_vxc_for_mgga(npoints,
                                               rho.data(),
                                               sigma.data(),
@@ -742,7 +742,7 @@ export_dft(py::module& m)
                 CDenseMatrix v2lapl2(npoints, 3);
                 CDenseMatrix v2lapltau(npoints, 4);
                 CDenseMatrix v2tau2(npoints, 3);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_fxc_for_mgga(npoints,
                                           rho.data(),
                                           sigma.data(),
@@ -820,7 +820,7 @@ export_dft(py::module& m)
                 CDenseMatrix v3lapl2tau(npoints, 6);
                 CDenseMatrix v3lapltau2(npoints, 6);
                 CDenseMatrix v3tau3(npoints, 4);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_kxc_for_mgga(npoints,
                                           rho.data(),
                                           sigma.data(),
@@ -946,7 +946,7 @@ export_dft(py::module& m)
                 CDenseMatrix v4lapl2tau2(npoints, 9);
                 CDenseMatrix v4lapltau3(npoints, 8);
                 CDenseMatrix v4tau4(npoints, 5);
-                auto         func = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
                 func.compute_lxc_for_mgga(npoints,
                                           rho.data(),
                                           sigma.data(),
@@ -1062,12 +1062,12 @@ export_dft(py::module& m)
         .def(py::init(&vlx_general::create<CXCMolecularGradient>), "comm"_a = py::none())
         .def(
             "integrate_vxc_gradient",
-            [](CXCMolecularGradient& self,
-               const CMolecule&         molecule,
-               const CMolecularBasis&   basis,
-               const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
-               const std::string&       xcFuncLabel) -> py::array_t<double> {
+            [](CXCMolecularGradient&   self,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CAODensityMatrix& gsDensityMatrix,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel) -> py::array_t<double> {
                 auto molgrad = self.integrateVxcGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
             },
@@ -1079,13 +1079,13 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_vxc_gradient",
-            [](CXCMolecularGradient& self,
-               const CMolecule&         molecule,
-               const CMolecularBasis&   basis,
-               const CAODensityMatrix&  rwDensityMatrix,
-               const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
-               const std::string&       xcFuncLabel) -> py::array_t<double> {
+            [](CXCMolecularGradient&   self,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CAODensityMatrix& rwDensityMatrix,
+               const CAODensityMatrix& gsDensityMatrix,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel) -> py::array_t<double> {
                 auto molgrad = self.integrateVxcGradient(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
             },
@@ -1098,14 +1098,14 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_fxc_gradient",
-            [](CXCMolecularGradient& self,
-               const CMolecule&         molecule,
-               const CMolecularBasis&   basis,
-               const CAODensityMatrix&  rwDensityMatrixOne,
-               const CAODensityMatrix&  rwDensityMatrixTwo,
-               const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
-               const std::string&       xcFuncLabel) -> py::array_t<double> {
+            [](CXCMolecularGradient&   self,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CAODensityMatrix& rwDensityMatrixOne,
+               const CAODensityMatrix& rwDensityMatrixTwo,
+               const CAODensityMatrix& gsDensityMatrix,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel) -> py::array_t<double> {
                 auto molgrad =
                     self.integrateFxcGradient(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
@@ -1120,14 +1120,14 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_kxc_gradient",
-            [](CXCMolecularGradient& self,
-               const CMolecule&         molecule,
-               const CMolecularBasis&   basis,
-               const CAODensityMatrix&  rwDensityMatrixOne,
-               const CAODensityMatrix&  rwDensityMatrixTwo,
-               const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
-               const std::string&       xcFuncLabel) -> py::array_t<double> {
+            [](CXCMolecularGradient&   self,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CAODensityMatrix& rwDensityMatrixOne,
+               const CAODensityMatrix& rwDensityMatrixTwo,
+               const CAODensityMatrix& gsDensityMatrix,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel) -> py::array_t<double> {
                 auto molgrad =
                     self.integrateKxcGradient(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molgrad.values(), molgrad.getNumberOfRows(), molgrad.getNumberOfColumns());
@@ -1147,12 +1147,12 @@ export_dft(py::module& m)
         .def(py::init(&vlx_general::create<CXCMolecularHessian>), "comm"_a = py::none())
         .def(
             "integrate_vxc_hessian",
-            [](CXCMolecularHessian& self,
-               const CMolecule&         molecule,
-               const CMolecularBasis&   basis,
-               const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
-               const std::string&       xcFuncLabel) -> py::array_t<double> {
+            [](CXCMolecularHessian&    self,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CAODensityMatrix& gsDensityMatrix,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel) -> py::array_t<double> {
                 auto molhess = self.integrateVxcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molhess.values(), molhess.getNumberOfRows(), molhess.getNumberOfColumns());
             },
@@ -1164,12 +1164,12 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_fxc_hessian",
-            [](CXCMolecularHessian& self,
-               const CMolecule&         molecule,
-               const CMolecularBasis&   basis,
-               const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
-               const std::string&       xcFuncLabel) -> py::array_t<double> {
+            [](CXCMolecularHessian&    self,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CAODensityMatrix& gsDensityMatrix,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel) -> py::array_t<double> {
                 auto molhess = self.integrateFxcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molhess.values(), molhess.getNumberOfRows(), molhess.getNumberOfColumns());
             },
@@ -1181,14 +1181,14 @@ export_dft(py::module& m)
             "xcFuncLabel"_a)
         .def(
             "integrate_vxc_fock_gradient",
-            [](CXCMolecularHessian& self,
-               const CMolecule&         molecule,
-               const CMolecularBasis&   basis,
-               const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
-               const std::string&       xcFuncLabel,
-               const int32_t            atomIdx) -> py::array_t<double> {
-                auto vxcgrad = self.integrateVxcFockGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel, atomIdx);
+            [](CXCMolecularHessian&    self,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CAODensityMatrix& gsDensityMatrix,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel,
+               const int32_t           atomIdx) -> py::array_t<double> {
+                auto     vxcgrad = self.integrateVxcFockGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel, atomIdx);
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(vxcgrad[0].values(), vxcgrad[0].getNumberOfRows(), vxcgrad[0].getNumberOfColumns()));
                 ret.append(vlx_general::pointer_to_numpy(vxcgrad[1].values(), vxcgrad[1].getNumberOfRows(), vxcgrad[1].getNumberOfColumns()));
@@ -1204,14 +1204,14 @@ export_dft(py::module& m)
             "atomIdx"_a)
         .def(
             "integrate_fxc_fock_gradient",
-            [](CXCMolecularHessian& self,
-               const CMolecule&         molecule,
-               const CMolecularBasis&   basis,
-               const CAODensityMatrix&  gsDensityMatrix,
-               const CMolecularGrid&    molecularGrid,
-               const std::string&       xcFuncLabel,
-               const int32_t            atomIdx) -> py::array_t<double> {
-                auto vxcgrad = self.integrateFxcFockGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel, atomIdx);
+            [](CXCMolecularHessian&    self,
+               const CMolecule&        molecule,
+               const CMolecularBasis&  basis,
+               const CAODensityMatrix& gsDensityMatrix,
+               const CMolecularGrid&   molecularGrid,
+               const std::string&      xcFuncLabel,
+               const int32_t           atomIdx) -> py::array_t<double> {
+                auto     vxcgrad = self.integrateFxcFockGradient(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel, atomIdx);
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(vxcgrad[0].values(), vxcgrad[0].getNumberOfRows(), vxcgrad[0].getNumberOfColumns()));
                 ret.append(vlx_general::pointer_to_numpy(vxcgrad[1].values(), vxcgrad[1].getNumberOfRows(), vxcgrad[1].getNumberOfColumns()));
@@ -1316,10 +1316,10 @@ export_dft(py::module& m)
 
     m.def("to_xcfun", &to_xcfun, "Converts string label to its enumerate class value.", "label"_a);
 
-    m.def("available_functionals", &newvxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
+    m.def("available_functionals", &vxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
 
     m.def("new_parse_xc_func",
-          &newvxcfuncs::getExchangeCorrelationFunctional,
+          &vxcfuncs::getExchangeCorrelationFunctional,
           "Converts exchange-correlation functional label to exchange-correlation functional object.",
           "xcLabel"_a);
 }
