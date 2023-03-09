@@ -37,7 +37,7 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .distributedarray import DistributedArray
@@ -369,7 +369,7 @@ class LinearSolver:
         # DFT: xcfun is functional object or string (other than 'hf')
         else:
             if isinstance(self.xcfun, str):
-                self.xcfun = new_parse_xc_func(self.xcfun.upper())
+                self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'LinearSolver: Undefined XC functional')
             self._dft = True

@@ -1316,7 +1316,7 @@ export_dft(py::module& m)
 
     m.def("available_functionals", &vxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
 
-    m.def("new_parse_xc_func",
+    m.def("parse_xc_func",
           &vxcfuncs::getExchangeCorrelationFunctional,
           "Converts exchange-correlation functional label to exchange-correlation functional object.",
           "xcLabel"_a);

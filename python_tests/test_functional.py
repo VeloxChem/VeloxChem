@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import GridDriver, XCIntegrator, XCFunctional
-from veloxchem.veloxchemlib import is_single_node, mpi_master, new_parse_xc_func
+from veloxchem.veloxchemlib import is_single_node, mpi_master, parse_xc_func
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -45,7 +45,7 @@ class TestFunctionalExcVxc:
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = new_parse_xc_func('slda')
+        func = parse_xc_func('slda')
 
         func_ref = XCFunctional(
             'slda',
@@ -117,7 +117,7 @@ class TestFunctionalExcVxc:
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = new_parse_xc_func('b3lyp')
+        func = parse_xc_func('b3lyp')
 
         func_ref = XCFunctional(
             'b3lyp',

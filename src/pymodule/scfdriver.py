@@ -40,7 +40,7 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -440,7 +440,7 @@ class ScfDriver:
         # DFT: xcfun is functional object or string (other than 'hf')
         else:
             if isinstance(self.xcfun, str):
-                self.xcfun = new_parse_xc_func(self.xcfun.upper())
+                self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'LinearSolver: Undefined XC functional')
             self._dft = True
