@@ -224,4 +224,31 @@ distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
     }
 }
 
+void
+distributeSubMatrixToDenseMatrix(CDenseMatrix&               matrix,
+                                 const CDenseMatrix&         subMatrix,
+                                 const std::vector<int32_t>& aoIndices,
+                                 const int32_t               aoCount,
+                                 const int32_t               nAOs)
+{
+    if (aoCount <= nAOs)
+    {
+        for (int32_t row = 0; row < subMatrix.getNumberOfRows(); row++)
+        {
+            auto row_orig = aoIndices[row];
+
+            auto mat_row_orig = matrix.row(row_orig);
+
+            auto submat_row = subMatrix.row(row);
+
+            for (int32_t col = 0; col < subMatrix.getNumberOfColumns(); col++)
+            {
+                auto col_orig = aoIndices[col];
+
+                mat_row_orig[col_orig] += submat_row[col];
+            }
+        }
+    }
+}
+
 }  // namespace submat
