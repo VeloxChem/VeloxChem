@@ -29,7 +29,7 @@
 #include <string>
 #include <vector>
 
-#include "XCNewFunctional.hpp"
+#include "XCFunctional.hpp"
 #include "XCPairDensityFunctional.hpp"
 
 namespace vxcfuncs {  // vxcfuncs namespace
@@ -48,7 +48,7 @@ std::vector<std::string> getAvailableFunctionals();
  @param xcLabel the label of exchange-correlation functional.
  @return the exchange-correlation functional object.
  */
-CXCNewFunctional getExchangeCorrelationFunctional(const std::string &xcLabel);
+CXCFunctional getExchangeCorrelationFunctional(const std::string &xcLabel);
 
 /**
  Gets labels of available pair-density exchange-correlation functional.

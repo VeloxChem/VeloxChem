@@ -41,10 +41,10 @@
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
 #include "XCFuncType.hpp"
+#include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
 #include "XCMolecularGradient.hpp"
 #include "XCMolecularHessian.hpp"
-#include "XCNewFunctional.hpp"
 #include "XCPairDensityFunctional.hpp"
 
 namespace py = pybind11;
@@ -182,25 +182,23 @@ export_dft(py::module& m)
         .def("get_label", &CXCComponent::getLabel, "Gets name of XC functional component.")
         .def(py::self == py::self);
 
-    // XCNewFunctional class
-    PyClass<CXCNewFunctional>(m, "XCNewFunctional")
+    // XCFunctional class
+    PyClass<CXCFunctional>(m, "XCFunctional")
         .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&, const double>(),
              "name_of_functional"_a,
              "labels"_a,
              "coeffs"_a,
              "fraction_of_exact_exchange"_a = 0.0)
-        .def(py::init<const CXCNewFunctional&>())
+        .def(py::init<const CXCFunctional&>())
         .def(py::self == py::self)
-        .def("is_hybrid", &CXCNewFunctional::isHybrid, "Determines whether the XC functional is hybrid.")
-        .def("is_undefined", &CXCNewFunctional::isUndefined, "Determines whether the XC function is undefined.")
-        .def("get_func_type", &CXCNewFunctional::getFunctionalType, "Gets type of XC functional.")
-        .def("get_func_label", &CXCNewFunctional::getFunctionalLabel, "Gets name of XC functional.")
-        .def("get_frac_exact_exchange",
-             &CXCNewFunctional::getFractionOfExactExchange,
-             "Gets fraction of exact Hartree-Fock exchange in XC functional.")
+        .def("is_hybrid", &CXCFunctional::isHybrid, "Determines whether the XC functional is hybrid.")
+        .def("is_undefined", &CXCFunctional::isUndefined, "Determines whether the XC function is undefined.")
+        .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of XC functional.")
+        .def("get_func_label", &CXCFunctional::getFunctionalLabel, "Gets name of XC functional.")
+        .def("get_frac_exact_exchange", &CXCFunctional::getFractionOfExactExchange, "Gets fraction of exact Hartree-Fock exchange in XC functional.")
         .def(
             "compute_exc_vxc_for_lda",
-            [](const CXCNewFunctional& self, const py::array_t<double>& rho) -> py::list {
+            [](const CXCFunctional& self, const py::array_t<double>& rho) -> py::list {
                 auto rho_c_style = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style, std::string("compute_exc_vxc_for_lda: Expecting C-style contiguous numpy array"));
                 auto rho_size = static_cast<int32_t>(rho.size());
@@ -218,7 +216,7 @@ export_dft(py::module& m)
             "rho"_a)
         .def(
             "compute_exc_vxc_for_gga",
-            [](const CXCNewFunctional& self, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
+            [](const CXCFunctional& self, const py::array_t<double>& rho, const py::array_t<double>& sigma) -> py::list {
                 auto rho_c_style   = py::detail::check_flags(rho.ptr(), py::array::c_style);
                 auto sigma_c_style = py::detail::check_flags(sigma.ptr(), py::array::c_style);
                 errors::assertMsgCritical(rho_c_style && sigma_c_style,

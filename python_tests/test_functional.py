@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import GridDriver, XCIntegrator, XCNewFunctional
+from veloxchem.veloxchemlib import GridDriver, XCIntegrator, XCFunctional
 from veloxchem.veloxchemlib import is_single_node, mpi_master, new_parse_xc_func
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -47,7 +47,7 @@ class TestFunctionalExcVxc:
 
         func = new_parse_xc_func('slda')
 
-        func_ref = XCNewFunctional(
+        func_ref = XCFunctional(
             'slda',
             ['LDA_X', 'LDA_C_VWN_RPA'],
             [1.0, 1.0],
@@ -119,7 +119,7 @@ class TestFunctionalExcVxc:
 
         func = new_parse_xc_func('b3lyp')
 
-        func_ref = XCNewFunctional(
+        func_ref = XCFunctional(
             'b3lyp',
             ['LDA_X', 'GGA_X_B88', 'LDA_C_VWN_RPA', 'GGA_C_LYP'],
             [0.08, 0.72, 0.19, 0.81],

@@ -43,7 +43,7 @@
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
-#include "XCNewFunctional.hpp"
+#include "XCFunctional.hpp"
 #include "XCPairDensityFunctional.hpp"
 
 /**
@@ -89,7 +89,7 @@ class CXCIntegrator
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& densityMatrix,
                                               const CMolecularGrid&   molecularGrid,
-                                              const CXCNewFunctional& xcFunctional,
+                                              const CXCFunctional&    xcFunctional,
                                               const std::string&      flag = std::string("closedshell")) const;
 
     /**
@@ -108,7 +108,7 @@ class CXCIntegrator
                                               const CMolecularBasis&  basis,
                                               const CAODensityMatrix& densityMatrix,
                                               const CMolecularGrid&   molecularGrid,
-                                              const CXCNewFunctional& xcFunctional,
+                                              const CXCFunctional&    xcFunctional,
                                               const std::string&      flag = std::string("closedshell")) const;
 
     /**
@@ -127,7 +127,7 @@ class CXCIntegrator
                                                const CMolecularBasis&  basis,
                                                const CAODensityMatrix& densityMatrix,
                                                const CMolecularGrid&   molecularGrid,
-                                               const CXCNewFunctional& xcFunctional,
+                                               const CXCFunctional&    xcFunctional,
                                                const std::string&      flag = std::string("closedshell")) const;
 
     /**
@@ -148,7 +148,7 @@ class CXCIntegrator
                                  const CAODensityMatrix& rwDensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCNewFunctional& xcFunctional) const;
+                                 const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates second-order GGA exchange-correlation functional contribution
@@ -168,7 +168,7 @@ class CXCIntegrator
                                  const CAODensityMatrix& rwDensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCNewFunctional& xcFunctional) const;
+                                 const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates second-order meta-GGA exchange-correlation functional
@@ -188,7 +188,7 @@ class CXCIntegrator
                                   const CAODensityMatrix& rwDensityMatrix,
                                   const CAODensityMatrix& gsDensityMatrix,
                                   const CMolecularGrid&   molecularGrid,
-                                  const CXCNewFunctional& xcFunctional) const;
+                                  const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates third-order LDA exchange-correlation functional contribution
@@ -211,7 +211,7 @@ class CXCIntegrator
                                  const CAODensityMatrix& rw2DensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCNewFunctional& xcFunctional,
+                                 const CXCFunctional&    xcFunctional,
                                  const std::string&      quadMode) const;
 
     /**
@@ -235,7 +235,7 @@ class CXCIntegrator
                                  const CAODensityMatrix& rw2DensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCNewFunctional& xcFunctional,
+                                 const CXCFunctional&    xcFunctional,
                                  const std::string&      quadMode) const;
 
     /**
@@ -259,7 +259,7 @@ class CXCIntegrator
                                   const CAODensityMatrix& rw2DensityMatrix,
                                   const CAODensityMatrix& gsDensityMatrix,
                                   const CMolecularGrid&   molecularGrid,
-                                  const CXCNewFunctional& xcFunctional,
+                                  const CXCFunctional&    xcFunctional,
                                   const std::string&      quadMode) const;
 
     /**
@@ -285,7 +285,7 @@ class CXCIntegrator
                                  const CAODensityMatrix& rw3DensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCNewFunctional& xcFunctional,
+                                 const CXCFunctional&    xcFunctional,
                                  const std::string&      quadMode) const;
 
     /**
@@ -311,7 +311,7 @@ class CXCIntegrator
                                  const CAODensityMatrix& rw3DensityMatrix,
                                  const CAODensityMatrix& gsDensityMatrix,
                                  const CMolecularGrid&   molecularGrid,
-                                 const CXCNewFunctional& xcFunctional,
+                                 const CXCFunctional&    xcFunctional,
                                  const std::string&      cubeMode) const;
 
     /**
@@ -337,7 +337,7 @@ class CXCIntegrator
                                     const CAODensityMatrix& rw3DensityMatrix,
                                     const CAODensityMatrix& gsDensityMatrix,
                                     const CMolecularGrid&   molecularGrid,
-                                    const CXCNewFunctional& xcFunctional,
+                                    const CXCFunctional&    xcFunctional,
                                     const std::string&      quadMode) const;
 
     /**
@@ -363,7 +363,7 @@ class CXCIntegrator
                                     const CAODensityMatrix& rw3DensityMatrix,
                                     const CAODensityMatrix& gsDensityMatrix,
                                     const CMolecularGrid&   molecularGrid,
-                                    const CXCNewFunctional& xcFunctional,
+                                    const CXCFunctional&    xcFunctional,
                                     const std::string&      cubeMode) const;
 
     /**
@@ -389,7 +389,7 @@ class CXCIntegrator
                                      const CAODensityMatrix& rw3DensityMatrix,
                                      const CAODensityMatrix& gsDensityMatrix,
                                      const CMolecularGrid&   molecularGrid,
-                                     const CXCNewFunctional& xcFunctional,
+                                     const CXCFunctional&    xcFunctional,
                                      const std::string&      cubeMode) const;
 
     /**

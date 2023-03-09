@@ -304,7 +304,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
                                        const CMolecularBasis&  basis,
                                        const CAODensityMatrix& densityMatrix,
                                        const CMolecularGrid&   molecularGrid,
-                                       const CXCNewFunctional& xcFunctional,
+                                       const CXCFunctional&    xcFunctional,
                                        const std::string&      flag) const
 {
     CMultiTimer timer;
@@ -580,7 +580,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
                                        const CMolecularBasis&  basis,
                                        const CAODensityMatrix& densityMatrix,
                                        const CMolecularGrid&   molecularGrid,
-                                       const CXCNewFunctional& xcFunctional,
+                                       const CXCFunctional&    xcFunctional,
                                        const std::string&      flag) const
 {
     CMultiTimer timer;
@@ -899,7 +899,7 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
                                         const CMolecularBasis&  basis,
                                         const CAODensityMatrix& densityMatrix,
                                         const CMolecularGrid&   molecularGrid,
-                                        const CXCNewFunctional& xcFunctional,
+                                        const CXCFunctional&    xcFunctional,
                                         const std::string&      flag) const
 {
     CMultiTimer timer;
@@ -1201,7 +1201,7 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
                                        const CAODensityMatrix& rwDensityMatrix,
                                        const CAODensityMatrix& gsDensityMatrix,
                                        const CMolecularGrid&   molecularGrid,
-                                       const CXCNewFunctional& xcFunctional) const
+                                       const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1438,7 +1438,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                        const CAODensityMatrix& rwDensityMatrix,
                                        const CAODensityMatrix& gsDensityMatrix,
                                        const CMolecularGrid&   molecularGrid,
-                                       const CXCNewFunctional& xcFunctional) const
+                                       const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1748,7 +1748,7 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
                                         const CAODensityMatrix& rwDensityMatrix,
                                         const CAODensityMatrix& gsDensityMatrix,
                                         const CMolecularGrid&   molecularGrid,
-                                        const CXCNewFunctional& xcFunctional) const
+                                        const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2075,7 +2075,7 @@ CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
                                        const CAODensityMatrix& rw2DensityMatrix,
                                        const CAODensityMatrix& gsDensityMatrix,
                                        const CMolecularGrid&   molecularGrid,
-                                       const CXCNewFunctional& xcFunctional,
+                                       const CXCFunctional&    xcFunctional,
                                        const std::string&      quadMode) const
 {
     CMultiTimer timer;
@@ -2330,7 +2330,7 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                        const CAODensityMatrix& rw2DensityMatrix,
                                        const CAODensityMatrix& gsDensityMatrix,
                                        const CMolecularGrid&   molecularGrid,
-                                       const CXCNewFunctional& xcFunctional,
+                                       const CXCFunctional&    xcFunctional,
                                        const std::string&      quadMode) const
 {
     CMultiTimer timer;
@@ -2649,7 +2649,7 @@ CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
                                         const CAODensityMatrix& rw2DensityMatrix,
                                         const CAODensityMatrix& gsDensityMatrix,
                                         const CMolecularGrid&   molecularGrid,
-                                        const CXCNewFunctional& xcFunctional,
+                                        const CXCFunctional&    xcFunctional,
                                         const std::string&      quadMode) const
 {
     CMultiTimer timer;
@@ -3067,7 +3067,7 @@ CXCIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
                                        const CAODensityMatrix& rw3DensityMatrix,
                                        const CAODensityMatrix& gsDensityMatrix,
                                        const CMolecularGrid&   molecularGrid,
-                                       const CXCNewFunctional& xcFunctional,
+                                       const CXCFunctional&    xcFunctional,
                                        const std::string&      quadMode) const
 {
     CMultiTimer timer;
@@ -3331,7 +3331,7 @@ CXCIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                        const CAODensityMatrix& rw3DensityMatrix,
                                        const CAODensityMatrix& gsDensityMatrix,
                                        const CMolecularGrid&   molecularGrid,
-                                       const CXCNewFunctional& xcFunctional,
+                                       const CXCFunctional&    xcFunctional,
                                        const std::string&      cubeMode) const
 {
     CMultiTimer timer;
@@ -3673,7 +3673,7 @@ CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
                                           const CAODensityMatrix& rw3DensityMatrix,
                                           const CAODensityMatrix& gsDensityMatrix,
                                           const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional,
+                                          const CXCFunctional&    xcFunctional,
                                           const std::string&      cubeMode) const
 {
     CMultiTimer timer;
@@ -3955,7 +3955,7 @@ CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                           const CAODensityMatrix& rw3DensityMatrix,
                                           const CAODensityMatrix& gsDensityMatrix,
                                           const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional,
+                                          const CXCFunctional&    xcFunctional,
                                           const std::string&      cubeMode) const
 {
     CMultiTimer timer;
@@ -4332,7 +4332,7 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
                                            const CAODensityMatrix& rw3DensityMatrix,
                                            const CAODensityMatrix& gsDensityMatrix,
                                            const CMolecularGrid&   molecularGrid,
-                                           const CXCNewFunctional& xcFunctional,
+                                           const CXCFunctional&    xcFunctional,
                                            const std::string&      cubeMode) const
 {
     CMultiTimer timer;

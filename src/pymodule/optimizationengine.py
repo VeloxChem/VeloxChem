@@ -31,7 +31,7 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import (XCNewFunctional, MolecularGrid)
+from .veloxchemlib import (XCFunctional, MolecularGrid)
 from .outputstream import OutputStream
 from .molecule import Molecule
 
@@ -166,8 +166,8 @@ class OptimizationEngine(geometric.engine.Engine):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 pass
-            elif isinstance(val, XCNewFunctional):
-                new_engine.key = XCNewFunctional(val)
+            elif isinstance(val, XCFunctional):
+                new_engine.key = XCFunctional(val)
             elif isinstance(val, MolecularGrid):
                 new_engine.key = MolecularGrid(val)
             else:

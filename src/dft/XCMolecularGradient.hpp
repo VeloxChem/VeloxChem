@@ -42,7 +42,7 @@
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
-#include "XCNewFunctional.hpp"
+#include "XCFunctional.hpp"
 
 /**
  Class CXCMolecularGradient implements XC molecular gradient.
@@ -89,7 +89,7 @@ class CXCMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrix,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCNewFunctional& xcFunctional) const;
+                                             const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates first-order LDA exchnage-correlation functional contribution to
@@ -109,7 +109,7 @@ class CXCMolecularGradient
                                                       const CAODensityMatrix& rwDensityMatrix,
                                                       const CAODensityMatrix& gsDensityMatrix,
                                                       const CMolecularGrid&   molecularGrid,
-                                                      const CXCNewFunctional& xcFunctional) const;
+                                                      const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates first-order GGA exchnage-correlation functional contribution to
@@ -128,7 +128,7 @@ class CXCMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrix,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCNewFunctional& xcFunctional) const;
+                                             const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates first-order GGA exchnage-correlation functional contribution to
@@ -147,7 +147,7 @@ class CXCMolecularGradient
                                                       const CAODensityMatrix& rwDensityMatrix,
                                                       const CAODensityMatrix& gsDensityMatrix,
                                                       const CMolecularGrid&   molecularGrid,
-                                                      const CXCNewFunctional& xcFunctional) const;
+                                                      const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates second-order LDA exchnage-correlation functional contribution
@@ -169,7 +169,7 @@ class CXCMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCNewFunctional& xcFunctional) const;
+                                             const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates second-order GGA exchnage-correlation functional contribution
@@ -191,7 +191,7 @@ class CXCMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCNewFunctional& xcFunctional) const;
+                                             const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates third-order LDA exchnage-correlation functional contribution to
@@ -213,7 +213,7 @@ class CXCMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCNewFunctional& xcFunctional) const;
+                                             const CXCFunctional&    xcFunctional) const;
 
     /**
      Integrates third-order GGA exchnage-correlation functional contribution to
@@ -235,7 +235,7 @@ class CXCMolecularGradient
                                              const CAODensityMatrix& rwDensityMatrixTwo,
                                              const CAODensityMatrix& gsDensityMatrix,
                                              const CMolecularGrid&   molecularGrid,
-                                             const CXCNewFunctional& xcFunctional) const;
+                                             const CXCFunctional&    xcFunctional) const;
 
     /**
      Computes AO-to-atom mapping.
@@ -244,9 +244,7 @@ class CXCMolecularGradient
      @param molecule the molecule.
      @param basis the molecular basis.
      */
-    void _computeAOtoAtomMapping(std::vector<int32_t>&  ao_to_atom_ids,
-                                 const CMolecule&       molecule,
-                                 const CMolecularBasis& basis) const;
+    void _computeAOtoAtomMapping(std::vector<int32_t>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) const;
 
    public:
     /**

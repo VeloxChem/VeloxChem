@@ -41,8 +41,7 @@ from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
 from .veloxchemlib import XCIntegrator
-from .veloxchemlib import XCNewFunctional
-from .veloxchemlib import XCNewFunctional as XCFunctional
+from .veloxchemlib import XCFunctional
 
 # C++ functions
 from .veloxchemlib import available_functionals
@@ -129,6 +128,7 @@ from .numerovdriver import NumerovDriver
 
 # for backward compatibility
 from .veloxchemlib import XCIntegrator as XCNewIntegrator
+from .veloxchemlib import XCFunctional as XCNewFunctional
 from .xtbdriver import XtbDriver as XTBDriver
 from .tdaeigensolver import TdaEigenSolver as TDAExciDriver
 from .shgdriver import ShgDriver as SHGDriver

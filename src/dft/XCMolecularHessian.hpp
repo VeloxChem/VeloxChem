@@ -42,7 +42,7 @@
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
 #include "MultiTimer.hpp"
-#include "XCNewFunctional.hpp"
+#include "XCFunctional.hpp"
 
 /**
  Class CXCMolecularHessian implements XC molecular Hessian.
@@ -86,38 +86,38 @@ class CXCMolecularHessian
                                             const CMolecularBasis&  basis,
                                             const CAODensityMatrix& gsDensityMatrix,
                                             const CMolecularGrid&   molecularGrid,
-                                            const CXCNewFunctional& xcFunctional) const;
+                                            const CXCFunctional&    xcFunctional) const;
 
     CDenseMatrix _integrateFxcHessianForLDA(const CMolecule&        molecule,
                                             const CMolecularBasis&  basis,
                                             const CAODensityMatrix& gsDensityMatrix,
                                             const CMolecularGrid&   molecularGrid,
-                                            const CXCNewFunctional& xcFunctional) const;
+                                            const CXCFunctional&    xcFunctional) const;
 
     CDenseMatrix _integrateVxcHessianForGGA(const CMolecule&        molecule,
                                             const CMolecularBasis&  basis,
                                             const CAODensityMatrix& gsDensityMatrix,
                                             const CMolecularGrid&   molecularGrid,
-                                            const CXCNewFunctional& xcFunctional) const;
+                                            const CXCFunctional&    xcFunctional) const;
 
     CDenseMatrix _integrateFxcHessianForGGA(const CMolecule&        molecule,
                                             const CMolecularBasis&  basis,
                                             const CAODensityMatrix& gsDensityMatrix,
                                             const CMolecularGrid&   molecularGrid,
-                                            const CXCNewFunctional& xcFunctional) const;
+                                            const CXCFunctional&    xcFunctional) const;
 
     std::vector<CDenseMatrix> _integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                                                               const CMolecularBasis&  basis,
                                                               const CAODensityMatrix& gsDensityMatrix,
                                                               const CMolecularGrid&   molecularGrid,
-                                                              const CXCNewFunctional& xcFunctional,
+                                                              const CXCFunctional&    xcFunctional,
                                                               const int32_t           atomIdx) const;
 
     std::vector<CDenseMatrix> _integrateFxcFockGradientForLDA(const CMolecule&        molecule,
                                                               const CMolecularBasis&  basis,
                                                               const CAODensityMatrix& gsDensityMatrix,
                                                               const CMolecularGrid&   molecularGrid,
-                                                              const CXCNewFunctional& xcFunctional,
+                                                              const CXCFunctional&    xcFunctional,
                                                               const int32_t           atomIdx) const;
 
     /**
@@ -127,9 +127,7 @@ class CXCMolecularHessian
      @param molecule the molecule.
      @param basis the molecular basis.
      */
-    void _computeAOtoAtomMapping(std::vector<int32_t>&  ao_to_atom_ids,
-                                 const CMolecule&       molecule,
-                                 const CMolecularBasis& basis) const;
+    void _computeAOtoAtomMapping(std::vector<int32_t>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) const;
 
    public:
     /**

@@ -206,7 +206,7 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
                                                 const CMolecularBasis&  basis,
                                                 const CAODensityMatrix& gsDensityMatrix,
                                                 const CMolecularGrid&   molecularGrid,
-                                                const CXCNewFunctional& xcFunctional) const
+                                                const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -674,7 +674,7 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                                                 const CMolecularBasis&  basis,
                                                 const CAODensityMatrix& gsDensityMatrix,
                                                 const CMolecularGrid&   molecularGrid,
-                                                const CXCNewFunctional& xcFunctional) const
+                                                const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1410,7 +1410,7 @@ CXCMolecularHessian::_integrateFxcHessianForLDA(const CMolecule&        molecule
                                                 const CMolecularBasis&  basis,
                                                 const CAODensityMatrix& gsDensityMatrix,
                                                 const CMolecularGrid&   molecularGrid,
-                                                const CXCNewFunctional& xcFunctional) const
+                                                const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1804,7 +1804,7 @@ CXCMolecularHessian::_integrateFxcHessianForGGA(const CMolecule&        molecule
                                                 const CMolecularBasis&  basis,
                                                 const CAODensityMatrix& gsDensityMatrix,
                                                 const CMolecularGrid&   molecularGrid,
-                                                const CXCNewFunctional& xcFunctional) const
+                                                const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2323,7 +2323,7 @@ CXCMolecularHessian::_integrateVxcFockGradientForLDA(const CMolecule&        mol
                                                      const CMolecularBasis&  basis,
                                                      const CAODensityMatrix& gsDensityMatrix,
                                                      const CMolecularGrid&   molecularGrid,
-                                                     const CXCNewFunctional& xcFunctional,
+                                                     const CXCFunctional&    xcFunctional,
                                                      const int32_t           atomIdx) const
 {
     CMultiTimer timer;
@@ -2611,7 +2611,7 @@ CXCMolecularHessian::_integrateFxcFockGradientForLDA(const CMolecule&        mol
                                                      const CMolecularBasis&  basis,
                                                      const CAODensityMatrix& gsDensityMatrix,
                                                      const CMolecularGrid&   molecularGrid,
-                                                     const CXCNewFunctional& xcFunctional,
+                                                     const CXCFunctional&    xcFunctional,
                                                      const int32_t           atomIdx) const
 {
     CMultiTimer timer;

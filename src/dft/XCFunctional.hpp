@@ -23,8 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef XCNewFunctional_hpp
-#define XCNewFunctional_hpp
+#ifndef XCFunctional_hpp
+#define XCFunctional_hpp
 
 #include <xc.h>
 
@@ -41,11 +41,11 @@
 #include "XCFuncType.hpp"
 
 /**
- * Class CXCNewFunctional is a wrapper to the C functions and structs provided by LibXC.
+ * Class CXCFunctional is a wrapper to the C functions and structs provided by LibXC.
  *
  * @author R. Di Remigio Eikås, Z. Rinkevicius, X. Li
  */
-class CXCNewFunctional
+class CXCFunctional
 {
    private:
     /** Name of functional. */
@@ -86,43 +86,43 @@ class CXCNewFunctional
      * @param[in] coeffs list of coefficients for functional components.
      * @param[in] fractionOfExactExchange fraction of exact exchange.
      */
-    CXCNewFunctional(const std::string&              nameOfFunctional,
-                     const std::vector<std::string>& labels,
-                     const std::vector<double>&      coeffs,
-                     const double                    fractionOfExactExchange = 0.0);
+    CXCFunctional(const std::string&              nameOfFunctional,
+                  const std::vector<std::string>& labels,
+                  const std::vector<double>&      coeffs,
+                  const double                    fractionOfExactExchange = 0.0);
 
     /**
      Creates an XC functional object by copying other XC functional object.
 
      @param source the XC functional object.
      */
-    CXCNewFunctional(const CXCNewFunctional& source);
+    CXCFunctional(const CXCFunctional& source);
 
     /**
      Creates an XC functional object by moving other XC functional object.
 
      @param source the XC functional object.
      */
-    CXCNewFunctional(CXCNewFunctional&& source) noexcept;
+    CXCFunctional(CXCFunctional&& source) noexcept;
 
     /**
      * Destroys an exchange-correlation functional object.
      */
-    ~CXCNewFunctional();
+    ~CXCFunctional();
 
     /**
      Assigns an XC functional object by copying other XC functional object.
 
      @param source the XC functional object.
      */
-    CXCNewFunctional& operator=(const CXCNewFunctional& source);
+    CXCFunctional& operator=(const CXCFunctional& source);
 
     /**
      Assigns an XC functional object by moving other XC functional object.
 
      @param source the XC functional object.
      */
-    CXCNewFunctional& operator=(CXCNewFunctional&& source) noexcept;
+    CXCFunctional& operator=(CXCFunctional&& source) noexcept;
 
     /**
      Compares XC functional object with other XC functional object.
@@ -130,7 +130,7 @@ class CXCNewFunctional
      @param other the XC functional object.
      @return true if XC functional objects are equal, false otherwise.
      */
-    bool operator==(const CXCNewFunctional& other) const;
+    bool operator==(const CXCFunctional& other) const;
 
     /**
      Compares XC functional object with other XC functional object.
@@ -138,7 +138,7 @@ class CXCNewFunctional
      @param other the XC functional object.
      @return true if XC functional objects are not equal, false otherwise.
      */
-    bool operator!=(const CXCNewFunctional& other) const;
+    bool operator!=(const CXCFunctional& other) const;
 
     /**
      Gets XC functional name.
@@ -542,4 +542,4 @@ class CXCNewFunctional
                               double*       v4tau4) const -> void;
 };
 
-#endif /* XCNewFunctional_hpp */
+#endif /* XCFunctional_hpp */

@@ -201,7 +201,7 @@ CXCMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecu
                                                   const CAODensityMatrix& rwDensityMatrix,
                                                   const CAODensityMatrix& gsDensityMatrix,
                                                   const CMolecularGrid&   molecularGrid,
-                                                  const CXCNewFunctional& xcFunctional) const
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -530,7 +530,7 @@ CXCMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&     
                                                            const CAODensityMatrix& rwDensityMatrix,
                                                            const CAODensityMatrix& gsDensityMatrix,
                                                            const CMolecularGrid&   molecularGrid,
-                                                           const CXCNewFunctional& xcFunctional) const
+                                                           const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -881,7 +881,7 @@ CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecu
                                                   const CAODensityMatrix& rwDensityMatrix,
                                                   const CAODensityMatrix& gsDensityMatrix,
                                                   const CMolecularGrid&   molecularGrid,
-                                                  const CXCNewFunctional& xcFunctional) const
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1337,7 +1337,7 @@ CXCMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&     
                                                            const CAODensityMatrix& rwDensityMatrix,
                                                            const CAODensityMatrix& gsDensityMatrix,
                                                            const CMolecularGrid&   molecularGrid,
-                                                           const CXCNewFunctional& xcFunctional) const
+                                                           const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1872,7 +1872,7 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
                                                   const CAODensityMatrix& rwDensityMatrixTwo,
                                                   const CAODensityMatrix& gsDensityMatrix,
                                                   const CMolecularGrid&   molecularGrid,
-                                                  const CXCNewFunctional& xcFunctional) const
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2235,7 +2235,7 @@ CXCMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecu
                                                   const CAODensityMatrix& rwDensityMatrixTwo,
                                                   const CAODensityMatrix& gsDensityMatrix,
                                                   const CMolecularGrid&   molecularGrid,
-                                                  const CXCNewFunctional& xcFunctional) const
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2763,7 +2763,7 @@ CXCMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        molecu
                                                   const CAODensityMatrix& rwDensityMatrixTwo,
                                                   const CAODensityMatrix& gsDensityMatrix,
                                                   const CMolecularGrid&   molecularGrid,
-                                                  const CXCNewFunctional& xcFunctional) const
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -3149,7 +3149,7 @@ CXCMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        molecu
                                                   const CAODensityMatrix& rwDensityMatrixTwo,
                                                   const CAODensityMatrix& gsDensityMatrix,
                                                   const CMolecularGrid&   molecularGrid,
-                                                  const CXCNewFunctional& xcFunctional) const
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
