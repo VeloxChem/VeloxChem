@@ -102,7 +102,7 @@ class LinearResponseSolver(LinearSolver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def compute(self, molecule, basis, scf_tensors):
+    def compute(self, molecule, basis, scf_tensors, v_grad=None):
         """
         Performs linear response calculation for a molecule and a basis set.
 
@@ -112,6 +112,9 @@ class LinearResponseSolver(LinearSolver):
             The AO basis set.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
+        :param v_grad:
+            The gradients on the right-hand side. If not provided, v_grad will
+            be computed for the B operator.
 
         :return:
             A dictionary containing response functions, solutions and a
@@ -128,6 +131,8 @@ class LinearResponseSolver(LinearSolver):
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        self.has_external_rhs = False
 
         # double check SCF information
         self._check_scf_results(scf_tensors)
@@ -183,13 +188,17 @@ class LinearResponseSolver(LinearSolver):
         pe_dict = self._init_pe(molecule, basis)
 
         # right-hand side (gradient)
-        b_grad = self.get_prop_grad(self.b_operator, self.b_components,
-                                    molecule, basis, scf_tensors)
         if self.rank == mpi_master():
-            v_grad = {(op, w): v for op, v in zip(self.b_components, b_grad)
-                      for w in self.frequencies}
-        #print(v_grad)
-        ## https://gitlab.com/rinkevic/VeloxChemMP/-/blob/master/src/pymodule/linearsolver.py#L1727
+            self.has_external_rhs = (v_grad is not None)
+        self.has_external_rhs = self.comm.bcast(self.has_external_rhs,
+                                                root=mpi_master())
+
+        if not self.has_external_rhs:
+            b_grad = self.get_prop_grad(self.b_operator, self.b_components,
+                                        molecule, basis, scf_tensors)
+            if self.rank == mpi_master():
+                v_grad = {(op, w): v for op, v in zip(self.b_components, b_grad)
+                          for w in self.frequencies}
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
@@ -443,411 +452,72 @@ class LinearResponseSolver(LinearSolver):
         profiler.print_memory_usage(self.ostream)
 
         # calculate response functions
-        a_grad = self.get_prop_grad(self.a_operator, self.a_components,
-                                    molecule, basis, scf_tensors)
+        if not self.has_external_rhs:
+            a_grad = self.get_prop_grad(self.a_operator, self.a_components,
+                                        molecule, basis, scf_tensors)
 
-        if self.is_converged:
-            if self.rank == mpi_master():
-                va = {op: v for op, v in zip(self.a_components, a_grad)}
-                rsp_funcs = {}
-                full_solutions = {}
+            if self.is_converged:
+                if self.rank == mpi_master():
+                    va = {op: v for op, v in zip(self.a_components, a_grad)}
+                    rsp_funcs = {}
+                    full_solutions = {}
 
-                # create h5 file for response solutions
-                if self.save_solutions and self.checkpoint_file is not None:
-                    final_h5_fname = str(
-                        Path(self.checkpoint_file).with_suffix('.solutions.h5'))
-                    create_hdf5(final_h5_fname, molecule, basis,
-                                dft_dict['dft_func_label'],
-                                pe_dict['potfile_text'])
+                    # create h5 file for response solutions
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                        final_h5_fname = str(
+                            Path(self.checkpoint_file).with_suffix(
+                                '.solutions.h5'))
+                        create_hdf5(final_h5_fname, molecule, basis,
+                                    dft_dict['dft_func_label'],
+                                    pe_dict['potfile_text'])
 
-            for bop, w in solutions:
-                x = self._get_full_solution_vector(solutions[(bop, w)])
+                for bop, w in solutions:
+                    x = self._get_full_solution_vector(solutions[(bop, w)])
+
+                    if self.rank == mpi_master():
+                        for aop in self.a_components:
+                            rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
+                            full_solutions[(bop, w)] = x
+
+                            # write to h5 file for response solutions
+                            if (self.save_solutions and
+                                    self.checkpoint_file is not None):
+                                write_rsp_solution(
+                                    final_h5_fname,
+                                    '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
 
                 if self.rank == mpi_master():
-                    for aop in self.a_components:
-                        rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
-                        full_solutions[(bop, w)] = x
+                    # print information about h5 file for response solutions
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                        checkpoint_text = 'Response solution vectors written to file: '
+                        checkpoint_text += final_h5_fname
+                        self.ostream.print_info(checkpoint_text)
+                        self.ostream.print_blank()
 
-                        # write to h5 file for response solutions
-                        if (self.save_solutions and
-                                self.checkpoint_file is not None):
-                            write_rsp_solution(
-                                final_h5_fname,
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                    ret_dict = {
+                        'response_functions': rsp_funcs,
+                        'solutions': full_solutions
+                    }
 
-            if self.rank == mpi_master():
-                # print information about h5 file for response solutions
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    checkpoint_text = 'Response solution vectors written to file: '
-                    checkpoint_text += final_h5_fname
-                    self.ostream.print_info(checkpoint_text)
-                    self.ostream.print_blank()
+                    self._print_results(ret_dict, self.ostream)
 
-                ret_dict = {
-                    'response_functions': rsp_funcs,
-                    'solutions': full_solutions
-                }
+                    return ret_dict
 
-                self._print_results(ret_dict, self.ostream)
+        else:
+            if self.is_converged:
+                full_solutions = {}
+
+                for bop, w in solutions:
+                    x = self._get_full_solution_vector(solutions[(bop, w)])
+                    full_solutions[(bop, w)] = x
+
+                ret_dict = {'solutions': full_solutions}
 
                 return ret_dict
 
         return None
-
-    def compute_pyopenrsp(self, molecule, basis, scf_tensors, RHS_pyopenrsp):
-        """
-        Performs linear response calculation for a molecule and a basis set.
-
-        :param molecule:
-            The molecule.
-        :param basis:
-            The AO basis set.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-
-        :return:
-            A dictionary containing response functions, solutions and a
-            dictionarry containing solutions and kappa values when called from
-            a non-linear response module.
-        """
-
-        if self.norm_thresh is None:
-            self.norm_thresh = self.conv_thresh * 1.0e-6
-        if self.lindep_thresh is None:
-            self.lindep_thresh = self.conv_thresh * 1.0e-2
-
-        self._dist_bger = None
-        self._dist_bung = None
-        self._dist_e2bger = None
-        self._dist_e2bung = None
-
-        # double check SCF information
-        self._check_scf_results(scf_tensors)
-
-        # check dft setup
-        self._dft_sanity_check()
-
-        # check pe setup
-        self._pe_sanity_check()
-
-        # check print level (verbosity of output)
-        if self.print_level < 2:
-            self.print_level = 1
-        if self.print_level > 2:
-            self.print_level = 3
-
-        # initialize profiler
-        profiler = Profiler({
-            'timing': self.timing,
-            'profiling': self.profiling,
-            'memory_profiling': self.memory_profiling,
-            'memory_tracing': self.memory_tracing,
-        })
-
-        if self.rank == mpi_master():
-            self._print_header('Linear Response Solver',
-                               n_freqs=len(self.frequencies))
-
-        self.start_time = tm.time()
-
-        # sanity check
-        nalpha = molecule.number_of_alpha_electrons()
-        nbeta = molecule.number_of_beta_electrons()
-        assert_msg_critical(
-            nalpha == nbeta,
-            'LinearResponseSolver: not implemented for unrestricted case')
-
-        if self.rank == mpi_master():
-            orb_ene = scf_tensors['E_alpha']
-        else:
-            orb_ene = None
-        orb_ene = self.comm.bcast(orb_ene, root=mpi_master())
-        norb = orb_ene.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
-
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
-
-        # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
-
-        # PE information
-        pe_dict = self._init_pe(molecule, basis)
-
-        # right-hand side (gradient)
-        # b_grad = self.get_prop_grad(self.b_operator, self.b_components,
-        #                             molecule, basis, scf_tensors)
-
-        if self.rank == mpi_master():
-            # (f, c), freqs[f]) -- for the correspondence (f - freqs[f])
-            # one freqs[f] value will be the same for different f
-            v_grad = {((hash_op[0], hash_comp), hash_op[1]): v
-                      for hash_op, op_dict in RHS_pyopenrsp.items() for hash_comp, v in op_dict.items()}  # CHANGED
-
-        # operators, frequencies and preconditioners
-        if self.rank == mpi_master():
-            op_freq_keys = list(v_grad.keys())  # CHANGED
-        else:
-            op_freq_keys = None
-        op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
-
-        self.frequencies = []
-        for (op, w) in op_freq_keys:
-            if w not in self.frequencies:
-                self.frequencies.append(w)
-
-        precond = {
-            w: self._get_precond(orb_ene, nocc, norb, w)
-            for w in self.frequencies
-        }
-
-        # distribute the right-hand side
-        # dist_grad will also serve as initial guess
-
-        dist_grad = {}
-        for key in op_freq_keys:
-            if self.rank == mpi_master():
-                gradger, gradung = self._decomp_grad(v_grad[key])
-                grad_mat = np.hstack((
-                    gradger.reshape(-1, 1),
-                    gradung.reshape(-1, 1),
-                ))
-            else:
-                grad_mat = None
-            dist_grad[key] = DistributedArray(grad_mat, self.comm)
-
-        rsp_vector_labels = [
-            'LR_bger_half_size',
-            'LR_bung_half_size',
-            'LR_e2bger_half_size',
-            'LR_e2bung_half_size',
-        ]
-
-        # check validity of checkpoint file
-        if self.restart:
-            if self.rank == mpi_master():
-                self.restart = check_rsp_hdf5(self.checkpoint_file,
-                                              rsp_vector_labels, molecule,
-                                              basis, dft_dict, pe_dict)
-            self.restart = self.comm.bcast(self.restart, root=mpi_master())
-
-        # read initial guess from restart file
-        if self.restart:
-            self._read_checkpoint(rsp_vector_labels)
-
-        # generate initial guess from scratch
-        else:
-            #print('line 639', dist_grad)
-            bger, bung = self._setup_trials(dist_grad, precond)
-
-            self._e2n_half_size(bger, bung, molecule, basis, scf_tensors,
-                                eri_dict, dft_dict, pe_dict)
-
-        profiler.check_memory_usage('Initial guess')
-
-        solutions = {}
-        residuals = {}
-        relative_residual_norm = {}
-
-        signal_handler = SignalHandler()
-        signal_handler.add_sigterm_function(self._graceful_exit, molecule,
-                                            basis, dft_dict, pe_dict,
-                                            rsp_vector_labels)
-
-        iter_per_trial_in_hours = None
-
-        # start iterations
-        for iteration in range(self.max_iter):
-
-            iter_start_time = tm.time()
-
-            profiler.set_timing_key(f'Iteration {iteration+1}')
-
-            profiler.start_timer('ReducedSpace')
-
-            n_ger = self._dist_bger.shape(1)
-            n_ung = self._dist_bung.shape(1)
-
-            e2gg = self._dist_bger.matmul_AtB(self._dist_e2bger, 2.0)
-            e2uu = self._dist_bung.matmul_AtB(self._dist_e2bung, 2.0)
-            s2ug = self._dist_bung.matmul_AtB(self._dist_bger, 2.0)
-
-            xvs = []
-            self._cur_iter = iteration
-
-            for op, freq in op_freq_keys:
-                if (iteration > 0 and
-                        relative_residual_norm[(op, freq)] < self.conv_thresh):
-                    continue
-
-                gradger = dist_grad[(op, freq)].get_column(0)
-                gradung = dist_grad[(op, freq)].get_column(1)
-
-                g_ger = self._dist_bger.matmul_AtB(gradger, 2.0)
-                g_ung = self._dist_bung.matmul_AtB(gradung, 2.0)
-
-                if self.rank == mpi_master():
-                    mat = np.zeros((n_ger + n_ung, n_ger + n_ung))
-                    mat[:n_ger, :n_ger] = e2gg[:, :]
-                    mat[:n_ger, n_ger:] = -freq * s2ug.T[:, :]
-                    mat[n_ger:, :n_ger] = -freq * s2ug[:, :]
-                    mat[n_ger:, n_ger:] = e2uu[:, :]
-
-                    g = np.zeros(n_ger + n_ung)
-                    g[:n_ger] = g_ger[:]
-                    g[n_ger:] = g_ung[:]
-
-                    c = np.linalg.solve(mat, g)
-                else:
-                    c = None
-                c = self.comm.bcast(c, root=mpi_master())
-
-                c_ger = c[:n_ger]
-                c_ung = c[n_ger:]
-
-                x_ger = self._dist_bger.matmul_AB_no_gather(c_ger)
-                x_ung = self._dist_bung.matmul_AB_no_gather(c_ung)
-
-                e2x_ger = self._dist_e2bger.matmul_AB_no_gather(c_ger)
-                e2x_ung = self._dist_e2bung.matmul_AB_no_gather(c_ung)
-
-                s2x_ger = x_ger.data
-                s2x_ung = x_ung.data
-
-                r_ger = e2x_ger.data - freq * s2x_ung - gradger.data
-                r_ung = e2x_ung.data - freq * s2x_ger - gradung.data
-
-                r_data = np.hstack((
-                    r_ger.reshape(-1, 1),
-                    r_ung.reshape(-1, 1),
-                ))
-
-                r = DistributedArray(r_data, self.comm, distribute=False)
-
-                x_data = np.hstack((
-                    x_ger.data.reshape(-1, 1),
-                    x_ung.data.reshape(-1, 1),
-                ))
-
-                x = DistributedArray(x_data, self.comm, distribute=False)
-
-                x_full = self._get_full_solution_vector(x)
-
-                if self.rank == mpi_master():
-                    xv = np.dot(x_full, v_grad[(op, freq)])
-                    xvs.append((op, freq, xv))
-
-                r_norms_2 = 2.0 * r.squared_norm(axis=0)
-                x_norms_2 = 2.0 * x.squared_norm(axis=0)
-
-                rn = np.sqrt(np.sum(r_norms_2))
-                xn = np.sqrt(np.sum(x_norms_2))
-
-                if xn != 0:
-                    relative_residual_norm[(op, freq)] = 2.0 * rn / xn
-                else:
-                    relative_residual_norm[(op, freq)] = 2.0 * rn
-
-                if relative_residual_norm[(op, freq)] < self.conv_thresh:
-                    solutions[(op, freq)] = x
-                else:
-                    residuals[(op, freq)] = r
-
-            # write to output
-            if self.rank == mpi_master():
-                self.ostream.print_info(
-                    '{:d} gerade trial vectors in reduced space'.format(n_ger))
-                self.ostream.print_info(
-                    '{:d} ungerade trial vectors in reduced space'.format(
-                        n_ung))
-                self.ostream.print_blank()
-
-                if self.print_level > 1:
-                    profiler.print_memory_subspace(
-                        {
-                            'dist_bger': self._dist_bger,
-                            'dist_bung': self._dist_bung,
-                            'dist_e2bger': self._dist_e2bger,
-                            'dist_e2bung': self._dist_e2bung,
-                            'precond': precond,
-                            'solutions': solutions,
-                            'residuals': residuals,
-                        }, self.ostream)
-
-                profiler.check_memory_usage(
-                    'Iteration {:d} subspace'.format(iteration + 1))
-
-                profiler.print_memory_tracing(self.ostream)
-
-                self._print_iteration(relative_residual_norm, xvs)
-
-            profiler.stop_timer('ReducedSpace')
-
-            # check convergence
-            self._check_convergence(relative_residual_norm)
-
-            if self.is_converged:
-                break
-
-            profiler.start_timer('Orthonorm.')
-
-            # update trial vectors
-            new_trials_ger, new_trials_ung = self._setup_trials(
-                residuals, precond, self._dist_bger, self._dist_bung)
-
-            residuals.clear()
-
-            profiler.stop_timer('Orthonorm.')
-
-            if self.rank == mpi_master():
-                n_new_trials = new_trials_ger.shape(1) + new_trials_ung.shape(1)
-            else:
-                n_new_trials = None
-            n_new_trials = self.comm.bcast(n_new_trials, root=mpi_master())
-
-            if iter_per_trial_in_hours is not None:
-                next_iter_in_hours = iter_per_trial_in_hours * n_new_trials
-                if self._need_graceful_exit(next_iter_in_hours):
-                    self._graceful_exit(molecule, basis, dft_dict, pe_dict,
-                                        rsp_vector_labels)
-
-            self._e2n_half_size(new_trials_ger, new_trials_ung, molecule, basis,
-                                scf_tensors, eri_dict, dft_dict, pe_dict,
-                                profiler)
-
-            iter_in_hours = (tm.time() - iter_start_time) / 3600
-            iter_per_trial_in_hours = iter_in_hours / n_new_trials
-
-            profiler.check_memory_usage(
-                'Iteration {:d} sigma build'.format(iteration + 1))
-
-        signal_handler.remove_sigterm_function()
-
-        self._write_checkpoint(molecule, basis, dft_dict, pe_dict,
-                               rsp_vector_labels)
-
-        # converged?
-        if self.rank == mpi_master():
-            self._print_convergence('Linear response')
-
-        profiler.print_timing(self.ostream)
-        profiler.print_profiling_summary(self.ostream)
-
-        profiler.check_memory_usage('End of LR solver')
-        profiler.print_memory_usage(self.ostream)
-
-        full_solutions = {}
-        for bop, w in solutions:
-            x = self._get_full_solution_vector(solutions[(bop, w)])
-            full_solutions[(bop, w)] = x
-
-        ret_dict = {
-            'solutions': full_solutions
-        }
-
-        self._print_results(ret_dict, self.ostream)
-
-        return ret_dict
 
     def _get_full_solution_vector(self, solution):
         """
@@ -1028,9 +698,9 @@ class LinearResponseSolver(LinearSolver):
 
             for a in self.a_components:
                 valstr = '{:<5s}'.format(a.upper())
-                # for b in self.b_components:
-                #     prop = -results['response_functions'][(a, b, w)]
-                #     valstr += '{:15.8f}'.format(prop)
+                for b in self.b_components:
+                    prop = -results['response_functions'][(a, b, w)]
+                    valstr += '{:15.8f}'.format(prop)
                 ostream.print_header(valstr.ljust(width))
 
             ostream.print_blank()
