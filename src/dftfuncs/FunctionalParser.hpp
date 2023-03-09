@@ -23,8 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef NewFunctionalParser_hpp
-#define NewFunctionalParser_hpp
+#ifndef FunctionalParser_hpp
+#define FunctionalParser_hpp
 
 #include <string>
 #include <vector>
@@ -68,4 +68,4 @@ CXCPairDensityFunctional getPairDensityExchangeCorrelationFunctional(const std::
 
 }  // namespace vxcfuncs
 
-#endif /* NewFunctionalParser_hpp */
+#endif /* FunctionalParser_hpp */
