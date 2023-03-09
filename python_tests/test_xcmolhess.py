@@ -12,7 +12,6 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 
 class TestXCMolHess:
 
-    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def run_xc_mol_hess(self, molecule, basis, xcfun_label, ref_exc_deriv_2,
                         ref_vxc_deriv_1):
 
@@ -51,6 +50,7 @@ class TestXCMolHess:
         assert np.max(np.abs(ref_exc_deriv_2 - exc_deriv_2)) < 1.0e-4
         assert np.max(np.abs(ref_vxc_deriv_1 - vxc_deriv_1)) < 1.0e-4
 
+    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_xc_mol_hess_lda(self):
 
         molecule_string = """
