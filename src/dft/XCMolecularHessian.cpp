@@ -1081,6 +1081,11 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                 {
                     auto mu_g = mu_offset + g;
 
+                    // first contribution to vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+                    // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi,\zeta)} \phi_{\nu}
+                    // note that F_{\mu} = \sum_{\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\nu}
+                    // factor of 2 is added outside of the for loop
+
                     double gdenxx = 0.0, gdenxy = 0.0, gdenxz = 0.0;
                     double gdenyx = 0.0, gdenyy = 0.0, gdenyz = 0.0;
                     double gdenzx = 0.0, gdenzy = 0.0, gdenzz = 0.0;
@@ -1217,6 +1222,11 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                     {
                         auto mu_g = mu_offset + g;
                         auto nu_g = nu_offset + g;
+
+                        // second contribution to vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+                        // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi)} \phi_{\nu}^{(\zeta)}
+                        // note that F_{\mu} = \sum_{\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\nu}
+                        // factor of 2 and P_{\mu\nu,sym}^{\alpha} are added outside of the for loop
 
                         double gxx = 0.0, gxy = 0.0, gxz = 0.0;
                         double gyx = 0.0, gyy = 0.0, gyz = 0.0;
@@ -2206,8 +2216,6 @@ CXCMolecularHessian::_integrateFxcHessianForGGA(const CMolecule&        molecule
 
                     auto j_offset = jatom * npoints;
 
-                    if (jatom != iatom) continue;
-
                     double gatmxx = 0.0, gatmyx = 0.0, gatmzx = 0.0;
                     double gatmxy = 0.0, gatmyy = 0.0, gatmzy = 0.0;
                     double gatmxz = 0.0, gatmyz = 0.0, gatmzz = 0.0;
@@ -2221,6 +2229,10 @@ CXCMolecularHessian::_integrateFxcHessianForGGA(const CMolecule&        molecule
                         auto jg = j_offset + g;
 
                         double w = local_weights[g];
+
+                        // (rho_a, rho_a), (rho_a, rho_b)
+
+                        // (v2rho2_aa + v2rho2_ab) \rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
 
                         double prefac = w * (v2rho2[3 * g + 0] + v2rho2[3 * g + 1]);
 
@@ -2236,7 +2248,94 @@ CXCMolecularHessian::_integrateFxcHessianForGGA(const CMolecule&        molecule
                         gatmzy += prefac * gdenz[ig] * gdeny[jg];
                         gatmzz += prefac * gdenz[ig] * gdenz[jg];
 
-                        // TODO add other contributions
+                        // (rho_a, sigma_aa), (rho_a, sigma_ab), (rho_a, sigma_bb)
+
+                        // 2 (v2rhosigma_a_aa + v2rhosigma_a_ab + v2rhosigma_a_bb) \rho_{\alpha}^{(\xi)} (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\zeta)})
+
+                        prefac = w * 2.0 * (v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 2]);
+
+                        auto gx = rhograd[6 * g + 0];
+                        auto gy = rhograd[6 * g + 1];
+                        auto gz = rhograd[6 * g + 2];
+
+                        auto xcomp_j = (gx * gdenxx[jg] + gy * gdenyx[jg] + gz * gdenzx[jg]);
+                        auto ycomp_j = (gx * gdenxy[jg] + gy * gdenyy[jg] + gz * gdenzy[jg]);
+                        auto zcomp_j = (gx * gdenxz[jg] + gy * gdenyz[jg] + gz * gdenzz[jg]);
+
+                        gatmxx += prefac * gdenx[ig] * xcomp_j;
+                        gatmxy += prefac * gdenx[ig] * ycomp_j;
+                        gatmxz += prefac * gdenx[ig] * zcomp_j;
+
+                        gatmyx += prefac * gdeny[ig] * xcomp_j;
+                        gatmyy += prefac * gdeny[ig] * ycomp_j;
+                        gatmyz += prefac * gdeny[ig] * zcomp_j;
+
+                        gatmzx += prefac * gdenz[ig] * xcomp_j;
+                        gatmzy += prefac * gdenz[ig] * ycomp_j;
+                        gatmzz += prefac * gdenz[ig] * zcomp_j;
+
+                        // (sigma_aa, rho_a), (sigma_ab, rho_a), (sigma_aa, rho_b), (sigma_ab, rho_b)
+
+                        auto f_aa = v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 3];
+                        auto f_ab = v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 4];
+
+                        prefac = w * (2.0 * f_aa + f_ab);
+
+                        auto xcomp_i = (gx * gdenxx[ig] + gy * gdenyx[ig] + gz * gdenzx[ig]);
+                        auto ycomp_i = (gx * gdenxy[ig] + gy * gdenyy[ig] + gz * gdenzy[ig]);
+                        auto zcomp_i = (gx * gdenxz[ig] + gy * gdenyz[ig] + gz * gdenzz[ig]);
+
+                        gatmxx += prefac * xcomp_i * gdenx[jg];
+                        gatmxy += prefac * xcomp_i * gdeny[jg];
+                        gatmxz += prefac * xcomp_i * gdenz[jg];
+
+                        gatmyx += prefac * ycomp_i * gdenx[jg];
+                        gatmyy += prefac * ycomp_i * gdeny[jg];
+                        gatmyz += prefac * ycomp_i * gdenz[jg];
+
+                        gatmzx += prefac * zcomp_i * gdenx[jg];
+                        gatmzy += prefac * zcomp_i * gdeny[jg];
+                        gatmzz += prefac * zcomp_i * gdenz[jg];
+
+                        // (sigma_aa, sigma_aa), ...
+
+                        f_aa = v2sigma2[6 * g + 0] + v2sigma2[6 * g + 1] + v2sigma2[6 * g + 2];
+                        f_ab = v2sigma2[6 * g + 1] + v2sigma2[6 * g + 3] + v2sigma2[6 * g + 4];
+
+                        prefac = w * 2.0 * (2.0 * f_aa + f_ab);
+
+                        gatmxx += prefac * xcomp_i * xcomp_j;
+                        gatmxy += prefac * xcomp_i * ycomp_j;
+                        gatmxz += prefac * xcomp_i * zcomp_j;
+
+                        gatmyx += prefac * ycomp_i * xcomp_j;
+                        gatmyy += prefac * ycomp_i * ycomp_j;
+                        gatmyz += prefac * ycomp_i * zcomp_j;
+
+                        gatmzx += prefac * zcomp_i * xcomp_j;
+                        gatmzy += prefac * zcomp_i * ycomp_j;
+                        gatmzz += prefac * zcomp_i * zcomp_j;
+
+                        // sigma_aa, sigma_ab
+
+                        // (2 vsigma_aa + vsigma_ab) (\nabla\rho_{\alpha})^{(\xi)} (\nabla\rho_{\alpha})^{(\zeta)}
+
+                        f_aa = vsigma[3 * g + 0];
+                        f_ab = vsigma[3 * g + 1];
+
+                        prefac = w * (2.0 * f_aa + f_ab);
+
+                        gatmxx += prefac * (gdenxx[ig] * gdenxx[jg] + gdenyx[ig] * gdenyx[jg] + gdenzx[ig] * gdenzx[jg]);
+                        gatmxy += prefac * (gdenxx[ig] * gdenxy[jg] + gdenyx[ig] * gdenyy[jg] + gdenzx[ig] * gdenzy[jg]);
+                        gatmxz += prefac * (gdenxx[ig] * gdenxz[jg] + gdenyx[ig] * gdenyz[jg] + gdenzx[ig] * gdenzz[jg]);
+
+                        gatmyx += prefac * (gdenxy[ig] * gdenxx[jg] + gdenyy[ig] * gdenyx[jg] + gdenzy[ig] * gdenzx[jg]);
+                        gatmyy += prefac * (gdenxy[ig] * gdenxy[jg] + gdenyy[ig] * gdenyy[jg] + gdenzy[ig] * gdenzy[jg]);
+                        gatmyz += prefac * (gdenxy[ig] * gdenxz[jg] + gdenyy[ig] * gdenyz[jg] + gdenzy[ig] * gdenzz[jg]);
+
+                        gatmzx += prefac * (gdenxz[ig] * gdenxx[jg] + gdenyz[ig] * gdenyx[jg] + gdenzz[ig] * gdenzx[jg]);
+                        gatmzy += prefac * (gdenxz[ig] * gdenxy[jg] + gdenyz[ig] * gdenyy[jg] + gdenzz[ig] * gdenzy[jg]);
+                        gatmzz += prefac * (gdenxz[ig] * gdenxz[jg] + gdenyz[ig] * gdenyz[jg] + gdenzz[ig] * gdenzz[jg]);
                     }
 
                     // factor of 2 from sum of alpha and beta contributions
