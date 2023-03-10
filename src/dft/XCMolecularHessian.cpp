@@ -72,13 +72,9 @@ CXCMolecularHessian::integrateVxcHessian(const CMolecule&        molecule,
         {
             return _integrateVxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
         }
-        else if (xcfuntype == xcfun::gga)
-        {
-            return _integrateVxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
-        }
         else
         {
-            std::string errxcfuntype("XCMolecularHessian.integrateVxcHessian: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularHessian.integrateVxcHessian: Only implemented for LDA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
@@ -110,13 +106,9 @@ CXCMolecularHessian::integrateFxcHessian(const CMolecule&        molecule,
         {
             return _integrateFxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
         }
-        else if (xcfuntype == xcfun::gga)
-        {
-            return _integrateFxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
-        }
         else
         {
-            std::string errxcfuntype("XCMolecularHessian.integrateFxcHessian: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularHessian.integrateFxcHessian: Only implemented for LDA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
