@@ -510,17 +510,17 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
                 {
                     auto mu_g = mu_offset + g;
 
-                    gatmxx += w0[g] * (F_val[mu_g] * chi_xx_val[mu_g]);
-                    gatmxy += w0[g] * (F_val[mu_g] * chi_xy_val[mu_g]);
-                    gatmxz += w0[g] * (F_val[mu_g] * chi_xz_val[mu_g]);
+                    gatmxx += w0[g] * F_val[mu_g] * chi_xx_val[mu_g];
+                    gatmxy += w0[g] * F_val[mu_g] * chi_xy_val[mu_g];
+                    gatmxz += w0[g] * F_val[mu_g] * chi_xz_val[mu_g];
 
-                    gatmyx += w0[g] * (F_val[mu_g] * chi_xy_val[mu_g]);
-                    gatmyy += w0[g] * (F_val[mu_g] * chi_yy_val[mu_g]);
-                    gatmyz += w0[g] * (F_val[mu_g] * chi_yz_val[mu_g]);
+                    gatmyx += w0[g] * F_val[mu_g] * chi_xy_val[mu_g];
+                    gatmyy += w0[g] * F_val[mu_g] * chi_yy_val[mu_g];
+                    gatmyz += w0[g] * F_val[mu_g] * chi_yz_val[mu_g];
 
-                    gatmzx += w0[g] * (F_val[mu_g] * chi_xz_val[mu_g]);
-                    gatmzy += w0[g] * (F_val[mu_g] * chi_yz_val[mu_g]);
-                    gatmzz += w0[g] * (F_val[mu_g] * chi_zz_val[mu_g]);
+                    gatmzx += w0[g] * F_val[mu_g] * chi_xz_val[mu_g];
+                    gatmzy += w0[g] * F_val[mu_g] * chi_yz_val[mu_g];
+                    gatmzz += w0[g] * F_val[mu_g] * chi_zz_val[mu_g];
                 }
 
                 // factor of 2 from differentiation
@@ -563,8 +563,6 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
 
                     auto nu_offset = nu * npoints;
 
-                    auto D_mn = D_val[mu * naos + nu];
-
                     double gatmxx = 0.0, gatmxy = 0.0, gatmxz = 0.0;
                     double gatmyx = 0.0, gatmyy = 0.0, gatmyz = 0.0;
                     double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
@@ -588,6 +586,8 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
                         gatmzy += w0[g] * chi_z_val[mu_g] * chi_y_val[nu_g];
                         gatmzz += w0[g] * chi_z_val[mu_g] * chi_z_val[nu_g];
                     }
+
+                    auto D_mn = D_val[mu * naos + nu];
 
                     // factor of 2 from differentiation
                     // factor of 2 from sum of alpha and beta contributions
@@ -1081,7 +1081,7 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                 {
                     auto mu_g = mu_offset + g;
 
-                    // first contribution to vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+                    // 1st contribution to vrho_a \rho_{\alpha}^{(\xi,\zeta)}
                     // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi,\zeta)} \phi_{\nu}
                     // note that F_{\mu} = \sum_{\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\nu}
                     // factor of 2 is added outside of the for loop
@@ -1209,8 +1209,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
                     auto nu_offset = nu * npoints;
 
-                    auto D_mn = D_val[mu * naos + nu];
-
                     double gatmxx = 0.0, gatmxy = 0.0, gatmxz = 0.0;
                     double gatmyx = 0.0, gatmyy = 0.0, gatmyz = 0.0;
                     double gatmzx = 0.0, gatmzy = 0.0, gatmzz = 0.0;
@@ -1223,9 +1221,8 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                         auto mu_g = mu_offset + g;
                         auto nu_g = nu_offset + g;
 
-                        // second contribution to vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+                        // 2nd contribution to vrho_a \rho_{\alpha}^{(\xi,\zeta)}
                         // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi)} \phi_{\nu}^{(\zeta)}
-                        // note that F_{\mu} = \sum_{\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\nu}
                         // factor of 2 and P_{\mu\nu,sym}^{\alpha} are added outside of the for loop
 
                         double gxx = 0.0, gxy = 0.0, gxz = 0.0;
@@ -1334,6 +1331,8 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                         gatmzy += w0[g] * gzy + (wx[g] * gxzy + wy[g] * gyzy + wz[g] * gzzy);
                         gatmzz += w0[g] * gzz + (wx[g] * gxzz + wy[g] * gyzz + wz[g] * gzzz);
                     }
+
+                    auto D_mn = D_val[mu * naos + nu];
 
                     // factor of 2 from differentiation
                     // factor of 2 from sum of alpha and beta contributions
@@ -2297,7 +2296,8 @@ CXCMolecularHessian::_integrateFxcHessianForGGA(const CMolecule&        molecule
                         gatmzy += prefac * zcomp_i * gdeny[jg];
                         gatmzz += prefac * zcomp_i * gdenz[jg];
 
-                        // (sigma_aa, sigma_aa), ...
+                        // (sigma_aa, sigma_aa), (sigma_aa, sigma_ab), (sigma_aa, sigma_bb)
+                        // (sigma_ab, sigma_aa), (sigma_ab, sigma_ab), (sigma_ab, sigma_bb)
 
                         f_aa = v2sigma2[6 * g + 0] + v2sigma2[6 * g + 1] + v2sigma2[6 * g + 2];
                         f_ab = v2sigma2[6 * g + 1] + v2sigma2[6 * g + 3] + v2sigma2[6 * g + 4];
