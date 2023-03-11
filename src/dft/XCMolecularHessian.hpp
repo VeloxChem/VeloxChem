@@ -120,6 +120,13 @@ class CXCMolecularHessian
                                                               const CXCFunctional&    xcFunctional,
                                                               const int32_t           atomIdx) const;
 
+    std::vector<CDenseMatrix> _integrateVxcFockGradientForGGA(const CMolecule&        molecule,
+                                                              const CMolecularBasis&  basis,
+                                                              const CAODensityMatrix& gsDensityMatrix,
+                                                              const CMolecularGrid&   molecularGrid,
+                                                              const CXCFunctional&    xcFunctional,
+                                                              const int32_t           atomIdx) const;
+
     /**
      Computes AO-to-atom mapping.
 
