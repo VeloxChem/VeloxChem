@@ -48,9 +48,6 @@ class TestXCMolHess:
         for iatom in range(molecule.number_of_atoms()):
             vxc_deriv_atom = xc_mol_hess.integrate_vxc_fock_gradient(
                 molecule, basis, density, mol_grid, xcfun_label, iatom)
-            if xcfun_label.lower() == 'slater':
-                vxc_deriv_atom += xc_mol_hess.integrate_fxc_fock_gradient(
-                    molecule, basis, density, mol_grid, xcfun_label, iatom)
             vxc_deriv_1.append(vxc_deriv_atom)
         vxc_deriv_1 = np.array(vxc_deriv_1)
 
