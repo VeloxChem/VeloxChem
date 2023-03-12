@@ -2947,21 +2947,21 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
 
         timer.start("Density grad. grid prep.");
 
-        CDenseMatrix dengradx(natoms, npoints);
-        CDenseMatrix dengrady(natoms, npoints);
-        CDenseMatrix dengradz(natoms, npoints);
+        CDenseMatrix dengradx(1, npoints);
+        CDenseMatrix dengrady(1, npoints);
+        CDenseMatrix dengradz(1, npoints);
 
-        CDenseMatrix dengradxx(natoms, npoints);
-        CDenseMatrix dengradxy(natoms, npoints);
-        CDenseMatrix dengradxz(natoms, npoints);
+        CDenseMatrix dengradxx(1, npoints);
+        CDenseMatrix dengradxy(1, npoints);
+        CDenseMatrix dengradxz(1, npoints);
 
-        CDenseMatrix dengradyx(natoms, npoints);
-        CDenseMatrix dengradyy(natoms, npoints);
-        CDenseMatrix dengradyz(natoms, npoints);
+        CDenseMatrix dengradyx(1, npoints);
+        CDenseMatrix dengradyy(1, npoints);
+        CDenseMatrix dengradyz(1, npoints);
 
-        CDenseMatrix dengradzx(natoms, npoints);
-        CDenseMatrix dengradzy(natoms, npoints);
-        CDenseMatrix dengradzz(natoms, npoints);
+        CDenseMatrix dengradzx(1, npoints);
+        CDenseMatrix dengradzy(1, npoints);
+        CDenseMatrix dengradzz(1, npoints);
 
         timer.stop("Density grad. grid prep.");
 
@@ -3026,9 +3026,9 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
 
             for (int32_t nu = 0; nu < naos; nu++)
             {
-                auto atomidx = ao_to_atom_ids[aoinds[nu]];
+                auto iatom = ao_to_atom_ids[aoinds[nu]];
 
-                auto atom_offset = atomidx * npoints;
+                if (iatom != atomIdx) continue;
 
                 auto nu_offset = nu * npoints;
 
@@ -3038,25 +3038,23 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
                         chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val : VLX_ALIGN)
                 for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
-                    auto atom_g = atom_offset + g;
-
                     auto nu_g = nu_offset + g;
 
-                    gdenx[atom_g] -= 2.0 * F_val[nu_g] * chi_x_val[nu_g];
-                    gdeny[atom_g] -= 2.0 * F_val[nu_g] * chi_y_val[nu_g];
-                    gdenz[atom_g] -= 2.0 * F_val[nu_g] * chi_z_val[nu_g];
+                    gdenx[g] -= 2.0 * F_val[nu_g] * chi_x_val[nu_g];
+                    gdeny[g] -= 2.0 * F_val[nu_g] * chi_y_val[nu_g];
+                    gdenz[g] -= 2.0 * F_val[nu_g] * chi_z_val[nu_g];
 
-                    gdenxx[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xx_val[nu_g]);
-                    gdenxy[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
-                    gdenxz[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
+                    gdenxx[g] -= 2.0 * (F_x_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xx_val[nu_g]);
+                    gdenxy[g] -= 2.0 * (F_x_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
+                    gdenxz[g] -= 2.0 * (F_x_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
 
-                    gdenyx[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
-                    gdenyy[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yy_val[nu_g]);
-                    gdenyz[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
+                    gdenyx[g] -= 2.0 * (F_y_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
+                    gdenyy[g] -= 2.0 * (F_y_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yy_val[nu_g]);
+                    gdenyz[g] -= 2.0 * (F_y_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
 
-                    gdenzx[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
-                    gdenzy[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
-                    gdenzz[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_zz_val[nu_g]);
+                    gdenzx[g] -= 2.0 * (F_z_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
+                    gdenzy[g] -= 2.0 * (F_z_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
+                    gdenzz[g] -= 2.0 * (F_z_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_zz_val[nu_g]);
                 }
             }
         }
@@ -3101,21 +3099,120 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
             {
                 auto nu_offset = nu * npoints;
 
-                #pragma omp simd aligned(local_weights, vrho, v2rho2, chi_val, \
-                        vxc_w_val, vxc_wx_val, vxc_wy_val, vxc_wz_val, gdenx, gdeny, gdenz : VLX_ALIGN)
+                #pragma omp simd aligned(local_weights, rhograd, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2, \
+                        chi_val, vxc_w_val, vxc_wx_val, vxc_wy_val, vxc_wz_val, gdenx, gdeny, gdenz, \
+                        gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz : VLX_ALIGN)
                 for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                 {
                     auto nu_g = nu_offset + g;
 
-                    auto prefac = local_weights[g] * vrho[2 * g + 0];
+                    auto w = local_weights[g];
 
-                    vxc_w_val[nu_g] = -1.0 * prefac * chi_val[nu_g];
+                    // 2 vrho_a (\phi_{\mu}^{(\xi)} \phi_{\nu})_{sym}
+                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
 
-                    prefac = local_weights[g] * (v2rho2[3 * g + 0] + v2rho2[3 * g + 1]) * chi_val[nu_g];
+                    auto prefac = w * vrho[2 * g + 0];
 
-                    vxc_wx_val[nu_g] = prefac * gdenx[g];
-                    vxc_wy_val[nu_g] = prefac * gdeny[g];
-                    vxc_wz_val[nu_g] = prefac * gdenz[g];
+                    vxc_w_val[nu_g] += -2.0 * prefac * chi_val[nu_g];
+
+                    // (v2rho2_aa + v2rho2_ab) \rho_{\alpha}^{(\xi)} \phi_{\mu} \phi_{\nu}
+                    // note: \phi_{\mu} will be added later (from mat_chi)
+
+                    prefac = w * (v2rho2[3 * g + 0] + v2rho2[3 * g + 1]);
+
+                    vxc_wx_val[nu_g] += prefac * gdenx[g] * chi_val[nu_g];
+                    vxc_wy_val[nu_g] += prefac * gdeny[g] * chi_val[nu_g];
+                    vxc_wz_val[nu_g] += prefac * gdenz[g] * chi_val[nu_g];
+
+                    // 2 (v2rhosigma_a_aa + v2rhosigma_a_ab + v2rhosigma_a_bb)
+                    // (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\xi)}) \phi_{\mu} \phi_{\nu}
+                    // note: \phi_{\mu} will be added later (from mat_chi)
+
+                    prefac = w * 2.0 * (v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 2]);
+
+                    auto gx = rhograd[6 * g + 0];
+                    auto gy = rhograd[6 * g + 1];
+                    auto gz = rhograd[6 * g + 2];
+
+                    auto xcomp = (gx * gdenxx[g] + gy * gdenyx[g] + gz * gdenzx[g]);
+                    auto ycomp = (gx * gdenxy[g] + gy * gdenyy[g] + gz * gdenzy[g]);
+                    auto zcomp = (gx * gdenxz[g] + gy * gdenyz[g] + gz * gdenzz[g]);
+
+                    vxc_wx_val[nu_g] += prefac * xcomp * chi_val[nu_g];
+                    vxc_wy_val[nu_g] += prefac * ycomp * chi_val[nu_g];
+                    vxc_wz_val[nu_g] += prefac * zcomp * chi_val[nu_g];
+
+                    // (2 vsigma_aa + vsigma_ab) (\nabla\rho_{\alpha})^{(\xi)} (\nabla\phi_{\nu} \phi_{\mu})_{sym}
+                    // note: \phi_{\mu} will be added later (from mat_chi)
+
+                    // TODO: double check symmetry in this contribution
+
+                    auto f_aa = vsigma[3 * g + 0];
+                    auto f_ab = vsigma[3 * g + 1];
+
+                    prefac = w * (2.0 * f_aa + f_ab);
+
+                    xcomp = (chi_x_val[nu_g] * gdenxx[g] + chi_y_val[nu_g] * gdenyx[g] + chi_z_val[nu_g] * gdenzx[g]);
+                    ycomp = (chi_x_val[nu_g] * gdenxy[g] + chi_y_val[nu_g] * gdenyy[g] + chi_z_val[nu_g] * gdenzy[g]);
+                    zcomp = (chi_x_val[nu_g] * gdenxz[g] + chi_y_val[nu_g] * gdenyz[g] + chi_z_val[nu_g] * gdenzz[g]);
+
+                    vxc_wx_val[nu_g] += 2.0 * prefac * xcomp;
+                    vxc_wy_val[nu_g] += 2.0 * prefac * ycomp;
+                    vxc_wz_val[nu_g] += 2.0 * prefac * zcomp;
+
+                    // (2 vsigma_aa + vsigma_ab) \nabla\rho_{\alpha}
+                    // [(\nabla\phi_{\nu})^{(\xi)} \phi_{\mu}]_{sym}
+                    // note: \phi_{\mu} will be added later (from mat_chi)
+
+                    // TODO: double check symmetry in this contribution
+
+                    xcomp = (gx * chi_xx_val[nu_g] + gy * chi_xy_val[nu_g] + gz * chi_xz_val[nu_g]);
+                    ycomp = (gx * chi_xy_val[nu_g] + gy * chi_yy_val[nu_g] + gz * chi_yz_val[nu_g]);
+                    zcomp = (gx * chi_xz_val[nu_g] + gy * chi_yz_val[nu_g] + gz * chi_zz_val[nu_g]);
+
+                    vxc_wx_val[nu_g] += -2.0 * prefac * xcomp;
+                    vxc_wy_val[nu_g] += -2.0 * prefac * ycomp;
+                    vxc_wz_val[nu_g] += -2.0 * prefac * zcomp;
+
+                    // (2 vsigma_aa + vsigma_ab) \nabla\rho_{\alpha}
+                    // [\nabla\phi_{\nu} (\phi_{\mu})^{(\xi)}]_{sym}
+                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
+
+                    auto dot_val = (gx * chi_x_val[nu_g] + gy * chi_y_val[nu_g] + gz * chi_z_val[nu_g]);
+
+                    vxc_w_val[nu_g] += -2.0 * prefac * dot_val;
+
+                    // (2 (v2rhosigma_a_aa + v2rhosigma_b_aa) + (v2rhosigma_a_ab + v2rhosigma_b_ab)) 
+                    // \rho_{\alpha}^{(\xi)} (\nabla\rho_{\alpha} \nabla\phi_{\nu} \phi_{\mu})_sym
+
+                    // TODO: double check symmetry in this contribution
+
+                    f_aa = v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 3];
+                    f_ab = v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 4];
+
+                    prefac = w * (2.0 * f_aa + f_ab);
+
+                    vxc_wx_val[nu_g] += 2.0 * prefac * dot_val * gdenx[g];
+                    vxc_wy_val[nu_g] += 2.0 * prefac * dot_val * gdeny[g];
+                    vxc_wz_val[nu_g] += 2.0 * prefac * dot_val * gdenz[g];
+
+                    // (2 (v2sigma2_aa_aa + v2sigma2_aa_ab + v2sigma2_aa_bb) + 
+                    //    (v2sigma2_ab_aa + v2sigma2_ab_ab + v2sigma2_ab_bb)) 
+                    // 2 (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\xi)})
+                    //   (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\zeta)})
+
+                    f_aa = v2sigma2[6 * g + 0] + v2sigma2[6 * g + 1] + v2sigma2[6 * g + 2];
+                    f_ab = v2sigma2[6 * g + 1] + v2sigma2[6 * g + 3] + v2sigma2[6 * g + 4];
+
+                    prefac = w * 2.0 * (2.0 * f_aa + f_ab);
+
+                    xcomp = (gx * gdenxx[g] + gy * gdenyx[g] + gz * gdenzx[g]);
+                    ycomp = (gx * gdenxy[g] + gy * gdenyy[g] + gz * gdenzy[g]);
+                    zcomp = (gx * gdenxz[g] + gy * gdenyz[g] + gz * gdenzz[g]);
+
+                    vxc_wx_val[nu_g] += 2.0 * prefac * dot_val * xcomp;
+                    vxc_wy_val[nu_g] += 2.0 * prefac * dot_val * ycomp;
+                    vxc_wz_val[nu_g] += 2.0 * prefac * dot_val * zcomp;
                 }
             }
         }
@@ -3128,9 +3225,9 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
         auto vxc_gy_first = denblas::multABt(mat_atom_chi_y, vxc_w);
         auto vxc_gz_first = denblas::multABt(mat_atom_chi_z, vxc_w);
 
-        vxc_gx_first.symmetrize();
-        vxc_gy_first.symmetrize();
-        vxc_gz_first.symmetrize();
+        vxc_gx_first.symmetrizeAndScale(0.5);
+        vxc_gy_first.symmetrizeAndScale(0.5);
+        vxc_gz_first.symmetrizeAndScale(0.5);
 
         auto vxc_gx_second = denblas::multABt(mat_chi, vxc_wx);
         auto vxc_gy_second = denblas::multABt(mat_chi, vxc_wy);
@@ -3139,6 +3236,10 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
         auto vxc_gx = denblas::addAB(vxc_gx_first, vxc_gx_second, 1.0);
         auto vxc_gy = denblas::addAB(vxc_gy_first, vxc_gy_second, 1.0);
         auto vxc_gz = denblas::addAB(vxc_gz_first, vxc_gz_second, 1.0);
+
+        vxc_gx.symmetrizeAndScale(0.5);
+        vxc_gy.symmetrizeAndScale(0.5);
+        vxc_gz.symmetrizeAndScale(0.5);
 
         timer.stop("Vxc matrix matmul");
 
