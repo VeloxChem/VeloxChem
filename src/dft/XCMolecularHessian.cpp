@@ -3097,6 +3097,10 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
 
             for (int32_t nu = 0; nu < aocount; nu++)
             {
+                auto iatom = ao_to_atom_ids[aoinds[nu]];
+
+                bool nu_on_atom = (iatom == atomIdx);
+
                 auto nu_offset = nu * npoints;
 
                 #pragma omp simd aligned(local_weights, rhograd, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2, \
@@ -3145,8 +3149,6 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
                     // (2 vsigma_aa + vsigma_ab) (\nabla\rho_{\alpha})^{(\xi)} (\nabla\phi_{\nu} \phi_{\mu})_{sym}
                     // note: \phi_{\mu} will be added later (from mat_chi)
 
-                    // TODO: double check symmetry in this contribution
-
                     auto f_aa = vsigma[3 * g + 0];
                     auto f_ab = vsigma[3 * g + 1];
 
@@ -3164,19 +3166,24 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
                     // [(\nabla\phi_{\nu})^{(\xi)} \phi_{\mu}]_{sym}
                     // note: \phi_{\mu} will be added later (from mat_chi)
 
-                    // TODO: double check symmetry in this contribution
+                    if (nu_on_atom)
+                    {
+                        prefac = w * (2.0 * f_aa + f_ab);
 
-                    xcomp = (gx * chi_xx_val[nu_g] + gy * chi_xy_val[nu_g] + gz * chi_xz_val[nu_g]);
-                    ycomp = (gx * chi_xy_val[nu_g] + gy * chi_yy_val[nu_g] + gz * chi_yz_val[nu_g]);
-                    zcomp = (gx * chi_xz_val[nu_g] + gy * chi_yz_val[nu_g] + gz * chi_zz_val[nu_g]);
+                        xcomp = (gx * chi_xx_val[nu_g] + gy * chi_xy_val[nu_g] + gz * chi_xz_val[nu_g]);
+                        ycomp = (gx * chi_xy_val[nu_g] + gy * chi_yy_val[nu_g] + gz * chi_yz_val[nu_g]);
+                        zcomp = (gx * chi_xz_val[nu_g] + gy * chi_yz_val[nu_g] + gz * chi_zz_val[nu_g]);
 
-                    vxc_wx_val[nu_g] += -2.0 * prefac * xcomp;
-                    vxc_wy_val[nu_g] += -2.0 * prefac * ycomp;
-                    vxc_wz_val[nu_g] += -2.0 * prefac * zcomp;
+                        vxc_wx_val[nu_g] += -2.0 * prefac * xcomp;
+                        vxc_wy_val[nu_g] += -2.0 * prefac * ycomp;
+                        vxc_wz_val[nu_g] += -2.0 * prefac * zcomp;
+                    }
 
                     // (2 vsigma_aa + vsigma_ab) \nabla\rho_{\alpha}
                     // [\nabla\phi_{\nu} (\phi_{\mu})^{(\xi)}]_{sym}
                     // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
+
+                    prefac = w * (2.0 * f_aa + f_ab);
 
                     auto dot_val = (gx * chi_x_val[nu_g] + gy * chi_y_val[nu_g] + gz * chi_z_val[nu_g]);
 
@@ -3184,8 +3191,6 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
 
                     // (2 (v2rhosigma_a_aa + v2rhosigma_b_aa) + (v2rhosigma_a_ab + v2rhosigma_b_ab)) 
                     // \rho_{\alpha}^{(\xi)} (\nabla\rho_{\alpha} \nabla\phi_{\nu} \phi_{\mu})_sym
-
-                    // TODO: double check symmetry in this contribution
 
                     f_aa = v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 3];
                     f_ab = v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 4];
@@ -3224,10 +3229,6 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
         auto vxc_gx_first = denblas::multABt(mat_atom_chi_x, vxc_w);
         auto vxc_gy_first = denblas::multABt(mat_atom_chi_y, vxc_w);
         auto vxc_gz_first = denblas::multABt(mat_atom_chi_z, vxc_w);
-
-        vxc_gx_first.symmetrizeAndScale(0.5);
-        vxc_gy_first.symmetrizeAndScale(0.5);
-        vxc_gz_first.symmetrizeAndScale(0.5);
 
         auto vxc_gx_second = denblas::multABt(mat_chi, vxc_wx);
         auto vxc_gy_second = denblas::multABt(mat_chi, vxc_wy);

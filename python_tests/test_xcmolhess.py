@@ -44,17 +44,17 @@ class TestXCMolHess:
 
         assert np.max(np.abs(ref_exc_deriv_2 - exc_deriv_2)) < 1.0e-4
 
-        if ref_vxc_deriv_1 is not None:
-            vxc_deriv_1 = []
-            for iatom in range(molecule.number_of_atoms()):
-                vxc_deriv_atom = xc_mol_hess.integrate_vxc_fock_gradient(
-                    molecule, basis, density, mol_grid, xcfun_label, iatom)
+        vxc_deriv_1 = []
+        for iatom in range(molecule.number_of_atoms()):
+            vxc_deriv_atom = xc_mol_hess.integrate_vxc_fock_gradient(
+                molecule, basis, density, mol_grid, xcfun_label, iatom)
+            if xcfun_label.lower() == 'slater':
                 vxc_deriv_atom += xc_mol_hess.integrate_fxc_fock_gradient(
                     molecule, basis, density, mol_grid, xcfun_label, iatom)
-                vxc_deriv_1.append(vxc_deriv_atom)
-            vxc_deriv_1 = np.array(vxc_deriv_1)
+            vxc_deriv_1.append(vxc_deriv_atom)
+        vxc_deriv_1 = np.array(vxc_deriv_1)
 
-            assert np.max(np.abs(ref_vxc_deriv_1 - vxc_deriv_1)) < 1.0e-4
+        assert np.max(np.abs(ref_vxc_deriv_1 - vxc_deriv_1)) < 1.0e-4
 
     @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_xc_mol_hess_lda(self):
@@ -105,4 +105,5 @@ class TestXCMolHess:
         ref_vxc_deriv_1 = np.array(hf.get('vxc_geom_deriv_1'))
         hf.close()
 
-        self.run_xc_mol_hess(molecule, basis, xcfun_label, ref_exc_deriv_2)
+        self.run_xc_mol_hess(molecule, basis, xcfun_label, ref_exc_deriv_2,
+                             ref_vxc_deriv_1)
