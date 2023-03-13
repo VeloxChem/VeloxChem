@@ -113,6 +113,8 @@ class GradientDriver:
             key = grad_dict['numerical'].lower()
             self.numerical = (key in ['yes', 'y'])
 
+        # TODO: use parse_input and _dft_sanity_check
+
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
             self.dft = (key in ['yes', 'y'])

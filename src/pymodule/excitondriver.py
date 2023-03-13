@@ -241,6 +241,8 @@ class ExcitonModelDriver:
 
         parse_input(self, method_keywords, method_dict)
 
+        # TODO: use _dft_sanity_check
+
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self.dft = True
