@@ -2029,31 +2029,24 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
             else:
                 pyscf_scf.grids.level = scfdrv.grid_level
 
-            if scfdrv.xcfun.get_func_type() == xcfun.lda:
-                grid_drv = GridDriver()
-                grid_drv.set_level(scfdrv.grid_level)
-                xc_mol_hess = XCMolecularHessian()
-                mol_grid = grid_drv.generate(molecule)
-                vlx_density = scfdrv.density
-                vlx_vxc_deriv_atom_i = xc_mol_hess.integrate_vxc_fock_gradient(
-                                        molecule, basis, vlx_density, mol_grid,
-                                        scfdrv.xcfun.get_func_label(), i)
-                vlx_vxc_deriv_atom_i += xc_mol_hess.integrate_fxc_fock_gradient(
-                                        molecule, basis, vlx_density, mol_grid,
-                                        scfdrv.xcfun.get_func_label(), i)
-            else:
-                pyscf_scf.kernel()
-
-                pyscf_hessian = pyscf.hessian.rks.Hessian(pyscf_scf)
+            #if scfdrv.xcfun.get_func_type() == xcfun.lda:
+            grid_drv = GridDriver()
+            grid_drv.set_level(scfdrv.grid_level)
+            xc_mol_hess = XCMolecularHessian()
+            mol_grid = grid_drv.generate(molecule)
+            vlx_density = scfdrv.density
+            vlx_vxc_deriv_atom_i = xc_mol_hess.integrate_vxc_fock_gradient(
+                                    molecule, basis, vlx_density, mol_grid,
+                                    scfdrv.xcfun.get_func_label(), i)
+            #else:
+            #    pyscf_scf.kernel()
+            #
+            #    pyscf_hessian = pyscf.hessian.rks.Hessian(pyscf_scf)
         else:
             pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
     else:
         pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
-    #pyscf_scf.kernel()
-    #nocc = pyscf_molecule.nelec[0]
     gs_dm = ao_matrix_to_dalton(DenseMatrix(density), basis, molecule).to_numpy()
-    #gs_dm = np.einsum('mi,ni->mn', pyscf_scf.mo_coeff[:,:nocc],
-    #                   pyscf_scf.mo_coeff[:,:nocc])
     nao = density.shape[0]
     
     if nao != pyscf_molecule.nao:
@@ -2088,41 +2081,21 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
 
     if scfdrv is not None:
         if scfdrv._dft:
-            ## import vxc derivative for partial derivative of Kohn-Sham matrix
-            ## This version does not work!
-            ## vxc_deriv_2 corresponds to:
-            ## fxc * rho * ao_deriv * ao
-            ## and not to the term which is needed for the Hessian:
-            ## fxc * rho_deriv * ao * ao.
-            #vxc_deriv_1, vxc_deriv_2 = import_xc_contrib_tddft(molecule, basis,
-            #                                    scfdrv, density, density,
-            #                                    vxc_deriv_only=True)
-            #vxc_deriv_atom_i = np.zeros((3, nao, nao))
-            #vxc_deriv_atom_i[:, ki:kf] = vxc_deriv_1[1:, ki:kf] # 0 would not be derivative
-            ##vxc_deriv_atom_i[:,ki:kf] += vxc_deriv_2[1:, ki:kf] # 0 would not bederivative
-
-            #vxc_deriv_atom_i += vxc_deriv_atom_i.transpose(0, 2, 1)
-            #vxc_deriv_atom_i[:,ki:kf] += vxc_deriv_2[1:, ki:kf] # 0 would not bederivative
-            
-
-            #print("\n\nvlx vxc deriv atom %d " % i)
-            #print(vxc_deriv_atom_i)
-
             # This one works!
 
-            if scfdrv.xcfun.get_func_type() != xcfun.lda:
-                pyscf_mo_coeff = pyscf_scf.mo_coeff
-                pyscf_mo_occ = pyscf_scf.mo_occ
-                max_memory = 2000
-                vxc_deriv1 = pyscf_rks_hessian._get_vxc_deriv1(pyscf_hessian,
-                                                          pyscf_mo_coeff,
-                                                          pyscf_mo_occ,
-                                                          max_memory)
+            #if scfdrv.xcfun.get_func_type() != xcfun.lda:
+            #    pyscf_mo_coeff = pyscf_scf.mo_coeff
+            #    pyscf_mo_occ = pyscf_scf.mo_occ
+            #    max_memory = 2000
+            #    vxc_deriv1 = pyscf_rks_hessian._get_vxc_deriv1(pyscf_hessian,
+            #                                              pyscf_mo_coeff,
+            #                                              pyscf_mo_occ,
+            #                                              max_memory)
 
-                #print(vxc_deriv1)
-                # select derivatives wrt. atom i
-                vxc_deriv_atom_i = vxc_deriv1[i]
-                fock_deriv_atom_i += vxc_deriv_atom_i
+            #    #print(vxc_deriv1)
+            #    # select derivatives wrt. atom i
+            #    vxc_deriv_atom_i = vxc_deriv1[i]
+            #    fock_deriv_atom_i += vxc_deriv_atom_i
 
             # check fraction of exact exchange
             if scfdrv.xcfun.is_hybrid():
@@ -2156,10 +2129,10 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
                                  basis, molecule).to_numpy()
                                 )
 
-    if scfdrv.xcfun.get_func_type() == xcfun.lda:
-        return vlx_fock_deriv_atom_i + vlx_vxc_deriv_atom_i 
-    else:
-        return vlx_fock_deriv_atom_i
+    #if scfdrv.xcfun.get_func_type() == xcfun.lda:
+    return vlx_fock_deriv_atom_i + vlx_vxc_deriv_atom_i 
+    #else:
+    #    return vlx_fock_deriv_atom_i
 
 
 def vxc_deriv(molecule, basis, scfdrv, unit="au"):

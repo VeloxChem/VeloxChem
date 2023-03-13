@@ -1,6 +1,6 @@
 import numpy as np
 
-from veloxchem.veloxchemlib import XCNewIntegrator
+from veloxchem.veloxchemlib import XCIntegrator
 
 
 class TestLibxcRhoA:
@@ -16,7 +16,7 @@ class TestLibxcRhoA:
 
         delta_h = 1.0e-6
 
-        xc_drv = XCNewIntegrator()
+        xc_drv = XCIntegrator()
 
         rho_a, rho_b = 0.17, 0.15
         nabla_a, nabla_b = 0.26, 0.29

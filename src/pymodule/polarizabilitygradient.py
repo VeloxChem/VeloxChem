@@ -9,10 +9,9 @@ from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
-from .veloxchemlib import XCNewIntegrator as XCIntegrator
-from .veloxchemlib import XCNewFunctional
+from .veloxchemlib import XCIntegrator
 from .veloxchemlib import MolecularGrid
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .veloxchemlib import GridDriver, XCMolecularGradient
 from .cphfsolver import CphfSolver
 from .outputstream import OutputStream
@@ -98,7 +97,7 @@ class PolarizabilityGradient():
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self._dft = True
-            self.xcfun = new_parse_xc_func(method_dict['xcfun'].upper())
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                             'PolarizabilityGradient: Undefined XC functional')
 

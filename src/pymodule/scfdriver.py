@@ -37,10 +37,10 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
+from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -440,7 +440,7 @@ class ScfDriver:
         # DFT: xcfun is functional object or string (other than 'hf')
         else:
             if isinstance(self.xcfun, str):
-                self.xcfun = new_parse_xc_func(self.xcfun.upper())
+                self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'LinearSolver: Undefined XC functional')
             self._dft = True
@@ -1397,7 +1397,7 @@ class ScfDriver:
                     fock_mat.scale(2.0, 0)
 
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
-                xc_drv = XCNewIntegrator(self.comm)
+                xc_drv = XCIntegrator(self.comm)
                 vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
                                                     self._mol_grid,
                                                     self.xcfun.get_func_label())
@@ -1525,7 +1525,7 @@ class ScfDriver:
 
         # calculate Vxc on DFT nodes
         if dft_comm:
-            xc_drv = XCNewIntegrator(local_comm)
+            xc_drv = XCIntegrator(local_comm)
             self._mol_grid.re_distribute_counts_and_displacements(
                 local_comm.Get_rank(), local_comm.Get_size(), local_comm)
             vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,

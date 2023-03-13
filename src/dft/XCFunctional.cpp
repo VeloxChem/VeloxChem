@@ -23,7 +23,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "XCNewFunctional.hpp"
+#include "XCFunctional.hpp"
 
 #include <algorithm>
 #include <cstdint>
@@ -38,16 +38,16 @@
 #include "MemAlloc.hpp"
 #include "StringFormat.hpp"
 
-CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctional,
-                                   const std::vector<std::string>& labels,
-                                   const std::vector<double>&      coeffs,
-                                   const double                    fractionOfExactExchange)
+CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
+                             const std::vector<std::string>& labels,
+                             const std::vector<double>&      coeffs,
+                             const double                    fractionOfExactExchange)
 
     : _nameOfFunctional(fstr::upcase(nameOfFunctional))
 
     , _fractionOfExactExchange(fractionOfExactExchange)
 {
-    std::string errmsg("XCNewFunctional: Inconsistent sizes of functional labels and coefficients");
+    std::string errmsg("XCFunctional: Inconsistent sizes of functional labels and coefficients");
 
     errors::assertMsgCritical(labels.size() == coeffs.size(), errmsg);
 
@@ -79,14 +79,13 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
         }
         else if (kind == XC_EXCHANGE_CORRELATION)
         {
-            errors::assertMsgCritical(labels.size() == 1,
-                                      std::string("XCNewFunctional: Cannot mix ") + label + std::string(" with other functionals"));
+            errors::assertMsgCritical(labels.size() == 1, std::string("XCFunctional: Cannot mix ") + label + std::string(" with other functionals"));
 
             _components.push_back(xccomp);
         }
         else
         {
-            errors::assertMsgCritical(false, std::string("XCNewFunctional: Unsupported functional ") + label);
+            errors::assertMsgCritical(false, std::string("XCFunctional: Unsupported functional ") + label);
         }
 
         // check functional flags
@@ -126,7 +125,7 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
 
         xc_hyb_cam_coef(funcptr, &omega, &alpha, &beta);
 
-        errors::assertMsgCritical(std::fabs(beta) < 1.0e-13, std::string("XCNewFunctional: Range-separated functional is not yet supported"));
+        errors::assertMsgCritical(std::fabs(beta) < 1.0e-13, std::string("XCFunctional: Range-separated functional is not yet supported"));
     }
 
     if (hasExc) _maxDerivOrder = 0;
@@ -139,12 +138,12 @@ CXCNewFunctional::CXCNewFunctional(const std::string&              nameOfFunctio
     if (isGGA) _familyOfFunctional = std::string("GGA");
     if (isMGGA) _familyOfFunctional = std::string("MGGA");
 
-    errors::assertMsgCritical(!needLaplacian, std::string("XCNewFunctional: Density Laplacian is not supported"));
+    errors::assertMsgCritical(!needLaplacian, std::string("XCFunctional: Density Laplacian is not supported"));
 
     _allocateStagingBuffer();
 }
 
-CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
+CXCFunctional::CXCFunctional(const CXCFunctional& source)
 
     : _nameOfFunctional(source._nameOfFunctional)
 
@@ -163,7 +162,7 @@ CXCNewFunctional::CXCNewFunctional(const CXCNewFunctional& source)
     _allocateStagingBuffer();
 }
 
-CXCNewFunctional::CXCNewFunctional(CXCNewFunctional&& source) noexcept
+CXCFunctional::CXCFunctional(CXCFunctional&& source) noexcept
 
     : _nameOfFunctional(std::move(source._nameOfFunctional))
 
@@ -184,7 +183,7 @@ CXCNewFunctional::CXCNewFunctional(CXCNewFunctional&& source) noexcept
     source._freeStagingBuffer();
 }
 
-CXCNewFunctional::~CXCNewFunctional()
+CXCFunctional::~CXCFunctional()
 {
     _components.clear();
 
@@ -192,7 +191,7 @@ CXCNewFunctional::~CXCNewFunctional()
 }
 
 void
-CXCNewFunctional::_allocateStagingBuffer()
+CXCFunctional::_allocateStagingBuffer()
 {
     if (_stagingBuffer == nullptr)
     {
@@ -211,7 +210,7 @@ CXCNewFunctional::_allocateStagingBuffer()
 }
 
 void
-CXCNewFunctional::_freeStagingBuffer()
+CXCFunctional::_freeStagingBuffer()
 {
     if (_stagingBuffer != nullptr)
     {
@@ -221,8 +220,8 @@ CXCNewFunctional::_freeStagingBuffer()
     }
 }
 
-CXCNewFunctional&
-CXCNewFunctional::operator=(const CXCNewFunctional& source)
+CXCFunctional&
+CXCFunctional::operator=(const CXCFunctional& source)
 {
     if (this == &source) return *this;
 
@@ -247,8 +246,8 @@ CXCNewFunctional::operator=(const CXCNewFunctional& source)
     return *this;
 }
 
-CXCNewFunctional&
-CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
+CXCFunctional&
+CXCFunctional::operator=(CXCFunctional&& source) noexcept
 {
     if (this == &source) return *this;
 
@@ -276,7 +275,7 @@ CXCNewFunctional::operator=(CXCNewFunctional&& source) noexcept
 }
 
 bool
-CXCNewFunctional::operator==(const CXCNewFunctional& other) const
+CXCFunctional::operator==(const CXCFunctional& other) const
 {
     if (_nameOfFunctional != other._nameOfFunctional) return false;
 
@@ -296,43 +295,43 @@ CXCNewFunctional::operator==(const CXCNewFunctional& other) const
 }
 
 bool
-CXCNewFunctional::operator!=(const CXCNewFunctional& other) const
+CXCFunctional::operator!=(const CXCFunctional& other) const
 {
     return !(*this == other);
 }
 
 std::string
-CXCNewFunctional::getFunctionalLabel() const
+CXCFunctional::getFunctionalLabel() const
 {
     return _nameOfFunctional;
 }
 
 xcfun
-CXCNewFunctional::getFunctionalType() const
+CXCFunctional::getFunctionalType() const
 {
     return to_xcfun(_familyOfFunctional);
 }
 
 bool
-CXCNewFunctional::isUndefined() const
+CXCFunctional::isUndefined() const
 {
     return (fstr::upcase(_nameOfFunctional) == "UNDEFINED");
 }
 
 bool
-CXCNewFunctional::isHybrid() const
+CXCFunctional::isHybrid() const
 {
     return (std::fabs(_fractionOfExactExchange) > 1.0e-13);
 }
 
 double
-CXCNewFunctional::getFractionOfExactExchange() const
+CXCFunctional::getFractionOfExactExchange() const
 {
     return _fractionOfExactExchange;
 }
 
 auto
-CXCNewFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* exc, double* vrho) const -> void
+CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* exc, double* vrho) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
@@ -380,7 +379,7 @@ CXCNewFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, d
 }
 
 auto
-CXCNewFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* vrho) const -> void
+CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* vrho) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
@@ -422,7 +421,7 @@ CXCNewFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, doubl
 }
 
 auto
-CXCNewFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* v2rho2) const -> void
+CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* v2rho2) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
@@ -466,7 +465,7 @@ CXCNewFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, doubl
 }
 
 auto
-CXCNewFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* v3rho3) const -> void
+CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* v3rho3) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
@@ -512,7 +511,7 @@ CXCNewFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, doubl
 }
 
 auto
-CXCNewFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* v4rho4) const -> void
+CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* v4rho4) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
@@ -560,7 +559,7 @@ CXCNewFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, doubl
 }
 
 auto
-CXCNewFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const
+CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const
     -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
@@ -637,7 +636,7 @@ CXCNewFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, c
 }
 
 auto
-CXCNewFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
+CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
@@ -705,7 +704,7 @@ CXCNewFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const
 }
 
 auto
-CXCNewFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2)
+CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2)
     const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 2,
@@ -800,13 +799,13 @@ CXCNewFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const
 }
 
 auto
-CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
-                                      const double* rho,
-                                      const double* sigma,
-                                      double*       v3rho3,
-                                      double*       v3rho2sigma,
-                                      double*       v3rhosigma2,
-                                      double*       v3sigma3) const -> void
+CXCFunctional::compute_kxc_for_gga(int32_t       np,
+                                   const double* rho,
+                                   const double* sigma,
+                                   double*       v3rho3,
+                                   double*       v3rho2sigma,
+                                   double*       v3rhosigma2,
+                                   double*       v3sigma3) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
@@ -945,14 +944,14 @@ CXCNewFunctional::compute_kxc_for_gga(int32_t       np,
 }
 
 auto
-CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
-                                      const double* rho,
-                                      const double* sigma,
-                                      double*       v4rho4,
-                                      double*       v4rho3sigma,
-                                      double*       v4rho2sigma2,
-                                      double*       v4rhosigma3,
-                                      double*       v4sigma4) const -> void
+CXCFunctional::compute_lxc_for_gga(int32_t       np,
+                                   const double* rho,
+                                   const double* sigma,
+                                   double*       v4rho4,
+                                   double*       v4rho3sigma,
+                                   double*       v4rho2sigma2,
+                                   double*       v4rhosigma3,
+                                   double*       v4sigma4) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
@@ -1167,16 +1166,16 @@ CXCNewFunctional::compute_lxc_for_gga(int32_t       np,
 }
 
 auto
-CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
-                                           const double* rho,
-                                           const double* sigma,
-                                           const double* lapl,
-                                           const double* tau,
-                                           double*       exc,
-                                           double*       vrho,
-                                           double*       vsigma,
-                                           double*       vlapl,
-                                           double*       vtau) const -> void
+CXCFunctional::compute_exc_vxc_for_mgga(int32_t       np,
+                                        const double* rho,
+                                        const double* sigma,
+                                        const double* lapl,
+                                        const double* tau,
+                                        double*       exc,
+                                        double*       vrho,
+                                        double*       vsigma,
+                                        double*       vlapl,
+                                        double*       vtau) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
@@ -1286,15 +1285,15 @@ CXCNewFunctional::compute_exc_vxc_for_mgga(int32_t       np,
 }
 
 auto
-CXCNewFunctional::compute_vxc_for_mgga(int32_t       np,
-                                       const double* rho,
-                                       const double* sigma,
-                                       const double* lapl,
-                                       const double* tau,
-                                       double*       vrho,
-                                       double*       vsigma,
-                                       double*       vlapl,
-                                       double*       vtau) const -> void
+CXCFunctional::compute_vxc_for_mgga(int32_t       np,
+                                    const double* rho,
+                                    const double* sigma,
+                                    const double* lapl,
+                                    const double* tau,
+                                    double*       vrho,
+                                    double*       vsigma,
+                                    double*       vlapl,
+                                    double*       vtau) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
@@ -1393,21 +1392,21 @@ CXCNewFunctional::compute_vxc_for_mgga(int32_t       np,
 }
 
 auto
-CXCNewFunctional::compute_fxc_for_mgga(int32_t       np,
-                                       const double* rho,
-                                       const double* sigma,
-                                       const double* lapl,
-                                       const double* tau,
-                                       double*       v2rho2,
-                                       double*       v2rhosigma,
-                                       double*       v2rholapl,
-                                       double*       v2rhotau,
-                                       double*       v2sigma2,
-                                       double*       v2sigmalapl,
-                                       double*       v2sigmatau,
-                                       double*       v2lapl2,
-                                       double*       v2lapltau,
-                                       double*       v2tau2) const -> void
+CXCFunctional::compute_fxc_for_mgga(int32_t       np,
+                                    const double* rho,
+                                    const double* sigma,
+                                    const double* lapl,
+                                    const double* tau,
+                                    double*       v2rho2,
+                                    double*       v2rhosigma,
+                                    double*       v2rholapl,
+                                    double*       v2rhotau,
+                                    double*       v2sigma2,
+                                    double*       v2sigmalapl,
+                                    double*       v2sigmatau,
+                                    double*       v2lapl2,
+                                    double*       v2lapltau,
+                                    double*       v2tau2) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
@@ -1637,31 +1636,31 @@ CXCNewFunctional::compute_fxc_for_mgga(int32_t       np,
 }
 
 auto
-CXCNewFunctional::compute_kxc_for_mgga(int32_t       np,
-                                       const double* rho,
-                                       const double* sigma,
-                                       const double* lapl,
-                                       const double* tau,
-                                       double*       v3rho3,
-                                       double*       v3rho2sigma,
-                                       double*       v3rho2lapl,
-                                       double*       v3rho2tau,
-                                       double*       v3rhosigma2,
-                                       double*       v3rhosigmalapl,
-                                       double*       v3rhosigmatau,
-                                       double*       v3rholapl2,
-                                       double*       v3rholapltau,
-                                       double*       v3rhotau2,
-                                       double*       v3sigma3,
-                                       double*       v3sigma2lapl,
-                                       double*       v3sigma2tau,
-                                       double*       v3sigmalapl2,
-                                       double*       v3sigmalapltau,
-                                       double*       v3sigmatau2,
-                                       double*       v3lapl3,
-                                       double*       v3lapl2tau,
-                                       double*       v3lapltau2,
-                                       double*       v3tau3) const -> void
+CXCFunctional::compute_kxc_for_mgga(int32_t       np,
+                                    const double* rho,
+                                    const double* sigma,
+                                    const double* lapl,
+                                    const double* tau,
+                                    double*       v3rho3,
+                                    double*       v3rho2sigma,
+                                    double*       v3rho2lapl,
+                                    double*       v3rho2tau,
+                                    double*       v3rhosigma2,
+                                    double*       v3rhosigmalapl,
+                                    double*       v3rhosigmatau,
+                                    double*       v3rholapl2,
+                                    double*       v3rholapltau,
+                                    double*       v3rhotau2,
+                                    double*       v3sigma3,
+                                    double*       v3sigma2lapl,
+                                    double*       v3sigma2tau,
+                                    double*       v3sigmalapl2,
+                                    double*       v3sigmalapltau,
+                                    double*       v3sigmatau2,
+                                    double*       v3lapl3,
+                                    double*       v3lapl2tau,
+                                    double*       v3lapltau2,
+                                    double*       v3tau3) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
@@ -2233,46 +2232,46 @@ CXCNewFunctional::compute_kxc_for_mgga(int32_t       np,
 }
 
 auto
-CXCNewFunctional::compute_lxc_for_mgga(int32_t       np,
-                                       const double* rho,
-                                       const double* sigma,
-                                       const double* lapl,
-                                       const double* tau,
-                                       double*       v4rho4,
-                                       double*       v4rho3sigma,
-                                       double*       v4rho3lapl,
-                                       double*       v4rho3tau,
-                                       double*       v4rho2sigma2,
-                                       double*       v4rho2sigmalapl,
-                                       double*       v4rho2sigmatau,
-                                       double*       v4rho2lapl2,
-                                       double*       v4rho2lapltau,
-                                       double*       v4rho2tau2,
-                                       double*       v4rhosigma3,
-                                       double*       v4rhosigma2lapl,
-                                       double*       v4rhosigma2tau,
-                                       double*       v4rhosigmalapl2,
-                                       double*       v4rhosigmalapltau,
-                                       double*       v4rhosigmatau2,
-                                       double*       v4rholapl3,
-                                       double*       v4rholapl2tau,
-                                       double*       v4rholapltau2,
-                                       double*       v4rhotau3,
-                                       double*       v4sigma4,
-                                       double*       v4sigma3lapl,
-                                       double*       v4sigma3tau,
-                                       double*       v4sigma2lapl2,
-                                       double*       v4sigma2lapltau,
-                                       double*       v4sigma2tau2,
-                                       double*       v4sigmalapl3,
-                                       double*       v4sigmalapl2tau,
-                                       double*       v4sigmalapltau2,
-                                       double*       v4sigmatau3,
-                                       double*       v4lapl4,
-                                       double*       v4lapl3tau,
-                                       double*       v4lapl2tau2,
-                                       double*       v4lapltau3,
-                                       double*       v4tau4) const -> void
+CXCFunctional::compute_lxc_for_mgga(int32_t       np,
+                                    const double* rho,
+                                    const double* sigma,
+                                    const double* lapl,
+                                    const double* tau,
+                                    double*       v4rho4,
+                                    double*       v4rho3sigma,
+                                    double*       v4rho3lapl,
+                                    double*       v4rho3tau,
+                                    double*       v4rho2sigma2,
+                                    double*       v4rho2sigmalapl,
+                                    double*       v4rho2sigmatau,
+                                    double*       v4rho2lapl2,
+                                    double*       v4rho2lapltau,
+                                    double*       v4rho2tau2,
+                                    double*       v4rhosigma3,
+                                    double*       v4rhosigma2lapl,
+                                    double*       v4rhosigma2tau,
+                                    double*       v4rhosigmalapl2,
+                                    double*       v4rhosigmalapltau,
+                                    double*       v4rhosigmatau2,
+                                    double*       v4rholapl3,
+                                    double*       v4rholapl2tau,
+                                    double*       v4rholapltau2,
+                                    double*       v4rhotau3,
+                                    double*       v4sigma4,
+                                    double*       v4sigma3lapl,
+                                    double*       v4sigma3tau,
+                                    double*       v4sigma2lapl2,
+                                    double*       v4sigma2lapltau,
+                                    double*       v4sigma2tau2,
+                                    double*       v4sigmalapl3,
+                                    double*       v4sigmalapl2tau,
+                                    double*       v4sigmalapltau2,
+                                    double*       v4sigmatau3,
+                                    double*       v4lapl4,
+                                    double*       v4lapl3tau,
+                                    double*       v4lapl2tau2,
+                                    double*       v4lapltau3,
+                                    double*       v4tau4) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");

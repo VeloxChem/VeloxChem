@@ -23,7 +23,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "XCNewIntegrator.hpp"
+#include "XCIntegrator.hpp"
 
 #include <omp.h>
 
@@ -38,13 +38,13 @@
 #include "DenseLinearAlgebra.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DensityGridType.hpp"
+#include "FunctionalParser.hpp"
 #include "GridScreener.hpp"
 #include "GtoEvaluator.hpp"
-#include "NewFunctionalParser.hpp"
 #include "SubMatrix.hpp"
 #include "XCFuncType.hpp"
 
-CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
+CXCIntegrator::CXCIntegrator(MPI_Comm comm)
 
     : _screeningThresholdForGTOValues(1.0e-12)
 {
@@ -56,32 +56,32 @@ CXCNewIntegrator::CXCNewIntegrator(MPI_Comm comm)
 }
 
 CAOKohnShamMatrix
-CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
-                                   const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& densityMatrix,
-                                   const CMolecularGrid&   molecularGrid,
-                                   const std::string&      xcFuncLabel) const
+CXCIntegrator::integrateVxcFock(const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& densityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     auto flag = densityMatrix.isClosedShell() ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
 
     if (xcfuntype == xcfun::lda)
     {
-        return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, newfvxc, flag);
+        return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
     }
     else if (xcfuntype == xcfun::gga)
     {
-        return _integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, newfvxc, flag);
+        return _integrateVxcFockForGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
     }
     else if (xcfuntype == xcfun::mgga)
     {
-        return _integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, newfvxc, flag);
+        return _integrateVxcFockForMGGA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
     }
 
-    std::string errxcfuntype("XCNewIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
+    std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA/GGA/meta-GGA");
 
     errors::assertMsgCritical(false, errxcfuntype);
 
@@ -89,15 +89,15 @@ CXCNewIntegrator::integrateVxcFock(const CMolecule&        molecule,
 }
 
 void
-CXCNewIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
-                                   const CMolecule&        molecule,
-                                   const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& rwDensityMatrix,
-                                   const CAODensityMatrix& gsDensityMatrix,
-                                   const CMolecularGrid&   molecularGrid,
-                                   const std::string&      xcFuncLabel) const
+CXCIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& rwDensityMatrix,
+                                const CAODensityMatrix& gsDensityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -117,31 +117,31 @@ CXCNewIntegrator::integrateFxcFock(CAOFockMatrix&          aoFockMatrix,
         }
         else
         {
-            std::string errxcfuntype("XCNewIntegrator.integrateFxcFock: Only implemented for LDA/GGA/meta-GGA");
+            std::string errxcfuntype("XCIntegrator.integrateFxcFock: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
     }
     else
     {
-        std::string erropenshell("XCNewIntegrator.integrateFxcFock: Not implemented for open-shell");
+        std::string erropenshell("XCIntegrator.integrateFxcFock: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
 }
 
 void
-CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
-                                   const CMolecule&        molecule,
-                                   const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& rwDensityMatrix,
-                                   const CAODensityMatrix& rw2DensityMatrix,
-                                   const CAODensityMatrix& gsDensityMatrix,
-                                   const CMolecularGrid&   molecularGrid,
-                                   const std::string&      xcFuncLabel,
-                                   const std::string&      quadMode) const
+CXCIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& rwDensityMatrix,
+                                const CAODensityMatrix& rw2DensityMatrix,
+                                const CAODensityMatrix& gsDensityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel,
+                                const std::string&      quadMode) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -162,32 +162,32 @@ CXCNewIntegrator::integrateKxcFock(CAOFockMatrix&          aoFockMatrix,
         }
         else
         {
-            std::string errxcfuntype("XCNewIntegrator.integrateKxcFock: Only implemented for LDA/GGA/meta-GGA");
+            std::string errxcfuntype("XCIntegrator.integrateKxcFock: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
     }
     else
     {
-        std::string erropenshell("XCNewIntegrator.integrateKxcFock: Not implemented for open-shell");
+        std::string erropenshell("XCIntegrator.integrateKxcFock: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
 }
 
 void
-CXCNewIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
-                                   const CMolecule&        molecule,
-                                   const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& rwDensityMatrix,
-                                   const CAODensityMatrix& rw2DensityMatrix,
-                                   const CAODensityMatrix& rw3DensityMatrix,
-                                   const CAODensityMatrix& gsDensityMatrix,
-                                   const CMolecularGrid&   molecularGrid,
-                                   const std::string&      xcFuncLabel,
-                                   const std::string&      cubeMode) const
+CXCIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& rwDensityMatrix,
+                                const CAODensityMatrix& rw2DensityMatrix,
+                                const CAODensityMatrix& rw3DensityMatrix,
+                                const CAODensityMatrix& gsDensityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel,
+                                const std::string&      cubeMode) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -205,32 +205,32 @@ CXCNewIntegrator::integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
         }
         else
         {
-            std::string errxcfuntype("XCNewIntegrator.integrateLxcFock: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCIntegrator.integrateLxcFock: Only implemented for LDA/GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
     }
     else
     {
-        std::string erropenshell("XCNewIntegrator.integrateLxcFock: Not implemented for open-shell");
+        std::string erropenshell("XCIntegrator.integrateLxcFock: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
 }
 
 void
-CXCNewIntegrator::integrateKxcLxcFock(CAOFockMatrix&          aoFockMatrix,
-                                      const CMolecule&        molecule,
-                                      const CMolecularBasis&  basis,
-                                      const CAODensityMatrix& rwDensityMatrix,
-                                      const CAODensityMatrix& rw2DensityMatrix,
-                                      const CAODensityMatrix& rw3DensityMatrix,
-                                      const CAODensityMatrix& gsDensityMatrix,
-                                      const CMolecularGrid&   molecularGrid,
-                                      const std::string&      xcFuncLabel,
-                                      const std::string&      cubeMode) const
+CXCIntegrator::integrateKxcLxcFock(CAOFockMatrix&          aoFockMatrix,
+                                   const CMolecule&        molecule,
+                                   const CMolecularBasis&  basis,
+                                   const CAODensityMatrix& rwDensityMatrix,
+                                   const CAODensityMatrix& rw2DensityMatrix,
+                                   const CAODensityMatrix& rw3DensityMatrix,
+                                   const CAODensityMatrix& gsDensityMatrix,
+                                   const CMolecularGrid&   molecularGrid,
+                                   const std::string&      xcFuncLabel,
+                                   const std::string&      cubeMode) const
 {
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -253,31 +253,31 @@ CXCNewIntegrator::integrateKxcLxcFock(CAOFockMatrix&          aoFockMatrix,
         }
         else
         {
-            std::string errxcfuntype("XCNewIntegrator.integrateKxcLxcFock: Only implemented for LDA/GGA/meta-GGA");
+            std::string errxcfuntype("XCIntegrator.integrateKxcLxcFock: Only implemented for LDA/GGA/meta-GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
     }
     else
     {
-        std::string erropenshell("XCNewIntegrator.integrateKxcLxcFock: Not implemented for open-shell");
+        std::string erropenshell("XCIntegrator.integrateKxcLxcFock: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
 }
 
 void
-CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
-                                   CDense4DTensor&         moTwoBodyGradient,
-                                   const CMolecule&        molecule,
-                                   const CMolecularBasis&  basis,
-                                   const CAODensityMatrix& DensityMatrix,
-                                   const CDense4DTensor&   TwoBodyDensityMatrix,
-                                   const CDenseMatrix&     ActiveMOs,
-                                   const CMolecularGrid&   molecularGrid,
-                                   const std::string&      xcFuncLabel) const
+CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
+                                CDense4DTensor&         moTwoBodyGradient,
+                                const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& DensityMatrix,
+                                const CDense4DTensor&   TwoBodyDensityMatrix,
+                                const CDenseMatrix&     ActiveMOs,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel) const
 {
-    auto fvxc = newvxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getPairDensityExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -293,19 +293,19 @@ CXCNewIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
     }
     else
     {
-        std::string errxcfuntype("XCNewIntegrator.integrateVxcPDFT: Only implemented for LDA/GGA");
+        std::string errxcfuntype("XCIntegrator.integrateVxcPDFT: Only implemented for LDA/GGA");
 
         errors::assertMsgCritical(false, errxcfuntype);
     }
 }
 
 CAOKohnShamMatrix
-CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& densityMatrix,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional,
-                                          const std::string&      flag) const
+CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& densityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional,
+                                       const std::string&      flag) const
 {
     CMultiTimer timer;
 
@@ -576,12 +576,12 @@ CXCNewIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 }
 
 CAOKohnShamMatrix
-CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& densityMatrix,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional,
-                                          const std::string&      flag) const
+CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& densityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional,
+                                       const std::string&      flag) const
 {
     CMultiTimer timer;
 
@@ -895,12 +895,12 @@ CXCNewIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 }
 
 CAOKohnShamMatrix
-CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
-                                           const CMolecularBasis&  basis,
-                                           const CAODensityMatrix& densityMatrix,
-                                           const CMolecularGrid&   molecularGrid,
-                                           const CXCNewFunctional& xcFunctional,
-                                           const std::string&      flag) const
+CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
+                                        const CMolecularBasis&  basis,
+                                        const CAODensityMatrix& densityMatrix,
+                                        const CMolecularGrid&   molecularGrid,
+                                        const CXCFunctional&    xcFunctional,
+                                        const std::string&      flag) const
 {
     CMultiTimer timer;
 
@@ -1195,13 +1195,13 @@ CXCNewIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 }
 
 void
-CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& rwDensityMatrix,
-                                          const CAODensityMatrix& gsDensityMatrix,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional) const
+CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                       const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& rwDensityMatrix,
+                                       const CAODensityMatrix& gsDensityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1432,13 +1432,13 @@ CXCNewIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& rwDensityMatrix,
-                                          const CAODensityMatrix& gsDensityMatrix,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional) const
+CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                       const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& rwDensityMatrix,
+                                       const CAODensityMatrix& gsDensityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1742,13 +1742,13 @@ CXCNewIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
-                                           const CMolecule&        molecule,
-                                           const CMolecularBasis&  basis,
-                                           const CAODensityMatrix& rwDensityMatrix,
-                                           const CAODensityMatrix& gsDensityMatrix,
-                                           const CMolecularGrid&   molecularGrid,
-                                           const CXCNewFunctional& xcFunctional) const
+CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
+                                        const CMolecule&        molecule,
+                                        const CMolecularBasis&  basis,
+                                        const CAODensityMatrix& rwDensityMatrix,
+                                        const CAODensityMatrix& gsDensityMatrix,
+                                        const CMolecularGrid&   molecularGrid,
+                                        const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2068,15 +2068,15 @@ CXCNewIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& rwDensityMatrix,
-                                          const CAODensityMatrix& rw2DensityMatrix,
-                                          const CAODensityMatrix& gsDensityMatrix,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional,
-                                          const std::string&      quadMode) const
+CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                       const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& rwDensityMatrix,
+                                       const CAODensityMatrix& rw2DensityMatrix,
+                                       const CAODensityMatrix& gsDensityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional,
+                                       const std::string&      quadMode) const
 {
     CMultiTimer timer;
 
@@ -2323,15 +2323,15 @@ CXCNewIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& rwDensityMatrix,
-                                          const CAODensityMatrix& rw2DensityMatrix,
-                                          const CAODensityMatrix& gsDensityMatrix,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional,
-                                          const std::string&      quadMode) const
+CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                       const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& rwDensityMatrix,
+                                       const CAODensityMatrix& rw2DensityMatrix,
+                                       const CAODensityMatrix& gsDensityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional,
+                                       const std::string&      quadMode) const
 {
     CMultiTimer timer;
 
@@ -2642,15 +2642,15 @@ CXCNewIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
-                                           const CMolecule&        molecule,
-                                           const CMolecularBasis&  basis,
-                                           const CAODensityMatrix& rwDensityMatrix,
-                                           const CAODensityMatrix& rw2DensityMatrix,
-                                           const CAODensityMatrix& gsDensityMatrix,
-                                           const CMolecularGrid&   molecularGrid,
-                                           const CXCNewFunctional& xcFunctional,
-                                           const std::string&      quadMode) const
+CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
+                                        const CMolecule&        molecule,
+                                        const CMolecularBasis&  basis,
+                                        const CAODensityMatrix& rwDensityMatrix,
+                                        const CAODensityMatrix& rw2DensityMatrix,
+                                        const CAODensityMatrix& gsDensityMatrix,
+                                        const CMolecularGrid&   molecularGrid,
+                                        const CXCFunctional&    xcFunctional,
+                                        const std::string&      quadMode) const
 {
     CMultiTimer timer;
 
@@ -3059,16 +3059,16 @@ CXCNewIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& rwDensityMatrix,
-                                          const CAODensityMatrix& rw2DensityMatrix,
-                                          const CAODensityMatrix& rw3DensityMatrix,
-                                          const CAODensityMatrix& gsDensityMatrix,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional,
-                                          const std::string&      quadMode) const
+CXCIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                       const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& rwDensityMatrix,
+                                       const CAODensityMatrix& rw2DensityMatrix,
+                                       const CAODensityMatrix& rw3DensityMatrix,
+                                       const CAODensityMatrix& gsDensityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional,
+                                       const std::string&      quadMode) const
 {
     CMultiTimer timer;
 
@@ -3323,16 +3323,16 @@ CXCNewIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
-                                          const CMolecule&        molecule,
-                                          const CMolecularBasis&  basis,
-                                          const CAODensityMatrix& rwDensityMatrix,
-                                          const CAODensityMatrix& rw2DensityMatrix,
-                                          const CAODensityMatrix& rw3DensityMatrix,
-                                          const CAODensityMatrix& gsDensityMatrix,
-                                          const CMolecularGrid&   molecularGrid,
-                                          const CXCNewFunctional& xcFunctional,
-                                          const std::string&      cubeMode) const
+CXCIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                       const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& rwDensityMatrix,
+                                       const CAODensityMatrix& rw2DensityMatrix,
+                                       const CAODensityMatrix& rw3DensityMatrix,
+                                       const CAODensityMatrix& gsDensityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional,
+                                       const std::string&      cubeMode) const
 {
     CMultiTimer timer;
 
@@ -3665,16 +3665,16 @@ CXCNewIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 }
 
 void
-CXCNewIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
-                                             const CMolecule&        molecule,
-                                             const CMolecularBasis&  basis,
-                                             const CAODensityMatrix& rwDensityMatrix,
-                                             const CAODensityMatrix& rw2DensityMatrix,
-                                             const CAODensityMatrix& rw3DensityMatrix,
-                                             const CAODensityMatrix& gsDensityMatrix,
-                                             const CMolecularGrid&   molecularGrid,
-                                             const CXCNewFunctional& xcFunctional,
-                                             const std::string&      cubeMode) const
+CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& rwDensityMatrix,
+                                          const CAODensityMatrix& rw2DensityMatrix,
+                                          const CAODensityMatrix& rw3DensityMatrix,
+                                          const CAODensityMatrix& gsDensityMatrix,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCFunctional&    xcFunctional,
+                                          const std::string&      cubeMode) const
 {
     CMultiTimer timer;
 
@@ -3947,16 +3947,16 @@ CXCNewIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatri
 }
 
 void
-CXCNewIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
-                                             const CMolecule&        molecule,
-                                             const CMolecularBasis&  basis,
-                                             const CAODensityMatrix& rwDensityMatrix,
-                                             const CAODensityMatrix& rw2DensityMatrix,
-                                             const CAODensityMatrix& rw3DensityMatrix,
-                                             const CAODensityMatrix& gsDensityMatrix,
-                                             const CMolecularGrid&   molecularGrid,
-                                             const CXCNewFunctional& xcFunctional,
-                                             const std::string&      cubeMode) const
+CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
+                                          const CMolecule&        molecule,
+                                          const CMolecularBasis&  basis,
+                                          const CAODensityMatrix& rwDensityMatrix,
+                                          const CAODensityMatrix& rw2DensityMatrix,
+                                          const CAODensityMatrix& rw3DensityMatrix,
+                                          const CAODensityMatrix& gsDensityMatrix,
+                                          const CMolecularGrid&   molecularGrid,
+                                          const CXCFunctional&    xcFunctional,
+                                          const std::string&      cubeMode) const
 {
     CMultiTimer timer;
 
@@ -4324,16 +4324,16 @@ CXCNewIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatri
 }
 
 void
-CXCNewIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
-                                              const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              const CAODensityMatrix& rwDensityMatrix,
-                                              const CAODensityMatrix& rw2DensityMatrix,
-                                              const CAODensityMatrix& rw3DensityMatrix,
-                                              const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
-                                              const CXCNewFunctional& xcFunctional,
-                                              const std::string&      cubeMode) const
+CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
+                                           const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const CAODensityMatrix& rwDensityMatrix,
+                                           const CAODensityMatrix& rw2DensityMatrix,
+                                           const CAODensityMatrix& rw3DensityMatrix,
+                                           const CAODensityMatrix& gsDensityMatrix,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const CXCFunctional&    xcFunctional,
+                                           const std::string&      cubeMode) const
 {
     CMultiTimer timer;
 
@@ -4955,15 +4955,15 @@ CXCNewIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatr
 }
 
 void
-CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
-                                          CDense4DTensor&                 moTwoBodyGradient,
-                                          const CMolecule&                molecule,
-                                          const CMolecularBasis&          basis,
-                                          const CAODensityMatrix&         DensityMatrix,
-                                          const CDense4DTensor&           TwoBodyDensityMatrix,
-                                          const CDenseMatrix&             ActiveMOs,
-                                          const CMolecularGrid&           molecularGrid,
-                                          const CXCPairDensityFunctional& xcFunctional) const
+CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
+                                       CDense4DTensor&                 moTwoBodyGradient,
+                                       const CMolecule&                molecule,
+                                       const CMolecularBasis&          basis,
+                                       const CAODensityMatrix&         DensityMatrix,
+                                       const CDense4DTensor&           TwoBodyDensityMatrix,
+                                       const CDenseMatrix&             ActiveMOs,
+                                       const CMolecularGrid&           molecularGrid,
+                                       const CXCPairDensityFunctional& xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -5191,15 +5191,15 @@ CXCNewIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFock
 }
 
 void
-CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
-                                          CDense4DTensor&                 moTwoBodyGradient,
-                                          const CMolecule&                molecule,
-                                          const CMolecularBasis&          basis,
-                                          const CAODensityMatrix&         DensityMatrix,
-                                          const CDense4DTensor&           TwoBodyDensityMatrix,
-                                          const CDenseMatrix&             ActiveMOs,
-                                          const CMolecularGrid&           molecularGrid,
-                                          const CXCPairDensityFunctional& xcFunctional) const
+CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
+                                       CDense4DTensor&                 moTwoBodyGradient,
+                                       const CMolecule&                molecule,
+                                       const CMolecularBasis&          basis,
+                                       const CAODensityMatrix&         DensityMatrix,
+                                       const CDense4DTensor&           TwoBodyDensityMatrix,
+                                       const CDenseMatrix&             ActiveMOs,
+                                       const CMolecularGrid&           molecularGrid,
+                                       const CXCPairDensityFunctional& xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -5455,11 +5455,11 @@ CXCNewIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFock
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t       npoints,
-                                                 const double*       weights,
-                                                 const CDenseMatrix& gtoValues,
-                                                 const double*       vrho,
-                                                 CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialVxcFockForLDA(const int32_t       npoints,
+                                              const double*       weights,
+                                              const CDenseMatrix& gtoValues,
+                                              const double*       vrho,
+                                              CMultiTimer&        timer) const
 {
     // GTO values on grid points
 
@@ -5511,11 +5511,11 @@ CXCNewIntegrator::_integratePartialVxcFockForLDA(const int32_t       npoints,
 }
 
 std::vector<CDenseMatrix>
-CXCNewIntegrator::_integratePartialVxcFockForLDAOpenShell(const int32_t       npoints,
-                                                          const double*       weights,
-                                                          const CDenseMatrix& gtoValues,
-                                                          const double*       vrho,
-                                                          CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialVxcFockForLDAOpenShell(const int32_t       npoints,
+                                                       const double*       weights,
+                                                       const CDenseMatrix& gtoValues,
+                                                       const double*       vrho,
+                                                       CMultiTimer&        timer) const
 {
     // GTO values on grid points
 
@@ -5575,16 +5575,16 @@ CXCNewIntegrator::_integratePartialVxcFockForLDAOpenShell(const int32_t       np
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t       npoints,
-                                                 const double*       weights,
-                                                 const CDenseMatrix& gtoValues,
-                                                 const CDenseMatrix& gtoValuesX,
-                                                 const CDenseMatrix& gtoValuesY,
-                                                 const CDenseMatrix& gtoValuesZ,
-                                                 const double*       rhograd,
-                                                 const double*       vrho,
-                                                 const double*       vsigma,
-                                                 CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialVxcFockForGGA(const int32_t       npoints,
+                                              const double*       weights,
+                                              const CDenseMatrix& gtoValues,
+                                              const CDenseMatrix& gtoValuesX,
+                                              const CDenseMatrix& gtoValuesY,
+                                              const CDenseMatrix& gtoValuesZ,
+                                              const double*       rhograd,
+                                              const double*       vrho,
+                                              const double*       vsigma,
+                                              CMultiTimer&        timer) const
 {
     // eq.(30), JCTC 2021, 17, 1512-1521
 
@@ -5659,16 +5659,16 @@ CXCNewIntegrator::_integratePartialVxcFockForGGA(const int32_t       npoints,
 }
 
 std::vector<CDenseMatrix>
-CXCNewIntegrator::_integratePartialVxcFockForGGAOpenShell(const int32_t       npoints,
-                                                          const double*       weights,
-                                                          const CDenseMatrix& gtoValues,
-                                                          const CDenseMatrix& gtoValuesX,
-                                                          const CDenseMatrix& gtoValuesY,
-                                                          const CDenseMatrix& gtoValuesZ,
-                                                          const double*       rhograd,
-                                                          const double*       vrho,
-                                                          const double*       vsigma,
-                                                          CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialVxcFockForGGAOpenShell(const int32_t       npoints,
+                                                       const double*       weights,
+                                                       const CDenseMatrix& gtoValues,
+                                                       const CDenseMatrix& gtoValuesX,
+                                                       const CDenseMatrix& gtoValuesY,
+                                                       const CDenseMatrix& gtoValuesZ,
+                                                       const double*       rhograd,
+                                                       const double*       vrho,
+                                                       const double*       vsigma,
+                                                       CMultiTimer&        timer) const
 {
     // eq.(30), JCTC 2021, 17, 1512-1521
 
@@ -5754,18 +5754,18 @@ CXCNewIntegrator::_integratePartialVxcFockForGGAOpenShell(const int32_t       np
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t       npoints,
-                                                  const double*       weights,
-                                                  const CDenseMatrix& gtoValues,
-                                                  const CDenseMatrix& gtoValuesX,
-                                                  const CDenseMatrix& gtoValuesY,
-                                                  const CDenseMatrix& gtoValuesZ,
-                                                  const double*       rhograd,
-                                                  const double*       vrho,
-                                                  const double*       vsigma,
-                                                  const double*       vlapl,
-                                                  const double*       vtau,
-                                                  CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialVxcFockForMGGA(const int32_t       npoints,
+                                               const double*       weights,
+                                               const CDenseMatrix& gtoValues,
+                                               const CDenseMatrix& gtoValuesX,
+                                               const CDenseMatrix& gtoValuesY,
+                                               const CDenseMatrix& gtoValuesZ,
+                                               const double*       rhograd,
+                                               const double*       vrho,
+                                               const double*       vsigma,
+                                               const double*       vlapl,
+                                               const double*       vtau,
+                                               CMultiTimer&        timer) const
 {
     // eq.(30), JCTC 2021, 17, 1512-1521
 
@@ -5869,18 +5869,18 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGA(const int32_t       npoints,
 }
 
 std::vector<CDenseMatrix>
-CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t       npoints,
-                                                           const double*       weights,
-                                                           const CDenseMatrix& gtoValues,
-                                                           const CDenseMatrix& gtoValuesX,
-                                                           const CDenseMatrix& gtoValuesY,
-                                                           const CDenseMatrix& gtoValuesZ,
-                                                           const double*       rhograd,
-                                                           const double*       vrho,
-                                                           const double*       vsigma,
-                                                           const double*       vlapl,
-                                                           const double*       vtau,
-                                                           CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t       npoints,
+                                                        const double*       weights,
+                                                        const CDenseMatrix& gtoValues,
+                                                        const CDenseMatrix& gtoValuesX,
+                                                        const CDenseMatrix& gtoValuesY,
+                                                        const CDenseMatrix& gtoValuesZ,
+                                                        const double*       rhograd,
+                                                        const double*       vrho,
+                                                        const double*       vsigma,
+                                                        const double*       vlapl,
+                                                        const double*       vtau,
+                                                        CMultiTimer&        timer) const
 {
     // eq.(30), JCTC 2021, 17, 1512-1521
 
@@ -6018,12 +6018,12 @@ CXCNewIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t       n
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialFxcFockForLDA(const int32_t       npoints,
-                                                 const double*       weights,
-                                                 const CDenseMatrix& gtoValues,
-                                                 const double*       rhow,
-                                                 const double*       v2rho2,
-                                                 CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialFxcFockForLDA(const int32_t       npoints,
+                                              const double*       weights,
+                                              const CDenseMatrix& gtoValues,
+                                              const double*       rhow,
+                                              const double*       v2rho2,
+                                              CMultiTimer&        timer) const
 {
     // GTO values on grid points
 
@@ -6076,20 +6076,20 @@ CXCNewIntegrator::_integratePartialFxcFockForLDA(const int32_t       npoints,
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t       npoints,
-                                                 const double*       weights,
-                                                 const CDenseMatrix& gtoValues,
-                                                 const CDenseMatrix& gtoValuesX,
-                                                 const CDenseMatrix& gtoValuesY,
-                                                 const CDenseMatrix& gtoValuesZ,
-                                                 const double*       rhow,
-                                                 const double*       rhograd,
-                                                 const double*       rhowgrad,
-                                                 const double*       vsigma,
-                                                 const double*       v2rho2,
-                                                 const double*       v2rhosigma,
-                                                 const double*       v2sigma2,
-                                                 CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialFxcFockForGGA(const int32_t       npoints,
+                                              const double*       weights,
+                                              const CDenseMatrix& gtoValues,
+                                              const CDenseMatrix& gtoValuesX,
+                                              const CDenseMatrix& gtoValuesY,
+                                              const CDenseMatrix& gtoValuesZ,
+                                              const double*       rhow,
+                                              const double*       rhograd,
+                                              const double*       rhowgrad,
+                                              const double*       vsigma,
+                                              const double*       v2rho2,
+                                              const double*       v2rhosigma,
+                                              const double*       v2sigma2,
+                                              CMultiTimer&        timer) const
 {
     // GTO values on grid points
 
@@ -6201,32 +6201,32 @@ CXCNewIntegrator::_integratePartialFxcFockForGGA(const int32_t       npoints,
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
-                                                  const double*       weights,
-                                                  const CDenseMatrix& gtoValues,
-                                                  const CDenseMatrix& gtoValuesX,
-                                                  const CDenseMatrix& gtoValuesY,
-                                                  const CDenseMatrix& gtoValuesZ,
-                                                  const double*       rhow,
-                                                  const double*       rhograd,
-                                                  const double*       rhowgrad,
-                                                  const double*       tauw,
-                                                  const double*       laplw,
-                                                  const double*       vrho,
-                                                  const double*       vsigma,
-                                                  const double*       vlapl,
-                                                  const double*       vtau,
-                                                  const double*       v2rho2,
-                                                  const double*       v2lapl2,
-                                                  const double*       v2tau2,
-                                                  const double*       v2rholapl,
-                                                  const double*       v2rhotau,
-                                                  const double*       v2lapltau,
-                                                  const double*       v2rhosigma,
-                                                  const double*       v2sigmalapl,
-                                                  const double*       v2sigmatau,
-                                                  const double*       v2sigma2,
-                                                  CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
+                                               const double*       weights,
+                                               const CDenseMatrix& gtoValues,
+                                               const CDenseMatrix& gtoValuesX,
+                                               const CDenseMatrix& gtoValuesY,
+                                               const CDenseMatrix& gtoValuesZ,
+                                               const double*       rhow,
+                                               const double*       rhograd,
+                                               const double*       rhowgrad,
+                                               const double*       tauw,
+                                               const double*       laplw,
+                                               const double*       vrho,
+                                               const double*       vsigma,
+                                               const double*       vlapl,
+                                               const double*       vtau,
+                                               const double*       v2rho2,
+                                               const double*       v2lapl2,
+                                               const double*       v2tau2,
+                                               const double*       v2rholapl,
+                                               const double*       v2rhotau,
+                                               const double*       v2lapltau,
+                                               const double*       v2rhosigma,
+                                               const double*       v2sigmalapl,
+                                               const double*       v2sigmatau,
+                                               const double*       v2sigma2,
+                                               CMultiTimer&        timer) const
 {
     // eq.(30), JCTC 2021, 17, 1512-1521
 
@@ -6287,8 +6287,8 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                 double grada_z_g = rhograd[6 * g + 2];
 
                 // perturbed density and its gradients
-                double rwa    = rhow[2 * g + 0];
-                double tauwa  = tauw[2 * g + 0];
+                double rwa   = rhow[2 * g + 0];
+                double tauwa = tauw[2 * g + 0];
                 // double laplwa = laplw[2 * g + 0];
 
                 double rwa_x = rhowgrad[6 * g + 0];
@@ -6453,15 +6453,15 @@ CXCNewIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t           npoints,
-                                                 const double*           weights,
-                                                 const CDenseMatrix&     gtoValues,
-                                                 const double*           v2rho2,
-                                                 const double*           v3rho3,
-                                                 const CDensityGridQuad& rwDensityGridQuad,
-                                                 const CDensityGrid&     rw2DensityGrid,
-                                                 const int32_t           iFock,
-                                                 CMultiTimer&            timer) const
+CXCIntegrator::_integratePartialKxcFockForLDA(const int32_t           npoints,
+                                              const double*           weights,
+                                              const CDenseMatrix&     gtoValues,
+                                              const double*           v2rho2,
+                                              const double*           v3rho3,
+                                              const CDensityGridQuad& rwDensityGridQuad,
+                                              const CDensityGrid&     rw2DensityGrid,
+                                              const int32_t           iFock,
+                                              CMultiTimer&            timer) const
 {
     timer.start("Kxc matrix prep.");
 
@@ -6531,25 +6531,25 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA(const int32_t           npoints
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t           npoints,
-                                                 const double*           weights,
-                                                 const CDenseMatrix&     gtoValues,
-                                                 const CDenseMatrix&     gtoValuesX,
-                                                 const CDenseMatrix&     gtoValuesY,
-                                                 const CDenseMatrix&     gtoValuesZ,
-                                                 const double*           rhograd,
-                                                 const double*           vsigma,
-                                                 const double*           v2rho2,
-                                                 const double*           v2rhosigma,
-                                                 const double*           v2sigma2,
-                                                 const double*           v3rho3,
-                                                 const double*           v3rho2sigma,
-                                                 const double*           v3rhosigma2,
-                                                 const double*           v3sigma3,
-                                                 const CDensityGridQuad& rwDensityGridQuad,
-                                                 const CDensityGrid&     rw2DensityGrid,
-                                                 const int32_t           iFock,
-                                                 CMultiTimer&            timer) const
+CXCIntegrator::_integratePartialKxcFockForGGA(const int32_t           npoints,
+                                              const double*           weights,
+                                              const CDenseMatrix&     gtoValues,
+                                              const CDenseMatrix&     gtoValuesX,
+                                              const CDenseMatrix&     gtoValuesY,
+                                              const CDenseMatrix&     gtoValuesZ,
+                                              const double*           rhograd,
+                                              const double*           vsigma,
+                                              const double*           v2rho2,
+                                              const double*           v2rhosigma,
+                                              const double*           v2sigma2,
+                                              const double*           v3rho3,
+                                              const double*           v3rho2sigma,
+                                              const double*           v3rhosigma2,
+                                              const double*           v3sigma3,
+                                              const CDensityGridQuad& rwDensityGridQuad,
+                                              const CDensityGrid&     rw2DensityGrid,
+                                              const int32_t           iFock,
+                                              CMultiTimer&            timer) const
 {
     timer.start("Kxc matrix prep.");
 
@@ -6816,48 +6816,48 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA(const int32_t           npoints
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForMGGA(const int32_t           npoints,
-                                                  const double*           weights,
-                                                  const CDenseMatrix&     gtoValues,
-                                                  const CDenseMatrix&     gtoValuesX,
-                                                  const CDenseMatrix&     gtoValuesY,
-                                                  const CDenseMatrix&     gtoValuesZ,
-                                                  const double*           rhograd,
-                                                  const double*           vsigma,
-                                                  const double*           v2rho2,
-                                                  const double*           v2rhosigma,
-                                                  const double*           v2rholapl,
-                                                  const double*           v2rhotau,
-                                                  const double*           v2sigma2,
-                                                  const double*           v2sigmalapl,
-                                                  const double*           v2sigmatau,
-                                                  const double*           v2lapl2,
-                                                  const double*           v2lapltau,
-                                                  const double*           v2tau2,
-                                                  const double*           v3rho3,
-                                                  const double*           v3rho2sigma,
-                                                  const double*           v3rho2lapl,
-                                                  const double*           v3rho2tau,
-                                                  const double*           v3rhosigma2,
-                                                  const double*           v3rhosigmalapl,
-                                                  const double*           v3rhosigmatau,
-                                                  const double*           v3rholapl2,
-                                                  const double*           v3rholapltau,
-                                                  const double*           v3rhotau2,
-                                                  const double*           v3sigma3,
-                                                  const double*           v3sigma2lapl,
-                                                  const double*           v3sigma2tau,
-                                                  const double*           v3sigmalapl2,
-                                                  const double*           v3sigmalapltau,
-                                                  const double*           v3sigmatau2,
-                                                  const double*           v3lapl3,
-                                                  const double*           v3lapl2tau,
-                                                  const double*           v3lapltau2,
-                                                  const double*           v3tau3,
-                                                  const CDensityGridQuad& rwDensityGridQuad,
-                                                  const CDensityGrid&     rw2DensityGrid,
-                                                  const int32_t           iFock,
-                                                  CMultiTimer&            timer) const
+CXCIntegrator::_integratePartialKxcFockForMGGA(const int32_t           npoints,
+                                               const double*           weights,
+                                               const CDenseMatrix&     gtoValues,
+                                               const CDenseMatrix&     gtoValuesX,
+                                               const CDenseMatrix&     gtoValuesY,
+                                               const CDenseMatrix&     gtoValuesZ,
+                                               const double*           rhograd,
+                                               const double*           vsigma,
+                                               const double*           v2rho2,
+                                               const double*           v2rhosigma,
+                                               const double*           v2rholapl,
+                                               const double*           v2rhotau,
+                                               const double*           v2sigma2,
+                                               const double*           v2sigmalapl,
+                                               const double*           v2sigmatau,
+                                               const double*           v2lapl2,
+                                               const double*           v2lapltau,
+                                               const double*           v2tau2,
+                                               const double*           v3rho3,
+                                               const double*           v3rho2sigma,
+                                               const double*           v3rho2lapl,
+                                               const double*           v3rho2tau,
+                                               const double*           v3rhosigma2,
+                                               const double*           v3rhosigmalapl,
+                                               const double*           v3rhosigmatau,
+                                               const double*           v3rholapl2,
+                                               const double*           v3rholapltau,
+                                               const double*           v3rhotau2,
+                                               const double*           v3sigma3,
+                                               const double*           v3sigma2lapl,
+                                               const double*           v3sigma2tau,
+                                               const double*           v3sigmalapl2,
+                                               const double*           v3sigmalapltau,
+                                               const double*           v3sigmatau2,
+                                               const double*           v3lapl3,
+                                               const double*           v3lapl2tau,
+                                               const double*           v3lapltau2,
+                                               const double*           v3tau3,
+                                               const CDensityGridQuad& rwDensityGridQuad,
+                                               const CDensityGrid&     rw2DensityGrid,
+                                               const int32_t           iFock,
+                                               CMultiTimer&            timer) const
 {
     timer.start("Kxc matrix prep.");
 
@@ -7499,15 +7499,15 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA(const int32_t           npoint
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForLDA2(const int32_t            npoints,
-                                                  const double*            weights,
-                                                  const CDenseMatrix&      gtoValues,
-                                                  const double*            v2rho2,
-                                                  const double*            v3rho3,
-                                                  const CDensityGridCubic& rwDensityGridCubic,
-                                                  const CDensityGrid&      rw2DensityGrid,
-                                                  const int32_t            iFock,
-                                                  CMultiTimer&             timer) const
+CXCIntegrator::_integratePartialKxcFockForLDA2(const int32_t            npoints,
+                                               const double*            weights,
+                                               const CDenseMatrix&      gtoValues,
+                                               const double*            v2rho2,
+                                               const double*            v3rho3,
+                                               const CDensityGridCubic& rwDensityGridCubic,
+                                               const CDensityGrid&      rw2DensityGrid,
+                                               const int32_t            iFock,
+                                               CMultiTimer&             timer) const
 {
     timer.start("Kxc matrix prep.");
 
@@ -7577,25 +7577,25 @@ CXCNewIntegrator::_integratePartialKxcFockForLDA2(const int32_t            npoin
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoints,
-                                                  const double*            weights,
-                                                  const CDenseMatrix&      gtoValues,
-                                                  const CDenseMatrix&      gtoValuesX,
-                                                  const CDenseMatrix&      gtoValuesY,
-                                                  const CDenseMatrix&      gtoValuesZ,
-                                                  const double*            rhograd,
-                                                  const double*            vsigma,
-                                                  const double*            v2rho2,
-                                                  const double*            v2rhosigma,
-                                                  const double*            v2sigma2,
-                                                  const double*            v3rho3,
-                                                  const double*            v3rho2sigma,
-                                                  const double*            v3rhosigma2,
-                                                  const double*            v3sigma3,
-                                                  const CDensityGridCubic& rwDensityGridCubic,
-                                                  const CDensityGrid&      rw2DensityGrid,
-                                                  const int32_t            iFock,
-                                                  CMultiTimer&             timer) const
+CXCIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoints,
+                                               const double*            weights,
+                                               const CDenseMatrix&      gtoValues,
+                                               const CDenseMatrix&      gtoValuesX,
+                                               const CDenseMatrix&      gtoValuesY,
+                                               const CDenseMatrix&      gtoValuesZ,
+                                               const double*            rhograd,
+                                               const double*            vsigma,
+                                               const double*            v2rho2,
+                                               const double*            v2rhosigma,
+                                               const double*            v2sigma2,
+                                               const double*            v3rho3,
+                                               const double*            v3rho2sigma,
+                                               const double*            v3rhosigma2,
+                                               const double*            v3sigma3,
+                                               const CDensityGridCubic& rwDensityGridCubic,
+                                               const CDensityGrid&      rw2DensityGrid,
+                                               const int32_t            iFock,
+                                               CMultiTimer&             timer) const
 {
     timer.start("Kxc matrix prep.");
 
@@ -7866,48 +7866,48 @@ CXCNewIntegrator::_integratePartialKxcFockForGGA2(const int32_t            npoin
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoints,
-                                                   const double*            weights,
-                                                   const CDenseMatrix&      gtoValues,
-                                                   const CDenseMatrix&      gtoValuesX,
-                                                   const CDenseMatrix&      gtoValuesY,
-                                                   const CDenseMatrix&      gtoValuesZ,
-                                                   const double*            rhograd,
-                                                   const double*            vsigma,
-                                                   const double*            v2rho2,
-                                                   const double*            v2rhosigma,
-                                                   const double*            v2rholapl,
-                                                   const double*            v2rhotau,
-                                                   const double*            v2sigma2,
-                                                   const double*            v2sigmalapl,
-                                                   const double*            v2sigmatau,
-                                                   const double*            v2lapl2,
-                                                   const double*            v2lapltau,
-                                                   const double*            v2tau2,
-                                                   const double*            v3rho3,
-                                                   const double*            v3rho2sigma,
-                                                   const double*            v3rho2lapl,
-                                                   const double*            v3rho2tau,
-                                                   const double*            v3rhosigma2,
-                                                   const double*            v3rhosigmalapl,
-                                                   const double*            v3rhosigmatau,
-                                                   const double*            v3rholapl2,
-                                                   const double*            v3rholapltau,
-                                                   const double*            v3rhotau2,
-                                                   const double*            v3sigma3,
-                                                   const double*            v3sigma2lapl,
-                                                   const double*            v3sigma2tau,
-                                                   const double*            v3sigmalapl2,
-                                                   const double*            v3sigmalapltau,
-                                                   const double*            v3sigmatau2,
-                                                   const double*            v3lapl3,
-                                                   const double*            v3lapl2tau,
-                                                   const double*            v3lapltau2,
-                                                   const double*            v3tau3,
-                                                   const CDensityGridCubic& rwDensityGridCubic,
-                                                   const CDensityGrid&      rw2DensityGrid,
-                                                   const int32_t            iFock,
-                                                   CMultiTimer&             timer) const
+CXCIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoints,
+                                                const double*            weights,
+                                                const CDenseMatrix&      gtoValues,
+                                                const CDenseMatrix&      gtoValuesX,
+                                                const CDenseMatrix&      gtoValuesY,
+                                                const CDenseMatrix&      gtoValuesZ,
+                                                const double*            rhograd,
+                                                const double*            vsigma,
+                                                const double*            v2rho2,
+                                                const double*            v2rhosigma,
+                                                const double*            v2rholapl,
+                                                const double*            v2rhotau,
+                                                const double*            v2sigma2,
+                                                const double*            v2sigmalapl,
+                                                const double*            v2sigmatau,
+                                                const double*            v2lapl2,
+                                                const double*            v2lapltau,
+                                                const double*            v2tau2,
+                                                const double*            v3rho3,
+                                                const double*            v3rho2sigma,
+                                                const double*            v3rho2lapl,
+                                                const double*            v3rho2tau,
+                                                const double*            v3rhosigma2,
+                                                const double*            v3rhosigmalapl,
+                                                const double*            v3rhosigmatau,
+                                                const double*            v3rholapl2,
+                                                const double*            v3rholapltau,
+                                                const double*            v3rhotau2,
+                                                const double*            v3sigma3,
+                                                const double*            v3sigma2lapl,
+                                                const double*            v3sigma2tau,
+                                                const double*            v3sigmalapl2,
+                                                const double*            v3sigmalapltau,
+                                                const double*            v3sigmatau2,
+                                                const double*            v3lapl3,
+                                                const double*            v3lapl2tau,
+                                                const double*            v3lapltau2,
+                                                const double*            v3tau3,
+                                                const CDensityGridCubic& rwDensityGridCubic,
+                                                const CDensityGrid&      rw2DensityGrid,
+                                                const int32_t            iFock,
+                                                CMultiTimer&             timer) const
 {
     timer.start("Kxc matrix prep.");
 
@@ -8545,16 +8545,16 @@ CXCNewIntegrator::_integratePartialKxcFockForMGGA2(const int32_t            npoi
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialLxcFockForLDA(const int32_t            npoints,
-                                                 const double*            weights,
-                                                 const CDenseMatrix&      gtoValues,
-                                                 const double*            v2rho2,
-                                                 const double*            v3rho3,
-                                                 const double*            v4rho4,
-                                                 const CDensityGridCubic& rwDensityGridCubic,
-                                                 const CDensityGrid&      rw3DensityGrid,
-                                                 const int32_t            iFock,
-                                                 CMultiTimer&             timer) const
+CXCIntegrator::_integratePartialLxcFockForLDA(const int32_t            npoints,
+                                              const double*            weights,
+                                              const CDenseMatrix&      gtoValues,
+                                              const double*            v2rho2,
+                                              const double*            v3rho3,
+                                              const double*            v4rho4,
+                                              const CDensityGridCubic& rwDensityGridCubic,
+                                              const CDensityGrid&      rw3DensityGrid,
+                                              const int32_t            iFock,
+                                              CMultiTimer&             timer) const
 {
     timer.start("Lxc matrix prep.");
 
@@ -8640,30 +8640,30 @@ CXCNewIntegrator::_integratePartialLxcFockForLDA(const int32_t            npoint
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t            npoints,
-                                                 const double*            weights,
-                                                 const CDenseMatrix&      gtoValues,
-                                                 const CDenseMatrix&      gtoValuesX,
-                                                 const CDenseMatrix&      gtoValuesY,
-                                                 const CDenseMatrix&      gtoValuesZ,
-                                                 const double*            rhograd,
-                                                 const double*            vsigma,
-                                                 const double*            v2rho2,
-                                                 const double*            v2rhosigma,
-                                                 const double*            v2sigma2,
-                                                 const double*            v3rho3,
-                                                 const double*            v3rho2sigma,
-                                                 const double*            v3rhosigma2,
-                                                 const double*            v3sigma3,
-                                                 const double*            v4rho4,
-                                                 const double*            v4rho3sigma,
-                                                 const double*            v4rho2sigma2,
-                                                 const double*            v4rhosigma3,
-                                                 const double*            v4sigma4,
-                                                 const CDensityGridCubic& rwDensityGridCubic,
-                                                 const CDensityGrid&      rw3DensityGrid,
-                                                 const int32_t            iFock,
-                                                 CMultiTimer&             timer) const
+CXCIntegrator::_integratePartialLxcFockForGGA(const int32_t            npoints,
+                                              const double*            weights,
+                                              const CDenseMatrix&      gtoValues,
+                                              const CDenseMatrix&      gtoValuesX,
+                                              const CDenseMatrix&      gtoValuesY,
+                                              const CDenseMatrix&      gtoValuesZ,
+                                              const double*            rhograd,
+                                              const double*            vsigma,
+                                              const double*            v2rho2,
+                                              const double*            v2rhosigma,
+                                              const double*            v2sigma2,
+                                              const double*            v3rho3,
+                                              const double*            v3rho2sigma,
+                                              const double*            v3rhosigma2,
+                                              const double*            v3sigma3,
+                                              const double*            v4rho4,
+                                              const double*            v4rho3sigma,
+                                              const double*            v4rho2sigma2,
+                                              const double*            v4rhosigma3,
+                                              const double*            v4sigma4,
+                                              const CDensityGridCubic& rwDensityGridCubic,
+                                              const CDensityGrid&      rw3DensityGrid,
+                                              const int32_t            iFock,
+                                              CMultiTimer&             timer) const
 {
     timer.start("Lxc matrix prep.");
 
@@ -9223,83 +9223,83 @@ CXCNewIntegrator::_integratePartialLxcFockForGGA(const int32_t            npoint
 }
 
 CDenseMatrix
-CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoints,
-                                                  const double*            weights,
-                                                  const CDenseMatrix&      gtoValues,
-                                                  const CDenseMatrix&      gtoValuesX,
-                                                  const CDenseMatrix&      gtoValuesY,
-                                                  const CDenseMatrix&      gtoValuesZ,
-                                                  const double*            rhograd,
-                                                  const double*            vsigma,
-                                                  const double*            v2rho2,
-                                                  const double*            v2rhosigma,
-                                                  const double*            v2rholapl,
-                                                  const double*            v2rhotau,
-                                                  const double*            v2sigma2,
-                                                  const double*            v2sigmalapl,
-                                                  const double*            v2sigmatau,
-                                                  const double*            v2lapl2,
-                                                  const double*            v2lapltau,
-                                                  const double*            v2tau2,
-                                                  const double*            v3rho3,
-                                                  const double*            v3rho2sigma,
-                                                  const double*            v3rho2lapl,
-                                                  const double*            v3rho2tau,
-                                                  const double*            v3rhosigma2,
-                                                  const double*            v3rhosigmalapl,
-                                                  const double*            v3rhosigmatau,
-                                                  const double*            v3rholapl2,
-                                                  const double*            v3rholapltau,
-                                                  const double*            v3rhotau2,
-                                                  const double*            v3sigma3,
-                                                  const double*            v3sigma2lapl,
-                                                  const double*            v3sigma2tau,
-                                                  const double*            v3sigmalapl2,
-                                                  const double*            v3sigmalapltau,
-                                                  const double*            v3sigmatau2,
-                                                  const double*            v3lapl3,
-                                                  const double*            v3lapl2tau,
-                                                  const double*            v3lapltau2,
-                                                  const double*            v3tau3,
-                                                  const double*            v4rho4,
-                                                  const double*            v4rho3sigma,
-                                                  const double*            v4rho3lapl,
-                                                  const double*            v4rho3tau,
-                                                  const double*            v4rho2sigma2,
-                                                  const double*            v4rho2sigmalapl,
-                                                  const double*            v4rho2sigmatau,
-                                                  const double*            v4rho2lapl2,
-                                                  const double*            v4rho2lapltau,
-                                                  const double*            v4rho2tau2,
-                                                  const double*            v4rhosigma3,
-                                                  const double*            v4rhosigma2lapl,
-                                                  const double*            v4rhosigma2tau,
-                                                  const double*            v4rhosigmalapl2,
-                                                  const double*            v4rhosigmalapltau,
-                                                  const double*            v4rhosigmatau2,
-                                                  const double*            v4rholapl3,
-                                                  const double*            v4rholapl2tau,
-                                                  const double*            v4rholapltau2,
-                                                  const double*            v4rhotau3,
-                                                  const double*            v4sigma4,
-                                                  const double*            v4sigma3lapl,
-                                                  const double*            v4sigma3tau,
-                                                  const double*            v4sigma2lapl2,
-                                                  const double*            v4sigma2lapltau,
-                                                  const double*            v4sigma2tau2,
-                                                  const double*            v4sigmalapl3,
-                                                  const double*            v4sigmalapl2tau,
-                                                  const double*            v4sigmalapltau2,
-                                                  const double*            v4sigmatau3,
-                                                  const double*            v4lapl4,
-                                                  const double*            v4lapl3tau,
-                                                  const double*            v4lapl2tau2,
-                                                  const double*            v4lapltau3,
-                                                  const double*            v4tau4,
-                                                  const CDensityGridCubic& rwDensityGridCubic,
-                                                  const CDensityGrid&      rw3DensityGrid,
-                                                  const int32_t            iFock,
-                                                  CMultiTimer&             timer) const
+CXCIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoints,
+                                               const double*            weights,
+                                               const CDenseMatrix&      gtoValues,
+                                               const CDenseMatrix&      gtoValuesX,
+                                               const CDenseMatrix&      gtoValuesY,
+                                               const CDenseMatrix&      gtoValuesZ,
+                                               const double*            rhograd,
+                                               const double*            vsigma,
+                                               const double*            v2rho2,
+                                               const double*            v2rhosigma,
+                                               const double*            v2rholapl,
+                                               const double*            v2rhotau,
+                                               const double*            v2sigma2,
+                                               const double*            v2sigmalapl,
+                                               const double*            v2sigmatau,
+                                               const double*            v2lapl2,
+                                               const double*            v2lapltau,
+                                               const double*            v2tau2,
+                                               const double*            v3rho3,
+                                               const double*            v3rho2sigma,
+                                               const double*            v3rho2lapl,
+                                               const double*            v3rho2tau,
+                                               const double*            v3rhosigma2,
+                                               const double*            v3rhosigmalapl,
+                                               const double*            v3rhosigmatau,
+                                               const double*            v3rholapl2,
+                                               const double*            v3rholapltau,
+                                               const double*            v3rhotau2,
+                                               const double*            v3sigma3,
+                                               const double*            v3sigma2lapl,
+                                               const double*            v3sigma2tau,
+                                               const double*            v3sigmalapl2,
+                                               const double*            v3sigmalapltau,
+                                               const double*            v3sigmatau2,
+                                               const double*            v3lapl3,
+                                               const double*            v3lapl2tau,
+                                               const double*            v3lapltau2,
+                                               const double*            v3tau3,
+                                               const double*            v4rho4,
+                                               const double*            v4rho3sigma,
+                                               const double*            v4rho3lapl,
+                                               const double*            v4rho3tau,
+                                               const double*            v4rho2sigma2,
+                                               const double*            v4rho2sigmalapl,
+                                               const double*            v4rho2sigmatau,
+                                               const double*            v4rho2lapl2,
+                                               const double*            v4rho2lapltau,
+                                               const double*            v4rho2tau2,
+                                               const double*            v4rhosigma3,
+                                               const double*            v4rhosigma2lapl,
+                                               const double*            v4rhosigma2tau,
+                                               const double*            v4rhosigmalapl2,
+                                               const double*            v4rhosigmalapltau,
+                                               const double*            v4rhosigmatau2,
+                                               const double*            v4rholapl3,
+                                               const double*            v4rholapl2tau,
+                                               const double*            v4rholapltau2,
+                                               const double*            v4rhotau3,
+                                               const double*            v4sigma4,
+                                               const double*            v4sigma3lapl,
+                                               const double*            v4sigma3tau,
+                                               const double*            v4sigma2lapl2,
+                                               const double*            v4sigma2lapltau,
+                                               const double*            v4sigma2tau2,
+                                               const double*            v4sigmalapl3,
+                                               const double*            v4sigmalapl2tau,
+                                               const double*            v4sigmalapltau2,
+                                               const double*            v4sigmatau3,
+                                               const double*            v4lapl4,
+                                               const double*            v4lapl3tau,
+                                               const double*            v4lapl2tau2,
+                                               const double*            v4lapltau3,
+                                               const double*            v4tau4,
+                                               const CDensityGridCubic& rwDensityGridCubic,
+                                               const CDensityGrid&      rw3DensityGrid,
+                                               const int32_t            iFock,
+                                               CMultiTimer&             timer) const
 {
     timer.start("Lxc matrix prep.");
 
@@ -11120,9 +11120,9 @@ CXCNewIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoin
 }
 
 CDenseMatrix
-CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) const
+CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) const
 {
-    // std::string errnotpartitioned("CXCNewIntegrator.computeGtoValuesOnGridPoints: Cannot use unpartitioned molecular grid");
+    // std::string errnotpartitioned("CXCIntegrator.computeGtoValuesOnGridPoints: Cannot use unpartitioned molecular grid");
 
     // errors::assertMsgCritical(molecularGrid.isPartitioned(), errnotpartitioned);
 
@@ -11248,11 +11248,11 @@ CXCNewIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const 
 }
 
 std::vector<CDenseMatrix>
-CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
-                                                             const CMolecularBasis& basis,
-                                                             const CMolecularGrid&  molecularGrid) const
+CXCIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                          const CMolecularBasis& basis,
+                                                          const CMolecularGrid&  molecularGrid) const
 {
-    // std::string errnotpartitioned("CXCNewIntegrator.computeGtoValuesAndDerivativesOnGridPoints: Cannot use unpartitioned molecular grid");
+    // std::string errnotpartitioned("CXCIntegrator.computeGtoValuesAndDerivativesOnGridPoints: Cannot use unpartitioned molecular grid");
 
     // errors::assertMsgCritical(molecularGrid.isPartitioned(), errnotpartitioned);
 
@@ -11406,12 +11406,12 @@ CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&   
 }
 
 std::vector<CDenseMatrix>
-CXCNewIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
-                                                             const CMolecularBasis& basis,
-                                                             const int32_t          npoints,
-                                                             const double*          xcoords,
-                                                             const double*          ycoords,
-                                                             const double*          zcoords) const
+CXCIntegrator::computeGtoValuesAndDerivativesOnGridPoints(const CMolecule&       molecule,
+                                                          const CMolecularBasis& basis,
+                                                          const int32_t          npoints,
+                                                          const double*          xcoords,
+                                                          const double*          ycoords,
+                                                          const double*          zcoords) const
 {
     auto nthreads = omp_get_max_threads();
 

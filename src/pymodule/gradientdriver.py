@@ -29,7 +29,7 @@ import sys
 
 from .veloxchemlib import GridDriver, XCMolecularGradient
 from .veloxchemlib import mpi_master
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
@@ -123,7 +123,7 @@ class GradientDriver:
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self._dft = True
-            self.xcfun = new_parse_xc_func(method_dict['xcfun'].upper())
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Gradient driver: Undefined XC functional')
 
@@ -495,6 +495,11 @@ class GradientDriver:
         if self.numerical:
             self.ostream.print_header(cur_str2.ljust(str_width))
             self.ostream.print_header(cur_str3.ljust(str_width))
+
+        if self._dft:
+            cur_str = 'DFT Functional              : '
+            cur_str += self.xcfun.get_func_label()
+            self.ostream.print_header(cur_str.ljust(str_width))
 
         if state_deriv_index is not None:
             if type(state_deriv_index) is int:

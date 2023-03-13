@@ -34,10 +34,10 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
+from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .distributedarray import DistributedArray
@@ -369,7 +369,7 @@ class LinearSolver:
         # DFT: xcfun is functional object or string (other than 'hf')
         else:
             if isinstance(self.xcfun, str):
-                self.xcfun = new_parse_xc_func(self.xcfun.upper())
+                self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'LinearSolver: Undefined XC functional')
             self._dft = True
@@ -711,10 +711,17 @@ class LinearSolver:
 
             mo = scf_tensors['C_alpha']
             fa = scf_tensors['F_alpha']
-            fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
+
+            if getattr(self, 'core_excitation', False):
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
+                    range(nocc, norb))
+                mo_core_exc = mo[:, core_exc_orb_inds]
+                fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            else:
+                fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
         # determine number of batches
 
@@ -760,9 +767,20 @@ class LinearSolver:
                 if self.rank == mpi_master():
                     half_size = vec.shape[0] // 2
 
-                    kn = self.lrvec2mat(vec, nocc, norb)
-                    dak = self.commut_mo_density(kn, nocc)
-                    dak = np.linalg.multi_dot([mo, dak, mo.T])
+                    if getattr(self, 'core_excitation', False):
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals)
+                        core_exc_orb_inds = list(range(
+                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_exc, dak, mo_core_exc.T])
+                    else:
+                        kn = self.lrvec2mat(vec, nocc, norb)
+                        dak = self.commut_mo_density(kn, nocc)
+                        dak = np.linalg.multi_dot([mo, dak, mo.T])
 
                     dks.append(dak)
                     kns.append(kn)
@@ -805,15 +823,31 @@ class LinearSolver:
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock.alpha_to_numpy(ifock)
 
-                    fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+                    if getattr(self, 'core_excitation', False):
+                        core_exc_orb_inds = list(range(
+                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        fak_mo = np.linalg.multi_dot(
+                            [mo_core_exc.T, fak, mo_core_exc])
+                    else:
+                        fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+
                     kfa_mo = self.commut(fa_mo.T, kns[ifock])
 
                     fat_mo = fak_mo + kfa_mo
 
-                    gmo = -self.commut_mo_density(fat_mo, nocc)
-                    gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
-                                                      norb)[:half_size]
+                    if getattr(self, 'core_excitation', False):
+                        gmo = -self.commut_mo_density(fat_mo, nocc,
+                                                      self.num_core_orbitals)
+                        gmo_vec_halfsize = self.lrmat2vec(
+                            gmo, nocc, norb, self.num_core_orbitals)[:half_size]
+                    else:
+                        gmo = -self.commut_mo_density(fat_mo, nocc)
+                        gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
+                                                          norb)[:half_size]
 
+                    # Note: fak_mo_vec uses full MO coefficients matrix since
+                    # it is only for fock_ger/fock_ung in nonlinear response
                     fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
                                                       mo]).reshape(norb**2)
 
@@ -910,7 +944,7 @@ class LinearSolver:
                     for ifock in range(fock.number_of_fock_matrices()):
                         fock.scale(2.0, ifock)
 
-                xc_drv = XCNewIntegrator(self.comm)
+                xc_drv = XCIntegrator(self.comm)
                 xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
                                           gs_density, molgrid,
                                           self.xcfun.get_func_label())
@@ -1032,7 +1066,7 @@ class LinearSolver:
 
         # calculate Fxc on DFT nodes
         if dft_comm:
-            xc_drv = XCNewIntegrator(local_comm)
+            xc_drv = XCIntegrator(local_comm)
             molgrid.re_distribute_counts_and_displacements(
                 local_comm.Get_rank(), local_comm.Get_size(), local_comm)
             xc_drv.integrate_fxc_fock(fock, molecule, basis, dens, gs_density,
@@ -1480,13 +1514,28 @@ class LinearSolver:
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
-            matrices = [
-                factor * (-1.0) * self.commut_mo_density(
-                    np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
-                for P in integral_comps
-            ]
 
-            gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
+            if getattr(self, 'core_excitation', False):
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
+                    range(nocc, norb))
+                mo_core_exc = mo[:, core_exc_orb_inds]
+                matrices = [
+                    factor * (-1.0) * self.commut_mo_density(
+                        np.linalg.multi_dot([mo_core_exc.T, P.T, mo_core_exc]),
+                        nocc, self.num_core_orbitals) for P in integral_comps
+                ]
+                gradients = tuple(
+                    self.lrmat2vec(m, nocc, norb, self.num_core_orbitals)
+                    for m in matrices)
+            else:
+                matrices = [
+                    factor * (-1.0) * self.commut_mo_density(
+                        np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
+                    for P in integral_comps
+                ]
+                gradients = tuple(
+                    self.lrmat2vec(m, nocc, norb) for m in matrices)
+
             return gradients
 
         else:
@@ -1591,7 +1640,7 @@ class LinearSolver:
             return tuple()
 
     @staticmethod
-    def commut_mo_density(A, nocc):
+    def commut_mo_density(A, nocc, num_core_orbitals=None):
         """
         Commutes matrix A and MO density
 
@@ -1608,8 +1657,16 @@ class LinearSolver:
         # | A_vo  0    |
 
         mat = np.zeros(A.shape, dtype=A.dtype)
-        mat[:nocc, nocc:] = -A[:nocc, nocc:]
-        mat[nocc:, :nocc] = A[nocc:, :nocc]
+
+        if num_core_orbitals is not None and num_core_orbitals > 0:
+            mat[:num_core_orbitals,
+                num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
+            mat[num_core_orbitals:, :num_core_orbitals] = A[
+                num_core_orbitals:, :num_core_orbitals]
+
+        else:
+            mat[:nocc, nocc:] = -A[:nocc, nocc:]
+            mat[nocc:, :nocc] = A[nocc:, :nocc]
 
         return mat
 
@@ -1630,7 +1687,7 @@ class LinearSolver:
         return np.matmul(A, B) - np.matmul(B, A)
 
     @staticmethod
-    def lrvec2mat(vec, nocc, norb):
+    def lrvec2mat(vec, nocc, norb, num_core_orbitals=None):
         """
         Converts vectors to matrices.
 
@@ -1646,17 +1703,28 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
-        n_ov = nocc * nvir
-        mat = np.zeros((norb, norb), dtype=vec.dtype)
 
-        # excitation and de-excitation
-        mat[:nocc, nocc:] = vec[:n_ov].reshape(nocc, nvir)
-        mat[nocc:, :nocc] = vec[n_ov:].reshape(nocc, nvir).T
+        if num_core_orbitals is not None and num_core_orbitals > 0:
+            n_ov = num_core_orbitals * nvir
+            mat = np.zeros((num_core_orbitals + nvir, num_core_orbitals + nvir),
+                           dtype=vec.dtype)
+            # excitation and de-excitation
+            mat[:num_core_orbitals, num_core_orbitals:] = vec[:n_ov].reshape(
+                num_core_orbitals, nvir)
+            mat[num_core_orbitals:, :num_core_orbitals] = vec[n_ov:].reshape(
+                num_core_orbitals, nvir).T
+
+        else:
+            n_ov = nocc * nvir
+            mat = np.zeros((norb, norb), dtype=vec.dtype)
+            # excitation and de-excitation
+            mat[:nocc, nocc:] = vec[:n_ov].reshape(nocc, nvir)
+            mat[nocc:, :nocc] = vec[n_ov:].reshape(nocc, nvir).T
 
         return mat
 
     @staticmethod
-    def lrmat2vec(mat, nocc, norb):
+    def lrmat2vec(mat, nocc, norb, num_core_orbitals=None):
         """
         Converts matrices to vectors.
 
@@ -1672,12 +1740,22 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
-        n_ov = nocc * nvir
-        vec = np.zeros(n_ov * 2, dtype=mat.dtype)
 
-        # excitation and de-excitation
-        vec[:n_ov] = mat[:nocc, nocc:].reshape(n_ov)
-        vec[n_ov:] = mat[nocc:, :nocc].T.reshape(n_ov)
+        if num_core_orbitals is not None and num_core_orbitals > 0:
+            n_ov = num_core_orbitals * nvir
+            vec = np.zeros(n_ov * 2, dtype=mat.dtype)
+            # excitation and de-excitation
+            vec[:n_ov] = mat[:num_core_orbitals,
+                             num_core_orbitals:].reshape(n_ov)
+            vec[n_ov:] = mat[num_core_orbitals:, :num_core_orbitals].T.reshape(
+                n_ov)
+
+        else:
+            n_ov = nocc * nvir
+            vec = np.zeros(n_ov * 2, dtype=mat.dtype)
+            # excitation and de-excitation
+            vec[:n_ov] = mat[:nocc, nocc:].reshape(n_ov)
+            vec[n_ov:] = mat[nocc:, :nocc].T.reshape(n_ov)
 
         return vec
 
@@ -1828,7 +1906,7 @@ class LinearSolver:
         return vecs
 
     @staticmethod
-    def construct_ediag_sdiag_half(orb_ene, nocc, norb):
+    def construct_ediag_sdiag_half(orb_ene, nocc, norb, num_core_orbitals=None):
         """
         Gets the upper half of E0 and S0 diagonal elements as arrays.
 
@@ -1844,9 +1922,14 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
-        n_ov = nocc * nvir
 
-        eocc = orb_ene[:nocc]
+        if num_core_orbitals is not None and num_core_orbitals > 0:
+            n_ov = num_core_orbitals * nvir
+            eocc = orb_ene[:num_core_orbitals]
+        else:
+            n_ov = nocc * nvir
+            eocc = orb_ene[:nocc]
+
         evir = orb_ene[nocc:]
 
         ediag = (-eocc.reshape(-1, 1) + evir).reshape(n_ov)

@@ -30,10 +30,9 @@ import sys
 import h5py
 
 from .molecule import Molecule
-from .tdhfgradientdriver import TdhfGradientDriver
+from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
 from .outputstream import OutputStream
-#from .firstorderprop import FirstOrderProperties
 from .veloxchemlib import mpi_master
 
 # For PySCF integral derivatives
@@ -156,17 +155,6 @@ class TdhfHessianDriver(HessianDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-###    def compute_analytical(self, molecule, ao_basis):
-###        """
-###        Computes the analytical nuclear Hessian.
-###
-###        :param molecule:
-###            The molecule.
-###        :param ao_basis:
-###            The AO basis set.
-###        """
-###        return
-
     def compute_numerical(self, molecule, ao_basis, rsp_drv, min_basis=None):
         """
         Performs calculation of numerical Hessian.
@@ -194,7 +182,8 @@ class TdhfHessianDriver(HessianDriver):
 
         if self.numerical_grad:
             grad_dict['numerical'] = 'yes'
-            warn_msg = '*** Warning: Numerical Hessian will be calculated based on numerical gradient.'
+            warn_msg = '*** Warning: Numerical Hessian will be calculated'
+            warn_msg += ' based on numerical gradient.'
             self.ostream.print_header(warn_msg.ljust(56))
             warn_msg = '  This takes a long time and has limited accuracy.'
             self.ostream.print_header(warn_msg.ljust(56))
@@ -216,10 +205,13 @@ class TdhfHessianDriver(HessianDriver):
         coords = molecule.get_coordinates()
 
         # gradient driver
-        grad_drv = TdhfGradientDriver(self.scf_drv, self.scf_drv.comm, self.scf_drv.ostream)
-        grad_drv.update_settings(grad_dict, self.rsp_dict, self.orbrsp_dict, self.method_dict)
+        grad_drv = TddftGradientDriver(self.scf_drv, self.scf_drv.comm,
+                                       self.scf_drv.ostream)
+        grad_drv.update_settings(grad_dict, self.rsp_dict,
+                                 self.orbrsp_dict, self.method_dict)
 
-        # numerical dipole moment gradient (3 dipole components, no. atoms x 3 atom coords)
+        # numerical dipole moment gradient 
+        # (3 dipole components, no. atoms x 3 atom coords)
         self.dipole_gradient = np.zeros((3, 3 * molecule.number_of_atoms()))
 
         # Hessian in temporary variable
@@ -252,11 +244,14 @@ class TdhfHessianDriver(HessianDriver):
                     mu_minus = grad_drv.relaxed_dipole_moment
 
                     for c in range(3):
-                        self.dipole_gradient[c, 3*i + d] = (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
+                        self.dipole_gradient[c, 3*i + d] = (
+                               (mu_plus[c] - mu_minus[c]) / (2.0 * self.delta_h)
+                                                            )
 
                     coords[i, d] += self.delta_h
-                    hessian[i, d, :, :] = (grad_plus - grad_minus) / (2.0 * self.delta_h)
-
+                    hessian[i, d, :, :] = (
+                            (grad_plus - grad_minus) / (2.0 * self.delta_h)
+                                          )
 
         else:
             # Four-point numerical derivative approximation
@@ -309,12 +304,17 @@ class TdhfHessianDriver(HessianDriver):
                     mu_minus2 = grad_drv.relaxed_dipole_moment
 
                     for c in range(3):
-                        self.dipole_gradient[c, 3*i + d] = (mu_minus2[c] - 8.0 * mu_minus1[c]
-                                                         + 8.0 * mu_plus1[c] - mu_plus2[c]) / (12.0 * self.delta_h)
+                        self.dipole_gradient[c, 3*i + d] = ( 
+            (mu_minus2[c] - 8.0 * mu_minus1[c] + 8.0 * mu_plus1[c] - mu_plus2[c])
+                / (12.0 * self.delta_h)
+                                                            )
                     coords[i, d] += 2.0 * self.delta_h
-                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-                    hessian[i, d] = (grad_minus2 - 8.0 * grad_minus1
-                                           + 8.0 * grad_plus1 - grad_plus2) / (12.0 * self.delta_h)
+                    # f'(x) ~ [ f(x - 2h) - 8 f(x - h) + 8 f(x + h)
+                    # - f(x + 2h) ] / ( 12h )
+                    hessian[i, d] = ( 
+             (grad_minus2 - 8.0 * grad_minus1 + 8.0 * grad_plus1 - grad_plus2)
+                     / (12.0 * self.delta_h)
+                                     )
 
         # reshaped Hessian as member variable
         self.hessian = hessian.reshape(3*natm, 3*natm)
@@ -323,7 +323,8 @@ class TdhfHessianDriver(HessianDriver):
 
         self.scf_drv.compute(molecule, ao_basis, min_basis)
         rsp_drv._is_converged = False
-        rsp_results = rsp_drv.compute(molecule, ao_basis, self.scf_drv.scf_tensors)
+        rsp_results = rsp_drv.compute(molecule, ao_basis,
+                                      self.scf_drv.scf_tensors)
         self.elec_energy = (self.scf_drv.get_scf_energy()
                            + rsp_results['eigenvalues'][self.state_deriv_index])
         self.scf_drv.ostream.state = scf_ostream_state

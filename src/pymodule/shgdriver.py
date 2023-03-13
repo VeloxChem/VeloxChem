@@ -44,9 +44,9 @@ from .checkpoint import read_distributed_focks
 from .checkpoint import write_distributed_focks
 from .inputparser import parse_input
 from pathlib import Path
-from .veloxchemlib import XCNewFunctional
-from .veloxchemlib import XCNewIntegrator as XCIntegrator
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import XCFunctional
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import parse_xc_func
 
 
 class ShgDriver(NonlinearSolver):

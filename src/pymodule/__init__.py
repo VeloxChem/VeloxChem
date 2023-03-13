@@ -40,10 +40,8 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import TwoIndexes
 from .veloxchemlib import MOIntsBatch
 from .veloxchemlib import ExcitationVector
-from .veloxchemlib import XCNewIntegrator
-from .veloxchemlib import XCNewFunctional
-from .veloxchemlib import XCNewIntegrator as XCIntegrator
-from .veloxchemlib import XCNewFunctional as XCNewFunctional
+from .veloxchemlib import XCIntegrator
+from .veloxchemlib import XCFunctional
 
 # C++ functions
 from .veloxchemlib import available_functionals
@@ -61,8 +59,7 @@ from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import extinction_coefficient_from_beta
 from .veloxchemlib import fine_structure_constant
 from .veloxchemlib import mathconst_pi
-from .veloxchemlib import new_parse_xc_func
-from .veloxchemlib import new_parse_xc_func as parse_xc_func
+from .veloxchemlib import parse_xc_func
 
 # C++ enums
 from .veloxchemlib import denmat
@@ -120,10 +117,7 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
-from .orbitalresponse import OrbitalResponse # TODO: remove
-from .tdacphfsolver import TdaCphfSolver # TODO: remove
 from .tddftgradientdriver import TddftOrbitalResponse
-from .tdhfgradientdriver import TdhfGradientDriver # TODO: remove
 from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
@@ -138,6 +132,9 @@ from .orbitalviewer import OrbitalViewer
 from .numerovdriver import NumerovDriver
 
 # for backward compatibility
+from .veloxchemlib import XCIntegrator as XCNewIntegrator
+from .veloxchemlib import XCFunctional as XCNewFunctional
+from .veloxchemlib import parse_xc_func as new_parse_xc_func
 from .xtbdriver import XtbDriver as XTBDriver
 from .xtbgradientdriver import XtbGradientDriver as XTBGradientDriver
 from .xtbhessiandriver import XtbHessianDriver as XTBHessianDriver
