@@ -34,10 +34,10 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import LinearMomentumIntegralsDriver
 from .veloxchemlib import AngularMomentumIntegralsDriver
 from .veloxchemlib import DenseMatrix
-from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
-from .veloxchemlib import mpi_master
+from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .distributedarray import DistributedArray
@@ -78,7 +78,7 @@ class LinearSolver:
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
         - cur_iter: Index of the current iteration.
-        - small_thresh: The norm threshold for a vector to be considered a zero
+        - norm_thresh: The norm threshold for a vector to be considered a zero
           vector.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
@@ -134,8 +134,8 @@ class LinearSolver:
         # solver setup
         self.conv_thresh = 1.0e-4
         self.max_iter = 150
-        self.lindep_thresh = 1.0e-6
-        self._small_thresh = 1.0e-10
+        self.norm_thresh = None
+        self.lindep_thresh = None
         self._cur_iter = 0
         self._is_converged = False
 
@@ -150,6 +150,7 @@ class LinearSolver:
         # restart information
         self.restart = True
         self.checkpoint_file = None
+        self.save_solutions = True
 
         # timing and profiling
         self.timing = False
@@ -185,9 +186,11 @@ class LinearSolver:
                 'batch_size': ('int', 'batch size for Fock build'),
                 'conv_thresh': ('float', 'convergence threshold'),
                 'max_iter': ('int', 'maximum number of iterations'),
+                'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
+                'save_solutions': ('str', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
@@ -316,21 +319,63 @@ class LinearSolver:
             # field
             self.restart = False
 
+    def _check_scf_results(self, scf_results):
+        """
+        Checks SCF results for ERI, DFT and PE information.
+
+        :param scf_results:
+            A dictionary containing SCF results.
+        """
+
+        updated_scf_info = {}
+
+        if self.rank == mpi_master():
+            if scf_results.get('eri_thresh', None) is not None:
+                updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
+
+            if scf_results.get('qq_type', None) is not None:
+                updated_scf_info['qq_type'] = scf_results['qq_type']
+
+            if scf_results.get('restart', None) is not None:
+                # do not restart if scf is not restarted from checkpoint
+                if not scf_results['restart']:
+                    updated_scf_info['restart'] = scf_results['restart']
+
+            if scf_results.get('xcfun', None) is not None:
+                # do not overwrite xcfun if it is already specified
+                if self.xcfun is None:
+                    updated_scf_info['xcfun'] = scf_results['xcfun']
+
+            if scf_results.get('potfile', None) is not None:
+                # do not overwrite potfile if it is already specified
+                if self.potfile is None:
+                    updated_scf_info['potfile'] = scf_results['potfile']
+
+        updated_scf_info = self.comm.bcast(updated_scf_info, root=mpi_master())
+
+        for key, val in updated_scf_info.items():
+            setattr(self, key, val)
+
     def _dft_sanity_check(self):
         """
         Checks DFT settings and updates relevant attributes.
         """
 
-        # check xc functional
-        if self.xcfun is not None:
+        # Hartree-Fock: xcfun is None or 'hf'
+        if (self.xcfun is None or
+            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
+            self._dft = False
+
+        # DFT: xcfun is functional object or string (other than 'hf')
+        else:
             if isinstance(self.xcfun, str):
-                self.xcfun = new_parse_xc_func(self.xcfun.upper())
+                self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'LinearSolver: Undefined XC functional')
-        self._dft = (self.xcfun is not None)
+            self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 6):
+        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
             warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
             warn_msg += ' Using default value. ***'
             self.ostream.print_blank()
@@ -666,10 +711,17 @@ class LinearSolver:
 
             mo = scf_tensors['C_alpha']
             fa = scf_tensors['F_alpha']
-            fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
             nocc = molecule.number_of_alpha_electrons()
             norb = mo.shape[1]
+
+            if getattr(self, 'core_excitation', False):
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
+                    range(nocc, norb))
+                mo_core_exc = mo[:, core_exc_orb_inds]
+                fa_mo = np.linalg.multi_dot([mo_core_exc.T, fa, mo_core_exc])
+            else:
+                fa_mo = np.linalg.multi_dot([mo.T, fa, mo])
 
         # determine number of batches
 
@@ -715,9 +767,20 @@ class LinearSolver:
                 if self.rank == mpi_master():
                     half_size = vec.shape[0] // 2
 
-                    kn = self.lrvec2mat(vec, nocc, norb)
-                    dak = self.commut_mo_density(kn, nocc)
-                    dak = np.linalg.multi_dot([mo, dak, mo.T])
+                    if getattr(self, 'core_excitation', False):
+                        kn = self.lrvec2mat(vec, nocc, norb,
+                                            self.num_core_orbitals)
+                        dak = self.commut_mo_density(kn, nocc,
+                                                     self.num_core_orbitals)
+                        core_exc_orb_inds = list(range(
+                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        dak = np.linalg.multi_dot(
+                            [mo_core_exc, dak, mo_core_exc.T])
+                    else:
+                        kn = self.lrvec2mat(vec, nocc, norb)
+                        dak = self.commut_mo_density(kn, nocc)
+                        dak = np.linalg.multi_dot([mo, dak, mo.T])
 
                     dks.append(dak)
                     kns.append(kn)
@@ -760,15 +823,31 @@ class LinearSolver:
                 for ifock in range(batch_ger + batch_ung):
                     fak = fock.alpha_to_numpy(ifock)
 
-                    fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+                    if getattr(self, 'core_excitation', False):
+                        core_exc_orb_inds = list(range(
+                            self.num_core_orbitals)) + list(range(nocc, norb))
+                        mo_core_exc = mo[:, core_exc_orb_inds]
+                        fak_mo = np.linalg.multi_dot(
+                            [mo_core_exc.T, fak, mo_core_exc])
+                    else:
+                        fak_mo = np.linalg.multi_dot([mo.T, fak, mo])
+
                     kfa_mo = self.commut(fa_mo.T, kns[ifock])
 
                     fat_mo = fak_mo + kfa_mo
 
-                    gmo = -self.commut_mo_density(fat_mo, nocc)
-                    gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
-                                                      norb)[:half_size]
+                    if getattr(self, 'core_excitation', False):
+                        gmo = -self.commut_mo_density(fat_mo, nocc,
+                                                      self.num_core_orbitals)
+                        gmo_vec_halfsize = self.lrmat2vec(
+                            gmo, nocc, norb, self.num_core_orbitals)[:half_size]
+                    else:
+                        gmo = -self.commut_mo_density(fat_mo, nocc)
+                        gmo_vec_halfsize = self.lrmat2vec(gmo, nocc,
+                                                          norb)[:half_size]
 
+                    # Note: fak_mo_vec uses full MO coefficients matrix since
+                    # it is only for fock_ger/fock_ung in nonlinear response
                     fak_mo_vec = np.linalg.multi_dot([mo.T, fak,
                                                       mo]).reshape(norb**2)
 
@@ -865,7 +944,7 @@ class LinearSolver:
                     for ifock in range(fock.number_of_fock_matrices()):
                         fock.scale(2.0, ifock)
 
-                xc_drv = XCNewIntegrator(self.comm)
+                xc_drv = XCIntegrator(self.comm)
                 xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
                                           gs_density, molgrid,
                                           self.xcfun.get_func_label())
@@ -987,7 +1066,7 @@ class LinearSolver:
 
         # calculate Fxc on DFT nodes
         if dft_comm:
-            xc_drv = XCNewIntegrator(local_comm)
+            xc_drv = XCIntegrator(local_comm)
             molgrid.re_distribute_counts_and_displacements(
                 local_comm.Get_rank(), local_comm.Get_size(), local_comm)
             xc_drv.integrate_fxc_fock(fock, molecule, basis, dens, gs_density,
@@ -1435,13 +1514,28 @@ class LinearSolver:
             norb = mo.shape[1]
 
             factor = np.sqrt(2.0)
-            matrices = [
-                factor * (-1.0) * self.commut_mo_density(
-                    np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
-                for P in integral_comps
-            ]
 
-            gradients = tuple(self.lrmat2vec(m, nocc, norb) for m in matrices)
+            if getattr(self, 'core_excitation', False):
+                core_exc_orb_inds = list(range(self.num_core_orbitals)) + list(
+                    range(nocc, norb))
+                mo_core_exc = mo[:, core_exc_orb_inds]
+                matrices = [
+                    factor * (-1.0) * self.commut_mo_density(
+                        np.linalg.multi_dot([mo_core_exc.T, P.T, mo_core_exc]),
+                        nocc, self.num_core_orbitals) for P in integral_comps
+                ]
+                gradients = tuple(
+                    self.lrmat2vec(m, nocc, norb, self.num_core_orbitals)
+                    for m in matrices)
+            else:
+                matrices = [
+                    factor * (-1.0) * self.commut_mo_density(
+                        np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
+                    for P in integral_comps
+                ]
+                gradients = tuple(
+                    self.lrmat2vec(m, nocc, norb) for m in matrices)
+
             return gradients
 
         else:
@@ -1546,7 +1640,7 @@ class LinearSolver:
             return tuple()
 
     @staticmethod
-    def commut_mo_density(A, nocc):
+    def commut_mo_density(A, nocc, num_core_orbitals=None):
         """
         Commutes matrix A and MO density
 
@@ -1563,8 +1657,16 @@ class LinearSolver:
         # | A_vo  0    |
 
         mat = np.zeros(A.shape, dtype=A.dtype)
-        mat[:nocc, nocc:] = -A[:nocc, nocc:]
-        mat[nocc:, :nocc] = A[nocc:, :nocc]
+
+        if num_core_orbitals is not None and num_core_orbitals > 0:
+            mat[:num_core_orbitals,
+                num_core_orbitals:] = -A[:num_core_orbitals, num_core_orbitals:]
+            mat[num_core_orbitals:, :num_core_orbitals] = A[
+                num_core_orbitals:, :num_core_orbitals]
+
+        else:
+            mat[:nocc, nocc:] = -A[:nocc, nocc:]
+            mat[nocc:, :nocc] = A[nocc:, :nocc]
 
         return mat
 
@@ -1585,7 +1687,7 @@ class LinearSolver:
         return np.matmul(A, B) - np.matmul(B, A)
 
     @staticmethod
-    def lrvec2mat(vec, nocc, norb):
+    def lrvec2mat(vec, nocc, norb, num_core_orbitals=None):
         """
         Converts vectors to matrices.
 
@@ -1601,17 +1703,28 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
-        n_ov = nocc * nvir
-        mat = np.zeros((norb, norb), dtype=vec.dtype)
 
-        # excitation and de-excitation
-        mat[:nocc, nocc:] = vec[:n_ov].reshape(nocc, nvir)
-        mat[nocc:, :nocc] = vec[n_ov:].reshape(nocc, nvir).T
+        if num_core_orbitals is not None and num_core_orbitals > 0:
+            n_ov = num_core_orbitals * nvir
+            mat = np.zeros((num_core_orbitals + nvir, num_core_orbitals + nvir),
+                           dtype=vec.dtype)
+            # excitation and de-excitation
+            mat[:num_core_orbitals, num_core_orbitals:] = vec[:n_ov].reshape(
+                num_core_orbitals, nvir)
+            mat[num_core_orbitals:, :num_core_orbitals] = vec[n_ov:].reshape(
+                num_core_orbitals, nvir).T
+
+        else:
+            n_ov = nocc * nvir
+            mat = np.zeros((norb, norb), dtype=vec.dtype)
+            # excitation and de-excitation
+            mat[:nocc, nocc:] = vec[:n_ov].reshape(nocc, nvir)
+            mat[nocc:, :nocc] = vec[n_ov:].reshape(nocc, nvir).T
 
         return mat
 
     @staticmethod
-    def lrmat2vec(mat, nocc, norb):
+    def lrmat2vec(mat, nocc, norb, num_core_orbitals=None):
         """
         Converts matrices to vectors.
 
@@ -1627,12 +1740,22 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
-        n_ov = nocc * nvir
-        vec = np.zeros(n_ov * 2, dtype=mat.dtype)
 
-        # excitation and de-excitation
-        vec[:n_ov] = mat[:nocc, nocc:].reshape(n_ov)
-        vec[n_ov:] = mat[nocc:, :nocc].T.reshape(n_ov)
+        if num_core_orbitals is not None and num_core_orbitals > 0:
+            n_ov = num_core_orbitals * nvir
+            vec = np.zeros(n_ov * 2, dtype=mat.dtype)
+            # excitation and de-excitation
+            vec[:n_ov] = mat[:num_core_orbitals,
+                             num_core_orbitals:].reshape(n_ov)
+            vec[n_ov:] = mat[num_core_orbitals:, :num_core_orbitals].T.reshape(
+                n_ov)
+
+        else:
+            n_ov = nocc * nvir
+            vec = np.zeros(n_ov * 2, dtype=mat.dtype)
+            # excitation and de-excitation
+            vec[:n_ov] = mat[:nocc, nocc:].reshape(n_ov)
+            vec[n_ov:] = mat[nocc:, :nocc].T.reshape(n_ov)
 
         return vec
 
@@ -1783,7 +1906,7 @@ class LinearSolver:
         return vecs
 
     @staticmethod
-    def construct_ediag_sdiag_half(orb_ene, nocc, norb):
+    def construct_ediag_sdiag_half(orb_ene, nocc, norb, num_core_orbitals=None):
         """
         Gets the upper half of E0 and S0 diagonal elements as arrays.
 
@@ -1799,9 +1922,14 @@ class LinearSolver:
         """
 
         nvir = norb - nocc
-        n_ov = nocc * nvir
 
-        eocc = orb_ene[:nocc]
+        if num_core_orbitals is not None and num_core_orbitals > 0:
+            n_ov = num_core_orbitals * nvir
+            eocc = orb_ene[:num_core_orbitals]
+        else:
+            n_ov = nocc * nvir
+            eocc = orb_ene[:nocc]
+
         evir = orb_ene[nocc:]
 
         ediag = (-eocc.reshape(-1, 1) + evir).reshape(n_ov)
@@ -1882,7 +2010,10 @@ class LinearSolver:
 
         vis_drv = VisualizationDriver(self.comm)
 
-        nocc = molecule.number_of_alpha_electrons()
+        if getattr(self, 'core_excitation', False):
+            nocc = self.num_core_orbitals
+        else:
+            nocc = molecule.number_of_alpha_electrons()
         nvir = nto_mo.number_mos() - nocc
         lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
 
@@ -2038,7 +2169,10 @@ class LinearSolver:
         de_excitations = []
 
         for i in range(nocc):
-            homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc-1-i}'
+            if getattr(self, 'core_excitation', False):
+                homo_str = f'core_{i+1}'
+            else:
+                homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc-1-i}'
 
             for a in range(nvir):
                 lumo_str = 'LUMO' if a == 0 else f'LUMO+{a}'
@@ -2067,3 +2201,101 @@ class LinearSolver:
             excitation_details.append(de_exc[1])
 
         return excitation_details
+
+    def _print_transition_dipoles(self, title, trans_dipoles):
+        """
+        Prints transition dipole moments to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param trans_dipoles:
+            The transition dipole moments.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        valstr = '                     '
+        valstr += '{:>13s}{:>13s}{:>13s}'.format('X', 'Y', 'Z')
+        self.ostream.print_header(valstr.ljust(92))
+        for s, r in enumerate(trans_dipoles):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:13.6f}{:13.6f}{:13.6f}'.format(r[0], r[1], r[2])
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_absorption(self, title, results):
+        """
+        Prints absorption to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, e in enumerate(results['eigenvalues']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '{:15.8f} a.u. '.format(e)
+            valstr += '{:12.5f} eV'.format(e * hartree_in_ev())
+            f = results['oscillator_strengths'][s]
+            valstr += '    Osc.Str. {:9.4f}'.format(f)
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_ecd(self, title, results):
+        """
+        Prints electronic circular dichroism to output stream.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        spin_str = 'S'
+
+        valstr = title
+        self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_header(('-' * len(valstr)).ljust(92))
+        for s, R in enumerate(results['rotatory_strengths']):
+            valstr = 'Excited State {:>5s}: '.format(spin_str + str(s + 1))
+            valstr += '    Rot.Str. '
+            valstr += f'{(R / rotatory_strength_in_cgs()):13.6f} a.u.'
+            valstr += f'{R:11.4f} [10**(-40) cgs]'
+            self.ostream.print_header(valstr.ljust(92))
+        self.ostream.print_blank()
+
+    def _print_excitation_details(self, title, results):
+        """
+        Prints excitation details.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self.ostream.print_header(title.ljust(92))
+        self.ostream.print_blank()
+
+        nstates = results['eigenvalues'].size
+        excitation_details = results['excitation_details']
+
+        for s in range(nstates):
+            valstr = 'Excited state {}'.format(s + 1)
+            self.ostream.print_header(valstr.ljust(92))
+            self.ostream.print_header(('-' * len(valstr)).ljust(92))
+
+            for exc_str in excitation_details[s]:
+                self.ostream.print_header(exc_str.ljust(92))
+            self.ostream.print_blank()
+
+        self.ostream.flush()

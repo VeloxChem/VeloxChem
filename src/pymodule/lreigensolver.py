@@ -29,8 +29,7 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import mpi_master
-from .veloxchemlib import rotatory_strength_in_cgs
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
 from .veloxchemlib import denmat
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
@@ -56,6 +55,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
     Instance variables
         - nstates: Number of excited states.
+        - core_excitation: The flag for computing core-excited states.
+        - num_core_orbitals: The number of core-orbitals involved in
+          the core-excited states.
         - nto: The flag for natural transition orbital analysis.
         - nto_pairs: The number of NTO pairs in NTO analysis.
         - detach_attach: The flag for detachment/attachment density analysis.
@@ -83,6 +85,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nstates = 3
 
+        self.core_excitation = False
+        self.num_core_orbitals = 0
+
         self.nto = False
         self.nto_pairs = None
         self.detach_attach = False
@@ -92,6 +97,8 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
+            'core_excitation': ('bool', 'compute core-excited states'),
+            'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
@@ -143,10 +150,18 @@ class LinearResponseEigenSolver(LinearSolver):
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
+
         self._dist_bger = None
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
 
         # check dft setup
         self._dft_sanity_check()
@@ -456,7 +471,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 eigvecs = np.zeros((x_0.size, self.nstates))
 
                 # create h5 file for response solutions
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     final_h5_fname = str(
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
                     create_hdf5(final_h5_fname, molecule, basis,
@@ -473,10 +488,19 @@ class LinearResponseEigenSolver(LinearSolver):
                 eigvec = self._get_full_solution_vector(excitations[s][1])
 
                 if self.rank == mpi_master():
-                    mo_occ = scf_tensors['C_alpha'][:, :nocc]
-                    mo_vir = scf_tensors['C_alpha'][:, nocc:]
-                    z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
-                    y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
+                    if self.core_excitation:
+                        mo_occ = scf_tensors['C_alpha'][:, :self.
+                                                        num_core_orbitals]
+                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
+                        z_mat = eigvec[:eigvec.size // 2].reshape(
+                            self.num_core_orbitals, -1)
+                        y_mat = eigvec[eigvec.size // 2:].reshape(
+                            self.num_core_orbitals, -1)
+                    else:
+                        mo_occ = scf_tensors['C_alpha'][:, :nocc]
+                        mo_vir = scf_tensors['C_alpha'][:, nocc:]
+                        z_mat = eigvec[:eigvec.size // 2].reshape(nocc, -1)
+                        y_mat = eigvec[eigvec.size // 2:].reshape(nocc, -1)
 
                 if self.nto or self.detach_attach:
                     vis_drv = VisualizationDriver(self.comm)
@@ -538,7 +562,8 @@ class LinearResponseEigenSolver(LinearSolver):
                     eigvecs[:, s] = eigvec[:]
 
                     # write to h5 file for response solutions
-                    if self.checkpoint_file is not None:
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
                         write_rsp_solution(final_h5_fname,
                                            'S{:d}'.format(s + 1), eigvec)
 
@@ -575,11 +600,13 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.detach_attach:
                     ret_dict['density_cubes'] = dens_cube_files
 
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     checkpoint_text = 'Response solution vectors written to file: '
                     checkpoint_text += final_h5_fname
                     self.ostream.print_info(checkpoint_text)
                     self.ostream.print_blank()
+
+                self._print_results(ret_dict)
 
                 return ret_dict
 
@@ -653,11 +680,19 @@ class LinearResponseEigenSolver(LinearSolver):
             vector).
         """
 
-        excitations = [(i, a) for i in range(nocc) for a in range(nocc, norb)]
+        if self.core_excitation:
+            excitations = [(i, a)
+                           for i in range(self.num_core_orbitals)
+                           for a in range(nocc, norb)]
+        else:
+            excitations = [
+                (i, a) for i in range(nocc) for a in range(nocc, norb)
+            ]
+
         excitation_energies = [ea[a] - ea[i] for i, a in excitations]
 
         w = {ia: w for ia, w in zip(excitations, excitation_energies)}
-        n_exc = nocc * (norb - nocc)
+        n_exc = len(excitations)
 
         final = {}
         for k, (i, a) in enumerate(sorted(w, key=w.get)[:nstates]):
@@ -709,13 +744,13 @@ class LinearResponseEigenSolver(LinearSolver):
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
-            if vn > self._small_thresh:
+            if vn > self.norm_thresh:
                 norms = np.sqrt(norms_2)
                 # gerade
-                if norms[0] > self._small_thresh:
+                if norms[0] > self.norm_thresh:
                     trials_ger.append(v.data[:, 0])
                 # ungerade
-                if norms[1] > self._small_thresh:
+                if norms[1] > self.norm_thresh:
                     trials_ung.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T
@@ -745,7 +780,11 @@ class LinearResponseEigenSolver(LinearSolver):
 
         # spawning needed components
 
-        ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
+        if self.core_excitation:
+            ediag, sdiag = self.construct_ediag_sdiag_half(
+                orb_ene, nocc, norb, self.num_core_orbitals)
+        else:
+            ediag, sdiag = self.construct_ediag_sdiag_half(orb_ene, nocc, norb)
 
         ediag_sq = ediag**2
         sdiag_sq = sdiag**2
@@ -806,6 +845,11 @@ class LinearResponseEigenSolver(LinearSolver):
         :return:
             The E[2] matrix as numpy array.
         """
+
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         self._dist_bger = None
         self._dist_bung = None
@@ -884,3 +928,27 @@ class LinearResponseEigenSolver(LinearSolver):
             return E2
         else:
             return None
+
+    def _print_results(self, results):
+        """
+        Prints results to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole length, a.u.)',
+            results['electric_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole velocity, a.u.)',
+            results['velocity_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Magnetic Transition Dipole Moments (a.u.)',
+            results['magnetic_transition_dipoles'])
+
+        self._print_absorption('One-Photon Absorption', results)
+        self._print_ecd('Electronic Circular Dichroism', results)
+        self._print_excitation_details('Character of excitations:', results)

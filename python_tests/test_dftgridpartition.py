@@ -2,7 +2,7 @@ from pathlib import Path
 import numpy as np
 import h5py
 
-from veloxchem.veloxchemlib import GridDriver, XCNewIntegrator
+from veloxchem.veloxchemlib import GridDriver, XCIntegrator
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -20,7 +20,7 @@ class TestDftGridPartition:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
         scf_drv.compute(molecule, basis)
         density = scf_drv.density
 
@@ -28,7 +28,7 @@ class TestDftGridPartition:
         grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_drv = XCNewIntegrator()
+        xc_drv = XCIntegrator()
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, density, mol_grid,
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
@@ -56,7 +56,7 @@ class TestDftGridPartition:
         basis_label = 'def2-svp'
         xcfun_label = 'slater'
         grid_level = 4
-        tol = 1.0e-11
+        tol = 1.0e-10
         ref_h5file = 'vxc_lda.h5'
 
         self.run_dft_grid_partition(mol_str, basis_label, xcfun_label,

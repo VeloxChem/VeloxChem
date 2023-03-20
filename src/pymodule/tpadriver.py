@@ -32,12 +32,12 @@ from .veloxchemlib import mpi_master, hartree_in_wavenumbers
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
-from .nonlinearsolver import NonLinearSolver
+from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 
 
-class TpaDriver(NonLinearSolver):
+class TpaDriver(NonlinearSolver):
     """
     Implements the isotropic cubic response driver for two-photon absorption
     (TPA)
@@ -52,8 +52,6 @@ class TpaDriver(NonLinearSolver):
         - frequencies: The frequencies.
         - comp: The list of all the gamma tensor components
         - damping: The damping parameter.
-        - lindep_thresh: The threshold for removing linear dependence in the
-          trial vectors.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
     """
@@ -70,9 +68,6 @@ class TpaDriver(NonLinearSolver):
         self.frequencies = (0,)
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumbers()
-        self.lindep_thresh = 1.0e-10
-        self.conv_thresh = 1.0e-4
-        self.max_iter = 50
 
         # input keywords
         self._input_keywords['response'].update({
@@ -113,17 +108,30 @@ class TpaDriver(NonLinearSolver):
               functions for TPA
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-6
+
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
+        # check dft setup
+        self._dft_sanity_check_nonlinrsp()
+
         profiler = Profiler({
-            'timing': False,
+            'timing': self.timing,
             'profiling': self.profiling,
             'memory_profiling': self.memory_profiling,
             'memory_tracing': self.memory_tracing,
         })
 
         if self.rank == mpi_master():
-            self.print_header()
+            self._print_header('Two-Photon Absorbtion Driver Setup')
 
         start_time = time.time()
+
+        dft_dict = self._init_dft(molecule, scf_tensors)
 
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
@@ -185,9 +193,10 @@ class TpaDriver(NonLinearSolver):
         Nb_drv = ComplexResponse(self.comm, self.ostream)
 
         cpp_keywords = {
-            'frequencies', 'damping', 'lindep_thresh', 'conv_thresh',
-            'max_iter', 'eri_thresh', 'qq_type', 'timing', 'memory_profiling',
-            'batch_size', 'restart', 'program_end_time'
+            'frequencies', 'damping', 'norm_thresh', 'lindep_thresh',
+            'conv_thresh', 'max_iter', 'eri_thresh', 'qq_type', 'timing',
+            'memory_profiling', 'batch_size', 'restart', 'xcfun', 'grid_level',
+            'potfile', 'electric_field', 'program_end_time'
         }
 
         for key in cpp_keywords:
@@ -243,7 +252,7 @@ class TpaDriver(NonLinearSolver):
         tpa_dict = self.compute_tpa_components(Focks, self.frequencies, X,
                                                d_a_mo, kX, self.comp,
                                                scf_tensors, molecule, ao_basis,
-                                               profiler)
+                                               profiler, dft_dict)
 
         valstr = '*** Time spent in TPA calculation: {:.2f} sec ***'.format(
             time.time() - start_time)
@@ -256,7 +265,8 @@ class TpaDriver(NonLinearSolver):
         return tpa_dict
 
     def compute_tpa_components(self, Focks, w, X, d_a_mo, kX, track,
-                               scf_tensors, molecule, ao_basis, profiler):
+                               scf_tensors, molecule, ao_basis, profiler,
+                               dft_dict):
         """
         Computes all the relevent terms to third-order isotropic gradient
 
@@ -300,15 +310,28 @@ class TpaDriver(NonLinearSolver):
 
         # computing all compounded first-order densities
         if self.rank == mpi_master():
-            density_list = self.get_densities(w, kX, mo, nocc)
+            density_list1, density_list2, density_list3 = self.get_densities(
+                w, kX, mo, nocc)
         else:
-            density_list = None
+            density_list1 = None
+            density_list2 = None
+            density_list3 = None
 
         profiler.check_memory_usage('1st densities')
 
+        fock_profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         #  computing the compounded first-order Fock matrices
-        fock_dict = self.get_fock_dict(w, density_list, F0, mo, molecule,
-                                       ao_basis)
+        fock_dict = self.get_fock_dict(w, density_list1, density_list2,
+                                       density_list3, F0, mo, molecule,
+                                       ao_basis, dft_dict, fock_profiler)
+
+        fock_profiler.end(self.ostream)
 
         profiler.check_memory_usage('1st Focks')
 
@@ -328,16 +351,29 @@ class TpaDriver(NonLinearSolver):
         # computing all second-order compounded densities based on the
         # second-order response vectors
         if self.rank == mpi_master():
-            density_list_two = self.get_densities_II(w, kX, kXY_dict, mo, nocc)
+            density_list_two1, density_list_two2 = self.get_densities_II(
+                w, kX, kXY_dict, mo, nocc)
         else:
-            density_list_two = None
+            density_list_two1 = None
+            density_list_two2 = None
 
         profiler.check_memory_usage('2nd densities')
 
+        fock_profiler_two = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
         # computing the remaning second-order Fock matrices from the
         # second-order densities
-        fock_dict_two = self.get_fock_dict_II(w, density_list_two, mo, molecule,
-                                              ao_basis)
+        fock_dict_two = self.get_fock_dict_II(w, density_list_two1,
+                                              density_list_two2, mo, molecule,
+                                              ao_basis, dft_dict,
+                                              fock_profiler_two)
+
+        fock_profiler_two.end(self.ostream)
 
         profiler.check_memory_usage('2nd Focks')
 
@@ -392,7 +428,7 @@ class TpaDriver(NonLinearSolver):
                 't4_dict': t4_dict,
                 't3_dict': t3_dict,
                 'gamma': gamma,
-                'w': self.frequencies,
+                'w': self.frequencies
             })
 
         profiler.check_memory_usage('End of TPA')
@@ -420,7 +456,8 @@ class TpaDriver(NonLinearSolver):
 
         return None
 
-    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis):
+    def get_fock_dict(self, wi, density_list, F0, mo, molecule, ao_basis,
+                      dft_dict, profiler):
         """
         Computes the compounded Fock matrices F^{σ},F^{λ+τ},F^{σλτ} used for the
         isotropic cubic response function
@@ -525,7 +562,8 @@ class TpaDriver(NonLinearSolver):
 
         return None
 
-    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis):
+    def get_fock_dict_II(self, wi, density_list, mo, molecule, ao_basis,
+                         dft_dict, profiler):
         """
         Computes the compounded second-order Fock matrices used for the
         isotropic cubic response function
@@ -776,35 +814,6 @@ class TpaDriver(NonLinearSolver):
         """
 
         return None
-
-    def print_header(self):
-        """
-        Prints TPA setup header to output stream.
-        """
-
-        self.ostream.print_blank()
-
-        title = 'Two-Photon Absorbtion Driver Setup'
-        self.ostream.print_header(title)
-        self.ostream.print_header('=' * (len(title) + 2))
-        self.ostream.print_blank()
-
-        width = 50
-
-        cur_str = 'ERI Screening Threshold         : {:.1e}'.format(
-            self.eri_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Convergance Threshold           : {:.1e}'.format(
-            self.conv_thresh)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Max. Number of Iterations       : {:d}'.format(self.max_iter)
-        self.ostream.print_header(cur_str.ljust(width))
-        cur_str = 'Damping Parameter               : {:.6e}'.format(
-            self.damping)
-        self.ostream.print_header(cur_str.ljust(width))
-
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     def get_comp(self, freqs):
         """

@@ -119,10 +119,18 @@ class LinearResponseSolver(LinearSolver):
             a non-linear response module.
         """
 
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
+
         self._dist_bger = None
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
 
         # check dft setup
         self._dft_sanity_check()
@@ -188,8 +196,15 @@ class LinearResponseSolver(LinearSolver):
             op_freq_keys = None
         op_freq_keys = self.comm.bcast(op_freq_keys, root=mpi_master())
 
-        freqs = set([w for (op, w) in op_freq_keys])
-        precond = {w: self._get_precond(orb_ene, nocc, norb, w) for w in freqs}
+        self.frequencies = []
+        for (op, w) in op_freq_keys:
+            if w not in self.frequencies:
+                self.frequencies.append(w)
+
+        precond = {
+            w: self._get_precond(orb_ene, nocc, norb, w)
+            for w in self.frequencies
+        }
 
         # distribute the right-hand side
         # dist_grad will also serve as initial guess
@@ -436,7 +451,7 @@ class LinearResponseSolver(LinearSolver):
                 full_solutions = {}
 
                 # create h5 file for response solutions
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     final_h5_fname = str(
                         Path(self.checkpoint_file).with_suffix('.solutions.h5'))
                     create_hdf5(final_h5_fname, molecule, basis,
@@ -452,23 +467,28 @@ class LinearResponseSolver(LinearSolver):
                         full_solutions[(bop, w)] = x
 
                         # write to h5 file for response solutions
-                        if self.checkpoint_file is not None:
+                        if (self.save_solutions and
+                                self.checkpoint_file is not None):
                             write_rsp_solution(
                                 final_h5_fname,
                                 '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
-                if self.checkpoint_file is not None:
+                if (self.save_solutions and self.checkpoint_file is not None):
                     checkpoint_text = 'Response solution vectors written to file: '
                     checkpoint_text += final_h5_fname
                     self.ostream.print_info(checkpoint_text)
                     self.ostream.print_blank()
 
-                return {
+                ret_dict = {
                     'response_functions': rsp_funcs,
                     'solutions': full_solutions
                 }
+
+                self._print_results(ret_dict, self.ostream)
+
+                return ret_dict
 
         return None
 
@@ -610,13 +630,13 @@ class LinearResponseSolver(LinearSolver):
             norms_2 = 2.0 * v.squared_norm(axis=0)
             vn = np.sqrt(np.sum(norms_2))
 
-            if vn > self._small_thresh:
+            if vn > self.norm_thresh:
                 norms = np.sqrt(norms_2)
                 # gerade
-                if norms[0] > self._small_thresh:
+                if norms[0] > self.norm_thresh:
                     trials_ger.append(v.data[:, 0])
                 # ungerade
-                if norms[1] > self._small_thresh:
+                if norms[1] > self.norm_thresh:
                     trials_ung.append(v.data[:, 1])
 
         new_ger = np.array(trials_ger).T
@@ -626,3 +646,36 @@ class LinearResponseSolver(LinearSolver):
         dist_new_ung = DistributedArray(new_ung, self.comm, distribute=False)
 
         return dist_new_ger, dist_new_ung
+
+    def _print_results(self, results, ostream):
+        """
+        Prints polarizability to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        :param ostream:
+            The output stream.
+        """
+
+        width = 92
+
+        for w in self.frequencies:
+            w_str = 'Polarizability (w={:.4f})'.format(w)
+            ostream.print_header(w_str.ljust(width))
+            ostream.print_header(('-' * len(w_str)).ljust(width))
+
+            valstr = '{:<5s}'.format('')
+            for b in self.b_components:
+                valstr += '{:>15s}'.format(b.upper())
+            ostream.print_header(valstr.ljust(width))
+
+            for a in self.a_components:
+                valstr = '{:<5s}'.format(a.upper())
+                for b in self.b_components:
+                    prop = -results['response_functions'][(a, b, w)]
+                    valstr += '{:15.8f}'.format(prop)
+                ostream.print_header(valstr.ljust(width))
+
+            ostream.print_blank()
+
+        ostream.flush()

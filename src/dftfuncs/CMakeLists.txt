@@ -1,6 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
-    NewFunctionalParser.cpp
+    FunctionalParser.cpp
     PairDensitySlater.cpp
     PairDensityVWN.cpp
     PairDensityPBE_C.cpp

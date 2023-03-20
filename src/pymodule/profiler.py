@@ -245,6 +245,9 @@ class Profiler:
         """
 
         if self.timing:
+            if not self.timing_dict:
+                return
+
             width = 92
 
             valstr = 'Timing (in sec)'

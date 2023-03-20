@@ -30,7 +30,7 @@ import sys
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import (molorb, fockmat)
-from .veloxchemlib import (XCNewFunctional, MolecularGrid)
+from .veloxchemlib import (XCFunctional, MolecularGrid)
 from .molecularorbitals import MolecularOrbitals
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -326,43 +326,46 @@ class ScfUnrestrictedDriver(ScfDriver):
             The natural orbitals.
         """
 
-        # Get total density
-        D_total = self.scf_tensors['D_alpha'] + self.scf_tensors['D_beta']
+        if self.rank == mpi_master():
+            # Get total density
+            D_total = self.scf_tensors['D_alpha'] + self.scf_tensors['D_beta']
 
-        # Get some MO coefficients and create C^-1
-        C = self.scf_tensors['C_alpha']
-        S = self.scf_tensors['S']
-        C_inv = np.matmul(S, C)
+            # Get some MO coefficients and create C^-1
+            C = self.scf_tensors['C_alpha']
+            S = self.scf_tensors['S']
+            C_inv = np.matmul(S, C)
 
-        # Transform total density to MO basis
-        D_MO = np.linalg.multi_dot([C_inv.T, D_total, C_inv])
+            # Transform total density to MO basis
+            D_MO = np.linalg.multi_dot([C_inv.T, D_total, C_inv])
 
-        # Diagonalize
-        occupations, eigenvectors = np.linalg.eigh(D_MO)
+            # Diagonalize
+            occupations, eigenvectors = np.linalg.eigh(D_MO)
 
-        # Create the final orbitals
-        C_natural = np.matmul(C, eigenvectors)
+            # Create the final orbitals
+            C_natural = np.matmul(C, eigenvectors)
 
-        # Compute the orbital energy as expectation value of the averaged Fock
-        # matrix (they are not eigenvalues!)
-        F_alpha = self.scf_tensors['F_alpha']
-        F_beta = self.scf_tensors['F_beta']
-        F_avg = 0.5 * (F_alpha + F_beta)
+            # Compute the orbital energy as expectation value of the averaged Fock
+            # matrix (they are not eigenvalues!)
+            F_alpha = self.scf_tensors['F_alpha']
+            F_beta = self.scf_tensors['F_beta']
+            F_avg = 0.5 * (F_alpha + F_beta)
 
-        orbital_energies = np.diag(
-            np.linalg.multi_dot([C_natural.T, F_avg, C_natural]))
+            orbital_energies = np.diag(
+                np.linalg.multi_dot([C_natural.T, F_avg, C_natural]))
 
-        # Sort by orbital energies or by occupation numbers?
-        # idx = orbital_energies.argsort() # Sort by orbital energies
-        idx = occupations.argsort()[::-1]  # Sort by occupation numbers
-        orbital_energies = orbital_energies[idx]
-        occupations = occupations[idx]
-        # eigenvectors = eigenvectors[:,idx]
-        C_natural = C_natural[:, idx]
+            # Sort by orbital energies or by occupation numbers?
+            # idx = orbital_energies.argsort() # Sort by orbital energies
+            idx = occupations.argsort()[::-1]  # Sort by occupation numbers
+            orbital_energies = orbital_energies[idx]
+            occupations = occupations[idx]
+            C_natural = C_natural[:, idx]
 
-        # Create the MolecularOrbitals object and return
-        natural_orbitals = MolecularOrbitals([C_natural], [orbital_energies],
-                                             [occupations], molorb.rest)
+            # Create the MolecularOrbitals object and return
+            natural_orbitals = MolecularOrbitals([C_natural],
+                                                 [orbital_energies],
+                                                 [occupations], molorb.rest)
+        else:
+            natural_orbitals = MolecularOrbitals()
 
         return natural_orbitals
 
@@ -382,8 +385,8 @@ class ScfUnrestrictedDriver(ScfDriver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 pass
-            elif isinstance(val, XCNewFunctional):
-                new_scf_drv.key = XCNewFunctional(val)
+            elif isinstance(val, XCFunctional):
+                new_scf_drv.key = XCFunctional(val)
             elif isinstance(val, MolecularGrid):
                 new_scf_drv.key = MolecularGrid(val)
             else:

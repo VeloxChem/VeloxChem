@@ -137,12 +137,19 @@ Cray platform (x86-64 or ARM processor)
 - Create and activate a `virtual enviroment <https://docs.python.org/3/tutorial/venv.html>`_
   ::
 
-    $ python3 -m venv vlxenv
+    $ python3 -m venv vlxenv --system-site-packages
     $ source vlxenv/bin/activate
     $ python -m pip install --upgrade pip
 
-- Install `Mpi4Py <https://mpi4py.readthedocs.io/>`_
+- Verify mpi4py installation on a compute node. For more information see `Mpi4Py <https://mpi4py.readthedocs.io/>`_
   ::
+
+    $ srun -n 2 python -c "from mpi4py import MPI;print(f'hello from rank {MPI.COMM_WORLD.Get_rank()}')"
+
+  If your system administrator has provided mpi4py then this mpi4py version of "hello world" should print ``hello from rank n`` from each MPI rank.
+
+  If the system you are running on does not provide the mpi4py package you can also install it manually.
+  For this to work you must use the Cray compiler wrappers.::
 
     $ CC=cc MPICC=cc python3 -m pip install --no-deps --no-binary=mpi4py mpi4py
 

@@ -1,6 +1,6 @@
 import numpy as np
 
-from veloxchem.veloxchemlib import GridDriver, XCNewIntegrator
+from veloxchem.veloxchemlib import GridDriver, XCIntegrator
 from veloxchem.veloxchemlib import is_mpi_master, mpi_master
 from veloxchem.veloxchemlib import denmat
 from veloxchem.molecule import Molecule
@@ -23,14 +23,14 @@ class TestPDFT:
 
         # Optimize ROHF wavefunction
         scfdrv = ScfRestrictedOpenDriver()
-        scfdrv.ostream.state = False
+        scfdrv.ostream.mute()
         scfdrv.compute(molecule, basis)
 
         # Compute SLDA correction
         grid_drv = GridDriver()
         molgrid = grid_drv.generate(molecule)
 
-        xc_drv = XCNewIntegrator()
+        xc_drv = XCIntegrator()
         vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, scfdrv.density,
                                             molgrid, func)
         vxc_mat.reduce_sum(scfdrv.rank, scfdrv.nodes, scfdrv.comm)

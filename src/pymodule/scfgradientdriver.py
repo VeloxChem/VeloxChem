@@ -27,7 +27,7 @@ from mpi4py import MPI
 from copy import deepcopy
 import time as tm
 
-from .veloxchemlib import (XCNewFunctional, MolecularGrid)
+from .veloxchemlib import (XCFunctional, MolecularGrid)
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
 
@@ -74,13 +74,12 @@ class ScfGradientDriver(GradientDriver):
         start_time = tm.time()
         self.print_header()
 
-        scf_ostream_state = self.scf_drv.ostream.state
-        self.scf_drv.ostream.state = False
+        self.scf_drv.ostream.mute()
 
         # Currently, only numerical gradients activated
         self.compute_numerical(molecule, ao_basis, min_basis)
 
-        self.scf_drv.ostream.state = scf_ostream_state
+        self.scf_drv.ostream.unmute()
 
         # print gradient
         self.print_geometry(molecule)
@@ -127,8 +126,8 @@ class ScfGradientDriver(GradientDriver):
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):
                 pass
-            elif isinstance(val, XCNewFunctional):
-                new_grad_drv.key = XCNewFunctional(val)
+            elif isinstance(val, XCFunctional):
+                new_grad_drv.key = XCFunctional(val)
             elif isinstance(val, MolecularGrid):
                 new_grad_drv.key = MolecularGrid(val)
             else:

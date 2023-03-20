@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from veloxchem.veloxchemlib import GridDriver, XCNewIntegrator, XCNewFunctional
-from veloxchem.veloxchemlib import is_single_node, mpi_master, new_parse_xc_func
+from veloxchem.veloxchemlib import GridDriver, XCIntegrator, XCFunctional
+from veloxchem.veloxchemlib import is_single_node, mpi_master, parse_xc_func
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -32,7 +32,7 @@ class TestFunctionalExcVxc:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
         scf_drv.compute(molecule, basis)
         gs_density = scf_drv.density
 
@@ -40,14 +40,14 @@ class TestFunctionalExcVxc:
         grid_drv.set_level(grid_level)
         molgrid = grid_drv.generate(molecule)
 
-        xc_drv = XCNewIntegrator()
+        xc_drv = XCIntegrator()
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = new_parse_xc_func('slda')
+        func = parse_xc_func('slda')
 
-        func_ref = XCNewFunctional(
+        func_ref = XCFunctional(
             'slda',
             ['LDA_X', 'LDA_C_VWN_RPA'],
             [1.0, 1.0],
@@ -104,7 +104,7 @@ class TestFunctionalExcVxc:
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
         scf_drv.compute(molecule, basis)
         gs_density = scf_drv.density
 
@@ -112,14 +112,14 @@ class TestFunctionalExcVxc:
         grid_drv.set_level(grid_level)
         molgrid = grid_drv.generate(molecule)
 
-        xc_drv = XCNewIntegrator()
+        xc_drv = XCIntegrator()
         vxc = xc_drv.integrate_vxc_fock(molecule, basis, gs_density, molgrid,
                                         xcfun_label)
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
-        func = new_parse_xc_func('b3lyp')
+        func = parse_xc_func('b3lyp')
 
-        func_ref = XCNewFunctional(
+        func_ref = XCFunctional(
             'b3lyp',
             ['LDA_X', 'GGA_X_B88', 'LDA_C_VWN_RPA', 'GGA_C_LYP'],
             [0.08, 0.72, 0.19, 0.81],

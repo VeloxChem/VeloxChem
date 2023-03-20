@@ -24,7 +24,6 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .rspproperty import ResponseProperty
-from .inputparser import parse_seq_range
 
 
 class Polarizability(ResponseProperty):
@@ -98,31 +97,4 @@ class Polarizability(ResponseProperty):
             The output stream.
         """
 
-        width = 92
-
-        freqs = parse_seq_range(self._rsp_dict['frequencies'])
-
-        for w in freqs:
-            w_str = 'Polarizability (w={:.4f})'.format(w)
-            ostream.print_header(w_str.ljust(width))
-            ostream.print_header(('-' * len(w_str)).ljust(width))
-
-            valstr = '{:<5s}'.format('')
-            for b in self._rsp_dict['b_components']:
-                if self._rsp_dict['complex'] == 'no':
-                    valstr += '{:>15s}'.format(b.upper())
-                else:
-                    valstr += '{:>29s}'.format(b.upper())
-            ostream.print_header(valstr.ljust(width))
-
-            for a in self._rsp_dict['a_components']:
-                valstr = '{:<5s}'.format(a.upper())
-                for b in self._rsp_dict['b_components']:
-                    prop = -self._rsp_property['response_functions'][(a, b, w)]
-                    if self._rsp_dict['complex'] == 'no':
-                        valstr += '{:15.8f}'.format(prop)
-                    else:
-                        valstr += '{:29.8f}'.format(prop)
-                ostream.print_header(valstr.ljust(width))
-
-            ostream.print_blank()
+        pass

@@ -30,14 +30,11 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import LinearMomentumIntegralsDriver
-from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import mpi_master
-from .veloxchemlib import rotatory_strength_in_cgs
-from .veloxchemlib import molorb
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
+from .veloxchemlib import (ElectricDipoleIntegralsDriver,
+                           LinearMomentumIntegralsDriver,
+                           AngularMomentumIntegralsDriver)
+from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
+from .veloxchemlib import denmat, fockmat
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .outputstream import OutputStream
@@ -64,6 +61,9 @@ class TdaEigenSolver(LinearSolver):
 
     Instance variables
         - nstates: The number of excited states to be determined.
+        - core_excitation: The flag for computing core-excited states.
+        - num_core_orbitals: The number of core-orbitals involved in
+          the core-excited states.
         - solver: The eigenvalues solver.
         - nto: The flag for natural transition orbital analysis.
         - nto_pairs: The number of NTO pairs in NTO analysis.
@@ -93,6 +93,9 @@ class TdaEigenSolver(LinearSolver):
         # excited states information
         self.nstates = 3
 
+        self.core_excitation = False
+        self.num_core_orbitals = 0
+
         # solver setup
         self.solver = None
 
@@ -106,6 +109,8 @@ class TdaEigenSolver(LinearSolver):
 
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
+            'core_excitation': ('bool', 'compute core-excited states'),
+            'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
@@ -159,6 +164,9 @@ class TdaEigenSolver(LinearSolver):
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
+        # double check SCF information
+        self._check_scf_results(scf_tensors)
+
         # check dft setup
         self._dft_sanity_check()
 
@@ -192,25 +200,24 @@ class TdaEigenSolver(LinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'TDAExciDriver: not implemented for unrestricted case')
+            'TdaEigenSolver: not implemented for unrestricted case')
 
         # prepare molecular orbitals
 
         if self.rank == mpi_master():
-            n_ao = scf_tensors['C_alpha'].shape[0]
-            # recreate an aufbau since occupation is not stored in scf_tensors
-            occ_alpha = molecule.get_aufbau_occupation(n_ao, 'restricted')
-            mol_orbs = MolecularOrbitals([scf_tensors['C_alpha']],
-                                         [scf_tensors['E_alpha']], [occ_alpha],
-                                         molorb.rest)
-        else:
-            mol_orbs = MolecularOrbitals()
-
-        if self.rank == mpi_master():
+            orb_ene = scf_tensors['E_alpha']
+            norb = orb_ene.shape[0]
             nocc = molecule.number_of_alpha_electrons()
-            norb = mol_orbs.number_mos()
-            assert_msg_critical(self.nstates <= nocc * (norb - nocc),
-                                'TDAExciDriver: too many excited states')
+            if self.core_excitation:
+                assert_msg_critical(
+                    self.nstates <= self.num_core_orbitals * (norb - nocc),
+                    'TdaEigenSolver: too many excited states')
+            else:
+                assert_msg_critical(self.nstates <= nocc * (norb - nocc),
+                                    'TdaEigenSolver: too many excited states')
+        else:
+            orb_ene = None
+            nocc = None
 
         # ERI information
         eri_dict = self._init_eri(molecule, basis)
@@ -223,7 +230,7 @@ class TdaEigenSolver(LinearSolver):
 
         # set up trial excitation vectors on master node
 
-        diag_mat, trial_mat = self._gen_trial_vectors(mol_orbs, molecule)
+        diag_mat, trial_mat = self._gen_trial_vectors(molecule, orb_ene, nocc)
 
         # block Davidson algorithm setup
 
@@ -333,7 +340,11 @@ class TdaEigenSolver(LinearSolver):
         # print converged excited states
 
         if self.rank == mpi_master() and self._is_converged:
-            mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
+            if self.core_excitation:
+                mo_occ = scf_tensors['C_alpha'][:, :self.
+                                                num_core_orbitals].copy()
+            else:
+                mo_occ = scf_tensors['C_alpha'][:, :nocc].copy()
             mo_vir = scf_tensors['C_alpha'][:, nocc:].copy()
 
             eigvals, rnorms = self.solver.get_eigenvalues()
@@ -441,38 +452,47 @@ class TdaEigenSolver(LinearSolver):
             self._write_final_hdf5(molecule, basis, dft_dict['dft_func_label'],
                                    pe_dict['potfile_text'], eigvecs)
 
+            self._print_results(ret_dict)
+
             return ret_dict
         else:
             return None
 
-    def _gen_trial_vectors(self, mol_orbs, molecule):
+    def _gen_trial_vectors(self, molecule, orb_ene, nocc):
         """
         Generates set of TDA trial vectors for given number of excited states
         by selecting primitive excitations wirh lowest approximate energies
         E_ai = e_a-e_i.
 
-        :param mol_orbs:
-            The molecular orbitals.
         :param molecule:
             The molecule.
+        :param orb_ene:
+            The orbital energies.
+        :param nocc:
+            The number of occupied orbitals.
 
         :return:
             tuple (approximate diagonal of symmetric A, set of trial vectors).
         """
 
         if self.rank == mpi_master():
+            norb = orb_ene.shape[0]
+            ea = orb_ene
 
-            nocc = molecule.number_of_alpha_electrons()
-            norb = mol_orbs.number_mos()
-            ea = mol_orbs.ea_to_numpy()
+            if self.core_excitation:
+                excitations = [(i, a)
+                               for i in range(self.num_core_orbitals)
+                               for a in range(nocc, norb)]
+                n_exc = self.num_core_orbitals * (norb - nocc)
+            else:
+                excitations = [
+                    (i, a) for i in range(nocc) for a in range(nocc, norb)
+                ]
+                n_exc = nocc * (norb - nocc)
 
-            excitations = [
-                (i, a) for i in range(nocc) for a in range(nocc, norb)
-            ]
             excitation_energies = [ea[a] - ea[i] for i, a in excitations]
 
             w = {ia: w for ia, w in zip(excitations, excitation_energies)}
-            n_exc = nocc * (norb - nocc)
 
             diag_mat = np.array(excitation_energies)
             trial_mat = np.zeros((n_exc, self.nstates))
@@ -526,11 +546,19 @@ class TdaEigenSolver(LinearSolver):
             nocc = molecule.number_of_alpha_electrons()
             norb = tensors['C_alpha'].shape[1]
             nvir = norb - nocc
-            mo_occ = tensors['C_alpha'][:, :nocc].copy()
+
+            if self.core_excitation:
+                mo_occ = tensors['C_alpha'][:, :self.num_core_orbitals].copy()
+            else:
+                mo_occ = tensors['C_alpha'][:, :nocc].copy()
             mo_vir = tensors['C_alpha'][:, nocc:].copy()
+
             ao_mats = []
             for k in range(trial_mat.shape[1]):
-                mat = trial_mat[:, k].reshape(nocc, nvir)
+                if self.core_excitation:
+                    mat = trial_mat[:, k].reshape(self.num_core_orbitals, nvir)
+                else:
+                    mat = trial_mat[:, k].reshape(nocc, nvir)
                 mat = np.matmul(mo_occ, np.matmul(mat, mo_vir.T))
                 ao_mats.append(mat)
             tdens = AODensityMatrix(ao_mats, denmat.rest)
@@ -589,7 +617,11 @@ class TdaEigenSolver(LinearSolver):
         nocc = molecule.number_of_alpha_electrons()
         norb = tensors['C_alpha'].shape[1]
         nvir = norb - nocc
-        mo_occ = tensors['C_alpha'][:, :nocc].copy()
+
+        if self.core_excitation:
+            mo_occ = tensors['C_alpha'][:, :self.num_core_orbitals].copy()
+        else:
+            mo_occ = tensors['C_alpha'][:, :nocc].copy()
         mo_vir = tensors['C_alpha'][:, nocc:].copy()
         orb_ene = tensors['E_alpha']
 
@@ -599,10 +631,17 @@ class TdaEigenSolver(LinearSolver):
             mat = fock.to_numpy(fockind)
             mat = np.matmul(mo_occ.T, np.matmul(mat, mo_vir))
             # 1e contribution
-            cjb = trial_mat[:, fockind].reshape(nocc, nvir)
-            mat += np.matmul(cjb, np.diag(orb_ene[nocc:]).T)
-            mat -= np.matmul(np.diag(orb_ene[:nocc]), cjb)
-            sigma_vecs.append(mat.reshape(nocc * nvir, 1))
+            if self.core_excitation:
+                cjb = trial_mat[:, fockind].reshape(self.num_core_orbitals,
+                                                    nvir)
+                mat += np.matmul(cjb, np.diag(orb_ene[nocc:]).T)
+                mat -= np.matmul(np.diag(orb_ene[:self.num_core_orbitals]), cjb)
+                sigma_vecs.append(mat.reshape(self.num_core_orbitals * nvir, 1))
+            else:
+                cjb = trial_mat[:, fockind].reshape(nocc, nvir)
+                mat += np.matmul(cjb, np.diag(orb_ene[nocc:]).T)
+                mat -= np.matmul(np.diag(orb_ene[:nocc]), cjb)
+                sigma_vecs.append(mat.reshape(nocc * nvir, 1))
 
         sigma_mat = sigma_vecs[0]
         for vec in sigma_vecs[1:]:
@@ -744,7 +783,7 @@ class TdaEigenSolver(LinearSolver):
             The TDA eigenvectors (in columns).
         """
 
-        if self.checkpoint_file is None:
+        if (not self.save_solutions) or (self.checkpoint_file is None):
             return
 
         final_h5_fname = str(
@@ -761,3 +800,27 @@ class TdaEigenSolver(LinearSolver):
         checkpoint_text += final_h5_fname
         self.ostream.print_info(checkpoint_text)
         self.ostream.print_blank()
+
+    def _print_results(self, results):
+        """
+        Prints results to output stream.
+
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole length, a.u.)',
+            results['electric_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Electric Transition Dipole Moments (dipole velocity, a.u.)',
+            results['velocity_transition_dipoles'])
+
+        self._print_transition_dipoles(
+            'Magnetic Transition Dipole Moments (a.u.)',
+            results['magnetic_transition_dipoles'])
+
+        self._print_absorption('One-Photon Absorption', results)
+        self._print_ecd('Electronic Circular Dichroism', results)
+        self._print_excitation_details('Character of excitations:', results)

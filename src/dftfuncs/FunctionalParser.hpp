@@ -23,16 +23,16 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef NewFunctionalParser_hpp
-#define NewFunctionalParser_hpp
+#ifndef FunctionalParser_hpp
+#define FunctionalParser_hpp
 
 #include <string>
 #include <vector>
 
-#include "XCNewFunctional.hpp"
+#include "XCFunctional.hpp"
 #include "XCPairDensityFunctional.hpp"
 
-namespace newvxcfuncs {  // newvxcfuncs namespace
+namespace vxcfuncs {  // vxcfuncs namespace
 
 /**
  Gets labels of available exchange-correlation functional.
@@ -48,7 +48,7 @@ std::vector<std::string> getAvailableFunctionals();
  @param xcLabel the label of exchange-correlation functional.
  @return the exchange-correlation functional object.
  */
-CXCNewFunctional getExchangeCorrelationFunctional(const std::string &xcLabel);
+CXCFunctional getExchangeCorrelationFunctional(const std::string &xcLabel);
 
 /**
  Gets labels of available pair-density exchange-correlation functional.
@@ -66,6 +66,6 @@ std::vector<std::string> getAvailablePairDensityFunctionals();
  */
 CXCPairDensityFunctional getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel);
 
-}  // namespace newvxcfuncs
+}  // namespace vxcfuncs
 
-#endif /* NewFunctionalParser_hpp */
+#endif /* FunctionalParser_hpp */

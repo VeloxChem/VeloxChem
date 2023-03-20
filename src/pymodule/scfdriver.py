@@ -37,10 +37,10 @@ from .veloxchemlib import KineticEnergyIntegralsDriver
 from .veloxchemlib import NuclearPotentialIntegralsDriver
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import GridDriver, MolecularGrid, XCNewIntegrator
+from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -432,16 +432,21 @@ class ScfDriver:
         Checks DFT settings and updates relevant attributes.
         """
 
-        # check xc functional
-        if self.xcfun is not None:
+        # Hartree-Fock: xcfun is None or 'hf'
+        if (self.xcfun is None or
+            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
+            self._dft = False
+
+        # DFT: xcfun is functional object or string (other than 'hf')
+        else:
             if isinstance(self.xcfun, str):
-                self.xcfun = new_parse_xc_func(self.xcfun.upper())
+                self.xcfun = parse_xc_func(self.xcfun.upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'SCF driver: Undefined XC functional')
-        self._dft = (self.xcfun is not None)
+                                'LinearSolver: Undefined XC functional')
+            self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 6):
+        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
             warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
             warn_msg += ' Using default value. ***'
             self.ostream.print_blank()
@@ -1048,6 +1053,13 @@ class ScfDriver:
             F_beta = fock_mat.beta_to_numpy(0)
 
             self._scf_tensors = {
+                # eri info
+                'eri_thresh': self.eri_thresh,
+                'qq_type': self.qq_type,
+                # scf info
+                'scf_energy': self.scf_energy,
+                'restart': self.restart,
+                # scf tensors
                 'S': S,
                 'C_alpha': C_alpha,
                 'C_beta': C_beta,
@@ -1063,6 +1075,14 @@ class ScfDriver:
                 'D': (D_alpha, D_beta),
                 'F': (F_alpha, F_beta),
             }
+
+            if self._dft:
+                # dft info
+                self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+
+            if self._pe:
+                # pe info
+                self._scf_tensors['potfile'] = self.potfile
 
             if self.is_converged:
                 self._write_final_hdf5(molecule, ao_basis)
@@ -1366,7 +1386,7 @@ class ScfDriver:
                     fock_mat.scale(2.0, 0)
 
             if self.xcfun.get_func_type() in [xcfun.lda, xcfun.gga, xcfun.mgga]:
-                xc_drv = XCNewIntegrator(self.comm)
+                xc_drv = XCIntegrator(self.comm)
                 vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,
                                                     self._mol_grid,
                                                     self.xcfun.get_func_label())
@@ -1494,7 +1514,7 @@ class ScfDriver:
 
         # calculate Vxc on DFT nodes
         if dft_comm:
-            xc_drv = XCNewIntegrator(local_comm)
+            xc_drv = XCIntegrator(local_comm)
             self._mol_grid.re_distribute_counts_and_displacements(
                 local_comm.Get_rank(), local_comm.Get_size(), local_comm)
             vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, den_mat,

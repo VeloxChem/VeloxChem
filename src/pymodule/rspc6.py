@@ -23,8 +23,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-import numpy as np
-
 from .rspproperty import ResponseProperty
 
 
@@ -98,59 +96,4 @@ class C6(ResponseProperty):
             The output stream.
         """
 
-        width = 92
-
-        title = 'Response Functions at Given Imaginary Frequencies'
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('=' * len(title)).ljust(width))
-        ostream.print_blank()
-
-        w0 = float(self._rsp_dict['w0'])
-        n_points = int(self._rsp_dict['n_points'])
-        points, weights = np.polynomial.legendre.leggauss(n_points)
-        imagfreqs = [w0 * (1 - t) / (1 + t) for t in points]
-        printfreqs = np.append(imagfreqs, 0.0)
-
-        for iw in printfreqs:
-            title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
-
-            for a in self._rsp_dict['a_components']:
-                for b in self._rsp_dict['b_components']:
-                    prop = self._rsp_property['response_functions'][(a, b, iw)]
-                    ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
-                        a.lower(), b.lower(), iw)
-                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
-                    ostream.print_header(output.ljust(width))
-            ostream.print_blank()
-
-        title = self._rsp_driver.get_prop_str()
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('=' * len(title)).ljust(width))
-        ostream.print_blank()
-
-        title = 'Reference: '
-        title += 'Amos et al., '
-        title += 'J. Chem. Phys. 89, 2186 (1985).'
-        ostream.print_header(title.ljust(width))
-        ostream.print_blank()
-
-        c6 = self._rsp_property['c6']
-
-        Gxx_i0 = self._rsp_property['response_functions'][('x', 'x', 0.0)].real
-        Gyy_i0 = self._rsp_property['response_functions'][('y', 'y', 0.0)].real
-        Gzz_i0 = self._rsp_property['response_functions'][('z', 'z', 0.0)].real
-
-        alpha_i0 = -(Gxx_i0 + Gyy_i0 + Gzz_i0) / 3.0
-
-        output = 'Homomolecular C_6 value        :    {:10.6f} a.u.'.format(c6)
-        ostream.print_header(output.ljust(width))
-        ostream.print_blank()
-        output = 'Static polarizability alpha(0) :    {:10.6f} a.u.'.format(
-            alpha_i0)
-        ostream.print_header(output.ljust(width))
-
-        ostream.print_blank()
+        pass

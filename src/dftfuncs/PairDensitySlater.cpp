@@ -25,6 +25,7 @@
 
 #include "PairDensitySlater.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -37,7 +38,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 {
     double onethird = 1.0 / 3.0;
 
-    double twothird = 2.0 / 3.0;
+    // double twothird = 2.0 / 3.0;
 
     double fourthird = 4.0 / 3.0;
 

@@ -24,7 +24,7 @@ class TestQrf:
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
-        scf_drv.ostream.state = False
+        scf_drv.ostream.mute()
         scf_drv.update_settings({}, {'xcfun': xcfun_label})
         scf_drv.compute(molecule, basis)
 
@@ -36,7 +36,7 @@ class TestQrf:
         method_settings = {'xcfun': xcfun_label}
 
         qrf_drv = QuadraticResponseDriver()
-        qrf_drv.ostream.state = False
+        qrf_drv.ostream.mute()
 
         rsp_settings = {
             'conv_thresh': 1.0e-6,

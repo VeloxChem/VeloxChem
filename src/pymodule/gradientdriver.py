@@ -27,9 +27,9 @@ from mpi4py import MPI
 import numpy as np
 import sys
 
-from .veloxchemlib import GridDriver, XCNewMolecularGradient
+from .veloxchemlib import GridDriver, XCMolecularGradient
 from .veloxchemlib import mpi_master
-from .veloxchemlib import new_parse_xc_func
+from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .errorhandler import assert_msg_critical
@@ -113,6 +113,8 @@ class GradientDriver:
             key = grad_dict['numerical'].lower()
             self.numerical = (key in ['yes', 'y'])
 
+        # TODO: use parse_input and _dft_sanity_check
+
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
             self.dft = (key in ['yes', 'y'])
@@ -121,7 +123,7 @@ class GradientDriver:
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
                 self.dft = True
-            self.xcfun = new_parse_xc_func(method_dict['xcfun'].upper())
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Gradient driver: Undefined XC functional')
 
@@ -229,7 +231,7 @@ class GradientDriver:
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCNewMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc_contrib = xc_molgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_density, gs_density, mol_grid, xcfun_label)
         vxc_contrib = self.comm.reduce(vxc_contrib, root=mpi_master())
@@ -262,7 +264,7 @@ class GradientDriver:
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCNewMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc2_contrib = xc_molgrad_drv.integrate_fxc_gradient(
             molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, mol_grid,
             xcfun_label)
@@ -298,7 +300,7 @@ class GradientDriver:
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xc_molgrad_drv = XCNewMolecularGradient(self.comm)
+        xc_molgrad_drv = XCMolecularGradient(self.comm)
         vxc3_contrib = xc_molgrad_drv.integrate_kxc_gradient(
             molecule, ao_basis, rhow_den_1, rhow_den_2, gs_density, mol_grid,
             xcfun_label)
@@ -332,7 +334,7 @@ class GradientDriver:
         grid_drv.set_level(self.grid_level)
         mol_grid = grid_drv.generate(molecule)
 
-        xcgrad_drv = XCNewMolecularGradient(self.comm)
+        xcgrad_drv = XCMolecularGradient(self.comm)
         tddft_xcgrad = xcgrad_drv.integrate_vxc_gradient(
             molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
         tddft_xcgrad += xcgrad_drv.integrate_fxc_gradient(

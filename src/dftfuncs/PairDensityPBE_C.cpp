@@ -25,6 +25,7 @@
 
 #include "PairDensityPBE_C.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 

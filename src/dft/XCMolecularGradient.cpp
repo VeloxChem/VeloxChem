@@ -23,7 +23,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "XCNewMolecularGradient.hpp"
+#include "XCMolecularGradient.hpp"
 
 #include <omp.h>
 
@@ -38,17 +38,15 @@
 #include "DenseLinearAlgebra.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DensityGridType.hpp"
+#include "FunctionalParser.hpp"
 #include "GridScreener.hpp"
 #include "GtoEvaluator.hpp"
-#include "NewFunctionalParser.hpp"
 #include "SubMatrix.hpp"
 #include "XCFuncType.hpp"
 
-CXCNewMolecularGradient::CXCNewMolecularGradient(MPI_Comm comm)
+CXCMolecularGradient::CXCMolecularGradient(MPI_Comm comm)
 
     : _screeningThresholdForGTOValues(1.0e-12)
-
-    , _screeningThresholdForDensityValues(1.0e-13)
 {
     _locRank = mpi::rank(comm);
 
@@ -58,40 +56,40 @@ CXCNewMolecularGradient::CXCNewMolecularGradient(MPI_Comm comm)
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
-                                              const std::string&      xcFuncLabel) const
+CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const CAODensityMatrix& gsDensityMatrix,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
 {
     return integrateVxcGradient(molecule, basis, gsDensityMatrix, gsDensityMatrix, molecularGrid, xcFuncLabel);
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              const CAODensityMatrix& rwDensityMatrix,
-                                              const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
-                                              const std::string&      xcFuncLabel) const
+CXCMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const CAODensityMatrix& rwDensityMatrix,
+                                           const CAODensityMatrix& gsDensityMatrix,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
-    auto xcfuntype = newfvxc.getFunctionalType();
+    auto xcfuntype = fvxc.getFunctionalType();
 
     if (rwDensityMatrix.isClosedShell() && gsDensityMatrix.isClosedShell())
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcGradientForLDA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcGradientForGGA(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
-            std::string errxcfuntype("XCNewMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
@@ -100,15 +98,15 @@ CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcGradientForLDAOpenShell(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcGradientForLDAOpenShell(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcGradientForGGAOpenShell(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, newfvxc);
+            return _integrateVxcGradientForGGAOpenShell(molecule, basis, rwDensityMatrix, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
-            std::string errxcfuntype("XCNewMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularGradient.integrateVxcGradient: Only implemented for LDA/GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
@@ -118,59 +116,15 @@ CXCNewMolecularGradient::integrateVxcGradient(const CMolecule&        molecule,
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::integrateFxcGradient(const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              const CAODensityMatrix& rwDensityMatrixOne,
-                                              const CAODensityMatrix& rwDensityMatrixTwo,
-                                              const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
-                                              const std::string&      xcFuncLabel) const
+CXCMolecularGradient::integrateFxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const CAODensityMatrix& rwDensityMatrixOne,
+                                           const CAODensityMatrix& rwDensityMatrixTwo,
+                                           const CAODensityMatrix& gsDensityMatrix,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
 {
-    auto newfvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-
-    auto xcfuntype = newfvxc.getFunctionalType();
-
-    if (rwDensityMatrixOne.isClosedShell() && rwDensityMatrixTwo.isClosedShell() && gsDensityMatrix.isClosedShell())
-    {
-        if (xcfuntype == xcfun::lda)
-        {
-            return _integrateFxcGradientForLDA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo,
-
-                                               gsDensityMatrix, molecularGrid, newfvxc);
-        }
-        else if (xcfuntype == xcfun::gga)
-        {
-            return _integrateFxcGradientForGGA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo,
-
-                                               gsDensityMatrix, molecularGrid, newfvxc);
-        }
-        else
-        {
-            std::string errxcfuntype("XCNewMolecularGradient.integrateFxcGradient: Only implemented for LDA/GGA");
-
-            errors::assertMsgCritical(false, errxcfuntype);
-        }
-    }
-    else
-    {
-        std::string erropenshell("XCNewMolecularGradient.integrateFxcGradient: Not implemented for open-shell");
-
-        errors::assertMsgCritical(false, erropenshell);
-    }
-
-    return CDenseMatrix();
-}
-
-CDenseMatrix
-CXCNewMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
-                                              const CMolecularBasis&  basis,
-                                              const CAODensityMatrix& rwDensityMatrixOne,
-                                              const CAODensityMatrix& rwDensityMatrixTwo,
-                                              const CAODensityMatrix& gsDensityMatrix,
-                                              const CMolecularGrid&   molecularGrid,
-                                              const std::string&      xcFuncLabel) const
-{
-    auto fvxc = newvxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
     auto xcfuntype = fvxc.getFunctionalType();
 
@@ -178,24 +132,22 @@ CXCNewMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateKxcGradientForLDA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo,
-                                               gsDensityMatrix, molecularGrid, fvxc);
+            return _integrateFxcGradientForLDA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateKxcGradientForGGA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo,
-                                               gsDensityMatrix, molecularGrid, fvxc);
+            return _integrateFxcGradientForGGA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
-            std::string errxcfuntype("XCNewMolecularGradient.integrateKxcGradient: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularGradient.integrateFxcGradient: Only implemented for LDA/GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
     }
     else
     {
-        std::string erropenshell("XCNewMolecularGradient.integrateKxcGradient: Not implemented for open-shell");
+        std::string erropenshell("XCMolecularGradient.integrateFxcGradient: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }
@@ -204,12 +156,52 @@ CXCNewMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecule,
-                                                     const CMolecularBasis&  basis,
-                                                     const CAODensityMatrix& rwDensityMatrix,
-                                                     const CAODensityMatrix& gsDensityMatrix,
-                                                     const CMolecularGrid&   molecularGrid,
-                                                     const CXCNewFunctional& xcFunctional) const
+CXCMolecularGradient::integrateKxcGradient(const CMolecule&        molecule,
+                                           const CMolecularBasis&  basis,
+                                           const CAODensityMatrix& rwDensityMatrixOne,
+                                           const CAODensityMatrix& rwDensityMatrixTwo,
+                                           const CAODensityMatrix& gsDensityMatrix,
+                                           const CMolecularGrid&   molecularGrid,
+                                           const std::string&      xcFuncLabel) const
+{
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
+    if (rwDensityMatrixOne.isClosedShell() && rwDensityMatrixTwo.isClosedShell() && gsDensityMatrix.isClosedShell())
+    {
+        if (xcfuntype == xcfun::lda)
+        {
+            return _integrateKxcGradientForLDA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, fvxc);
+        }
+        else if (xcfuntype == xcfun::gga)
+        {
+            return _integrateKxcGradientForGGA(molecule, basis, rwDensityMatrixOne, rwDensityMatrixTwo, gsDensityMatrix, molecularGrid, fvxc);
+        }
+        else
+        {
+            std::string errxcfuntype("XCMolecularGradient.integrateKxcGradient: Only implemented for LDA/GGA");
+
+            errors::assertMsgCritical(false, errxcfuntype);
+        }
+    }
+    else
+    {
+        std::string erropenshell("XCMolecularGradient.integrateKxcGradient: Not implemented for open-shell");
+
+        errors::assertMsgCritical(false, erropenshell);
+    }
+
+    return CDenseMatrix();
+}
+
+CDenseMatrix
+CXCMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecule,
+                                                  const CMolecularBasis&  basis,
+                                                  const CAODensityMatrix& rwDensityMatrix,
+                                                  const CAODensityMatrix& gsDensityMatrix,
+                                                  const CMolecularGrid&   molecularGrid,
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -235,7 +227,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+    CMemBlock2D<double> molgrad_threads(natoms * 3, nthreads);
 
     // memory blocks for GTOs on grid points
 
@@ -262,13 +254,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
-    auto exc = exc_data.data();
+    auto rho  = rho_data.data();
     auto vrho = vrho_data.data();
 
     // coordinates and weights of grid points
@@ -319,8 +309,8 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
-                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -343,10 +333,8 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -462,19 +450,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
-
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
+        xcFunctional.compute_vxc_for_lda(npoints, rho, vrho);
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -545,12 +525,12 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        mol
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&        molecule,
-                                                              const CMolecularBasis&  basis,
-                                                              const CAODensityMatrix& rwDensityMatrix,
-                                                              const CAODensityMatrix& gsDensityMatrix,
-                                                              const CMolecularGrid&   molecularGrid,
-                                                              const CXCNewFunctional& xcFunctional) const
+CXCMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&        molecule,
+                                                           const CMolecularBasis&  basis,
+                                                           const CAODensityMatrix& rwDensityMatrix,
+                                                           const CAODensityMatrix& gsDensityMatrix,
+                                                           const CMolecularGrid&   molecularGrid,
+                                                           const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -576,7 +556,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+    CMemBlock2D<double> molgrad_threads(natoms * 3, nthreads);
 
     // memory blocks for GTOs on grid points
 
@@ -603,13 +583,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
-    auto exc = exc_data.data();
+    auto rho  = rho_data.data();
     auto vrho = vrho_data.data();
 
     // coordinates and weights of grid points
@@ -660,8 +638,8 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
-                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -684,10 +662,8 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -821,19 +797,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
-
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
+        xcFunctional.compute_vxc_for_lda(npoints, rho, vrho);
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForLDA(rho, exc, vrho, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -908,12 +876,12 @@ CXCNewMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&  
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecule,
-                                                     const CMolecularBasis&  basis,
-                                                     const CAODensityMatrix& rwDensityMatrix,
-                                                     const CAODensityMatrix& gsDensityMatrix,
-                                                     const CMolecularGrid&   molecularGrid,
-                                                     const CXCNewFunctional& xcFunctional) const
+CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecule,
+                                                  const CMolecularBasis&  basis,
+                                                  const CAODensityMatrix& rwDensityMatrix,
+                                                  const CAODensityMatrix& gsDensityMatrix,
+                                                  const CMolecularGrid&   molecularGrid,
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -939,7 +907,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+    CMemBlock2D<double> molgrad_threads(natoms * 3, nthreads);
 
     // memory blocks for GTOs on grid points
 
@@ -980,37 +948,25 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
-
+    auto rho     = rho_data.data();
     auto rhograd = rhograd_data.data();
+    auto sigma   = sigma_data.data();
 
-    auto sigma = sigma_data.data();
-
-    auto exc = exc_data.data();
-
-    auto vrho = vrho_data.data();
-
+    auto vrho   = vrho_data.data();
     auto vsigma = vsigma_data.data();
 
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
 
     auto weights = molecularGrid.getWeights();
@@ -1055,11 +1011,26 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForMetaGGA(gaos, gaox, gaoy, gaoz, gaoxx, gaoxy, gaoxz, gaoyy, gaoyz, gaozz,
+            gtoeval::computeGtosValuesForMetaGGA(gaos,
+                                                 gaox,
+                                                 gaoy,
+                                                 gaoz,
+                                                 gaoxx,
+                                                 gaoxy,
+                                                 gaoxz,
+                                                 gaoyy,
+                                                 gaoyz,
+                                                 gaozz,
 
-                                                 gtovec, xcoords, ycoords, zcoords,
+                                                 gtovec,
+                                                 xcoords,
+                                                 ycoords,
+                                                 zcoords,
 
-                                                 gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+                                                 gridblockpos,
+                                                 grid_batch_offset,
+                                                 grid_batch_size,
+                                                 skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -1077,35 +1048,23 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
             auto gaos_nu = gaos.data(nu);
 
             auto gaox_nu = gaox.data(nu);
-
             auto gaoy_nu = gaoy.data(nu);
-
             auto gaoz_nu = gaoz.data(nu);
 
             auto gaoxx_nu = gaoxx.data(nu);
-
             auto gaoxy_nu = gaoxy.data(nu);
-
             auto gaoxz_nu = gaoxz.data(nu);
-
             auto gaoyy_nu = gaoyy.data(nu);
-
             auto gaoyz_nu = gaoyz.data(nu);
-
             auto gaozz_nu = gaozz.data(nu);
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -1124,21 +1083,14 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         CDenseMatrix mat_chi(aocount, npoints);
 
         CDenseMatrix mat_chi_x(aocount, npoints);
-
         CDenseMatrix mat_chi_y(aocount, npoints);
-
         CDenseMatrix mat_chi_z(aocount, npoints);
 
         CDenseMatrix mat_chi_xx(aocount, npoints);
-
         CDenseMatrix mat_chi_xy(aocount, npoints);
-
         CDenseMatrix mat_chi_xz(aocount, npoints);
-
         CDenseMatrix mat_chi_yy(aocount, npoints);
-
         CDenseMatrix mat_chi_yz(aocount, npoints);
-
         CDenseMatrix mat_chi_zz(aocount, npoints);
 
         for (int32_t i = 0; i < aocount; i++)
@@ -1146,21 +1098,14 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_xx.row(i), gaoxx.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_xy.row(i), gaoxy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_xz.row(i), gaoxz.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_yy.row(i), gaoyy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_yz.row(i), gaoyz.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_zz.row(i), gaozz.data(aoinds[i]), npoints * sizeof(double));
         }
 
@@ -1171,16 +1116,13 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
         timer.start("Density matrix slicing");
 
         auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
-
         auto rw_sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
         // generate density grid
 
-        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-
-                                          gs_sub_dens_mat, timer);
+        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat, timer);
 
         // generate density gradient grid
 
@@ -1307,19 +1249,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
-
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -1398,12 +1332,12 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        mol
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
-                                                              const CMolecularBasis&  basis,
-                                                              const CAODensityMatrix& rwDensityMatrix,
-                                                              const CAODensityMatrix& gsDensityMatrix,
-                                                              const CMolecularGrid&   molecularGrid,
-                                                              const CXCNewFunctional& xcFunctional) const
+CXCMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&        molecule,
+                                                           const CMolecularBasis&  basis,
+                                                           const CAODensityMatrix& rwDensityMatrix,
+                                                           const CAODensityMatrix& gsDensityMatrix,
+                                                           const CMolecularGrid&   molecularGrid,
+                                                           const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1429,7 +1363,7 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+    CMemBlock2D<double> molgrad_threads(natoms * 3, nthreads);
 
     // memory blocks for GTOs on grid points
 
@@ -1466,18 +1400,16 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
     CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
+    auto rho     = rho_data.data();
     auto rhograd = rhograd_data.data();
-    auto sigma = sigma_data.data();
+    auto sigma   = sigma_data.data();
 
-    auto exc = exc_data.data();
-    auto vrho = vrho_data.data();
+    auto vrho   = vrho_data.data();
     auto vsigma = vsigma_data.data();
 
     // coordinates and weights of grid points
@@ -1528,9 +1460,24 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForMetaGGA(gaos, gaox, gaoy, gaoz, gaoxx, gaoxy, gaoxz, gaoyy, gaoyz, gaozz,
-                                                 gtovec, xcoords, ycoords, zcoords, gridblockpos,
-                                                 grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForMetaGGA(gaos,
+                                                 gaox,
+                                                 gaoy,
+                                                 gaoz,
+                                                 gaoxx,
+                                                 gaoxy,
+                                                 gaoxz,
+                                                 gaoyy,
+                                                 gaoyz,
+                                                 gaozz,
+                                                 gtovec,
+                                                 xcoords,
+                                                 ycoords,
+                                                 zcoords,
+                                                 gridblockpos,
+                                                 grid_batch_offset,
+                                                 grid_batch_size,
+                                                 skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -1560,16 +1507,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -1630,8 +1572,8 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 
         // generate density grid
 
-        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                                          gs_sub_dens_mat_a, rw_sub_dens_mat_b, timer);
+        dengridgen::generateDensityForGGA(
+            rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat_a, rw_sub_dens_mat_b, timer);
 
         // generate density gradient grid
 
@@ -1820,19 +1762,11 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 
         timer.start("XC functional eval.");
 
-        xcFunctional.compute_exc_vxc_for_gga(npoints, rho, sigma, exc, vrho, vsigma);
-
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
 
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenVxcFockForGGA(rho, sigma, exc, vrho, vsigma, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -1932,13 +1866,13 @@ CXCNewMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&  
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecule,
-                                                     const CMolecularBasis&  basis,
-                                                     const CAODensityMatrix& rwDensityMatrixOne,
-                                                     const CAODensityMatrix& rwDensityMatrixTwo,
-                                                     const CAODensityMatrix& gsDensityMatrix,
-                                                     const CMolecularGrid&   molecularGrid,
-                                                     const CXCNewFunctional& xcFunctional) const
+CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecule,
+                                                  const CMolecularBasis&  basis,
+                                                  const CAODensityMatrix& rwDensityMatrixOne,
+                                                  const CAODensityMatrix& rwDensityMatrixTwo,
+                                                  const CAODensityMatrix& gsDensityMatrix,
+                                                  const CMolecularGrid&   molecularGrid,
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -1964,7 +1898,7 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+    CMemBlock2D<double> molgrad_threads(natoms * 3, nthreads);
 
     // memory blocks for GTOs on grid points
 
@@ -2056,9 +1990,19 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords,
+            gtoeval::computeGtosValuesForGGA(gaos,
+                                             gaox,
+                                             gaoy,
+                                             gaoz,
+                                             gtovec,
+                                             xcoords,
+                                             ycoords,
+                                             zcoords,
 
-                                             gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+                                             gridblockpos,
+                                             grid_batch_offset,
+                                             grid_batch_size,
+                                             skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -2083,10 +2027,8 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -2213,17 +2155,9 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 
         xcFunctional.compute_fxc_for_lda(npoints, rho, v2rho2);
 
-        timer.stop("XC functional eval.");
-
-        // screen density and functional derivatives
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForLDA(rho, v2rho2, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -2251,8 +2185,7 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
                 {
                     auto atom_g = atom_offset + g;
 
-                    double prefac = local_weights[g] * (v2rho2[3 * g + 0] * rhow[2 * g + 0] +
-                                                        v2rho2[3 * g + 1] * rhow[2 * g + 1]);
+                    double prefac = local_weights[g] * (v2rho2[3 * g + 0] * rhow[2 * g + 0] + v2rho2[3 * g + 1] * rhow[2 * g + 1]);
 
                     gatmx += prefac * gdenx[atom_g];
                     gatmy += prefac * gdeny[atom_g];
@@ -2296,13 +2229,13 @@ CXCNewMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        mol
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecule,
-                                                     const CMolecularBasis&  basis,
-                                                     const CAODensityMatrix& rwDensityMatrixOne,
-                                                     const CAODensityMatrix& rwDensityMatrixTwo,
-                                                     const CAODensityMatrix& gsDensityMatrix,
-                                                     const CMolecularGrid&   molecularGrid,
-                                                     const CXCNewFunctional& xcFunctional) const
+CXCMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecule,
+                                                  const CMolecularBasis&  basis,
+                                                  const CAODensityMatrix& rwDensityMatrixOne,
+                                                  const CAODensityMatrix& rwDensityMatrixTwo,
+                                                  const CAODensityMatrix& gsDensityMatrix,
+                                                  const CMolecularGrid&   molecularGrid,
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2328,7 +2261,7 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+    CMemBlock2D<double> molgrad_threads(natoms * 3, nthreads);
 
     // memory blocks for GTOs on grid points
 
@@ -2378,20 +2311,20 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
+    auto rho  = rho_data.data();
     auto rhow = rhow_data.data();
 
-    auto rhograd = rhograd_data.data();
+    auto rhograd  = rhograd_data.data();
     auto rhowgrad = rhowgrad_data.data();
 
     auto sigma = sigma_data.data();
 
-    auto vrho = vrho_data.data();
+    auto vrho   = vrho_data.data();
     auto vsigma = vsigma_data.data();
 
-    auto v2rho2 = v2rho2_data.data();
+    auto v2rho2     = v2rho2_data.data();
     auto v2rhosigma = v2rhosigma_data.data();
-    auto v2sigma2 = v2sigma2_data.data();
+    auto v2sigma2   = v2sigma2_data.data();
 
     // coordinates and weights of grid points
 
@@ -2440,11 +2373,26 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForMetaGGA(gaos, gaox, gaoy, gaoz, gaoxx, gaoxy, gaoxz, gaoyy, gaoyz, gaozz,
+            gtoeval::computeGtosValuesForMetaGGA(gaos,
+                                                 gaox,
+                                                 gaoy,
+                                                 gaoz,
+                                                 gaoxx,
+                                                 gaoxy,
+                                                 gaoxz,
+                                                 gaoyy,
+                                                 gaoyz,
+                                                 gaozz,
 
-                                                 gtovec, xcoords, ycoords, zcoords,
+                                                 gtovec,
+                                                 xcoords,
+                                                 ycoords,
+                                                 zcoords,
 
-                                                 gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
+                                                 gridblockpos,
+                                                 grid_batch_offset,
+                                                 grid_batch_size,
+                                                 skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -2474,16 +2422,11 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -2544,13 +2487,29 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
         // generate density grid
 
-        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+        dengridgen::generateDensityForGGA(rho,
+                                          rhograd,
+                                          sigma,
+                                          npoints,
+                                          mat_chi,
+                                          mat_chi_x,
+                                          mat_chi_y,
+                                          mat_chi_z,
 
-                                          gs_sub_dens_mat, timer);
+                                          gs_sub_dens_mat,
+                                          timer);
 
-        dengridgen::generateDensityForGGA(rhow, rhowgrad, nullptr, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
+        dengridgen::generateDensityForGGA(rhow,
+                                          rhowgrad,
+                                          nullptr,
+                                          npoints,
+                                          mat_chi,
+                                          mat_chi_x,
+                                          mat_chi_y,
+                                          mat_chi_z,
 
-                                          rw_sub_dens_mat_one, timer);
+                                          rw_sub_dens_mat_one,
+                                          timer);
 
         // generate density gradient grid
 
@@ -2680,19 +2639,9 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
         xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 
-        timer.stop("XC functional eval.");
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenFxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
-
-                                        npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // eq.(32), JCTC 2021, 17, 1512-1521
 
@@ -2723,29 +2672,23 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
                     double w = local_weights[g];
 
-                    auto grhow_grho_aa = 2.0 * (rhowgrad[6 * g + 0] * rhograd[6 * g + 0] +
-                                                rhowgrad[6 * g + 1] * rhograd[6 * g + 1] +
+                    auto grhow_grho_aa = 2.0 * (rhowgrad[6 * g + 0] * rhograd[6 * g + 0] + rhowgrad[6 * g + 1] * rhograd[6 * g + 1] +
                                                 rhowgrad[6 * g + 2] * rhograd[6 * g + 2]);
 
-                    auto grhow_grho_bb = 2.0 * (rhowgrad[6 * g + 3] * rhograd[6 * g + 3] +
-                                                rhowgrad[6 * g + 4] * rhograd[6 * g + 4] +
+                    auto grhow_grho_bb = 2.0 * (rhowgrad[6 * g + 3] * rhograd[6 * g + 3] + rhowgrad[6 * g + 4] * rhograd[6 * g + 4] +
                                                 rhowgrad[6 * g + 5] * rhograd[6 * g + 5]);
 
-                    auto grhow_grho_ab = (rhowgrad[6 * g + 0] * rhograd[6 * g + 3] +
-                                          rhowgrad[6 * g + 1] * rhograd[6 * g + 4] +
+                    auto grhow_grho_ab = (rhowgrad[6 * g + 0] * rhograd[6 * g + 3] + rhowgrad[6 * g + 1] * rhograd[6 * g + 4] +
                                           rhowgrad[6 * g + 2] * rhograd[6 * g + 5] +
 
-                                          rhowgrad[6 * g + 3] * rhograd[6 * g + 0] +
-                                          rhowgrad[6 * g + 4] * rhograd[6 * g + 1] +
+                                          rhowgrad[6 * g + 3] * rhograd[6 * g + 0] + rhowgrad[6 * g + 4] * rhograd[6 * g + 1] +
                                           rhowgrad[6 * g + 5] * rhograd[6 * g + 2]);
 
                     // scalar contribution, \nabla_A (\phi_mu \phi_nu)
 
-                    double f_0 = v2rho2[3 * g + 0] * rhow[2 * g + 0] +
-                                 v2rho2[3 * g + 1] * rhow[2 * g + 1] +
+                    double f_0 = v2rho2[3 * g + 0] * rhow[2 * g + 0] + v2rho2[3 * g + 1] * rhow[2 * g + 1] +
 
-                                 v2rhosigma[6 * g + 0] * grhow_grho_aa +
-                                 v2rhosigma[6 * g + 1] * grhow_grho_ab +
+                                 v2rhosigma[6 * g + 0] * grhow_grho_aa + v2rhosigma[6 * g + 1] * grhow_grho_ab +
                                  v2rhosigma[6 * g + 2] * grhow_grho_bb;
 
                     gatmx += w * f_0 * gdenx[atom_g];
@@ -2754,19 +2697,13 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 
                     // vector contribution, \nabla_A (\nabla (\phi_mu \phi_nu))
 
-                    double f_aa = v2rhosigma[6 * g + 0] * rhow[2 * g + 0] + 
-                                  v2rhosigma[6 * g + 3] * rhow[2 * g + 1] +
+                    double f_aa = v2rhosigma[6 * g + 0] * rhow[2 * g + 0] + v2rhosigma[6 * g + 3] * rhow[2 * g + 1] +
 
-                                  v2sigma2[6 * g + 0] * grhow_grho_aa +
-                                  v2sigma2[6 * g + 1] * grhow_grho_ab +
-                                  v2sigma2[6 * g + 2] * grhow_grho_bb;
+                                  v2sigma2[6 * g + 0] * grhow_grho_aa + v2sigma2[6 * g + 1] * grhow_grho_ab + v2sigma2[6 * g + 2] * grhow_grho_bb;
 
-                    double f_ab = v2rhosigma[6 * g + 1] * rhow[2 * g + 0] + 
-                                  v2rhosigma[6 * g + 4] * rhow[2 * g + 1] +
+                    double f_ab = v2rhosigma[6 * g + 1] * rhow[2 * g + 0] + v2rhosigma[6 * g + 4] * rhow[2 * g + 1] +
 
-                                  v2sigma2[6 * g + 1] * grhow_grho_aa +
-                                  v2sigma2[6 * g + 3] * grhow_grho_ab +
-                                  v2sigma2[6 * g + 4] * grhow_grho_bb;
+                                  v2sigma2[6 * g + 1] * grhow_grho_aa + v2sigma2[6 * g + 3] * grhow_grho_ab + v2sigma2[6 * g + 4] * grhow_grho_bb;
 
                     double xcomp = 0.0, ycomp = 0.0, zcomp = 0.0;
 
@@ -2820,13 +2757,13 @@ CXCNewMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        mol
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        molecule,
-                                                     const CMolecularBasis&  basis,
-                                                     const CAODensityMatrix& rwDensityMatrixOne,
-                                                     const CAODensityMatrix& rwDensityMatrixTwo,
-                                                     const CAODensityMatrix& gsDensityMatrix,
-                                                     const CMolecularGrid&   molecularGrid,
-                                                     const CXCNewFunctional& xcFunctional) const
+CXCMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        molecule,
+                                                  const CMolecularBasis&  basis,
+                                                  const CAODensityMatrix& rwDensityMatrixOne,
+                                                  const CAODensityMatrix& rwDensityMatrixTwo,
+                                                  const CAODensityMatrix& gsDensityMatrix,
+                                                  const CMolecularGrid&   molecularGrid,
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -2852,7 +2789,7 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+    CMemBlock2D<double> molgrad_threads(natoms * 3, nthreads);
 
     // memory blocks for GTOs on grid points
 
@@ -2938,8 +2875,8 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos,
-                                             grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -2962,10 +2899,8 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -3025,8 +2960,8 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
         zero_sub_den_mat_one.zero();
         zero_sub_den_mat_two.zero();
 
-        CAODensityMatrix rwdenmat(std::vector<CDenseMatrix>({rw_sub_dens_mat_one, zero_sub_den_mat_one,
-                                                             rw_sub_dens_mat_two, zero_sub_den_mat_two}), denmat::rest);
+        CAODensityMatrix rwdenmat(std::vector<CDenseMatrix>({rw_sub_dens_mat_one, zero_sub_den_mat_one, rw_sub_dens_mat_two, zero_sub_den_mat_two}),
+                                  denmat::rest);
 
         // Note: We use quadratic response (quadMode == "QRF") to calculate
         // third-order functional derivative contribution. The rw2DensityMatrix
@@ -3125,21 +3060,13 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 
         xcFunctional.compute_kxc_for_lda(npoints, rho, v3rho3);
 
-        timer.stop("XC functional eval.");
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenKxcFockForLDA(rho, v2rho2, v3rho3, npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // pointers to perturbed density gradient norms
 
-        auto rhow1a = rwdengridquad.rhow1rhow2(0);
+        auto rhow1a = rwdengridquad.gam(0);
 
         // Note: rw2DensityMatrix is zero in KxcGradientForLDA
         // auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
@@ -3216,13 +3143,13 @@ CXCNewMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        mol
 }
 
 CDenseMatrix
-CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        molecule,
-                                                     const CMolecularBasis&  basis,
-                                                     const CAODensityMatrix& rwDensityMatrixOne,
-                                                     const CAODensityMatrix& rwDensityMatrixTwo,
-                                                     const CAODensityMatrix& gsDensityMatrix,
-                                                     const CMolecularGrid&   molecularGrid,
-                                                     const CXCNewFunctional& xcFunctional) const
+CXCMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        molecule,
+                                                  const CMolecularBasis&  basis,
+                                                  const CAODensityMatrix& rwDensityMatrixOne,
+                                                  const CAODensityMatrix& rwDensityMatrixTwo,
+                                                  const CAODensityMatrix& gsDensityMatrix,
+                                                  const CMolecularGrid&   molecularGrid,
+                                                  const CXCFunctional&    xcFunctional) const
 {
     CMultiTimer timer;
 
@@ -3248,7 +3175,7 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    CMemBlock2D<double> molgrad_threads(natoms * 3,  nthreads);
+    CMemBlock2D<double> molgrad_threads(natoms * 3, nthreads);
 
     // memory blocks for GTOs on grid points
 
@@ -3299,21 +3226,21 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
+    auto rho     = rho_data.data();
     auto rhograd = rhograd_data.data();
-    auto sigma = sigma_data.data();
+    auto sigma   = sigma_data.data();
 
-    auto vrho = vrho_data.data();
+    auto vrho   = vrho_data.data();
     auto vsigma = vsigma_data.data();
 
-    auto v2rho2 = v2rho2_data.data();
+    auto v2rho2     = v2rho2_data.data();
     auto v2rhosigma = v2rhosigma_data.data();
-    auto v2sigma2 = v2sigma2_data.data();
+    auto v2sigma2   = v2sigma2_data.data();
 
-    auto v3rho3 = v3rho3_data.data();
+    auto v3rho3      = v3rho3_data.data();
     auto v3rho2sigma = v3rho2sigma_data.data();
     auto v3rhosigma2 = v3rhosigma2_data.data();
-    auto v3sigma3 = v3sigma3_data.data();
+    auto v3sigma3    = v3sigma3_data.data();
 
     // coordinates and weights of grid points
 
@@ -3363,9 +3290,24 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForMetaGGA(gaos, gaox, gaoy, gaoz, gaoxx, gaoxy, gaoxz, gaoyy, gaoyz, gaozz,
-                                                 gtovec, xcoords, ycoords, zcoords, gridblockpos,
-                                                 grid_batch_offset, grid_batch_size, skip_cgto_ids);
+            gtoeval::computeGtosValuesForMetaGGA(gaos,
+                                                 gaox,
+                                                 gaoy,
+                                                 gaoz,
+                                                 gaoxx,
+                                                 gaoxy,
+                                                 gaoxz,
+                                                 gaoyy,
+                                                 gaoyz,
+                                                 gaozz,
+                                                 gtovec,
+                                                 xcoords,
+                                                 ycoords,
+                                                 zcoords,
+                                                 gridblockpos,
+                                                 grid_batch_offset,
+                                                 grid_batch_size,
+                                                 skip_cgto_ids);
         }
 
         timer.stop("OMP GTO evaluation");
@@ -3395,16 +3337,11 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
             for (int32_t g = 0; g < npoints; g++)
             {
-                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) ||
-                    (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
+                if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxx_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoxy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoxz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoyy_nu[g]) > _screeningThresholdForGTOValues) ||
+                    (std::fabs(gaoyz_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaozz_nu[g]) > _screeningThresholdForGTOValues))
                 {
                     skip = false;
 
@@ -3464,8 +3401,7 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         // generate density grid
 
-        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                                          gs_sub_dens_mat, timer);
+        dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, gs_sub_dens_mat, timer);
 
         // compute perturbed density
 
@@ -3479,8 +3415,8 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
         zero_sub_den_mat_one.zero();
         zero_sub_den_mat_two.zero();
 
-        CAODensityMatrix rwdenmat(std::vector<CDenseMatrix>({rw_sub_dens_mat_one, zero_sub_den_mat_one,
-                                                             rw_sub_dens_mat_two, zero_sub_den_mat_two}), denmat::rest);
+        CAODensityMatrix rwdenmat(std::vector<CDenseMatrix>({rw_sub_dens_mat_one, zero_sub_den_mat_one, rw_sub_dens_mat_two, zero_sub_den_mat_two}),
+                                  denmat::rest);
 
         // Note: We use quadratic response (quadMode == "QRF") to calculate
         // third-order functional derivative contribution. The rw2DensityMatrix
@@ -3496,8 +3432,7 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         auto xcfuntype = xcFunctional.getFunctionalType();
 
-        auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z,
-                                                               rwdenmat, xcfuntype, timer);
+        auto rwdengrid = dengridgen::generateDensityGridForGGA(npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rwdenmat, xcfuntype, timer);
 
         CDensityGridQuad rwdengridquad(npoints, numdens_rw2, xcfuntype, dengrid::ab);
 
@@ -3635,39 +3570,29 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
         xcFunctional.compute_kxc_for_gga(npoints, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
 
-        timer.stop("XC functional eval.");
-
-        // screen density grid, weights and GTO matrix
-
-        timer.start("Density screening");
-
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
-        gridscreen::screenKxcFockForGGA(rho, sigma, vrho, vsigma, v2rho2, v2rhosigma, v2sigma2,
-                                        v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3,
-                                        npoints, _screeningThresholdForDensityValues);
-
-        timer.stop("Density screening");
+        timer.stop("XC functional eval.");
 
         // pointers to perturbed densities
 
-        auto rhow1rhow2 = rwdengridquad.rhow1rhow2(0);
+        auto rhow1rhow2 = rwdengridquad.gam(0);
 
-        auto rxw1rhow2 = rwdengridquad.rxw1rhow2(0);
-        auto ryw1rhow2 = rwdengridquad.ryw1rhow2(0);
-        auto rzw1rhow2 = rwdengridquad.rzw1rhow2(0);
+        auto rxw1rhow2 = rwdengridquad.gamX(0);
+        auto ryw1rhow2 = rwdengridquad.gamY(0);
+        auto rzw1rhow2 = rwdengridquad.gamZ(0);
 
-        auto rxw1rxw2 = rwdengridquad.rxw1rxw2(0);
-        auto rxw1ryw2 = rwdengridquad.rxw1ryw2(0);
-        auto rxw1rzw2 = rwdengridquad.rxw1rzw2(0);
+        auto rxw1rxw2 = rwdengridquad.gamXX(0);
+        auto rxw1ryw2 = rwdengridquad.gamXY(0);
+        auto rxw1rzw2 = rwdengridquad.gamXZ(0);
 
-        auto ryw1rxw2 = rwdengridquad.ryw1rxw2(0);
-        auto ryw1ryw2 = rwdengridquad.ryw1ryw2(0);
-        auto ryw1rzw2 = rwdengridquad.ryw1rzw2(0);
+        auto ryw1rxw2 = rwdengridquad.gamYX(0);
+        auto ryw1ryw2 = rwdengridquad.gamYY(0);
+        auto ryw1rzw2 = rwdengridquad.gamYZ(0);
 
-        auto rzw1rxw2 = rwdengridquad.rzw1rxw2(0);
-        auto rzw1ryw2 = rwdengridquad.rzw1ryw2(0);
-        auto rzw1rzw2 = rwdengridquad.rzw1rzw2(0);
+        auto rzw1rxw2 = rwdengridquad.gamZX(0);
+        auto rzw1ryw2 = rwdengridquad.gamZY(0);
+        auto rzw1rzw2 = rwdengridquad.gamZZ(0);
 
         // Note: rw2DensityMatrix is zero in KxcGradientForGGA
         // auto rhow12a = rw2DensityGrid.alphaDensity(iFock);
@@ -3722,15 +3647,10 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 
                     double q2contract = grada_x_g * rxw1rhow2[g] + grada_y_g * ryw1rhow2[g] + grada_z_g * rzw1rhow2[g];
 
-                    double q3contract = grada_x_g * grada_x_g * rxw1rxw2[g] +
-                                        grada_x_g * grada_y_g * rxw1ryw2[g] +
-                                        grada_x_g * grada_z_g * rxw1rzw2[g] +
-                                        grada_y_g * grada_x_g * ryw1rxw2[g] +
-                                        grada_y_g * grada_y_g * ryw1ryw2[g] +
-                                        grada_y_g * grada_z_g * ryw1rzw2[g] +
-                                        grada_z_g * grada_x_g * rzw1rxw2[g] +
-                                        grada_z_g * grada_y_g * rzw1ryw2[g] +
-                                        grada_z_g * grada_z_g * rzw1rzw2[g];
+                    double q3contract =
+                        grada_x_g * grada_x_g * rxw1rxw2[g] + grada_x_g * grada_y_g * rxw1ryw2[g] + grada_x_g * grada_z_g * rxw1rzw2[g] +
+                        grada_y_g * grada_x_g * ryw1rxw2[g] + grada_y_g * grada_y_g * ryw1ryw2[g] + grada_y_g * grada_z_g * ryw1rzw2[g] +
+                        grada_z_g * grada_x_g * rzw1rxw2[g] + grada_z_g * grada_y_g * rzw1ryw2[g] + grada_z_g * grada_z_g * rzw1rzw2[g];
 
                     double q4contract = rxw1rxw2[g] + ryw1ryw2[g] + rzw1rzw2[g];
 
@@ -3786,8 +3706,10 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
                     // v3rho2sigma_aba = v3rho2sigma[9 * g + 3];
                     // v3rho2sigma_abc = v3rho2sigma[9 * g + 4];
                     // v3rho2sigma_abb = v3rho2sigma[9 * g + 5];
-                    prefac += 2.0 * (v3rho2sigma[9 * g + 0] + v3rho2sigma[9 * g + 1] + v3rho2sigma[9 * g + 2] +
-                                     v3rho2sigma[9 * g + 3] + v3rho2sigma[9 * g + 4] + v3rho2sigma[9 * g + 5]) * q2contract;
+                    prefac += 2.0 *
+                              (v3rho2sigma[9 * g + 0] + v3rho2sigma[9 * g + 1] + v3rho2sigma[9 * g + 2] + v3rho2sigma[9 * g + 3] +
+                               v3rho2sigma[9 * g + 4] + v3rho2sigma[9 * g + 5]) *
+                              q2contract;
 
                     // Q3
                     // v3rhosigma2_aaa = v3rhosigma2[12 * g + 0];
@@ -3796,9 +3718,10 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
                     // v3rhosigma2_acc = v3rhosigma2[12 * g + 3];
                     // v3rhosigma2_acb = v3rhosigma2[12 * g + 4];
                     // v3rhosigma2_abb = v3rhosigma2[12 * g + 5];
-                    prefac += 4.0 * (v3rhosigma2[12 * g + 0] + 2.0*v3rhosigma2[12 * g + 1] + 2.0*v3rhosigma2[12 * g + 2] +
-                                     v3rhosigma2[12 * g + 3] + 2.0*v3rhosigma2[12 * g + 4] +
-                                     v3rhosigma2[12 * g + 5]) * q3contract;
+                    prefac += 4.0 *
+                              (v3rhosigma2[12 * g + 0] + 2.0 * v3rhosigma2[12 * g + 1] + 2.0 * v3rhosigma2[12 * g + 2] + v3rhosigma2[12 * g + 3] +
+                               2.0 * v3rhosigma2[12 * g + 4] + v3rhosigma2[12 * g + 5]) *
+                              q3contract;
 
                     // Q4
                     // v2rhosigma_aa = v2rhosigma[6 * g + 0];
@@ -3856,9 +3779,8 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
                     // v3rho2sigma_abc = v3rho2sigma[9 * g + 4];
                     // v3rho2sigma_bba = v3rho2sigma[9 * g + 6];
                     // v3rho2sigma_bbc = v3rho2sigma[9 * g + 7];
-                    double q5 = 2.0*v3rho2sigma[9 * g + 0] +     v3rho2sigma[9 * g + 1]
-                              + 4.0*v3rho2sigma[9 * g + 3] + 2.0*v3rho2sigma[9 * g + 4]
-                              + 2.0*v3rho2sigma[9 * g + 6] +     v3rho2sigma[9 * g + 7];
+                    double q5 = 2.0 * v3rho2sigma[9 * g + 0] + v3rho2sigma[9 * g + 1] + 4.0 * v3rho2sigma[9 * g + 3] + 2.0 * v3rho2sigma[9 * g + 4] +
+                                2.0 * v3rho2sigma[9 * g + 6] + v3rho2sigma[9 * g + 7];
 
                     xcomp += q5 * grada_x_g * rhow1rhow2[g];
                     ycomp += q5 * grada_y_g * rhow1rhow2[g];
@@ -3869,8 +3791,7 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
                     // v2rhosigma_ac = v2rhosigma[6 * g + 1];
                     // v2rhosigma_ba = v2rhosigma[6 * g + 3];
                     // v2rhosigma_bc = v2rhosigma[6 * g + 4];
-                    double q6 = 2.0*v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 1] +
-                                2.0*v2rhosigma[6 * g + 3] + v2rhosigma[6 * g + 4];
+                    double q6 = 2.0 * v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 1] + 2.0 * v2rhosigma[6 * g + 3] + v2rhosigma[6 * g + 4];
 
                     xcomp += q6 * rxw1rhow2[g];
                     ycomp += q6 * ryw1rhow2[g];
@@ -3887,10 +3808,10 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
                     // v3rhosigma2_bab = v3rhosigma2[12 * g + 8];
                     // v3rhosigma2_bcc = v3rhosigma2[12 * g + 9];
                     // v3rhosigma2_bcb = v3rhosigma2[12 * g + 10];
-                    double q7 = 2.0 * (2.0*v3rhosigma2[12 * g + 0] + 3.0*v3rhosigma2[12 * g + 1] + 2.0*v3rhosigma2[12 * g + 2] +
-                                           v3rhosigma2[12 * g + 3] +     v3rhosigma2[12 * g + 4] +
-                                       2.0*v3rhosigma2[12 * g + 6] + 3.0*v3rhosigma2[12 * g + 7] + 2.0*v3rhosigma2[12 * g + 8] +
-                                           v3rhosigma2[12 * g + 9] +     v3rhosigma2[12 * g + 10]);
+                    double q7 =
+                        2.0 * (2.0 * v3rhosigma2[12 * g + 0] + 3.0 * v3rhosigma2[12 * g + 1] + 2.0 * v3rhosigma2[12 * g + 2] +
+                               v3rhosigma2[12 * g + 3] + v3rhosigma2[12 * g + 4] + 2.0 * v3rhosigma2[12 * g + 6] + 3.0 * v3rhosigma2[12 * g + 7] +
+                               2.0 * v3rhosigma2[12 * g + 8] + v3rhosigma2[12 * g + 9] + v3rhosigma2[12 * g + 10]);
 
                     xcomp += q7 * q7contract_x;
                     ycomp += q7 * q7contract_y;
@@ -3902,8 +3823,8 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
                     // v2sigma2_ab = v2sigma2[6 * g + 2];
                     // v2sigma2_cc = v2sigma2[6 * g + 3];
                     // v2sigma2_cb = v2sigma2[6 * g + 4];
-                    double q8 = 4.0*v2sigma2[6 * g + 0] + 6.0*v2sigma2[6 * g + 1] + 4.0*v2sigma2[6 * g + 2] +
-                                2.0*v2sigma2[6 * g + 3] + 2.0*v2sigma2[6 * g + 4];
+                    double q8 = 4.0 * v2sigma2[6 * g + 0] + 6.0 * v2sigma2[6 * g + 1] + 4.0 * v2sigma2[6 * g + 2] + 2.0 * v2sigma2[6 * g + 3] +
+                                2.0 * v2sigma2[6 * g + 4];
 
                     xcomp += q8 * (q8contract_x + q10contract_x + q11contract_x);
                     ycomp += q8 * (q8contract_y + q10contract_y + q11contract_y);
@@ -3919,9 +3840,9 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
                     // v3sigma3_ccc = v3sigma3[10 * g + 6];
                     // v3sigma3_ccb = v3sigma3[10 * g + 7];
                     // v3sigma3_cbb = v3sigma3[10 * g + 8];
-                    double q9 =    8.0*v3sigma3[10 * g + 0] + 20.0*v3sigma3[10 * g + 1] + 16.0*v3sigma3[10 * g + 2]
-                                + 16.0*v3sigma3[10 * g + 3] + 24.0*v3sigma3[10 * g + 4] +  8.0*v3sigma3[10 * g + 5]
-                                +  4.0*v3sigma3[10 * g + 6] +  8.0*v3sigma3[10 * g + 7] +  4.0*v3sigma3[10 * g + 8];
+                    double q9 = 8.0 * v3sigma3[10 * g + 0] + 20.0 * v3sigma3[10 * g + 1] + 16.0 * v3sigma3[10 * g + 2] + 16.0 * v3sigma3[10 * g + 3] +
+                                24.0 * v3sigma3[10 * g + 4] + 8.0 * v3sigma3[10 * g + 5] + 4.0 * v3sigma3[10 * g + 6] + 8.0 * v3sigma3[10 * g + 7] +
+                                4.0 * v3sigma3[10 * g + 8];
 
                     xcomp += q9 * q9contract_x;
                     ycomp += q9 * q9contract_y;
@@ -3970,9 +3891,7 @@ CXCNewMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        mol
 }
 
 void
-CXCNewMolecularGradient::_computeAOtoAtomMapping(std::vector<int32_t>&  ao_to_atom_ids,
-                                                 const CMolecule&       molecule,
-                                                 const CMolecularBasis& basis) const
+CXCMolecularGradient::_computeAOtoAtomMapping(std::vector<int32_t>& ao_to_atom_ids, const CMolecule& molecule, const CMolecularBasis& basis) const
 {
     for (int32_t iatom = 0; iatom < molecule.getNumberOfAtoms(); iatom++)
     {

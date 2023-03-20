@@ -23,14 +23,14 @@ class TestMOM:
 
         # Ground state
         scf_gs = ScfRestrictedDriver()
-        scf_gs.ostream.state = False
+        scf_gs.ostream.mute()
         scf_gs.compute(molecule, basis)
 
         # Core-hole
         molecule.set_charge(1)
         molecule.set_multiplicity(2)
         scf_ch = ScfRestrictedOpenDriver()
-        scf_ch.ostream.state = False
+        scf_ch.ostream.mute()
 
         scf_ch.maximum_overlap(
             molecule,
@@ -64,7 +64,7 @@ class TestMOM:
 
         # Ground state
         scf_gs = ScfRestrictedDriver()
-        scf_gs.ostream.state = False
+        scf_gs.ostream.mute()
         scf_gs.xcfun = 'B3LYP'
         scf_gs.compute(molecule, basis)
 
@@ -72,7 +72,7 @@ class TestMOM:
         molecule.set_charge(1)
         molecule.set_multiplicity(2)
         scf_ch = ScfUnrestrictedDriver()
-        scf_ch.ostream.state = False
+        scf_ch.ostream.mute()
         scf_ch.xcfun = 'B3LYP'
 
         scf_ch.maximum_overlap(
@@ -84,7 +84,7 @@ class TestMOM:
         )
         scf_ch.compute(molecule, basis)
 
-        assert abs(scf_ch.get_scf_energy() + 56.4455719055) < 1.0e-6
+        assert abs(scf_ch.get_scf_energy() + 56.4455683807) < 1.0e-6
 
         if is_mpi_master():
             scf_h5 = Path(scf_ch.checkpoint_file)
