@@ -56,7 +56,7 @@ CXCMolecularHessian::CXCMolecularHessian(MPI_Comm comm)
 }
 
 CDenseMatrix
-CXCMolecularHessian::integrateVxcHessian(const CMolecule&        molecule,
+CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
                                          const CMolecularBasis&  basis,
                                          const CAODensityMatrix& gsDensityMatrix,
                                          const CMolecularGrid&   molecularGrid,
@@ -70,60 +70,34 @@ CXCMolecularHessian::integrateVxcHessian(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            return _integrateVxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
+            // TODO calculate two contributions in one function call
+
+            auto vxchessian = _integrateVxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
+
+            auto fxchessian = _integrateFxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
+
+            return denblas::addAB(vxchessian, fxchessian, 1.0);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            return _integrateVxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
+            // TODO calculate two contributions in one function call
+
+            auto vxchessian = _integrateVxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
+
+            auto fxchessian = _integrateFxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
+
+            return denblas::addAB(vxchessian, fxchessian, 1.0);
         }
         else
         {
-            std::string errxcfuntype("XCMolecularHessian.integrateVxcHessian: Only implemented for LDA/GGA");
+            std::string errxcfuntype("XCMolecularHessian.integrateExcHessian: Only implemented for LDA/GGA");
 
             errors::assertMsgCritical(false, errxcfuntype);
         }
     }
     else
     {
-        std::string erropenshell("XCMolecularHessian.integrateVxcHessian: Not implemented for open-shell");
-
-        errors::assertMsgCritical(false, erropenshell);
-    }
-
-    return CDenseMatrix();
-}
-
-CDenseMatrix
-CXCMolecularHessian::integrateFxcHessian(const CMolecule&        molecule,
-                                         const CMolecularBasis&  basis,
-                                         const CAODensityMatrix& gsDensityMatrix,
-                                         const CMolecularGrid&   molecularGrid,
-                                         const std::string&      xcFuncLabel) const
-{
-    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
-
-    auto xcfuntype = fvxc.getFunctionalType();
-
-    if (gsDensityMatrix.isClosedShell())
-    {
-        if (xcfuntype == xcfun::lda)
-        {
-            return _integrateFxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
-        }
-        else if (xcfuntype == xcfun::gga)
-        {
-            return _integrateFxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
-        }
-        else
-        {
-            std::string errxcfuntype("XCMolecularHessian.integrateFxcHessian: Only implemented for LDA/GGA");
-
-            errors::assertMsgCritical(false, errxcfuntype);
-        }
-    }
-    else
-    {
-        std::string erropenshell("XCMolecularHessian.integrateFxcHessian: Not implemented for open-shell");
+        std::string erropenshell("XCMolecularHessian.integrateExcHessian: Not implemented for open-shell");
 
         errors::assertMsgCritical(false, erropenshell);
     }

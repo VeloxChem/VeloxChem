@@ -72,8 +72,8 @@ class CXCMolecularHessian
     double _screeningThresholdForGTOValues;
 
     /**
-     Integrates first-order LDA exchnage-correlation functional contribution to
-     molecular Hessian.
+     Integrates LDA exchnage-correlation functional contribution to molecular
+     Hessian.
 
      @param molecule the molecule.
      @param basis the molecular basis.
@@ -94,6 +94,17 @@ class CXCMolecularHessian
                                             const CMolecularGrid&   molecularGrid,
                                             const CXCFunctional&    xcFunctional) const;
 
+    /**
+     Integrates GGA exchnage-correlation functional contribution to molecular
+     Hessian.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @return the molecular Hessian.
+     */
     CDenseMatrix _integrateVxcHessianForGGA(const CMolecule&        molecule,
                                             const CMolecularBasis&  basis,
                                             const CAODensityMatrix& gsDensityMatrix,
@@ -106,6 +117,19 @@ class CXCMolecularHessian
                                             const CMolecularGrid&   molecularGrid,
                                             const CXCFunctional&    xcFunctional) const;
 
+    /**
+     Integrates LDA exchnage-correlation functional contribution to molecular
+     gradient of Vxc matrix element.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @param atomIdx the index of the atom with respect to which gradient is
+     computed.
+     @return the molecular Hessian.
+     */
     std::vector<CDenseMatrix> _integrateVxcFockGradientForLDA(const CMolecule&        molecule,
                                                               const CMolecularBasis&  basis,
                                                               const CAODensityMatrix& gsDensityMatrix,
@@ -113,6 +137,19 @@ class CXCMolecularHessian
                                                               const CXCFunctional&    xcFunctional,
                                                               const int32_t           atomIdx) const;
 
+    /**
+     Integrates GGA exchnage-correlation functional contribution to molecular
+     gradient of Vxc matrix element.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @param atomIdx the index of the atom with respect to which gradient is
+     computed.
+     @return the molecular Hessian.
+     */
     std::vector<CDenseMatrix> _integrateVxcFockGradientForGGA(const CMolecule&        molecule,
                                                               const CMolecularBasis&  basis,
                                                               const CAODensityMatrix& gsDensityMatrix,
@@ -138,8 +175,8 @@ class CXCMolecularHessian
     CXCMolecularHessian(MPI_Comm comm);
 
     /**
-     Integrates first-order exchnage-correlation functional contribution to
-     molecular Hessian.
+     Integrates exchnage-correlation functional contribution to molecular
+     Hessian.
 
      @param molecule the molecule.
      @param basis the molecular basis.
@@ -148,18 +185,25 @@ class CXCMolecularHessian
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the molecular Hessian.
      */
-    CDenseMatrix integrateVxcHessian(const CMolecule&        molecule,
+    CDenseMatrix integrateExcHessian(const CMolecule&        molecule,
                                      const CMolecularBasis&  basis,
                                      const CAODensityMatrix& gsDensityMatrix,
                                      const CMolecularGrid&   molecularGrid,
                                      const std::string&      xcFuncLabel) const;
 
-    CDenseMatrix integrateFxcHessian(const CMolecule&        molecule,
-                                     const CMolecularBasis&  basis,
-                                     const CAODensityMatrix& gsDensityMatrix,
-                                     const CMolecularGrid&   molecularGrid,
-                                     const std::string&      xcFuncLabel) const;
+    /**
+     Integrates exchnage-correlation functional contribution to molecular
+     gradient of Vxc matrix element.
 
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param gsDensityMatrix the ground state AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFuncLabel the label of exchange-correlation functional.
+     @param atomIdx the index of the atom with respect to which gradient is
+     computed.
+     @return the molecular Hessian.
+     */
     std::vector<CDenseMatrix> integrateVxcFockGradient(const CMolecule&        molecule,
                                                        const CMolecularBasis&  basis,
                                                        const CAODensityMatrix& gsDensityMatrix,

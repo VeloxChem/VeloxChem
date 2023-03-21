@@ -1144,34 +1144,17 @@ export_dft(py::module& m)
     PyClass<CXCMolecularHessian>(m, "XCMolecularHessian")
         .def(py::init(&vlx_general::create<CXCMolecularHessian>), "comm"_a = py::none())
         .def(
-            "integrate_vxc_hessian",
+            "integrate_exc_hessian",
             [](CXCMolecularHessian&    self,
                const CMolecule&        molecule,
                const CMolecularBasis&  basis,
                const CAODensityMatrix& gsDensityMatrix,
                const CMolecularGrid&   molecularGrid,
                const std::string&      xcFuncLabel) -> py::array_t<double> {
-                auto molhess = self.integrateVxcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                auto molhess = self.integrateExcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molhess.values(), molhess.getNumberOfRows(), molhess.getNumberOfColumns());
             },
-            "Integrates Vxc contribution to molecular Hessian.",
-            "molecule"_a,
-            "basis"_a,
-            "gsDensityMatrix"_a,
-            "molecularGrid"_a,
-            "xcFuncLabel"_a)
-        .def(
-            "integrate_fxc_hessian",
-            [](CXCMolecularHessian&    self,
-               const CMolecule&        molecule,
-               const CMolecularBasis&  basis,
-               const CAODensityMatrix& gsDensityMatrix,
-               const CMolecularGrid&   molecularGrid,
-               const std::string&      xcFuncLabel) -> py::array_t<double> {
-                auto molhess = self.integrateFxcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
-                return vlx_general::pointer_to_numpy(molhess.values(), molhess.getNumberOfRows(), molhess.getNumberOfColumns());
-            },
-            "Integrates Fxc contribution to molecular Hessian.",
+            "Integrates XC contribution to molecular Hessian.",
             "molecule"_a,
             "basis"_a,
             "gsDensityMatrix"_a,
@@ -1193,7 +1176,7 @@ export_dft(py::module& m)
                 ret.append(vlx_general::pointer_to_numpy(vxcgrad[2].values(), vxcgrad[2].getNumberOfRows(), vxcgrad[2].getNumberOfColumns()));
                 return ret;
             },
-            "Integrates Vxc Fock gradient.",
+            "Integrates XC contribution to gradient of Vxc matrix element.",
             "molecule"_a,
             "basis"_a,
             "gsDensityMatrix"_a,

@@ -35,11 +35,9 @@ class TestXCMolHess:
         xc_mol_hess = XCMolecularHessian()
         mol_grid = grid_drv.generate(molecule)
 
-        exc_deriv_2 = xc_mol_hess.integrate_vxc_hessian(molecule, basis,
+        exc_deriv_2 = xc_mol_hess.integrate_exc_hessian(molecule, basis,
                                                         density, mol_grid,
                                                         xcfun_label)
-        exc_deriv_2 += xc_mol_hess.integrate_fxc_hessian(
-            molecule, basis, density, mol_grid, xcfun_label)
         exc_deriv_2 = scf_drv.comm.reduce(exc_deriv_2, root=mpi_master())
 
         vxc_deriv_1 = []
