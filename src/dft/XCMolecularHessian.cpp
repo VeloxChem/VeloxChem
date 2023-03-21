@@ -70,23 +70,11 @@ CXCMolecularHessian::integrateExcHessian(const CMolecule&        molecule,
     {
         if (xcfuntype == xcfun::lda)
         {
-            // TODO calculate two contributions in one function call
-
-            auto vxchessian = _integrateVxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
-
-            auto fxchessian = _integrateFxcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
-
-            return denblas::addAB(vxchessian, fxchessian, 1.0);
+            return _integrateExcHessianForLDA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
         }
         else if (xcfuntype == xcfun::gga)
         {
-            // TODO calculate two contributions in one function call
-
-            auto vxchessian = _integrateVxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
-
-            auto fxchessian = _integrateFxcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
-
-            return denblas::addAB(vxchessian, fxchessian, 1.0);
+            return _integrateExcHessianForGGA(molecule, basis, gsDensityMatrix, molecularGrid, fvxc);
         }
         else
         {
@@ -145,7 +133,7 @@ CXCMolecularHessian::integrateVxcFockGradient(const CMolecule&        molecule,
 }
 
 CDenseMatrix
-CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule,
+CXCMolecularHessian::_integrateExcHessianForLDA(const CMolecule&        molecule,
                                                 const CMolecularBasis&  basis,
                                                 const CAODensityMatrix& gsDensityMatrix,
                                                 const CMolecularGrid&   molecularGrid,
@@ -396,53 +384,9 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
 
         timer.start("Density grad. grid matmul");
 
-        auto D_val = gs_sub_dens_mat.values();
-
         auto mat_F = denblas::multAB(gs_sub_dens_mat, mat_chi);
 
         timer.stop("Density grad. grid matmul");
-
-        timer.start("Density grad. grid rho");
-
-        auto naos = mat_chi.getNumberOfRows();
-
-        auto F_val = mat_F.values();
-
-        auto chi_x_val = mat_chi_x.values();
-        auto chi_y_val = mat_chi_y.values();
-        auto chi_z_val = mat_chi_z.values();
-
-        #pragma omp parallel
-        {
-            auto thread_id = omp_get_thread_num();
-
-            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
-
-            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
-
-            for (int32_t nu = 0; nu < naos; nu++)
-            {
-                auto atomidx = ao_to_atom_ids[aoinds[nu]];
-
-                auto atom_offset = atomidx * npoints;
-
-                auto nu_offset = nu * npoints;
-
-                #pragma omp simd aligned(gdenx, gdeny, gdenz, F_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-                {
-                    auto atom_g = atom_offset + g;
-
-                    auto nu_g = nu_offset + g;
-
-                    gdenx[atom_g] -= 2.0 * F_val[nu_g] * chi_x_val[nu_g];
-                    gdeny[atom_g] -= 2.0 * F_val[nu_g] * chi_y_val[nu_g];
-                    gdenz[atom_g] -= 2.0 * F_val[nu_g] * chi_z_val[nu_g];
-                }
-            }
-        }
-
-        timer.stop("Density grad. grid rho");
 
         // compute exchange-correlation functional derivative
 
@@ -457,6 +401,16 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
         timer.stop("XC functional eval.");
 
         timer.start("Accumulate Hessian");
+
+        auto naos = mat_chi.getNumberOfRows();
+
+        auto D_val = gs_sub_dens_mat.values();
+
+        auto F_val = mat_F.values();
+
+        auto chi_x_val = mat_chi_x.values();
+        auto chi_y_val = mat_chi_y.values();
+        auto chi_z_val = mat_chi_z.values();
 
         auto chi_xx_val = mat_chi_xx.values();
         auto chi_xy_val = mat_chi_xy.values();
@@ -475,13 +429,40 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
 
             auto gatm = molhess_threads.data(thread_id);
 
+            // prepare w0
+
             #pragma omp simd aligned(local_weights, vrho, w0 : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 w0[g] = local_weights[g] * vrho[2 * g + 0];
             }
 
-            // first contribution, same atom
+            // prepare gradient grid
+
+            for (int32_t mu = 0; mu < naos; mu++)
+            {
+                auto atomidx = ao_to_atom_ids[aoinds[mu]];
+
+                auto atom_offset = atomidx * npoints;
+
+                auto mu_offset = mu * npoints;
+
+                #pragma omp simd aligned(gdenx, gdeny, gdenz, F_val, chi_x_val, chi_y_val, chi_z_val : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                {
+                    auto atom_g = atom_offset + g;
+
+                    auto mu_g = mu_offset + g;
+
+                    gdenx[atom_g] -= 2.0 * F_val[mu_g] * chi_x_val[mu_g];
+                    gdeny[atom_g] -= 2.0 * F_val[mu_g] * chi_y_val[mu_g];
+                    gdenz[atom_g] -= 2.0 * F_val[mu_g] * chi_z_val[mu_g];
+                }
+            }
+
+            // first contribution to
+            // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
+            // on the same atom
 
             for (int32_t mu = 0; mu < naos; mu++)
             {
@@ -532,7 +513,9 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
                 gatm[iz * (natoms * 3) + iz] += 4.0 * gatmzz;
             }
 
-            // first contribution, same or different atoms
+            // second contribution to
+            // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
+            // on the same atom and on different atoms
 
             for (int32_t mu = 0; mu < naos; mu++)
             {
@@ -601,7 +584,7 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
                 }
             }
 
-            // second contribution
+            // (v2rho2_aa + v2rho2_ab) \rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
 
             for (int32_t iatom = 0; iatom < natoms; iatom++)
             {
@@ -623,8 +606,8 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
                     double gatmxy = 0.0, gatmyy = 0.0, gatmzy = 0.0;
                     double gatmxz = 0.0, gatmyz = 0.0, gatmzz = 0.0;
 
-                    #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) aligned(local_weights, \
-                            v2rho2, gdenx, gdeny, gdenz : VLX_ALIGN)
+                    #pragma omp simd reduction(+ : gatmxx, gatmxy, gatmxz, gatmyx, gatmyy, gatmyz, gatmzx, gatmzy, gatmzz) \
+                            aligned(local_weights, v2rho2, gdenx, gdeny, gdenz : VLX_ALIGN)
                     for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
                         auto ig = i_offset + g;
@@ -725,7 +708,7 @@ CXCMolecularHessian::_integrateVxcHessianForLDA(const CMolecule&        molecule
 }
 
 CDenseMatrix
-CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule,
+CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule,
                                                 const CMolecularBasis&  basis,
                                                 const CAODensityMatrix& gsDensityMatrix,
                                                 const CMolecularGrid&   molecularGrid,
@@ -1079,8 +1062,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
         timer.start("Density grad. grid matmul");
 
-        auto D_val = gs_sub_dens_mat.values();
-
         auto mat_F = denblas::multAB(gs_sub_dens_mat, mat_chi);
 
         auto mat_F_x = denblas::multAB(gs_sub_dens_mat, mat_chi_x);
@@ -1089,9 +1070,23 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
         timer.stop("Density grad. grid matmul");
 
-        timer.start("Density grad. grid rho");
+        // compute exchange-correlation functional derivative
+
+        timer.start("XC functional eval.");
+
+        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
+
+        xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+
+        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
+
+        timer.stop("XC functional eval.");
+
+        timer.start("Accumulate Hessian");
 
         auto naos = mat_chi.getNumberOfRows();
+
+        auto D_val = gs_sub_dens_mat.values();
 
         auto F_val = mat_F.values();
 
@@ -1109,67 +1104,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
         auto chi_yy_val = mat_chi_yy.values();
         auto chi_yz_val = mat_chi_yz.values();
         auto chi_zz_val = mat_chi_zz.values();
-
-        #pragma omp parallel
-        {
-            auto thread_id = omp_get_thread_num();
-
-            auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
-
-            auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
-
-            for (int32_t nu = 0; nu < naos; nu++)
-            {
-                auto atomidx = ao_to_atom_ids[aoinds[nu]];
-
-                auto atom_offset = atomidx * npoints;
-
-                auto nu_offset = nu * npoints;
-
-                #pragma omp simd aligned(gdenx, gdeny, gdenz, \
-                        gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz, \
-                        F_val, F_x_val, F_y_val, F_z_val, chi_x_val, chi_y_val, chi_z_val, \
-                        chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val : VLX_ALIGN)
-                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-                {
-                    auto atom_g = atom_offset + g;
-
-                    auto nu_g = nu_offset + g;
-
-                    gdenx[atom_g] -= 2.0 * F_val[nu_g] * chi_x_val[nu_g];
-                    gdeny[atom_g] -= 2.0 * F_val[nu_g] * chi_y_val[nu_g];
-                    gdenz[atom_g] -= 2.0 * F_val[nu_g] * chi_z_val[nu_g];
-
-                    gdenxx[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xx_val[nu_g]);
-                    gdenxy[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
-                    gdenxz[atom_g] -= 2.0 * (F_x_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
-
-                    gdenyx[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xy_val[nu_g]);
-                    gdenyy[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yy_val[nu_g]);
-                    gdenyz[atom_g] -= 2.0 * (F_y_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
-
-                    gdenzx[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_x_val[nu_g] + F_val[nu_g] * chi_xz_val[nu_g]);
-                    gdenzy[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_y_val[nu_g] + F_val[nu_g] * chi_yz_val[nu_g]);
-                    gdenzz[atom_g] -= 2.0 * (F_z_val[nu_g] * chi_z_val[nu_g] + F_val[nu_g] * chi_zz_val[nu_g]);
-                }
-            }
-        }
-
-        timer.stop("Density grad. grid rho");
-
-        // compute exchange-correlation functional derivative
-
-        timer.start("XC functional eval.");
-
-        xcFunctional.compute_vxc_for_gga(npoints, rho, sigma, vrho, vsigma);
-
-        xcFunctional.compute_fxc_for_gga(npoints, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
-
-        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
-
-        timer.stop("XC functional eval.");
-
-        timer.start("Accumulate Hessian");
 
         auto chi_xxx_val = mat_chi_xxx.values();
         auto chi_xxy_val = mat_chi_xxy.values();
@@ -1192,6 +1126,8 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
             auto gatm = molhess_threads.data(thread_id);
 
+            // prepare w0, wx, wy and wz
+
             #pragma omp simd aligned(local_weights, rhograd, vrho, vsigma, w0, wx, wy, wz : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
@@ -1206,7 +1142,49 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                 wz[g] = local_weights[g] * vz;
             }
 
-            // first contribution, same atom
+            // prepare gradient grid
+
+            for (int32_t mu = 0; mu < naos; mu++)
+            {
+                auto atomidx = ao_to_atom_ids[aoinds[mu]];
+
+                auto atom_offset = atomidx * npoints;
+
+                auto mu_offset = mu * npoints;
+
+                #pragma omp simd aligned(gdenx, gdeny, gdenz, \
+                        gdenxx, gdenxy, gdenxz, gdenyx, gdenyy, gdenyz, gdenzx, gdenzy, gdenzz, \
+                        F_val, F_x_val, F_y_val, F_z_val, chi_x_val, chi_y_val, chi_z_val, \
+                        chi_xx_val, chi_xy_val, chi_xz_val, chi_yy_val, chi_yz_val, chi_zz_val : VLX_ALIGN)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                {
+                    auto atom_g = atom_offset + g;
+
+                    auto mu_g = mu_offset + g;
+
+                    gdenx[atom_g] -= 2.0 * F_val[mu_g] * chi_x_val[mu_g];
+                    gdeny[atom_g] -= 2.0 * F_val[mu_g] * chi_y_val[mu_g];
+                    gdenz[atom_g] -= 2.0 * F_val[mu_g] * chi_z_val[mu_g];
+
+                    gdenxx[atom_g] -= 2.0 * (F_x_val[mu_g] * chi_x_val[mu_g] + F_val[mu_g] * chi_xx_val[mu_g]);
+                    gdenxy[atom_g] -= 2.0 * (F_x_val[mu_g] * chi_y_val[mu_g] + F_val[mu_g] * chi_xy_val[mu_g]);
+                    gdenxz[atom_g] -= 2.0 * (F_x_val[mu_g] * chi_z_val[mu_g] + F_val[mu_g] * chi_xz_val[mu_g]);
+
+                    gdenyx[atom_g] -= 2.0 * (F_y_val[mu_g] * chi_x_val[mu_g] + F_val[mu_g] * chi_xy_val[mu_g]);
+                    gdenyy[atom_g] -= 2.0 * (F_y_val[mu_g] * chi_y_val[mu_g] + F_val[mu_g] * chi_yy_val[mu_g]);
+                    gdenyz[atom_g] -= 2.0 * (F_y_val[mu_g] * chi_z_val[mu_g] + F_val[mu_g] * chi_yz_val[mu_g]);
+
+                    gdenzx[atom_g] -= 2.0 * (F_z_val[mu_g] * chi_x_val[mu_g] + F_val[mu_g] * chi_xz_val[mu_g]);
+                    gdenzy[atom_g] -= 2.0 * (F_z_val[mu_g] * chi_y_val[mu_g] + F_val[mu_g] * chi_yz_val[mu_g]);
+                    gdenzz[atom_g] -= 2.0 * (F_z_val[mu_g] * chi_z_val[mu_g] + F_val[mu_g] * chi_zz_val[mu_g]);
+                }
+            }
+
+            // first contribution to
+            // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)} and
+            // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}}) *
+            // \nabla \rho_{\alpha} \cdot \nabla \rho_{\alpha}^{(\xi,\zeta)}
+            // on the same atom
 
             for (int32_t mu = 0; mu < naos; mu++)
             {
@@ -1231,7 +1209,8 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                 {
                     auto mu_g = mu_offset + g;
 
-                    // 1st contribution to vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+                    // vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+
                     // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi,\zeta)} \phi_{\nu}
                     // note that F_{\mu} = \sum_{\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\nu}
                     // factor of 2 is added outside of the for loop
@@ -1248,8 +1227,8 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                     double gdenzy = F_val[mu_g] * chi_yz_val[mu_g];
                     double gdenzz = F_val[mu_g] * chi_zz_val[mu_g];
 
-                    // 1st contribution to
-                    // (2 vsigma_aa \nabla\rho_{\alpha} + vsigma_ab \nabla\rho_{\beta}) \cdot (\nabla\rho_{\alpha})^{(\xi,\zeta)}
+                    // (2 vsigma_aa \nabla\rho_{\alpha} + vsigma_ab \nabla\rho_{\beta}) \cdot
+                    // (\nabla\rho_{\alpha})^{(\xi,\zeta)}
 
                     // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} (\nabla\phi_{\mu})^{(\xi,\zeta)} \phi_{\nu}
                     // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi,\zeta)} \nabla\phi_{\nu}
@@ -1328,7 +1307,11 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                 gatm[iz * (natoms * 3) + iz] += 4.0 * gatmzz;
             }
 
-            // first contribution, same or different atoms
+            // second contribution to
+            // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)} and
+            // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}}) *
+            // \nabla \rho_{\alpha} \cdot \nabla \rho_{\alpha}^{(\xi,\zeta)}
+            // on the same atom and on different atoms
 
             for (int32_t mu = 0; mu < naos; mu++)
             {
@@ -1366,7 +1349,8 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                         auto mu_g = mu_offset + g;
                         auto nu_g = nu_offset + g;
 
-                        // 2nd contribution to vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+                        // vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+
                         // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi)} \phi_{\nu}^{(\zeta)}
                         // factor of 2 and P_{\mu\nu,sym}^{\alpha} are added outside of the for loop
 
@@ -1382,8 +1366,8 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                         double gzy = chi_z_val[mu_g] * chi_y_val[nu_g];
                         double gzz = chi_z_val[mu_g] * chi_z_val[nu_g];
 
-                        // 2nd contribution to
-                        // (2 vsigma_aa \nabla\rho_{\alpha} + vsigma_ab \nabla\rho_{\beta}) \cdot (\nabla\rho_{\alpha})^{(\xi,\zeta)}
+                        // (2 vsigma_aa \nabla\rho_{\alpha} + vsigma_ab \nabla\rho_{\beta}) \cdot
+                        // (\nabla\rho_{\alpha})^{(\xi,\zeta)}
 
                         // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} (\nabla\phi_{\mu})^{(\xi)} \phi_{\nu}^{(\zeta)}
                         // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} (\nabla\phi_{\nu})^{(\zeta)} \phi_{\mu}^{(\xi)}
@@ -1465,7 +1449,7 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                 }
             }
 
-            // second contribution
+            // other contributions
 
             for (int32_t iatom = 0; iatom < natoms; iatom++)
             {
@@ -1497,8 +1481,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
 
                         double w = local_weights[g];
 
-                        // (rho_a, rho_a), (rho_a, rho_b)
-
                         // (v2rho2_aa + v2rho2_ab) \rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
 
                         double prefac = w * (v2rho2[3 * g + 0] + v2rho2[3 * g + 1]);
@@ -1514,8 +1496,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                         gatmzx += prefac * gdenz[ig] * gdenx[jg];
                         gatmzy += prefac * gdenz[ig] * gdeny[jg];
                         gatmzz += prefac * gdenz[ig] * gdenz[jg];
-
-                        // (rho_a, sigma_aa), (rho_a, sigma_ab), (rho_a, sigma_bb)
 
                         // 2 (v2rhosigma_a_aa + v2rhosigma_a_ab + v2rhosigma_a_bb)
                         // \rho_{\alpha}^{(\xi)} (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\zeta)})
@@ -1542,8 +1522,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                         gatmzy += prefac * gdenz[ig] * ycomp_j;
                         gatmzz += prefac * gdenz[ig] * zcomp_j;
 
-                        // (sigma_aa, rho_a), (sigma_ab, rho_a), (sigma_aa, rho_b), (sigma_ab, rho_b)
-
                         // (2 (v2rhosigma_a_aa + v2rhosigma_b_aa) + (v2rhosigma_a_ab + v2rhosigma_b_ab))
                         // (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\xi)}) \rho_{\alpha}^{(\zeta)}
 
@@ -1568,9 +1546,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                         gatmzy += prefac * zcomp_i * gdeny[jg];
                         gatmzz += prefac * zcomp_i * gdenz[jg];
 
-                        // (sigma_aa, sigma_aa), (sigma_aa, sigma_ab), (sigma_aa, sigma_bb)
-                        // (sigma_ab, sigma_aa), (sigma_ab, sigma_ab), (sigma_ab, sigma_bb)
-
                         // (2 (v2sigma2_aa_aa + v2sigma2_aa_ab + v2sigma2_aa_bb) +
                         //    (v2sigma2_ab_aa + v2sigma2_ab_ab + v2sigma2_ab_bb))
                         // 2 (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\xi)})
@@ -1592,8 +1567,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
                         gatmzx += prefac * zcomp_i * xcomp_j;
                         gatmzy += prefac * zcomp_i * ycomp_j;
                         gatmzz += prefac * zcomp_i * zcomp_j;
-
-                        // sigma_aa, sigma_ab
 
                         // (2 vsigma_aa + vsigma_ab) (\nabla\rho_{\alpha})^{(\xi)} (\nabla\rho_{\alpha})^{(\zeta)}
 
@@ -1692,30 +1665,6 @@ CXCMolecularHessian::_integrateVxcHessianForGGA(const CMolecule&        molecule
     }
 
     return molhess;
-}
-
-CDenseMatrix
-CXCMolecularHessian::_integrateFxcHessianForLDA(const CMolecule&        molecule,
-                                                const CMolecularBasis&  basis,
-                                                const CAODensityMatrix& gsDensityMatrix,
-                                                const CMolecularGrid&   molecularGrid,
-                                                const CXCFunctional&    xcFunctional) const
-{
-    auto natoms = molecule.getNumberOfAtoms();
-
-    return CDenseMatrix(natoms * 3, natoms * 3);
-}
-
-CDenseMatrix
-CXCMolecularHessian::_integrateFxcHessianForGGA(const CMolecule&        molecule,
-                                                const CMolecularBasis&  basis,
-                                                const CAODensityMatrix& gsDensityMatrix,
-                                                const CMolecularGrid&   molecularGrid,
-                                                const CXCFunctional&    xcFunctional) const
-{
-    auto natoms = molecule.getNumberOfAtoms();
-
-    return CDenseMatrix(natoms * 3, natoms * 3);
 }
 
 std::vector<CDenseMatrix>

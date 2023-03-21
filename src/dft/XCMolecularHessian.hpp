@@ -82,13 +82,7 @@ class CXCMolecularHessian
      @param xcFunctional the exchange-correlation functional.
      @return the molecular Hessian.
      */
-    CDenseMatrix _integrateVxcHessianForLDA(const CMolecule&        molecule,
-                                            const CMolecularBasis&  basis,
-                                            const CAODensityMatrix& gsDensityMatrix,
-                                            const CMolecularGrid&   molecularGrid,
-                                            const CXCFunctional&    xcFunctional) const;
-
-    CDenseMatrix _integrateFxcHessianForLDA(const CMolecule&        molecule,
+    CDenseMatrix _integrateExcHessianForLDA(const CMolecule&        molecule,
                                             const CMolecularBasis&  basis,
                                             const CAODensityMatrix& gsDensityMatrix,
                                             const CMolecularGrid&   molecularGrid,
@@ -105,13 +99,7 @@ class CXCMolecularHessian
      @param xcFunctional the exchange-correlation functional.
      @return the molecular Hessian.
      */
-    CDenseMatrix _integrateVxcHessianForGGA(const CMolecule&        molecule,
-                                            const CMolecularBasis&  basis,
-                                            const CAODensityMatrix& gsDensityMatrix,
-                                            const CMolecularGrid&   molecularGrid,
-                                            const CXCFunctional&    xcFunctional) const;
-
-    CDenseMatrix _integrateFxcHessianForGGA(const CMolecule&        molecule,
+    CDenseMatrix _integrateExcHessianForGGA(const CMolecule&        molecule,
                                             const CMolecularBasis&  basis,
                                             const CAODensityMatrix& gsDensityMatrix,
                                             const CMolecularGrid&   molecularGrid,
