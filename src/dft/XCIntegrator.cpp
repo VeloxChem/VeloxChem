@@ -271,9 +271,9 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
                                 CDense4DTensor&         moTwoBodyGradient,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
-                                const CAODensityMatrix& DensityMatrix,
-                                const CDense4DTensor&   TwoBodyDensityMatrix,
-                                const CDenseMatrix&     ActiveMOs,
+                                const CAODensityMatrix& densityMatrix,
+                                const CDense4DTensor&   twoBodyDensityMatrix,
+                                const CDenseMatrix&     activeMOs,
                                 const CMolecularGrid&   molecularGrid,
                                 const std::string&      xcFuncLabel) const
 {
@@ -284,12 +284,12 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
     if (xcfuntype == "PLDA")
     {
         _integrateVxcPDFTForLDA(
-            aoFockMatrix, moTwoBodyGradient, molecule, basis, DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
+            aoFockMatrix, moTwoBodyGradient, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
     }
     else if (xcfuntype == "PGGA")
     {
         _integrateVxcPDFTForGGA(
-            aoFockMatrix, moTwoBodyGradient, molecule, basis, DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
+            aoFockMatrix, moTwoBodyGradient, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
     }
     else
     {
@@ -352,17 +352,13 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
-
-    auto exc = exc_data.data();
-
+    auto rho  = rho_data.data();
+    auto exc  = exc_data.data();
     auto vrho = vrho_data.data();
 
     // initial values for XC energy and number of electrons
@@ -372,9 +368,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
 
     auto weights = molecularGrid.getWeights();
@@ -421,16 +415,8 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(gaos,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(
+                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -612,9 +598,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
@@ -634,29 +618,21 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
-
+    auto rho     = rho_data.data();
     auto rhograd = rhograd_data.data();
+    auto sigma   = sigma_data.data();
 
-    auto sigma = sigma_data.data();
-
-    auto exc = exc_data.data();
-
-    auto vrho = vrho_data.data();
-
+    auto exc    = exc_data.data();
+    auto vrho   = vrho_data.data();
     auto vsigma = vsigma_data.data();
 
     // initial values for XC energy and number of electrons
@@ -666,9 +642,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
 
     auto weights = molecularGrid.getWeights();
@@ -715,19 +689,8 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos,
-                                             gaox,
-                                             gaoy,
-                                             gaoz,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -747,9 +710,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             auto gaos_nu = gaos.data(nu);
 
             auto gaox_nu = gaox.data(nu);
-
             auto gaoy_nu = gaoy.data(nu);
-
             auto gaoz_nu = gaoz.data(nu);
 
             for (int32_t g = 0; g < npoints; g++)
@@ -774,9 +735,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
         CDenseMatrix mat_chi(aocount, npoints);
 
         CDenseMatrix mat_chi_x(aocount, npoints);
-
         CDenseMatrix mat_chi_y(aocount, npoints);
-
         CDenseMatrix mat_chi_z(aocount, npoints);
 
         for (int32_t i = 0; i < aocount; i++)
@@ -784,9 +743,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
         }
 
@@ -1240,25 +1197,19 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhow_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
-
-    auto rhow = rhow_data.data();
-
+    auto rho    = rho_data.data();
+    auto rhow   = rhow_data.data();
     auto v2rho2 = v2rho2_data.data();
 
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
 
     auto weights = molecularGrid.getWeights();
@@ -1305,16 +1256,8 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(gaos,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(
+                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -1461,9 +1404,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
@@ -1483,53 +1424,35 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhow_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhowgrad_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
-    auto rho = rho_data.data();
-
-    auto rhow = rhow_data.data();
-
-    auto rhograd = rhograd_data.data();
-
+    auto rho      = rho_data.data();
+    auto rhow     = rhow_data.data();
+    auto rhograd  = rhograd_data.data();
     auto rhowgrad = rhowgrad_data.data();
+    auto sigma    = sigma_data.data();
 
-    auto sigma = sigma_data.data();
-
-    auto vrho = vrho_data.data();
-
-    auto vsigma = vsigma_data.data();
-
-    auto v2rho2 = v2rho2_data.data();
-
+    auto vrho       = vrho_data.data();
+    auto vsigma     = vsigma_data.data();
+    auto v2rho2     = v2rho2_data.data();
     auto v2rhosigma = v2rhosigma_data.data();
-
-    auto v2sigma2 = v2sigma2_data.data();
+    auto v2sigma2   = v2sigma2_data.data();
 
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
 
     auto weights = molecularGrid.getWeights();
@@ -1576,19 +1499,8 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos,
-                                             gaox,
-                                             gaoy,
-                                             gaoz,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -1608,9 +1520,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
             auto gaos_nu = gaos.data(nu);
 
             auto gaox_nu = gaox.data(nu);
-
             auto gaoy_nu = gaoy.data(nu);
-
             auto gaoz_nu = gaoz.data(nu);
 
             for (int32_t g = 0; g < npoints; g++)
@@ -1635,9 +1545,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
         CDenseMatrix mat_chi(aocount, npoints);
 
         CDenseMatrix mat_chi_x(aocount, npoints);
-
         CDenseMatrix mat_chi_y(aocount, npoints);
-
         CDenseMatrix mat_chi_z(aocount, npoints);
 
         for (int32_t i = 0; i < aocount; i++)
@@ -1645,9 +1553,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
         }
 
@@ -1703,7 +1609,6 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                                                   mat_chi_x,
                                                                   mat_chi_y,
                                                                   mat_chi_z,
-
                                                                   rhow,
                                                                   rhograd,
                                                                   rhowgrad,
@@ -1711,7 +1616,6 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
                                                                   v2rho2,
                                                                   v2rhosigma,
                                                                   v2sigma2,
-
                                                                   timer);
 
             // distribute partial Fxc to full Fock matrix
@@ -1858,9 +1762,7 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
 
     auto weights = molecularGrid.getWeights();
@@ -2131,6 +2033,7 @@ CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -2175,16 +2078,8 @@ CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(gaos,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(
+                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -2412,6 +2307,7 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -2456,19 +2352,8 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos,
-                                             gaox,
-                                             gaoy,
-                                             gaoz,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -2488,9 +2373,7 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
             auto gaos_nu = gaos.data(nu);
 
             auto gaox_nu = gaox.data(nu);
-
             auto gaoy_nu = gaoy.data(nu);
-
             auto gaoz_nu = gaoz.data(nu);
 
             for (int32_t g = 0; g < npoints; g++)
@@ -2794,6 +2677,7 @@ CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -3125,6 +3009,7 @@ CXCIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -3169,16 +3054,8 @@ CXCIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(gaos,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(
+                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -3424,6 +3301,7 @@ CXCIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -3731,6 +3609,7 @@ CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -3775,16 +3654,8 @@ CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(gaos,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(
+                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -4048,6 +3919,7 @@ CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -4092,19 +3964,8 @@ CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos,
-                                             gaox,
-                                             gaoy,
-                                             gaoz,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -4551,6 +4412,7 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -4959,9 +4821,9 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
                                        CDense4DTensor&                 moTwoBodyGradient,
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
-                                       const CAODensityMatrix&         DensityMatrix,
-                                       const CDense4DTensor&           TwoBodyDensityMatrix,
-                                       const CDenseMatrix&             ActiveMOs,
+                                       const CAODensityMatrix&         densityMatrix,
+                                       const CDense4DTensor&           twoBodyDensityMatrix,
+                                       const CDenseMatrix&             activeMOs,
                                        const CMolecularGrid&           molecularGrid,
                                        const CXCPairDensityFunctional& xcFunctional) const
 {
@@ -5026,6 +4888,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -5070,16 +4933,8 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForLDA(gaos,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForLDA(
+                gaos, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -5131,15 +4986,15 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat_a = submat::getSubDensityMatrix(DensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto sub_ActiveMOs = submat::getSubMatrixByColumnSlicing(ActiveMOs, aoinds, aocount, naos);
+        auto sub_active_mos = submat::getSubMatrixByColumnSlicing(activeMOs, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
         // generate density and on-top pair density on the grid
 
-        dengridgen::generatePairDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, sub_ActiveMOs, TwoBodyDensityMatrix, timer);
+        dengridgen::generatePairDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, sub_active_mos, twoBodyDensityMatrix, timer);
 
         // compute exchange-correlation functional derivative
 
@@ -5195,9 +5050,9 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
                                        CDense4DTensor&                 moTwoBodyGradient,
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
-                                       const CAODensityMatrix&         DensityMatrix,
-                                       const CDense4DTensor&           TwoBodyDensityMatrix,
-                                       const CDenseMatrix&             ActiveMOs,
+                                       const CAODensityMatrix&         densityMatrix,
+                                       const CDense4DTensor&           twoBodyDensityMatrix,
+                                       const CDenseMatrix&             activeMOs,
                                        const CMolecularGrid&           molecularGrid,
                                        const CXCPairDensityFunctional& xcFunctional) const
 {
@@ -5272,6 +5127,7 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
     auto xcoords = molecularGrid.getCoordinatesX();
     auto ycoords = molecularGrid.getCoordinatesY();
     auto zcoords = molecularGrid.getCoordinatesZ();
+
     auto weights = molecularGrid.getWeights();
 
     // counts and displacements of grid points in boxes
@@ -5316,19 +5172,8 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            gtoeval::computeGtosValuesForGGA(gaos,
-                                             gaox,
-                                             gaoy,
-                                             gaoz,
-                                             gtovec,
-                                             xcoords,
-                                             ycoords,
-                                             zcoords,
-                                             gridblockpos,
-
-                                             grid_batch_offset,
-                                             grid_batch_size,
-                                             skip_cgto_ids);
+            gtoeval::computeGtosValuesForGGA(
+                gaos, gaox, gaoy, gaoz, gtovec, xcoords, ycoords, zcoords, gridblockpos, grid_batch_offset, grid_batch_size, skip_cgto_ids);
 
             omptimers[thread_id].stop("gtoeval");
         }
@@ -5393,16 +5238,16 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat_a = submat::getSubDensityMatrix(DensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
-        auto sub_ActiveMOs = submat::getSubMatrixByColumnSlicing(ActiveMOs, aoinds, aocount, naos);
+        auto sub_active_mos = submat::getSubMatrixByColumnSlicing(activeMOs, aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
         // generate density and on-top pair density on the grid
 
         dengridgen::generatePairDensityForGGA(
-            rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_ActiveMOs, TwoBodyDensityMatrix, timer);
+            rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_active_mos, twoBodyDensityMatrix, timer);
 
         // compute exchange-correlation functional derivative
 
