@@ -2010,7 +2010,10 @@ class LinearSolver:
 
         vis_drv = VisualizationDriver(self.comm)
 
-        nocc = molecule.number_of_alpha_electrons()
+        if getattr(self, 'core_excitation', False):
+            nocc = self.num_core_orbitals
+        else:
+            nocc = molecule.number_of_alpha_electrons()
         nvir = nto_mo.number_mos() - nocc
         lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
 
@@ -2166,7 +2169,10 @@ class LinearSolver:
         de_excitations = []
 
         for i in range(nocc):
-            homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc-1-i}'
+            if getattr(self, 'core_excitation', False):
+                homo_str = f'core_{i+1}'
+            else:
+                homo_str = 'HOMO' if i == nocc - 1 else f'HOMO-{nocc-1-i}'
 
             for a in range(nvir):
                 lumo_str = 'LUMO' if a == 0 else f'LUMO+{a}'

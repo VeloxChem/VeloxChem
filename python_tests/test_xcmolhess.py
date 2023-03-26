@@ -1,9 +1,8 @@
 from pathlib import Path
 import numpy as np
-import pytest
 import h5py
 
-from veloxchem.veloxchemlib import is_single_node
+from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import GridDriver, XCMolecularHessian
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -36,13 +35,10 @@ class TestXCMolHess:
         xc_mol_hess = XCMolecularHessian()
         mol_grid = grid_drv.generate(molecule)
 
-        exc_deriv_2 = xc_mol_hess.integrate_vxc_hessian(molecule, basis,
+        exc_deriv_2 = xc_mol_hess.integrate_exc_hessian(molecule, basis,
                                                         density, mol_grid,
                                                         xcfun_label)
-        exc_deriv_2 += xc_mol_hess.integrate_fxc_hessian(
-            molecule, basis, density, mol_grid, xcfun_label)
-
-        assert np.max(np.abs(ref_exc_deriv_2 - exc_deriv_2)) < 1.0e-4
+        exc_deriv_2 = scf_drv.comm.reduce(exc_deriv_2, root=mpi_master())
 
         vxc_deriv_1 = []
         for iatom in range(molecule.number_of_atoms()):
@@ -50,16 +46,21 @@ class TestXCMolHess:
                 molecule, basis, density, mol_grid, xcfun_label, iatom)
             vxc_deriv_1.append(vxc_deriv_atom)
         vxc_deriv_1 = np.array(vxc_deriv_1)
+        vxc_deriv_1 = scf_drv.comm.reduce(vxc_deriv_1, root=mpi_master())
 
-        assert np.max(np.abs(ref_vxc_deriv_1 - vxc_deriv_1)) < 1.0e-4
+        if scf_drv.rank == mpi_master():
+            assert np.max(np.abs(ref_exc_deriv_2 - exc_deriv_2)) < 1.0e-4
+            assert np.max(np.abs(ref_vxc_deriv_1 - vxc_deriv_1)) < 1.0e-4
 
-    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_xc_mol_hess_lda(self):
 
         molecule_string = """
         O   0.0   0.0   0.0
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
+        O  10.0   0.0   0.0
+        H  10.0   1.4   1.1
+        H  10.0  -1.4   1.1
         """
         units = 'au'
 
@@ -79,13 +80,15 @@ class TestXCMolHess:
         self.run_xc_mol_hess(molecule, basis, xcfun_label, ref_exc_deriv_2,
                              ref_vxc_deriv_1)
 
-    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_xc_mol_hess_gga(self):
 
         molecule_string = """
         O   0.0   0.0   0.0
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
+        O  10.0   0.0   0.0
+        H  10.0   1.4   1.1
+        H  10.0  -1.4   1.1
         """
         units = 'au'
 

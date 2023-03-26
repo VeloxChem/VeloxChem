@@ -402,8 +402,6 @@ CXCMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecu
 
         timer.start("Density grad. grid rho");
 
-        auto naos = mat_chi.getNumberOfRows();
-
         auto F_val = mat_F.values();
 
         auto chi_x_val = mat_chi_x.values();
@@ -422,7 +420,7 @@ CXCMolecularGradient::_integrateVxcGradientForLDA(const CMolecule&        molecu
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < naos; nu++)
+            for (int32_t nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -739,8 +737,6 @@ CXCMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&     
 
         timer.start("Density grad. grid rho");
 
-        auto naos = mat_chi.getNumberOfRows();
-
         auto F_a_val = mat_F_a.values();
         auto F_b_val = mat_F_b.values();
 
@@ -764,7 +760,7 @@ CXCMolecularGradient::_integrateVxcGradientForLDAOpenShell(const CMolecule&     
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < naos; nu++)
+            for (int32_t nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -914,21 +910,14 @@ CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecu
     CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     CMemBlock2D<double> gaoxx(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoxy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoxz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoyy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoyz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaozz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
@@ -1021,12 +1010,10 @@ CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecu
                                                  gaoyy,
                                                  gaoyz,
                                                  gaozz,
-
                                                  gtovec,
                                                  xcoords,
                                                  ycoords,
                                                  zcoords,
-
                                                  gridblockpos,
                                                  grid_batch_offset,
                                                  grid_batch_size,
@@ -1162,8 +1149,6 @@ CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecu
 
         timer.start("Density grad. grid rho");
 
-        auto naos = mat_chi.getNumberOfRows();
-
         auto F_val = mat_F.values();
 
         auto F_x_val = mat_F_x.values();
@@ -1206,7 +1191,7 @@ CXCMolecularGradient::_integrateVxcGradientForGGA(const CMolecule&        molecu
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < naos; nu++)
+            for (int32_t nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -1634,8 +1619,6 @@ CXCMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&     
 
         timer.start("Density grad. grid rho");
 
-        auto naos = mat_chi.getNumberOfRows();
-
         auto F_a_val = mat_F_a.values();
         auto F_b_val = mat_F_b.values();
 
@@ -1699,7 +1682,7 @@ CXCMolecularGradient::_integrateVxcGradientForGGAOpenShell(const CMolecule&     
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < naos; nu++)
+            for (int32_t nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -1905,9 +1888,7 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
     CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-
     CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
 
     // indices for keeping track of GTOs
@@ -1927,25 +1908,19 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
     CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> rhow_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
     CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
-
     auto rhow = rhow_data.data();
-
     auto v2rho2 = v2rho2_data.data();
 
     // coordinates and weights of grid points
 
     auto xcoords = molecularGrid.getCoordinatesX();
-
     auto ycoords = molecularGrid.getCoordinatesY();
-
     auto zcoords = molecularGrid.getCoordinatesZ();
 
     auto weights = molecularGrid.getWeights();
@@ -1998,7 +1973,6 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
                                              xcoords,
                                              ycoords,
                                              zcoords,
-
                                              gridblockpos,
                                              grid_batch_offset,
                                              grid_batch_size,
@@ -2020,9 +1994,7 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
             auto gaos_nu = gaos.data(nu);
 
             auto gaox_nu = gaox.data(nu);
-
             auto gaoy_nu = gaoy.data(nu);
-
             auto gaoz_nu = gaoz.data(nu);
 
             for (int32_t g = 0; g < npoints; g++)
@@ -2047,9 +2019,7 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
         CDenseMatrix mat_chi(aocount, npoints);
 
         CDenseMatrix mat_chi_x(aocount, npoints);
-
         CDenseMatrix mat_chi_y(aocount, npoints);
-
         CDenseMatrix mat_chi_z(aocount, npoints);
 
         for (int32_t i = 0; i < aocount; i++)
@@ -2057,9 +2027,7 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
 
             std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
-
             std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
         }
 
@@ -2072,7 +2040,6 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
         auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
         auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, "ALPHA", aoinds, aocount, naos);
-
         auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
@@ -2105,8 +2072,6 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
 
         timer.start("Density grad. grid rho");
 
-        auto naos = mat_chi.getNumberOfRows();
-
         auto F_val = mat_F.values();
 
         auto chi_x_val = mat_chi_x.values();
@@ -2125,7 +2090,7 @@ CXCMolecularGradient::_integrateFxcGradientForLDA(const CMolecule&        molecu
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < naos; nu++)
+            for (int32_t nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -2383,12 +2348,10 @@ CXCMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecu
                                                  gaoyy,
                                                  gaoyz,
                                                  gaozz,
-
                                                  gtovec,
                                                  xcoords,
                                                  ycoords,
                                                  zcoords,
-
                                                  gridblockpos,
                                                  grid_batch_offset,
                                                  grid_batch_size,
@@ -2480,7 +2443,6 @@ CXCMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecu
         auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
 
         auto rw_sub_dens_mat_one = submat::getSubDensityMatrix(rwDensityMatrixOne, 0, "ALPHA", aoinds, aocount, naos);
-
         auto rw_sub_dens_mat_two = submat::getSubDensityMatrix(rwDensityMatrixTwo, 0, "ALPHA", aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
@@ -2495,7 +2457,6 @@ CXCMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecu
                                           mat_chi_x,
                                           mat_chi_y,
                                           mat_chi_z,
-
                                           gs_sub_dens_mat,
                                           timer);
 
@@ -2507,7 +2468,6 @@ CXCMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecu
                                           mat_chi_x,
                                           mat_chi_y,
                                           mat_chi_z,
-
                                           rw_sub_dens_mat_one,
                                           timer);
 
@@ -2548,8 +2508,6 @@ CXCMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecu
         // eq.(34), JCTC 2021, 17, 1512-1521
 
         timer.start("Density grad. grid rho");
-
-        auto naos = mat_chi.getNumberOfRows();
 
         auto F_val = mat_F.values();
 
@@ -2592,7 +2550,7 @@ CXCMolecularGradient::_integrateFxcGradientForGGA(const CMolecule&        molecu
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < naos; nu++)
+            for (int32_t nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -3007,8 +2965,6 @@ CXCMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        molecu
 
         timer.start("Density grad. grid rho");
 
-        auto naos = mat_chi.getNumberOfRows();
-
         auto F_val = mat_F.values();
 
         auto chi_x_val = mat_chi_x.values();
@@ -3027,7 +2983,7 @@ CXCMolecularGradient::_integrateKxcGradientForLDA(const CMolecule&        molecu
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < naos; nu++)
+            for (int32_t nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 
@@ -3478,8 +3434,6 @@ CXCMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        molecu
 
         timer.start("Density grad. grid rho");
 
-        auto naos = mat_chi.getNumberOfRows();
-
         auto F_val = mat_F.values();
 
         auto F_x_val = mat_F_x.values();
@@ -3521,7 +3475,7 @@ CXCMolecularGradient::_integrateKxcGradientForGGA(const CMolecule&        molecu
 
             auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-            for (int32_t nu = 0; nu < naos; nu++)
+            for (int32_t nu = 0; nu < aocount; nu++)
             {
                 auto atomidx = ao_to_atom_ids[aoinds[nu]];
 

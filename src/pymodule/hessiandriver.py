@@ -29,10 +29,11 @@ from io import StringIO
 import numpy as np
 import sys
 
+from .veloxchemlib import GridDriver, XCMolecularHessian
 from .veloxchemlib import (mpi_master, bohr_in_angstroms, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
-                           amu_in_kg, speed_of_light_in_vacuum_in_SI,
-                           dipole_in_debye)
+                           amu_in_kg, speed_of_light_in_vacuum_in_SI)
+from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -137,11 +138,14 @@ class HessianDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
-        # DFT
-        self._dft = False
+        # TODO: DFT with underscore or not?
+        #self._dft = False
 
         self.checkpoint_file = None
 
+        self._dft = False
+        self.grid_level = 4
+        self.xcfun = None
 
     def update_settings(self, method_dict, freq_dict=None):
         """
@@ -164,6 +168,20 @@ class HessianDriver:
         if 'do_four_point' in freq_dict:
             key = freq_dict['do_four_point'].lower()
             self.do_four_point = (key in ['yes', 'y'])
+
+        # TODO: use parse_input and _dft_sanity_check
+
+        if 'dft' in method_dict:
+            key = method_dict['dft'].lower()
+            self._dft = (key in ['yes', 'y'])
+        if 'grid_level' in method_dict:
+            self.grid_level = int(method_dict['grid_level'])
+        if 'xcfun' in method_dict:
+            if 'dft' not in method_dict:
+                self._dft = True
+            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
+            assert_msg_critical(not self.xcfun.is_undefined(),
+                                'Gradient driver: Undefined XC functional')
 
         if self.do_four_point:
             self.numerical = True
@@ -512,6 +530,72 @@ class HessianDriver:
 
         return nuc_contrib
 
+    def hess_xc_contrib(self, molecule, basis, gs_density, xcfun_label):
+        """
+        Calculates the exchange-correlation contribution to the analytical
+        nuclear Hessian.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param gs_density:
+            The ground state AO density matrix object.
+        :param xcfun_label:
+            The name of the exchange-correlation functional.
+
+        :return:
+            The exchange-correlation contribution to the Hessian.
+        """
+
+        xc_mol_hess = XCMolecularHessian(self.comm)
+
+        grid_drv = GridDriver(self.comm)
+        grid_drv.set_level(self.grid_level)
+        mol_grid = grid_drv.generate(molecule)
+
+        exc_hessian = xc_mol_hess.integrate_vxc_hessian(molecule, basis,
+                                                        gs_density, mol_grid,
+                                                        xcfun_label)
+        exc_hessian += xc_mol_hess.integrate_fxc_hessian(
+            molecule, basis, gs_density, mol_grid, xcfun_label)
+        exc_hessian = self.comm.reduce(exc_hessian, root=mpi_master())
+
+        return exc_hessian
+
+    def vxc_fock_grad_xc_contrib(self, molecule, basis, gs_density, xcfun_label,
+                                 atom_idx):
+        """
+        Calculates the exchange-correlation contribution to the analytical
+        nuclear gradient of Vxc Fock matrix element w.r.t. a given atom.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param gs_density:
+            The ground state AO density matrix object.
+        :param xcfun_label:
+            The name of the exchange-correlation functional.
+        :param atom_idx:
+            The index (0-based) of the atom.
+
+        :return:
+            The exchange-correlation contribution to the nuclear gradient of
+            Vxc Fock matrix element w.r.t. a given atom.
+        """
+
+        xc_mol_hess = XCMolecularHessian(self.comm)
+
+        grid_drv = GridDriver(self.comm)
+        grid_drv.set_level(self.grid_level)
+        mol_grid = grid_drv.generate(molecule)
+
+        vxc_grad_atom = xc_mol_hess.integrate_vxc_fock_gradient(
+            molecule, basis, gs_density, mol_grid, xcfun_label, atom_idx)
+        vxc_grad_atom = self.comm.reduce(vxc_grad_atom, root=mpi_master())
+
+        return vxc_grad_atom
 
     def get_hessian(self):
         """

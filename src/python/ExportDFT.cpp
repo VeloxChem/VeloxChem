@@ -55,75 +55,75 @@ namespace vlx_dft {  // vlx_dft namespace
 CAOKohnShamMatrix
 integrate_vxc_pdft(const CXCIntegrator&       self,
                    const CAODensityMatrix&    aoDensityMatrix,
-                   const py::array_t<double>& Active2DM,
-                   const py::array_t<double>& ActiveMOs,
+                   const py::array_t<double>& active2DM,
+                   const py::array_t<double>& activeMOs,
                    const CMolecule&           molecule,
                    const CMolecularBasis&     basis,
                    const CMolecularGrid&      molecularGrid,
                    const std::string&         xcFuncLabel)
 {
-    // Active2DM
+    // active2DM
 
     // check dimension
 
-    std::string errdim("integrate_vxc_pdft, Active2DM: Expecting a 4D numpy array");
+    std::string errdim("integrate_vxc_pdft, active2DM: Expecting a 4D numpy array");
 
-    errors::assertMsgCritical(Active2DM.ndim() == 4, errdim);
+    errors::assertMsgCritical(active2DM.ndim() == 4, errdim);
 
     // check that the numpy array is c-style contiguous
 
-    std::string errsrc("integrate_vxc_pdft, Active2DM: Expecting a contiguous numpy array in C ordering");
+    std::string errsrc("integrate_vxc_pdft, active2DM: Expecting a C-style contiguous numpy array");
 
-    auto c_style = py::detail::check_flags(Active2DM.ptr(), py::array::c_style);
+    auto c_style = py::detail::check_flags(active2DM.ptr(), py::array::c_style);
 
     errors::assertMsgCritical(c_style, errsrc);
 
     // Form 4D tensor
 
-    auto nActive = static_cast<int32_t>(Active2DM.shape(0));
+    auto n_active = static_cast<int32_t>(active2DM.shape(0));
 
     bool same_size =
-        ((Active2DM.shape(0) == Active2DM.shape(1)) && (Active2DM.shape(0) == Active2DM.shape(2)) && (Active2DM.shape(0) == Active2DM.shape(3)));
+        ((active2DM.shape(0) == active2DM.shape(1)) && (active2DM.shape(0) == active2DM.shape(2)) && (active2DM.shape(0) == active2DM.shape(3)));
 
-    std::string errsizes("integrate_vxc_pdft, Active2DM: Expecting 4 identical dimensions");
+    std::string errsizes("integrate_vxc_pdft, active2DM: Expecting 4 identical dimensions");
 
     errors::assertMsgCritical(same_size, errsizes);
 
-    std::vector<double> vec(Active2DM.data(), Active2DM.data() + Active2DM.size());
+    std::vector<double> vec(active2DM.data(), active2DM.data() + active2DM.size());
 
-    CDense4DTensor Tensor_2DM(vec, nActive, nActive, nActive, nActive);
+    CDense4DTensor tensor2DM(vec, n_active, n_active, n_active, n_active);
 
     // active MO
 
     // Check dimensions
 
-    errdim = "integrate_vxc_pdft, ActiveMOs: Expecting a 2D numpy array";
+    errdim = "integrate_vxc_pdft, activeMOs: Expecting a 2D numpy array";
 
-    errors::assertMsgCritical(ActiveMOs.ndim() == 2, errdim);
+    errors::assertMsgCritical(activeMOs.ndim() == 2, errdim);
 
     // check that the numpy array is c-style contiguous
 
-    errsrc = "integrate_vxc_pdft, ActiveMOs: Expecting a contiguous numpy array in C ordering";
+    errsrc = "integrate_vxc_pdft, activeMOs: Expecting a C-style contiguous numpy array";
 
-    c_style = py::detail::check_flags(ActiveMOs.ptr(), py::array::c_style);
+    c_style = py::detail::check_flags(activeMOs.ptr(), py::array::c_style);
 
     errors::assertMsgCritical(c_style, errsrc);
 
-    auto naos = ActiveMOs.shape(1);
+    auto naos = activeMOs.shape(1);
 
-    std::vector<double> vec2(ActiveMOs.data(), ActiveMOs.data() + ActiveMOs.size());
+    std::vector<double> vec2(activeMOs.data(), activeMOs.data() + activeMOs.size());
 
-    CDenseMatrix Dense_activeMO(vec2, nActive, naos);
+    CDenseMatrix denseActiveMO(vec2, n_active, naos);
 
     CAOKohnShamMatrix mat_Vxc(naos, naos, true);
 
     mat_Vxc.zero();
 
-    CDense4DTensor TwoBodyGradient(naos, nActive, nActive, nActive);
+    CDense4DTensor twoBodyGradient(naos, n_active, n_active, n_active);
 
-    TwoBodyGradient.zero();
+    twoBodyGradient.zero();
 
-    self.integrateVxcPDFT(mat_Vxc, TwoBodyGradient, molecule, basis, aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
+    self.integrateVxcPDFT(mat_Vxc, twoBodyGradient, molecule, basis, aoDensityMatrix, tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
 
     return mat_Vxc;
 }
@@ -1144,34 +1144,17 @@ export_dft(py::module& m)
     PyClass<CXCMolecularHessian>(m, "XCMolecularHessian")
         .def(py::init(&vlx_general::create<CXCMolecularHessian>), "comm"_a = py::none())
         .def(
-            "integrate_vxc_hessian",
+            "integrate_exc_hessian",
             [](CXCMolecularHessian&    self,
                const CMolecule&        molecule,
                const CMolecularBasis&  basis,
                const CAODensityMatrix& gsDensityMatrix,
                const CMolecularGrid&   molecularGrid,
                const std::string&      xcFuncLabel) -> py::array_t<double> {
-                auto molhess = self.integrateVxcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
+                auto molhess = self.integrateExcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
                 return vlx_general::pointer_to_numpy(molhess.values(), molhess.getNumberOfRows(), molhess.getNumberOfColumns());
             },
-            "Integrates Vxc contribution to molecular Hessian.",
-            "molecule"_a,
-            "basis"_a,
-            "gsDensityMatrix"_a,
-            "molecularGrid"_a,
-            "xcFuncLabel"_a)
-        .def(
-            "integrate_fxc_hessian",
-            [](CXCMolecularHessian&    self,
-               const CMolecule&        molecule,
-               const CMolecularBasis&  basis,
-               const CAODensityMatrix& gsDensityMatrix,
-               const CMolecularGrid&   molecularGrid,
-               const std::string&      xcFuncLabel) -> py::array_t<double> {
-                auto molhess = self.integrateFxcHessian(molecule, basis, gsDensityMatrix, molecularGrid, xcFuncLabel);
-                return vlx_general::pointer_to_numpy(molhess.values(), molhess.getNumberOfRows(), molhess.getNumberOfColumns());
-            },
-            "Integrates Fxc contribution to molecular Hessian.",
+            "Integrates XC contribution to molecular Hessian.",
             "molecule"_a,
             "basis"_a,
             "gsDensityMatrix"_a,
@@ -1193,7 +1176,7 @@ export_dft(py::module& m)
                 ret.append(vlx_general::pointer_to_numpy(vxcgrad[2].values(), vxcgrad[2].getNumberOfRows(), vxcgrad[2].getNumberOfColumns()));
                 return ret;
             },
-            "Integrates Vxc Fock gradient.",
+            "Integrates XC contribution to gradient of Vxc matrix element.",
             "molecule"_a,
             "basis"_a,
             "gsDensityMatrix"_a,

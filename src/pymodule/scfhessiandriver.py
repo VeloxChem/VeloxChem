@@ -429,12 +429,16 @@ class ScfHessianDriver(HessianDriver):
             mol_grid = grid_drv.generate(molecule)
 
             gs_density = self.scf_drv.density
-            hessian_dft_xc = xc_mol_hess.integrate_vxc_hessian(molecule,
-                                        ao_basis, gs_density, mol_grid,
-                                        self.scf_drv.xcfun.get_func_label())
-            hessian_dft_xc += xc_mol_hess.integrate_fxc_hessian(molecule,
-                                        ao_basis, gs_density, mol_grid,
-                                        self.scf_drv.xcfun.get_func_label())
+            hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule, ao_basis,
+                                                gs_density, mol_grid,
+                                                self.scf_drv.xcfun.get_func_label())
+                                        #integrate_vxc_hessian(molecule,
+                                        #ao_basis, gs_density, mol_grid,
+                                        #self.scf_drv.xcfun.get_func_label())
+            self.scf_drv.comm.reduce(hessian_dft_xc, root=mpi_master())
+            #hessian_dft_xc += xc_mol_hess.integrate_fxc_hessian(molecule,
+            #                            ao_basis, gs_density, mol_grid,
+            #                            self.scf_drv.xcfun.get_func_label())
             #    # DFT exchange and correlation contribution
             #    hessian_dft_xc = dft_xc_second_deriv(molecule, ao_basis,
             #            self.scf_drv).transpose(0,2,1,3).reshape(3*natm, 3*natm)
