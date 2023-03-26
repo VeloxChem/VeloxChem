@@ -117,7 +117,7 @@ from .mpitask import MpiTask
 from .subcommunicators import SubCommunicators
 from .loprop import LoPropDriver
 from .firstorderprop import FirstOrderProperties
-from .tddftgradientdriver import TddftOrbitalResponse
+from .tddftorbitalresponse import TddftOrbitalResponse
 from .tddftgradientdriver import TddftGradientDriver
 from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver

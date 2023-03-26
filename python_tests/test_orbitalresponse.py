@@ -12,8 +12,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
-from veloxchem.tdaorbitalresponse import TdaOrbitalResponse
-from veloxchem.rpaorbitalresponse import RpaOrbitalResponse
+from veloxchem.tddftorbitalresponse import TddftOrbitalResponse
 from veloxchem.checkpoint import read_rsp_hdf5
 
 
@@ -46,7 +45,8 @@ class TestOrbitalResponse(unittest.TestCase):
             rsp_results = tda_solver.compute(task.molecule, task.ao_basis,
                                              scf_drv.scf_tensors)
 
-            orb_resp = TdaOrbitalResponse(task.mpi_comm, task.ostream)
+            orb_resp = TddftOrbitalResponse(task.mpi_comm, task.ostream)
+            orb_resp.tamm_dancoff = True
             lambda_ref = 'lambda_tda'
             omega_ref = 'omega_tda'
         else:
@@ -56,16 +56,19 @@ class TestOrbitalResponse(unittest.TestCase):
             rsp_results = rpa_solver.compute(task.molecule, task.ao_basis,
                                              scf_drv.scf_tensors)
 
-            orb_resp = RpaOrbitalResponse(task.mpi_comm, task.ostream)
+            orb_resp = TddftOrbitalResponse(task.mpi_comm, task.ostream)
             lambda_ref = 'lambda_rpa'
             omega_ref = 'omega_rpa'
 
         orb_resp.update_settings({
             'nstates': 3,
-            'state_deriv_index': 1
+            'state_deriv_index': '1,2'
         }, task.input_dict['method_settings'])
-        orb_resp_result = orb_resp.compute(task.molecule, task.ao_basis,
-                                           scf_drv.scf_tensors, rsp_results)
+        orb_resp.compute(task.molecule, task.ao_basis,
+                         scf_drv.scf_tensors, rsp_results)
+        orb_resp_results = orb_resp.cphf_results
+        #omega_ao = orb_resp.compute_omega(task.molecule, task.ao_basis,
+        #                                  scf_drv.scf_tensors)
 
         dft_dict = {'dft_func_label': 'HF'}
         pe_dict = {'potfile_text': ''}
@@ -75,15 +78,20 @@ class TestOrbitalResponse(unittest.TestCase):
                                                     task.molecule,
                                                     task.ao_basis, dft_dict,
                                                     pe_dict, task.ostream)
-        print("ref_lambda_ao:\n", ref_lambda_ao)
+        #print("ref_lambda_ao:\n", ref_lambda_ao)
 
         if task.mpi_rank == mpi_master():
-            lambda_ao = orb_resp_result['lambda_ao']
-            omega_ao = orb_resp_result['omega_ao']
+            nocc = task.molecule.number_of_alpha_electrons()
+            mo = scf_drv.scf_tensors['C']
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            lambda_ov = orb_resp_results['cphf_ov']
+            lambda_ao = np.einsum('mi,sia,na->smn', mo_occ, lambda_ov, mo_vir)
 
-            self.assertTrue(np.max(np.abs(lambda_ao - ref_lambda_ao)) < 5.0e-4)
-			# TODO: uncomment once TDDFT gradients are working
-            #self.assertTrue(np.max(np.abs(omega_ao - ref_omega_ao)) < 5.0e-4)
+            self.assertTrue(np.max(np.abs(lambda_ao[0] - ref_lambda_ao))
+                             < 5.0e-4)
+            # TODO: uncomment once TDDFT gradients are working
+            #self.assertTrue(np.max(np.abs(omega_ao[0] - ref_omega_ao)) < 5.0e-4)
 
     def test_tda_hf(self):
 
