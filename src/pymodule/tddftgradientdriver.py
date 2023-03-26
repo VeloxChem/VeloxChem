@@ -395,35 +395,37 @@ class TddftGradientDriver(GradientDriver):
             The electric dipole moment vector.
         """
 
-        scf_ostream_state = self.scf_drv.ostream.state
-        self.scf_drv.ostream.state = False
+        self.scf_drv.ostream.mute()
 
-        # numerical gradient
-        dipole_moment = np.zeros((3))
+        # numerical dipole moment of the excited states
+        n_states = len(self.state_deriv_index)
+        dipole_moment = np.zeros((n_states, 3))
         field = [0.0, 0.0, 0.0]
 
-        for i in range(3):
-            field[i] = field_strength
-            self.scf_drv.electric_field = field
-            self.scf_drv.compute(molecule, ao_basis, min_basis)
-            scf_tensors = self.scf_drv.scf_tensors
-            rsp_drv._is_converged = False  # only needed for RPA
-            rsp_results = rsp_drv.compute(molecule, ao_basis, scf_tensors)
-            exc_en_plus = rsp_results['eigenvalues'][self.state_deriv_index]
-            e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
+        for s in range(n_states):
+            for i in range(3):
+                field[i] = field_strength
+                self.scf_drv.electric_field = field
+                self.scf_drv.compute(molecule, ao_basis, min_basis)
+                scf_tensors = self.scf_drv.scf_tensors
+                rsp_drv._is_converged = False  # only needed for RPA
+                rsp_results = rsp_drv.compute(molecule, ao_basis, scf_tensors)
+                exc_en_plus = rsp_results['eigenvalues'][s]
+                e_plus = self.scf_drv.get_scf_energy() + exc_en_plus
 
-            field[i] = -field_strength
-            self.scf_drv.compute(molecule, ao_basis, min_basis)
-            rsp_drv._is_converged = False
-            rsp_results = rsp_drv.compute(molecule, ao_basis,
-                                          self.scf_drv.scf_tensors)
-            exc_en_minus = rsp_results['eigenvalues'][self.state_deriv_index]
-            e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
+                field[i] = -field_strength
+                self.scf_drv.compute(molecule, ao_basis, min_basis)
+                rsp_drv._is_converged = False
+                rsp_results = rsp_drv.compute(molecule, ao_basis,
+                                              self.scf_drv.scf_tensors)
+                exc_en_minus = rsp_results['eigenvalues'][s]
+                e_minus = self.scf_drv.get_scf_energy() + exc_en_minus
 
-            field[i] = 0.0
-            dipole_moment[i] = -(e_plus - e_minus) / (2.0 * field_strength)
+                field[i] = 0.0
+                dipole_moment[s, i] = ( -(e_plus - e_minus)
+                                         / (2.0 * field_strength) )
 
-        self.scf_drv.ostream.state = scf_ostream_state
+        self.scf_drv.ostream.unmute()
 
         return dipole_moment
 

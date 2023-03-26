@@ -62,7 +62,7 @@ class TestOrbitalResponse(unittest.TestCase):
 
         orb_resp.update_settings({
             'nstates': 3,
-            'state_deriv_index': '1,2'
+            'state_deriv_index': '1'
         }, task.input_dict['method_settings'])
         orb_resp.compute(task.molecule, task.ao_basis,
                          scf_drv.scf_tensors, rsp_results)
