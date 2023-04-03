@@ -268,7 +268,7 @@ CXCIntegrator::integrateKxcLxcFock(CAOFockMatrix&          aoFockMatrix,
 
 void
 CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
-                                CDense4DTensor&         moTwoBodyGradient,
+                                CDense4DTensor&         mat_wxc,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
                                 const CAODensityMatrix& DensityMatrix,
@@ -284,12 +284,12 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
     if (xcfuntype == "PLDA")
     {
         _integrateVxcPDFTForLDA(
-            aoFockMatrix, moTwoBodyGradient, molecule, basis, DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
+            aoFockMatrix, mat_wxc, molecule, basis, DensityMatrix,TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
     }
     else if (xcfuntype == "PGGA")
     {
         _integrateVxcPDFTForGGA(
-            aoFockMatrix, moTwoBodyGradient, molecule, basis, DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
+            aoFockMatrix, mat_wxc, molecule, basis, DensityMatrix, TwoBodyDensityMatrix, ActiveMOs, molecularGrid, fvxc);
     }
     else
     {
@@ -312,6 +312,9 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
     timer.start("Total timing");
 
     timer.start("Preparation");
+    //
+    //  Dr. M. Scott
+    //
 
     auto nthreads = omp_get_max_threads();
 
@@ -4954,9 +4957,10 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // }
 }
 
+
 void
 CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
-                                       CDense4DTensor&                 moTwoBodyGradient,
+                                       CDense4DTensor&                 mat_wxc,
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
                                        const CAODensityMatrix&         DensityMatrix,
@@ -4968,7 +4972,6 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
     CMultiTimer timer;
 
     timer.start("Total timing");
-
     timer.start("Preparation");
 
     auto nthreads = omp_get_max_threads();
@@ -5151,17 +5154,21 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
         timer.stop("XC functional eval.");
 
-        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
-
-        // TODO (MGD) 2-body gradient
-
-        // distribute partial Vxc to full Kohn-Sham matrix
-
         timer.start("Vxc matrix dist.");
+
+        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
 
         submat::distributeSubMatrixToKohnSham(aoFockMatrix, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
+
+        timer.start("Wxc matrix dist.");
+
+        auto partial_mat_Wxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi,  ActiveMOs, vrho, timer);
+
+        submat::distribute4DSubTo4DFull(mat_wxc, partial_mat_Wxc, aoinds, aocount);
+
+        timer.stop("Wxc matrix dist.");
 
         // compute partial contribution to XC energy
 
@@ -5188,6 +5195,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
+
 }
 
 void
@@ -5508,6 +5516,75 @@ CXCIntegrator::_integratePartialVxcFockForLDA(const int32_t       npoints,
     timer.stop("Vxc matrix matmul");
 
     return mat_Vxc;
+}
+
+CDense4DTensor
+CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // total number of points in the box
+                                              const double*       weights,    // weights
+                                              const CDenseMatrix& gtoValues,
+                                              const CDenseMatrix& ActiveMOs,
+                                              const double*       vrho,       //
+                                              CMultiTimer&        timer) const
+
+{
+
+    auto chi_val = gtoValues.values();
+    // eq.(30), JCTC 2021, 17, 1512-1521
+    timer.start("Wxc matrix");
+
+    auto naos = gtoValues.getNumberOfRows();
+    auto n_active = ActiveMOs.getNumberOfRows();
+
+    CDenseMatrix MOs_on_grid;
+    if (n_active > 0)
+    {
+        MOs_on_grid = denblas::multAB(ActiveMOs, gtoValues);
+    }
+
+    // created empty partial mat_W
+    CDense4DTensor mat_W(naos, n_active, n_active, n_active);
+    auto W_val = mat_W.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+        auto nthreads = omp_get_max_threads();
+
+        auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t i = 0; i < naos; i++) // looping over AO
+        {
+            auto nu_offset = i * npoints;
+            for (int32_t j = 0; j < n_active; j++)
+            {
+                auto ij = n_active * i  + j;
+                auto MOj = MOs_on_grid.row(j);
+                for (int32_t k = 0; k < n_active; k++)
+                {
+                    auto ijk = ij * n_active + k;
+                    auto MOk = MOs_on_grid.row(k);
+                    for (int32_t l = 0; l < n_active; l++)
+                    {
+
+                        auto ijkl = ijk * n_active + l;
+                        auto MOl = MOs_on_grid.row(l);
+                        #pragma omp simd aligned(W_val, vrho, weights, chi_val, MOj, MOk, MOl : VLX_ALIGN)
+                        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                        {
+                            // MGD warning: there is a race condition here, for now run single thread
+                            W_val[ijkl] += weights[g] * vrho[2 * g + 1] * chi_val[nu_offset+g]  * MOj[g] * MOk[g] * MOl[g];
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+    timer.stop("Wxc matrix");
+
+    return mat_W;
 }
 
 std::vector<CDenseMatrix>

@@ -24,7 +24,6 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "ExportDFT.hpp"
-
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
@@ -32,8 +31,8 @@
 
 #include <memory>
 #include <string>
-
 #include "DenseMatrix.hpp"
+#include "Dense4DTensor.hpp"
 #include "DensityGrid.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
@@ -54,6 +53,7 @@ namespace vlx_dft {  // vlx_dft namespace
 
 CAOKohnShamMatrix
 integrate_vxc_pdft(const CXCIntegrator&       self,
+                   const py::array_t<double>& Wxc_np,
                    const CAODensityMatrix&    aoDensityMatrix,
                    const py::array_t<double>& Active2DM,
                    const py::array_t<double>& ActiveMOs,
@@ -65,7 +65,6 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
     // Active2DM
 
     // check dimension
-
     std::string errdim("integrate_vxc_pdft, Active2DM: Expecting a 4D numpy array");
 
     errors::assertMsgCritical(Active2DM.ndim() == 4, errdim);
@@ -115,15 +114,26 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     CDenseMatrix Dense_activeMO(vec2, nActive, naos);
 
+    // Create output tensors
+
     CAOKohnShamMatrix mat_Vxc(naos, naos, true);
 
     mat_Vxc.zero();
 
-    CDense4DTensor TwoBodyGradient(naos, nActive, nActive, nActive);
+    bool right_size =
+        ((Wxc_np.shape(0) == naos) && (Wxc_np.shape(1) == nActive) && (Wxc_np.shape(2) == nActive) && (Wxc_np.shape(3) == nActive));
 
-    TwoBodyGradient.zero();
+    std::string errsizes2("integrate_vxc_pdft, wxc_np: Dimensions do not match those of the density matrices");
 
-    self.integrateVxcPDFT(mat_Vxc, TwoBodyGradient, molecule, basis, aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
+    errors::assertMsgCritical(right_size, errsizes2);
+
+    std::vector<double> Wvec(Wxc_np.data(), Wxc_np.data() + Wxc_np.size());
+
+    CDense4DTensor mat_Wxc(Wvec, naos, nActive, nActive, nActive);
+
+    mat_Wxc.zero();
+
+    self.integrateVxcPDFT(mat_Vxc, mat_Wxc, molecule, basis, aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
 
     return mat_Vxc;
 }

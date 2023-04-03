@@ -397,7 +397,7 @@ class CXCIntegrator
      AO Kohn-Sham matrix and MO "Q-matrix".
 
      @param aoFockMatrix the AO Fock matrix.
-     @param moTwoBodyGradient the MO Two-body energy gradient term.
+     @param mat_wxc the MO Two-body energy gradient term.
      @param molecule the molecule.
      @param basis the molecular basis.
      @param DensityMatrix the AO density matrix object.
@@ -406,8 +406,9 @@ class CXCIntegrator
      @param molecularGrid the molecular grid.
      @param fvxc the exchange-correlation functional.
      */
+
     void _integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
-                                 CDense4DTensor&                 moTwoBodyGradient,
+                                 CDense4DTensor&                 mat_wxc,
                                  const CMolecule&                molecule,
                                  const CMolecularBasis&          basis,
                                  const CAODensityMatrix&         DensityMatrix,
@@ -455,7 +456,24 @@ class CXCIntegrator
                                                 const CDenseMatrix& gtoValues,
                                                 const double*       vrho,
                                                 CMultiTimer&        timer) const;
+    /**
+     Integrates PLDA contribution to (first-order) Wxc tensor.
 
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param vrho the 1st-order functional derivative wrt density.
+     @param timer the timer.
+     @return the contribution as a CDense4DTensor object.
+     */
+
+
+    CDense4DTensor _integratePartialWxcFockForPLDA(const int32_t       npoints,
+                                              const double*       weights,
+                                              const CDenseMatrix& gtoValues,
+                                              const CDenseMatrix& ActiveMOs,
+                                              const double*       vrho,
+                                              CMultiTimer&        timer) const;
     /**
      Integrates LDA contribution to (first-order) Vxc matrix.
 
@@ -1387,7 +1405,7 @@ class CXCIntegrator
      @param xcFuncLabel the label of exchange-correlation functional.
      */
     void integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
-                          CDense4DTensor&         moTwoBodyGradient,
+                          CDense4DTensor&         mat_wxc,
                           const CMolecule&        molecule,
                           const CMolecularBasis&  basis,
                           const CAODensityMatrix& DensityMatrix,

@@ -24,7 +24,6 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "SubMatrix.hpp"
-
 #include "StringFormat.hpp"
 
 namespace submat {  // submat namespace
@@ -131,6 +130,38 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
 
     return CAODensityMatrix(submatrices, denmat::rest);
 }
+
+void
+distribute4DSubTo4DFull(CDense4DTensor&          fullMatrix,
+                                          const CDense4DTensor&       subMatrix,
+                                          const std::vector<int32_t>& aoIndices,
+                                          const int32_t               aoCount)
+{
+    auto W_full = fullMatrix.values();
+
+    auto W_small = subMatrix.values();
+
+    auto nAct =  subMatrix.getjIndex();
+
+    int32_t nAct3 = nAct * nAct * nAct;
+
+    for (int32_t i = 0; i < aoCount; i++) // looping over AO
+    {
+        auto irow = nAct3 * i;
+
+        auto irow_full = nAct3 * aoIndices[i];
+
+        for (int32_t jkl = 0; jkl < nAct3; jkl++)
+        {
+
+            W_full[irow_full + jkl] += W_small[irow + jkl];
+
+        }
+    }
+
+}
+
+
 
 void
 distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          aoKohnShamMatrix,
