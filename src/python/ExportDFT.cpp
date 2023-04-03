@@ -51,9 +51,8 @@ using namespace py::literals;
 
 namespace vlx_dft {  // vlx_dft namespace
 
-CAOKohnShamMatrix
+py::list
 integrate_vxc_pdft(const CXCIntegrator&       self,
-                   const py::array_t<double>& Wxc_np,
                    const CAODensityMatrix&    aoDensityMatrix,
                    const py::array_t<double>& Active2DM,
                    const py::array_t<double>& ActiveMOs,
@@ -120,22 +119,19 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     mat_Vxc.zero();
 
-    bool right_size =
-        ((Wxc_np.shape(0) == naos) && (Wxc_np.shape(1) == nActive) && (Wxc_np.shape(2) == nActive) && (Wxc_np.shape(3) == nActive));
-
-    std::string errsizes2("integrate_vxc_pdft, wxc_np: Dimensions do not match those of the density matrices");
-
-    errors::assertMsgCritical(right_size, errsizes2);
-
-    std::vector<double> Wvec(Wxc_np.data(), Wxc_np.data() + Wxc_np.size());
-
-    CDense4DTensor mat_Wxc(Wvec, naos, nActive, nActive, nActive);
+    CDense4DTensor mat_Wxc(naos, nActive, nActive, nActive);
 
     mat_Wxc.zero();
 
     self.integrateVxcPDFT(mat_Vxc, mat_Wxc, molecule, basis, aoDensityMatrix, Tensor_2DM, Dense_activeMO, molecularGrid, xcFuncLabel);
 
-    return mat_Vxc;
+    py::list ret;
+
+    ret.append(mat_Vxc);
+
+    ret.append(vlx_general::pointer_to_numpy(mat_Wxc.values(), naos, nActive* nActive* nActive));
+
+    return ret;
 }
 
 // Exports classes/functions in src/dft to python
