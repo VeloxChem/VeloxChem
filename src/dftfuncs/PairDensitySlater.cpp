@@ -110,7 +110,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             // dExc/d(Pi)
 
-            if (pair_density > -1.0e-8)
+            if (pair_density < -1.0e-8)
             {
                 dexc_pi = -fre * fourthird * rhothird / delta * fl_zeta;
             }
@@ -148,7 +148,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             // dExc/d(Pi)
 
-            if (pair_density < 1.0e-8)
+            if (pair_density > 1.0e-8)
             {
                 dexc_pi = -fre * eightthird * rhothird / delta * gr * flim_eta;
             }

@@ -5164,7 +5164,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
         timer.start("Wxc matrix dist.");
 
-        auto partial_mat_Wxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi,  ActiveMOs, vrho, timer);
+        auto partial_mat_Wxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi,  sub_ActiveMOs, vrho, timer);
 
         submat::distribute4DSubTo4DFull(mat_wxc, partial_mat_Wxc, aoinds, aocount);
 
