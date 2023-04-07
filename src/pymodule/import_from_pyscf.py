@@ -2079,6 +2079,8 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
     # fraction of exact exchange
     x_frac = 1.0
 
+    vlx_vxc_deriv_atom_i = np.zeros_like(fock_deriv_atom_i)
+
     if scfdrv is not None:
         if scfdrv._dft:
             # This one works!
