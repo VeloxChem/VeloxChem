@@ -166,7 +166,7 @@ class TddftGradientDriver(GradientDriver):
             scf_ostream_state = self.scf_drv.ostream.state
             self.scf_drv.ostream.state = False
             self.compute_numerical(molecule, basis, rsp_drv, rsp_results,
-                                   min_basis, self.state_deriv_index[:1])
+                                   min_basis, self.state_deriv_index[0]-1)
             self.scf_drv.ostream.state = scf_ostream_state
         else:
             self.compute_analytical(molecule, basis, rsp_results)
@@ -175,7 +175,7 @@ class TddftGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.print_geometry(molecule)
             if self.numerical:
-                self.print_gradient(molecule, self.state_deriv_index[0]-1)
+                self.print_gradient(molecule, self.state_deriv_index[:1])
             else:
                 self.print_gradient(molecule, self.state_deriv_index)
 
