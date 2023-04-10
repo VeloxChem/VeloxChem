@@ -482,6 +482,14 @@ CXCMolecularHessian::_integrateExcHessianForLDA(const CMolecule&        molecule
                 {
                     auto mu_g = mu_offset + g;
 
+                    // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
+
+                    // \rho_{\alpha}^{(\xi,\zeta)} (first contrib.)
+                    // = 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \phi_{\mu}^{(\xi,\zeta)} \phi_{\nu}
+                    // = 2 \sum_{\mu} F_{\mu} \phi_{\mu}^{(\xi,\zeta)}
+
+                    // factor of 2 is added outside of the for loop
+
                     gatmxx += w0[g] * F_val[mu_g] * chi_xx_val[mu_g];
                     gatmxy += w0[g] * F_val[mu_g] * chi_xy_val[mu_g];
                     gatmxz += w0[g] * F_val[mu_g] * chi_xz_val[mu_g];
@@ -550,6 +558,13 @@ CXCMolecularHessian::_integrateExcHessianForLDA(const CMolecule&        molecule
                         auto mu_g = mu_offset + g;
                         auto nu_g = nu_offset + g;
 
+                        // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
+
+                        // \rho_{\alpha}^{(\xi,\zeta)} (second contrib.)
+                        // = 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \phi_{\mu}^{(\xi)} \phi_{\nu}^{(\zeta)}
+
+                        // factor of 2 and D_{\mu\nu,sym}^{\alpha} are added outside of the for loop
+
                         gatmxx += w0[g] * chi_x_val[mu_g] * chi_x_val[nu_g];
                         gatmxy += w0[g] * chi_x_val[mu_g] * chi_y_val[nu_g];
                         gatmxz += w0[g] * chi_x_val[mu_g] * chi_z_val[nu_g];
@@ -582,7 +597,7 @@ CXCMolecularHessian::_integrateExcHessianForLDA(const CMolecule&        molecule
                 }
             }
 
-            // (v2rho2_aa + v2rho2_ab) \rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
+            // other contributions
 
             for (int32_t iatom = 0; iatom < natoms; iatom++)
             {
@@ -610,6 +625,9 @@ CXCMolecularHessian::_integrateExcHessianForLDA(const CMolecule&        molecule
                     {
                         auto ig = i_offset + g;
                         auto jg = j_offset + g;
+
+                        // (f_{\rho_{\alpha} \rho_{\alpha}} + f_{\rho_{\alpha} \rho_{\beta}})
+                        // \rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
 
                         double prefac = local_weights[g] * (v2rho2[3 * g + 0] + v2rho2[3 * g + 1]);
 
@@ -1177,9 +1195,10 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
             }
 
             // first contribution to
-            // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)} and
-            // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}}) *
-            // \nabla \rho_{\alpha} \cdot \nabla \rho_{\alpha}^{(\xi,\zeta)}
+            // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
+            // and
+            // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
+            // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi,\zeta)}
             // on the same atom
 
             for (int32_t mu = 0; mu < aocount; mu++)
@@ -1205,10 +1224,12 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
                 {
                     auto mu_g = mu_offset + g;
 
-                    // vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+                    // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
 
-                    // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi,\zeta)} \phi_{\nu}
-                    // note that F_{\mu} = \sum_{\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\nu}
+                    // \rho_{\alpha}^{(\xi,\zeta)} (first contrib.)
+                    // = 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \phi_{\mu}^{(\xi,\zeta)} \phi_{\nu}
+                    // = 2 \sum_{\mu} F_{\mu} \phi_{\mu}^{(\xi,\zeta)}
+
                     // factor of 2 is added outside of the for loop
 
                     double gdenxx = F_val[mu_g] * chi_xx_val[mu_g];
@@ -1223,12 +1244,18 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
                     double gdenzy = F_val[mu_g] * chi_yz_val[mu_g];
                     double gdenzz = F_val[mu_g] * chi_zz_val[mu_g];
 
-                    // (2 vsigma_aa \nabla\rho_{\alpha} + vsigma_ab \nabla\rho_{\beta}) \cdot
-                    // (\nabla\rho_{\alpha})^{(\xi,\zeta)}
+                    // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
+                    // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi,\zeta)}
 
-                    // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} (\nabla\phi_{\mu})^{(\xi,\zeta)} \phi_{\nu}
-                    // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi,\zeta)} \nabla\phi_{\nu}
+                    // \nabla\rho_{\alpha}^{(\xi,\zeta)} (first contrib.)
+                    // = 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} (\nabla\phi_{\mu})^{(\xi,\zeta)} \phi_{\nu}
+                    // + 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \phi_{\mu}^{(\xi,\zeta)} \nabla\phi_{\nu}
+                    // = 2 \sum_{\mu} F_{\mu} (\nabla\phi_{\mu})^{(\xi,\zeta)}
+                    // + 2 \sum_{\mu} (\nabla F_{\mu}) \phi_{\mu}^{(\xi,\zeta)}
+
                     // factor of 2 is added outside of the for loop
+
+                    // ordering of components: nabla, xi, zeta
 
                     // === x ===
 
@@ -1304,9 +1331,10 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
             }
 
             // second contribution to
-            // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)} and
-            // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}}) *
-            // \nabla \rho_{\alpha} \cdot \nabla \rho_{\alpha}^{(\xi,\zeta)}
+            // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
+            // and
+            // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
+            // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi,\zeta)}
             // on the same atom and on different atoms
 
             for (int32_t mu = 0; mu < aocount; mu++)
@@ -1345,10 +1373,12 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
                         auto mu_g = mu_offset + g;
                         auto nu_g = nu_offset + g;
 
-                        // vrho_a \rho_{\alpha}^{(\xi,\zeta)}
+                        // f_{\rho_{\alpha}} \rho_{\alpha}^{(\xi,\zeta)}
 
-                        // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} \phi_{\mu}^{(\xi)} \phi_{\nu}^{(\zeta)}
-                        // factor of 2 and P_{\mu\nu,sym}^{\alpha} are added outside of the for loop
+                        // \rho_{\alpha}^{(\xi,\zeta)} (second contrib.)
+                        // = 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}} \phi_{\mu}^{(\xi)} \phi_{\nu}^{(\zeta)}
+
+                        // factor of 2 and D_{\mu\nu,sym}^{\alpha} are added outside of the for loop
 
                         double gxx = chi_x_val[mu_g] * chi_x_val[nu_g];
                         double gxy = chi_x_val[mu_g] * chi_y_val[nu_g];
@@ -1362,12 +1392,17 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
                         double gzy = chi_z_val[mu_g] * chi_y_val[nu_g];
                         double gzz = chi_z_val[mu_g] * chi_z_val[nu_g];
 
-                        // (2 vsigma_aa \nabla\rho_{\alpha} + vsigma_ab \nabla\rho_{\beta}) \cdot
-                        // (\nabla\rho_{\alpha})^{(\xi,\zeta)}
+                        // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
+                        // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi,\zeta)}
 
-                        // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} (\nabla\phi_{\mu})^{(\xi)} \phi_{\nu}^{(\zeta)}
-                        // 2 \sum_{\mu\nu} P_{\mu\nu,sym}^{\alpha} (\nabla\phi_{\nu})^{(\zeta)} \phi_{\mu}^{(\xi)}
-                        // factor of 2 and P_{\mu\nu,sym}^{\alpha} are added outside of the for loop
+                        // \nabla\rho_{\alpha}^{(\xi,\zeta)} (second contrib.)
+                        // = 2 \sum_{\mu\nu} D^{\alpha}_{\mu\nu,\rm{sym}}
+                        //   (\nabla\phi_{\mu}^{(\xi)} \phi_{\nu}^{(\zeta)} +
+                        //    \nabla\phi_{\nu}^{(\zeta)} \phi_{\mu}^{(\xi)})
+
+                        // factor of 2 and D^{\alpha}_{\mu\nu,\rm{sym}} are added outside of the for loop
+
+                        // ordering of components: nabla, xi, zeta
 
                         // === x ===
 
@@ -1477,7 +1512,8 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
 
                         double w = local_weights[g];
 
-                        // (v2rho2_aa + v2rho2_ab) \rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
+                        // (f_{\rho_{\alpha} \rho_{\alpha}} + f_{\rho_{\alpha} \rho_{\beta}})
+                        // \rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
 
                         double prefac = w * (v2rho2[3 * g + 0] + v2rho2[3 * g + 1]);
 
@@ -1493,8 +1529,10 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
                         gatmzy += prefac * gdenz[ig] * gdeny[jg];
                         gatmzz += prefac * gdenz[ig] * gdenz[jg];
 
-                        // 2 (v2rhosigma_a_aa + v2rhosigma_a_ab + v2rhosigma_a_bb)
-                        // \rho_{\alpha}^{(\xi)} (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\zeta)})
+                        // (2 f_{\rho_{\alpha} \sigma_{\alpha\alpha}} +
+                        //  2 f_{\rho_{\alpha} \sigma_{\alpha\beta}} +
+                        //  2 f_{\rho_{\alpha} \sigma_{\beta\beta}})
+                        // \rho_{\alpha}^{(\xi)} \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\zeta)}
 
                         prefac = w * 2.0 * (v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 2]);
 
@@ -1518,8 +1556,11 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
                         gatmzy += prefac * gdenz[ig] * ycomp_j;
                         gatmzz += prefac * gdenz[ig] * zcomp_j;
 
-                        // (2 (v2rhosigma_a_aa + v2rhosigma_b_aa) + (v2rhosigma_a_ab + v2rhosigma_b_ab))
-                        // (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\xi)}) \rho_{\alpha}^{(\zeta)}
+                        // (2 f_{\rho_{\alpha} \sigma_{\alpha\alpha}} +
+                        //  2 f_{\rho_{\beta} \sigma_{\alpha\alpha}} +
+                        //  f_{\rho_{\alpha} \sigma_{\alpha\beta}} +
+                        //  f_{\rho_{\beta} \sigma_{\alpha\beta}})
+                        // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi)} \rho_{\alpha}^{(\zeta)}
 
                         auto f_aa = v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 3];
                         auto f_ab = v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 4];
@@ -1542,10 +1583,13 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
                         gatmzy += prefac * zcomp_i * gdeny[jg];
                         gatmzz += prefac * zcomp_i * gdenz[jg];
 
-                        // (2 (v2sigma2_aa_aa + v2sigma2_aa_ab + v2sigma2_aa_bb) +
-                        //    (v2sigma2_ab_aa + v2sigma2_ab_ab + v2sigma2_ab_bb))
-                        // 2 (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\xi)})
-                        //   (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\zeta)})
+                        // (4 f_{\sigma_{\alpha\alpha} \sigma_{\alpha\alpha}} +
+                        //  6 f_{\sigma_{\alpha\alpha} \sigma_{\alpha\beta}} +
+                        //  4 f_{\sigma_{\alpha\alpha} \sigma_{\beta\beta}} +
+                        //  2 f_{\sigma_{\alpha\beta} \sigma_{\alpha\beta}} +
+                        //  2 f_{\sigma_{\alpha\beta} \sigma_{\beta\beta}})
+                        // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi)}
+                        // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\zeta)}
 
                         f_aa = v2sigma2[6 * g + 0] + v2sigma2[6 * g + 1] + v2sigma2[6 * g + 2];
                         f_ab = v2sigma2[6 * g + 1] + v2sigma2[6 * g + 3] + v2sigma2[6 * g + 4];
@@ -1564,7 +1608,8 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
                         gatmzy += prefac * zcomp_i * ycomp_j;
                         gatmzz += prefac * zcomp_i * zcomp_j;
 
-                        // (2 vsigma_aa + vsigma_ab) (\nabla\rho_{\alpha})^{(\xi)} (\nabla\rho_{\alpha})^{(\zeta)}
+                        // (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
+                        // \nabla\rho_{\alpha}^{(\xi)} \cdot \nabla\rho_{\alpha}^{(\zeta)}
 
                         f_aa = vsigma[3 * g + 0];
                         f_ab = vsigma[3 * g + 1];
@@ -1834,17 +1879,25 @@ CXCMolecularHessian::_integrateVxcFockGradientForLDA(const CMolecule&        mol
         CDenseMatrix mat_chi_y(aocount, npoints);
         CDenseMatrix mat_chi_z(aocount, npoints);
 
+        CDenseMatrix mat_atom_chi_x(aocount, npoints);
+        CDenseMatrix mat_atom_chi_y(aocount, npoints);
+        CDenseMatrix mat_atom_chi_z(aocount, npoints);
+
         for (int32_t i = 0; i < aocount; i++)
         {
             std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+
+            std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
+            std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
+            std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
 
             auto iatom = ao_to_atom_ids[aoinds[i]];
 
             if (iatom == atomIdx)
             {
-                std::memcpy(mat_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
-                std::memcpy(mat_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
-                std::memcpy(mat_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
+                std::memcpy(mat_atom_chi_x.row(i), gaox.data(aoinds[i]), npoints * sizeof(double));
+                std::memcpy(mat_atom_chi_y.row(i), gaoy.data(aoinds[i]), npoints * sizeof(double));
+                std::memcpy(mat_atom_chi_z.row(i), gaoz.data(aoinds[i]), npoints * sizeof(double));
             }
         }
 
@@ -1964,13 +2017,16 @@ CXCMolecularHessian::_integrateVxcFockGradientForLDA(const CMolecule&        mol
 
                     auto prefac = local_weights[g] * vrho[2 * g + 0];
 
-                    // (f_{\rho_{\alpha}}) \phi_{\nu}^{(\xi)} \phi_{\nu}
-                    // (f_{\rho_{\alpha}}) \phi_{\nu} \phi_{\nu}^{(\xi)}
+                    // 2 f_{\rho_{\alpha}} \phi_{\mu}^{(\xi)} \phi_{\nu}
+
+                    // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
 
                     vxc_w_val[nu_g] = -2.0 * prefac * chi_val[nu_g];
 
-                    // (f_{\rho_{\alpha} \rho_{\alpha}} + f_{\rho_{\alpha} \rho_{\beta}}) *
-                    // \phi_{\nu} \phi_{\nu} \rho_{\alpha}^{(\xi)}
+                    // (f_{\rho_{\alpha} \rho_{\alpha}} + f_{\rho_{\alpha} \rho_{\beta}})
+                    // \rho_{\alpha}^{(\xi)} \phi_{\mu} \phi_{\nu}
+
+                    // note: \phi_{\mu} will be added later (from mat_chi)
 
                     prefac = local_weights[g] * (v2rho2[3 * g + 0] + v2rho2[3 * g + 1]) * chi_val[nu_g];
 
@@ -1985,9 +2041,9 @@ CXCMolecularHessian::_integrateVxcFockGradientForLDA(const CMolecule&        mol
 
         timer.start("Vxc matrix matmul");
 
-        auto vxc_gx_first_contrib = denblas::multABt(mat_chi_x, vxc_w);
-        auto vxc_gy_first_contrib = denblas::multABt(mat_chi_y, vxc_w);
-        auto vxc_gz_first_contrib = denblas::multABt(mat_chi_z, vxc_w);
+        auto vxc_gx_first_contrib = denblas::multABt(mat_atom_chi_x, vxc_w);
+        auto vxc_gy_first_contrib = denblas::multABt(mat_atom_chi_y, vxc_w);
+        auto vxc_gz_first_contrib = denblas::multABt(mat_atom_chi_z, vxc_w);
 
         auto vxc_gx_second_contrib = denblas::multABt(mat_chi, vxc_wx);
         auto vxc_gy_second_contrib = denblas::multABt(mat_chi, vxc_wy);
@@ -2446,14 +2502,17 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
 
                     auto w = local_weights[g];
 
-                    // 2 vrho_a (\phi_{\mu}^{(\xi)} \phi_{\nu})_{sym}
+                    // 2 f_{\rho_{\alpha}} \phi_{\mu}^{(\xi)} \phi_{\nu}
+
                     // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
 
                     auto prefac = w * vrho[2 * g + 0];
 
                     vxc_w_val[nu_g] += -2.0 * prefac * chi_val[nu_g];
 
-                    // (v2rho2_aa + v2rho2_ab) \rho_{\alpha}^{(\xi)} \phi_{\mu} \phi_{\nu}
+                    // (f_{\rho_{\alpha} \rho_{\alpha}} + f_{\rho_{\alpha} \rho_{\beta}})
+                    // \rho_{\alpha}^{(\xi)} \phi_{\mu} \phi_{\nu}
+
                     // note: \phi_{\mu} will be added later (from mat_chi)
 
                     prefac = w * (v2rho2[3 * g + 0] + v2rho2[3 * g + 1]);
@@ -2462,8 +2521,11 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
                     vxc_wy_val[nu_g] += prefac * gdeny[g] * chi_val[nu_g];
                     vxc_wz_val[nu_g] += prefac * gdenz[g] * chi_val[nu_g];
 
-                    // 2 (v2rhosigma_a_aa + v2rhosigma_a_ab + v2rhosigma_a_bb)
-                    // (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\xi)}) \phi_{\mu} \phi_{\nu}
+                    // (2 f_{\rho_{\alpha} \sigma_{\alpha\alpha}} +
+                    //  2 f_{\rho_{\alpha} \sigma_{\alpha\beta}} +
+                    //  2 f_{\rho_{\alpha} \sigma_{\beta\beta}})
+                    // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi)} \phi_{\mu} \phi_{\nu}
+
                     // note: \phi_{\mu} will be added later (from mat_chi)
 
                     prefac = w * 2.0 * (v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 2]);
@@ -2480,7 +2542,9 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
                     vxc_wy_val[nu_g] += prefac * ycomp * chi_val[nu_g];
                     vxc_wz_val[nu_g] += prefac * zcomp * chi_val[nu_g];
 
-                    // (2 vsigma_aa + vsigma_ab) (\nabla\rho_{\alpha})^{(\xi)} (\nabla\phi_{\nu} \phi_{\mu})_{sym}
+                    // 2 (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
+                    // \nabla\rho_{\alpha}^{(\xi)} \cdot \nabla\phi_{\nu} \phi_{\mu}
+
                     // note: \phi_{\mu} will be added later (from mat_chi)
 
                     auto f_aa = vsigma[3 * g + 0];
@@ -2496,8 +2560,9 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
                     vxc_wy_val[nu_g] += 2.0 * prefac * ycomp;
                     vxc_wz_val[nu_g] += 2.0 * prefac * zcomp;
 
-                    // (2 vsigma_aa + vsigma_ab) \nabla\rho_{\alpha}
-                    // [(\nabla\phi_{\nu})^{(\xi)} \phi_{\mu}]_{sym}
+                    // 2 (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
+                    // \nabla\rho_{\alpha} \cdot \nabla\phi_{\nu}^{(\xi)} \phi_{\mu}
+
                     // note: \phi_{\mu} will be added later (from mat_chi)
 
                     if (nu_on_atom)
@@ -2513,8 +2578,9 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
                         vxc_wz_val[nu_g] += -2.0 * prefac * zcomp;
                     }
 
-                    // (2 vsigma_aa + vsigma_ab) \nabla\rho_{\alpha}
-                    // [\nabla\phi_{\nu} (\phi_{\mu})^{(\xi)}]_{sym}
+                    // 2 (2 f_{\sigma_{\alpha\alpha}} + f_{\sigma_{\alpha\beta}})
+                    // \nabla\rho_{\alpha} \cdot \nabla\phi_{\nu} \phi_{\mu}^{(\xi)}
+
                     // note: \phi_{\mu}^{(\xi)} will be added later (from mat_atom_chi_{xyz})
 
                     prefac = w * (2.0 * f_aa + f_ab);
@@ -2523,8 +2589,13 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
 
                     vxc_w_val[nu_g] += -2.0 * prefac * dot_val;
 
-                    // (2 (v2rhosigma_a_aa + v2rhosigma_b_aa) + (v2rhosigma_a_ab + v2rhosigma_b_ab))
-                    // \rho_{\alpha}^{(\xi)} (\nabla\rho_{\alpha} \nabla\phi_{\nu} \phi_{\mu})_sym
+                    // 2 (2 f_{\rho_{\alpha} \sigma_{\alpha\alpha}} +
+                    //    2 f_{\rho_{\beta} \sigma_{\alpha\alpha}} +
+                    //    f_{\rho_{\alpha} \sigma_{\alpha\beta}} +
+                    //    f_{\rho_{\beta} \sigma_{\alpha\beta}})
+                    // \rho_{\alpha}^{(\xi)} \nabla\phi_{\nu} \cdot \nabla\rho_{\alpha} \phi_{\mu}
+
+                    // note: \phi_{\mu} will be added later (from mat_chi)
 
                     f_aa = v2rhosigma[6 * g + 0] + v2rhosigma[6 * g + 3];
                     f_ab = v2rhosigma[6 * g + 1] + v2rhosigma[6 * g + 4];
@@ -2535,10 +2606,15 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
                     vxc_wy_val[nu_g] += 2.0 * prefac * dot_val * gdeny[g];
                     vxc_wz_val[nu_g] += 2.0 * prefac * dot_val * gdenz[g];
 
-                    // (2 (v2sigma2_aa_aa + v2sigma2_aa_ab + v2sigma2_aa_bb) +
-                    //    (v2sigma2_ab_aa + v2sigma2_ab_ab + v2sigma2_ab_bb))
-                    // 2 (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\xi)})
-                    //   (\nabla\rho_{\alpha} \cdot (\nabla\rho_{\alpha})^{(\zeta)})
+                    // 2 (4 f_{\sigma_{\alpha\alpha} \sigma_{\alpha\alpha}} +
+                    //    6 f_{\sigma_{\alpha\alpha} \sigma_{\alpha\beta}} +
+                    //    4 f_{\sigma_{\alpha\alpha} \sigma_{\beta\beta}} +
+                    //    2 f_{\sigma_{\alpha\beta} \sigma_{\alpha\beta}} +
+                    //    2 f_{\sigma_{\alpha\beta} \sigma_{\beta\beta}})
+                    // \nabla\phi_{\nu} \cdot \nabla\rho_{\alpha}
+                    // \nabla\rho_{\alpha} \cdot \nabla\rho_{\alpha}^{(\xi)} \phi_{\mu}
+
+                    // note: \phi_{\mu} will be added later (from mat_chi)
 
                     f_aa = v2sigma2[6 * g + 0] + v2sigma2[6 * g + 1] + v2sigma2[6 * g + 2];
                     f_ab = v2sigma2[6 * g + 1] + v2sigma2[6 * g + 3] + v2sigma2[6 * g + 4];
