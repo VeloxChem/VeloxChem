@@ -430,7 +430,7 @@ class GradientDriver:
         self.ostream.print_header('-' * (len(title) + 2))
         self.ostream.print_blank()
 
-        if (state_deriv_index is None) or (type(state_deriv_index) is int):
+        if (state_deriv_index is None):
             valstr = '  Atom '
             valstr += '{:>20s}  '.format('Gradient X')
             valstr += '{:>20s}  '.format('Gradient Y')

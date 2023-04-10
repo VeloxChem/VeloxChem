@@ -1,4 +1,6 @@
 import numpy as np
+import sys
+import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
@@ -7,106 +9,107 @@ from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
 from veloxchem.gradientdriver import GradientDriver
-from veloxchem.tdhfgradientdriver import TdhfGradientDriver
+from veloxchem.tddftgradientdriver import TddftGradientDriver
+
+try:
+    import pyscf
+except ImportError:
+    pass
 
 class TestGrad:
-    pass
-    # TODO: this does not work because it relies on pyscf integral derivatives
-    # and pyscf is not available on monkey;
-    # add back in when integral derivatives are available. 
-   # def run_tddft_grad(self, xcfun_label, tamm_dancoff, ref_grad):
+    def run_tddft_grad(self, xcfun_label, tamm_dancoff, ref_grad):
 
-   #     molecule_string = """
-   #     O 0.0000000000    0.0000000000   -0.0254395383
-   #     H 0.0000000000    0.7695699584    0.5948147012
-   #     H 0.0000000000   -0.7695699584    0.5948147012
-   #     """
+        molecule_string = """
+        O 0.0000000000    0.0000000000   -0.0254395383
+        H 0.0000000000    0.7695699584    0.5948147012
+        H 0.0000000000   -0.7695699584    0.5948147012
+        """
 
-   #     basis_set_label = "def2-svp"
+        basis_set_label = "def2-svp"
 
-   #     molecule = Molecule.read_str(molecule_string, units='angstrom')
-   #     basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
+        molecule = Molecule.read_str(molecule_string, units='angstrom')
+        basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
-   #     scf_drv = ScfRestrictedDriver()
+        scf_drv = ScfRestrictedDriver()
 
-   #     scf_drv.dft = True
-   #     scf_drv.xcfun = xcfun_label
-   #     scf_drv.conv_thresh = 1e-8
-   #     scf_drv.checkpoint_file = None
+        scf_dict = {'conv_thresh': 1e-8}
+        method_dict = {'xcfun': xcfun_label, 'grid_level': 5}
 
-   #     scf_drv.compute(molecule, basis)
+        scf_drv.update_settings(scf_dict, method_dict)
 
-   #     if tamm_dancoff:
-   #         rsp_solver = TdaEigenSolver()
-   #     else:
-   #         rsp_solver = LinearResponseEigenSolver()
+        scf_drv.compute(molecule, basis)
 
-   #     rsp_solver.dft = True
-   #     rsp_solver.tamm_dancoff = tamm_dancoff
-   #     rsp_solver.xcfun = scf_drv.xcfun
-   #     rsp_solver.conv_thresh = 1e-5
-   #     rsp_solver.nstates = 3
-   #     rsp_solver.checkpoint_file = None
+        if tamm_dancoff:
+            rsp_solver = TdaEigenSolver()
+        else:
+            rsp_solver = LinearResponseEigenSolver()
 
-   #     rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_tensors)
+        if tamm_dancoff:
+            tda = 'yes'
+        else:
+            tda = 'no'
+        rsp_dict = {"tamm_dancoff": tda}
 
-   #     tddft_grad = TdhfGradientDriver(scf_drv)
-   #     if tamm_dancoff:
-   #         tda = 'yes'
-   #     else:
-   #         tda = 'no'
-   #     rsp_dict = {"tamm_dancoff": tda}
-   #     method_dict = {'xcfun': xcfun_label}
-   #     orbrsp_dict = {"conv_thresh": 1e-7}
-   #     tddft_grad.update_settings({}, rsp_dict, orbrsp_dict, method_dict)
-   #     tddft_grad.dft = True
-   #     tddft_grad.xcfun = scf_drv.xcfun
-   #     tddft_grad.compute(molecule, basis, rsp_solver, rsp_results)
+        rsp_solver.update_settings(rsp_dict, method_dict)
+        rsp_solver.conv_thresh = 1e-5
+        rsp_solver.nstates = 3
 
-   #     if is_mpi_master():
-   #         grad = tddft_grad.get_gradient()
-   #         print("Gradient:\n", grad)
-   #         print("\nReference gradient:\n", ref_grad) 
-   #         assert np.max(np.abs(grad - ref_grad)) < 1.0e-6
+        rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_tensors)
 
+        tddft_grad = TddftGradientDriver(scf_drv)
 
-   # def test_tda_slater(self):
-   #     xcfun_label = 'slater'
-   #     tamm_dancoff = True
-   #     ref_grad = np.array(
-   #         [[-0. ,  0.000000000000008,  0.096834496224282],
-   #          [-0. , -0.059511770311381, -0.048404984179591],
-   #          [ 0. ,  0.059511770311380, -0.048404984179587]])
+        orbrsp_dict = {"conv_thresh": 1e-7}
+        tddft_grad.update_settings({}, rsp_dict, orbrsp_dict, method_dict)
+        tddft_grad.compute(molecule, basis, rsp_solver, rsp_results)
 
-   #     self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
+        if is_mpi_master():
+            grad = tddft_grad.get_gradient()[0]
+            assert np.max(np.abs(grad - ref_grad)) < 1.0e-6
 
-   # def test_tda_blyp(self):
-   #     xcfun_label = 'blyp'
-   #     tamm_dancoff = True
-   #     ref_grad = np.array(
-   #         [[-0. ,  0.000000000000000,  0.081712506517363],
-   #          [-0. , -0.052036762539477, -0.040837608701902],
-   #          [ 0. ,  0.052036762539478, -0.040837608701899]])
+    @pytest.mark.skipif('pyscf' not in sys.modules,
+                        reason='pyscf for integral derivatives not available')
+    def test_tda_slater(self):
+        xcfun_label = 'slater'
+        tamm_dancoff = True
+        ref_grad = np.array(
+            [[-0.000000000000001, -0.000000000000005,  0.096828839746124],
+              [ 0.              ,  -0.059512179812975, -0.048405146528462],
+              [-0.              ,   0.059512179812977, -0.048405146528465]])
 
-   #     self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
+        self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
+    @pytest.mark.skipif('pyscf' not in sys.modules,
+                        reason='pyscf for integral derivatives not available')
+    def test_tda_blyp(self):
+        xcfun_label = 'blyp'
+        tamm_dancoff = True
+        ref_grad = np.array(
+            [[ 0.000000000000002,  0.000000000000003,  0.081702810507772],
+              [-0.               , -0.052036797551521, -0.040837361620094],
+              [ 0.               ,  0.052036797551518, -0.040837361620095]])
 
-   # def test_rpa_slater(self):
-   #     xcfun_label = 'slater'
-   #     tamm_dancoff = False
-   #     ref_grad = np.array(
-   #         [[ 0. ,  0.000000000000001,  0.097154237192811],
-   #          [-0. , -0.060393010060886, -0.048564843803965],
-   #          [ 0. ,  0.060393010060885, -0.048564843803961]])
+        self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
-   #     self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
+    @pytest.mark.skipif('pyscf' not in sys.modules,
+                        reason='pyscf for integral derivatives not available')
+    def test_rpa_slater(self):
+        xcfun_label = 'slater'
+        tamm_dancoff = False
+        ref_grad = np.array(
+            [[ 0.000000000000001, -0.000000000000006,  0.097148642876961],
+              [ 0.,                -0.060393461796934, -0.048565041680259],
+              [ 0.,                 0.060393461796936, -0.048565041680257]])
 
-   # def test_rpa_blyp(self):
-   #     xcfun_label = 'blyp'
-   #     tamm_dancoff = False
-   #     ref_grad = np.array(
-   #         [[ 0. ,  0.000000000000008,  0.081819790394095],
-   #          [-0. , -0.052800069387996, -0.040891688938228],
-   #          [ 0. ,  0.052800069387988, -0.040891688938229]])
+        self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
 
-   #     self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)
+    @pytest.mark.skipif('pyscf' not in sys.modules,
+                        reason='pyscf for integral derivatives not available')
+    def test_rpa_blyp(self):
+        xcfun_label = 'blyp'
+        tamm_dancoff = False
+        ref_grad = np.array(
+            [[-0.000000000000001, -0.000000000000001,  0.0818110121047  ],
+              [-0.               , -0.052800208718226, -0.040891498953149],
+              [ 0.               ,  0.052800208718228, -0.040891498953151]])
+
+        self.run_tddft_grad(xcfun_label, tamm_dancoff, ref_grad)

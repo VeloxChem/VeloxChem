@@ -78,7 +78,7 @@ class TestOrbitalResponse(unittest.TestCase):
                                                     task.molecule,
                                                     task.ao_basis, dft_dict,
                                                     pe_dict, task.ostream)
-        #print("ref_lambda_ao:\n", ref_lambda_ao)
+        print("ref_omega_ao:\n", ref_omega_ao)
 
         if task.mpi_rank == mpi_master():
             nocc = task.molecule.number_of_alpha_electrons()

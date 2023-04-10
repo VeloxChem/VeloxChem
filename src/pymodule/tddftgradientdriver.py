@@ -56,7 +56,6 @@ class TddftGradientDriver(GradientDriver):
         self.gradient = None
 
         # SCF (and response) drivers
-        # TODO: include rsp_drv in energy_drv
         self.scf_drv = scf_drv
 
         # flag on whether RPA or TDA is calculated
@@ -74,7 +73,6 @@ class TddftGradientDriver(GradientDriver):
         # for numerical gradient
         self.delta_h = 0.001
 
-    # TODO: should grad_dict and orbrsp_dict be unified?
     def update_settings(self,
                         grad_dict,
                         rsp_dict,
@@ -143,7 +141,6 @@ class TddftGradientDriver(GradientDriver):
         """
 
         # sanity check
-
         if self.rank == mpi_master():
             all_states = list(np.arange(1, len(rsp_results['eigenvalues'])+1))
             if self.state_deriv_index is not None:
@@ -156,26 +153,25 @@ class TddftGradientDriver(GradientDriver):
                 self.state_deriv_index = all_states
 
             if self.numerical:
-                self.print_header(self.state_deriv_index[0]-1)
+                self.print_header(self.state_deriv_index[:1])
             else:
                 self.print_header(self.state_deriv_index)
 
         start_time = tm.time()
 
         # compute gradient
-        # TODO: enable numerical gradient of multiple states
-        # / do first selected state only?
+        # NOTE: the numerical gradient is calculated for
+        # the first state only.
         if self.numerical:
             scf_ostream_state = self.scf_drv.ostream.state
             self.scf_drv.ostream.state = False
             self.compute_numerical(molecule, basis, rsp_drv, rsp_results,
-                                   min_basis, self.state_deriv_index[0]-1)
+                                   min_basis, self.state_deriv_index[:1])
             self.scf_drv.ostream.state = scf_ostream_state
         else:
             self.compute_analytical(molecule, basis, rsp_results)
 
         # print gradient
-
         if self.rank == mpi_master():
             self.print_geometry(molecule)
             if self.numerical:
@@ -216,6 +212,7 @@ class TddftGradientDriver(GradientDriver):
                                    self.method_dict)
         orbrsp_drv.compute(molecule, basis, scf_tensors,
                            rsp_results)
+
         orbrsp_results = orbrsp_drv.cphf_results
         omega_ao = orbrsp_drv.compute_omega(molecule, basis, scf_tensors)
 
@@ -234,14 +231,16 @@ class TddftGradientDriver(GradientDriver):
             # TODO: check variable names and make sure they are consistent
             # with cphfsolver.
             # spin summation already included
-            x_plus_y = orbrsp_results['x_plus_y_ao']
-            x_minus_y = orbrsp_results['x_minus_y_ao']
-            lambda_ov = orbrsp_results['cphf_ov']
-            unrel_dm_ao = orbrsp_results['unrelaxed_density_ao']
-            lambda_ao = np.einsum('mi,sia,na->smn', mo_occ, lambda_ov, mo_vir)
-            rel_dm_ao = ( unrel_dm_ao + 2.0 * lambda_ao
-                        + 2.0 * lambda_ao.transpose(0,2,1) )
-            dof = x_plus_y.shape[0]
+            x_plus_y_ao = orbrsp_results['x_plus_y_ao']
+            x_minus_y_ao = orbrsp_results['x_minus_y_ao']
+
+            # CPHF/CPKS coefficients (lambda Lagrange multipliers)
+            cphf_ov = orbrsp_results['cphf_ov']
+            unrelaxed_density_ao = orbrsp_results['unrelaxed_density_ao']
+            cphf_ao = np.einsum('mi,sia,na->smn', mo_occ, cphf_ov, mo_vir)
+            relaxed_density_ao = ( unrelaxed_density_ao + 2.0 * cphf_ao
+                        + 2.0 * cphf_ao.transpose(0,2,1) )
+            dof = x_plus_y_ao.shape[0]
         else:
             dof = None
 
@@ -269,7 +268,8 @@ class TddftGradientDriver(GradientDriver):
                 d_hcore = hcore_deriv(molecule, basis, i)
                 d_eri = eri_deriv(molecule, basis, i)
 
-                self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx', rel_dm_ao,
+                self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
+                                                    relaxed_density_ao,
                                                     d_hcore)
                 self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
                                                        2.0 * omega_ao, d_ovlp)
@@ -283,26 +283,29 @@ class TddftGradientDriver(GradientDriver):
                     frac_K = 1.0
 
                 self.gradient[:,i] += 2.0 * np.einsum('mt,snp,xmtnp->sx', gs_dm,
-                                                    rel_dm_ao, d_eri)
+                                                    relaxed_density_ao, d_eri)
                 self.gradient[:,i] += -1.0 * frac_K * np.einsum(
-                    'mt,snp,xmnpt->sx', gs_dm, rel_dm_ao, d_eri)
+                    'mt,snp,xmnpt->sx', gs_dm, relaxed_density_ao, d_eri)
 
                 self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx',
-                                    x_plus_y,
-                                    x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
+                                    x_plus_y_ao,
+                                    x_plus_y_ao - x_plus_y_ao.transpose(0,2,1),
+                                    d_eri)
                 self.gradient[:,i] += -0.5 * frac_K * np.einsum(
-                                'smn,spt,xtnmp->sx', x_plus_y,
-                                x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
+                                'smn,spt,xtnmp->sx', x_plus_y_ao,
+                                x_plus_y_ao - x_plus_y_ao.transpose(0,2,1),
+                                d_eri)
 
                 self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx',
-                                  x_minus_y,
-                                  x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
+                                  x_minus_y_ao,
+                                  x_minus_y_ao + x_minus_y_ao.transpose(0,2,1),
+                                  d_eri)
                 self.gradient[:,i] += -0.5 * frac_K * np.einsum(
-                                'smn,spt,xtnmp->sx', x_minus_y,
-                                x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
+                                'smn,spt,xtnmp->sx', x_minus_y_ao,
+                                x_minus_y_ao + x_minus_y_ao.transpose(0,2,1),
+                                d_eri)
 
-        # TODO: use for-loop for now;
-        # TODO: ask Xin if he can enable multiple DMs for DFT.
+        # TODO: enable multiple DMs for DFT to avoid for-loops.
         if self._dft:
             xcfun_label = self.scf_drv.xcfun.get_func_label()
 
@@ -311,11 +314,11 @@ class TddftGradientDriver(GradientDriver):
                     gs_dm = self.scf_drv.scf_tensors['D_alpha']
                     gs_density = AODensityMatrix([gs_dm], denmat.rest)
 
-                    rhow_dm = 0.5 * rel_dm_ao[s]
+                    rhow_dm = 0.5 * relaxed_density_ao[s]
                     rhow_dm_sym = 0.5 * (rhow_dm + rhow_dm.T)
                     rhow_den_sym = AODensityMatrix([rhow_dm_sym], denmat.rest)
 
-                    x_minus_y_sym = 0.5 * (x_minus_y[s] + x_minus_y[s].T)
+                    x_minus_y_sym = 0.5 * (x_minus_y_ao[s] + x_minus_y_ao[s].T)
                     x_minus_y_den_sym = AODensityMatrix([x_minus_y_sym],
                                                         denmat.rest)
                 else:
@@ -358,10 +361,12 @@ class TddftGradientDriver(GradientDriver):
             The index of the excited state of interest.
         """
 
+        self.scf_drv.ostream.mute()
         self.scf_drv.compute(molecule, basis, min_basis)
         scf_tensors = self.scf_drv.scf_tensors
 
         rsp_drv._is_converged = False  # needed by RPA
+        rsp_drv.ostream.mute()
         rsp_results = rsp_drv.compute(molecule, basis, scf_tensors)
 
         if self.rank == mpi_master():
@@ -369,6 +374,9 @@ class TddftGradientDriver(GradientDriver):
         else:
             exc_en = None
         exc_en = self.comm.bcast(exc_en, root=mpi_master())
+
+        self.scf_drv.ostream.unmute()
+        rsp_drv.ostream.unmute()
 
         return self.scf_drv.get_scf_energy() + exc_en
 
