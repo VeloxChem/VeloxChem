@@ -457,8 +457,12 @@ class GradientDriver:
                 self.ostream.print_blank()
                 for i in range(molecule.number_of_atoms()):
                     valstr = '  {:<4s}'.format(labels[i])
-                    for d in range(3):
-                        valstr += '{:22.12f}'.format(self.gradient[index, i, d])
+                    if len(state_deriv_index) == 1:
+                        for d in range(3):
+                            valstr += '{:22.12f}'.format(self.gradient[i, d])
+                    else:
+                        for d in range(3):
+                            valstr += '{:22.12f}'.format(self.gradient[index, i, d])
                     self.ostream.print_header(valstr)
                 index += 1
         self.ostream.print_blank()
