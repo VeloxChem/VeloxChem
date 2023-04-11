@@ -133,7 +133,7 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
 
 void
 distribute4DSubTo4DFull(CDense4DTensor&          fullMatrix,
-                                          const CDense4DTensor&       subMatrix,
+                                          const CDenseMatrix&       subMatrix,
                                           const std::vector<int32_t>& aoIndices,
                                           const int32_t               aoCount)
 {
@@ -141,9 +141,7 @@ distribute4DSubTo4DFull(CDense4DTensor&          fullMatrix,
 
     auto W_small = subMatrix.values();
 
-    auto nAct =  subMatrix.getjIndex();
-
-    int32_t nAct3 = nAct * nAct * nAct;
+    auto nAct3 = subMatrix.getNumberOfColumns();
 
     for (int32_t i = 0; i < aoCount; i++) // looping over AO
     {

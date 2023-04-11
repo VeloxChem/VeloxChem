@@ -91,7 +91,7 @@ CDenseMatrix getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix
 
 void
 distribute4DSubTo4DFull(CDense4DTensor&          fullMatrix,
-                                          const CDense4DTensor&       subMatrix,
+                                          const CDenseMatrix&       subMatrix,
                                           const std::vector<int32_t>& aoIndices,
                                           const int32_t               aoCount);
 

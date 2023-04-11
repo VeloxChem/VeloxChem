@@ -5518,7 +5518,7 @@ CXCIntegrator::_integratePartialVxcFockForLDA(const int32_t       npoints,
     return mat_Vxc;
 }
 
-CDense4DTensor
+CDenseMatrix
 CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // total number of points in the box
                                               const double*       weights,    // weights
                                               const CDenseMatrix& gtoValues,
@@ -5542,7 +5542,7 @@ CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // tot
     }
 
     // created empty partial mat_W
-    CDense4DTensor mat_W(naos, n_active, n_active, n_active);
+    CDenseMatrix mat_W(n_active*n_active*n_active, npoints);
     auto W_val = mat_W.values();
 
     #pragma omp parallel
@@ -5553,28 +5553,22 @@ CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // tot
         auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
         auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-        for (int32_t i = 0; i < naos; i++) // looping over AO
+        for (int32_t j = 0; j < n_active; j++)
         {
-            auto nu_offset = i * npoints;
-            for (int32_t j = 0; j < n_active; j++)
+            auto MOj = MOs_on_grid.row(j);
+            for (int32_t k = 0; k < n_active; k++)
             {
-                auto ij = n_active * i  + j;
-                auto MOj = MOs_on_grid.row(j);
-                for (int32_t k = 0; k < n_active; k++)
+                auto jk = j * n_active + k;
+                auto MOk = MOs_on_grid.row(k);
+                for (int32_t l = 0; l < n_active; l++)
                 {
-                    auto ijk = ij * n_active + k;
-                    auto MOk = MOs_on_grid.row(k);
-                    for (int32_t l = 0; l < n_active; l++)
-                    {
 
-                        auto ijkl = ijk * n_active + l;
-                        auto MOl = MOs_on_grid.row(l);
-                        #pragma omp simd aligned(W_val, vrho, weights, chi_val, MOj, MOk, MOl : VLX_ALIGN)
-                        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
-                        {
-                            // MGD warning: there is a race condition here, for now run single thread
-                            W_val[ijkl] += weights[g] * vrho[2 * g + 1] * chi_val[nu_offset+g]  * MOj[g] * MOk[g] * MOl[g];
-                        }
+                    auto jkl = jk * n_active + l;
+                    auto MOl = MOs_on_grid.row(l);
+                    #pragma omp simd aligned(W_val, vrho, weights, chi_val, MOj, MOk, MOl : VLX_ALIGN)
+                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    {
+                        W_val[jkl*npoints + g] = weights[g] * vrho[2 * g + 1] * MOj[g] * MOk[g] * MOl[g];
                     }
                 }
             }
@@ -5582,9 +5576,11 @@ CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // tot
 
     }
 
+    auto mat_Wxc = denblas::multABt(gtoValues, mat_W); //MGD tmp
+
     timer.stop("Wxc matrix");
 
-    return mat_W;
+    return mat_Wxc;
 }
 
 std::vector<CDenseMatrix>

@@ -468,7 +468,7 @@ class CXCIntegrator
      */
 
 
-    CDense4DTensor _integratePartialWxcFockForPLDA(const int32_t       npoints,
+    CDenseMatrix _integratePartialWxcFockForPLDA(const int32_t       npoints,
                                               const double*       weights,
                                               const CDenseMatrix& gtoValues,
                                               const CDenseMatrix& ActiveMOs,
