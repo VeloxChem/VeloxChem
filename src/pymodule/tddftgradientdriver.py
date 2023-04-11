@@ -97,12 +97,6 @@ class TddftGradientDriver(GradientDriver):
         if self.tamm_dancoff:
             self.flag = 'TDA Gradient Driver'
 
-        if 'do_first_order_prop' in grad_dict:
-            key = grad_dict['do_first_order_prop'].lower()
-            self.do_first_order_prop = True if key in ['yes', 'y'] else False
-            orbrsp_dict['do_first_order_prop'] = (
-                                        grad_dict['do_first_order_prop'] )
-
         # Excited state of interest
         # NOTE: the indexing starts at 1.
         if 'state_deriv_index' in grad_dict:
