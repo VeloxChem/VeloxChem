@@ -26,10 +26,9 @@
 import time as tm
 import numpy as np
 
-from .veloxchemlib import (XCFunctional, MolecularGrid, mpi_master)
+from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 
-from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
 
 
@@ -120,14 +119,14 @@ class TddftGradientDriver(GradientDriver):
 
         # sanity check
         if self.rank == mpi_master():
-            all_states = list(np.arange(1, len(rsp_results['eigenvalues'])+1))
+            all_states = list(np.arange(1, len(rsp_results['eigenvalues']) + 1))
             if self.state_deriv_index is not None:
-                error_message =  'TdscfGradientDriver: some of the '
+                error_message = 'TddftGradientDriver: some of the '
                 error_message += 'selected states have not been calculated.'
                 assert_msg_critical(
                     self.state_deriv_index in all_states,
-                        error_message)
-            
+                    error_message)
+
             self.print_header(self.state_deriv_index)
 
         start_time = tm.time()
@@ -138,7 +137,7 @@ class TddftGradientDriver(GradientDriver):
         # NOTE: the index passed to compute_numerical and compute_energy
         # uses Python indexing starting at 0.
         self.compute_numerical(molecule, basis, rsp_drv, rsp_results,
-                               min_basis, self.state_deriv_index-1)
+                               min_basis, self.state_deriv_index - 1)
 
         self.scf_drv.ostream.unmute()
 

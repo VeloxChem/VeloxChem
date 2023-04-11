@@ -369,9 +369,9 @@ def main():
 
     if task_type == 'excited_state_gradient':
         grad_dict = (task.input_dict['gradient']
-                        if 'gradient' in task.input_dict else {})
+                     if 'gradient' in task.input_dict else {})
         rsp_dict = (task.input_dict['response']
-                        if 'response' in task.input_dict else {})
+                    if 'response' in task.input_dict else {})
 
         # Run a linea response calculation first
         rsp_dict['program_end_time'] = program_end_time
@@ -442,9 +442,9 @@ def main():
         opt_dict = (task.input_dict['optimize']
                     if 'optimize' in task.input_dict else {})
         grad_dict = (task.input_dict['gradient']
-                        if 'gradient' in task.input_dict else {})
+                     if 'gradient' in task.input_dict else {})
         rsp_dict = (task.input_dict['response']
-                        if 'response' in task.input_dict else {})
+                    if 'response' in task.input_dict else {})
 
         # Run a linear response calculation first
         rsp_dict['program_end_time'] = program_end_time
