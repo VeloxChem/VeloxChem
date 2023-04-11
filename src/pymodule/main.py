@@ -43,6 +43,7 @@ from .gopdriver import GlobalOptimizationDriver
 from .loprop import LoPropDriver
 from .trajectorydriver import TrajectoryDriver
 from .scfgradientdriver import ScfGradientDriver
+from .tddftgradientdriver import TddftGradientDriver
 from .scfhessiandriver import ScfHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
@@ -301,8 +302,9 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
-        'wave function', 'mp2', 'gradient', 'hessian', 'optimize', 'response',
-        'pulses', 'visualization', 'loprop'
+        'wave function', 'mp2', 'gradient', 'excited_state_gradient',
+        'hessian', 'optimize', 'optimize_excited_state', 'response', 'pulses',
+        'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -365,6 +367,31 @@ def main():
             grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
             grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
+    if task_type == 'excited_state_gradient':
+        grad_dict = (task.input_dict['gradient']
+                        if 'gradient' in task.input_dict else {})
+        rsp_dict = (task.input_dict['response']
+                        if 'response' in task.input_dict else {})
+
+        # Run a linea response calculation first
+        rsp_dict['program_end_time'] = program_end_time
+        rsp_dict['filename'] = task.input_dict['filename']
+
+        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
+        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+
+        # Calculate the excited state gradient
+        tddftgrad_drv = TddftGradientDriver(scf_drv, task.mpi_comm,
+                                            task.ostream)
+        tddftgrad_drv.update_settings(grad_dict, rsp_dict,
+                                      method_dict)
+        tddftgrad_drv.compute(task.molecule, task.ao_basis,
+                              rsp_prop._rsp_driver.solver,
+                              rsp_prop._rsp_property)
+
     # Hessian
 
     if task_type == 'hessian':
@@ -408,6 +435,38 @@ def main():
             opt_drv = OptimizationDriver(grad_drv)
             opt_drv.update_settings(opt_dict)
             opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+    # Excited state geometry optimization
+
+    if task_type == 'optimize_excited_state':
+        opt_dict = (task.input_dict['optimize']
+                    if 'optimize' in task.input_dict else {})
+        grad_dict = (task.input_dict['gradient']
+                        if 'gradient' in task.input_dict else {})
+        rsp_dict = (task.input_dict['response']
+                        if 'response' in task.input_dict else {})
+
+        # Run a linear response calculation first
+        rsp_dict['program_end_time'] = program_end_time
+        rsp_dict['filename'] = task.input_dict['filename']
+
+        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
+        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+
+        tddftgrad_drv = TddftGradientDriver(scf_drv, task.mpi_comm,
+                                            task.ostream)
+        tddftgrad_drv.update_settings(grad_dict, rsp_dict,
+                                      method_dict)
+
+        opt_drv = OptimizationDriver(tddftgrad_drv)
+        opt_drv.update_settings(opt_dict)
+        opt_drv.compute(task.molecule, task.ao_basis,
+                        rsp_prop._rsp_driver.solver,
+                        rsp_prop._rsp_property,
+                        task.min_basis)
 
     # Response
 

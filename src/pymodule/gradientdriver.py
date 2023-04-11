@@ -478,8 +478,7 @@ class GradientDriver:
             self.ostream.print_header(cur_str3.ljust(str_width))
 
         if state_deriv_index is not None:
-            cur_str = 'Excited State of Interest   : ' + str(state_deriv_index +
-                                                             1)
+            cur_str = 'Excited State of Interest   : ' + str(state_deriv_index)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()

@@ -82,6 +82,7 @@ from .scfunrestdriver import ScfUnrestrictedDriver
 from .scfrestopendriver import ScfRestrictedOpenDriver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
+from .tddftgradientdriver import TddftGradientDriver
 from .xtbdriver import XtbDriver
 from .xtbgradientdriver import XtbGradientDriver
 from .optimizationdriver import OptimizationDriver
