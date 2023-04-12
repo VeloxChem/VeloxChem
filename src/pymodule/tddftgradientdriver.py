@@ -23,6 +23,7 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from copy import deepcopy
 import time as tm
 import numpy as np
 
@@ -189,3 +190,29 @@ class TddftGradientDriver(GradientDriver):
         exc_en = self.comm.bcast(exc_en, root=mpi_master())
 
         return self.scf_drv.get_scf_energy() + exc_en
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_grad_drv = TddftGradientDriver(deepcopy(self.scf_drv), self.comm,
+                                          self.ostream)
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                pass
+            elif isinstance(val, XCFunctional):
+                new_grad_drv.key = XCFunctional(val)
+            elif isinstance(val, MolecularGrid):
+                new_grad_drv.key = MolecularGrid(val)
+            else:
+                new_grad_drv.key = deepcopy(val)
+
+        return new_grad_drv
