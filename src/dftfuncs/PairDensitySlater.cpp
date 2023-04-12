@@ -144,7 +144,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             // dExc/d(rho)
 
-            dexc_rho = fre * fourthird * rhothird * (f_zeta - eta / 2.0 * gr * flim_eta);
+            dexc_rho = fre * fourthird * rhothird * (f_zeta - eta * 2.0 * gr * flim_eta);
 
             // dExc/d(Pi)
 
