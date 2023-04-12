@@ -180,7 +180,6 @@ class TddftGradientDriver(GradientDriver):
         scf_tensors = self.scf_drv.scf_tensors
 
         rsp_drv._is_converged = False  # needed by RPA
-        rsp_drv.ostream.mute()
         rsp_results = rsp_drv.compute(molecule, basis, scf_tensors)
 
         if self.rank == mpi_master():
@@ -188,7 +187,5 @@ class TddftGradientDriver(GradientDriver):
         else:
             exc_en = None
         exc_en = self.comm.bcast(exc_en, root=mpi_master())
-
-        rsp_drv.ostream.unmute()
 
         return self.scf_drv.get_scf_energy() + exc_en
