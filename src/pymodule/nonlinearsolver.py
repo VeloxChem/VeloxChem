@@ -320,7 +320,7 @@ class NonlinearSolver:
             self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
+        if self._dft and (self.grid_level < 1 or self.grid_level > 8):
             warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
             warn_msg += ' Using default value. ***'
             self.ostream.print_blank()
