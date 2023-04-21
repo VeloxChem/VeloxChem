@@ -24,6 +24,7 @@ dependencies:
   - scipy
   - gtest
   - gmock
+  - rdkit
   - cppe
   - xtb
   - geometric
