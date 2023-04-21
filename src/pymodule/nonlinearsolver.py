@@ -537,7 +537,10 @@ class NonlinearSolver:
 
         if self.rank == mpi_master():
             if mode_is_cubic:
-                n_total = len(third_order_dens)
+                if self._dft:
+                    n_total = len(second_order_dens) + len(third_order_dens)
+                else:
+                    n_total = len(third_order_dens)
                 n_ao = third_order_dens[0].shape[0]
             elif mode_is_quadratic:
                 n_total = len(second_order_dens)
