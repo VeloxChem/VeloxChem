@@ -1079,6 +1079,7 @@ class ScfDriver:
             if self._dft:
                 # dft info
                 self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                self._scf_tensors['grid_level'] = self.grid_level
 
             if self._pe:
                 # pe info

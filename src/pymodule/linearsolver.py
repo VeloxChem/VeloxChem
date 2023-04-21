@@ -345,6 +345,7 @@ class LinearSolver:
                 # do not overwrite xcfun if it is already specified
                 if self.xcfun is None:
                     updated_scf_info['xcfun'] = scf_results['xcfun']
+                    updated_scf_info['grid_level'] = scf_results['grid_level']
 
             if scf_results.get('potfile', None) is not None:
                 # do not overwrite potfile if it is already specified
@@ -355,6 +356,23 @@ class LinearSolver:
 
         for key, val in updated_scf_info.items():
             setattr(self, key, val)
+
+        # double check xcfun in SCF and response
+
+        if self.rank == mpi_master():
+            scf_xcfun_label = scf_results.get('xcfun', 'HF').upper()
+            if self.xcfun is None:
+                rsp_xcfun_label = 'HF'
+            elif isinstance(self.xcfun, str):
+                rsp_xcfun_label = self.xcfun.upper()
+            else:
+                rsp_xcfun_label = self.xcfun.get_func_label().upper()
+            if rsp_xcfun_label != scf_xcfun_label:
+                warn_msg = f'*** Warning: {rsp_xcfun_label} will be used in response'
+                warn_msg += f' but {scf_xcfun_label} was used in SCF. ***'
+                self.ostream.print_header(warn_msg)
+                warn_msg = '*** Please double check. ***'
+                self.ostream.print_header(warn_msg)
 
     def _dft_sanity_check(self):
         """
