@@ -326,6 +326,63 @@ class DistributedArray:
             The distributed array.
         """
 
+        h5cfg = h5py.get_config()
+
+        if hasattr(h5cfg, 'mpi') and h5cfg.mpi:
+            return cls.read_from_hdf5_file_parallel(fname, label, comm)
+        else:
+            return cls.read_from_hdf5_file_serial(fname, label, comm)
+
+    @classmethod
+    def read_from_hdf5_file_parallel(cls, fname, label, comm):
+        """
+        Reads an array from checkpoint file and returns a distributed array.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+        :param comm:
+            The communicator.
+
+        :return:
+            The distributed array.
+        """
+
+        rank = comm.Get_rank()
+        nodes = comm.Get_size()
+
+        hf = h5py.File(fname, 'r', driver='mpio', comm=comm)
+        dset = hf[label]
+
+        ave, res = divmod(dset.shape[0], nodes)
+        counts = [ave + 1 if p < res else ave for p in range(nodes)]
+        displacements = [sum(counts[:p]) for p in range(nodes)]
+
+        row_start = displacements[rank]
+        row_end = row_start + counts[rank]
+        data = np.array(dset[row_start:row_end, :])
+
+        hf.close()
+
+        return cls(data, comm, distribute=False)
+
+    @classmethod
+    def read_from_hdf5_file_serial(cls, fname, label, comm):
+        """
+        Reads an array from checkpoint file and returns a distributed array.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+        :param comm:
+            The communicator.
+
+        :return:
+            The distributed array.
+        """
+
         rank = comm.Get_rank()
         nodes = comm.Get_size()
 
