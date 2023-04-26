@@ -448,6 +448,57 @@ class DistributedArray:
             The time spent in writing to checkpoint file.
         """
 
+        h5cfg = h5py.get_config()
+
+        if hasattr(h5cfg, 'mpi') and h5cfg.mpi:
+            self.append_to_hdf5_file_parallel(fname, label)
+        else:
+            self.append_to_hdf5_file_serial(fname, label)
+
+    def append_to_hdf5_file_parallel(self, fname, label):
+        """
+        Appends an array to checkpoint file.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+
+        :return:
+            The time spent in writing to checkpoint file.
+        """
+
+        t0 = tm.time()
+
+        counts = self.comm.allgather(self.shape(0))
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        hf = h5py.File(fname, 'a', driver='mpio', comm=self.comm)
+
+        dset = hf.create_dataset(label, (sum(counts), self.shape(1)),
+                                 dtype=self.data.dtype)
+
+        row_start = displacements[self.rank]
+        row_end = row_start + counts[self.rank]
+        dset[row_start:row_end, :] = self.data[:, :]
+
+        hf.close()
+
+        return tm.time() - t0
+
+    def append_to_hdf5_file_serial(self, fname, label):
+        """
+        Appends an array to checkpoint file.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+
+        :return:
+            The time spent in writing to checkpoint file.
+        """
+
         t0 = tm.time()
 
         counts = self.comm.gather(self.shape(0))
