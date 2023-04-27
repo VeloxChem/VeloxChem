@@ -519,8 +519,7 @@ class DistributedArray:
             hf = h5py.File(fname, 'a')
 
             dset = hf.create_dataset(label, (sum(counts), self.shape(1)),
-                                     dtype=self.data.dtype,
-                                     compression='gzip')
+                                     dtype=self.data.dtype)
 
         for batch_start in range(0, n_total, batch_size):
             batch_end = min(batch_start + batch_size, n_total)
