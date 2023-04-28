@@ -97,23 +97,25 @@ class TestCheckpoint:
 
         mol, bas = self.get_molecule_and_basis()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fname = str(Path(temp_dir, 'rsp.h5'))
+        here = Path(__file__).parent
+        fpath = here / 'inputs' / 'rsp_with_random_values_for_test.h5'
+        fname = str(fpath)
 
-            solver.checkpoint_file = fname
-            solver._write_checkpoint(mol, bas, dft_dict, pe_dict, labels)
+        solver.checkpoint_file = fname
+        solver._write_checkpoint(mol, bas, dft_dict, pe_dict, labels)
 
-            solver._read_checkpoint(labels)
-            assert np.max(
-                np.abs(backup_data['bger'] - solver._dist_bger.data)) < 1.0e-12
-            assert np.max(
-                np.abs(backup_data['bung'] - solver._dist_bung.data)) < 1.0e-12
-            assert np.max(
-                np.abs(backup_data['e2bger'] -
-                       solver._dist_e2bger.data)) < 1.0e-12
-            assert np.max(
-                np.abs(backup_data['e2bung'] -
-                       solver._dist_e2bung.data)) < 1.0e-12
+        solver._read_checkpoint(labels)
+        assert np.max(np.abs(backup_data['bger'] -
+                             solver._dist_bger.data)) < 1.0e-12
+        assert np.max(np.abs(backup_data['bung'] -
+                             solver._dist_bung.data)) < 1.0e-12
+        assert np.max(np.abs(backup_data['e2bger'] -
+                             solver._dist_e2bger.data)) < 1.0e-12
+        assert np.max(np.abs(backup_data['e2bung'] -
+                             solver._dist_e2bung.data)) < 1.0e-12
+
+        if is_mpi_master(comm) and fpath.is_file():
+            fpath.unlink()
 
     def test_fock_checkpoint(self):
 
@@ -124,44 +126,45 @@ class TestCheckpoint:
         keys = ['f_sig_xx', 'f_lamtau_yy']
 
         focks = {
-            key:
-            {w: DistributedArray(np.random.rand(81,), comm) for w in freqs}
-            for key in keys
+            key: {
+                w: DistributedArray(np.random.rand(81,), comm) for w in freqs
+            } for key in keys
         }
 
         mol, bas = self.get_molecule_and_basis()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fname = str(Path(temp_dir, 'fock.h5'))
+        here = Path(__file__).parent
+        fpath = here / 'inputs' / 'fock_with_random_values_for_test.h5'
+        fname = str(fpath)
 
-            # test writing
-            success = write_distributed_focks(fname, focks, keys, freqs, comm,
-                                              ostream)
-            assert success
+        # test writing
+        success = write_distributed_focks(fname, focks, keys, freqs, comm,
+                                          ostream)
+        assert success
 
-            # test reading
-            read_focks = read_distributed_focks(fname, keys, freqs, comm,
-                                                ostream)
-            for key in keys:
-                for w in freqs:
-                    a = read_focks[key][w].get_full_vector()
-                    b = focks[key][w].get_full_vector()
-                    if is_mpi_master(comm):
-                        assert np.max(np.abs(a - b)) < 1.0e-12
+        # test reading
+        read_focks = read_distributed_focks(fname, keys, freqs, comm, ostream)
+        for key in keys:
+            for w in freqs:
+                a = read_focks[key][w].get_full_vector()
+                b = focks[key][w].get_full_vector()
+                if is_mpi_master(comm):
+                    assert np.max(np.abs(a - b)) < 1.0e-12
 
-            # test hdf5
-            if is_mpi_master(comm):
+        # test hdf5
+        if is_mpi_master(comm):
 
-                valid_checkpoint = check_distributed_focks(fname, keys, freqs)
-                assert valid_checkpoint
+            valid_checkpoint = check_distributed_focks(fname, keys, freqs)
+            assert valid_checkpoint
 
-                valid_checkpoint = check_distributed_focks(
-                    fname, ['x', 'y'], freqs)
-                assert not valid_checkpoint
+            valid_checkpoint = check_distributed_focks(fname, ['x', 'y'], freqs)
+            assert not valid_checkpoint
 
-                valid_checkpoint = check_distributed_focks(
-                    fname, keys, [0.1, 0.2])
-                assert not valid_checkpoint
+            valid_checkpoint = check_distributed_focks(fname, keys, [0.1, 0.2])
+            assert not valid_checkpoint
+
+            if fpath.is_file():
+                fpath.unlink()
 
     def test_distributed_array(self):
 
@@ -170,16 +173,20 @@ class TestCheckpoint:
         dist_array = DistributedArray(np.random.rand(81, 2), comm)
         label = 'distributed array'
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fname = str(Path(temp_dir, 'array.h5'))
+        here = Path(__file__).parent
+        fpath = here / 'inputs' / 'array_with_random_values_for_test.h5'
+        fname = str(fpath)
 
-            dist_array.append_to_hdf5_file(fname, label)
+        dist_array.append_to_hdf5_file(fname, label)
 
-            read_array = DistributedArray.read_from_hdf5_file(
-                fname, label, comm)
+        read_array = DistributedArray.read_from_hdf5_file(fname, label, comm)
 
-            for col in range(dist_array.shape(1)):
-                a = dist_array.get_full_vector(col)
-                b = read_array.get_full_vector(col)
-                if is_mpi_master(comm):
-                    assert np.max(np.abs(a - b)) < 1.0e-12
+        for col in range(dist_array.shape(1)):
+            a = dist_array.get_full_vector(col)
+            b = read_array.get_full_vector(col)
+
+            if is_mpi_master(comm):
+                assert np.max(np.abs(a - b)) < 1.0e-12
+
+                if fpath.is_file():
+                    fpath.unlink()
