@@ -218,8 +218,10 @@ class ShgDriver(NonlinearSolver):
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('xyz', a_grad) for w in wa}
-            B = {(op, w): v for op, v in zip('xyz', b_grad)
-                 for w in self.frequencies}
+            B = {
+                (op, w): v for op, v in zip('xyz', b_grad)
+                for w in self.frequencies
+            }
 
             AB.update(A)
             AB.update(B)
@@ -618,69 +620,69 @@ class ShgDriver(NonlinearSolver):
         if self.rank == mpi_master():
             self._print_fock_header()
 
-        ww = [wb for (wb, wc) in wi]
+        # generate key-frequency pairs
 
-        keys = [
-            'F_sig_x',
-            'F_sig_y',
-            'F_sig_z',
-            'F_lam_xy',
-            'F_lam_xz',
-            'F_lam_yz',
-        ]
+        key_freq_pairs = []
+
+        for (wb, wc) in wi:
+            for key in [
+                    'F_sig_x', 'F_sig_y', 'F_sig_z', 'F_lam_xy', 'F_lam_xz',
+                    'F_lam_yz'
+            ]:
+                key_freq_pairs.append((key, wb))
+
+        # examine checkpoint for distributed Focks
 
         if self.checkpoint_file is not None:
-            fock_file = str(
-                Path(self.checkpoint_file).with_suffix('.shg_fock.h5'))
+            if self.shg_type == 'reduced':
+                fock_suffix = '.shg_fock_red.h5'
+            elif self.shg_type == 'full':
+                fock_suffix = '.shg_fock_full.h5'
+            fock_file = str(Path(self.checkpoint_file).with_suffix(fock_suffix))
         else:
             fock_file = None
 
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = check_distributed_focks(fock_file, keys, ww)
+                self.restart = check_distributed_focks(fock_file,
+                                                       key_freq_pairs)
             self.restart = self.comm.bcast(self.restart, mpi_master())
 
+        # examine checkpoint for distributed Focks
+
         if self.restart:
-            focks = read_distributed_focks(fock_file, keys, ww, self.comm,
-                                           self.ostream)
-            focks['F0'] = F0
-            return focks
+            dist_focks = read_distributed_focks(fock_file, self.comm,
+                                                self.ostream)
+        else:
+            time_start_fock = time.time()
 
-        time_start_fock = time.time()
+            if self.shg_type == 'reduced':
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                                 dft_dict, first_order_dens,
+                                                 second_order_dens, None,
+                                                 'shg_red', profiler)
+            elif self.shg_type == 'full':
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                                 'real_and_imag', dft_dict,
+                                                 first_order_dens,
+                                                 second_order_dens, None, 'shg',
+                                                 profiler)
 
-        if self.shg_type == 'reduced':
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
-                                             dft_dict, first_order_dens,
-                                             second_order_dens, None, 'shg_red',
-                                             profiler)
-        elif self.shg_type == 'full':
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                             'real_and_imag', dft_dict,
-                                             first_order_dens,
-                                             second_order_dens, None, 'shg',
-                                             profiler)
+            self._print_fock_time(time.time() - time_start_fock)
 
-        time_end_fock = time.time()
+            write_distributed_focks(fock_file, dist_focks, key_freq_pairs,
+                                    self.comm, self.ostream)
 
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
+        # assign distributed Focks to key-frequency pairs
 
         focks = {'F0': F0}
-        for key in keys:
-            focks[key] = {}
 
-        fock_index = 0
-
-        for (wb, wc) in wi:
-            for key in keys:
-                focks[key][wb] = DistributedArray(dist_focks.data[:,
-                                                                  fock_index],
-                                                  self.comm,
-                                                  distribute=False)
-                fock_index += 1
-
-        write_distributed_focks(fock_file, focks, keys, ww, self.comm,
-                                self.ostream)
+        for fock_index, (key, wb) in enumerate(key_freq_pairs):
+            if key not in focks:
+                focks[key] = {}
+            focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index],
+                                              self.comm,
+                                              distribute=False)
 
         return focks
 
