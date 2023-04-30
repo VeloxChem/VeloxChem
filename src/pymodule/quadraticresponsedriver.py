@@ -374,23 +374,23 @@ class QuadraticResponseDriver(NonlinearSolver):
                 beta = val_E3 + val_A2 + val_X2
 
                 self.ostream.print_blank()
-                w_str = 'Quadratic response function at given frequencies: '
-                w_str += '<< {};{},{} >>'.format(self.a_components,
-                                                 self.b_components,
-                                                 self.c_components)
+                w_str = 'Quadratic response function: '
+                w_str += '<< {};{},{} >>  ({},{})'.format(
+                    self.a_components, self.b_components, self.c_components,
+                    str(wb), str(wc))
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
 
-                title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
-                    'Component', 'Frequency', 'Real', 'Imaginary')
+                title = '{:<9s} {:>20s} {:>21s}'.format('Component', 'Real',
+                                                        'Imaginary')
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component('X2', wb, val_X2, width)
-                self._print_component('A2', wb, val_A2, width)
-                self._print_component('E3', wb, val_E3, width)
-                self._print_component('beta', wb, beta, width)
+                self._print_component('X2', val_X2, width)
+                self._print_component('A2', val_A2, width)
+                self._print_component('E3', val_E3, width)
+                self._print_component('beta', beta, width)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
@@ -595,7 +595,7 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         return e3vec
 
-    def _print_component(self, label, freq, value, width):
+    def _print_component(self, label, value, width):
         """
         Prints QRF component.
 
@@ -609,6 +609,6 @@ class QuadraticResponseDriver(NonlinearSolver):
             The width for the output
         """
 
-        w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
-            label, freq, value.real, value.imag)
+        w_str = '{:<9s} {:20.8f} {:20.8f}j'.format(label, value.real,
+                                                   value.imag)
         self.ostream.print_header(w_str.ljust(width))
