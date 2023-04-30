@@ -25,6 +25,7 @@
 
 from pathlib import Path
 import numpy as np
+import time as tm
 import h5py
 
 from .veloxchemlib import mpi_master
@@ -324,12 +325,21 @@ def write_distributed_focks(fname, focks, keys, freqs, comm, ostream):
 
     h5cfg = h5py.get_config()
 
+    t0 = tm.time()
+
     if hasattr(h5cfg, 'mpi') and h5cfg.mpi:
-        return write_distributed_focks_parallel(fname, focks, keys, freqs, comm,
-                                                ostream)
+        success = write_distributed_focks_parallel(fname, focks, keys, freqs,
+                                                   comm, ostream)
     else:
-        return write_distributed_focks_serial(fname, focks, keys, freqs, comm,
-                                              ostream)
+        success = write_distributed_focks_serial(fname, focks, keys, freqs,
+                                                 comm, ostream)
+
+    checkpoint_text = 'Time spent in writing checkpoint file: '
+    checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+    ostream.print_info(checkpoint_text)
+    ostream.print_blank()
+
+    return success
 
 
 def write_distributed_focks_parallel(fname, focks, keys, freqs, comm, ostream):
