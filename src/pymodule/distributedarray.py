@@ -451,9 +451,9 @@ class DistributedArray:
         h5cfg = h5py.get_config()
 
         if hasattr(h5cfg, 'mpi') and h5cfg.mpi:
-            self.append_to_hdf5_file_parallel(fname, label)
+            return self.append_to_hdf5_file_parallel(fname, label)
         else:
-            self.append_to_hdf5_file_serial(fname, label)
+            return self.append_to_hdf5_file_serial(fname, label)
 
     def append_to_hdf5_file_parallel(self, fname, label):
         """

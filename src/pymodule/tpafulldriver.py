@@ -324,8 +324,8 @@ class TpaFullDriver(TpaDriver):
         # read or compute distributed Focks
 
         if self.restart:
-            dist_focks = read_distributed_focks(fock_file, key_freq_pairs,
-                                                self.comm, self.ostream)
+            dist_focks = read_distributed_focks(fock_file, self.comm,
+                                                self.ostream)
         else:
             time_start_fock = time.time()
 
@@ -1065,8 +1065,8 @@ class TpaFullDriver(TpaDriver):
         # read or compute distributed Focks
 
         if self.restart:
-            dist_focks = read_distributed_focks(fock_file, key_freq_pairs,
-                                                self.comm, self.ostream)
+            dist_focks = read_distributed_focks(fock_file, self.comm,
+                                                self.ostream)
         else:
             time_start_fock = time.time()
 

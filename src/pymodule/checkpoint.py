@@ -321,135 +321,36 @@ def write_distributed_focks(fname, dist_focks, key_freq_pairs, comm, ostream):
         valid.
     """
 
-    h5cfg = h5py.get_config()
-
-    t0 = tm.time()
-
-    if hasattr(h5cfg, 'mpi') and h5cfg.mpi:
-        success = write_distributed_focks_parallel(fname, dist_focks,
-                                                   key_freq_pairs, comm,
-                                                   ostream)
-    else:
-        success = write_distributed_focks_serial(fname, dist_focks,
-                                                 key_freq_pairs, comm, ostream)
-
-    checkpoint_text = 'Time spent in writing checkpoint file: '
-    checkpoint_text += f'{(tm.time() - t0):.2f} sec'
-    ostream.print_info(checkpoint_text)
-    ostream.print_blank()
-
-    return success
-
-
-def write_distributed_focks_parallel(fname, dist_focks, key_freq_pairs, comm,
-                                     ostream):
-    """
-    Writes distributed Fock matrices to checkpoint file.
-
-    :param fname:
-        Name of the checkpoint file.
-    :param dist_focks:
-        The distributed Fock matrices as DistributedArray.
-    :param key_freq_pairs:
-        The key-frequency pairs.
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
-
-    :return:
-        True if checkpoint file is written. False if checkpoint file is not
-        valid.
-    """
-
     valid_checkpoint = (fname and isinstance(fname, str))
 
     if not valid_checkpoint:
         return False
 
-    rank = comm.Get_rank()
-    nodes = comm.Get_size()
+    t0 = tm.time()
 
-    shape_0 = dist_focks.shape(0)
-    counts = comm.allgather(shape_0)
-    displacements = [sum(counts[:p]) for p in range(nodes)]
-
-    n_start = displacements[rank]
-    n_end = n_start + counts[rank]
-
-    hf = h5py.File(fname, 'w', driver='mpio', comm=comm)
-    dset = hf.create_dataset('distributed_focks',
-                             (sum(counts), dist_focks.shape(1)),
-                             dtype=dist_focks.data.dtype)
-    dset[n_start:n_end, :] = dist_focks.data[:, :]
-    hf.close()
-
-    if rank == mpi_master():
-        hf = h5py.File(fname, 'a')
+    if comm.Get_rank() == mpi_master():
+        hf = h5py.File(fname, 'w')
         str_key_freq_pairs = [str((key, w)) for key, w in key_freq_pairs]
         hf.create_dataset('key_freq_pairs', data=np.string_(str_key_freq_pairs))
         hf.close()
     comm.barrier()
+
+    dist_focks.append_to_hdf5_file(fname, 'distributed_focks')
 
     checkpoint_text = 'Checkpoint written to file: '
     checkpoint_text += fname
     ostream.print_info(checkpoint_text)
     ostream.print_blank()
 
-    return True
-
-
-def write_distributed_focks_serial(fname, focks, keys, freqs, comm, ostream):
-    """
-    Writes distributed Fock matrices to checkpoint file.
-
-    :param fname:
-        Name of the checkpoint file.
-    :param focks:
-        The dictionary containing the distributed Fock matrices.
-    :param keys:
-        The keys.
-    :param freqs:
-        The frequencies.
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
-
-    :return:
-        True if checkpoint file is written. False if checkpoint file is not
-        valid.
-    """
-
-    valid_checkpoint = (fname and isinstance(fname, str))
-
-    if not valid_checkpoint:
-        return False
-
-    rank = comm.Get_rank()
-
-    if rank == mpi_master():
-        hf = h5py.File(fname, 'w')
-
-    for w in freqs:
-        for key in keys:
-            label = str((key, w))
-            array = focks[key][w].get_full_vector()
-            if rank == mpi_master():
-                hf.create_dataset(label, data=array)
-
-    if rank == mpi_master():
-        hf.close()
-
-        checkpoint_text = 'Checkpoint written to file: '
-        checkpoint_text += fname
-        ostream.print_info(checkpoint_text)
-        ostream.print_blank()
+    checkpoint_text = 'Time spent in writing checkpoint file: '
+    checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+    ostream.print_info(checkpoint_text)
+    ostream.print_blank()
 
     return True
 
 
-def read_distributed_focks(fname, key_freq_pairs, comm, ostream):
+def read_distributed_focks(fname, comm, ostream):
     """
     Reads distributed Fock matrices from checkpoint file.
 
@@ -466,50 +367,8 @@ def read_distributed_focks(fname, key_freq_pairs, comm, ostream):
         A dictionary containing the distributed Fock matrices.
     """
 
-    h5cfg = h5py.get_config()
-
-    if hasattr(h5cfg, 'mpi') and h5cfg.mpi:
-        return read_distributed_focks_parallel(fname, key_freq_pairs, comm,
-                                               ostream)
-    else:
-        return read_distributed_focks_serial(fname, key_freq_pairs, comm,
-                                             ostream)
-
-
-def read_distributed_focks_parallel(fname, key_freq_pairs, comm, ostream):
-    """
-    Reads distributed Fock matrices from checkpoint file.
-
-    :param fname:
-        Name of the checkpoint file.
-    :param key_freq_pairs:
-        The key-frequency pairs.
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
-
-    :return:
-        The distributed Fock matrices as DistributedArray.
-    """
-
-    rank = comm.Get_rank()
-    nodes = comm.Get_size()
-
-    hf = h5py.File(fname, 'r', driver='mpio', comm=comm)
-    dset = hf['distributed_focks']
-
-    ave, res = divmod(dset.shape[0], nodes)
-    counts = [ave + 1 if p < res else ave for p in range(nodes)]
-    displacements = [sum(counts[:p]) for p in range(nodes)]
-
-    n_start = displacements[rank]
-    n_end = n_start + counts[rank]
-
-    data = np.array(dset[n_start:n_end])
-    dist_focks = DistributedArray(data, comm, distribute=False)
-
-    hf.close()
+    dist_focks = DistributedArray.read_from_hdf5_file(fname,
+                                                      'distributed_focks', comm)
 
     checkpoint_text = 'Restarting from checkpoint file: '
     checkpoint_text += fname
@@ -517,54 +376,6 @@ def read_distributed_focks_parallel(fname, key_freq_pairs, comm, ostream):
     ostream.print_blank()
 
     return dist_focks
-
-
-def read_distributed_focks_serial(fname, keys, freqs, comm, ostream):
-    """
-    Reads distributed Fock matrices from checkpoint file.
-
-    :param fname:
-        Name of the checkpoint file.
-    :param keys:
-        The keys.
-    :param freqs:
-        The frequencies.
-    :param comm:
-        The MPI communicator.
-    :param ostream:
-        The output stream.
-
-    :return:
-        A dictionary containing the distributed Fock matrices.
-    """
-
-    rank = comm.Get_rank()
-
-    if rank == mpi_master():
-        hf = h5py.File(fname, 'r')
-
-    focks = {}
-    for key in keys:
-        focks[key] = {}
-
-    for w in freqs:
-        for key in keys:
-            if rank == mpi_master():
-                label = str((key, w))
-                array = np.array(hf.get(label))
-            else:
-                array = None
-            focks[key][w] = DistributedArray(array, comm)
-
-    if rank == mpi_master():
-        hf.close()
-
-        checkpoint_text = 'Restarting from checkpoint file: '
-        checkpoint_text += fname
-        ostream.print_info(checkpoint_text)
-        ostream.print_blank()
-
-    return focks
 
 
 def check_distributed_focks(fname, key_freq_pairs):
