@@ -124,12 +124,13 @@ class TestCheckpoint:
 
         freqs = [0.05, 0.1]
         keys = ['f_sig_xx', 'f_lamtau_yy']
+        key_freq_pairs = [(key, w) for w in freqs for key in keys]
 
-        focks = {
-            key: {
-                w: DistributedArray(np.random.rand(81,), comm) for w in freqs
-            } for key in keys
-        }
+        wrong_key_freq_pairs_1 = [(key, w) for w in freqs for key in ['x', 'y']]
+        wrong_key_freq_pairs_2 = [(key, w) for w in [0.1, 0.2] for key in keys]
+
+        dist_focks = DistributedArray(np.random.rand(81, len(key_freq_pairs)),
+                                      comm)
 
         mol, bas = self.get_molecule_and_basis()
 
@@ -138,29 +139,37 @@ class TestCheckpoint:
         fname = str(fpath)
 
         # test writing
-        success = write_distributed_focks(fname, focks, keys, freqs, comm,
-                                          ostream)
+        success = write_distributed_focks(fname, dist_focks, key_freq_pairs,
+                                          comm, ostream)
         assert success
 
         # test reading
-        read_focks = read_distributed_focks(fname, keys, freqs, comm, ostream)
-        for key in keys:
-            for w in freqs:
-                a = read_focks[key][w].get_full_vector()
-                b = focks[key][w].get_full_vector()
-                if is_mpi_master(comm):
-                    assert np.max(np.abs(a - b)) < 1.0e-12
+        read_focks = read_distributed_focks(fname, comm, ostream)
+
+        for fock_index in range(len(key_freq_pairs)):
+            a_dist = DistributedArray(dist_focks.data[:, fock_index],
+                                      comm,
+                                      distribute=False)
+            b_dist = DistributedArray(read_focks.data[:, fock_index],
+                                      comm,
+                                      distribute=False)
+            a_full = a_dist.get_full_vector()
+            b_full = b_dist.get_full_vector()
+            if is_mpi_master(comm):
+                assert np.max(np.abs(a_full - b_full)) < 1.0e-12
 
         # test hdf5
         if is_mpi_master(comm):
 
-            valid_checkpoint = check_distributed_focks(fname, keys, freqs)
+            valid_checkpoint = check_distributed_focks(fname, key_freq_pairs)
             assert valid_checkpoint
 
-            valid_checkpoint = check_distributed_focks(fname, ['x', 'y'], freqs)
+            valid_checkpoint = check_distributed_focks(fname,
+                                                       wrong_key_freq_pairs_1)
             assert not valid_checkpoint
 
-            valid_checkpoint = check_distributed_focks(fname, keys, [0.1, 0.2])
+            valid_checkpoint = check_distributed_focks(fname,
+                                                       wrong_key_freq_pairs_2)
             assert not valid_checkpoint
 
             if fpath.is_file():
