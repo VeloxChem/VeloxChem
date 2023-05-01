@@ -78,7 +78,7 @@ class OutputStream:
             errio = f'OutputStream: invalid argument {stream}'
             assert_msg_critical(self.state, errio)
 
-        self._state_backup = self.state
+        self._state_backup = None
 
     def __del__(self):
         """
@@ -104,8 +104,10 @@ class OutputStream:
         Mutes the output stream.
         """
 
-        self._state_backup = self.state
-        self.state = False
+        # only mute from an unmuted state (i.e. when _state_backup is None)
+        if self._state_backup is None:
+            self._state_backup = self.state
+            self.state = False
 
     def unmute(self):
         """
@@ -113,7 +115,10 @@ class OutputStream:
         state of the output stream.
         """
 
-        self.state = self._state_backup
+        # only unmute from an muted state (i.e. when _state_backup is not None)
+        if self._state_backup is not None:
+            self.state = self._state_backup
+            self._state_backup = None
 
     def get_state(self):
         """
