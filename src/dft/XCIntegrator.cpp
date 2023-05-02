@@ -5019,7 +5019,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
         timer.start("Wxc matrix dist.");
 
-        auto partial_mat_Wxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi,  sub_ActiveMOs, vrho, timer);
+        auto partial_mat_Wxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi,  sub_active_mos, vrho, timer);
 
         submat::distribute4DSubTo4DFull(mat_wxc, partial_mat_Wxc, aoinds, aocount);
 
@@ -5377,7 +5377,7 @@ CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // tot
     // eq.(30), JCTC 2021, 17, 1512-1521
     timer.start("Wxc matrix");
 
-    auto naos = gtoValues.getNumberOfRows();
+    //auto naos = gtoValues.getNumberOfRows();
     auto n_active = ActiveMOs.getNumberOfRows();
 
     CDenseMatrix MOs_on_grid;

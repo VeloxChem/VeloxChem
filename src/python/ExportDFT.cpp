@@ -120,7 +120,7 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     mat_Vxc.zero();
 
-    CDense4DTensor mat_Wxc(naos, nActive, nActive, nActive);
+    CDense4DTensor mat_Wxc(naos, n_active, n_active, n_active);
 
     mat_Wxc.zero();
 
@@ -130,7 +130,7 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     ret.append(mat_Vxc);
 
-    ret.append(vlx_general::pointer_to_numpy(mat_Wxc.values(), naos, nActive* nActive* nActive));
+    ret.append(vlx_general::pointer_to_numpy(mat_Wxc.values(), naos, n_active * n_active * n_active));
 
     return ret;
 }
