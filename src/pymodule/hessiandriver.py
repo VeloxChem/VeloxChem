@@ -308,28 +308,6 @@ class HessianDriver:
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = 'Harmonic frequencies (in cm**-1), force constants '
-        valstr += '(in mdyne/A), reduced masses (in amu),'
-        self.ostream.print_header(valstr)
-
-        if self.ir_intensities is not None:
-            valstr = ' IR intensities (in km/mol),'
-            if self.raman_intensities is not None:
-                valstr += ' Raman scattering activities (in A**4/amu),'
-            self.ostream.print_header(valstr)
-
-            if (self.raman_intensities is not None and
-                    self.print_depolarization_ratio):
-                valstr = ' parallel and perpendicular Raman '
-                valstr += 'scattering activities,'
-                valstr += ' depolarization ratios,'
-                self.ostream.print_header(valstr)
-
-        valstr = 'and Cartesian normal mode displacements.'
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
         width = 52
 
         for k in range(number_of_modes):
@@ -340,7 +318,7 @@ class HessianDriver:
             self.ostream.print_header('-' * width)
 
             freq_string = '{:22s}{:20.2f}  {:8s}'.format(
-                'Frequency:', self.frequencies[k], 'cm**-1')
+                'Harmonic frequency:', self.frequencies[k], 'cm**-1')
             self.ostream.print_header(freq_string.ljust(width))
 
             mass_string = '{:22s}{:20.4f}  {:8s}'.format(
