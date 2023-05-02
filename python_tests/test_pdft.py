@@ -23,15 +23,16 @@ class TestPDFT:
 
         # Optimize ROHF wavefunction
         scfdrv = ScfRestrictedOpenDriver()
+        scfdrv.xcfun = func
         scfdrv.ostream.mute()
-        scfdrv.compute(molecule, basis)
+        results = scfdrv.compute(molecule, basis)
 
         # Compute SLDA correction
         grid_drv = GridDriver()
         molgrid = grid_drv.generate(molecule)
 
         xc_drv = XCIntegrator()
-        vxc_mat = xc_drv.integrate_vxc_fock(molecule, basis, scfdrv.density,
+        vxc_mat= xc_drv.integrate_vxc_fock(molecule, basis, scfdrv.density,
                                             molgrid, func)
         vxc_mat.reduce_sum(scfdrv.rank, scfdrv.nodes, scfdrv.comm)
 
@@ -55,21 +56,60 @@ class TestPDFT:
             mo_act = None
         mo_act = scfdrv.comm.bcast(mo_act, root=mpi_master())
 
-        pdft_mat = xc_drv.integrate_vxc_pdft(den_mat, D2act, mo_act.T.copy(),
+        pdft_vxc, pdft_wxc = xc_drv.integrate_vxc_pdft(den_mat, D2act, mo_act.T.copy(),
                                              molecule, basis, molgrid, pfunc)
-        pdft_mat.reduce_sum(scfdrv.rank, scfdrv.nodes, scfdrv.comm)
+        pdft_vxc.reduce_sum(scfdrv.rank, scfdrv.nodes, scfdrv.comm)
+
+        # Compute gradients
+        nIn = molecule.number_of_beta_electrons()
+        nInAct = molecule.number_of_alpha_electrons()
+        nAct = nInAct- nIn
+        nAO = total_density.shape[0]
+        wxc = 2.0 * pdft_wxc.reshape(nAO, nAct, nAct, nAct)
+
+        C = results["C"]
+        FA = results["F"][0]
+        FB = results["F"][1]
+        FA = vxc_mat.get_matrix(True).to_numpy()
+        FB = vxc_mat.get_matrix(False).to_numpy()
+
+        FAMO = np.linalg.multi_dot((C.T, FA, C))
+        FBMO = np.linalg.multi_dot((C.T, FB, C))
+        grad_ks = FAMO[:nInAct,:]
+        grad_ks[:nIn,:] += FBMO[:nIn,:]
+
+        Fock = pdft_vxc.get_matrix().to_numpy()
+        Qpt = np.tensordot(
+            wxc, D2act, axes=([1, 2, 3], [1, 2, 3])
+        )
+
+        grad_pdft = np.empty_like(grad_ks)
+        grad_pdft[:nIn, :] = np.linalg.multi_dot(
+            (C[:,:nIn].T, 2 * Fock, C)
+        )
+        grad_pdft[nIn:nInAct, :] = np.linalg.multi_dot(
+            (Dact, mo_act.T, Fock, C)
+        )
+        grad_pdft[nIn:nInAct, :] -= np.matmul(C.T, Qpt).T
 
         if scfdrv.rank == mpi_master():
-            return vxc_mat.get_energy(), pdft_mat.get_energy()
+            return vxc_mat.get_energy(), pdft_vxc.get_energy(), grad_ks, grad_pdft
         else:
-            return None, None
+            return None, None, None, None
 
-    def test_O2_ROLDA(self):
-        ksdft, pdft = self.run_RODFT('slda', 'plda')
+    def test_O2_ROSlater(self):
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slater', 'pslater')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
+            assert np.allclose(ks_grad, pdft_grad)
+
+    def test_O2_ROLDA(self):
+        ksdft, pdft, ks_grad, pdft_grad= self.run_RODFT('slda', 'plda')
+        if is_mpi_master():
+            assert abs(ksdft - pdft) < 1.0e-6
+            assert np.allclose(ks_grad, pdft_grad)
 
     def test_O2_ROGGA(self):
-        ksdft, pdft = self.run_RODFT('pbe', 'ppbe')
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'ppbe')
         if is_mpi_master():
-            assert abs(-16.88550889838203 - pdft) < 1.0e-6
+            assert abs(-16.924117087238564 - pdft) < 1.0e-6
