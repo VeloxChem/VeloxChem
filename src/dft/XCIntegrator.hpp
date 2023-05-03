@@ -397,7 +397,7 @@ class CXCIntegrator
      AO Kohn-Sham matrix and MO "Q-matrix".
 
      @param aoFockMatrix the AO Fock matrix.
-     @param mat_wxc the MO Two-body energy gradient term.
+     @param tensorWxc the MO Two-body energy gradient term.
      @param molecule the molecule.
      @param basis the molecular basis.
      @param densityMatrix the AO density matrix object.
@@ -408,7 +408,7 @@ class CXCIntegrator
      */
 
     void _integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
-                                 CDense4DTensor&                 mat_wxc,
+                                 CDense4DTensor&                 tensorWxc,
                                  const CMolecule&                molecule,
                                  const CMolecularBasis&          basis,
                                  const CAODensityMatrix&         densityMatrix,
@@ -422,7 +422,7 @@ class CXCIntegrator
      AO Kohn-Sham matrix and MO "Q-matrix".
 
      @param aoFockMatrix the AO Fock matrix.
-     @param moTwoBodyGradient the MO Two-body energy gradient term.
+     @param tensorWxc the MO Two-body energy gradient term.
      @param molecule the molecule.
      @param basis the molecular basis.
      @param densityMatrix the AO density matrix object.
@@ -432,7 +432,7 @@ class CXCIntegrator
      @param fvxc the exchange-correlation functional.
      */
     void _integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
-                                 CDense4DTensor&                 moTwoBodyGradient,
+                                 CDense4DTensor&                 tensorWxc,
                                  const CMolecule&                molecule,
                                  const CMolecularBasis&          basis,
                                  const CAODensityMatrix&         densityMatrix,
@@ -462,6 +462,7 @@ class CXCIntegrator
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
+     @param activeMOs the active molecular orbitals.
      @param vrho the 1st-order functional derivative wrt density.
      @param timer the timer.
      @return the contribution as a CDense4DTensor object.
@@ -471,7 +472,7 @@ class CXCIntegrator
     CDenseMatrix _integratePartialWxcFockForPLDA(const int32_t       npoints,
                                               const double*       weights,
                                               const CDenseMatrix& gtoValues,
-                                              const CDenseMatrix& ActiveMOs,
+                                              const CDenseMatrix& activeMOs,
                                               const double*       vrho,
                                               CMultiTimer&        timer) const;
     /**
@@ -1395,7 +1396,7 @@ class CXCIntegrator
      Fock matrix and MO "Q-matrix".
 
      @param aoFockMatrix the AO Fock matrix.
-     @param moTwoBodyGradient the MO Two-body energy gradient term.
+     @param tensorWxc the MO Two-body energy gradient term.
      @param molecule the molecule.
      @param basis the molecular basis.
      @param densityMatrix the AO density matrix object.
@@ -1405,7 +1406,7 @@ class CXCIntegrator
      @param xcFuncLabel the label of exchange-correlation functional.
      */
     void integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
-                          CDense4DTensor&         mat_wxc,
+                          CDense4DTensor&         tensorWxc,
                           const CMolecule&        molecule,
                           const CMolecularBasis&  basis,
                           const CAODensityMatrix& densityMatrix,

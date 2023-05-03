@@ -80,20 +80,19 @@ CDenseMatrix getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix
 
 
 /**
- Distributes partial Wxc tensor (Pair functional) to full Wxc tensor.
+ Distributes partial Wxc tensor (pair functional) to full Wxc tensor.
 
- @param fullMatrix the full Wxc tensor.
+ @param fullTensor the full Wxc tensor.
  @param subMatrix the partial Wxc matrix.
- @param aoIndices the index mapping from partial matrix to full matrix.
+ @param aoIndices the index mapping from partial to full.
  @param aoCount the number of indices in partial matrix.
- @param nAOs the number of indices in full matrix.
  */
 
 void
-distribute4DSubTo4DFull(CDense4DTensor&          fullMatrix,
-                                          const CDenseMatrix&       subMatrix,
-                                          const std::vector<int32_t>& aoIndices,
-                                          const int32_t               aoCount);
+distributeSubmatrixTo4DTensor(CDense4DTensor&            fullTensor,
+                             const CDenseMatrix&         subMatrix,
+                             const std::vector<int32_t>& aoIndices,
+                             const int32_t               aoCount);
 
 
 /**

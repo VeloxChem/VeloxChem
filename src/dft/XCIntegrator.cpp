@@ -268,7 +268,7 @@ CXCIntegrator::integrateKxcLxcFock(CAOFockMatrix&          aoFockMatrix,
 
 void
 CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
-                                CDense4DTensor&         mat_wxc,
+                                CDense4DTensor&         tensorWxc,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
                                 const CAODensityMatrix& densityMatrix,
@@ -284,12 +284,12 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
     if (xcfuntype == "PLDA")
     {
         _integrateVxcPDFTForLDA(
-            aoFockMatrix, mat_wxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
+            aoFockMatrix, tensorWxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
     }
     else if (xcfuntype == "PGGA")
     {
         _integrateVxcPDFTForGGA(
-            aoFockMatrix, mat_wxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
+            aoFockMatrix, tensorWxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
     }
     else
     {
@@ -312,9 +312,6 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
     timer.start("Total timing");
 
     timer.start("Preparation");
-    //
-    //  Dr. M. Scott
-    //
 
     auto nthreads = omp_get_max_threads();
 
@@ -4822,7 +4819,7 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
 void
 CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
-                                       CDense4DTensor&                 mat_wxc,
+                                       CDense4DTensor&                 tensorWxc,
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
                                        const CAODensityMatrix&         densityMatrix,
@@ -4834,6 +4831,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
     CMultiTimer timer;
 
     timer.start("Total timing");
+
     timer.start("Preparation");
 
     auto nthreads = omp_get_max_threads();
@@ -5019,9 +5017,9 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
         timer.start("Wxc matrix dist.");
 
-        auto partial_mat_Wxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi,  sub_active_mos, vrho, timer);
+        auto partial_tensorWxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi,  sub_active_mos, vrho, timer);
 
-        submat::distribute4DSubTo4DFull(mat_wxc, partial_mat_Wxc, aoinds, aocount);
+        submat::distributeSubmatrixTo4DTensor(tensorWxc, partial_tensorWxc, aoinds, aocount);
 
         timer.stop("Wxc matrix dist.");
 
@@ -5050,7 +5048,6 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
-
 }
 
 void
@@ -5364,11 +5361,11 @@ CXCIntegrator::_integratePartialVxcFockForLDA(const int32_t       npoints,
 }
 
 CDenseMatrix
-CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // total number of points in the box
-                                              const double*       weights,    // weights
+CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t      npoints,
+                                              const double*       weights,
                                               const CDenseMatrix& gtoValues,
-                                              const CDenseMatrix& ActiveMOs,
-                                              const double*       vrho,       //
+                                              const CDenseMatrix& activeMOs,
+                                              const double*       vrho,
                                               CMultiTimer&        timer) const
 
 {
@@ -5377,18 +5374,17 @@ CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // tot
     // eq.(30), JCTC 2021, 17, 1512-1521
     timer.start("Wxc matrix");
 
-    //auto naos = gtoValues.getNumberOfRows();
-    auto n_active = ActiveMOs.getNumberOfRows();
+    auto nActive = activeMOs.getNumberOfRows();
 
-    CDenseMatrix MOs_on_grid;
-    if (n_active > 0)
+    CDenseMatrix mos_on_grid;
+    if (nActive > 0)
     {
-        MOs_on_grid = denblas::multAB(ActiveMOs, gtoValues);
+        mos_on_grid = denblas::multAB(activeMOs, gtoValues);
     }
 
     // created empty partial mat_W
-    CDenseMatrix mat_W(n_active*n_active*n_active, npoints);
-    auto W_val = mat_W.values();
+    CDenseMatrix matrixWxc(nActive*nActive*nActive, npoints);
+    auto W_val = matrixWxc.values();
 
     #pragma omp parallel
     {
@@ -5398,22 +5394,22 @@ CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // tot
         auto grid_batch_size = mpi::batch_size(npoints, thread_id, nthreads);
         auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
 
-        for (int32_t j = 0; j < n_active; j++)
+        for (int32_t j = 0; j < nActive; j++)
         {
-            auto MOj = MOs_on_grid.row(j);
-            for (int32_t k = 0; k < n_active; k++)
+            auto mo_j = mos_on_grid.row(j);
+            for (int32_t k = 0; k < nActive; k++)
             {
-                auto jk = j * n_active + k;
-                auto MOk = MOs_on_grid.row(k);
-                for (int32_t l = 0; l < n_active; l++)
+                auto jk = j * nActive + k;
+                auto mo_k = mos_on_grid.row(k);
+                for (int32_t l = 0; l < nActive; l++)
                 {
 
-                    auto jkl = jk * n_active + l;
-                    auto MOl = MOs_on_grid.row(l);
-                    #pragma omp simd aligned(W_val, vrho, weights, chi_val, MOj, MOk, MOl : VLX_ALIGN)
+                    auto jkl = jk * nActive + l;
+                    auto mo_l = mos_on_grid.row(l);
+                    #pragma omp simd aligned(W_val, vrho, weights, mo_j, mo_k, mo_l : VLX_ALIGN)
                     for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
                     {
-                        W_val[jkl*npoints + g] = weights[g] * vrho[2 * g + 1] * MOj[g] * MOk[g] * MOl[g];
+                        W_val[jkl*npoints + g] = weights[g] * vrho[2 * g + 1] * mo_j[g] * mo_k[g] * mo_l[g];
                     }
                 }
             }
@@ -5421,11 +5417,11 @@ CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t  npoints,    // tot
 
     }
 
-    auto mat_Wxc = denblas::multABt(gtoValues, mat_W); //MGD tmp
+    auto tensorWxc = denblas::multABt(gtoValues, matrixWxc);
 
     timer.stop("Wxc matrix");
 
-    return mat_Wxc;
+    return tensorWxc;
 }
 
 std::vector<CDenseMatrix>

@@ -24,6 +24,7 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "ExportDFT.hpp"
+
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/pybind11.h>
@@ -92,7 +93,7 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     CDense4DTensor tensor2DM(vec, n_active, n_active, n_active, n_active);
 
-    // active MO
+    // activeMOs
 
     // Check dimensions
 
@@ -116,23 +117,23 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     // Create output tensors
 
-    CAOKohnShamMatrix mat_Vxc(naos, naos, true);
+    CAOKohnShamMatrix matrixVxc(naos, naos, true);
 
-    mat_Vxc.zero();
+    matrixVxc.zero();
 
-    CDense4DTensor mat_Wxc(naos, n_active, n_active, n_active);
+    CDense4DTensor tensorWxc(naos, n_active, n_active, n_active);
 
-    mat_Wxc.zero();
+    tensorWxc.zero();
 
-    self.integrateVxcPDFT(mat_Vxc, mat_Wxc, molecule, basis, aoDensityMatrix, tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
+    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, aoDensityMatrix, tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
 
-    py::list ret;
+    py::list returnList;
 
-    ret.append(mat_Vxc);
+    returnList.append(matrixVxc);
 
-    ret.append(vlx_general::pointer_to_numpy(mat_Wxc.values(), naos, n_active * n_active * n_active));
+    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), naos, n_active * n_active * n_active));
 
-    return ret;
+    return returnList;
 }
 
 // Exports classes/functions in src/dft to python

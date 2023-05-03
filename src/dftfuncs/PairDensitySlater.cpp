@@ -92,7 +92,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double fxa = std::pow(1.0 + zeta, fourthird);
 
-            double fxb = std::pow(std::max(1.0 - zeta, 0.0), fourthird);
+            double fxb = std::pow(1.0 - zeta, fourthird);
 
             f_zeta = fxa + fxb;
 
@@ -100,7 +100,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double dxa = std::pow(1.0 + zeta, onethird);
 
-            double dxb = std::pow(std::max(1.0 - zeta, 0.0), onethird);
+            double dxb = std::pow(1.0 - zeta, onethird);
 
             double fl_zeta = dxa - dxb;
 

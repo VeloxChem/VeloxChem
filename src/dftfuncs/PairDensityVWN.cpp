@@ -94,6 +94,8 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
     double f76 = -7.0 / 6.0;
 
+    double f89 = 8.0 / 9.0;
+
     double DCRS = std::pow(3.0 / (4.0 * mathconst::getPiValue()), -f16);
 
     for (int32_t g = 0; g < np; g++)
@@ -130,15 +132,15 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double zeta = delta / density;
 
-            double fl_zeta = fourthird * (std::pow(1.0 + zeta, onethird) - std::pow(std::max(1.0 - zeta, 0.0), onethird));
+            double fl_zeta = fourthird * (std::pow(1.0 + zeta, onethird) - std::pow(1.0 - zeta, onethird));
 
-            f_zeta = spinpolf * (std::pow(1.0 + zeta, fourthird) + std::pow(std::max(1.0 - zeta, 0.0), fourthird) - 2.0);
+            f_zeta = spinpolf * (std::pow(1.0 + zeta, fourthird) + std::pow(1.0 - zeta, fourthird) - 2.0);
 
             f_zet1 =  - spinpolf * zeta * fl_zeta;
 
             if (pair_density > -1.0e-12)
             {
-                f_zetpi =  - spinpolf * 8.0 /9.0 / density;
+                f_zetpi =  - spinpolf * f89 / density;
             }
             else
             {
@@ -166,7 +168,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             if (pair_density < 1.0e-12)
             {
-                f_zetpi =  - spinpolf * 8.0 /9.0 / density;
+                f_zetpi =  - spinpolf * f89 / density;
             }
             else
             {
