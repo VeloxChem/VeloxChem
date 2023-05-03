@@ -1,7 +1,8 @@
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import GridDriver, XCIntegrator
-from veloxchem.veloxchemlib import is_mpi_master, mpi_master
+from veloxchem.veloxchemlib import is_single_node, is_mpi_master, mpi_master
 from veloxchem.veloxchemlib import denmat
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -97,18 +98,21 @@ class TestPDFT:
         else:
             return None, None, None, None
 
+    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_O2_ROSlater(self):
         ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slater', 'pslater')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
+    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_O2_ROLDA(self):
         ksdft, pdft, ks_grad, pdft_grad= self.run_RODFT('slda', 'plda')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
+    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_O2_ROGGA(self):
         ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'ppbe')
         if is_mpi_master():
