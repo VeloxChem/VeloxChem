@@ -326,6 +326,63 @@ class DistributedArray:
             The distributed array.
         """
 
+        h5cfg = h5py.get_config()
+
+        if hasattr(h5cfg, 'mpi') and h5cfg.mpi:
+            return cls.read_from_hdf5_file_parallel(fname, label, comm)
+        else:
+            return cls.read_from_hdf5_file_serial(fname, label, comm)
+
+    @classmethod
+    def read_from_hdf5_file_parallel(cls, fname, label, comm):
+        """
+        Reads an array from checkpoint file and returns a distributed array.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+        :param comm:
+            The communicator.
+
+        :return:
+            The distributed array.
+        """
+
+        rank = comm.Get_rank()
+        nodes = comm.Get_size()
+
+        hf = h5py.File(fname, 'r', driver='mpio', comm=comm)
+        dset = hf[label]
+
+        ave, res = divmod(dset.shape[0], nodes)
+        counts = [ave + 1 if p < res else ave for p in range(nodes)]
+        displacements = [sum(counts[:p]) for p in range(nodes)]
+
+        row_start = displacements[rank]
+        row_end = row_start + counts[rank]
+        data = np.array(dset[row_start:row_end, :])
+
+        hf.close()
+
+        return cls(data, comm, distribute=False)
+
+    @classmethod
+    def read_from_hdf5_file_serial(cls, fname, label, comm):
+        """
+        Reads an array from checkpoint file and returns a distributed array.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+        :param comm:
+            The communicator.
+
+        :return:
+            The distributed array.
+        """
+
         rank = comm.Get_rank()
         nodes = comm.Get_size()
 
@@ -391,6 +448,57 @@ class DistributedArray:
             The time spent in writing to checkpoint file.
         """
 
+        h5cfg = h5py.get_config()
+
+        if hasattr(h5cfg, 'mpi') and h5cfg.mpi:
+            return self.append_to_hdf5_file_parallel(fname, label)
+        else:
+            return self.append_to_hdf5_file_serial(fname, label)
+
+    def append_to_hdf5_file_parallel(self, fname, label):
+        """
+        Appends an array to checkpoint file.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+
+        :return:
+            The time spent in writing to checkpoint file.
+        """
+
+        t0 = tm.time()
+
+        counts = self.comm.allgather(self.shape(0))
+        displacements = [sum(counts[:p]) for p in range(self.nodes)]
+
+        hf = h5py.File(fname, 'a', driver='mpio', comm=self.comm)
+
+        dset = hf.create_dataset(label, (sum(counts), self.shape(1)),
+                                 dtype=self.data.dtype)
+
+        row_start = displacements[self.rank]
+        row_end = row_start + counts[self.rank]
+        dset[row_start:row_end, :] = self.data[:, :]
+
+        hf.close()
+
+        return tm.time() - t0
+
+    def append_to_hdf5_file_serial(self, fname, label):
+        """
+        Appends an array to checkpoint file.
+
+        :param fname:
+            The name of the checkpoint file.
+        :param label:
+            The label for the array.
+
+        :return:
+            The time spent in writing to checkpoint file.
+        """
+
         t0 = tm.time()
 
         counts = self.comm.gather(self.shape(0))
@@ -411,8 +519,7 @@ class DistributedArray:
             hf = h5py.File(fname, 'a')
 
             dset = hf.create_dataset(label, (sum(counts), self.shape(1)),
-                                     dtype=self.data.dtype,
-                                     compression='gzip')
+                                     dtype=self.data.dtype)
 
         for batch_start in range(0, n_total, batch_size):
             batch_end = min(batch_start + batch_size, n_total)

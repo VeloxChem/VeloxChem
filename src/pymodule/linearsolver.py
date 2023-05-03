@@ -282,8 +282,7 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['response'].items()
+            key: val[0] for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -1149,6 +1148,8 @@ class LinearSolver:
         if self.checkpoint_file is None:
             return
 
+        t0 = tm.time()
+
         if self.rank == mpi_master():
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
                                      basis, dft_dict, pe_dict, self.ostream)
@@ -1170,6 +1171,11 @@ class LinearSolver:
 
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
+
+            checkpoint_text = 'Time spent in writing checkpoint file: '
+            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
 
     def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
         """

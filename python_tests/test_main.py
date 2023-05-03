@@ -1,6 +1,6 @@
 from pathlib import Path
 from unittest.mock import patch
-import tempfile
+from random import choice
 import sys
 
 from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
@@ -29,16 +29,18 @@ class TestMain:
 
     def run_main_function(self, capsys, input_lines, input_fname, output):
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_file = Path(temp_dir, input_fname)
-            self.create_input_file(input_lines, input_file)
-            with patch.object(sys, 'argv', ['vlx', str(input_file)]):
-                main()
-                captured = capsys.readouterr()
-                if is_mpi_master():
-                    for line in output:
-                        assert line in captured.out
-                self.remove_h5_files(input_file)
+        here = Path(__file__).parent
+        random_string = ''.join([choice('abcdef123456') for i in range(8)])
+        input_file = here / 'inputs' / f'{input_fname}_{random_string}.inp'
+
+        self.create_input_file(input_lines, input_file)
+        with patch.object(sys, 'argv', ['vlx', str(input_file)]):
+            main()
+            captured = capsys.readouterr()
+            if is_mpi_master():
+                for line in output:
+                    assert line in captured.out
+            self.remove_h5_files(input_file)
 
     def remove_h5_files(self, input_file):
 
@@ -204,7 +206,7 @@ class TestMain:
 
         scf_input_lines = (scf_job_input + method_input + molecule_input)
 
-        self.run_main_function(capsys, scf_input_lines, 'vlx_scf_test.inp',
+        self.run_main_function(capsys, scf_input_lines, 'vlx_scf_test',
                                scf_output)
 
         # rpa test
@@ -212,7 +214,7 @@ class TestMain:
         rpa_input_lines = (rsp_job_input + method_input + rpa_input +
                            molecule_input)
 
-        self.run_main_function(capsys, rpa_input_lines, 'vlx_rpa_test.inp',
+        self.run_main_function(capsys, rpa_input_lines, 'vlx_rpa_test',
                                scf_output + rpa_output)
 
         # cpp test
@@ -220,5 +222,5 @@ class TestMain:
         cpp_input_lines = (rsp_job_input + method_input + cpp_input +
                            molecule_input)
 
-        self.run_main_function(capsys, cpp_input_lines, 'vlx_cpp_test.inp',
+        self.run_main_function(capsys, cpp_input_lines, 'vlx_cpp_test',
                                scf_output + cpp_output)

@@ -308,99 +308,75 @@ class HessianDriver:
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = 'Harmonic frequencies (in cm**-1), force constants '
-        valstr += '(in mdyne/A), reduced masses (in amu),'
-        self.ostream.print_header(valstr)
-        if self.ir_intensities is not None:
-            valstr = ' IR intensities (in km/mol),'
-            if self.raman_intensities is not None:
-                valstr += ' Raman scattering activities (in A**4/amu),'
-            self.ostream.print_header(valstr)
-            if (self.raman_intensities is not None and
-                    self.print_depolarization_ratio):
-                valstr = ' parallel and perpendicular Raman '
-                valstr += 'scattering activities,'
-                valstr += ' depolarization ratios,'
-                self.ostream.print_header(valstr)
-        valstr = 'and Cartesian normal mode displacements.'
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.print_blank()
+        width = 52
 
-        for k in range(0, number_of_modes, 3):
-
-            end = k + 3
-            if k + 3 > number_of_modes:
-                end = number_of_modes
+        for k in range(number_of_modes):
 
             # Print indices and frequencies:
-            index_string = '{:17s}'.format('  Index: ')
-            freq_string = '{:17s}'.format('  Frequency: ')
-            mass_string = '{:17s}'.format('  Reduced mass: ')
-            force_cnst_string = '{:17s}'.format('  Force constant:')
-            if self.ir_intensities is not None:
-                ir_intens_string = '{:17s}'.format('  IR intensity:')
-                if self.raman_intensities is not None:
-                    raman_intens_string = '{:17s}'.format('  Raman activ.:')
-                    if self.print_depolarization_ratio:
-                        raman_parallel_str = '{:17s}'.format(
-                            '  Parallel Raman:')
-                        raman_perpendicular_str = '{:17s}'.format(
-                            '  Perp. Raman:')
-                        depolarization_str = '{:17s}'.format('  Depol. ratio:')
+            index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
+            self.ostream.print_header(index_string.ljust(width))
+            self.ostream.print_header('-' * width)
 
-            normal_mode_string = '{:17s}'.format('  Normal mode: ')
-            for i in range(k, end):
-                index_string += '{:^31d}'.format(i + 1)
-                freq_string += '{:^31.2f}'.format(self.frequencies[i])
-                mass_string += '{:^31.4f}'.format(self.reduced_masses[i])
-                force_cnst_string += '{:^31.4f}'.format(self.force_constants[i])
-                if self.ir_intensities is not None:
-                    ir_intens_string += '{:^31.4f}'.format(
-                        self.ir_intensities[i])
-                    if self.raman_intensities is not None:
-                        raman_intens_string += '{:^31.4f}'.format(
-                            self.raman_intensities[i])
-                        if self.print_depolarization_ratio:
-                            raman_parallel_str += '{:^31.4f}'.format(int_pol[i])
-                            raman_perpendicular_str += '{:^31.4f}'.format(
-                                int_depol[i])
-                            depolarization_str += '{:^31.4f}'.format(
-                                depol_ratio[i])
+            freq_string = '{:22s}{:20.2f}  {:8s}'.format(
+                'Harmonic frequency:', self.frequencies[k], 'cm**-1')
+            self.ostream.print_header(freq_string.ljust(width))
 
-                normal_mode_string += '{:^30s}{:>1s}'.format(
-                    'X         Y         Z', '|')
-            self.ostream.print_line(index_string)
-            self.ostream.print_line(freq_string)
-            self.ostream.print_line(force_cnst_string)
-            self.ostream.print_line(mass_string)
+            mass_string = '{:22s}{:20.4f}  {:8s}'.format(
+                'Reduced mass:', self.reduced_masses[k], 'amu')
+            self.ostream.print_header(mass_string.ljust(width))
+
+            force_cnst_string = '{:22s}{:20.4f}  {:8s}'.format(
+                'Force constant:', self.force_constants[k], 'mdyne/A')
+            self.ostream.print_header(force_cnst_string.ljust(width))
+
             if self.ir_intensities is not None:
-                self.ostream.print_line(ir_intens_string)
+                ir_intens_string = '{:22s}{:20.4f}  {:8s}'.format(
+                    'IR intensity:', self.ir_intensities[k], 'km/mol')
+                self.ostream.print_header(ir_intens_string.ljust(width))
+
                 if self.raman_intensities is not None:
-                    self.ostream.print_line(raman_intens_string)
+                    raman_intens_string = '{:22s}{:20.4f}  {:8s}'.format(
+                        'Raman activity:', self.raman_intensities[k],
+                        'A**4/amu')
+                    self.ostream.print_header(raman_intens_string.ljust(width))
+
                     if self.print_depolarization_ratio:
-                        self.ostream.print_line(raman_parallel_str)
-                        self.ostream.print_line(raman_perpendicular_str)
-                        self.ostream.print_line(depolarization_str)
-            self.ostream.print_line(normal_mode_string)
+                        raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
+                            'Parallel Raman:', int_pol[k], 'A**4/amu')
+                        self.ostream.print_header(
+                            raman_parallel_str.ljust(width))
+
+                        raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
+                            'Perpendicular Raman:', int_depol[k], 'A**4/amu')
+                        self.ostream.print_header(
+                            raman_perpendicular_str.ljust(width))
+
+                        depolarization_str = '{:22s}{:20.4f}'.format(
+                            'Depolarization ratio:', depol_ratio[k])
+                        self.ostream.print_header(
+                            depolarization_str.ljust(width))
+
+            normal_mode_string = '{:22s}'.format('Normal mode:')
+            self.ostream.print_header(normal_mode_string.ljust(width))
+
+            normal_mode_string = '{:16s}{:>12s}{:>12s}{:>12s}'.format(
+                '', 'X', 'Y', 'Z')
+            self.ostream.print_header(normal_mode_string.ljust(width))
 
             # Print normal modes:
             for atom_index in range(natoms):
-                valstr = '{:17s}'.format('  ' + str(atom_index + 1) + ' ' +
-                                         atom_symbol[atom_index])
-
-                for j in range(k, end):
-                    valstr += '{:^10.4f}'.format(
-                        self.normal_modes[j][3 * atom_index])  # X
-                    valstr += '{:^10.4f}'.format(
-                        self.normal_modes[j][3 * atom_index + 1])  # Y
-                    valstr += '{:^10.4f}{:>1s}'.format(
-                        self.normal_modes[j][3 * atom_index + 2], '|')  # Z
-                self.ostream.print_line(valstr)
+                valstr = '{:<8d}'.format(atom_index + 1)
+                valstr += '{:<8s}'.format(atom_symbol[atom_index])
+                valstr += '{:12.4f}'.format(
+                    self.normal_modes[k][atom_index * 3 + 0])
+                valstr += '{:12.4f}'.format(
+                    self.normal_modes[k][atom_index * 3 + 1])
+                valstr += '{:12.4f}'.format(
+                    self.normal_modes[k][atom_index * 3 + 2])
+                self.ostream.print_header(valstr.ljust(width))
 
             self.ostream.print_blank()
-
-        self.ostream.print_blank()
+            self.ostream.print_blank()
 
         self.ostream.flush()
 
