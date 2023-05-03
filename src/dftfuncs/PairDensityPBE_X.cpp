@@ -76,11 +76,11 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double rho43 = std::pow(density, f43);
 
-        double drho43 = f43 * std::pow(density, f13);
+        // double drho43 = f43 * std::pow(density, f13);
 
         double rho53 = std::pow(density, f53);
 
-        double rho83 = std::pow(density, f83);
+        // double rho83 = std::pow(density, f83);
 
         double rho2 = std::pow(density, 2.0);
 
@@ -88,7 +88,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double sig = sigma[3 * g + 0];
 
-        double delta2 = -2.0 * pair_density;
+        // double delta2 = -2.0 * pair_density;
 
         double delta = std::sqrt(std::fabs(-2.0 * pair_density));
 

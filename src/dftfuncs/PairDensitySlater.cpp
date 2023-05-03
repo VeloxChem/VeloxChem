@@ -69,7 +69,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double rhothird = std::pow(density, onethird);
 
-        double rhofourthird = std::pow(density, fourthird);
+        // double rhofourthird = std::pow(density, fourthird);
 
         double rhotwothird = std::pow(density, twothird);
 

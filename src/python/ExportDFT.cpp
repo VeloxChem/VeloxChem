@@ -32,8 +32,9 @@
 
 #include <memory>
 #include <string>
-#include "DenseMatrix.hpp"
+
 #include "Dense4DTensor.hpp"
+#include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"

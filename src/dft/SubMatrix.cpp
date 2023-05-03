@@ -24,6 +24,7 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include "SubMatrix.hpp"
+
 #include "StringFormat.hpp"
 
 namespace submat {  // submat namespace
@@ -63,10 +64,7 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
 }
 
 CDenseMatrix
-getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
-                            const std::vector<int32_t>& aoIndices,
-                            const int32_t               aoCount,
-                            const int32_t               nAOs)
+getSubMatrixByColumnSlicing(const CDenseMatrix& denseMatrix, const std::vector<int32_t>& aoIndices, const int32_t aoCount, const int32_t nAOs)
 {
     auto nrows = denseMatrix.getNumberOfRows();
 
@@ -95,9 +93,7 @@ getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
 }
 
 CAODensityMatrix
-getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                    const std::vector<int32_t>& aoIndices,
-                    const int32_t               aoCount)
+getSubDensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int32_t>& aoIndices, const int32_t aoCount)
 {
     auto naos = densityMatrix.getNumberOfRows(0);
 
@@ -132,10 +128,7 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
 }
 
 void
-distributeSubmatrixTo4DTensor(CDense4DTensor&            fullTensor,
-                             const CDenseMatrix&         subMatrix,
-                             const std::vector<int32_t>& aoIndices,
-                             const int32_t               aoCount)
+distributeSubmatrixTo4DTensor(CDense4DTensor& fullTensor, const CDenseMatrix& subMatrix, const std::vector<int32_t>& aoIndices, const int32_t aoCount)
 {
     auto w_full = fullTensor.values();
 
@@ -151,15 +144,10 @@ distributeSubmatrixTo4DTensor(CDense4DTensor&            fullTensor,
 
         for (int32_t jkl = 0; jkl < nAct3; jkl++)
         {
-
             w_full[irow_full + jkl] += w_small[irow + jkl];
-
         }
     }
-
 }
-
-
 
 void
 distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          aoKohnShamMatrix,

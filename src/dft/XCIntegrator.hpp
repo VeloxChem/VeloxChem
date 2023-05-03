@@ -468,13 +468,12 @@ class CXCIntegrator
      @return the contribution as a CDense4DTensor object.
      */
 
-
     CDenseMatrix _integratePartialWxcFockForPLDA(const int32_t       npoints,
-                                              const double*       weights,
-                                              const CDenseMatrix& gtoValues,
-                                              const CDenseMatrix& activeMOs,
-                                              const double*       vrho,
-                                              CMultiTimer&        timer) const;
+                                                 const double*       weights,
+                                                 const CDenseMatrix& gtoValues,
+                                                 const CDenseMatrix& activeMOs,
+                                                 const double*       vrho,
+                                                 CMultiTimer&        timer) const;
     /**
      Integrates LDA contribution to (first-order) Vxc matrix.
 
