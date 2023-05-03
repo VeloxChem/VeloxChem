@@ -553,7 +553,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
-                            edip_grad[ind], eigvec)
+                            edip_grad[ind], eigvec) * (-1.0)
                         velo_trans_dipoles[s, ind] = np.vdot(
                             lmom_grad[ind], eigvec) / eigvals[s]
                         magn_trans_dipoles[s, ind] = np.vdot(

@@ -123,7 +123,7 @@ CDense4DTensor_from_numpy(const py::array_t<double>& arr)
 
     // check that the numpy array is c-style contiguous
 
-    std::string errsrc("Dense4DTensor: Expecting a contiguous numpy array in C ordering");
+    std::string errsrc("Dense4DTensor: Expecting a C-style contiguous numpy array");
 
     auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
 

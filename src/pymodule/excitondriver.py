@@ -760,6 +760,7 @@ class ExcitonModelDriver:
                                                 self.magn_trans_dipoles)
 
             for s in range(adia_velo_trans_dipoles.shape[0]):
+                adia_elec_trans_dipoles *= -1.0
                 adia_velo_trans_dipoles[s, :] /= eigvals[s]
 
             valstr = 'Adiabatic excited states:'
@@ -861,19 +862,30 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
                            dipole_mats.z_to_numpy())
-            linmom_ints = (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
-                           linmom_mats.z_to_numpy())
-            angmom_ints = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
-                           angmom_mats.z_to_numpy())
+
+            linmom_ints = (-1.0 * linmom_mats.x_to_numpy(),
+                           -1.0 * linmom_mats.y_to_numpy(),
+                           -1.0 * linmom_mats.z_to_numpy())
+
+            angmom_ints = (-1.0 * angmom_mats.x_to_numpy(),
+                           -1.0 * angmom_mats.y_to_numpy(),
+                           -1.0 * angmom_mats.z_to_numpy())
+
+            magdip_ints = (0.5 * angmom_mats.x_to_numpy(),
+                           0.5 * angmom_mats.y_to_numpy(),
+                           0.5 * angmom_mats.z_to_numpy())
+
         else:
             dipole_ints = None
             linmom_ints = None
             angmom_ints = None
+            magdip_ints = None
 
         return {
             'electric_dipole': dipole_ints,
             'linear_momentum': linmom_ints,
             'angular_momentum': angmom_ints,
+            'magnetic_dipole': magdip_ints,
         }
 
     def monomer_scf(self, method_dict, ind, monomer, basis, min_basis=None):
@@ -1007,7 +1019,7 @@ class ExcitonModelDriver:
 
         dipole_ints = one_elec_ints['electric_dipole']
         linmom_ints = one_elec_ints['linear_momentum']
-        angmom_ints = one_elec_ints['angular_momentum']
+        magdip_ints = one_elec_ints['magnetic_dipole']
 
         mo = scf_tensors['C_alpha']
         nocc = monomer.number_of_alpha_electrons()
@@ -1026,14 +1038,11 @@ class ExcitonModelDriver:
             tdens = sqrt_2 * np.matmul(
                 mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
             elec_trans_dipoles.append(
-                np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+                np.array([np.sum(tdens * dipole_ints[d]) for d in range(3)]))
             velo_trans_dipoles.append(
-                np.array([
-                    np.sum(-1.0 * tdens * linmom_ints[d].T) for d in range(3)
-                ]))
+                np.array([np.sum(tdens * linmom_ints[d]) for d in range(3)]))
             magn_trans_dipoles.append(
-                np.array(
-                    [np.sum(0.5 * tdens * angmom_ints[d].T) for d in range(3)]))
+                np.array([np.sum(tdens * magdip_ints[d]) for d in range(3)]))
 
         return {
             'electric': elec_trans_dipoles,
@@ -1524,7 +1533,7 @@ class ExcitonModelDriver:
 
         dipole_ints = one_elec_ints['electric_dipole']
         linmom_ints = one_elec_ints['linear_momentum']
-        angmom_ints = one_elec_ints['angular_momentum']
+        magdip_ints = one_elec_ints['magnetic_dipole']
 
         nocc = dimer.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
@@ -1539,14 +1548,11 @@ class ExcitonModelDriver:
         for cvec in ct_exc_vectors:
             tdens = sqrt_2 * np.matmul(mo_occ, np.matmul(cvec['vec'], mo_vir.T))
             elec_trans_dipoles.append(
-                np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+                np.array([np.sum(tdens * dipole_ints[d]) for d in range(3)]))
             velo_trans_dipoles.append(
-                np.array([
-                    np.sum(-1.0 * tdens * linmom_ints[d].T) for d in range(3)
-                ]))
+                np.array([np.sum(tdens * linmom_ints[d]) for d in range(3)]))
             magn_trans_dipoles.append(
-                np.array(
-                    [np.sum(0.5 * tdens * angmom_ints[d].T) for d in range(3)]))
+                np.array([np.sum(tdens * magdip_ints[d]) for d in range(3)]))
 
         return {
             'electric': elec_trans_dipoles,

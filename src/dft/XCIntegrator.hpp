@@ -400,9 +400,9 @@ class CXCIntegrator
      @param mat_wxc the MO Two-body energy gradient term.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param DensityMatrix the AO density matrix object.
-     @param TwoBodyDensityMatrix the MO two-body active density matrix.
-     @param ActiveMOs the active molecular orbitals.
+     @param densityMatrix the AO density matrix object.
+     @param twoBodyDensityMatrix the MO two-body active density matrix.
+     @param activeMOs the active molecular orbitals.
      @param molecularGrid the molecular grid.
      @param fvxc the exchange-correlation functional.
      */
@@ -411,9 +411,9 @@ class CXCIntegrator
                                  CDense4DTensor&                 mat_wxc,
                                  const CMolecule&                molecule,
                                  const CMolecularBasis&          basis,
-                                 const CAODensityMatrix&         DensityMatrix,
-                                 const CDense4DTensor&           TwoBodyDensityMatrix,
-                                 const CDenseMatrix&             ActiveMOs,
+                                 const CAODensityMatrix&         densityMatrix,
+                                 const CDense4DTensor&           twoBodyDensityMatrix,
+                                 const CDenseMatrix&             activeMOs,
                                  const CMolecularGrid&           molecularGrid,
                                  const CXCPairDensityFunctional& xcFunctional) const;
 
@@ -425,9 +425,9 @@ class CXCIntegrator
      @param moTwoBodyGradient the MO Two-body energy gradient term.
      @param molecule the molecule.
      @param basis the molecular basis.
-     @param DensityMatrix the AO density matrix object.
-     @param TwoBodyDensityMatrix the MO two-body active density matrix.
-     @param ActiveMOs the active molecular orbitals.
+     @param densityMatrix the AO density matrix object.
+     @param twoBodyDensityMatrix the MO two-body active density matrix.
+     @param activeMOs the active molecular orbitals.
      @param molecularGrid the molecular grid.
      @param fvxc the exchange-correlation functional.
      */
@@ -435,9 +435,9 @@ class CXCIntegrator
                                  CDense4DTensor&                 moTwoBodyGradient,
                                  const CMolecule&                molecule,
                                  const CMolecularBasis&          basis,
-                                 const CAODensityMatrix&         DensityMatrix,
-                                 const CDense4DTensor&           TwoBodyDensityMatrix,
-                                 const CDenseMatrix&             ActiveMOs,
+                                 const CAODensityMatrix&         densityMatrix,
+                                 const CDense4DTensor&           twoBodyDensityMatrix,
+                                 const CDenseMatrix&             activeMOs,
                                  const CMolecularGrid&           molecularGrid,
                                  const CXCPairDensityFunctional& xcFunctional) const;
 
@@ -1399,8 +1399,8 @@ class CXCIntegrator
      @param molecule the molecule.
      @param basis the molecular basis.
      @param densityMatrix the AO density matrix object.
-     @param TwoBodyDensityMatrix the MO two-body active density matrix.
-     @param ActiveMOs the active molecular orbitals.
+     @param twoBodyDensityMatrix the MO two-body active density matrix.
+     @param activeMOs the active molecular orbitals.
      @param molecularGrid the molecular grid.
      @param xcFuncLabel the label of exchange-correlation functional.
      */
@@ -1408,9 +1408,9 @@ class CXCIntegrator
                           CDense4DTensor&         mat_wxc,
                           const CMolecule&        molecule,
                           const CMolecularBasis&  basis,
-                          const CAODensityMatrix& DensityMatrix,
-                          const CDense4DTensor&   TwoBodyDensityMatrix,
-                          const CDenseMatrix&     ActiveMOs,
+                          const CAODensityMatrix& densityMatrix,
+                          const CDense4DTensor&   twoBodyDensityMatrix,
+                          const CDenseMatrix&     activeMOs,
                           const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel) const;
 

@@ -30,6 +30,8 @@ from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
 from .veloxchemlib import bohr_in_angstroms
 
+from .errorhandler import assert_msg_critical
+
 
 @staticmethod
 def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
@@ -114,10 +116,10 @@ def _Molecule_read_smiles(smiles_str):
 @staticmethod
 def _Molecule_read_str(xyzstr, units='angstrom'):
     """
-    Reads molecule from xyz string.
+    Reads molecule from a string containing Cartesian coordinates.
 
     :param xyzstr:
-        The xyz string.
+        The string containing Cartesian coordinates.
     :param units:
         The unit of coordinates.
 
@@ -167,9 +169,18 @@ def _Molecule_from_xyz_string(xyz):
         The molecule.
     """
 
-    xyzstr = '\n'.join(xyz.strip().splitlines()[2:])
+    lines = xyz.strip().splitlines()
 
-    return Molecule.read_str(xyzstr, 'angstrom')
+    try:
+        natoms = int(lines[0].strip())
+    except (ValueError, TypeError):
+        assert_msg_critical(False, 'Invalid number of atoms in XYZ string')
+
+    assert_msg_critical(natoms == len(lines[2:]),
+                        'Inconsistent number of atoms in XYZ string')
+
+    coords_str = '\n'.join(lines[2:])
+    return Molecule.read_str(coords_str, 'angstrom')
 
 
 @staticmethod
@@ -455,3 +466,7 @@ Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
 Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
 Molecule.__deepcopy__ = _Molecule_deepcopy
+
+# aliases
+Molecule.read_xyz_file = _Molecule_read_xyz
+Molecule.read_xyz_string = _Molecule_from_xyz_string

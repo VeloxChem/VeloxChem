@@ -446,7 +446,7 @@ class ScfDriver:
             self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
+        if self._dft and (self.grid_level < 1 or self.grid_level > 8):
             warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
             warn_msg += ' Using default value. ***'
             self.ostream.print_blank()
@@ -1079,6 +1079,7 @@ class ScfDriver:
             if self._dft:
                 # dft info
                 self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                self._scf_tensors['grid_level'] = self.grid_level
 
             if self._pe:
                 # pe info

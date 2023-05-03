@@ -451,6 +451,10 @@ computeGtosValuesForLDA(CMemBlock2D<double>&      gtoValues,
             else
             {
                 // FIX ME: implement l > 2 cases
+
+                std::string errangmom("gtoeval::computeGtosValuesForLDA: Only implemented up to d-orbitals");
+
+                errors::assertMsgCritical(false, errangmom);
             }
 
             // distribute j-th GTO values into grid values matrix
@@ -844,6 +848,10 @@ computeGtosValuesForGGA(CMemBlock2D<double>&      gtoValues,
             else
             {
                 // FIX ME: implement l > 2 cases
+
+                std::string errangmom("gtoeval::computeGtosValuesForGGA: Only implemented up to d-orbitals");
+
+                errors::assertMsgCritical(false, errangmom);
             }
 
             // distribute j-th GTO values into grid values matrix
@@ -1512,6 +1520,10 @@ computeGtosValuesForMetaGGA(CMemBlock2D<double>&      gtoValues,
             else
             {
                 // FIX ME: implement l > 2 cases
+
+                std::string errangmom("gtoeval::computeGtosValuesForMetaGGA: Only implemented up to d-orbitals");
+
+                errors::assertMsgCritical(false, errangmom);
             }
 
             // distribute j-th GTO values into grid values matrix
@@ -2294,6 +2306,10 @@ computeGtosValuesForThirdOrder(CMemBlock2D<double>&      gtoValues,
             else
             {
                 // FIX ME: implement l > 2 cases
+
+                std::string errangmom("gtoeval::computeGtosValuesForThirdOrder: Only implemented up to d-orbitals");
+
+                errors::assertMsgCritical(false, errangmom);
             }
 
             // distribute j-th GTO values into grid values matrix
