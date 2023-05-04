@@ -30,6 +30,7 @@
 #include "AOKohnShamMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
+#include "StringFormat.hpp"
 
 CAOKohnShamMatrix::CAOKohnShamMatrix()
     : _xcMatrices(std::vector<CDenseMatrix>())
@@ -468,6 +469,22 @@ CAOKohnShamMatrix::getReferenceToKohnSham(const bool beta) const
     {
         return _xcMatrices[1];
     }
+}
+
+const CDenseMatrix&
+CAOKohnShamMatrix::getReferenceToKohnSham(const std::string& spin) const
+{
+    std::string errspin("AOKohnShamMatrix.getReferenceToKohnSham: Invalid spin");
+
+    bool alphaspin = ((fstr::upcase(spin) == std::string("ALPHA")) || (fstr::upcase(spin) == std::string("A")));
+
+    bool betaspin = ((fstr::upcase(spin) == std::string("BETA")) || (fstr::upcase(spin) == std::string("B")));
+
+    errors::assertMsgCritical(alphaspin || betaspin, errspin);
+
+    auto betaflag = alphaspin ? false : true;
+
+    return getReferenceToKohnSham(betaflag);
 }
 
 const double*

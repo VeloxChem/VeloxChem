@@ -1643,9 +1643,9 @@ class ScfDriver:
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
             if self._dft and not self._first_step:
-                fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
+                fock_mat.add_matrix(vxc_mat.get_matrix('alpha'), 0, 'alpha')
                 if self.scf_type in ['unrestricted', 'restricted_openshell']:
-                    fock_mat.add_matrix(vxc_mat.get_matrix(True), 0, 'beta')
+                    fock_mat.add_matrix(vxc_mat.get_matrix('beta'), 0, 'beta')
 
             if self._pe and not self._first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)

@@ -157,7 +157,14 @@ export_dft(py::module& m)
         .def(py::init<>())
         .def(py::init<int32_t, int32_t, bool>(), "nrows"_a, "ncols"_a, "is_rest"_a)
         .def("__str__", &CAOKohnShamMatrix::getString)
-        .def("get_matrix", &CAOKohnShamMatrix::getReferenceToKohnSham, "Gets constant reference to specific Kohn-Sham matrix.", "beta"_a = false)
+        .def("get_matrix",
+             py::overload_cast<const bool>(&CAOKohnShamMatrix::getReferenceToKohnSham, py::const_),
+             "Gets constant reference to specific Kohn-Sham matrix.",
+             "beta"_a = false)
+        .def("get_matrix",
+             py::overload_cast<const std::string&>(&CAOKohnShamMatrix::getReferenceToKohnSham, py::const_),
+             "Gets constant reference to specific Kohn-Sham matrix.",
+             "spin"_a)
         .def(
             "reduce_sum",
             [](CAOKohnShamMatrix& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {
