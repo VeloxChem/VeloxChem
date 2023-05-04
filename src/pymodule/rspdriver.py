@@ -148,6 +148,10 @@ class ResponseDriver:
               self._rsp_dict['onlystatic'] == 'no' and
               self._rsp_dict['complex'] == 'yes'):
             self._solver = ComplexResponse(self.comm, self.ostream)
+            if rsp_dict['property'] == 'linear absorption cross-section':
+                self._solver.set_cpp_flag('absorption')
+            elif rsp_dict['property'] == 'circular dichroism spectrum':
+                self._solver.set_cpp_flag('ecd')
 
         # C6 linear response solver
         elif (self._rsp_dict['order'] == 'linear' and

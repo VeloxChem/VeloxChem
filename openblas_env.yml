@@ -28,3 +28,7 @@ dependencies:
   - xtb
   - geometric
   - libxc
+  - clang-format
+  - yapf
+  - toml
+  - flake8
