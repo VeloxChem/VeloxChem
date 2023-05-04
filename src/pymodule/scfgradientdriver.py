@@ -36,15 +36,13 @@ class ScfGradientDriver(GradientDriver):
     """
     Implements SCF gradient driver.
 
-    :param scf_drv:
-        The SCF driver.
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
 
     Instance variables
-        - scf_drv: The SCF driver.
+        - flag: The driver flag.
         - delta_h: The displacement for finite difference.
     """
 
@@ -57,6 +55,7 @@ class ScfGradientDriver(GradientDriver):
 
         self.flag = 'SCF Gradient Driver'
 
+        self.numerical = True
         self.delta_h = 0.001
 
     def compute(self, molecule, ao_basis, scf_drv):
@@ -106,8 +105,12 @@ class ScfGradientDriver(GradientDriver):
             The energy.
         """
 
+        scf_drv.ostream.mute()
+
         scf_drv.restart = False
         scf_results = scf_drv.compute(molecule, ao_basis)
+
+        scf_drv.ostream.unmute()
 
         return scf_results['scf_energy']
 

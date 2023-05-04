@@ -31,15 +31,13 @@ class XtbGradientDriver(GradientDriver):
     """
     Implements XTB gradient driver.
 
-    :param xtb_drv:
-        The XTB driver.
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
 
     Instance variables
-        - xtb_drv: The XTB driver.
+        - flag: The driver flag.
     """
 
     def __init__(self, comm=None, ostream=None):

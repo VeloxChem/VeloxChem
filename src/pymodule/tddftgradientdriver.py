@@ -34,18 +34,13 @@ class TddftGradientDriver(GradientDriver):
     """
     Implements the TDDFT gradient driver.
 
-    :param scf_drv:
-        The SCF driver.
-    :param rsp_drv:
-        The linear response driver.
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
 
     Instance variables:
-        - scf_drv: The SCF driver.
-        - rsp_drv: The linear response driver.
+        - flag: The driver flag.
         - delta_h: The displacement for finite diference.
         - state_deriv_index: The index of the excited state of interest.
     """
