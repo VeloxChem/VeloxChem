@@ -48,18 +48,18 @@ class ScfGradientDriver(GradientDriver):
         - delta_h: The displacement for finite difference.
     """
 
-    def __init__(self, scf_drv, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
 
-        super().__init__(scf_drv, comm, ostream)
+        super().__init__(comm, ostream)
 
         self.flag = 'SCF Gradient Driver'
-        self.scf_drv = scf_drv
+
         self.delta_h = 0.001
 
-    def compute(self, molecule, ao_basis, min_basis=None):
+    def compute(self, molecule, ao_basis, scf_drv):
         """
         Performs calculation of gradient.
 
@@ -67,19 +67,19 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param scf_drv:
+            The SCF driver.
         """
 
         start_time = tm.time()
         self.print_header()
 
-        self.scf_drv.ostream.mute()
+        scf_drv.ostream.mute()
 
         # Currently, only numerical gradients activated
-        self.compute_numerical(molecule, ao_basis, min_basis)
+        self.compute_numerical(molecule, ao_basis, scf_drv)
 
-        self.scf_drv.ostream.unmute()
+        scf_drv.ostream.unmute()
 
         # print gradient
         self.print_geometry(molecule)
@@ -91,7 +91,7 @@ class ScfGradientDriver(GradientDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_energy(self, molecule, ao_basis, min_basis=None):
+    def compute_energy(self, molecule, ao_basis, scf_drv):
         """
         Computes the energy at current geometry.
 
@@ -99,15 +99,17 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param scf_drv:
+            The SCF driver.
 
         :return:
             The energy.
         """
 
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
-        return self.scf_drv.get_scf_energy()
+        scf_drv.restart = False
+        scf_results = scf_drv.compute(molecule, ao_basis)
+
+        return scf_results['scf_energy']
 
     def __deepcopy__(self, memo):
         """
@@ -120,8 +122,7 @@ class ScfGradientDriver(GradientDriver):
             A deepcopy of self.
         """
 
-        new_grad_drv = ScfGradientDriver(deepcopy(self.scf_drv), self.comm,
-                                         self.ostream)
+        new_grad_drv = ScfGradientDriver(self.comm, self.ostream)
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):

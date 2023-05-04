@@ -370,9 +370,8 @@ def main():
                                              task.ostream)
                 grad_drv.compute(task.molecule)
             elif scf_drv.scf_type == 'restricted':
-                grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm,
-                                             task.ostream)
-                grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+                grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
+                grad_drv.compute(task.molecule, task.ao_basis, scf_drv)
 
         elif run_excited_state_gradient:
 
@@ -443,11 +442,10 @@ def main():
                 opt_drv.compute(task.molecule)
 
             elif scf_drv.scf_type == 'restricted':
-                grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm,
-                                             task.ostream)
+                grad_drv = ScfGradientDriver(task.mpi_comm, task.ostream)
                 opt_drv = OptimizationDriver(grad_drv)
                 opt_drv.update_settings(opt_dict)
-                opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+                opt_drv.compute(task.molecule, task.ao_basis, scf_drv)
 
         elif run_excited_state_gradient:
 
