@@ -27,7 +27,7 @@ from mpi4py import MPI
 from copy import deepcopy
 import time as tm
 
-from .veloxchemlib import (XCFunctional, MolecularGrid)
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
 

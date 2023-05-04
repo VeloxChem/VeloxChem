@@ -29,8 +29,8 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import (molorb, fockmat)
-from .veloxchemlib import (XCFunctional, MolecularGrid)
+from .veloxchemlib import molorb, fockmat
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .molecularorbitals import MolecularOrbitals
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver

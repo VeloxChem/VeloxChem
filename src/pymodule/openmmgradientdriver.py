@@ -55,9 +55,13 @@ class OpenMMGradientDriver(GradientDriver):
 
         :param molecule:
             The molecule.
+        :param openmm_drv:
+            The OpenMM driver.
         """
 
         self.print_header()
+
+        openmm_drv.compute(molecule)
 
         self.gradient = openmm_drv.get_gradient()
         self.gradient = self.comm.bcast(self.gradient, root=mpi_master())
@@ -74,6 +78,8 @@ class OpenMMGradientDriver(GradientDriver):
 
         :param molecule:
             The molecule.
+        :param openmm_drv:
+            The OpenMM driver.
         """
 
         openmm_drv.compute(molecule)

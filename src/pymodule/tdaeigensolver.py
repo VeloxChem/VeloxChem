@@ -25,6 +25,7 @@
 
 from mpi4py import MPI
 from pathlib import Path
+from copy import deepcopy
 import numpy as np
 import time as tm
 import math
@@ -33,6 +34,7 @@ import sys
 from .veloxchemlib import (ElectricDipoleIntegralsDriver,
                            LinearMomentumIntegralsDriver,
                            AngularMomentumIntegralsDriver)
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
 from .veloxchemlib import denmat, fockmat
 from .aodensitymatrix import AODensityMatrix
@@ -830,3 +832,28 @@ class TdaEigenSolver(LinearSolver):
         self._print_absorption('One-Photon Absorption', results)
         self._print_ecd('Electronic Circular Dichroism', results)
         self._print_excitation_details('Character of excitations:', results)
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_rsp_drv = TdaEigenSolver(self.comm, self.ostream)
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                pass
+            elif isinstance(val, XCFunctional):
+                new_rsp_drv.key = XCFunctional(val)
+            elif isinstance(val, MolecularGrid):
+                new_rsp_drv.key = MolecularGrid(val)
+            else:
+                new_rsp_drv.key = deepcopy(val)
+
+        return new_rsp_drv

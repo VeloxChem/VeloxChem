@@ -31,7 +31,7 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import (XCFunctional, MolecularGrid)
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
 from .molecule import Molecule
 
