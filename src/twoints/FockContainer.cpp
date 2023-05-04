@@ -29,42 +29,32 @@ CFockContainer::CFockContainer()
 
     : _subFockMatrices({})
 {
-    
 }
 
 CFockContainer::CFockContainer(const std::vector<CFockSubMatrix>& subFockMatrices)
 
     : _subFockMatrices(subFockMatrices)
 {
-    
 }
 
-CFockContainer::CFockContainer(const CAOFockMatrix*  aoFockMatrix,
-                               const CGtoPairsBlock& braGtoPairsBlock,
-                               const CGtoPairsBlock& ketGtoPairsBlock)
+CFockContainer::CFockContainer(const CAOFockMatrix* aoFockMatrix, const CGtoPairsBlock& braGtoPairsBlock, const CGtoPairsBlock& ketGtoPairsBlock)
 {
     auto nfock = aoFockMatrix->getNumberOfFockMatrices();
-    
+
     if (aoFockMatrix->isClosedShell())
     {
         for (int32_t i = 0; i < nfock; i++)
         {
-            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
-                                                      ketGtoPairsBlock,
-                                                      aoFockMatrix->getFockType(i)));
+            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock, ketGtoPairsBlock, aoFockMatrix->getFockType(i)));
         }
     }
     else
     {
         for (int32_t i = 0; i < nfock; i++)
         {
-            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
-                                                      ketGtoPairsBlock,
-                                                      aoFockMatrix->getFockType(i, "alpha")));
+            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock, ketGtoPairsBlock, aoFockMatrix->getFockType(i, std::string("ALPHA"))));
 
-            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock,
-                                                      ketGtoPairsBlock,
-                                                      aoFockMatrix->getFockType(i, "beta")));
+            _subFockMatrices.push_back(CFockSubMatrix(braGtoPairsBlock, ketGtoPairsBlock, aoFockMatrix->getFockType(i, std::string("BETA"))));
         }
     }
 }
@@ -73,28 +63,25 @@ CFockContainer::CFockContainer(const CFockContainer& source)
 
     : _subFockMatrices(source._subFockMatrices)
 {
-    
 }
 
 CFockContainer::CFockContainer(CFockContainer&& source) noexcept
 
     : _subFockMatrices(std::move(source._subFockMatrices))
 {
-    
 }
 
 CFockContainer::~CFockContainer()
 {
-    
 }
 
 CFockContainer&
 CFockContainer::operator=(const CFockContainer& source)
 {
     if (this == &source) return *this;
-    
+
     _subFockMatrices = source._subFockMatrices;
-    
+
     return *this;
 }
 
@@ -102,9 +89,9 @@ CFockContainer&
 CFockContainer::operator=(CFockContainer&& source) noexcept
 {
     if (this == &source) return *this;
-    
+
     _subFockMatrices = std::move(source._subFockMatrices);
-    
+
     return *this;
 }
 
@@ -115,12 +102,12 @@ CFockContainer::operator==(const CFockContainer& other) const
     {
         return false;
     }
-    
+
     for (size_t i = 0; i < _subFockMatrices.size(); i++)
     {
         if (_subFockMatrices[i] != other._subFockMatrices[i]) return false;
     }
-    
+
     return true;
 }
 
@@ -134,38 +121,33 @@ void
 CFockContainer::accumulate(CAOFockMatrix* aoFockMatrix)
 {
     auto nfock = aoFockMatrix->getNumberOfFockMatrices();
-    
+
     if (aoFockMatrix->isClosedShell())
     {
         for (int32_t i = 0; i < nfock; i++)
         {
-            _subFockMatrices[i].accumulate(aoFockMatrix->getFock(i),
-                                           aoFockMatrix->getNumberOfColumns(i),
-                                           aoFockMatrix->getFockType(i));
+            _subFockMatrices[i].accumulate(aoFockMatrix->getFock(i), aoFockMatrix->getNumberOfColumns(i), aoFockMatrix->getFockType(i));
         }
     }
     else
     {
         for (int32_t i = 0; i < nfock; i++)
         {
-            _subFockMatrices[2 * i].accumulate(aoFockMatrix->getFock(i, "alpha"),
+            _subFockMatrices[2 * i].accumulate(aoFockMatrix->getFock(i, std::string("ALPHA")),
                                                aoFockMatrix->getNumberOfColumns(i),
-                                               aoFockMatrix->getFockType(i, "alpha"));
+                                               aoFockMatrix->getFockType(i, std::string("ALPHA")));
 
-            _subFockMatrices[2 * i + 1].accumulate(aoFockMatrix->getFock(i, "beta"),
+            _subFockMatrices[2 * i + 1].accumulate(aoFockMatrix->getFock(i, std::string("BETA")),
                                                    aoFockMatrix->getNumberOfColumns(i),
-                                                   aoFockMatrix->getFockType(i, "beta"));
+                                                   aoFockMatrix->getFockType(i, std::string("BETA")));
         }
     }
 }
 
 double*
-CFockContainer::getSubMatrixData(const int32_t iFockMatrix,
-                                 const int32_t iSubMatrix,
-                                 const int32_t iComponent)
+CFockContainer::getSubMatrixData(const int32_t iFockMatrix, const int32_t iSubMatrix, const int32_t iComponent)
 {
-    return _subFockMatrices[iFockMatrix].getSubMatrixData(iSubMatrix,
-                                                          iComponent);
+    return _subFockMatrices[iFockMatrix].getSubMatrixData(iSubMatrix, iComponent);
 }
 
 const int32_t*
@@ -217,21 +199,20 @@ CFockContainer::getDimensionsD(const int32_t iFockMatrix) const
 }
 
 std::ostream&
-operator<<(      std::ostream&   output,
-           const CFockContainer& source)
+operator<<(std::ostream& output, const CFockContainer& source)
 {
     output << std::endl;
-    
+
     output << "[CFockContainer (Object):" << &source << "]" << std::endl;
-    
+
     output << "_subFockMatrices: " << std::endl;
-    
+
     for (size_t i = 0; i < source._subFockMatrices.size(); i++)
     {
         output << "_subFockMatrices[" << i << "]: " << std::endl;
-        
+
         output << source._subFockMatrices[i] << std::endl;
     }
-    
+
     return output;
 }

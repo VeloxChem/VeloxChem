@@ -257,7 +257,7 @@ export_twoints(py::module& m)
             "alpha_to_numpy",
             [](const CAOFockMatrix& self, const int32_t iFockMatrix) -> py::array_t<double> {
                 return vlx_general::pointer_to_numpy(
-                    self.getFock(iFockMatrix, "alpha"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+                    self.getFock(iFockMatrix, std::string("ALPHA")), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
             },
             "Converts alpha AOFockMatrix to numpy array.",
             "iFockMatrix"_a)
@@ -265,7 +265,7 @@ export_twoints(py::module& m)
             "beta_to_numpy",
             [](const CAOFockMatrix& self, const int32_t iFockMatrix) -> py::array_t<double> {
                 return vlx_general::pointer_to_numpy(
-                    self.getFock(iFockMatrix, "beta"), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
+                    self.getFock(iFockMatrix, std::string("BETA")), self.getNumberOfRows(iFockMatrix), self.getNumberOfColumns(iFockMatrix));
             },
             "Converts beta AOFockMatrix to numpy array.",
             "iFockMatrix"_a)
