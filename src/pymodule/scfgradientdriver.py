@@ -108,11 +108,11 @@ class ScfGradientDriver(GradientDriver):
         scf_drv.ostream.mute()
 
         scf_drv.restart = False
-        scf_results = scf_drv.compute(molecule, ao_basis)
+        scf_drv.compute(molecule, ao_basis)
 
         scf_drv.ostream.unmute()
 
-        return scf_results['scf_energy']
+        return scf_drv.get_scf_energy()
 
     def __deepcopy__(self, memo):
         """
