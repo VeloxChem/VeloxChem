@@ -61,6 +61,7 @@ class TddftGradientDriver(GradientDriver):
         super().__init__(scf_drv, comm, ostream)
 
         self.flag = 'RPA Gradient Driver'
+        self.tamm_dancoff = False
 
         self.scf_drv = scf_drv
 
@@ -69,10 +70,7 @@ class TddftGradientDriver(GradientDriver):
 
         self.numerical = True
 
-    def update_settings(self,
-                        grad_dict,
-                        rsp_dict,
-                        method_dict=None):
+    def update_settings(self, grad_dict, rsp_dict, method_dict=None):
         """
         Updates settings in gradient driver.
 
@@ -96,13 +94,15 @@ class TddftGradientDriver(GradientDriver):
 
         if self.tamm_dancoff:
             self.flag = 'TDA Gradient Driver'
+        else:
+            self.flag = 'RPA Gradient Driver'
 
         # Excited state of interest
         # NOTE: the indexing starts at 1.
         if 'state_deriv_index' in grad_dict:
             self.state_deriv_index = int(grad_dict['state_deriv_index'])
 
-    def compute(self, molecule, basis, rsp_drv, rsp_results, min_basis=None):
+    def compute(self, molecule, basis, rsp_drv):
         """
         Performs calculation of analytical or numerical gradient.
 
@@ -112,33 +112,24 @@ class TddftGradientDriver(GradientDriver):
             The AO basis set.
         :param rsp_drv:
             The RPA or TDA driver.
-        :param rsp_results:
-            The results from the RPA or TDA calculation.
-        :param min_basis:
-            The reduced basis set.
         """
 
         # sanity check
+        # TODO automatically determine nstates for response driver
         if self.rank == mpi_master():
-            all_states = list(np.arange(1, len(rsp_results['eigenvalues']) + 1))
-            if self.state_deriv_index is not None:
-                error_message = 'TddftGradientDriver: some of the '
-                error_message += 'selected states have not been calculated.'
-                assert_msg_critical(
-                    self.state_deriv_index in all_states,
-                    error_message)
+            error_message = 'TddftGradientDriver: some of the '
+            error_message += 'selected states have not been calculated.'
+            assert_msg_critical(self.state_deriv_index <= rsp_drv.nstates,
+                                error_message)
 
-            self.print_header(self.state_deriv_index)
+        self.print_header(self.state_deriv_index)
 
         start_time = tm.time()
 
         self.scf_drv.ostream.mute()
 
         # Currently, only numerical gradients are available
-        # NOTE: the index passed to compute_numerical and compute_energy
-        # uses Python indexing starting at 0.
-        self.compute_numerical(molecule, basis, rsp_drv, rsp_results,
-                               min_basis, self.state_deriv_index - 1)
+        self.compute_numerical(molecule, basis, rsp_drv)
 
         self.scf_drv.ostream.unmute()
 
@@ -153,13 +144,7 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_energy(self,
-                       molecule,
-                       basis,
-                       rsp_drv,
-                       rsp_results=None,
-                       min_basis=None,
-                       state_deriv_index=0):
+    def compute_energy(self, molecule, basis, rsp_drv):
         """
         Computes the energy at the current position.
 
@@ -169,50 +154,21 @@ class TddftGradientDriver(GradientDriver):
             The basis set.
         :param rsp_drv:
             The linear response driver.
-        :param rsp_results:
-            The results of a linear response calculation.
         :param min_basis:
             The reduced basis set.
-        :param state_deriv_index:
-            The index of the excited state of interest.
         """
 
-        self.scf_drv.compute(molecule, basis, min_basis)
-        scf_tensors = self.scf_drv.scf_tensors
+        scf_results = self.scf_drv.compute(molecule, basis)
 
-        rsp_drv._is_converged = False  # needed by RPA
-        rsp_results = rsp_drv.compute(molecule, basis, scf_tensors)
+        rsp_drv._is_converged = False
+        rsp_results = rsp_drv.compute(molecule, basis, scf_results)
 
         if self.rank == mpi_master():
-            exc_en = rsp_results['eigenvalues'][state_deriv_index]
+            scf_ene = scf_results['scf_energy']
+            exc_ene = rsp_results['eigenvalues'][self.state_deriv_index - 1]
+            total_ene = scf_ene + exc_ene
         else:
-            exc_en = None
-        exc_en = self.comm.bcast(exc_en, root=mpi_master())
+            total_ene = None
+        total_ene = self.comm.bcast(total_ene, root=mpi_master())
 
-        return self.scf_drv.get_scf_energy() + exc_en
-
-    def __deepcopy__(self, memo):
-        """
-        Implements deepcopy.
-
-        :param memo:
-            The memo dictionary for deepcopy.
-
-        :return:
-            A deepcopy of self.
-        """
-
-        new_grad_drv = TddftGradientDriver(deepcopy(self.scf_drv), self.comm,
-                                          self.ostream)
-
-        for key, val in vars(self).items():
-            if isinstance(val, (MPI.Intracomm, OutputStream)):
-                pass
-            elif isinstance(val, XCFunctional):
-                new_grad_drv.key = XCFunctional(val)
-            elif isinstance(val, MolecularGrid):
-                new_grad_drv.key = MolecularGrid(val)
-            else:
-                new_grad_drv.key = deepcopy(val)
-
-        return new_grad_drv
+        return total_ene

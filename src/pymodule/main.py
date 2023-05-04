@@ -234,7 +234,6 @@ def main():
 
     method_dict = (dict(task.input_dict['method_settings'])
                    if 'method_settings' in task.input_dict else {})
-
     method_dict['pe_options'] = (dict(task.input_dict['pe'])
                                  if 'pe' in task.input_dict else {})
 
@@ -243,9 +242,8 @@ def main():
     # Exciton model
 
     if task_type == 'exciton':
-        exciton_dict = (task.input_dict['exciton']
+        exciton_dict = (dict(task.input_dict['exciton'])
                         if 'exciton' in task.input_dict else {})
-
         exciton_dict['program_end_time'] = program_end_time
         exciton_dict['filename'] = task.input_dict['filename']
 
@@ -256,12 +254,12 @@ def main():
     # Force field generator
 
     if task_type == 'force field':
-        force_field_dict = (task.input_dict['force_field']
+        force_field_dict = (dict(task.input_dict['force_field'])
                             if 'force_field' in task.input_dict else {})
-        resp_dict = (task.input_dict['resp_charges']
-                     if 'resp_charges' in task.input_dict else {})
-
         force_field_dict['filename'] = task.input_dict['filename']
+
+        resp_dict = (dict(task.input_dict['resp_charges'])
+                     if 'resp_charges' in task.input_dict else {})
         resp_dict['filename'] = task.input_dict['filename']
 
         force_field_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
@@ -273,14 +271,15 @@ def main():
     if task_type == 'trajectory':
         traj_dict = (dict(task.input_dict['trajectory'])
                      if 'trajectory' in task.input_dict else {})
-        spect_dict = (dict(task.input_dict['spectrum_settings'])
-                      if 'spectrum_settings' in task.input_dict else {})
-        rsp_dict = (dict(task.input_dict['response'])
-                    if 'response' in task.input_dict else {})
-
         traj_dict['filename'] = task.input_dict['filename']
         traj_dict['charges'] = task.input_dict['charges']
         traj_dict['polarizabilities'] = task.input_dict['polarizabilities']
+
+        spect_dict = (dict(task.input_dict['spectrum_settings'])
+                      if 'spectrum_settings' in task.input_dict else {})
+
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
 
         traj_drv = TrajectoryDriver(task.mpi_comm, task.ostream)
         traj_drv.update_settings(traj_dict, spect_dict, rsp_dict, method_dict)
@@ -291,6 +290,7 @@ def main():
     if task_type == 'numerov':
         numerov_dict = (dict(task.input_dict['numerov'])
                         if 'numerov' in task.input_dict else {})
+
         scf_dict = (dict(task.input_dict['scf'])
                     if 'scf' in task.input_dict else {})
 
@@ -302,9 +302,8 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
-        'wave function', 'mp2', 'gradient', 'excited_state_gradient',
-        'hessian', 'optimize', 'optimize_excited_state', 'response', 'pulses',
-        'visualization', 'loprop'
+        'wave function', 'mp2', 'gradient', 'hessian', 'optimize', 'response',
+        'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -320,8 +319,8 @@ def main():
         assert_msg_critical(task.molecule.number_of_atoms(),
                             'Molecule: no atoms found in molecule')
 
-        scf_dict = task.input_dict['scf'] if 'scf' in task.input_dict else {}
-
+        scf_dict = (dict(task.input_dict['scf'])
+                    if 'scf' in task.input_dict else {})
         scf_dict['program_end_time'] = program_end_time
         scf_dict['filename'] = task.input_dict['filename']
 
@@ -360,43 +359,51 @@ def main():
     # Gradient
 
     if task_type == 'gradient':
-        if use_xtb:
-            grad_drv = XtbGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
-            grad_drv.compute(task.molecule)
-        elif scf_drv.scf_type == 'restricted':
-            grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-            grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-    if task_type == 'excited_state_gradient':
-        grad_dict = (task.input_dict['gradient']
-                     if 'gradient' in task.input_dict else {})
-        rsp_dict = (task.input_dict['response']
-                    if 'response' in task.input_dict else {})
+        run_excited_state_gradient = ('response' in task.input_dict)
+        run_ground_state_gradient = (not run_excited_state_gradient)
 
-        # Run a linea response calculation first
-        rsp_dict['program_end_time'] = program_end_time
-        rsp_dict['filename'] = task.input_dict['filename']
+        if run_ground_state_gradient:
 
-        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+            if use_xtb:
+                grad_drv = XtbGradientDriver(xtb_drv, task.mpi_comm,
+                                             task.ostream)
+                grad_drv.compute(task.molecule)
+            elif scf_drv.scf_type == 'restricted':
+                grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm,
+                                             task.ostream)
+                grad_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
-        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+        elif run_excited_state_gradient:
 
-        # Calculate the excited state gradient
-        tddftgrad_drv = TddftGradientDriver(scf_drv, task.mpi_comm,
-                                            task.ostream)
-        tddftgrad_drv.update_settings(grad_dict, rsp_dict,
-                                      method_dict)
-        tddftgrad_drv.compute(task.molecule, task.ao_basis,
-                              rsp_prop._rsp_driver.solver,
-                              rsp_prop._rsp_property)
+            grad_dict = (task.input_dict['gradient']
+                         if 'gradient' in task.input_dict else {})
+
+            rsp_dict = dict(task.input_dict['response'])
+            rsp_dict['program_end_time'] = program_end_time
+            rsp_dict['filename'] = task.input_dict['filename']
+            rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+            assert_msg_critical(
+                rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
+                'Invalid response property for gradient calculation')
+
+            rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
+                                           method_dict)
+            rsp_prop.init_driver(task.mpi_comm, task.ostream)
+
+            tddftgrad_drv = TddftGradientDriver(scf_drv, task.mpi_comm,
+                                                task.ostream)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+            tddftgrad_drv.compute(task.molecule, task.ao_basis,
+                                  rsp_prop._rsp_driver.solver)
 
     # Hessian
 
     if task_type == 'hessian':
         hessian_dict = (task.input_dict['hessian']
                         if 'hessian' in task.input_dict else {})
+
         if use_xtb:
             hessian_drv = XtbHessianDriver(xtb_drv, task.mpi_comm, task.ostream)
             hessian_drv.update_settings(method_dict, hessian_dict)
@@ -413,70 +420,70 @@ def main():
     # Geometry optimization
 
     if task_type == 'optimize':
+
         if 'potfile' in method_dict:
             errmsg = 'OptimizationDriver: The \'potfile\' keyword is not '
             errmsg += 'supported in geometry optimization.'
             if task.mpi_rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-        opt_dict = (task.input_dict['optimize']
+        opt_dict = (dict(task.input_dict['optimize'])
                     if 'optimize' in task.input_dict else {})
-
         opt_dict['filename'] = task.input_dict['filename']
 
-        if use_xtb:
-            grad_drv = XtbGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(grad_drv)
+        run_excited_state_gradient = ('response' in task.input_dict)
+        run_ground_state_gradient = (not run_excited_state_gradient)
+
+        if run_ground_state_gradient:
+
+            if use_xtb:
+                grad_drv = XtbGradientDriver(xtb_drv, task.mpi_comm,
+                                             task.ostream)
+                opt_drv = OptimizationDriver(grad_drv)
+                opt_drv.update_settings(opt_dict)
+                opt_drv.compute(task.molecule)
+
+            elif scf_drv.scf_type == 'restricted':
+                grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm,
+                                             task.ostream)
+                opt_drv = OptimizationDriver(grad_drv)
+                opt_drv.update_settings(opt_dict)
+                opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        elif run_excited_state_gradient:
+
+            grad_dict = (task.input_dict['gradient']
+                         if 'gradient' in task.input_dict else {})
+
+            rsp_dict = dict(task.input_dict['response'])
+            rsp_dict['program_end_time'] = program_end_time
+            rsp_dict['filename'] = task.input_dict['filename']
+            rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+            assert_msg_critical(
+                rsp_dict['property'].lower() in ['absorption', 'uv-vis', 'ecd'],
+                'Invalid response property for geometry optimization')
+
+            rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict,
+                                           method_dict)
+            rsp_prop.init_driver(task.mpi_comm, task.ostream)
+
+            tddftgrad_drv = TddftGradientDriver(scf_drv, task.mpi_comm,
+                                                task.ostream)
+            tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
+
+            opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.update_settings(opt_dict)
-            opt_drv.compute(task.molecule)
-
-        elif scf_drv.scf_type == 'restricted':
-            grad_drv = ScfGradientDriver(scf_drv, task.mpi_comm, task.ostream)
-            opt_drv = OptimizationDriver(grad_drv)
-            opt_drv.update_settings(opt_dict)
-            opt_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-
-    # Excited state geometry optimization
-
-    if task_type == 'optimize_excited_state':
-        opt_dict = (task.input_dict['optimize']
-                    if 'optimize' in task.input_dict else {})
-        grad_dict = (task.input_dict['gradient']
-                     if 'gradient' in task.input_dict else {})
-        rsp_dict = (task.input_dict['response']
-                    if 'response' in task.input_dict else {})
-
-        # Run a linear response calculation first
-        rsp_dict['program_end_time'] = program_end_time
-        rsp_dict['filename'] = task.input_dict['filename']
-
-        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
-
-        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
-        rsp_prop.init_driver(task.mpi_comm, task.ostream)
-        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
-
-        tddftgrad_drv = TddftGradientDriver(scf_drv, task.mpi_comm,
-                                            task.ostream)
-        tddftgrad_drv.update_settings(grad_dict, rsp_dict,
-                                      method_dict)
-
-        opt_drv = OptimizationDriver(tddftgrad_drv)
-        opt_drv.update_settings(opt_dict)
-        opt_drv.compute(task.molecule, task.ao_basis,
-                        rsp_prop._rsp_driver.solver,
-                        rsp_prop._rsp_property,
-                        task.min_basis)
+            opt_drv.compute(task.molecule, task.ao_basis,
+                            rsp_prop._rsp_driver.solver)
 
     # Response
 
     if task_type == 'response' and scf_drv.scf_type == 'restricted':
         rsp_dict = (dict(task.input_dict['response'])
                     if 'response' in task.input_dict else {})
-
         rsp_dict['program_end_time'] = program_end_time
         rsp_dict['filename'] = task.input_dict['filename']
-
         rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
 
         rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
@@ -503,7 +510,6 @@ def main():
 
     if task_type == 'mp2' and scf_drv.scf_type == 'restricted':
         mp2_dict = task.input_dict['mp2'] if 'mp2' in task.input_dict else {}
-
         mp2_dict = updated_dict_with_eri_settings(mp2_dict, scf_drv)
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
