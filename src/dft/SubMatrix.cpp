@@ -227,7 +227,7 @@ distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
         {
             auto row_orig = aoIndices[row];
 
-            auto fock_row_orig = aoFockMatrix.getFock(fockIndex, "ALPHA") + row_orig * nAOs;
+            auto fock_row_orig = aoFockMatrix.getFock(fockIndex, std::string("ALPHA")) + row_orig * nAOs;
 
             auto submat_row = subMatrix.row(row);
 
