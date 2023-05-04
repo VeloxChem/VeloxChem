@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import numpy as np
 import pytest
 
@@ -53,24 +54,27 @@ class TestPDFT:
 
         if scfdrv.rank == mpi_master():
             mo_act = scfdrv.mol_orbs.alpha_to_numpy()[:, [7, 8]]
+            nAO = total_density.shape[0]
+            C = results["C"]
         else:
             mo_act = None
+            nAO = None
+            C = None
         mo_act = scfdrv.comm.bcast(mo_act, root=mpi_master())
+        nAO = scfdrv.comm.bcast(nAO, root=mpi_master())
+        C = scfdrv.comm.bcast(C, root=mpi_master())
 
         pdft_vxc, pdft_wxc = xc_drv.integrate_vxc_pdft(den_mat, D2act, mo_act.T.copy(),
                                              molecule, basis, molgrid, pfunc)
         pdft_vxc.reduce_sum(scfdrv.rank, scfdrv.nodes, scfdrv.comm)
+        pdft_wxc = scfdrv.comm.allreduce(pdft_wxc, MPI.SUM)
 
         # Compute gradients
         nIn = molecule.number_of_beta_electrons()
         nInAct = molecule.number_of_alpha_electrons()
         nAct = nInAct- nIn
-        nAO = total_density.shape[0]
         wxc = 2.0 * pdft_wxc.reshape(nAO, nAct, nAct, nAct)
 
-        C = results["C"]
-        FA = results["F"][0]
-        FB = results["F"][1]
         FA = vxc_mat.get_matrix(True).to_numpy()
         FB = vxc_mat.get_matrix(False).to_numpy()
 
@@ -98,21 +102,18 @@ class TestPDFT:
         else:
             return None, None, None, None
 
-    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_O2_ROSlater(self):
         ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slater', 'pslater')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
-    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_O2_ROLDA(self):
         ksdft, pdft, ks_grad, pdft_grad= self.run_RODFT('slda', 'plda')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
-    @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_O2_ROGGA(self):
         ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'ppbe')
         if is_mpi_master():
