@@ -157,14 +157,23 @@ export_dft(py::module& m)
         .def(py::init<>())
         .def(py::init<int32_t, int32_t, bool>(), "nrows"_a, "ncols"_a, "is_rest"_a)
         .def("__str__", &CAOKohnShamMatrix::getString)
-        .def("get_matrix",
-             py::overload_cast<const bool>(&CAOKohnShamMatrix::getReferenceToKohnSham, py::const_),
-             "Gets constant reference to specific Kohn-Sham matrix.",
-             "beta"_a = false)
-        .def("get_matrix",
-             py::overload_cast<const std::string&>(&CAOKohnShamMatrix::getReferenceToKohnSham, py::const_),
-             "Gets constant reference to specific Kohn-Sham matrix.",
-             "spin"_a)
+        .def("get_matrix", &CAOKohnShamMatrix::getReferenceToKohnSham, "Gets constant reference to specific Kohn-Sham matrix.", "beta"_a = false)
+        .def("get_alpha_matrix", &CAOKohnShamMatrix::getReferenceToAlphaKohnSham, "Gets constant reference to alpha-spin Kohn-Sham matrix.")
+        .def("get_beta_matrix", &CAOKohnShamMatrix::getReferenceToBetaKohnSham, "Gets constant reference to beta-spin Kohn-Sham matrix.")
+        .def(
+            "alpha_to_numpy",
+            [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
+                auto alphaMatrix = self.getReferenceToAlphaKohnSham();
+                return vlx_general::pointer_to_numpy(alphaMatrix.values(), alphaMatrix.getNumberOfRows(), alphaMatrix.getNumberOfColumns());
+            },
+            "Converts alpha AOKohnShamMatrix to numpy array.")
+        .def(
+            "beta_to_numpy",
+            [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
+                auto betaMatrix = self.getReferenceToBetaKohnSham();
+                return vlx_general::pointer_to_numpy(betaMatrix.values(), betaMatrix.getNumberOfRows(), betaMatrix.getNumberOfColumns());
+            },
+            "Converts beta AOKohnShamMatrix to numpy array.")
         .def(
             "reduce_sum",
             [](CAOKohnShamMatrix& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {

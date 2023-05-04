@@ -98,7 +98,7 @@ class TestExcVxc:
             Gmat = gto * gw * vrho_a
 
             Vxcmat = np.matmul(gto, Gmat.T)
-            assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
+            assert np.max(np.abs(Vxcmat - vxc.alpha_to_numpy())) < tol
 
             fxc = xc_drv.compute_fxc_for_lda(xcfun_label, rho)
             v2rho2_a_a = fxc['v2rho2'][:, 0]
@@ -229,7 +229,7 @@ class TestExcVxc:
 
             Vxcmat_gga = np.matmul(gto, Gmat_gga.T)
             Vxcmat = np.matmul(gto, Gmat.T) + Vxcmat_gga + Vxcmat_gga.T
-            assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
+            assert np.max(np.abs(Vxcmat - vxc.alpha_to_numpy())) < tol
 
             fxc = xc_drv.compute_fxc_for_gga(xcfun_label, rho, sigma)
             v2rho2_a_a = fxc['v2rho2'][:, 0]

@@ -290,12 +290,18 @@ public:
     const CDenseMatrix& getReferenceToKohnSham(const bool beta=false) const;
 
     /**
-     Gets constant reference to specific Kohn-Sham matrix.
+     Gets constant reference to alpha-spin Kohn-Sham matrix.
 
-     @param spin the spin of Kohn-Sham matrix.
-     @return the constant reference to Kohn-Sham matrix.
+     @return the constant reference to alpha-spin Kohn-Sham matrix.
      */
-    const CDenseMatrix& getReferenceToKohnSham(const std::string& spin) const;
+    const CDenseMatrix& getReferenceToAlphaKohnSham() const;
+
+    /**
+     Gets constant reference to beta-spin Kohn-Sham matrix.
+
+     @return the constant reference to beta-spin Kohn-Sham matrix.
+     */
+    const CDenseMatrix& getReferenceToBetaKohnSham() const;
     
     /**
      Gets constant pointer to first element of specific matrix in Kohn-Sham matrix.

@@ -333,8 +333,8 @@ class ExcitonModelDriver:
             for ind_B in range(ind_A + 1, nfragments):
                 mol_B = monomer_molecules[ind_B]
                 min_dist_AB = self.get_minimal_distance(mol_A, mol_B)
-                if (self.dimer_cutoff_radius is None or min_dist_AB <
-                        self.dimer_cutoff_radius / bohr_in_angstroms()):
+                if (self.dimer_cutoff_radius is None or min_dist_AB
+                        < self.dimer_cutoff_radius / bohr_in_angstroms()):
                     dimer_pairs.append((ind_A, ind_B))
 
         npairs = len(dimer_pairs)
@@ -1202,7 +1202,7 @@ class ExcitonModelDriver:
             dimer_energy += np.sum(dens * (hcore + fock))
             if self.dft:
                 dimer_energy += vxc_mat.get_energy()
-                fock += vxc_mat.get_matrix().to_numpy()
+                fock += vxc_mat.alpha_to_numpy()
             # compute Fock in MO basis
             fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
         else:

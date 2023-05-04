@@ -472,17 +472,17 @@ CAOKohnShamMatrix::getReferenceToKohnSham(const bool beta) const
 }
 
 const CDenseMatrix&
-CAOKohnShamMatrix::getReferenceToKohnSham(const std::string& spin) const
+CAOKohnShamMatrix::getReferenceToAlphaKohnSham() const
 {
-    std::string errspin("AOKohnShamMatrix.getReferenceToKohnSham: Invalid spin");
+    auto betaflag = false;
 
-    bool alphaspin = ((fstr::upcase(spin) == std::string("ALPHA")) || (fstr::upcase(spin) == std::string("A")));
+    return getReferenceToKohnSham(betaflag);
+}
 
-    bool betaspin = ((fstr::upcase(spin) == std::string("BETA")) || (fstr::upcase(spin) == std::string("B")));
-
-    errors::assertMsgCritical(alphaspin || betaspin, errspin);
-
-    auto betaflag = alphaspin ? false : true;
+const CDenseMatrix&
+CAOKohnShamMatrix::getReferenceToBetaKohnSham() const
+{
+    auto betaflag = true;
 
     return getReferenceToKohnSham(betaflag);
 }
