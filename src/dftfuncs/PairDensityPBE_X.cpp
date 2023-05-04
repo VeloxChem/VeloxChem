@@ -88,7 +88,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double sig = sigma[3 * g + 0];
 
-        // double delta2 = -2.0 * pair_density;
+        double delta2 = -2.0 * pair_density;
 
         double delta = std::sqrt(std::fabs(-2.0 * pair_density));
 
@@ -97,7 +97,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         double zeta2 = zeta * zeta;  // This is really the absolute value
 
         // Li Manni's 2014 translation of gradients
-        double gradR = 0.25 * sig * (1.0 + zeta2);
+        double gradR = 0.25 * sig * (1.0 + delta2 / rho2);
 
         double gradI = 0.25 * sig * zeta;
 
