@@ -75,11 +75,11 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double pair_density = rho[2 * g + 1];
 
-        double f_zeta;
+        double f_zeta = 0.0;
 
-        double dexc_rho;
+        double dexc_rho = 0.0;
 
-        double dexc_pi;
+        double dexc_pi = 0.0;
 
         // Real case
         if (pair_density <= 0)

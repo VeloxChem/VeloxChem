@@ -101,19 +101,19 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double gradI = 0.25 * sig * zeta;
 
-        double f_zeta;
+        double f_zeta = 0.0;
 
-        double fg_zeta;
+        double fg_zeta = 0.0;
 
-        double dF_rho;
+        double dF_rho = 0.0;
 
-        double dFg_rho;
+        double dFg_rho = 0.0;
 
-        double dF_pi;
+        double dF_pi = 0.0;
 
-        double dFg_pi;
+        double dFg_pi = 0.0;
 
-        double dFg_sigma;
+        double dFg_sigma = 0.0;
 
         // Real case
         if (pair_density <= 0)

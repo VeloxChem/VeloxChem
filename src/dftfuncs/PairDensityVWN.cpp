@@ -119,11 +119,11 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
         double xrho = DCRS * f16 * std::pow(density, f76);
 
-        double f_zeta;
+        double f_zeta = 0.0;
 
-        double f_zet1;
+        double f_zet1 = 0.0;
 
-        double f_zetpi;
+        double f_zetpi = 0.0;
 
         // Real case
         if (pair_density <= 0)
