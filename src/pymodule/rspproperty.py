@@ -91,10 +91,10 @@ class ResponseProperty:
             'ResponseProperty: response driver not initialized')
 
         assert_msg_critical(
-            self._rsp_driver.solver is not None,
+            self.solver is not None,
             'ResponseProperty: response solver not initialized')
 
-        self._rsp_driver.solver.print_keywords()
+        self.solver.print_keywords()
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -111,11 +111,19 @@ class ResponseProperty:
         self._rsp_property = self._rsp_driver.compute(molecule, basis,
                                                       scf_tensors)
 
-        if not self._rsp_driver.is_converged:
+        if not self.is_converged:
             return
 
         if self._rsp_driver.rank == mpi_master():
             self.print_property(self._rsp_driver.ostream)
+
+    @property
+    def solver(self):
+        """
+        Returns the response solver.
+        """
+
+        return self._rsp_driver.solver
 
     @property
     def is_converged(self):

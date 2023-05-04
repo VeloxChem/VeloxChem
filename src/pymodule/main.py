@@ -392,11 +392,10 @@ def main():
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
 
-            tddftgrad_drv = TddftGradientDriver(scf_drv, task.mpi_comm,
-                                                task.ostream)
+            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
-            tddftgrad_drv.compute(task.molecule, task.ao_basis,
-                                  rsp_prop._rsp_driver.solver)
+            tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
+                                  rsp_prop.solver)
 
     # Hessian
 
@@ -468,14 +467,13 @@ def main():
                                            method_dict)
             rsp_prop.init_driver(task.mpi_comm, task.ostream)
 
-            tddftgrad_drv = TddftGradientDriver(scf_drv, task.mpi_comm,
-                                                task.ostream)
+            tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
 
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.update_settings(opt_dict)
-            opt_drv.compute(task.molecule, task.ao_basis,
-                            rsp_prop._rsp_driver.solver)
+            opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
+                            rsp_prop.solver)
 
     # Response
 

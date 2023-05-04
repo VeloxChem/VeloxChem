@@ -39,8 +39,6 @@ class GradientDriver:
     """
     Implements gradient driver.
 
-    :param energy_drv:
-        The energy driver.
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -57,25 +55,19 @@ class GradientDriver:
         - xcfun: The XC functional.
     """
 
-    def __init__(self, energy_drv, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
 
         if comm is None:
-            if hasattr(energy_drv, 'comm'):
-                comm = energy_drv.comm
-            else:
-                comm = MPI.COMM_WORLD
+            comm = MPI.COMM_WORLD
 
         if ostream is None:
-            if hasattr(energy_drv, 'ostream'):
-                ostream = energy_drv.ostream
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
             else:
-                if comm.Get_rank() == mpi_master():
-                    ostream = OutputStream(sys.stdout)
-                else:
-                    ostream = OutputStream(None)
+                ostream = OutputStream(None)
 
         self.comm = comm
         self.rank = self.comm.Get_rank()

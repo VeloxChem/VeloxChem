@@ -23,14 +23,11 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from copy import deepcopy
 import time as tm
-import numpy as np
 
 from .veloxchemlib import mpi_master
-from .errorhandler import assert_msg_critical
-
 from .gradientdriver import GradientDriver
+from .errorhandler import assert_msg_critical
 
 
 class TddftGradientDriver(GradientDriver):
@@ -53,22 +50,19 @@ class TddftGradientDriver(GradientDriver):
         - state_deriv_index: The index of the excited state of interest.
     """
 
-    def __init__(self, scf_drv, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes the TDDFT gradient driver.
         """
 
-        super().__init__(scf_drv, comm, ostream)
+        super().__init__(comm, ostream)
 
         self.flag = 'RPA Gradient Driver'
         self.tamm_dancoff = False
-
-        self.scf_drv = scf_drv
-
-        self.delta_h = 0.001
         self.state_deriv_index = 1
 
         self.numerical = True
+        self.delta_h = 0.001
 
     def update_settings(self, grad_dict, rsp_dict, method_dict=None):
         """
@@ -102,7 +96,7 @@ class TddftGradientDriver(GradientDriver):
         if 'state_deriv_index' in grad_dict:
             self.state_deriv_index = int(grad_dict['state_deriv_index'])
 
-    def compute(self, molecule, basis, rsp_drv):
+    def compute(self, molecule, basis, scf_drv, rsp_drv):
         """
         Performs calculation of analytical or numerical gradient.
 
@@ -110,15 +104,20 @@ class TddftGradientDriver(GradientDriver):
             The molecule.
         :param basis:
             The AO basis set.
+        :param scf_drv:
+            The SCF driver.
         :param rsp_drv:
             The RPA or TDA driver.
         """
 
-        # sanity check
-        # TODO automatically determine nstates for response driver
+        if self.tamm_dancoff:
+            self.flag = 'TDA Gradient Driver'
+        else:
+            self.flag = 'RPA Gradient Driver'
+
         if self.rank == mpi_master():
-            error_message = 'TddftGradientDriver: some of the '
-            error_message += 'selected states have not been calculated.'
+            error_message = 'TddftGradientDriver: The state of interest is '
+            error_message += 'beyond the number of solved states.'
             assert_msg_critical(self.state_deriv_index <= rsp_drv.nstates,
                                 error_message)
 
@@ -126,14 +125,13 @@ class TddftGradientDriver(GradientDriver):
 
         start_time = tm.time()
 
-        self.scf_drv.ostream.mute()
+        scf_drv.ostream.mute()
 
         # Currently, only numerical gradients are available
-        self.compute_numerical(molecule, basis, rsp_drv)
+        self.compute_numerical(molecule, basis, scf_drv, rsp_drv)
 
-        self.scf_drv.ostream.unmute()
+        scf_drv.ostream.unmute()
 
-        # print gradient
         if self.rank == mpi_master():
             self.print_geometry(molecule)
             self.print_gradient(molecule)
@@ -144,7 +142,7 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_energy(self, molecule, basis, rsp_drv):
+    def compute_energy(self, molecule, basis, scf_drv, rsp_drv):
         """
         Computes the energy at the current position.
 
@@ -152,15 +150,16 @@ class TddftGradientDriver(GradientDriver):
             The molecule.
         :param basis:
             The basis set.
+        :param scf_drv:
+            The SCF driver.
         :param rsp_drv:
-            The linear response driver.
-        :param min_basis:
-            The reduced basis set.
+            The RPA or TDA driver.
         """
 
-        scf_results = self.scf_drv.compute(molecule, basis)
+        scf_drv.restart = False
+        scf_results = scf_drv.compute(molecule, basis)
 
-        rsp_drv._is_converged = False
+        rsp_drv.restart = False
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
 
         if self.rank == mpi_master():
