@@ -30,6 +30,7 @@
 
 #include "AOFockMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
+#include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
 
 namespace submat {  // submat namespace
@@ -60,9 +61,7 @@ CDenseMatrix getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
  @param aoCount the number of indices in submatrix.
  @return the sub AO density matrices.
  */
-CAODensityMatrix getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                                     const std::vector<int32_t>& aoIndices,
-                                     const int32_t               aoCount);
+CAODensityMatrix getSubDensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int32_t>& aoIndices, const int32_t aoCount);
 
 /**
  Gets sub matrix from an arbitrary matrix by slicing the columns.
@@ -79,6 +78,20 @@ CDenseMatrix getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix
                                          const int32_t               nAOs);
 
 /**
+ Distributes partial Wxc tensor (pair functional) to full Wxc tensor.
+
+ @param fullTensor the full Wxc tensor.
+ @param subMatrix the partial Wxc matrix.
+ @param aoIndices the index mapping from partial to full.
+ @param aoCount the number of indices in partial matrix.
+ */
+
+void distributeSubmatrixTo4DTensor(CDense4DTensor&             fullTensor,
+                                   const CDenseMatrix&         subMatrix,
+                                   const std::vector<int32_t>& aoIndices,
+                                   const int32_t               aoCount);
+
+/**
  Distributes partial Vxc matrix to full AO Kohn-Sham matrix.
 
  @param aoKohnShamMatrix the AO Kohn-Sham matrix.
@@ -87,6 +100,7 @@ CDenseMatrix getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix
  @param aoCount the number of indices in partial matrix.
  @param nAOs the number of indices in full matrix.
  */
+
 void distributeSubMatrixToKohnSham(CAOKohnShamMatrix&          aoKohnShamMatrix,
                                    const CDenseMatrix&         subMatrix,
                                    const std::vector<int32_t>& aoIndices,

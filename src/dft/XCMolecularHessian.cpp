@@ -360,7 +360,7 @@ CXCMolecularHessian::_integrateExcHessianForLDA(const CMolecule&        molecule
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1030,7 +1030,7 @@ CXCMolecularHessian::_integrateExcHessianForGGA(const CMolecule&        molecule
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1909,7 +1909,7 @@ CXCMolecularHessian::_integrateVxcFockGradientForLDA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2340,7 +2340,7 @@ CXCMolecularHessian::_integrateVxcFockGradientForGGA(const CMolecule&        mol
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 

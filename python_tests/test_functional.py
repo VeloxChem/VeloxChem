@@ -80,7 +80,7 @@ class TestFunctionalExcVxc:
             Gmat = gto * gw * vrho_a
 
             Vxcmat = np.matmul(gto, Gmat.T)
-            assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
+            assert np.max(np.abs(Vxcmat - vxc.alpha_to_numpy())) < tol
 
     @pytest.mark.skipif(not is_single_node(), reason="single node only")
     def test_gga(self):
@@ -182,4 +182,4 @@ class TestFunctionalExcVxc:
 
             Vxcmat_gga = np.matmul(gto, Gmat_gga.T)
             Vxcmat = np.matmul(gto, Gmat.T) + Vxcmat_gga + Vxcmat_gga.T
-            assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
+            assert np.max(np.abs(Vxcmat - vxc.alpha_to_numpy())) < tol

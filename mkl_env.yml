@@ -24,7 +24,12 @@ dependencies:
   - scipy
   - gtest
   - gmock
+  - rdkit
   - cppe
   - xtb
   - geometric
   - libxc
+  - clang-format
+  - yapf
+  - toml
+  - flake8

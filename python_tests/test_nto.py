@@ -50,6 +50,9 @@ class TestNTO:
                 rsp_drv = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
             rsp_drv.update_settings(rsp_dict,
                                     task.input_dict['method_settings'])
+            # set checkpoint_file to None to avoid the issue with running
+            # parallel h5py in temp_dir
+            rsp_drv.checkpoint_file = None
             rsp_results = rsp_drv.compute(task.molecule, task.ao_basis,
                                           scf_drv.scf_tensors)
 

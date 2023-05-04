@@ -30,6 +30,7 @@
 #include "AOKohnShamMatrix.hpp"
 #include "ErrorHandler.hpp"
 #include "MpiFunc.hpp"
+#include "StringFormat.hpp"
 
 CAOKohnShamMatrix::CAOKohnShamMatrix()
     : _xcMatrices(std::vector<CDenseMatrix>())
@@ -468,6 +469,22 @@ CAOKohnShamMatrix::getReferenceToKohnSham(const bool beta) const
     {
         return _xcMatrices[1];
     }
+}
+
+const CDenseMatrix&
+CAOKohnShamMatrix::getReferenceToAlphaKohnSham() const
+{
+    auto betaflag = false;
+
+    return getReferenceToKohnSham(betaflag);
+}
+
+const CDenseMatrix&
+CAOKohnShamMatrix::getReferenceToBetaKohnSham() const
+{
+    auto betaflag = true;
+
+    return getReferenceToKohnSham(betaflag);
 }
 
 const double*

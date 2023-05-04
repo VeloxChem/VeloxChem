@@ -291,23 +291,23 @@ class TpaFullDriver(TpaDriver):
         if self.rank == mpi_master():
             self._print_fock_header()
 
-        keys = [
-            'f_sig_xx',
-            'f_sig_yy',
-            'f_sig_zz',
-            'f_sig_xy',
-            'f_sig_xz',
-            'f_sig_yz',
-            'f_lamtau_xx',
-            'f_lamtau_yy',
-            'f_lamtau_zz',
-            'f_lamtau_xy',
-            'f_lamtau_xz',
-            'f_lamtau_yz',
-            'F123_x',
-            'F123_y',
-            'F123_z',
-        ]
+        # generate key-frequency pairs
+
+        key_freq_pairs = []
+
+        for wb in wi:
+            for key in [
+                    'f_sig_xx', 'f_sig_yy', 'f_sig_zz', 'f_sig_xy', 'f_sig_xz',
+                    'f_sig_yz', 'f_lamtau_xx', 'f_lamtau_yy', 'f_lamtau_zz',
+                    'f_lamtau_xy', 'f_lamtau_xz', 'f_lamtau_yz'
+            ]:
+                key_freq_pairs.append((key, wb))
+
+        for wb in wi:
+            for key in ['F123_x', 'F123_y', 'F123_z']:
+                key_freq_pairs.append((key, wb))
+
+        # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
             fock_file = str(
@@ -317,76 +317,48 @@ class TpaFullDriver(TpaDriver):
 
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = check_distributed_focks(fock_file, keys, wi)
+                self.restart = check_distributed_focks(fock_file,
+                                                       key_freq_pairs)
             self.restart = self.comm.bcast(self.restart, mpi_master())
 
+        # read or compute distributed Focks
+
         if self.restart:
-            focks = read_distributed_focks(fock_file, keys, wi, self.comm,
-                                           self.ostream)
-            focks['F0'] = F0_a
-            return focks
-
-        time_start_fock = time.time()
-
-        if self._dft:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                             'real_and_imag', dft_dict,
-                                             density_list1, density_list2,
-                                             density_list3, 'tpa', profiler)
+            dist_focks = read_distributed_focks(fock_file, self.comm,
+                                                self.ostream)
         else:
-            if self.rank == mpi_master():
-                density_list_23 = density_list2 + density_list3
-            else:
-                density_list_23 = None
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                             'real_and_imag', None, None, None,
-                                             density_list_23, 'tpa', profiler)
+            time_start_fock = time.time()
 
-        time_end_fock = time.time()
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
+            if self._dft:
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                                 'real_and_imag', dft_dict,
+                                                 density_list1, density_list2,
+                                                 density_list3, 'tpa', profiler)
+            else:
+                if self.rank == mpi_master():
+                    density_list_23 = density_list2 + density_list3
+                else:
+                    density_list_23 = None
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                                 'real_and_imag', None, None,
+                                                 None, density_list_23, 'tpa',
+                                                 profiler)
+
+            self._print_fock_time(time.time() - time_start_fock)
+
+            write_distributed_focks(fock_file, dist_focks, key_freq_pairs,
+                                    self.comm, self.ostream)
+
+        # assign distributed Focks to key-frequency pairs
 
         focks = {'F0': F0_a}
-        for key in keys:
-            focks[key] = {}
 
-        fock_index = 0
-
-        for wb in wi:
-            for key in [
-                    'f_sig_xx',
-                    'f_sig_yy',
-                    'f_sig_zz',
-                    'f_sig_xy',
-                    'f_sig_xz',
-                    'f_sig_yz',
-                    'f_lamtau_xx',
-                    'f_lamtau_yy',
-                    'f_lamtau_zz',
-                    'f_lamtau_xy',
-                    'f_lamtau_xz',
-                    'f_lamtau_yz',
-            ]:
-                focks[key][wb] = DistributedArray(dist_focks.data[:,
-                                                                  fock_index],
-                                                  self.comm,
-                                                  distribute=False)
-                fock_index += 1
-
-        for wb in wi:
-            for key in [
-                    'F123_x',
-                    'F123_y',
-                    'F123_z',
-            ]:
-                focks[key][wb] = DistributedArray(dist_focks.data[:,
-                                                                  fock_index],
-                                                  self.comm,
-                                                  distribute=False)
-                fock_index += 1
-
-        write_distributed_focks(fock_file, focks, keys, wi, self.comm,
-                                self.ostream)
+        for fock_index, (key, wb) in enumerate(key_freq_pairs):
+            if key not in focks:
+                focks[key] = {}
+            focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index],
+                                              self.comm,
+                                              distribute=False)
 
         return focks
 
@@ -1069,7 +1041,14 @@ class TpaFullDriver(TpaDriver):
         if self.rank == mpi_master():
             self._print_fock_header()
 
-        keys = ['F123_x', 'F123_y', 'F123_z']
+        # generate key-frequency paris
+
+        key_freq_pairs = []
+        for w in wi:
+            for key in ['F123_x', 'F123_y', 'F123_z']:
+                key_freq_pairs.append((key, w))
+
+        # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
             fock_file = str(
@@ -1079,44 +1058,44 @@ class TpaFullDriver(TpaDriver):
 
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = check_distributed_focks(fock_file, keys, wi)
+                self.restart = check_distributed_focks(fock_file,
+                                                       key_freq_pairs)
             self.restart = self.comm.bcast(self.restart, mpi_master())
 
+        # read or compute distributed Focks
+
         if self.restart:
-            return read_distributed_focks(fock_file, keys, wi, self.comm,
-                                          self.ostream)
-
-        time_start_fock = time.time()
-
-        if self._dft:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                             'real_and_imag', dft_dict,
-                                             density_list1, density_list2, None,
-                                             'tpa_ii', profiler)
+            dist_focks = read_distributed_focks(fock_file, self.comm,
+                                                self.ostream)
         else:
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                             'real_and_imag', None, None,
-                                             density_list2, None, 'tpa_ii',
-                                             profiler)
+            time_start_fock = time.time()
 
-        time_end_fock = time.time()
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
+            if self._dft:
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                                 'real_and_imag', dft_dict,
+                                                 density_list1, density_list2,
+                                                 None, 'tpa_ii', profiler)
+            else:
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                                 'real_and_imag', None, None,
+                                                 density_list2, None, 'tpa_ii',
+                                                 profiler)
+
+            self._print_fock_time(time.time() - time_start_fock)
+
+            write_distributed_focks(fock_file, dist_focks, key_freq_pairs,
+                                    self.comm, self.ostream)
+
+        # assign distributed Focks to key-frequency pairs
 
         focks = {}
-        for key in keys:
-            focks[key] = {}
 
-        fock_index = 0
-        for w in wi:
-            for key in keys:
-                focks[key][w] = DistributedArray(dist_focks.data[:, fock_index],
-                                                 self.comm,
-                                                 distribute=False)
-                fock_index += 1
-
-        write_distributed_focks(fock_file, focks, keys, wi, self.comm,
-                                self.ostream)
+        for fock_index, (key, w) in enumerate(key_freq_pairs):
+            if key not in focks:
+                focks[key] = {}
+            focks[key][w] = DistributedArray(dist_focks.data[:, fock_index],
+                                             self.comm,
+                                             distribute=False)
 
         return focks
 

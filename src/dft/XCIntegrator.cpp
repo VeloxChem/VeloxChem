@@ -268,7 +268,7 @@ CXCIntegrator::integrateKxcLxcFock(CAOFockMatrix&          aoFockMatrix,
 
 void
 CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
-                                CDense4DTensor&         moTwoBodyGradient,
+                                CDense4DTensor&         tensorWxc,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
                                 const CAODensityMatrix& densityMatrix,
@@ -283,13 +283,11 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
 
     if (xcfuntype == "PLDA")
     {
-        _integrateVxcPDFTForLDA(
-            aoFockMatrix, moTwoBodyGradient, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
+        _integrateVxcPDFTForLDA(aoFockMatrix, tensorWxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
     }
     else if (xcfuntype == "PGGA")
     {
-        _integrateVxcPDFTForGGA(
-            aoFockMatrix, moTwoBodyGradient, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
+        _integrateVxcPDFTForGGA(aoFockMatrix, tensorWxc, molecule, basis, densityMatrix, twoBodyDensityMatrix, activeMOs, molecularGrid, fvxc);
     }
     else
     {
@@ -470,7 +468,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
         {
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
             timer.stop("Density matrix slicing");
 
@@ -480,8 +478,8 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
         {
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
-            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
+            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
+            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, std::string("BETA"), aoinds, aocount, naos);
 
             timer.stop("Density matrix slicing");
 
@@ -757,7 +755,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
         {
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
             dengridgen::generateDensityForGGA(rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, timer);
 
@@ -767,8 +765,8 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
         {
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
-            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
+            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
+            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, std::string("BETA"), aoinds, aocount, naos);
 
             dengridgen::generateDensityForGGA(
                 rho, rhograd, sigma, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_dens_mat_b, timer);
@@ -1056,7 +1054,7 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
         {
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
             dengridgen::generateDensityForMGGA(
                 rho, rhograd, sigma, lapl, tau, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat, timer);
@@ -1067,8 +1065,8 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
         {
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
-            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, "BETA", aoinds, aocount, naos);
+            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
+            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, std::string("BETA"), aoinds, aocount, naos);
 
             dengridgen::generateDensityForMGGA(
                 rho, rhograd, sigma, lapl, tau, npoints, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, sub_dens_mat_a, sub_dens_mat_b, timer);
@@ -1309,7 +1307,7 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1335,7 +1333,7 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, idensity, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, idensity, std::string("ALPHA"), aoinds, aocount, naos);
 
             timer.stop("Density matrix slicing");
 
@@ -1565,7 +1563,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1593,7 +1591,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, idensity, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, idensity, std::string("ALPHA"), aoinds, aocount, naos);
 
             timer.stop("Density matrix slicing");
 
@@ -1875,7 +1873,7 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -1904,7 +1902,7 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
             timer.start("Density matrix slicing");
 
-            auto sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, idensity, "ALPHA", aoinds, aocount, naos);
+            auto sub_dens_mat = submat::getSubDensityMatrix(rwDensityMatrix, idensity, std::string("ALPHA"), aoinds, aocount, naos);
 
             timer.stop("Density matrix slicing");
 
@@ -2131,7 +2129,7 @@ CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2418,7 +2416,7 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -2788,7 +2786,7 @@ CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -3107,7 +3105,7 @@ CXCIntegrator::_integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -3425,7 +3423,7 @@ CXCIntegrator::_integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -3707,7 +3705,7 @@ CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -4032,7 +4030,7 @@ CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto gs_sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -4523,7 +4521,7 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat = submat::getSubDensityMatrix(gsDensityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         timer.stop("Density matrix slicing");
 
@@ -4818,7 +4816,7 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
 void
 CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMatrix,
-                                       CDense4DTensor&                 moTwoBodyGradient,
+                                       CDense4DTensor&                 tensorWxc,
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
                                        const CAODensityMatrix&         densityMatrix,
@@ -4986,7 +4984,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         auto sub_active_mos = submat::getSubMatrixByColumnSlicing(activeMOs, aoinds, aocount, naos);
 
@@ -5006,17 +5004,21 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
         timer.stop("XC functional eval.");
 
-        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
-
-        // TODO (MGD) 2-body gradient
-
-        // distribute partial Vxc to full Kohn-Sham matrix
-
         timer.start("Vxc matrix dist.");
+
+        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
 
         submat::distributeSubMatrixToKohnSham(aoFockMatrix, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
+
+        timer.start("Wxc matrix dist.");
+
+        auto partial_tensorWxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi, sub_active_mos, vrho, timer);
+
+        submat::distributeSubmatrixTo4DTensor(tensorWxc, partial_tensorWxc, aoinds, aocount);
+
+        timer.stop("Wxc matrix dist.");
 
         // compute partial contribution to XC energy
 
@@ -5238,7 +5240,7 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
 
         timer.start("Density matrix slicing");
 
-        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, "ALPHA", aoinds, aocount, naos);
+        auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
 
         auto sub_active_mos = submat::getSubMatrixByColumnSlicing(activeMOs, aoinds, aocount, naos);
 
@@ -5353,6 +5355,65 @@ CXCIntegrator::_integratePartialVxcFockForLDA(const int32_t       npoints,
     timer.stop("Vxc matrix matmul");
 
     return mat_Vxc;
+}
+
+CDenseMatrix
+CXCIntegrator::_integratePartialWxcFockForPLDA(const int32_t       npoints,
+                                               const double*       weights,
+                                               const CDenseMatrix& gtoValues,
+                                               const CDenseMatrix& activeMOs,
+                                               const double*       vrho,
+                                               CMultiTimer&        timer) const
+
+{
+    timer.start("Wxc matrix");
+
+    auto nActive = activeMOs.getNumberOfRows();
+
+    CDenseMatrix mos_on_grid;
+    if (nActive > 0)
+    {
+        mos_on_grid = denblas::multAB(activeMOs, gtoValues);
+    }
+
+    // created empty partial mat_W
+    CDenseMatrix matrixWxc(nActive * nActive * nActive, npoints);
+    auto         W_val = matrixWxc.values();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+        auto nthreads  = omp_get_max_threads();
+
+        auto grid_batch_size   = mpi::batch_size(npoints, thread_id, nthreads);
+        auto grid_batch_offset = mpi::batch_offset(npoints, thread_id, nthreads);
+
+        for (int32_t j = 0; j < nActive; j++)
+        {
+            auto mo_j = mos_on_grid.row(j);
+            for (int32_t k = 0; k < nActive; k++)
+            {
+                auto jk   = j * nActive + k;
+                auto mo_k = mos_on_grid.row(k);
+                for (int32_t l = 0; l < nActive; l++)
+                {
+                    auto jkl  = jk * nActive + l;
+                    auto mo_l = mos_on_grid.row(l);
+                    #pragma omp simd aligned(W_val, vrho, weights, mo_j, mo_k, mo_l : VLX_ALIGN)
+                    for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+                    {
+                        W_val[jkl * npoints + g] = weights[g] * vrho[2 * g + 1] * mo_j[g] * mo_k[g] * mo_l[g];
+                    }
+                }
+            }
+        }
+    }
+
+    auto tensorWxc = denblas::multABt(gtoValues, matrixWxc);
+
+    timer.stop("Wxc matrix");
+
+    return tensorWxc;
 }
 
 std::vector<CDenseMatrix>

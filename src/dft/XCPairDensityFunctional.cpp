@@ -55,6 +55,10 @@ CXCPairDensityFunctional::CXCPairDensityFunctional(const std::string&           
     {
         _familyOfFunctional = std::string("PLDA");
     }
+    else if (fstr::upcase(nameOfFunctional) == "PSLATER")
+    {
+        _familyOfFunctional = std::string("PLDA");
+    }
     else if (fstr::upcase(nameOfFunctional) == "PPBE")
     {
         _familyOfFunctional = std::string("PGGA");

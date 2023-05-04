@@ -282,8 +282,7 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['response'].items()
+            key: val[0] for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -345,6 +344,7 @@ class LinearSolver:
                 # do not overwrite xcfun if it is already specified
                 if self.xcfun is None:
                     updated_scf_info['xcfun'] = scf_results['xcfun']
+                    updated_scf_info['grid_level'] = scf_results['grid_level']
 
             if scf_results.get('potfile', None) is not None:
                 # do not overwrite potfile if it is already specified
@@ -355,6 +355,23 @@ class LinearSolver:
 
         for key, val in updated_scf_info.items():
             setattr(self, key, val)
+
+        # double check xcfun in SCF and response
+
+        if self.rank == mpi_master():
+            scf_xcfun_label = scf_results.get('xcfun', 'HF').upper()
+            if self.xcfun is None:
+                rsp_xcfun_label = 'HF'
+            elif isinstance(self.xcfun, str):
+                rsp_xcfun_label = self.xcfun.upper()
+            else:
+                rsp_xcfun_label = self.xcfun.get_func_label().upper()
+            if rsp_xcfun_label != scf_xcfun_label:
+                warn_msg = f'*** Warning: {rsp_xcfun_label} will be used in response'
+                warn_msg += f' but {scf_xcfun_label} was used in SCF. ***'
+                self.ostream.print_header(warn_msg)
+                warn_msg = '*** Please double check. ***'
+                self.ostream.print_header(warn_msg)
 
     def _dft_sanity_check(self):
         """
@@ -375,7 +392,7 @@ class LinearSolver:
             self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
+        if self._dft and (self.grid_level < 1 or self.grid_level > 8):
             warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
             warn_msg += ' Using default value. ***'
             self.ostream.print_blank()
@@ -1131,6 +1148,8 @@ class LinearSolver:
         if self.checkpoint_file is None:
             return
 
+        t0 = tm.time()
+
         if self.rank == mpi_master():
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
                                      basis, dft_dict, pe_dict, self.ostream)
@@ -1152,6 +1171,11 @@ class LinearSolver:
 
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
+
+            checkpoint_text = 'Time spent in writing checkpoint file: '
+            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
 
     def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -1521,7 +1545,7 @@ class LinearSolver:
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
-                        np.linalg.multi_dot([mo_core_exc.T, P.T, mo_core_exc]),
+                        np.linalg.multi_dot([mo_core_exc.T, P, mo_core_exc]),
                         nocc, self.num_core_orbitals) for P in integral_comps
                 ]
                 gradients = tuple(
@@ -1530,7 +1554,7 @@ class LinearSolver:
             else:
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
-                        np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
+                        np.linalg.multi_dot([mo.T, P, mo]), nocc)
                     for P in integral_comps
                 ]
                 gradients = tuple(
@@ -1628,8 +1652,8 @@ class LinearSolver:
 
             factor = np.sqrt(2.0)
             matrices = [
-                factor * (-1.0) * self.commut_mo_density(
-                    np.linalg.multi_dot([mo.T, P.conj().T, mo]), nocc)
+                factor * (-1.0) *
+                self.commut_mo_density(np.linalg.multi_dot([mo.T, P, mo]), nocc)
                 for P in integral_comps
             ]
 

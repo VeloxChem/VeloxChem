@@ -33,6 +33,7 @@
 #include <memory>
 #include <string>
 
+#include "Dense4DTensor.hpp"
 #include "DenseMatrix.hpp"
 #include "DensityGrid.hpp"
 #include "ExportGeneral.hpp"
@@ -52,7 +53,7 @@ using namespace py::literals;
 
 namespace vlx_dft {  // vlx_dft namespace
 
-CAOKohnShamMatrix
+py::list
 integrate_vxc_pdft(const CXCIntegrator&       self,
                    const CAODensityMatrix&    aoDensityMatrix,
                    const py::array_t<double>& active2DM,
@@ -93,7 +94,7 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     CDense4DTensor tensor2DM(vec, n_active, n_active, n_active, n_active);
 
-    // active MO
+    // activeMOs
 
     // Check dimensions
 
@@ -115,17 +116,25 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     CDenseMatrix denseActiveMO(vec2, n_active, naos);
 
-    CAOKohnShamMatrix mat_Vxc(naos, naos, true);
+    // Create output tensors
 
-    mat_Vxc.zero();
+    CAOKohnShamMatrix matrixVxc(naos, naos, true);
 
-    CDense4DTensor twoBodyGradient(naos, n_active, n_active, n_active);
+    matrixVxc.zero();
 
-    twoBodyGradient.zero();
+    CDense4DTensor tensorWxc(naos, n_active, n_active, n_active);
 
-    self.integrateVxcPDFT(mat_Vxc, twoBodyGradient, molecule, basis, aoDensityMatrix, tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
+    tensorWxc.zero();
 
-    return mat_Vxc;
+    self.integrateVxcPDFT(matrixVxc, tensorWxc, molecule, basis, aoDensityMatrix, tensor2DM, denseActiveMO, molecularGrid, xcFuncLabel);
+
+    py::list returnList;
+
+    returnList.append(matrixVxc);
+
+    returnList.append(vlx_general::pointer_to_numpy(tensorWxc.values(), naos, n_active * n_active * n_active));
+
+    return returnList;
 }
 
 // Exports classes/functions in src/dft to python
@@ -149,6 +158,22 @@ export_dft(py::module& m)
         .def(py::init<int32_t, int32_t, bool>(), "nrows"_a, "ncols"_a, "is_rest"_a)
         .def("__str__", &CAOKohnShamMatrix::getString)
         .def("get_matrix", &CAOKohnShamMatrix::getReferenceToKohnSham, "Gets constant reference to specific Kohn-Sham matrix.", "beta"_a = false)
+        .def("get_alpha_matrix", &CAOKohnShamMatrix::getReferenceToAlphaKohnSham, "Gets constant reference to alpha-spin Kohn-Sham matrix.")
+        .def("get_beta_matrix", &CAOKohnShamMatrix::getReferenceToBetaKohnSham, "Gets constant reference to beta-spin Kohn-Sham matrix.")
+        .def(
+            "alpha_to_numpy",
+            [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
+                auto alphaMatrix = self.getReferenceToAlphaKohnSham();
+                return vlx_general::pointer_to_numpy(alphaMatrix.values(), alphaMatrix.getNumberOfRows(), alphaMatrix.getNumberOfColumns());
+            },
+            "Converts alpha AOKohnShamMatrix to numpy array.")
+        .def(
+            "beta_to_numpy",
+            [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
+                auto betaMatrix = self.getReferenceToBetaKohnSham();
+                return vlx_general::pointer_to_numpy(betaMatrix.values(), betaMatrix.getNumberOfRows(), betaMatrix.getNumberOfColumns());
+            },
+            "Converts beta AOKohnShamMatrix to numpy array.")
         .def(
             "reduce_sum",
             [](CAOKohnShamMatrix& self, int32_t rank, int32_t nodes, py::object py_comm) -> void {

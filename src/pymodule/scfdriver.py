@@ -446,7 +446,7 @@ class ScfDriver:
             self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
+        if self._dft and (self.grid_level < 1 or self.grid_level > 8):
             warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
             warn_msg += ' Using default value. ***'
             self.ostream.print_blank()
@@ -1079,6 +1079,7 @@ class ScfDriver:
             if self._dft:
                 # dft info
                 self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                self._scf_tensors['grid_level'] = self.grid_level
 
             if self._pe:
                 # pe info
@@ -1642,9 +1643,9 @@ class ScfDriver:
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
             if self._dft and not self._first_step:
-                fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
+                fock_mat.add_matrix(vxc_mat.get_alpha_matrix(), 0, 'alpha')
                 if self.scf_type in ['unrestricted', 'restricted_openshell']:
-                    fock_mat.add_matrix(vxc_mat.get_matrix(True), 0, 'beta')
+                    fock_mat.add_matrix(vxc_mat.get_beta_matrix(), 0, 'beta')
 
             if self._pe and not self._first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
