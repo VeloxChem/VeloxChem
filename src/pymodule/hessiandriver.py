@@ -239,7 +239,8 @@ class HessianDriver:
                 normalized=False))
 
         # Diagonalizes Hessian and calculates the reduced masses
-        self.reduced_masses = 1.0 / (np.einsum('ki->i', self.normal_modes.T**2))
+        # einsum 'ki->i'
+        self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
         # Constants and conversion factors
         c = speed_of_light_in_vacuum_in_SI()
@@ -276,10 +277,13 @@ class HessianDriver:
 
         # Calculate Raman intensities, if applicable
         if self.polarizability_gradient is not None:
-            raman_transmom = np.einsum('xyi,ik->xyk',
-                                       self.polarizability_gradient,
-                                       self.normal_modes.T,
-                                       optimize=True)
+            # einsum 'xyi,ik->xyk'
+            size_x = self.polarizability_gradient.shape[0]
+            size_y = self.polarizability_gradient.shape[1]
+            size_k = self.normal_modes.shape[0]
+            raman_transmom = np.matmul(
+                self.polarizability_gradient.reshape(size_x * size_y, -1),
+                self.normal_modes.T).reshape(size_x, size_y, size_k)
             # Calculate rotational invariants
             alpha_bar = np.zeros((number_of_modes))
             gamma_bar_sq = np.zeros((number_of_modes))
