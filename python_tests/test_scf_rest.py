@@ -35,6 +35,7 @@ class TestScfRestricted:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
+
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
@@ -120,8 +121,7 @@ class TestScfRestricted:
         xcfun_label = 'm06'
         electric_field = None
         ref_e_scf = -76.405960204758
-        ref_dip = np.array([0.000000, 0.000000, 0.748155])
-        # note: reference dipole moment with finer grid is 0.748301
+        ref_dip = np.array([0.000000, 0.000000, 0.748301])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)

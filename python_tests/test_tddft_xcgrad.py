@@ -4,6 +4,7 @@ import h5py
 
 from veloxchem.veloxchemlib import denmat
 from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import parse_xc_func
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.aodensitymatrix import AODensityMatrix
@@ -46,7 +47,9 @@ class TestTddftXCgrad:
 
         # XC contribution to molecular gradient
 
-        grad_drv = GradientDriver(None)
+        grad_drv = GradientDriver()
+        grad_drv.xcfun = parse_xc_func(xcfun_label)
+        grad_drv.ostream.mute()
 
         if is_mpi_master():
             gs_density = AODensityMatrix([gs_dm], denmat.rest)
