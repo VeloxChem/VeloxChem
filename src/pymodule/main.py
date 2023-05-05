@@ -393,7 +393,7 @@ def main():
             tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
             tddftgrad_drv.update_settings(grad_dict, rsp_dict, method_dict)
             tddftgrad_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                                  rsp_prop.solver)
+                                  rsp_prop.rsp_driver)
 
     # Hessian
 
@@ -469,7 +469,7 @@ def main():
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.update_settings(opt_dict)
             opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                            rsp_prop.solver)
+                            rsp_prop.rsp_driver)
 
     # Response
 

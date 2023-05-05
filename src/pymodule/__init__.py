@@ -91,7 +91,6 @@ from .mp2driver import Mp2Driver
 from .cubicgrid import CubicGrid
 from .visualizationdriver import VisualizationDriver
 from .excitondriver import ExcitonModelDriver
-from .rspdriver import ResponseDriver
 from .tdaeigensolver import TdaEigenSolver
 from .blockdavidson import BlockDavidsonSolver
 from .lreigensolver import LinearResponseEigenSolver
