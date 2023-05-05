@@ -54,6 +54,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_datetime_string)
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_tensors
 
@@ -194,7 +195,7 @@ class ScfDriver:
 
         # dft
         self.xcfun = None
-        self.grid_level = 4
+        self.grid_level = None
         self._dft = False
         self._mol_grid = None
 
@@ -252,7 +253,7 @@ class ScfDriver:
             'method_settings': {
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
-                'grid_level': ('int', 'accuracy level of DFT grid (1-6)'),
+                'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 'use_split_comm': ('bool', 'use split communicators'),
@@ -446,14 +447,15 @@ class ScfDriver:
             self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 8):
-            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
-            warn_msg += ' Using default value. ***'
-            self.ostream.print_blank()
-            self.ostream.print_header(warn_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.grid_level = 4
+        if self._dft and self.grid_level is not None:
+            if (self.grid_level < 1 or self.grid_level > 8):
+                warn_msg = f'Invalid DFT grid level {self.grid_level}. '
+                warn_msg += 'Using default value.'
+                self.ostream.print_blank()
+                self.ostream.print_warning(warn_msg)
+                self.ostream.print_blank()
+                self.ostream.flush()
+                self.grid_level = None
 
     def _pe_sanity_check(self, method_dict=None):
         """
@@ -566,7 +568,9 @@ class ScfDriver:
         # generate integration grid
         if self._dft:
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             self._mol_grid = grid_drv.generate(molecule)
@@ -1079,7 +1083,8 @@ class ScfDriver:
             if self._dft:
                 # dft info
                 self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
-                self._scf_tensors['grid_level'] = self.grid_level
+                if self.grid_level is not None:
+                    self._scf_tensors['grid_level'] = self.grid_level
 
             if self._pe:
                 # pe info
@@ -1964,8 +1969,9 @@ class ScfDriver:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level            : ' + str(
-                self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.electric_field is not None:

@@ -49,6 +49,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_datetime_string)
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
+from .dftutils import get_default_grid_level
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
@@ -116,7 +117,7 @@ class LinearSolver:
 
         # dft
         self.xcfun = None
-        self.grid_level = 4
+        self.grid_level = None
         self._dft = False
 
         # polarizable embedding
@@ -344,7 +345,9 @@ class LinearSolver:
                 # do not overwrite xcfun if it is already specified
                 if self.xcfun is None:
                     updated_scf_info['xcfun'] = scf_results['xcfun']
-                    updated_scf_info['grid_level'] = scf_results['grid_level']
+                    if 'grid_level' in scf_results:
+                        updated_scf_info['grid_level'] = scf_results[
+                            'grid_level']
 
             if scf_results.get('potfile', None) is not None:
                 # do not overwrite potfile if it is already specified
@@ -392,14 +395,15 @@ class LinearSolver:
             self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 8):
-            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
-            warn_msg += ' Using default value. ***'
-            self.ostream.print_blank()
-            self.ostream.print_header(warn_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.grid_level = 4
+        if self._dft and self.grid_level is not None:
+            if (self.grid_level < 1 or self.grid_level > 8):
+                warn_msg = f'Invalid DFT grid level {self.grid_level}. '
+                warn_msg += 'Using default value.'
+                self.ostream.print_blank()
+                self.ostream.print_warning(warn_msg)
+                self.ostream.print_blank()
+                self.ostream.flush()
+                self.grid_level = None
 
     def _pe_sanity_check(self, method_dict=None):
         """
@@ -483,7 +487,9 @@ class LinearSolver:
 
         if self._dft:
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
@@ -1287,8 +1293,9 @@ class LinearSolver:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level            : ' + str(
-                self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()

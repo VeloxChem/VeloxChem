@@ -197,6 +197,25 @@ class OutputStream:
         return '* Info * ' + line + ' ' * right
 
     @staticmethod
+    def warning(line, width):
+        """
+        Gets the warning string.
+
+        :param line:
+            The line of text.
+        :param width:
+            Width of the output.
+
+        :return:
+            The warning string.
+        """
+
+        length = len(line)
+        left = 12
+        right = width - length - left
+        return '* Warning * ' + line + ' ' * right
+
+    @staticmethod
     def tsep(width):
         """
         Gets the separator string.
@@ -266,6 +285,18 @@ class OutputStream:
         if not self.state:
             return
         self.buffer_lines.append(self.info(line, self.width))
+
+    def print_warning(self, line):
+        """
+        Prints a warning line to stream.
+
+        :param line:
+            The line of text.
+        """
+
+        if not self.state:
+            return
+        self.buffer_lines.append(self.warning(line, self.width))
 
     def print_separator(self):
         """

@@ -28,11 +28,10 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import GridDriver
-from .veloxchemlib import MolecularGrid
+from .veloxchemlib import XCIntegrator, GridDriver, MolecularGrid
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
+from .veloxchemlib import denmat, fockmat
+from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .linearsolver import LinearSolver
@@ -40,10 +39,9 @@ from .distributedarray import DistributedArray
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
+from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
-from .veloxchemlib import parse_xc_func
-from .veloxchemlib import XCIntegrator
 
 
 class NonlinearSolver:
@@ -97,7 +95,7 @@ class NonlinearSolver:
         # dft
         self._dft = False
         self.xcfun = None
-        self.grid_level = 4
+        self.grid_level = None
 
         # polarizable embedding
         self.potfile = None
@@ -230,8 +228,7 @@ class NonlinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['response'].items()
+            key: val[0] for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -290,7 +287,9 @@ class NonlinearSolver:
                 # do not overwrite xcfun if it is already specified
                 if self.xcfun is None:
                     updated_scf_info['xcfun'] = scf_results['xcfun']
-                    updated_scf_info['grid_level'] = scf_results['grid_level']
+                    if 'grid_level' in scf_results:
+                        updated_scf_info['grid_level'] = scf_results[
+                            'grid_level']
 
             if scf_results.get('potfile', None) is not None:
                 # do not overwrite potfile if it is already specified
@@ -338,14 +337,15 @@ class NonlinearSolver:
             self._dft = True
 
         # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 8):
-            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
-            warn_msg += ' Using default value. ***'
-            self.ostream.print_blank()
-            self.ostream.print_header(warn_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.grid_level = 4
+        if self._dft and self.grid_level is not None:
+            if (self.grid_level < 1 or self.grid_level > 8):
+                warn_msg = f'Warning: Invalid DFT grid level {self.grid_level}. '
+                warn_msg += 'Using default value.'
+                self.ostream.print_blank()
+                self.ostream.print_warning(warn_msg)
+                self.ostream.print_blank()
+                self.ostream.flush()
+                self.grid_level = None
 
         # check if SCAN family of functional is used in nonliear response
         if self._dft:
@@ -390,7 +390,9 @@ class NonlinearSolver:
 
         if self._dft:
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
@@ -998,8 +1000,9 @@ class NonlinearSolver:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(width))
-            cur_str = 'Molecular Grid Level            : ' + str(
-                self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(width))
 
         self.ostream.print_blank()
