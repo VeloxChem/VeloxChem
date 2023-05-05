@@ -283,7 +283,8 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0] for key, val in self._input_keywords['response'].items()
+            key: val[0]
+            for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -302,7 +303,7 @@ class LinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        self._dft_sanity_check()
+        self._dft_sanity_check('update_settings')
 
         self._pe_sanity_check(method_dict)
 
@@ -376,9 +377,13 @@ class LinearSolver:
                 warn_msg = '*** Please double check. ***'
                 self.ostream.print_header(warn_msg)
 
-    def _dft_sanity_check(self):
+    def _dft_sanity_check(self, flag='compute'):
         """
         Checks DFT settings and updates relevant attributes.
+
+        :param flag:
+            The flag indicating the routine in which the sanity check is
+            being called.
         """
 
         # Hartree-Fock: xcfun is None or 'hf'
@@ -399,11 +404,14 @@ class LinearSolver:
             if (self.grid_level < 1 or self.grid_level > 8):
                 warn_msg = f'Invalid DFT grid level {self.grid_level}. '
                 warn_msg += 'Using default value.'
-                self.ostream.print_blank()
                 self.ostream.print_warning(warn_msg)
-                self.ostream.print_blank()
-                self.ostream.flush()
                 self.grid_level = None
+            elif (flag == 'compute' and
+                  self.grid_level < get_default_grid_level(self.xcfun)):
+                warn_msg = 'DFT grid level is below the recommended value. '
+                warn_msg += 'Please double check.'
+                self.ostream.print_warning(warn_msg)
+            self.ostream.flush()
 
     def _pe_sanity_check(self, method_dict=None):
         """

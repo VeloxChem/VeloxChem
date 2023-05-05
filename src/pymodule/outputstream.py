@@ -296,7 +296,9 @@ class OutputStream:
 
         if not self.state:
             return
+        self.buffer_lines.append('*' * 11 + ' ' * (self.width - 11))
         self.buffer_lines.append(self.warning(line, self.width))
+        self.buffer_lines.append('*' * 11 + ' ' * (self.width - 11))
 
     def print_separator(self):
         """

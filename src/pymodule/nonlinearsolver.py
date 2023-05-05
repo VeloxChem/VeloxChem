@@ -228,7 +228,8 @@ class NonlinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0] for key, val in self._input_keywords['response'].items()
+            key: val[0]
+            for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -247,7 +248,7 @@ class NonlinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        self._dft_sanity_check_nonlinrsp()
+        self._dft_sanity_check_nonlinrsp('update_settings')
 
         if self.potfile is not None:
             errmsg = 'NonlinearSolver: The \'potfile\' keyword is not supported '
@@ -318,9 +319,13 @@ class NonlinearSolver:
                 warn_msg = '*** Please double check. ***'
                 self.ostream.print_header(warn_msg)
 
-    def _dft_sanity_check_nonlinrsp(self):
+    def _dft_sanity_check_nonlinrsp(self, flag='compute'):
         """
         Checks DFT settings and updates relevant attributes.
+
+        :param flag:
+            The flag indicating the routine in which the sanity check is
+            being called.
         """
 
         # Hartree-Fock: xcfun is None or 'hf'
@@ -341,11 +346,14 @@ class NonlinearSolver:
             if (self.grid_level < 1 or self.grid_level > 8):
                 warn_msg = f'Warning: Invalid DFT grid level {self.grid_level}. '
                 warn_msg += 'Using default value.'
-                self.ostream.print_blank()
                 self.ostream.print_warning(warn_msg)
-                self.ostream.print_blank()
-                self.ostream.flush()
                 self.grid_level = None
+            elif (flag == 'compute' and
+                  self.grid_level < get_default_grid_level(self.xcfun)):
+                warn_msg = 'DFT grid level is below the recommended value. '
+                warn_msg += 'Please double check.'
+                self.ostream.print_warning(warn_msg)
+            self.ostream.flush()
 
         # check if SCAN family of functional is used in nonliear response
         if self._dft:
