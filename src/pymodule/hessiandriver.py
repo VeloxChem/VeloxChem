@@ -392,6 +392,7 @@ class HessianDriver:
         :return:
             The nuclear contribution to the Hessian.
         """
+
         # number of atoms
         natm = molecule.number_of_atoms()
 

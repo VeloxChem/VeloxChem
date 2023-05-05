@@ -142,14 +142,14 @@ class CXtbDriver
 
      @param method the XTB method.
      */
-    void setMethod(const std::string method);
+    void setMethod(const std::string& method);
 
     /**
      Sets output filename.
 
      @param filename the output filename.
      */
-    void setOutputFilename(const std::string filename);
+    void setOutputFilename(const std::string& filename);
 
     /**
      Mutes output.
@@ -202,6 +202,13 @@ class CXtbDriver
      @return a vector of strings.
     */
     std::vector<std::string> getOutput() const;
+
+    /**
+     Gets XTB method.
+
+     @return the XTB method.
+    */
+    std::string getMethod() const;
 
     /**
      Gets XTB output filename.

@@ -402,14 +402,14 @@ def main():
                         if 'hessian' in task.input_dict else {})
 
         if use_xtb:
-            hessian_drv = XtbHessianDriver(xtb_drv, task.mpi_comm, task.ostream)
+            hessian_drv = XtbHessianDriver(task.mpi_comm, task.ostream)
             hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule)
+            hessian_drv.compute(task.molecule, xtb_drv)
 
         elif scf_drv.scf_type == 'restricted':
-            hessian_drv = ScfHessianDriver(scf_drv, task.mpi_comm, task.ostream)
+            hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)
             hessian_drv.update_settings(method_dict, hessian_dict)
-            hessian_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+            hessian_drv.compute(task.molecule, task.ao_basis, scf_drv)
 
         if task.mpi_rank == mpi_master():
             hessian_drv.vibrational_analysis(task.molecule)
