@@ -153,9 +153,13 @@ class TddftGradientDriver(GradientDriver):
 
         scf_drv.restart = False
         scf_results = scf_drv.compute(molecule, basis)
+        assert_msg_critical(scf_drv.is_converged,
+                            'TddftGradientDriver: SCF did not converge')
 
         rsp_drv.restart = False
         rsp_results = rsp_drv.compute(molecule, basis, scf_results)
+        assert_msg_critical(rsp_drv.is_converged,
+                            'TddftGradientDriver: response did not converge')
 
         if self.rank == mpi_master():
             scf_ene = scf_results['scf_energy']

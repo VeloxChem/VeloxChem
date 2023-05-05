@@ -30,14 +30,13 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import KineticEnergyIntegralsDriver
-from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import LinearMomentumIntegralsDriver
-from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import GridDriver
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import (KineticEnergyIntegralsDriver,
+                           NuclearPotentialIntegralsDriver,
+                           ElectricDipoleIntegralsDriver,
+                           LinearMomentumIntegralsDriver,
+                           AngularMomentumIntegralsDriver,
+                           ElectronRepulsionIntegralsDriver)
+from .veloxchemlib import GridDriver, XCIntegrator
 from .veloxchemlib import denmat, fockmat, mpi_master
 from .veloxchemlib import (hartree_in_ev, bohr_in_angstroms,
                            rotatory_strength_in_cgs)
@@ -51,6 +50,7 @@ from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
+from .dftutils import get_default_grid_level
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
 
@@ -131,7 +131,7 @@ class ExcitonModelDriver:
 
         # dft settings
         self.dft = False
-        self.grid_level = 4
+        self.grid_level = None
         self.xcfun_label = 'Undefined'
 
         # scf settings
@@ -366,14 +366,12 @@ class ExcitonModelDriver:
 
         if self.dft:
             dft_func_label = self.xcfun_label
-            method_dict = {
-                'dft': 'yes',
-                'grid_level': self.grid_level,
-                'xcfun': dft_func_label,
-            }
+            method_dict = {'xcfun': dft_func_label}
+            if self.grid_level is not None:
+                method_dict.update({'grid_level': self.grid_level})
         else:
             dft_func_label = 'HF'
-            method_dict = {'dft': 'no'}
+            method_dict = {}
 
         rsp_vector_labels = [
             'dimer_indices',
@@ -399,17 +397,17 @@ class ExcitonModelDriver:
 
             one_elec_ints = self.get_one_elec_integrals(monomer, basis)
 
-            scf_tensors = self.monomer_scf(method_dict, ind, monomer, basis)
+            scf_results = self.monomer_scf(method_dict, ind, monomer, basis)
             tda_results = self.monomer_tda(method_dict, ind, monomer, basis,
-                                           scf_tensors)
+                                           scf_results)
 
             if self.rank == mpi_master():
-                self.monomers[ind]['mo'] = scf_tensors['C_alpha'].copy()
+                self.monomers[ind]['mo'] = scf_results['C_alpha'].copy()
                 self.monomers[ind]['exc_energies'] = tda_results['exc_energies']
                 self.monomers[ind]['exc_vectors'] = tda_results['exc_vectors']
 
                 trans_dipoles = self.get_LE_trans_dipoles(
-                    monomer, basis, one_elec_ints, scf_tensors, tda_results)
+                    monomer, basis, one_elec_ints, scf_results, tda_results)
 
                 for s in range(self.nstates):
                     # LE excitation energy
@@ -904,7 +902,7 @@ class ExcitonModelDriver:
             The minimal AO basis set.
 
         :return:
-            The SCF tensors.
+            The dictionary containing SCF results.
         """
 
         # molecule and basis info
@@ -934,15 +932,15 @@ class ExcitonModelDriver:
                 'restart': 'yes' if self.restart else 'no',
                 'checkpoint_file': str(monomer_scf_h5),
             }, method_dict)
-        scf_drv.compute(monomer, basis, min_basis)
+        scf_results = scf_drv.compute(monomer, basis, min_basis)
 
         # update ERI screening threshold
         if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
             self.eri_thresh = scf_drv.eri_thresh
 
-        return scf_drv.scf_tensors
+        return scf_results
 
-    def monomer_tda(self, method_dict, ind, monomer, basis, scf_tensors):
+    def monomer_tda(self, method_dict, ind, monomer, basis, scf_results):
         """
         Runs monomer TDDFT-TDA calculation.
 
@@ -954,11 +952,11 @@ class ExcitonModelDriver:
             The monomer molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
+        :param scf_results:
+            The dictionary containing SCF results.
 
         :return:
-            The dictionary that contains TDA properties.
+            The dictionary containing TDA properties.
         """
 
         # checkpoint file for TDA
@@ -980,7 +978,7 @@ class ExcitonModelDriver:
                 'checkpoint_file': str(monomer_rsp_h5),
             }, method_dict)
         abs_spec.init_driver(self.comm, self.ostream)
-        abs_spec.compute(monomer, basis, scf_tensors)
+        abs_spec.compute(monomer, basis, scf_results)
 
         # TDA results
         if self.rank == mpi_master():
@@ -996,7 +994,7 @@ class ExcitonModelDriver:
 
         return tda_results
 
-    def get_LE_trans_dipoles(self, monomer, basis, one_elec_ints, scf_tensors,
+    def get_LE_trans_dipoles(self, monomer, basis, one_elec_ints, scf_results,
                              tda_results):
         """
         Gets transition dipole for LE states.
@@ -1007,8 +1005,8 @@ class ExcitonModelDriver:
             The AO basis.
         :param one_elec_ints:
             The dictionary of one-electron integrals.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
+        :param scf_results:
+            The dictionary containing SCF results.
         :param tda_results:
             The dictionary of eigenvalues and eigenvectors from TDDFT-TDA.
 
@@ -1021,7 +1019,7 @@ class ExcitonModelDriver:
         linmom_ints = one_elec_ints['linear_momentum']
         magdip_ints = one_elec_ints['magnetic_dipole']
 
-        mo = scf_tensors['C_alpha']
+        mo = scf_results['C_alpha']
         nocc = monomer.number_of_alpha_electrons()
         nvir = mo.shape[1] - nocc
         mo_occ = mo[:, :nocc].copy()
@@ -1140,8 +1138,11 @@ class ExcitonModelDriver:
 
         # dft grid
         if self.dft:
+            xcfun = parse_xc_func(self.xcfun_label.upper())
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             dimer_molgrid = grid_drv.generate(dimer)

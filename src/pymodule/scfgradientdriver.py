@@ -30,6 +30,7 @@ import time as tm
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
+from .errorhandler import assert_msg_critical
 
 
 class ScfGradientDriver(GradientDriver):
@@ -109,6 +110,8 @@ class ScfGradientDriver(GradientDriver):
 
         scf_drv.restart = False
         scf_drv.compute(molecule, ao_basis)
+        assert_msg_critical(scf_drv.is_converged,
+                            'ScfGradientDriver: SCF did not converge')
 
         scf_drv.ostream.unmute()
 

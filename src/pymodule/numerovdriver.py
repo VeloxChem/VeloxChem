@@ -38,6 +38,7 @@ from .firstorderprop import FirstOrderProperties
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
+from .dftutils import get_default_grid_level
 
 
 class NumerovDriver:
@@ -850,8 +851,9 @@ class NumerovDriver:
             cur_str = 'DFT Functional                : '
             cur_str += scf_drv.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level          : ' + str(
-                scf_drv.grid_level)
+            grid_level = (get_default_grid_level(scf_drv.xcfun)
+                          if scf_drv.grid_level is None else scf_drv.grid_level)
+            cur_str = 'Molecular Grid Level          : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         # print excited state info

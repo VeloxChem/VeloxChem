@@ -32,6 +32,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
 from .molecule import Molecule
+from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
 
@@ -82,7 +83,7 @@ class GradientDriver:
         self.do_four_point = False
 
         self.dft = False
-        self.grid_level = 4
+        self.grid_level = None
         self.xcfun = None
 
     def update_settings(self, grad_dict, method_dict):
@@ -220,7 +221,9 @@ class GradientDriver:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
@@ -253,7 +256,9 @@ class GradientDriver:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
@@ -289,7 +294,9 @@ class GradientDriver:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
@@ -323,7 +330,9 @@ class GradientDriver:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xcgrad_drv = XCMolecularGradient(self.comm)

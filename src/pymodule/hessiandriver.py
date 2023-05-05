@@ -36,6 +36,7 @@ from .veloxchemlib import (mpi_master, bohr_in_angstroms, avogadro_constant,
 from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
+from .dftutils import get_default_grid_level
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -125,7 +126,7 @@ class HessianDriver:
         self.pressure = 1.0
 
         self.dft = False
-        self.grid_level = 4
+        self.grid_level = None
         self.xcfun = None
 
     def update_settings(self, method_dict, freq_dict=None):
@@ -450,7 +451,9 @@ class HessianDriver:
         xc_mol_hess = XCMolecularHessian(self.comm)
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         exc_hessian = xc_mol_hess.integrate_vxc_hessian(molecule, basis,
@@ -487,7 +490,9 @@ class HessianDriver:
         xc_mol_hess = XCMolecularHessian(self.comm)
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         vxc_grad_atom = xc_mol_hess.integrate_vxc_fock_gradient(
