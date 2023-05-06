@@ -1,9 +1,9 @@
 from pathlib import Path
 from unittest.mock import patch
-from random import choice
 import sys
 
 from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
+from veloxchem.inputparser import get_random_string_parallel
 from veloxchem.main import main
 
 
@@ -86,7 +86,7 @@ class TestInputEnergy:
     def run_input_energy(self, capsys, xcfun, scf_type, ref_data):
 
         here = Path(__file__).parent
-        random_string = ''.join([choice('abcdef123456') for i in range(8)])
+        random_string = get_random_string_parallel()
         input_file = here / 'inputs' / f'vlx_scf_{random_string}.inp'
 
         input_lines = self.get_input_lines(xcfun, scf_type)

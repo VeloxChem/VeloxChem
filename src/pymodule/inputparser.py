@@ -23,12 +23,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from pathlib import PurePath
 from datetime import datetime
+from random import getrandbits
 import numpy as np
 import sys
 import re
 
+from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 
 
@@ -481,3 +484,37 @@ def get_datetime_string():
 
     return datetime.now().isoformat(sep='T',
                                     timespec='seconds').replace(':', '.')
+
+
+def get_random_string_serial():
+    """
+    Gets a random string.
+
+    :return:
+        The random string.
+    """
+
+    return '{:>08s}'.format(hex(getrandbits(32))[2:])
+
+
+def get_random_string_parallel(comm=None):
+    """
+    Gets a random string.
+
+    :param comm:
+        The MPI communicator.
+
+    :return:
+        The random string.
+    """
+
+    if comm is None:
+        comm = MPI.COMM_WORLD
+
+    if comm.Get_rank() == mpi_master():
+        random_string = get_random_string_serial()
+    else:
+        random_string = None
+    random_string = comm.bcast(random_string, root=mpi_master())
+
+    return random_string

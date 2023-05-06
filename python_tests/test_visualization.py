@@ -1,5 +1,4 @@
 from pathlib import Path
-from random import choice
 import numpy as np
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -8,6 +7,7 @@ from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
+from veloxchem.inputparser import get_random_string_parallel
 
 
 class TestVisualization:
@@ -143,7 +143,7 @@ class TestVisualization:
         density.broadcast(task.mpi_rank, task.mpi_comm)
 
         here = Path(__file__).parent
-        random_string = ''.join([choice('abcdef123456') for i in range(8)])
+        random_string = get_random_string_parallel()
         dens_cube_fpath = here / 'inputs' / f'vlx_dens_{random_string}.cube'
         homo_cube_fpath = here / 'inputs' / f'vlx_homo_{random_string}.cube'
 

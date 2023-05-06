@@ -8,6 +8,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
+from veloxchem.inputparser import get_random_string_serial
 
 from .addons import using_cppe
 
@@ -68,7 +69,7 @@ class TestLR:
         lr_vals = np.array(lr_vals)
 
         here = Path(__file__).parent
-        random_string = ''.join([choice('abcdef123456') for i in range(8)])
+        random_string = get_random_string_serial()
         fpath = here / 'inputs' / f'vlx_printout_lr_{random_string}.out'
 
         ostream = OutputStream(fpath)

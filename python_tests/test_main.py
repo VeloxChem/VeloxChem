@@ -1,6 +1,5 @@
 from pathlib import Path
 from unittest.mock import patch
-from random import choice
 import sys
 
 from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
@@ -13,6 +12,7 @@ from veloxchem.rspcdspec import CircularDichroismSpectrum
 from veloxchem.rsplinabscross import LinearAbsorptionCrossSection
 from veloxchem.rsppolarizability import Polarizability
 from veloxchem.rsptpa import TPA
+from veloxchem.inputparser import get_random_string_parallel
 from veloxchem.main import select_scf_driver, select_rsp_property, main
 
 
@@ -30,7 +30,7 @@ class TestMain:
     def run_main_function(self, capsys, input_lines, input_fname, output):
 
         here = Path(__file__).parent
-        random_string = ''.join([choice('abcdef123456') for i in range(8)])
+        random_string = get_random_string_parallel()
         input_file = here / 'inputs' / f'{input_fname}_{random_string}.inp'
 
         self.create_input_file(input_lines, input_file)

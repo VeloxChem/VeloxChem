@@ -1,8 +1,8 @@
 from pathlib import Path
-from random import choice
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicgrid import CubicGrid
+from veloxchem.inputparser import get_random_string_serial
 
 
 class TestCheckpoint:
@@ -38,7 +38,7 @@ class TestCheckpoint:
 
         if is_mpi_master():
             here = Path(__file__).parent
-            random_string = ''.join([choice('abcdef123456') for i in range(8)])
+            random_string = get_random_string_serial()
             fpath = here / 'inputs' / f'vlx_cube_test_{random_string}.cube'
             fname = str(fpath)
 

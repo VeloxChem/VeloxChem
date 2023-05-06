@@ -1,14 +1,13 @@
 from pathlib import Path
-from random import choice
-import pytest
-
 import numpy as np
+import pytest
 
 from veloxchem.veloxchemlib import ChemicalElement, DispersionModel
 from veloxchem.veloxchemlib import bohr_in_angstroms, is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.mpitask import MpiTask
 from veloxchem.optimizationdriver import OptimizationDriver
+from veloxchem.inputparser import get_random_string_serial
 
 
 @pytest.mark.filterwarnings(
@@ -321,7 +320,7 @@ class TestMolData:
 
         if is_mpi_master():
             here = Path(__file__).parent
-            random_string = ''.join([choice('abcdef123456') for i in range(8)])
+            random_string = get_random_string_serial
             fpath = here / 'inputs' / f'vlx_molecule_{random_string}.xyz'
             fname = str(fpath)
 

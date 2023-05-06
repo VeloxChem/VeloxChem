@@ -1,6 +1,5 @@
-import random
 from pathlib import Path
-
+from random import choice
 import numpy as np
 import pytest
 
@@ -39,7 +38,7 @@ class TestRPA:
         rpa_solver.update_settings(
             {
                 'nstates': len(ref_exc_ene),
-                'batch_size': random.choice([1, 10, 100])
+                'batch_size': choice([1, 10, 100])
             },
             task.input_dict['method_settings'],
         )

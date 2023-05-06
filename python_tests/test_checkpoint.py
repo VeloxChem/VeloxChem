@@ -1,6 +1,5 @@
 from mpi4py import MPI
 from pathlib import Path
-from random import choice
 import numpy as np
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -13,6 +12,7 @@ from veloxchem.checkpoint import (write_rsp_hdf5, read_rsp_hdf5, check_rsp_hdf5,
                                   write_rsp_solution, write_distributed_focks,
                                   read_distributed_focks,
                                   check_distributed_focks)
+from veloxchem.inputparser import get_random_string_serial
 
 
 class TestCheckpoint:
@@ -42,7 +42,7 @@ class TestCheckpoint:
 
         if is_mpi_master():
             here = Path(__file__).parent
-            random_string = ''.join([choice('abcdef123456') for i in range(8)])
+            random_string = get_random_string_serial()
             fpath = here / 'inputs' / f'vlx_checkpoint_{random_string}.h5'
             fname = str(fpath)
 

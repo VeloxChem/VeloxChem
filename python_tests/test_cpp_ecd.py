@@ -1,12 +1,12 @@
 from pathlib import Path
-from random import choice
 import pytest
 
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
 from veloxchem.cppsolver import ComplexResponse
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.inputparser import get_random_string_serial
 
 
 @pytest.mark.solvers
@@ -61,7 +61,7 @@ class TestCppEcd:
         rsp_func = cpp_results['response_functions']
 
         here = Path(__file__).parent
-        random_string = ''.join([choice('abcdef123456') for i in range(8)])
+        random_string = get_random_string_serial()
         fpath = here / 'inputs' / f'vlx_printout_cpp_ecd_{random_string}.out'
 
         ostream = OutputStream(fpath)

@@ -2,10 +2,10 @@ from pathlib import Path
 from unittest.mock import patch
 from random import choice
 import numpy as np
-import random
 import sys
 
 from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
+from veloxchem.inputparser import get_random_string_parallel
 from veloxchem.main import main
 
 
@@ -78,7 +78,7 @@ class TestInputPolarizability:
         """
 
         input_lines = input_lines.replace('==batch_size==',
-                                          str(random.choice([1, 10, 100])))
+                                          str(choice([1, 10, 100])))
 
         if xcfun is not None:
             input_lines = input_lines.replace(
@@ -89,7 +89,7 @@ class TestInputPolarizability:
     def run_input_polarizability(self, capsys, xcfun, ref_data):
 
         here = Path(__file__).parent
-        random_string = ''.join([choice('abcdef123456') for i in range(8)])
+        random_string = get_random_string_parallel()
         input_file = here / 'inputs' / f'vlx_polarizability_{random_string}.inp'
 
         input_lines = self.get_input_lines(xcfun)
