@@ -251,62 +251,69 @@ class ForceFieldGenerator:
 
         self.ffversion = 0
 
-        with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        except TypeError:
+            temp_dir = tempfile.TemporaryDirectory()
 
-            self._workdir = Path(temp_dir)
+        self._workdir = Path(temp_dir.name)
 
-            if self.original_top_file is None:
-                original_itp_file = self._workdir / (
-                    mol_name + f'_{self.ffversion:02d}.itp')
-                original_top_file = original_itp_file.with_suffix('.top')
+        if self.original_top_file is None:
+            original_itp_file = self._workdir / (mol_name +
+                                                 f'_{self.ffversion:02d}.itp')
+            original_top_file = original_itp_file.with_suffix('.top')
 
-                if self.rank == mpi_master():
-                    self.write_original_itp(original_itp_file,
-                                            list(self.atom_types),
-                                            self.partial_charges)
-                    self.write_top(original_top_file, original_itp_file)
-                self.comm.barrier()
+            if self.rank == mpi_master():
+                self.write_original_itp(original_itp_file,
+                                        list(self.atom_types),
+                                        self.partial_charges)
+                self.write_top(original_top_file, original_itp_file)
+            self.comm.barrier()
 
-            else:
-                original_top_file = Path(self.original_top_file)
+        else:
+            original_top_file = Path(self.original_top_file)
 
-            self.ostream.print_info(
-                f'Original topology file: {original_top_file.name}')
+        self.ostream.print_info(
+            f'Original topology file: {original_top_file.name}')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        # validate original force field
+
+        for i, dih in enumerate(self.target_dihedrals):
+            self.validate_force_field(original_top_file, i)
+
+        # fit dihedral potentials
+
+        n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
+        target_top_file = original_top_file
+        for i_round in range(n_rounds):
+            for i, dih in enumerate(self.target_dihedrals):
+                target_top_file = self.dihedral_correction(target_top_file, i)
+
+        # validate final force field
+
+        for i, dih in enumerate(self.target_dihedrals):
+            self.validate_force_field(target_top_file, i)
+
+        # save output files
+
+        if self.rank == mpi_master() and self.keep_files:
+            out_dir = Path(self.molecule_name + '_files')
+            for ffver in range(self.ffversion + 1):
+                for ftype in ['itp', 'top']:
+                    fname = mol_name + f'_{ffver:02d}.{ftype}'
+                    self.copy_file(self._workdir / fname, out_dir / fname)
+                    valstr = f'Saving file: {str(out_dir / fname)}'
+                    self.ostream.print_info(valstr)
+
             self.ostream.print_blank()
             self.ostream.flush()
 
-            # validate original force field
-
-            for i, dih in enumerate(self.target_dihedrals):
-                self.validate_force_field(original_top_file, i)
-
-            # fit dihedral potentials
-
-            n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
-            target_top_file = original_top_file
-            for i_round in range(n_rounds):
-                for i, dih in enumerate(self.target_dihedrals):
-                    target_top_file = self.dihedral_correction(
-                        target_top_file, i)
-
-            # validate final force field
-
-            for i, dih in enumerate(self.target_dihedrals):
-                self.validate_force_field(target_top_file, i)
-
-            # save output files
-
-            if self.rank == mpi_master() and self.keep_files:
-                out_dir = Path(self.molecule_name + '_files')
-                for ffver in range(self.ffversion + 1):
-                    for ftype in ['itp', 'top']:
-                        fname = mol_name + f'_{ffver:02d}.{ftype}'
-                        self.copy_file(self._workdir / fname, out_dir / fname)
-                        valstr = f'Saving file: {str(out_dir / fname)}'
-                        self.ostream.print_info(valstr)
-
-                self.ostream.print_blank()
-                self.ostream.flush()
+        try:
+            temp_dir.cleanup()
+        except (NotADirectoryError, PermissionError):
+            pass
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
