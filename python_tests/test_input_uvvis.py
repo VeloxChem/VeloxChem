@@ -19,21 +19,28 @@ class TestInputUVVis:
                         f_inp.write(f'{line}\n')
         mpi_barrier()
 
-    def remove_h5_files(self, input_file):
+    def remove_input_and_h5_files(self, input_file):
 
         if is_mpi_master():
+            if input_file.is_file():
+                input_file.unlink()
+
             scf_h5 = input_file.with_suffix('.scf.h5')
             if scf_h5.is_file():
                 scf_h5.unlink()
+
             scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
             if scf_final_h5.is_file():
                 scf_final_h5.unlink()
+
             rsp_h5 = input_file.with_suffix('.rsp.h5')
             if rsp_h5.is_file():
                 rsp_h5.unlink()
+
             rsp_solutions_h5 = rsp_h5.with_suffix('.solutions.h5')
             if rsp_solutions_h5.is_file():
                 rsp_solutions_h5.unlink()
+
         mpi_barrier()
 
     def get_input_lines(self, xcfun, tamm_dancoff):
@@ -133,7 +140,7 @@ class TestInputUVVis:
                 assert np.max(np.abs(exc_ene - ref_data['exc_ene'])) < 1.0e-5
                 assert np.max(np.abs(osc_str - ref_data['osc_str'])) < 1.0e-4
 
-            self.remove_h5_files(input_file)
+            self.remove_input_and_h5_files(input_file)
 
     def test_input_rhf_cis_uvvis(self, capsys):
 
