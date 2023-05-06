@@ -1,7 +1,7 @@
 from mpi4py import MPI
 from pathlib import Path
+from random import choice
 import numpy as np
-import tempfile
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
@@ -40,11 +40,11 @@ class TestCheckpoint:
 
         mol, bas = self.get_molecule_and_basis()
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            if not is_mpi_master():
-                return
-
-            fname = str(Path(temp_dir, 'rsp.h5'))
+        if is_mpi_master():
+            here = Path(__file__).parent
+            random_string = ''.join([choice('abcdef123456') for i in range(8)])
+            fpath = here / 'inputs' / f'vlx_checkpoint_{random_string}.h5'
+            fname = str(fpath)
 
             # test writing
             success = write_rsp_hdf5(fname, arrays, labels, mol, bas, dft_dict,
@@ -71,6 +71,9 @@ class TestCheckpoint:
             match = check_rsp_hdf5(fname, ['bger', 'e2bger', 'c'], mol, bas,
                                    dft_dict, pe_dict)
             assert not match
+
+            if fpath.is_file():
+                fpath.unlink()
 
     def test_rsp_checkpoint_distributed(self):
 
@@ -105,14 +108,14 @@ class TestCheckpoint:
         solver._write_checkpoint(mol, bas, dft_dict, pe_dict, labels)
 
         solver._read_checkpoint(labels)
-        assert np.max(np.abs(backup_data['bger'] -
-                             solver._dist_bger.data)) < 1.0e-12
-        assert np.max(np.abs(backup_data['bung'] -
-                             solver._dist_bung.data)) < 1.0e-12
-        assert np.max(np.abs(backup_data['e2bger'] -
-                             solver._dist_e2bger.data)) < 1.0e-12
-        assert np.max(np.abs(backup_data['e2bung'] -
-                             solver._dist_e2bung.data)) < 1.0e-12
+        assert np.max(
+            np.abs(backup_data['bger'] - solver._dist_bger.data)) < 1.0e-12
+        assert np.max(
+            np.abs(backup_data['bung'] - solver._dist_bung.data)) < 1.0e-12
+        assert np.max(
+            np.abs(backup_data['e2bger'] - solver._dist_e2bger.data)) < 1.0e-12
+        assert np.max(
+            np.abs(backup_data['e2bung'] - solver._dist_e2bung.data)) < 1.0e-12
 
         if is_mpi_master(comm) and fpath.is_file():
             fpath.unlink()

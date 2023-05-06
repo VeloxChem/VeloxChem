@@ -1,5 +1,5 @@
 from pathlib import Path
-import tempfile
+from random import choice
 import pytest
 
 import numpy as np
@@ -319,11 +319,11 @@ class TestMolData:
 
     def test_write_xyz(self):
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            if not is_mpi_master():
-                return
-
-            fname = str(Path(temp_dir, 'mol.xyz'))
+        if is_mpi_master():
+            here = Path(__file__).parent
+            random_string = ''.join([choice('abcdef123456') for i in range(8)])
+            fpath = here / 'inputs' / f'vlx_molecule_{random_string}.xyz'
+            fname = str(fpath)
 
             mol = self.nh3_molecule()
             mol.write_xyz(fname)
@@ -342,3 +342,6 @@ class TestMolData:
                 assert ref_labels == mol_3.get_labels()
                 assert np.max(
                     np.abs(ref_coords - mol_3.get_coordinates())) < 1.0e-10
+
+            if fpath.is_file():
+                fpath.unlink()

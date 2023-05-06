@@ -1,7 +1,6 @@
 from pathlib import Path
+from random import choice
 import numpy as np
-import tempfile
-import random
 import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -46,7 +45,7 @@ class TestLR:
         lr_drv.update_settings(
             {
                 'frequencies': ','.join(ref_freqs_str),
-                'batch_size': random.choice([1, 10, 100])
+                'batch_size': choice([1, 10, 100])
             }, task.input_dict['method_settings'])
         lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_tensors)
 
@@ -68,26 +67,30 @@ class TestLR:
         lr_vals = [v[1] for v in sorted(lr_vals)]
         lr_vals = np.array(lr_vals)
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fname = str(Path(temp_dir, 'lr.out'))
+        here = Path(__file__).parent
+        random_string = ''.join([choice('abcdef123456') for i in range(8)])
+        fpath = here / 'inputs' / f'vlx_printout_lr_{random_string}.out'
 
-            ostream = OutputStream(fname)
-            lr_drv._print_results(lr_results, ostream)
-            ostream.close()
+        ostream = OutputStream(fpath)
+        lr_drv._print_results(lr_results, ostream)
+        ostream.close()
 
-            with open(fname, 'r') as f_out:
-                lines = f_out.readlines()
+        with fpath.open('r') as f_out:
+            lines = f_out.readlines()
 
-            print_vals = []
-            for line in lines:
-                content = line.split()
-                if len(content) == 4 and content[0] in ['X', 'Y', 'Z']:
-                    print_vals.append(float(content[1]))
-                    print_vals.append(float(content[2]))
-                    print_vals.append(float(content[3]))
-            print_vals = np.array(print_vals)
+        print_vals = []
+        for line in lines:
+            content = line.split()
+            if len(content) == 4 and content[0] in ['X', 'Y', 'Z']:
+                print_vals.append(float(content[1]))
+                print_vals.append(float(content[2]))
+                print_vals.append(float(content[3]))
+        print_vals = np.array(print_vals)
 
-            assert np.max(np.abs(lr_vals - print_vals)) < 1e-6
+        assert np.max(np.abs(lr_vals - print_vals)) < 1e-6
+
+        if fpath.is_file():
+            fpath.unlink()
 
     def test_lr_hf(self):
 

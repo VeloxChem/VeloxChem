@@ -1,5 +1,5 @@
 from pathlib import Path
-import tempfile
+from random import choice
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicgrid import CubicGrid
@@ -36,14 +36,18 @@ class TestCheckpoint:
 
     def test_cube(self):
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            if not is_mpi_master():
-                return
+        if is_mpi_master():
+            here = Path(__file__).parent
+            random_string = ''.join([choice('abcdef123456') for i in range(8)])
+            fpath = here / 'inputs' / f'vlx_cube_test_{random_string}.cube'
+            fname = str(fpath)
 
-            fname = str(Path(temp_dir, 'test.cube'))
             self.write_cube(fname)
 
             grid_1 = CubicGrid.read_cube(fname)
             grid_2 = CubicGrid.read_cube(fname)
             diff = grid_1.compare(grid_2)
             assert diff < 1.0e-12
+
+            if fpath.is_file():
+                fpath.unlink()
