@@ -320,7 +320,7 @@ class TestMolData:
 
         if is_mpi_master():
             here = Path(__file__).parent
-            random_string = get_random_string_serial
+            random_string = get_random_string_serial()
             fpath = here / 'inputs' / f'vlx_molecule_{random_string}.xyz'
             fname = str(fpath)
 
