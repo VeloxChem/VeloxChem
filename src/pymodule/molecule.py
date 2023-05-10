@@ -152,9 +152,9 @@ def _Molecule_read_xyz(xyzfile):
     """
 
     with Path(xyzfile).open('r') as fh:
-        xyzstr = '\n'.join(fh.readlines()[2:])
+        xyzstr = fh.read()
 
-    return Molecule.read_str(xyzstr, units='angstrom')
+    return Molecule.from_xyz_string(xyzstr)
 
 
 @staticmethod
@@ -318,7 +318,7 @@ def _Molecule_get_xyz_string(self):
         xa = coords[a][0] * bohr_in_angstroms()
         ya = coords[a][1] * bohr_in_angstroms()
         za = coords[a][2] * bohr_in_angstroms()
-        xyz += f'{labels[a]} {xa:.6f} {ya:.6f} {za:.6f}\n'
+        xyz += f'{labels[a]:<6s} {xa:22.12f} {ya:22.12f} {za:22.12f}\n'
 
     return xyz
 
