@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .veloxchemlib import xcfun
+from .veloxchemlib import parse_xc_func
 from .errorhandler import assert_msg_critical
 
 
@@ -32,14 +33,19 @@ def get_default_grid_level(xc_func):
     Gets default grid level for an exchange-correlation functional.
 
     :param xc_func:
-        The exchange-correlation functional object.
+        The exchange-correlation functional.
 
     :return:
         The default grid level.
     """
 
-    func_name = xc_func.get_func_label()
-    func_type = xc_func.get_func_type()
+    if isinstance(xc_func, str):
+        xc_func_obj = parse_xc_func(xc_func.upper())
+        func_name = xc_func_obj.get_func_label()
+        func_type = xc_func_obj.get_func_type()
+    else:
+        func_name = xc_func.get_func_label()
+        func_type = xc_func.get_func_type()
 
     # LDA
 
