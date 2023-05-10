@@ -25,12 +25,13 @@
 
 import numpy as np
 import time as tm
+import sys
 
 from .veloxchemlib import XtbDriver
 from .errorhandler import assert_msg_critical
 
 
-def _XtbDriver_compute(self, molecule, ostream):
+def _XtbDriver_compute(self, molecule, ostream=None):
     """
     Computes DFT-B energy using XTB driver.
 
@@ -47,42 +48,46 @@ def _XtbDriver_compute(self, molecule, ostream):
 
     start_time = tm.time()
 
-    ostream.print_blank()
-    ostream.print_header('XTB Driver')
-    ostream.print_header(12 * '=')
-    ostream.print_blank()
-    ostream.flush()
+    if self.is_master_node() and ostream is not None:
+        ostream.print_blank()
+        ostream.print_header('XTB Driver')
+        ostream.print_header(12 * '=')
+        ostream.print_blank()
+        ostream.flush()
 
     self._compute(molecule)
+    sys.stdout.flush()
 
     if self.is_master_node():
         energy = self.get_energy()
         gradient = self.get_gradient()
 
-        valstr = '  Energy   : {:.10f} a.u.'.format(energy)
-        ostream.print_info(valstr)
-
         grad2 = np.sum(gradient**2, axis=1)
         rms_grad = np.sqrt(np.mean(grad2))
         max_grad = np.max(np.sqrt(grad2))
-        valstr = '  Gradient : {:.6e} a.u. (RMS)'.format(rms_grad)
-        ostream.print_info(valstr)
-        valstr = '             {:.6e} a.u. (Max)'.format(max_grad)
-        ostream.print_info(valstr)
 
-        valstr = '  Time     : {:.2f} sec'.format(tm.time() - start_time)
-        ostream.print_info(valstr)
-        ostream.print_blank()
+        if ostream is not None:
+            valstr = '  Energy   : {:.10f} a.u.'.format(energy)
+            ostream.print_info(valstr)
 
-        valstr = 'Reference: C. Bannwarth, E. Caldeweyher, S. Ehlert,'
-        ostream.print_info(valstr)
-        valstr = 'A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme,'
-        ostream.print_info(valstr)
-        valstr = 'WIREs Comput. Mol. Sci., 2020, 11, e01493'
-        ostream.print_info(valstr)
-        ostream.print_blank()
+            valstr = '  Gradient : {:.6e} a.u. (RMS)'.format(rms_grad)
+            ostream.print_info(valstr)
+            valstr = '             {:.6e} a.u. (Max)'.format(max_grad)
+            ostream.print_info(valstr)
 
-        ostream.flush()
+            valstr = '  Time     : {:.2f} sec'.format(tm.time() - start_time)
+            ostream.print_info(valstr)
+            ostream.print_blank()
+
+            valstr = 'Reference: C. Bannwarth, E. Caldeweyher, S. Ehlert,'
+            ostream.print_info(valstr)
+            valstr = 'A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme,'
+            ostream.print_info(valstr)
+            valstr = 'WIREs Comput. Mol. Sci., 2020, 11, e01493'
+            ostream.print_info(valstr)
+            ostream.print_blank()
+
+            ostream.flush()
 
 
 XtbDriver.compute = _XtbDriver_compute
