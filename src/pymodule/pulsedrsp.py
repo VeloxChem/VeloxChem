@@ -374,15 +374,10 @@ class PulsedResponse:
         # Save all the internal data to the h5 datafile named 'fname'
         try:
             with h5py.File(fname, 'w') as hf:
-                hf.create_dataset('frequencies',
-                                  data=self.zero_padded_freqs,
-                                  compression='gzip')
+                hf.create_dataset('frequencies', data=self.zero_padded_freqs)
                 hf.create_dataset('amplitudes',
-                                  data=self.zero_padded_amplitudes,
-                                  compression='gzip')
-                hf.create_dataset('zero_padded',
-                                  data=zeropad,
-                                  compression='gzip')
+                                  data=self.zero_padded_amplitudes)
+                hf.create_dataset('zero_padded', data=zeropad)
 
                 # Loop over all directions
                 for xyz1 in ['x', 'y', 'z']:
@@ -395,8 +390,7 @@ class PulsedResponse:
                                                                     freq)])
 
                         hf.create_dataset('{}{}'.format(xyz1, xyz2),
-                                          data=np.array(polarizability),
-                                          compression='gzip')
+                                          data=np.array(polarizability))
 
         except Exception as e:
             print('Pulsed response failed to create h5 data file: {}'.format(e),

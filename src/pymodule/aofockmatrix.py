@@ -70,7 +70,7 @@ def _AOFockMatrix_write_hdf5(self, fname):
         density_id = self.get_density_identifier(fock_id)
         name = f'{matrix_count}_{fock_type_str}_{density_id}'
         array = self.alpha_to_numpy(fock_id)
-        hf.create_dataset(name, data=array, compression='gzip')
+        hf.create_dataset(name, data=array)
 
         matrix_count += 1
 
@@ -83,11 +83,11 @@ def _AOFockMatrix_write_hdf5(self, fname):
             density_id = self.get_density_identifier(fock_id)
             name = f'{matrix_count}_{fock_type_str}_{density_id}'
             array = self.beta_to_numpy(fock_id)
-            hf.create_dataset(name, data=array, compression='gzip')
+            hf.create_dataset(name, data=array)
 
             matrix_count += 1
 
-    hf.create_dataset('factors', data=factors, compression='gzip')
+    hf.create_dataset('factors', data=factors)
 
     hf.close()
 

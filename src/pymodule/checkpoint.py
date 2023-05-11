@@ -54,28 +54,17 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
         hf = h5py.File(fname, 'w')
 
         hf.create_dataset('nuclear_repulsion',
-                          data=np.array([molecule.nuclear_repulsion_energy()]),
-                          compression='gzip')
+                          data=np.array([molecule.nuclear_repulsion_energy()]))
 
-        hf.create_dataset('nuclear_charges',
-                          data=molecule.elem_ids_to_numpy(),
-                          compression='gzip')
+        hf.create_dataset('nuclear_charges', data=molecule.elem_ids_to_numpy())
 
-        hf.create_dataset('atom_coordinates',
-                          data=molecule.get_coordinates(),
-                          compression='gzip')
+        hf.create_dataset('atom_coordinates', data=molecule.get_coordinates())
 
-        hf.create_dataset('basis_set',
-                          data=np.string_([basis.get_label()]),
-                          compression='gzip')
+        hf.create_dataset('basis_set', data=np.string_([basis.get_label()]))
 
-        hf.create_dataset('dft_func_label',
-                          data=np.string_([dft_func_label]),
-                          compression='gzip')
+        hf.create_dataset('dft_func_label', data=np.string_([dft_func_label]))
 
-        hf.create_dataset('potfile_text',
-                          data=np.string_([potfile_text]),
-                          compression='gzip')
+        hf.create_dataset('potfile_text', data=np.string_([potfile_text]))
 
         hf.close()
 
@@ -97,7 +86,7 @@ def write_scf_tensors(fname, scf_tensors):
         hf = h5py.File(fname, 'a')
         keys = ['S'] + [f'{x}_{y}' for x in 'CEDF' for y in ['alpha', 'beta']]
         for key in keys:
-            hf.create_dataset(key, data=scf_tensors[key], compression='gzip')
+            hf.create_dataset(key, data=scf_tensors[key])
         hf.close()
 
 
@@ -118,7 +107,7 @@ def write_rsp_solution(fname, key, vec):
 
     if valid_checkpoint:
         hf = h5py.File(fname, 'a')
-        hf.create_dataset(key, data=vec, compression='gzip')
+        hf.create_dataset(key, data=vec)
         hf.close()
 
 
@@ -160,7 +149,7 @@ def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
 
     hf = h5py.File(fname, 'a')
     for label, array in zip(labels, arrays):
-        hf.create_dataset(label, data=array, compression='gzip')
+        hf.create_dataset(label, data=array)
     hf.close()
 
     checkpoint_text = 'Checkpoint written to file: '
