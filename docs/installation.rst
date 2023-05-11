@@ -25,7 +25,7 @@ Build prerequisites
 - Linear algebra libraries implementing the BLAS and LAPACK interfaces (*e.g.* 
   Intel MKL, OpenBLAS or Cray LibSci)
 - MPI library (*e.g.* MPICH, Intel MPI or Open MPI)
-- Installation of Python >=3.7 that includes the interpreter, the development
+- Installation of Python >=3.8 that includes the interpreter, the development
   header files, and the development libraries.
 - The `pybind11 <https://pybind11.readthedocs.io>`_ (>=2.6) header-only library
 - The following Python modules:
