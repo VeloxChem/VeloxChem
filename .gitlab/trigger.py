@@ -182,7 +182,7 @@ def main():
     # get GitHub PAT
     gh_pat = os.getenv("GITHUB_PAT")
     r = post(
-        "https://api.github.com/repos/ENCCS/meta-vlx/actions/workflows/deploy-cxx.yml/dispatches",
+        "https://api.github.com/repos/VeloxChem/meta-vlx/actions/workflows/deploy-cxx.yml/dispatches",
         auth=("robertodr", gh_pat),
         headers={"Accept": "application/vnd.github.v3+json"},
         data=json.dumps(payload),
