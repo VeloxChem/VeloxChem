@@ -799,15 +799,7 @@ class ComplexResponse(LinearSolver):
 
         else:
             if self.is_converged:
-                kappas = {}
-
-                for op, w in solutions:
-                    x = self._get_full_solution_vector(solutions[(op, w)])
-                    x = self.comm.bcast(x, root=mpi_master())
-                    kappas[(op, w)] = (self.lrvec2mat(x.real, nocc, norb) +
-                                       1j * self.lrvec2mat(x.imag, nocc, norb))
-
-                return {'focks': focks, 'kappas': kappas}
+                return {'focks': focks, 'solutions': solutions}
 
         return None
 

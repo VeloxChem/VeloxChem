@@ -564,19 +564,18 @@ class NonlinearSolver:
         # determine number of batches
 
         if self.rank == mpi_master():
-            if mode_is_cubic:
-                if self._dft:
-                    n_total = len(second_order_dens) + len(third_order_dens)
-                else:
-                    n_total = len(third_order_dens)
-                n_ao = third_order_dens[0].shape[0]
-            elif mode_is_quadratic:
-                n_total = len(second_order_dens)
-                n_ao = second_order_dens[0].shape[0]
+            n_ao = mo.shape[0]
             norb = mo.shape[1]
         else:
-            n_total = None
             n_ao = None
+
+        if mode_is_cubic:
+            if self._dft:
+                n_total = second_order_dens.shape(1) + third_order_dens.shape(1)
+            else:
+                n_total = third_order_dens.shape(1)
+        elif mode_is_quadratic:
+            n_total = second_order_dens.shape(1)
 
         batch_size = get_batch_size(self.batch_size, n_total, n_ao, self.comm)
         num_batches = get_number_of_batches(n_total, batch_size, self.comm)
@@ -642,9 +641,9 @@ class NonlinearSolver:
                     batch_size_second_order = (batch_size // size_3) * size_2
                     batch_size_first_order = (batch_size // size_3) * size_1
 
-                    num_1 = len(first_order_dens)
-                    num_2 = len(second_order_dens)
-                    num_3 = len(third_order_dens)
+                    num_1 = first_order_dens.shape(1)
+                    num_2 = second_order_dens.shape(1)
+                    num_3 = third_order_dens.shape(1)
 
                     condition = ((num_1 % size_1 == 0) and
                                  (num_2 % size_2 == 0) and
@@ -656,8 +655,8 @@ class NonlinearSolver:
                     batch_size = max((batch_size // size_2) * size_2, size_2)
                     batch_size_first_order = (batch_size // size_2) * size_1
 
-                    num_1 = len(first_order_dens)
-                    num_2 = len(second_order_dens)
+                    num_1 = first_order_dens.shape(1)
+                    num_2 = second_order_dens.shape(1)
 
                     condition = ((num_1 % size_1 == 0) and
                                  (num_2 % size_2 == 0) and
@@ -670,10 +669,16 @@ class NonlinearSolver:
             else:
                 batch_size = None
                 batch_size_first_order = None
-                batch_size_second_order = None
+                if mode_is_cubic:
+                    batch_size_second_order = None
 
-            batch_size = self.comm.bcast(batch_size, root=mpi_master())
             num_batches = get_number_of_batches(n_total, batch_size, self.comm)
+            batch_size = self.comm.bcast(batch_size, root=mpi_master())
+            batch_size_first_order = self.comm.bcast(batch_size_first_order,
+                                                     root=mpi_master())
+            if mode_is_cubic:
+                batch_size_second_order = self.comm.bcast(
+                    batch_size_second_order, root=mpi_master())
 
         # go through batches
 
@@ -691,106 +696,161 @@ class NonlinearSolver:
                 batch_ind + 1, num_batches))
             self.ostream.flush()
 
-            if self.rank == mpi_master():
+            dts1 = []
+            dts2 = []
+            dts3 = []
 
-                batch_start = batch_size * batch_ind
-                batch_end = min(batch_start + batch_size, n_total)
+            batch_start = batch_size * batch_ind
+            batch_end = min(batch_start + batch_size, n_total)
 
-                if self._dft:
+            if self._dft:
 
-                    # DFT on MPI master process
+                # DFT
 
-                    batch_start_first_order = batch_size_first_order * batch_ind
-                    batch_end_first_order = min(
-                        batch_start_first_order + batch_size_first_order,
-                        len(first_order_dens))
+                # One, two and three-time perturbed Fock matrices all use
+                # one-time perturbed densities
 
-                    # One, two and three-time perturbed Fock matrices all use
-                    # one-time perturbed densities
+                batch_start_first_order = batch_size_first_order * batch_ind
+                batch_end_first_order = min(
+                    batch_start_first_order + batch_size_first_order,
+                    first_order_dens.shape(1))
 
-                    dts1 = [
-                        np.ascontiguousarray(dab) for dab in first_order_dens[
-                            batch_start_first_order:batch_end_first_order]
-                    ]
+                dist_den_1_batch = DistributedArray(
+                    first_order_dens.
+                    data[:, batch_start_first_order:batch_end_first_order],
+                    self.comm,
+                    distribute=False)
+
+                for i in range(dist_den_1_batch.shape(1)):
+                    v = dist_den_1_batch.get_full_vector(i)
+                    if self.rank == mpi_master():
+                        dts1.append(v.reshape(n_ao, n_ao))
+
+                if self.rank == mpi_master():
                     dens1 = AODensityMatrix(dts1, denmat.rest)
-
-                    if mode_is_quadratic:
-
-                        # If computing two-time perturbed Fock matrices (DFT)
-                        # then include first and second-order perturbed
-                        # densities
-
-                        dts2 = [
-                            np.ascontiguousarray(dab)
-                            for dab in second_order_dens[batch_start:batch_end]
-                        ]
-                        dens2 = AODensityMatrix(dts2, denmat.rest)
-                        dens_for_fock = dens2
-
-                    elif mode_is_cubic:
-
-                        # If computing three-time perturbed Fock matrices (DFT)
-                        # then include first, second and third-order perturbed
-                        # densities
-
-                        batch_start_second_order = batch_size_second_order * batch_ind
-                        batch_end_second_order = min(
-                            batch_start_second_order + batch_size_second_order,
-                            len(second_order_dens))
-
-                        dts2 = [
-                            np.ascontiguousarray(dab)
-                            for dab in second_order_dens[
-                                batch_start_second_order:batch_end_second_order]
-                        ]
-                        dens2 = AODensityMatrix(dts2, denmat.rest)
-
-                        dts3 = [
-                            np.ascontiguousarray(dab)
-                            for dab in third_order_dens[batch_start:batch_end]
-                        ]
-                        dens3 = AODensityMatrix(dts3, denmat.rest)
-
-                        # TODO separate dens2 and dens3 from dens_for_fock
-
-                        dens23 = AODensityMatrix(dts2 + dts3, denmat.rest)
-                        dens_for_fock = dens23
-
                 else:
+                    dens1 = AODensityMatrix()
 
-                    # Hartree-Fock on MPI master process
+                if mode_is_quadratic:
 
-                    if mode_is_quadratic:
+                    # If computing two-time perturbed Fock matrices (DFT) then
+                    # include first and second-order perturbed densities
 
-                        # If computing two-time perturbed Fock matrices at HF
-                        # level only second-order perturbed densities are
-                        # needed
+                    dist_den_2_batch = DistributedArray(
+                        second_order_dens.data[:, batch_start:batch_end],
+                        self.comm,
+                        distribute=False)
 
-                        dts2 = [
-                            np.ascontiguousarray(dab)
-                            for dab in second_order_dens[batch_start:batch_end]
-                        ]
+                    for i in range(dist_den_2_batch.shape(1)):
+                        v2 = dist_den_2_batch.get_full_vector(i)
+                        if self.rank == mpi_master():
+                            dts2.append(v2.reshape(n_ao, n_ao))
+
+                    if self.rank == mpi_master():
                         dens2 = AODensityMatrix(dts2, denmat.rest)
-                        dens_for_fock = dens2
+                        dens_for_fock = AODensityMatrix(dens2)
+                    else:
+                        dens2 = AODensityMatrix()
+                        dens_for_fock = AODensityMatrix()
 
-                    elif mode_is_cubic:
+                elif mode_is_cubic:
 
-                        # If computing three-time perturbed Fock matrices at HF
-                        # level only third-order perturbed densities are needed
+                    # If computing three-time perturbed Fock matrices (DFT)
+                    # then include first, second and third-order perturbed
+                    # densities
 
-                        dts3 = [
-                            np.ascontiguousarray(dab)
-                            for dab in third_order_dens[batch_start:batch_end]
-                        ]
+                    batch_start_second_order = batch_size_second_order * batch_ind
+                    batch_end_second_order = min(
+                        batch_start_second_order + batch_size_second_order,
+                        second_order_dens.shape(1))
+
+                    dist_den_2_batch = DistributedArray(
+                        second_order_dens.
+                        data[:,
+                             batch_start_second_order:batch_end_second_order],
+                        self.comm,
+                        distribute=False)
+
+                    dist_den_3_batch = DistributedArray(
+                        third_order_dens.data[:, batch_start:batch_end],
+                        self.comm,
+                        distribute=False)
+
+                    for i in range(dist_den_2_batch.shape(1)):
+                        v2 = dist_den_2_batch.get_full_vector(i)
+                        if self.rank == mpi_master():
+                            dts2.append(v2.reshape(n_ao, n_ao))
+
+                    if self.rank == mpi_master():
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
+                    else:
+                        dens2 = AODensityMatrix()
+
+                    for i in range(dist_den_3_batch.shape(1)):
+                        v3 = dist_den_3_batch.get_full_vector(i)
+                        if self.rank == mpi_master():
+                            dts3.append(v3.reshape(n_ao, n_ao))
+
+                    if self.rank == mpi_master():
                         dens3 = AODensityMatrix(dts3, denmat.rest)
-                        dens_for_fock = dens3
+                    else:
+                        dens3 = AODensityMatrix()
+
+                    # TODO separate dens2 and dens3 from dens_for_fock
+
+                    if self.rank == mpi_master():
+                        dens_for_fock = AODensityMatrix(dts2 + dts3,
+                                                        denmat.rest)
+                    else:
+                        dens_for_fock = AODensityMatrix()
 
             else:
-                # DFT or Hartree-Fock on non-master processes
-                dens1 = AODensityMatrix()
-                dens2 = AODensityMatrix()
-                dens3 = AODensityMatrix()
-                dens_for_fock = AODensityMatrix()
+
+                # Hartree-Fock
+
+                if mode_is_quadratic:
+
+                    # If computing two-time perturbed Fock matrices at HF level
+                    # only second-order perturbed densities are needed
+
+                    dist_den_2_batch = DistributedArray(
+                        second_order_dens.data[:, batch_start:batch_end],
+                        self.comm,
+                        distribute=False)
+
+                    for i in range(dist_den_2_batch.shape(1)):
+                        v2 = dist_den_2_batch.get_full_vector(i)
+                        if self.rank == mpi_master():
+                            dts2.append(v2.reshape(n_ao, n_ao))
+
+                    if self.rank == mpi_master():
+                        dens2 = AODensityMatrix(dts2, denmat.rest)
+                        dens_for_fock = AODensityMatrix(dens2)
+                    else:
+                        dens2 = AODensityMatrix()
+                        dens_for_fock = AODensityMatrix()
+
+                elif mode_is_cubic:
+
+                    # If computing three-time perturbed Fock matrices at HF
+                    # level only third-order perturbed densities are needed
+
+                    dist_den_3_batch = DistributedArray(
+                        third_order_dens.data[:, batch_start:batch_end],
+                        self.comm,
+                        distribute=False)
+
+                    for i in range(dist_den_3_batch.shape(1)):
+                        v3 = dist_den_3_batch.get_full_vector(i)
+                        if self.rank == mpi_master():
+                            dts3.append(v3.reshape(n_ao, n_ao))
+
+                    if self.rank == mpi_master():
+                        dens3 = AODensityMatrix(dts3, denmat.rest)
+                        dens_for_fock = AODensityMatrix(dens3)
+                    else:
+                        dens3 = AODensityMatrix()
+                        dens_for_fock = AODensityMatrix()
 
             # broadcast densities
 
@@ -798,12 +858,9 @@ class NonlinearSolver:
             fock = AOFockMatrix(dens_for_fock)
 
             if self._dft:
-                if mode_is_quadratic:
-                    dens1.broadcast(self.rank, self.comm)
-                    dens2 = dens_for_fock
-                elif mode_is_cubic:
-                    dens1.broadcast(self.rank, self.comm)
-                    dens2.broadcast(self.rank, self.comm)
+                dens1.broadcast(self.rank, self.comm)
+                dens2.broadcast(self.rank, self.comm)
+                if mode_is_cubic:
                     dens3.broadcast(self.rank, self.comm)
 
             # set Fock type (including scaling factor)
@@ -1370,6 +1427,25 @@ class NonlinearSolver:
                                   self.commut(kA, F0) + 2 * Fa))
 
     @staticmethod
+    def complex_lrvec2mat(vec, nocc, norb):
+        """
+        Converts complex vector to matrix.
+
+        :param vec:
+            The complex vector.
+        :param nocc:
+            Number of occupied orbitals.
+        :param norb:
+            Number of orbitals.
+
+        :return:
+            The complex matrix.
+        """
+
+        return (LinearSolver.lrvec2mat(vec.real, nocc, norb) +
+                1j * LinearSolver.lrvec2mat(vec.imag, nocc, norb))
+
+    @staticmethod
     def complex_lrmat2vec(mat, nocc, norb):
         """
         Converts complex matrix to vector.
@@ -1387,3 +1463,28 @@ class NonlinearSolver:
 
         return (LinearSolver.lrmat2vec(mat.real, nocc, norb) +
                 1j * LinearSolver.lrmat2vec(mat.imag, nocc, norb))
+
+    def _get_full_solution_vector(self, solution):
+        """
+        Gets a full solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector.
+        """
+
+        x_realger = solution.get_full_vector(0)
+        x_realung = solution.get_full_vector(1)
+        x_imagung = solution.get_full_vector(2)
+        x_imagger = solution.get_full_vector(3)
+
+        if self.rank == mpi_master():
+            x_real = np.hstack((x_realger, x_realger)) + np.hstack(
+                (x_realung, -x_realung))
+            x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
+                (x_imagger, x_imagger))
+            return x_real + 1j * x_imag
+        else:
+            return None
