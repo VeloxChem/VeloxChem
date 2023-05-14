@@ -111,6 +111,29 @@ def write_rsp_solution(fname, key, vec):
         hf.close()
 
 
+def write_rsp_solution_with_multiple_keys(fname, keys, vec):
+    """
+    Writes a response solution vector with multiple keys to HDF5 file.
+
+    :param fname:
+        The name of the checkpoint file.
+    :param keys:
+        The list of keys for the solution vector.
+    :param vec:
+        The solution vector.
+    """
+
+    valid_checkpoint = (fname and isinstance(fname, str) and
+                        Path(fname).is_file())
+
+    if valid_checkpoint:
+        hf = h5py.File(fname, 'a')
+        dset = hf.create_dataset(keys[0], data=vec)
+        for key in keys[1:]:
+            hf[key] = dset
+        hf.close()
+
+
 def write_rsp_hdf5(fname, arrays, labels, molecule, basis, dft_dict, pe_dict,
                    ostream):
     """

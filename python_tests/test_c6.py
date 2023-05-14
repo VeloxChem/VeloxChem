@@ -96,6 +96,7 @@ class TestC6:
 
     def check_printout(self, c6_drv, c6_results):
 
+        c6_val = c6_results['c6']
         rsp_func = c6_results['response_functions']
 
         here = Path(__file__).parent
@@ -103,7 +104,7 @@ class TestC6:
         fpath = here / 'inputs' / f'vlx_printout_c6_{random_string}.out'
 
         ostream = OutputStream(fpath)
-        c6_drv._print_results(c6_results, ostream)
+        c6_drv._print_results(c6_val, rsp_func, ostream)
         ostream.close()
 
         with fpath.open('r') as f_out:

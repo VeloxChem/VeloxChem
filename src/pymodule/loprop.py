@@ -182,12 +182,15 @@ class LoPropDriver:
         lrs_drv = LinearResponseSolver(self.comm, self.ostream)
         lrs_out = lrs_drv.compute(molecule, basis, scf_tensors)
 
-        if self.rank == mpi_master():
+        # obtain response vectors
+        Nx = LinearResponseSolver.get_full_solution_vector(
+            lrs_out['solutions'][('x', 0)])
+        Ny = LinearResponseSolver.get_full_solution_vector(
+            lrs_out['solutions'][('y', 0)])
+        Nz = LinearResponseSolver.get_full_solution_vector(
+            lrs_out['solutions'][('z', 0)])
 
-            # obtain response vectors
-            Nx = lrs_out['solutions'][('x', 0)]
-            Ny = lrs_out['solutions'][('y', 0)]
-            Nz = lrs_out['solutions'][('z', 0)]
+        if self.rank == mpi_master():
 
             # This is a workaround for the sqrt(2) factor in the solution vectors
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)

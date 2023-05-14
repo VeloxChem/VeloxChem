@@ -9,7 +9,9 @@ from veloxchem.outputstream import OutputStream
 from veloxchem.distributedarray import DistributedArray
 from veloxchem.linearsolver import LinearSolver
 from veloxchem.checkpoint import (write_rsp_hdf5, read_rsp_hdf5, check_rsp_hdf5,
-                                  write_rsp_solution, write_distributed_focks,
+                                  write_rsp_solution,
+                                  write_rsp_solution_with_multiple_keys,
+                                  write_distributed_focks,
                                   read_distributed_focks,
                                   check_distributed_focks)
 from veloxchem.inputparser import get_random_string_serial
@@ -61,15 +63,20 @@ class TestCheckpoint:
             new_array = np.random.rand(10, 20)
             new_label = 'c'
             write_rsp_solution(fname, new_label, new_array)
+            labels.append(new_label)
+
+            new_array = np.random.rand(10, 20)
+            new_labels = ['d', 'e', 'f']
+            write_rsp_solution_with_multiple_keys(fname, new_labels, new_array)
+            labels += new_labels
 
             # test hdf5
-            arrays.append(new_array)
-            labels.append(new_label)
             match = check_rsp_hdf5(fname, labels, mol, bas, dft_dict, pe_dict)
             assert match
 
-            match = check_rsp_hdf5(fname, ['bger', 'e2bger', 'c'], mol, bas,
-                                   dft_dict, pe_dict)
+            match = check_rsp_hdf5(fname,
+                                   ['bger', 'e2bger', 'c', 'd', 'e', 'f'], mol,
+                                   bas, dft_dict, pe_dict)
             assert not match
 
             if fpath.is_file():

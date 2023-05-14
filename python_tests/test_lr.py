@@ -73,7 +73,7 @@ class TestLR:
         fpath = here / 'inputs' / f'vlx_printout_lr_{random_string}.out'
 
         ostream = OutputStream(fpath)
-        lr_drv._print_results(lr_results, ostream)
+        lr_drv._print_results(rsp_func, ostream)
         ostream.close()
 
         with fpath.open('r') as f_out:

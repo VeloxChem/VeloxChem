@@ -36,7 +36,8 @@ from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
-from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
+from .checkpoint import (check_rsp_hdf5, create_hdf5,
+                         write_rsp_solution_with_multiple_keys)
 
 
 class LinearResponseSolver(LinearSolver):
@@ -335,7 +336,7 @@ class LinearResponseSolver(LinearSolver):
 
                 x = DistributedArray(x_data, self.comm, distribute=False)
 
-                x_full = self._get_full_solution_vector(x)
+                x_full = self.get_full_solution_vector(x)
 
                 if self.rank == mpi_master():
                     xv = np.dot(x_full, v_grad[(op, freq)])
@@ -448,7 +449,6 @@ class LinearResponseSolver(LinearSolver):
             if self.rank == mpi_master():
                 va = {op: v for op, v in zip(self.a_components, a_grad)}
                 rsp_funcs = {}
-                full_solutions = {}
 
                 # create h5 file for response solutions
                 if (self.save_solutions and self.checkpoint_file is not None):
@@ -459,19 +459,21 @@ class LinearResponseSolver(LinearSolver):
                                 pe_dict['potfile_text'])
 
             for bop, w in solutions:
-                x = self._get_full_solution_vector(solutions[(bop, w)])
+                x = self.get_full_solution_vector(solutions[(bop, w)])
 
                 if self.rank == mpi_master():
                     for aop in self.a_components:
                         rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
-                        full_solutions[(bop, w)] = x
 
-                        # write to h5 file for response solutions
-                        if (self.save_solutions and
-                                self.checkpoint_file is not None):
-                            write_rsp_solution(
-                                final_h5_fname,
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                    # write to h5 file for response solutions
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                        solution_keys = [
+                            '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
+                            for aop in self.a_components
+                        ]
+                        write_rsp_solution_with_multiple_keys(
+                            final_h5_fname, solution_keys, x)
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
@@ -481,18 +483,19 @@ class LinearResponseSolver(LinearSolver):
                     self.ostream.print_info(checkpoint_text)
                     self.ostream.print_blank()
 
-                ret_dict = {
+                self._print_results(rsp_funcs, self.ostream)
+
+                return {
                     'response_functions': rsp_funcs,
-                    'solutions': full_solutions
+                    'solutions': solutions,
                 }
-
-                self._print_results(ret_dict, self.ostream)
-
-                return ret_dict
+            else:
+                return {'solutions': solutions}
 
         return None
 
-    def _get_full_solution_vector(self, solution):
+    @staticmethod
+    def get_full_solution_vector(solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -506,7 +509,7 @@ class LinearResponseSolver(LinearSolver):
         x_ger = solution.get_full_vector(0)
         x_ung = solution.get_full_vector(1)
 
-        if self.rank == mpi_master():
+        if solution.rank == mpi_master():
             x_ger_full = np.hstack((x_ger, x_ger))
             x_ung_full = np.hstack((x_ung, -x_ung))
             return x_ger_full + x_ung_full
@@ -647,12 +650,12 @@ class LinearResponseSolver(LinearSolver):
 
         return dist_new_ger, dist_new_ung
 
-    def _print_results(self, results, ostream):
+    def _print_results(self, rsp_funcs, ostream):
         """
         Prints polarizability to output stream.
 
-        :param results:
-            The dictionary containing response results.
+        :param rsp_funcs:
+            The response functions.
         :param ostream:
             The output stream.
         """
@@ -672,7 +675,7 @@ class LinearResponseSolver(LinearSolver):
             for a in self.a_components:
                 valstr = '{:<5s}'.format(a.upper())
                 for b in self.b_components:
-                    prop = -results['response_functions'][(a, b, w)]
+                    prop = -rsp_funcs[(a, b, w)]
                     valstr += '{:15.8f}'.format(prop)
                 ostream.print_header(valstr.ljust(width))
 

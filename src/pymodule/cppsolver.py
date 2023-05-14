@@ -39,7 +39,8 @@ from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
-from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
+from .checkpoint import (check_rsp_hdf5, create_hdf5,
+                         write_rsp_solution_with_multiple_keys)
 
 
 class ComplexResponse(LinearSolver):
@@ -633,7 +634,7 @@ class ComplexResponse(LinearSolver):
 
                     x = DistributedArray(x_data, self.comm, distribute=False)
 
-                    x_full = self._get_full_solution_vector(x)
+                    x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
@@ -752,7 +753,6 @@ class ComplexResponse(LinearSolver):
                 if self.rank == mpi_master():
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
-                    full_solutions = {}
 
                     # create h5 file for response solutions
                     if (self.save_solutions and
@@ -765,19 +765,21 @@ class ComplexResponse(LinearSolver):
                                     pe_dict['potfile_text'])
 
                 for bop, w in solutions:
-                    x = self._get_full_solution_vector(solutions[(bop, w)])
+                    x = self.get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
-                            full_solutions[(bop, w)] = x
 
-                            # write to h5 file for response solutions
-                            if (self.save_solutions and
-                                    self.checkpoint_file is not None):
-                                write_rsp_solution(
-                                    final_h5_fname,
-                                    '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                        # write to h5 file for response solutions
+                        if (self.save_solutions and
+                                self.checkpoint_file is not None):
+                            solution_keys = [
+                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
+                                for aop in self.a_components
+                            ]
+                            write_rsp_solution_with_multiple_keys(
+                                final_h5_fname, solution_keys, x)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -788,14 +790,14 @@ class ComplexResponse(LinearSolver):
                         self.ostream.print_info(checkpoint_text)
                         self.ostream.print_blank()
 
-                    ret_dict = {
+                    self._print_results(rsp_funcs, self.ostream)
+
+                    return {
                         'response_functions': rsp_funcs,
-                        'solutions': full_solutions
+                        'solutions': solutions
                     }
-
-                    self._print_results(ret_dict, self.ostream)
-
-                    return ret_dict
+                else:
+                    return {'solutions': solutions}
 
         else:
             if self.is_converged:
@@ -803,7 +805,8 @@ class ComplexResponse(LinearSolver):
 
         return None
 
-    def _get_full_solution_vector(self, solution):
+    @staticmethod
+    def get_full_solution_vector(solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -819,7 +822,7 @@ class ComplexResponse(LinearSolver):
         x_imagung = solution.get_full_vector(2)
         x_imagger = solution.get_full_vector(3)
 
-        if self.rank == mpi_master():
+        if solution.rank == mpi_master():
             x_real = np.hstack((x_realger, x_realger)) + np.hstack(
                 (x_realung, -x_realung))
             x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
@@ -866,31 +869,31 @@ class ComplexResponse(LinearSolver):
 
         self.ostream.flush()
 
-    def get_spectrum(self, results):
+    def get_spectrum(self, rsp_funcs):
         """
         Gets spectrum.
 
-        :param results:
-            The dictionary containing response results.
+        :param rsp_funcs:
+            The response functions.
 
         :return:
             A list containing the energies and spectrum.
         """
 
         if self.cpp_flag == 'absorption':
-            return self._get_absorption_spectrum(results)
+            return self._get_absorption_spectrum(rsp_funcs)
 
         elif self.cpp_flag == 'ecd':
-            return self._get_ecd_spectrum(results)
+            return self._get_ecd_spectrum(rsp_funcs)
 
         return None
 
-    def _get_absorption_spectrum(self, results):
+    def _get_absorption_spectrum(self, rsp_funcs):
         """
         Gets absorption spectrum.
 
-        :param results:
-            The dictionary containing response results.
+        :param rsp_funcs:
+            The response functions.
 
         :return:
             A list containing the energies and cross-sections in a.u.
@@ -902,9 +905,9 @@ class ComplexResponse(LinearSolver):
             if w == 0.0:
                 continue
 
-            axx = -results['response_functions'][('x', 'x', w)].imag
-            ayy = -results['response_functions'][('y', 'y', w)].imag
-            azz = -results['response_functions'][('z', 'z', w)].imag
+            axx = -rsp_funcs[('x', 'x', w)].imag
+            ayy = -rsp_funcs[('y', 'y', w)].imag
+            azz = -rsp_funcs[('z', 'z', w)].imag
 
             alpha_bar = (axx + ayy + azz) / 3.0
             sigma = 4.0 * math.pi * w * alpha_bar * fine_structure_constant()
@@ -913,12 +916,12 @@ class ComplexResponse(LinearSolver):
 
         return spectrum
 
-    def _get_ecd_spectrum(self, results):
+    def _get_ecd_spectrum(self, rsp_funcs):
         """
         Gets circular dichroism spectrum.
 
-        :param results:
-            The dictionary containing response results.
+        :param rsp_funcs:
+            The response functions.
 
         :return:
             A list containing the energies and extinction coefficient (Delta
@@ -931,9 +934,9 @@ class ComplexResponse(LinearSolver):
             if w == 0.0:
                 continue
 
-            Gxx = -results['response_functions'][('x', 'x', w)].imag
-            Gyy = -results['response_functions'][('y', 'y', w)].imag
-            Gzz = -results['response_functions'][('z', 'z', w)].imag
+            Gxx = -rsp_funcs[('x', 'x', w)].imag
+            Gyy = -rsp_funcs[('y', 'y', w)].imag
+            Gzz = -rsp_funcs[('z', 'z', w)].imag
 
             Gxx /= w
             Gyy /= w
@@ -946,28 +949,28 @@ class ComplexResponse(LinearSolver):
 
         return spectrum
 
-    def _print_results(self, results, ostream):
+    def _print_results(self, rsp_funcs, ostream):
         """
         Prints response resutls to output stream.
 
-        :param results:
-            The dictionary containing response results.
+        :param rsp_funcs:
+            The response functions.
         :param ostream:
             The output stream.
         """
 
         if self.cpp_flag == 'absorption':
-            self._print_absorption_results(results, ostream)
+            self._print_absorption_results(rsp_funcs, ostream)
 
         elif self.cpp_flag == 'ecd':
-            self._print_ecd_results(results, ostream)
+            self._print_ecd_results(rsp_funcs, ostream)
 
-    def _print_absorption_results(self, results, ostream):
+    def _print_absorption_results(self, rsp_funcs, ostream):
         """
         Prints absorption results to output stream.
 
-        :param results:
-            The dictionary containing response results.
+        :param rsp_funcs:
+            The response functions.
         :param ostream:
             The output stream.
         """
@@ -987,11 +990,11 @@ class ComplexResponse(LinearSolver):
 
             for a in self.a_components:
                 for b in self.b_components:
-                    prop = results['response_functions'][(a, b, w)]
+                    rsp_func_val = rsp_funcs[(a, b, w)]
                     ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
                         a.lower(), b.lower(), w)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
+                        ops_label, rsp_func_val.real, rsp_func_val.imag)
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
 
@@ -1018,7 +1021,7 @@ class ComplexResponse(LinearSolver):
         ostream.print_header(title.ljust(width))
         ostream.print_header(('-' * len(title)).ljust(width))
 
-        spectrum = self.get_spectrum(results)
+        spectrum = self.get_spectrum(rsp_funcs)
 
         for w, sigma in spectrum:
             output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
@@ -1027,12 +1030,12 @@ class ComplexResponse(LinearSolver):
 
         ostream.print_blank()
 
-    def _print_ecd_results(self, results, ostream):
+    def _print_ecd_results(self, rsp_funcs, ostream):
         """
         Prints ECD results to output stream.
 
-        :param results:
-            The dictionary containing response results.
+        :param rsp_funcs:
+            The response functions.
         :param ostream:
             The output stream.
         """
@@ -1052,11 +1055,11 @@ class ComplexResponse(LinearSolver):
 
             for a in self.a_components:
                 for b in self.b_components:
-                    prop = results['response_functions'][(a, b, w)]
+                    rsp_func_val = rsp_funcs[(a, b, w)]
                     ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
                         a.lower(), b.lower(), w)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
+                        ops_label, rsp_func_val.real, rsp_func_val.imag)
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
 
@@ -1083,7 +1086,7 @@ class ComplexResponse(LinearSolver):
         ostream.print_header(title.ljust(width))
         ostream.print_header(('-' * len(title)).ljust(width))
 
-        spectrum = self.get_spectrum(results)
+        spectrum = self.get_spectrum(rsp_funcs)
 
         for w, Delta_epsilon in spectrum:
             output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(

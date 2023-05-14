@@ -50,7 +50,7 @@ class TestCppEcd:
         if is_mpi_master(task.mpi_comm):
             self.check_printout(cpp_drv, cpp_results)
 
-            spectrum = cpp_drv.get_spectrum(cpp_results)
+            spectrum = cpp_drv.get_spectrum(cpp_results['response_functions'])
             for i, (w, Delta_epsilon) in enumerate(spectrum):
                 ref_w, ref_Delta_epsilon = ref_spectrum[i]
                 assert abs(w - ref_w) < 1.0e-6
@@ -65,7 +65,7 @@ class TestCppEcd:
         fpath = here / 'inputs' / f'vlx_printout_cpp_ecd_{random_string}.out'
 
         ostream = OutputStream(fpath)
-        cpp_drv._print_results(cpp_results, ostream)
+        cpp_drv._print_results(rsp_func, ostream)
         ostream.close()
 
         with fpath.open('r') as f_out:

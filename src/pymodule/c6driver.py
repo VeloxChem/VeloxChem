@@ -37,7 +37,8 @@ from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
 from .errorhandler import assert_msg_critical
-from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
+from .checkpoint import (check_rsp_hdf5, create_hdf5,
+                         write_rsp_solution_with_multiple_keys)
 
 
 class C6Driver(LinearSolver):
@@ -480,7 +481,7 @@ class C6Driver(LinearSolver):
 
                     x = DistributedArray(x_data, self.comm, distribute=False)
 
-                    x_full = self._get_full_solution_vector(x)
+                    x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v_grad[(op, iw)])
                         xvs.append((op, iw, xv))
@@ -597,7 +598,6 @@ class C6Driver(LinearSolver):
             if self.rank == mpi_master():
                 va = {op: v for op, v in zip(self.a_components, a_grad)}
                 rsp_funcs = {}
-                full_solutions = {}
 
                 # create h5 file for response solutions
                 if (self.save_solutions and self.checkpoint_file is not None):
@@ -608,19 +608,21 @@ class C6Driver(LinearSolver):
                                 pe_dict['potfile_text'])
 
             for bop, iw in solutions:
-                x = self._get_full_solution_vector(solutions[(bop, iw)])
+                x = self.get_full_solution_vector(solutions[(bop, iw)])
 
                 if self.rank == mpi_master():
                     for aop in self.a_components:
                         rsp_funcs[(aop, bop, iw)] = -np.dot(va[aop], x)
-                        full_solutions[(bop, iw)] = x
 
-                        # write to h5 file for response solutions
-                        if (self.save_solutions and
-                                self.checkpoint_file is not None):
-                            write_rsp_solution(
-                                final_h5_fname,
-                                '{:s}_{:s}_{:.8f}'.format(aop, bop, iw), x)
+                    # write to h5 file for response solutions
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                        solution_keys = [
+                            '{:s}_{:s}_{:.8f}'.format(aop, bop, iw)
+                            for aop in self.a_components
+                        ]
+                        write_rsp_solution_with_multiple_keys(
+                            final_h5_fname, solution_keys, x)
 
             if self.rank == mpi_master():
                 # print information about h5 file for response solutions
@@ -633,15 +635,15 @@ class C6Driver(LinearSolver):
                 c6 = self._integrate_c6(self.w0, points, weights, imagfreqs,
                                         rsp_funcs)
 
-                ret_dict = {
+                self._print_results(c6, rsp_funcs, self.ostream)
+
+                return {
                     'c6': c6,
                     'response_functions': rsp_funcs,
-                    'solutions': full_solutions,
+                    'solutions': solutions
                 }
-
-                self._print_results(ret_dict, self.ostream)
-
-                return ret_dict
+            else:
+                return {'solutions': solutions}
 
         return None
 
@@ -687,7 +689,8 @@ class C6Driver(LinearSolver):
 
         return c6
 
-    def _get_full_solution_vector(self, solution):
+    @staticmethod
+    def get_full_solution_vector(solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -701,7 +704,7 @@ class C6Driver(LinearSolver):
         x_realung = solution.get_full_vector(0)
         x_imagger = solution.get_full_vector(1)
 
-        if self.rank == mpi_master():
+        if solution.rank == mpi_master():
             x_real = np.hstack((x_realung, -x_realung))
             x_imag = np.hstack((x_imagger, x_imagger))
             return x_real + 1j * x_imag
@@ -745,12 +748,14 @@ class C6Driver(LinearSolver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def _print_results(self, results, ostream):
+    def _print_results(self, c6, rsp_funcs, ostream):
         """
         Prints response property to output stream.
 
-        :param results:
-            The dictionary containing response results.
+        :param c6:
+            The C6 value.
+        :param rsp_funcs:
+            The response functions.
         :param ostream:
             The output stream.
         """
@@ -774,11 +779,11 @@ class C6Driver(LinearSolver):
 
             for a in self.a_components:
                 for b in self.b_components:
-                    prop = results['response_functions'][(a, b, iw)]
+                    rsp_func_val = rsp_funcs[(a, b, iw)]
                     ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
                         a.lower(), b.lower(), iw)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
+                        ops_label, rsp_func_val.real, rsp_func_val.imag)
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
 
@@ -793,11 +798,9 @@ class C6Driver(LinearSolver):
         ostream.print_header(title.ljust(width))
         ostream.print_blank()
 
-        c6 = results['c6']
-
-        Gxx_i0 = results['response_functions'][('x', 'x', 0.0)].real
-        Gyy_i0 = results['response_functions'][('y', 'y', 0.0)].real
-        Gzz_i0 = results['response_functions'][('z', 'z', 0.0)].real
+        Gxx_i0 = rsp_funcs[('x', 'x', 0.0)].real
+        Gyy_i0 = rsp_funcs[('y', 'y', 0.0)].real
+        Gzz_i0 = rsp_funcs[('z', 'z', 0.0)].real
 
         alpha_i0 = -(Gxx_i0 + Gyy_i0 + Gzz_i0) / 3.0
 

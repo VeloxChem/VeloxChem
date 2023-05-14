@@ -71,7 +71,7 @@ class TestCppAbs:
             assert np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4
             assert np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4
 
-            spectrum = cpp_drv.get_spectrum(cpp_results)
+            spectrum = cpp_drv.get_spectrum(cpp_results['response_functions'])
             for i, (w, sigma) in enumerate(spectrum):
                 ref_w, ref_sigma = ref_spectrum[i]
                 assert abs(w - ref_w) < 1.0e-6
@@ -86,7 +86,7 @@ class TestCppAbs:
         fpath = here / 'inputs' / f'vlx_printout_cpp_abs_{random_string}.out'
 
         ostream = OutputStream(fpath)
-        cpp_drv._print_results(cpp_results, ostream)
+        cpp_drv._print_results(rsp_func, ostream)
         ostream.close()
 
         with fpath.open('r') as f_out:
