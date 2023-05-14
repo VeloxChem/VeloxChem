@@ -83,7 +83,7 @@ class TpaReducedDriver(TpaDriver):
 
         super().update_settings(rsp_dict, method_dict)
 
-    def get_densities(self, wi, kX, mo, nocc):
+    def get_densities(self, wi, Nx, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded Fock
         matrices F^{σ} used for the reduced iostropic cubic response function
@@ -91,76 +91,111 @@ class TpaReducedDriver(TpaDriver):
         :param wi:
             A list of the frequencies
         :param kX:
-            A dictonary with all the first-order response matrices
+            A dictonary with all the first-order response vectors in
+            distributed form
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
             Number of occupied orbitals
+        :param norb:
+            Number of orbitals
 
         :return:
             A list of tranformed compounded densities
         """
 
-        density_list1 = []
-        density_list2 = []
+        distributed_density_1 = None
+        distributed_density_2 = None
 
         for w in wi:
 
-            kx = kX['Nb'][('x', w)]
-            ky = kX['Nb'][('y', w)]
-            kz = kX['Nb'][('z', w)]
+            nx = self._get_full_solution_vector(Nx[('x', w)])
+            ny = self._get_full_solution_vector(Nx[('y', w)])
+            nz = self._get_full_solution_vector(Nx[('z', w)])
 
-            # create the first order single indexed densiteies #
+            if self.rank == mpi_master():
 
-            Dx = self.commut_mo_density(kx, nocc)
-            Dy = self.commut_mo_density(ky, nocc)
-            Dz = self.commut_mo_density(kz, nocc)
+                kx = self.complex_lrvec2mat(nx, nocc, norb)
+                ky = self.complex_lrvec2mat(ny, nocc, norb)
+                kz = self.complex_lrvec2mat(nz, nocc, norb)
 
-            # create the first order two indexed densities #
+                # create the first order single indexed densiteies #
 
-            # σ terms #
+                Dx = self.commut_mo_density(kx, nocc)
+                Dy = self.commut_mo_density(ky, nocc)
+                Dz = self.commut_mo_density(kz, nocc)
 
-            Dxx = self.commut(kx, Dx)
-            Dyy = self.commut(ky, Dy)
-            Dzz = self.commut(kz, Dz)
+                # create the first order two indexed densities #
 
-            D_sig_xx = 6 * (3 * Dxx + Dyy + Dzz)
-            D_sig_yy = 6 * (Dxx + 3 * Dyy + Dzz)
-            D_sig_zz = 6 * (Dxx + Dyy + 3 * Dzz)
+                # σ terms #
 
-            D_sig_xy = 6 * (self.commut(ky, Dx) + self.commut(kx, Dy))
-            D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
-            D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
+                Dxx = self.commut(kx, Dx)
+                Dyy = self.commut(ky, Dy)
+                Dzz = self.commut(kz, Dz)
 
-            # density transformation from MO to AO basis
+                D_sig_xx = 6 * (3 * Dxx + Dyy + Dzz)
+                D_sig_yy = 6 * (Dxx + 3 * Dyy + Dzz)
+                D_sig_zz = 6 * (Dxx + Dyy + 3 * Dzz)
 
-            Dx = np.linalg.multi_dot([mo, Dx, mo.T])
-            Dy = np.linalg.multi_dot([mo, Dy, mo.T])
-            Dz = np.linalg.multi_dot([mo, Dz, mo.T])
+                D_sig_xy = 6 * (self.commut(ky, Dx) + self.commut(kx, Dy))
+                D_sig_xz = 6 * (self.commut(kx, Dz) + self.commut(kz, Dx))
+                D_sig_yz = 6 * (self.commut(ky, Dz) + self.commut(kz, Dy))
 
-            D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
-            D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
-            D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
+                # density transformation from MO to AO basis
 
-            D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
-            D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
-            D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
+                Dx = np.linalg.multi_dot([mo, Dx, mo.T])
+                Dy = np.linalg.multi_dot([mo, Dy, mo.T])
+                Dz = np.linalg.multi_dot([mo, Dz, mo.T])
 
-            density_list1.append(Dx.real)
-            density_list1.append(Dx.imag)
-            density_list1.append(Dy.real)
-            density_list1.append(Dy.imag)
-            density_list1.append(Dz.real)
-            density_list1.append(Dz.imag)
+                D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
+                D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
+                D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
 
-            density_list2.append(D_sig_xx.real)
-            density_list2.append(D_sig_yy.real)
-            density_list2.append(D_sig_zz.real)
-            density_list2.append(D_sig_xy.real)
-            density_list2.append(D_sig_xz.real)
-            density_list2.append(D_sig_yz.real)
+                D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
+                D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
+                D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
 
-        return density_list1, density_list2, None
+                dist_den_1_freq = np.hstack((
+                    Dx.real.reshape(-1, 1),
+                    Dx.imag.reshape(-1, 1),
+                    Dy.real.reshape(-1, 1),
+                    Dy.imag.reshape(-1, 1),
+                    Dz.real.reshape(-1, 1),
+                    Dz.imag.reshape(-1, 1),
+                ))
+
+                dist_den_2_freq = np.hstack((
+                    D_sig_xx.real.reshape(-1, 1),
+                    D_sig_yy.real.reshape(-1, 1),
+                    D_sig_zz.real.reshape(-1, 1),
+                    D_sig_xy.real.reshape(-1, 1),
+                    D_sig_xz.real.reshape(-1, 1),
+                    D_sig_yz.real.reshape(-1, 1),
+                ))
+
+            else:
+
+                dist_den_1_freq = None
+                dist_den_2_freq = None
+
+            dist_den_1_freq = DistributedArray(dist_den_1_freq, self.comm)
+            dist_den_2_freq = DistributedArray(dist_den_2_freq, self.comm)
+
+            if distributed_density_1 is None:
+                distributed_density_1 = DistributedArray(dist_den_1_freq.data,
+                                                         self.comm,
+                                                         distribute=False)
+            else:
+                distributed_density_1.append(dist_den_1_freq, axis=1)
+
+            if distributed_density_2 is None:
+                distributed_density_2 = DistributedArray(dist_den_2_freq.data,
+                                                         self.comm,
+                                                         distribute=False)
+            else:
+                distributed_density_2.append(dist_den_2_freq, axis=1)
+
+        return distributed_density_1, distributed_density_2, None
 
     def get_fock_dict(self, wi, density_list1, density_list2, density_list3,
                       F0_a, mo, molecule, ao_basis, dft_dict, profiler):
@@ -249,7 +284,7 @@ class TpaReducedDriver(TpaDriver):
 
         return focks
 
-    def get_Nxy(self, w, d_a_mo, X, fock_dict, kX, nocc, norb, molecule,
+    def get_Nxy(self, w, d_a_mo, X, fock_dict, Nx, nocc, norb, molecule,
                 ao_basis, scf_tensors):
         """
         Computes all the second-order response vectors needed for the reduced
@@ -263,8 +298,8 @@ class TpaReducedDriver(TpaDriver):
             Dipole integrals
         :param fock_dict:
             A dictonary containing all the Fock matricies
-        :param kX:
-            A dictonary containg all the response matricies
+        :param Nx:
+            A dictonary containg all the response vectors in distributed form
         :param nocc:
             The number of occupied orbitals
         :param norb:
@@ -282,7 +317,7 @@ class TpaReducedDriver(TpaDriver):
         """
 
         # Get the second-order gradiants
-        xy_dict = self.get_xy(d_a_mo, X, w, fock_dict, kX, nocc, norb)
+        xy_dict = self.get_xy(d_a_mo, X, w, fock_dict, Nx, nocc, norb)
 
         # Frequencies to compute
         if self.rank == mpi_master():
@@ -313,12 +348,12 @@ class TpaReducedDriver(TpaDriver):
 
         self._is_converged = (self._is_converged and N_total_drv.is_converged)
 
-        kXY_dict = N_total_results['kappas']
+        Nxy_dict = N_total_results['solutions']
         FXY_2_dict = N_total_results['focks']
 
-        return (kXY_dict, FXY_2_dict)
+        return (Nxy_dict, FXY_2_dict)
 
-    def get_xy(self, d_a_mo, X, wi, Fock, kX, nocc, norb):
+    def get_xy(self, d_a_mo, X, wi, Fock, Nx, nocc, norb):
         """
         Computes the compounded gradient vectors N^{σ}  used for the reduced
         isotropic cubic response function
@@ -331,8 +366,9 @@ class TpaReducedDriver(TpaDriver):
             A list of the frequencies
         :param Fock:
             A dictonary containing all the Fock matricies
-        :param kX:
-            A dictonary with all the first-order response matrices
+        :param Nx:
+            A dictonary with all the first-order response vector in distributed
+            form
         :param nocc:
             The number of occupied orbitals
         :param norb:
@@ -362,6 +398,10 @@ class TpaReducedDriver(TpaDriver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
+            nx = self._get_full_solution_vector(Nx[('x', w)])
+            ny = self._get_full_solution_vector(Nx[('y', w)])
+            nz = self._get_full_solution_vector(Nx[('z', w)])
+
             if self.rank != mpi_master():
                 continue
 
@@ -374,9 +414,9 @@ class TpaReducedDriver(TpaDriver):
             mu_y = X['y']
             mu_z = X['z']
 
-            kx = kX['Nb'][('x', w)].T
-            ky = kX['Nb'][('y', w)].T
-            kz = kX['Nb'][('z', w)].T
+            kx = (self.complex_lrvec2mat(nx, nocc, norb)).T
+            ky = (self.complex_lrvec2mat(ny, nocc, norb)).T
+            kz = (self.complex_lrvec2mat(nz, nocc, norb)).T
 
             # REAL PART #
             F0 = Fock['F0']
@@ -435,7 +475,7 @@ class TpaReducedDriver(TpaDriver):
 
         return xy_dict
 
-    def get_densities_II(self, wi, kX, kXY, mo, nocc):
+    def get_densities_II(self, wi, Nx, Nxy, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded
         second-order Fock matrices used for the reduced isotropic cubic response
@@ -444,127 +484,158 @@ class TpaReducedDriver(TpaDriver):
 
         :param wi:
             A list of the frequencies
-        :param kX:
-            A dictonary with all the first-order response matrices
-        :param kXY:
-            A dict of the two index response matrices
+        :param Nx:
+            A dictonary with all the first-order response vectors in
+            distributed form
+        :param Nxy:
+            A dict of the two index response vectors in distributed form
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
             Number of occupied orbitals
+        :param norb:
+            Number of orbitals
 
         :return:
             A list of tranformed compounded densities
         """
 
-        density_list1 = []
-        density_list2 = []
+        distributed_density_1 = None
+        distributed_density_2 = None
 
         for w in wi:
-            k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)]
-            k_sig_yy = kXY[(('N_sig_yy', w), 2 * w)]
-            k_sig_zz = kXY[(('N_sig_zz', w), 2 * w)]
 
-            k_sig_xy = kXY[(('N_sig_xy', w), 2 * w)]
-            k_sig_xz = kXY[(('N_sig_xz', w), 2 * w)]
-            k_sig_yz = kXY[(('N_sig_yz', w), 2 * w)]
+            nx = self._get_full_solution_vector(Nx[('x', w)])
+            ny = self._get_full_solution_vector(Nx[('y', w)])
+            nz = self._get_full_solution_vector(Nx[('z', w)])
 
-            kx = kX['Nb'][('x', w)]
-            ky = kX['Nb'][('y', w)]
-            kz = kX['Nb'][('z', w)]
+            n_sig_xx = self._get_full_solution_vector(Nxy[(('N_sig_xx', w),
+                                                           2 * w)])
+            n_sig_yy = self._get_full_solution_vector(Nxy[(('N_sig_yy', w),
+                                                           2 * w)])
+            n_sig_zz = self._get_full_solution_vector(Nxy[(('N_sig_zz', w),
+                                                           2 * w)])
+            n_sig_xy = self._get_full_solution_vector(Nxy[(('N_sig_xy', w),
+                                                           2 * w)])
+            n_sig_xz = self._get_full_solution_vector(Nxy[(('N_sig_xz', w),
+                                                           2 * w)])
+            n_sig_yz = self._get_full_solution_vector(Nxy[(('N_sig_yz', w),
+                                                           2 * w)])
 
-            kx_ = -kx.conj().T  # kX['Nc'][('x', -w)].T
-            ky_ = -ky.conj().T  # kX['Nc'][('y', -w)].T
-            kz_ = -kz.conj().T  # kX['Nc'][('z', -w)].T
+            if self.rank == mpi_master():
 
-            # SIGMA contributiatons #
-            Dc_x_ = self.commut_mo_density(kx_, nocc)
-            Dc_y_ = self.commut_mo_density(ky_, nocc)
-            Dc_z_ = self.commut_mo_density(kz_, nocc)
+                k_sig_xx = self.complex_lrvec2mat(n_sig_xx, nocc, norb)
+                k_sig_yy = self.complex_lrvec2mat(n_sig_yy, nocc, norb)
+                k_sig_zz = self.complex_lrvec2mat(n_sig_zz, nocc, norb)
+                k_sig_xy = self.complex_lrvec2mat(n_sig_xy, nocc, norb)
+                k_sig_xz = self.complex_lrvec2mat(n_sig_xz, nocc, norb)
+                k_sig_yz = self.complex_lrvec2mat(n_sig_yz, nocc, norb)
 
-            D_sig_xx = self.commut_mo_density(k_sig_xx, nocc)
-            D_sig_yy = self.commut_mo_density(k_sig_yy, nocc)
-            D_sig_zz = self.commut_mo_density(k_sig_zz, nocc)
+                kx = self.complex_lrvec2mat(nx, nocc, norb)
+                ky = self.complex_lrvec2mat(ny, nocc, norb)
+                kz = self.complex_lrvec2mat(nz, nocc, norb)
 
-            D_sig_xy = self.commut_mo_density(k_sig_xy, nocc)
-            D_sig_xz = self.commut_mo_density(k_sig_xz, nocc)
-            D_sig_yz = self.commut_mo_density(k_sig_yz, nocc)
+                kx_ = -kx.conj().T  # kX['Nc'][('x', -w)].T
+                ky_ = -ky.conj().T  # kX['Nc'][('y', -w)].T
+                kz_ = -kz.conj().T  # kX['Nc'][('z', -w)].T
 
-            # x #
-            Dx = self.commut(kx_, D_sig_xx)
-            Dx += self.commut(k_sig_xx, Dc_x_)
-            Dx += self.commut(ky_, D_sig_xy)
-            Dx += self.commut(k_sig_xy, Dc_y_)
+                # SIGMA contributiatons #
+                Dc_x_ = self.commut_mo_density(kx_, nocc)
+                Dc_y_ = self.commut_mo_density(ky_, nocc)
+                Dc_z_ = self.commut_mo_density(kz_, nocc)
 
-            Dx += self.commut(kz_, D_sig_xz)
-            Dx += self.commut(k_sig_xz, Dc_z_)
+                D_sig_xx = self.commut_mo_density(k_sig_xx, nocc)
+                D_sig_yy = self.commut_mo_density(k_sig_yy, nocc)
+                D_sig_zz = self.commut_mo_density(k_sig_zz, nocc)
 
-            # y #
-            Dy = self.commut(kx_, D_sig_xy)
-            Dy += self.commut(k_sig_xy, Dc_x_)
+                D_sig_xy = self.commut_mo_density(k_sig_xy, nocc)
+                D_sig_xz = self.commut_mo_density(k_sig_xz, nocc)
+                D_sig_yz = self.commut_mo_density(k_sig_yz, nocc)
 
-            Dy += self.commut(ky_, D_sig_yy)
-            Dy += self.commut(k_sig_yy, Dc_y_)
+                # x #
+                Dx = self.commut(kx_, D_sig_xx)
+                Dx += self.commut(k_sig_xx, Dc_x_)
+                Dx += self.commut(ky_, D_sig_xy)
+                Dx += self.commut(k_sig_xy, Dc_y_)
 
-            Dy += self.commut(kz_, D_sig_yz)
-            Dy += self.commut(k_sig_yz, Dc_z_)
+                Dx += self.commut(kz_, D_sig_xz)
+                Dx += self.commut(k_sig_xz, Dc_z_)
 
-            # z #
-            Dz = self.commut(kx_, D_sig_xz)
-            Dz += self.commut(k_sig_xz, Dc_x_)
+                # y #
+                Dy = self.commut(kx_, D_sig_xy)
+                Dy += self.commut(k_sig_xy, Dc_x_)
 
-            Dz += self.commut(ky_, D_sig_yz)
-            Dz += self.commut(k_sig_yz, Dc_y_)
+                Dy += self.commut(ky_, D_sig_yy)
+                Dy += self.commut(k_sig_yy, Dc_y_)
 
-            Dz += self.commut(kz_, D_sig_zz)
-            Dz += self.commut(k_sig_zz, Dc_z_)
+                Dy += self.commut(kz_, D_sig_yz)
+                Dy += self.commut(k_sig_yz, Dc_z_)
 
-            # density transformation from MO to AO basis
+                # z #
+                Dz = self.commut(kx_, D_sig_xz)
+                Dz += self.commut(k_sig_xz, Dc_x_)
 
-            Dc_x_ = np.linalg.multi_dot([mo, Dc_x_, mo.T])
-            Dc_y_ = np.linalg.multi_dot([mo, Dc_y_, mo.T])
-            Dc_z_ = np.linalg.multi_dot([mo, Dc_z_, mo.T])
+                Dz += self.commut(ky_, D_sig_yz)
+                Dz += self.commut(k_sig_yz, Dc_y_)
 
-            Dx = np.linalg.multi_dot([mo, Dx, mo.T])
-            Dy = np.linalg.multi_dot([mo, Dy, mo.T])
-            Dz = np.linalg.multi_dot([mo, Dz, mo.T])
+                Dz += self.commut(kz_, D_sig_zz)
+                Dz += self.commut(k_sig_zz, Dc_z_)
 
-            D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
-            D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
-            D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
-            D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
-            D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
-            D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
+                # density transformation from MO to AO basis
 
-            density_list1.append(Dc_x_.real)
-            density_list1.append(Dc_x_.imag)
-            density_list1.append(Dc_y_.real)
-            density_list1.append(Dc_y_.imag)
-            density_list1.append(Dc_z_.real)
-            density_list1.append(Dc_z_.imag)
+                Dc_x_ = np.linalg.multi_dot([mo, Dc_x_, mo.T])
+                Dc_y_ = np.linalg.multi_dot([mo, Dc_y_, mo.T])
+                Dc_z_ = np.linalg.multi_dot([mo, Dc_z_, mo.T])
 
-            density_list1.append(D_sig_xx.real)
-            density_list1.append(D_sig_xx.imag)
-            density_list1.append(D_sig_yy.real)
-            density_list1.append(D_sig_yy.imag)
-            density_list1.append(D_sig_zz.real)
-            density_list1.append(D_sig_zz.imag)
+                Dx = np.linalg.multi_dot([mo, Dx, mo.T])
+                Dy = np.linalg.multi_dot([mo, Dy, mo.T])
+                Dz = np.linalg.multi_dot([mo, Dz, mo.T])
 
-            density_list1.append(D_sig_xy.real)
-            density_list1.append(D_sig_xy.imag)
-            density_list1.append(D_sig_xz.real)
-            density_list1.append(D_sig_xz.imag)
-            density_list1.append(D_sig_yz.real)
-            density_list1.append(D_sig_yz.imag)
+                D_sig_xx = np.linalg.multi_dot([mo, D_sig_xx, mo.T])
+                D_sig_yy = np.linalg.multi_dot([mo, D_sig_yy, mo.T])
+                D_sig_zz = np.linalg.multi_dot([mo, D_sig_zz, mo.T])
+                D_sig_xy = np.linalg.multi_dot([mo, D_sig_xy, mo.T])
+                D_sig_xz = np.linalg.multi_dot([mo, D_sig_xz, mo.T])
+                D_sig_yz = np.linalg.multi_dot([mo, D_sig_yz, mo.T])
 
-            density_list2.append(Dx.real)
-            density_list2.append(Dx.imag)
-            density_list2.append(Dy.real)
-            density_list2.append(Dy.imag)
-            density_list2.append(Dz.real)
-            density_list2.append(Dz.imag)
+                dist_den_1_freq = np.hstack(
+                    (Dc_x_.real.reshape(-1, 1), Dc_x_.imag.reshape(-1, 1),
+                     Dc_y_.real.reshape(-1, 1), Dc_y_.imag.reshape(-1, 1),
+                     Dc_z_.real.reshape(-1, 1), Dc_z_.imag.reshape(-1, 1),
+                     D_sig_xx.real.reshape(-1, 1), D_sig_xx.imag.reshape(-1, 1),
+                     D_sig_yy.real.reshape(-1, 1), D_sig_yy.imag.reshape(-1, 1),
+                     D_sig_zz.real.reshape(-1, 1), D_sig_zz.imag.reshape(-1, 1),
+                     D_sig_xy.real.reshape(-1, 1), D_sig_xy.imag.reshape(-1, 1),
+                     D_sig_xz.real.reshape(-1, 1), D_sig_xz.imag.reshape(-1, 1),
+                     D_sig_yz.real.reshape(-1, 1), D_sig_yz.imag.reshape(-1,
+                                                                         1)))
 
-        return density_list1, density_list2
+                dist_den_2_freq = np.hstack(
+                    (Dx.real.reshape(-1, 1), Dx.imag.reshape(-1, 1),
+                     Dy.real.reshape(-1, 1), Dy.imag.reshape(-1, 1),
+                     Dz.real.reshape(-1, 1), Dz.imag.reshape(-1, 1)))
+            else:
+                dist_den_1_freq = None
+                dist_den_2_freq = None
+
+            dist_den_1_freq = DistributedArray(dist_den_1_freq, self.comm)
+            dist_den_2_freq = DistributedArray(dist_den_2_freq, self.comm)
+
+            if distributed_density_1 is None:
+                distributed_density_1 = DistributedArray(dist_den_1_freq.data,
+                                                         self.comm,
+                                                         distribute=False)
+            else:
+                distributed_density_1.append(dist_den_1_freq, axis=1)
+
+            if distributed_density_2 is None:
+                distributed_density_2 = DistributedArray(dist_den_2_freq.data,
+                                                         self.comm,
+                                                         distribute=False)
+            else:
+                distributed_density_2.append(dist_den_2_freq, axis=1)
+
+        return distributed_density_1, distributed_density_2
 
     def get_fock_dict_II(self, wi, density_list1, density_list2, mo, molecule,
                          ao_basis, dft_dict, profiler):
@@ -649,7 +720,7 @@ class TpaReducedDriver(TpaDriver):
 
         return focks
 
-    def get_e3(self, wi, kX, kXY, fo, fo2, nocc, norb):
+    def get_e3(self, wi, Nx, Nxy, fo, fo2, nocc, norb):
         """
         Contracts E[3]NxNyz for the isotropic cubic response function. Takes
         the Fock matrices from fock_dict and fock_dict_II and contracts them
@@ -657,10 +728,10 @@ class TpaReducedDriver(TpaDriver):
 
         :param wi:
              A list of freqs
-        :param kX:
-            A dict of the single index response matricies
-        :param kXY:
-            A dict of the two index response matrices
+        :param Nx:
+            A dict of the single index response vectors in distributed form
+        :param Nxy:
+            A dict of the two index response vectors in distributed form
         :param fo:
             A dictonary of transformed Fock matricies from fock_dict
         :param fo2:
@@ -698,6 +769,23 @@ class TpaReducedDriver(TpaDriver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
+            nx = self._get_full_solution_vector(Nx[('x', w)])
+            ny = self._get_full_solution_vector(Nx[('y', w)])
+            nz = self._get_full_solution_vector(Nx[('z', w)])
+
+            n_sig_xx = self._get_full_solution_vector(Nxy[(('N_sig_xx', w),
+                                                           2 * w)])
+            n_sig_yy = self._get_full_solution_vector(Nxy[(('N_sig_yy', w),
+                                                           2 * w)])
+            n_sig_zz = self._get_full_solution_vector(Nxy[(('N_sig_zz', w),
+                                                           2 * w)])
+            n_sig_xy = self._get_full_solution_vector(Nxy[(('N_sig_xy', w),
+                                                           2 * w)])
+            n_sig_xz = self._get_full_solution_vector(Nxy[(('N_sig_xz', w),
+                                                           2 * w)])
+            n_sig_yz = self._get_full_solution_vector(Nxy[(('N_sig_yz', w),
+                                                           2 * w)])
+
             if self.rank != mpi_master():
                 continue
 
@@ -722,21 +810,20 @@ class TpaReducedDriver(TpaDriver):
 
             # Response #
 
-            k_x = kX['Nb'][('x', w)].T
-            k_y = kX['Nb'][('y', w)].T
-            k_z = kX['Nb'][('z', w)].T
+            k_x = (self.complex_lrvec2mat(nx, nocc, norb)).T
+            k_y = (self.complex_lrvec2mat(ny, nocc, norb)).T
+            k_z = (self.complex_lrvec2mat(nz, nocc, norb)).T
 
             k_x_ = -k_x.conj().T  # kX['Nc'][('x', -w)].T
             k_y_ = -k_y.conj().T  # kX['Nc'][('y', -w)].T
             k_z_ = -k_z.conj().T  # kX['Nc'][('z', -w)].T
 
-            k_sig_xx = kXY[(('N_sig_xx', w), 2 * w)].T
-            k_sig_yy = kXY[(('N_sig_yy', w), 2 * w)].T
-            k_sig_zz = kXY[(('N_sig_zz', w), 2 * w)].T
-
-            k_sig_xy = kXY[(('N_sig_xy', w), 2 * w)].T
-            k_sig_xz = kXY[(('N_sig_xz', w), 2 * w)].T
-            k_sig_yz = kXY[(('N_sig_yz', w), 2 * w)].T
+            k_sig_xx = (self.complex_lrvec2mat(n_sig_xx, nocc, norb)).T
+            k_sig_yy = (self.complex_lrvec2mat(n_sig_yy, nocc, norb)).T
+            k_sig_zz = (self.complex_lrvec2mat(n_sig_zz, nocc, norb)).T
+            k_sig_xy = (self.complex_lrvec2mat(n_sig_xy, nocc, norb)).T
+            k_sig_xz = (self.complex_lrvec2mat(n_sig_xz, nocc, norb)).T
+            k_sig_yz = (self.complex_lrvec2mat(n_sig_yz, nocc, norb)).T
 
             # x #
 
@@ -779,7 +866,7 @@ class TpaReducedDriver(TpaDriver):
 
         return {'f_iso_x': f_iso_x, 'f_iso_y': f_iso_y, 'f_iso_z': f_iso_z}
 
-    def get_other_terms(self, wi, track, X, kX, kXY, da, nocc, norb):
+    def get_other_terms(self, wi, track, X, Nx, Nxy, da, nocc, norb):
         """
         Computes the terms involving X[2],A[2] in the reduced isotropic cubic
         response function
@@ -791,10 +878,11 @@ class TpaReducedDriver(TpaDriver):
             to be computed and which freqs
         :param X:
             A dictonray with all the property integral matricies
-        :param kX:
-            A dictonary with all the respone matricies
-        :param kXY:
-            A dictonary containing all the two-index response matricies
+        :param Nx:
+            A dictonary with all the respone vectors in distributed form
+        :param Nxy:
+            A dictonary containing all the two-index response vectors in
+            distributed form
         :param da:
             The SCF density matrix in MO basis
         :param nocc:
@@ -824,49 +912,37 @@ class TpaReducedDriver(TpaDriver):
             wbd = wb + wd
 
             for op_a in 'xyz':
-                Na_ka = kX['Na'][(op_a, wa)]
+                Na = Nx[(op_a, wa)]
                 A = X[op_a]
 
                 for op_c in 'xyz':
                     op_ac = op_a + op_c if op_a <= op_c else op_c + op_a
 
                     # BD
-                    kbd = kXY[(('N_sig_' + op_ac, w), wbd)]
-                    kc_kb = kX['Nb'][(op_c, -wc)]
+                    Nbd = Nxy[(('N_sig_' + op_ac, w), wbd)]
+                    Nc = Nx[(op_c, -wc)]
                     C = X[op_c]
 
                     inp_list.append({
                         'flag': 'BD',
                         'freq': w,
-                        'kbd': kbd,
-                        'Na_ka': Na_ka,
-                        'kc_kb': kc_kb,
+                        'Nbd': Nbd,
+                        'Na': Na,
+                        'Nc': Nc,
                         'A': A,
                         'C': C,
                     })
 
-        ave, res = divmod(len(inp_list), self.nodes)
-        counts = [ave + 1 if p < res else ave for p in range(self.nodes)]
-        starts = [sum(counts[:p]) for p in range(self.nodes)]
-        ends = [sum(counts[:p + 1]) for p in range(self.nodes)]
-
-        list_x2_a2 = [
-            self.get_x2_a2(inp, da, nocc, norb)
-            for inp in inp_list[starts[self.rank]:ends[self.rank]]
-        ]
-
-        list_x2_a2 = self.comm.gather(list_x2_a2, root=mpi_master())
+        list_x2_a2 = [self.get_x2_a2(inp, da, nocc, norb) for inp in inp_list]
 
         if self.rank == mpi_master():
             for terms in list_x2_a2:
-                for term in terms:
-                    key = term['key']
-                    if key not in na_x2_nyz_dict:
-                        na_x2_nyz_dict[key] = 0.0
-                    if key not in nx_a2_nyz_dict:
-                        nx_a2_nyz_dict[key] = 0.0
-                    na_x2_nyz_dict[key] += term['x2']
-                    nx_a2_nyz_dict[key] += term['a2']
+                if terms['key'] not in na_x2_nyz_dict:
+                    na_x2_nyz_dict[terms['key']] = 0.0
+                if terms['key'] not in nx_a2_nyz_dict:
+                    nx_a2_nyz_dict[terms['key']] = 0.0
+                na_x2_nyz_dict[terms['key']] += terms['x2']
+                nx_a2_nyz_dict[terms['key']] += terms['a2']
 
             return {
                 'NaX2Nyz': na_x2_nyz_dict,
