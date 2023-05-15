@@ -140,7 +140,7 @@ def get_atom_ecp(identifier,
     ang_mom_labels = ['S', 'P', 'D', 'F', 'G', 'H', 'I']
     
     atom_ecp_str = f'\n@ATOMECP {elem_labels[int(identifier)].upper()}\n'
-    atom_ecp_str = f'NELEC {ecp_elec}\n'
+    atom_ecp_str += f'NELEC {ecp_elec}\n'
     
     # local potential part
     
