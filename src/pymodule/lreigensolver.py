@@ -249,8 +249,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
         profiler.check_memory_usage('Initial guess')
 
-        excitations = {}
-        exresiduals = {}
+        exc_energies = {}
+        exc_solutions = {}
+        exc_residuals = {}
         relative_residual_norm = {}
 
         signal_handler = SignalHandler()
@@ -360,9 +361,10 @@ class LinearResponseEigenSolver(LinearSolver):
                     relative_residual_norm[k] = 2.0 * rn
 
                 if relative_residual_norm[k] < self.conv_thresh:
-                    excitations[k] = (w, x)
+                    exc_energies[k] = w
+                    exc_solutions[k] = x
                 else:
-                    exresiduals[k] = (w, r)
+                    exc_residuals[k] = r
 
             # write to output
             if self.rank == mpi_master():
@@ -380,8 +382,8 @@ class LinearResponseEigenSolver(LinearSolver):
                         'dist_bung': self._dist_bung,
                         'dist_e2bger': self._dist_e2bger,
                         'dist_e2bung': self._dist_e2bung,
-                        'exsolutions': excitations,
-                        'exresiduals': exresiduals,
+                        'exc_solutions': exc_solutions,
+                        'exc_residuals': exc_residuals,
                     }, self.ostream)
 
                 profiler.check_memory_usage(
@@ -408,9 +410,9 @@ class LinearResponseEigenSolver(LinearSolver):
             }
 
             new_trials_ger, new_trials_ung = self._setup_trials(
-                exresiduals, precond, self._dist_bger, self._dist_bung)
+                exc_residuals, precond, self._dist_bger, self._dist_bung)
 
-            exresiduals.clear()
+            exc_residuals.clear()
 
             profiler.stop_timer('Orthonorm.')
 
@@ -460,18 +462,13 @@ class LinearResponseEigenSolver(LinearSolver):
             mdip_grad = self.get_prop_grad('magnetic dipole', 'xyz', molecule,
                                            basis, scf_tensors)
 
-            eigvals = np.array([excitations[s][0] for s in range(self.nstates)])
+            eigvals = np.array([exc_energies[s] for s in range(self.nstates)])
 
             elec_trans_dipoles = np.zeros((self.nstates, 3))
             velo_trans_dipoles = np.zeros((self.nstates, 3))
             magn_trans_dipoles = np.zeros((self.nstates, 3))
 
-            key_0 = list(excitations.keys())[0]
-            x_0 = self._get_full_solution_vector(excitations[key_0][1])
-
             if self.rank == mpi_master():
-                eigvecs = np.zeros((x_0.size, self.nstates))
-
                 # create h5 file for response solutions
                 if (self.save_solutions and self.checkpoint_file is not None):
                     final_h5_fname = str(
@@ -487,7 +484,7 @@ class LinearResponseEigenSolver(LinearSolver):
             excitation_details = []
 
             for s in range(self.nstates):
-                eigvec = self._get_full_solution_vector(excitations[s][1])
+                eigvec = self.get_full_solution_vector(exc_solutions[s])
 
                 if self.rank == mpi_master():
                     if self.core_excitation:
@@ -561,8 +558,6 @@ class LinearResponseEigenSolver(LinearSolver):
                         magn_trans_dipoles[s, ind] = np.vdot(
                             mdip_grad[ind], eigvec)
 
-                    eigvecs[:, s] = eigvec[:]
-
                     # write to h5 file for response solutions
                     if (self.save_solutions and
                             self.checkpoint_file is not None):
@@ -586,7 +581,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 ret_dict = {
                     'eigenvalues': eigvals,
-                    'eigenvectors': eigvecs,
+                    'eigenvectors_distributed': exc_solutions,
                     'electric_transition_dipoles': elec_trans_dipoles,
                     'velocity_transition_dipoles': velo_trans_dipoles,
                     'magnetic_transition_dipoles': magn_trans_dipoles,
@@ -611,10 +606,16 @@ class LinearResponseEigenSolver(LinearSolver):
                 self._print_results(ret_dict)
 
                 return ret_dict
+            else:
+                return {
+                    'eigenvalues': eigvals,
+                    'eigenvectors_distributed': exc_solutions,
+                }
 
         return None
 
-    def _get_full_solution_vector(self, solution):
+    @staticmethod
+    def get_full_solution_vector(solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -628,7 +629,7 @@ class LinearResponseEigenSolver(LinearSolver):
         x_ger = solution.get_full_vector(0)
         x_ung = solution.get_full_vector(1)
 
-        if self.rank == mpi_master():
+        if solution.rank == mpi_master():
             x_ger_full = np.hstack((x_ger, x_ger))
             x_ung_full = np.hstack((x_ung, -x_ung))
             return x_ger_full + x_ung_full
@@ -718,16 +719,16 @@ class LinearResponseEigenSolver(LinearSolver):
             else:
                 X = None
 
-            final[k] = (w[(i, a)], DistributedArray(X, self.comm))
+            final[k] = DistributedArray(X, self.comm)
 
         return final
 
-    def _precond_trials(self, excitations, precond):
+    def _precond_trials(self, vectors, precond):
         """
         Applies preconditioner to distributed trial vectors.
 
-        :param excitations:
-            The set of excitations.
+        :param vectors:
+            The set of vectors.
         :param precond:
             The preconditioner.
 
@@ -738,7 +739,7 @@ class LinearResponseEigenSolver(LinearSolver):
         trials_ger = []
         trials_ung = []
 
-        for k, (w, X) in excitations.items():
+        for k, X in vectors.items():
             if precond is not None:
                 v = self._preconditioning(precond[k], X)
             else:
@@ -903,7 +904,7 @@ class LinearResponseEigenSolver(LinearSolver):
                 Xn_ung.reshape(-1, 1),
             ))
 
-            igs[i] = (1.0, DistributedArray(X, self.comm))
+            igs[i] = DistributedArray(X, self.comm)
 
         bger, bung = self._setup_trials(igs, precond=None, renormalize=False)
 
@@ -921,7 +922,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
             e2b = DistributedArray(e2b_data, self.comm, distribute=False)
 
-            sigma = self._get_full_solution_vector(e2b)
+            sigma = self.get_full_solution_vector(e2b)
 
             if self.rank == mpi_master():
                 E2[:, i] = sigma[:]
