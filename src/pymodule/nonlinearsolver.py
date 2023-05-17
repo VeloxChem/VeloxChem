@@ -637,7 +637,8 @@ class NonlinearSolver:
                     size_1, size_2 = 6, 6
 
                 if mode_is_cubic:
-                    batch_size = max((batch_size // size_3) * size_3, size_3)
+                    batch_size = max((batch_size // (size_2 + size_3)) * size_3,
+                                     size_3)
                     batch_size_second_order = (batch_size // size_3) * size_2
                     batch_size_first_order = (batch_size // size_3) * size_1
 
