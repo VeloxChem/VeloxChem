@@ -982,9 +982,6 @@ class ExcitonModelDriver:
 
         # TDA results
         if self.rank == mpi_master():
-            abs_spec.print_property(self.ostream)
-            self.ostream.flush()
-
             tda_results = {
                 'exc_energies': abs_spec.get_property('eigenvalues').copy(),
                 'exc_vectors': abs_spec.get_property('eigenvectors').copy(),

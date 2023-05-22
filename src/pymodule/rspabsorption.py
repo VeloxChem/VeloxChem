@@ -69,26 +69,3 @@ class Absorption(ResponseProperty):
             rsp_dict['tamm_dancoff'] = 'no'
 
         super().__init__(rsp_dict, method_dict)
-
-    def get_property(self, key):
-        """
-        Gets excitation energies, CI vectors, or oscillator stengths.
-
-        :param key:
-            The keyword to the absorption property.
-
-        :return:
-            The absorption property.
-        """
-
-        return self._rsp_property[key]
-
-    def print_property(self, ostream):
-        """
-        Prints absorption to output stream.
-
-        :param ostream:
-            The output stream.
-        """
-
-        pass

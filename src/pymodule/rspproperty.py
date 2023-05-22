@@ -226,12 +226,6 @@ class ResponseProperty:
         self._rsp_property = self._rsp_driver.compute(molecule, basis,
                                                       scf_tensors)
 
-        if not self.is_converged:
-            return
-
-        if self._rsp_driver.rank == mpi_master():
-            self.print_property(self._rsp_driver.ostream)
-
     @property
     def rsp_driver(self):
         """
@@ -267,14 +261,4 @@ class ResponseProperty:
             The property.
         """
 
-        return None
-
-    def print_property(self, ostream):
-        """
-        Prints response property/spectroscopy to output stream.
-
-        :param ostream:
-            The output stream.
-        """
-
-        return
+        return self._rsp_property[key]

@@ -398,8 +398,6 @@ class TrajectoryDriver:
             abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_tensors)
 
             if local_rank == mpi_master():
-                abs_spec.print_property(ostream)
-
                 excitation_energies = abs_spec.get_property('eigenvalues')
                 oscillator_strengths = abs_spec.get_property(
                     'oscillator_strengths')

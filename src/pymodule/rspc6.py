@@ -74,26 +74,3 @@ class C6(ResponseProperty):
             rsp_dict['w0'] = '0.3'
 
         super().__init__(rsp_dict, method_dict)
-
-    def get_property(self, key):
-        """
-        Gets excitation energies, CI vectors, or oscillator stengths.
-
-        :param key:
-            The keyword to the C6 property.
-
-        :return:
-            The C6 property.
-        """
-
-        return self._rsp_property[key]
-
-    def print_property(self, ostream):
-        """
-        Prints response property to output stream.
-
-        :param ostream:
-            The output stream.
-        """
-
-        pass

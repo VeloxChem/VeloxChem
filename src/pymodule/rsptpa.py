@@ -65,16 +65,3 @@ class TPA(ResponseProperty):
             rsp_dict['frequencies'] = '0'
 
         super().__init__(rsp_dict, method_dict)
-
-    def get_property(self, key):
-        """
-        Gets response functions or solutions.
-
-        :param key:
-            The keyword.
-
-        :return:
-            The response functions or solutions.
-        """
-
-        return self._rsp_property[key]
