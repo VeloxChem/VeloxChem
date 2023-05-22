@@ -419,15 +419,18 @@ class ShgDriver(NonlinearSolver):
         for (wb, wc) in freqpairs:
 
             Na = {
-                'x': self._get_full_solution_vector(Nx[('x', (wb + wc))]),
-                'y': self._get_full_solution_vector(Nx[('y', (wb + wc))]),
-                'z': self._get_full_solution_vector(Nx[('z', (wb + wc))]),
+                'x': ComplexResponse.get_full_solution_vector(Nx[('x',
+                                                                  (wb + wc))]),
+                'y': ComplexResponse.get_full_solution_vector(Nx[('y',
+                                                                  (wb + wc))]),
+                'z': ComplexResponse.get_full_solution_vector(Nx[('z',
+                                                                  (wb + wc))]),
             }
 
             Nb = {
-                'x': self._get_full_solution_vector(Nx[('x', wb)]),
-                'y': self._get_full_solution_vector(Nx[('y', wb)]),
-                'z': self._get_full_solution_vector(Nx[('z', wb)]),
+                'x': ComplexResponse.get_full_solution_vector(Nx[('x', wb)]),
+                'y': ComplexResponse.get_full_solution_vector(Nx[('y', wb)]),
+                'z': ComplexResponse.get_full_solution_vector(Nx[('z', wb)]),
             }
 
             if self.rank == mpi_master():
@@ -517,9 +520,9 @@ class ShgDriver(NonlinearSolver):
 
         for (wb, wc) in freqpairs:
 
-            nx = self._get_full_solution_vector(Nx[('x', wb)])
-            ny = self._get_full_solution_vector(Nx[('y', wb)])
-            nz = self._get_full_solution_vector(Nx[('z', wb)])
+            nx = ComplexResponse.get_full_solution_vector(Nx[('x', wb)])
+            ny = ComplexResponse.get_full_solution_vector(Nx[('y', wb)])
+            nz = ComplexResponse.get_full_solution_vector(Nx[('z', wb)])
 
             if self.rank == mpi_master():
 
@@ -764,9 +767,9 @@ class ShgDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            nx = self._get_full_solution_vector(Nx[('x', wb)])
-            ny = self._get_full_solution_vector(Nx[('y', wb)])
-            nz = self._get_full_solution_vector(Nx[('z', wb)])
+            nx = ComplexResponse.get_full_solution_vector(Nx[('x', wb)])
+            ny = ComplexResponse.get_full_solution_vector(Nx[('y', wb)])
+            nz = ComplexResponse.get_full_solution_vector(Nx[('z', wb)])
 
             if self.rank != mpi_master():
                 continue

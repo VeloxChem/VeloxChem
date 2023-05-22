@@ -1460,28 +1460,3 @@ class NonlinearSolver:
 
         return (LinearSolver.lrmat2vec(mat.real, nocc, norb) +
                 1j * LinearSolver.lrmat2vec(mat.imag, nocc, norb))
-
-    def _get_full_solution_vector(self, solution):
-        """
-        Gets a full solution vector from the distributed solution.
-
-        :param solution:
-            The distributed solution as a tuple.
-
-        :return:
-            The full solution vector.
-        """
-
-        x_realger = solution.get_full_vector(0)
-        x_realung = solution.get_full_vector(1)
-        x_imagung = solution.get_full_vector(2)
-        x_imagger = solution.get_full_vector(3)
-
-        if self.rank == mpi_master():
-            x_real = np.hstack((x_realger, x_realger)) + np.hstack(
-                (x_realung, -x_realung))
-            x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
-                (x_imagger, x_imagger))
-            return x_real + 1j * x_imag
-        else:
-            return None

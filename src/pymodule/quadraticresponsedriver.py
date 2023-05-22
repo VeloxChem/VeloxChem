@@ -334,9 +334,9 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         for (wb, wc) in freqpairs:
 
-            Na = self._get_full_solution_vector(Nx[('A', (wb + wc))])
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
+            Na = ComplexResponse.get_full_solution_vector(Nx[('A', (wb + wc))])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
 
             if self.rank == mpi_master():
 
@@ -418,8 +418,8 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         for (wb, wc) in freqpairs:
 
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
 
             if self.rank == mpi_master():
 
@@ -594,8 +594,8 @@ class QuadraticResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
 
             if self.rank != mpi_master():
                 continue

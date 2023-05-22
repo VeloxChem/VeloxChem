@@ -109,9 +109,9 @@ class TpaReducedDriver(TpaDriver):
 
         for w in wi:
 
-            nx = self._get_full_solution_vector(Nx[('x', w)])
-            ny = self._get_full_solution_vector(Nx[('y', w)])
-            nz = self._get_full_solution_vector(Nx[('z', w)])
+            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
+            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
+            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
 
             if self.rank == mpi_master():
 
@@ -398,9 +398,9 @@ class TpaReducedDriver(TpaDriver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            nx = self._get_full_solution_vector(Nx[('x', w)])
-            ny = self._get_full_solution_vector(Nx[('y', w)])
-            nz = self._get_full_solution_vector(Nx[('z', w)])
+            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
+            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
+            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
 
             if self.rank != mpi_master():
                 continue
@@ -505,22 +505,22 @@ class TpaReducedDriver(TpaDriver):
 
         for w in wi:
 
-            nx = self._get_full_solution_vector(Nx[('x', w)])
-            ny = self._get_full_solution_vector(Nx[('y', w)])
-            nz = self._get_full_solution_vector(Nx[('z', w)])
+            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
+            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
+            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
 
-            n_sig_xx = self._get_full_solution_vector(Nxy[(('N_sig_xx', w),
-                                                           2 * w)])
-            n_sig_yy = self._get_full_solution_vector(Nxy[(('N_sig_yy', w),
-                                                           2 * w)])
-            n_sig_zz = self._get_full_solution_vector(Nxy[(('N_sig_zz', w),
-                                                           2 * w)])
-            n_sig_xy = self._get_full_solution_vector(Nxy[(('N_sig_xy', w),
-                                                           2 * w)])
-            n_sig_xz = self._get_full_solution_vector(Nxy[(('N_sig_xz', w),
-                                                           2 * w)])
-            n_sig_yz = self._get_full_solution_vector(Nxy[(('N_sig_yz', w),
-                                                           2 * w)])
+            n_sig_xx = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_xx', w), 2 * w)])
+            n_sig_yy = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_yy', w), 2 * w)])
+            n_sig_zz = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_zz', w), 2 * w)])
+            n_sig_xy = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_xy', w), 2 * w)])
+            n_sig_xz = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_xz', w), 2 * w)])
+            n_sig_yz = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_yz', w), 2 * w)])
 
             if self.rank == mpi_master():
 
@@ -769,22 +769,22 @@ class TpaReducedDriver(TpaDriver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            nx = self._get_full_solution_vector(Nx[('x', w)])
-            ny = self._get_full_solution_vector(Nx[('y', w)])
-            nz = self._get_full_solution_vector(Nx[('z', w)])
+            nx = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
+            ny = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
+            nz = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
 
-            n_sig_xx = self._get_full_solution_vector(Nxy[(('N_sig_xx', w),
-                                                           2 * w)])
-            n_sig_yy = self._get_full_solution_vector(Nxy[(('N_sig_yy', w),
-                                                           2 * w)])
-            n_sig_zz = self._get_full_solution_vector(Nxy[(('N_sig_zz', w),
-                                                           2 * w)])
-            n_sig_xy = self._get_full_solution_vector(Nxy[(('N_sig_xy', w),
-                                                           2 * w)])
-            n_sig_xz = self._get_full_solution_vector(Nxy[(('N_sig_xz', w),
-                                                           2 * w)])
-            n_sig_yz = self._get_full_solution_vector(Nxy[(('N_sig_yz', w),
-                                                           2 * w)])
+            n_sig_xx = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_xx', w), 2 * w)])
+            n_sig_yy = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_yy', w), 2 * w)])
+            n_sig_zz = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_zz', w), 2 * w)])
+            n_sig_xy = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_xy', w), 2 * w)])
+            n_sig_xz = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_xz', w), 2 * w)])
+            n_sig_yz = ComplexResponse.get_full_solution_vector(
+                Nxy[(('N_sig_yz', w), 2 * w)])
 
             if self.rank != mpi_master():
                 continue

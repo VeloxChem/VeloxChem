@@ -382,14 +382,18 @@ class CubicResponseDriver(NonlinearSolver):
 
         for (wb, wc, wd) in freqtriples:
 
-            Na = self._get_full_solution_vector(Nx[('A', (wb + wc + wd))])
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
-            Nd = self._get_full_solution_vector(Nx[('D', wd)])
+            Na = ComplexResponse.get_full_solution_vector(Nx[('A',
+                                                              (wb + wc + wd))])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = self._get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
-            Nbd = self._get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
-            Ncd = self._get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
+            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(('BC', wb, wc),
+                                                                wb + wc)])
+            Nbd = ComplexResponse.get_full_solution_vector(Nxy[(('BD', wb, wd),
+                                                                wb + wd)])
+            Ncd = ComplexResponse.get_full_solution_vector(Nxy[(('CD', wc, wd),
+                                                                wc + wd)])
 
             if self.rank == mpi_master():
 
@@ -553,13 +557,16 @@ class CubicResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
-            Nd = self._get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = self._get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
-            Nbd = self._get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
-            Ncd = self._get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
+            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(('BC', wb, wc),
+                                                                wb + wc)])
+            Nbd = ComplexResponse.get_full_solution_vector(Nxy[(('BD', wb, wd),
+                                                                wb + wd)])
+            Ncd = ComplexResponse.get_full_solution_vector(Nxy[(('CD', wc, wd),
+                                                                wc + wd)])
 
             if self.rank != mpi_master():
                 continue
@@ -632,9 +639,9 @@ class CubicResponseDriver(NonlinearSolver):
 
             # convert response matrix to ao basis #
 
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
-            Nd = self._get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
 
             if self.rank == mpi_master():
 
@@ -765,13 +772,16 @@ class CubicResponseDriver(NonlinearSolver):
 
         for (wb, wc, wd) in freqtriples:
 
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
-            Nd = self._get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
 
-            Nbc = self._get_full_solution_vector(Nxy[(('BC', wb, wc), wb + wc)])
-            Nbd = self._get_full_solution_vector(Nxy[(('BD', wb, wd), wb + wd)])
-            Ncd = self._get_full_solution_vector(Nxy[(('CD', wc, wd), wc + wd)])
+            Nbc = ComplexResponse.get_full_solution_vector(Nxy[(('BC', wb, wc),
+                                                                wb + wc)])
+            Nbd = ComplexResponse.get_full_solution_vector(Nxy[(('BD', wb, wd),
+                                                                wb + wd)])
+            Ncd = ComplexResponse.get_full_solution_vector(Nxy[(('CD', wc, wd),
+                                                                wc + wd)])
 
             if self.rank == mpi_master():
 
@@ -1078,10 +1088,11 @@ class CubicResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Na = self._get_full_solution_vector(Nx[('A', (wb + wc + wd))])
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
-            Nd = self._get_full_solution_vector(Nx[('D', wd)])
+            Na = ComplexResponse.get_full_solution_vector(Nx[('A',
+                                                              (wb + wc + wd))])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
 
             if self.rank != mpi_master():
                 continue
@@ -1188,9 +1199,9 @@ class CubicResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
-            Nb = self._get_full_solution_vector(Nx[('B', wb)])
-            Nc = self._get_full_solution_vector(Nx[('C', wc)])
-            Nd = self._get_full_solution_vector(Nx[('D', wd)])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+            Nd = ComplexResponse.get_full_solution_vector(Nx[('D', wd)])
 
             if self.rank != mpi_master():
                 continue

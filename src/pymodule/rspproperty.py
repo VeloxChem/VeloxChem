@@ -262,3 +262,17 @@ class ResponseProperty:
         """
 
         return self._rsp_property[key]
+
+    def get_full_solution_vector(self, key):
+        """
+        Gets response solution vector for a given key.
+
+        :param key:
+            The key for the solution vector.
+
+        :return:
+            The solution vector.
+        """
+
+        return self._rsp_driver.get_full_solution_vector(
+            self._rsp_property['solutions'][key])

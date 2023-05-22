@@ -686,9 +686,9 @@ class TpaDriver(NonlinearSolver):
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            na_x = self._get_full_solution_vector(Nx[('x', w)])
-            na_y = self._get_full_solution_vector(Nx[('y', w)])
-            na_z = self._get_full_solution_vector(Nx[('z', w)])
+            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
+            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
+            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
 
             if self.rank == mpi_master():
 
@@ -742,15 +742,15 @@ class TpaDriver(NonlinearSolver):
         w = inp_dict['freq']
         A = inp_dict['A']
 
-        Na = self._get_full_solution_vector(inp_dict['Na'])
+        Na = ComplexResponse.get_full_solution_vector(inp_dict['Na'])
 
         if inp_dict['flag'] == 'CD':
-            Ncd = self._get_full_solution_vector(inp_dict['Ncd'])
-            Nb = self._get_full_solution_vector(inp_dict['Nb'])
+            Ncd = ComplexResponse.get_full_solution_vector(inp_dict['Ncd'])
+            Nb = ComplexResponse.get_full_solution_vector(inp_dict['Nb'])
 
         elif inp_dict['flag'] == 'BD':
-            Nbd = self._get_full_solution_vector(inp_dict['Nbd'])
-            Nc = self._get_full_solution_vector(inp_dict['Nc'])
+            Nbd = ComplexResponse.get_full_solution_vector(inp_dict['Nbd'])
+            Nc = ComplexResponse.get_full_solution_vector(inp_dict['Nc'])
 
         if self.rank == mpi_master():
 
