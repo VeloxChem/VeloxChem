@@ -1,5 +1,4 @@
 from mpi4py import MPI
-import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.outputstream import OutputStream
@@ -10,7 +9,6 @@ from veloxchem.cppsolver import ComplexResponse
 from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 
 
-@pytest.mark.solvers
 class TestQrfFD:
 
     def run_qrf_fd(self, xcfun_label, basis_set_label, components, freqs):

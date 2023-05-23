@@ -1,7 +1,7 @@
 from mpi4py import MPI
 import pytest
 
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import is_single_node, is_mpi_master
 from veloxchem.outputstream import OutputStream
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -10,7 +10,6 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.cubicresponsedriver import CubicResponseDriver
 
 
-@pytest.mark.solvers
 class TestCrfFD:
 
     def run_crf_fd(self, xcfun_label, basis_set_label, components, freqs):
@@ -177,6 +176,8 @@ class TestCrfFD:
 
         self.run_crf_fd('pbe0', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
 
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
     def test_mgga_crf_fd(self):
 
+        # Note: this test is expensive and we skip it on single-node runs
         self.run_crf_fd('tpssh', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])

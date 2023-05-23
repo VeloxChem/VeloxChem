@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
@@ -10,7 +9,6 @@ from veloxchem.quadraticresponsedriver import QuadraticResponseDriver
 from veloxchem.shgdriver import ShgDriver
 
 
-@pytest.mark.solvers
 class TestShgFromQrf:
 
     def run_shg_from_qrf(self, xcfun_label):

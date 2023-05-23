@@ -1,5 +1,3 @@
-import pytest
-
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -8,7 +6,6 @@ from veloxchem.cubicresponsedriver import CubicResponseDriver
 from veloxchem.tpafulldriver import TpaFullDriver
 
 
-@pytest.mark.solvers
 class TestTpaFromCrf:
 
     def test_tpa_from_crf(self):

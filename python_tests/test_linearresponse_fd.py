@@ -1,5 +1,4 @@
 from mpi4py import MPI
-import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.outputstream import OutputStream
@@ -10,7 +9,6 @@ from veloxchem.rsppolarizability import Polarizability
 from veloxchem.firstorderprop import FirstOrderProperties
 
 
-@pytest.mark.solvers
 class TestLrfFD:
 
     def run_lrf_fd(self, xcfun_label):
