@@ -55,6 +55,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level
+from .sanitychecks import molecule_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_tensors
 
@@ -519,6 +520,9 @@ class ScfDriver:
             else:
                 min_basis = MolecularBasis()
             min_basis.broadcast(self.rank, self.comm)
+
+        # check molecule
+        molecule_sanity_check(molecule)
 
         # check dft setup
         self._dft_sanity_check()
