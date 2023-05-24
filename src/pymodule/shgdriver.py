@@ -38,6 +38,7 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .firstorderprop import FirstOrderProperties
+from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -146,7 +147,7 @@ class ShgDriver(NonlinearSolver):
         self._check_scf_results(scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check_nonlinrsp()
+        dft_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': self.timing,
@@ -218,8 +219,10 @@ class ShgDriver(NonlinearSolver):
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('xyz', a_grad) for w in wa}
-            B = {(op, w): v for op, v in zip('xyz', b_grad)
-                 for w in self.frequencies}
+            B = {
+                (op, w): v for op, v in zip('xyz', b_grad)
+                for w in self.frequencies
+            }
 
             AB.update(A)
             AB.update(B)

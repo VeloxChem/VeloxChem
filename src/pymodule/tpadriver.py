@@ -34,6 +34,7 @@ from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
+from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 
 
@@ -117,7 +118,7 @@ class TpaDriver(NonlinearSolver):
         self._check_scf_results(scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check_nonlinrsp()
+        dft_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': self.timing,
@@ -174,8 +175,10 @@ class TpaDriver(NonlinearSolver):
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():
-            v_grad = {(op, w): v for op, v in zip(component, b_grad)
-                      for w in self.frequencies}
+            v_grad = {
+                (op, w): v for op, v in zip(component, b_grad)
+                for w in self.frequencies
+            }
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
                 'y': 2 * self.ao2mo(mo, dipole_mats.y_to_numpy()),

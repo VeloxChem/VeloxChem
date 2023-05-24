@@ -31,11 +31,11 @@ from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import XCIntegrator, GridDriver, MolecularGrid
 from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat, fockmat
-from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
+from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
@@ -228,8 +228,7 @@ class NonlinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['response'].items()
+            key: val[0] for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -248,7 +247,7 @@ class NonlinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        self._dft_sanity_check_nonlinrsp('update_settings')
+        dft_sanity_check(self, 'update_settings', 'nonlinear')
 
         if self.potfile is not None:
             errmsg = 'NonlinearSolver: The \'potfile\' keyword is not supported '
@@ -318,49 +317,6 @@ class NonlinearSolver:
                 self.ostream.print_header(warn_msg)
                 warn_msg = '*** Please double check. ***'
                 self.ostream.print_header(warn_msg)
-
-    def _dft_sanity_check_nonlinrsp(self, flag='compute'):
-        """
-        Checks DFT settings and updates relevant attributes.
-
-        :param flag:
-            The flag indicating the routine in which the sanity check is
-            being called.
-        """
-
-        # Hartree-Fock: xcfun is None or 'hf'
-        if (self.xcfun is None or
-            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
-            self._dft = False
-
-        # DFT: xcfun is functional object or string (other than 'hf')
-        else:
-            if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'NonlinearSolver: Undefined XC functional')
-            self._dft = True
-
-        # check grid level
-        if self._dft and self.grid_level is not None:
-            if (self.grid_level < 1 or self.grid_level > 8):
-                warn_msg = f'Warning: Invalid DFT grid level {self.grid_level}. '
-                warn_msg += 'Using default value.'
-                self.ostream.print_warning(warn_msg)
-                self.grid_level = None
-            elif (flag == 'compute' and
-                  self.grid_level < get_default_grid_level(self.xcfun)):
-                warn_msg = 'DFT grid level is below the recommended value. '
-                warn_msg += 'Please double check.'
-                self.ostream.print_warning(warn_msg)
-            self.ostream.flush()
-
-        # check if SCAN family of functional is used in nonliear response
-        if self._dft:
-            err_msg_scan = 'NonlinearSolver: Nonlinear response with '
-            err_msg_scan += 'SCAN family of functional is not supported'
-            assert_msg_critical(
-                'scan' not in self.xcfun.get_func_label().lower(), err_msg_scan)
 
     def _init_eri(self, molecule, basis):
         """
