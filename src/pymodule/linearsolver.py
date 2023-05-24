@@ -319,63 +319,6 @@ class LinearSolver:
             # field
             self.restart = False
 
-    def _check_scf_results(self, scf_results):
-        """
-        Checks SCF results for ERI, DFT and PE information.
-
-        :param scf_results:
-            A dictionary containing SCF results.
-        """
-
-        updated_scf_info = {}
-
-        if self.rank == mpi_master():
-            if scf_results.get('eri_thresh', None) is not None:
-                updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
-
-            if scf_results.get('qq_type', None) is not None:
-                updated_scf_info['qq_type'] = scf_results['qq_type']
-
-            if scf_results.get('restart', None) is not None:
-                # do not restart if scf is not restarted from checkpoint
-                if not scf_results['restart']:
-                    updated_scf_info['restart'] = scf_results['restart']
-
-            if scf_results.get('xcfun', None) is not None:
-                # do not overwrite xcfun if it is already specified
-                if self.xcfun is None:
-                    updated_scf_info['xcfun'] = scf_results['xcfun']
-                    if 'grid_level' in scf_results:
-                        updated_scf_info['grid_level'] = scf_results[
-                            'grid_level']
-
-            if scf_results.get('potfile', None) is not None:
-                # do not overwrite potfile if it is already specified
-                if self.potfile is None:
-                    updated_scf_info['potfile'] = scf_results['potfile']
-
-        updated_scf_info = self.comm.bcast(updated_scf_info, root=mpi_master())
-
-        for key, val in updated_scf_info.items():
-            setattr(self, key, val)
-
-        # double check xcfun in SCF and response
-
-        if self.rank == mpi_master():
-            scf_xcfun_label = scf_results.get('xcfun', 'HF').upper()
-            if self.xcfun is None:
-                rsp_xcfun_label = 'HF'
-            elif isinstance(self.xcfun, str):
-                rsp_xcfun_label = self.xcfun.upper()
-            else:
-                rsp_xcfun_label = self.xcfun.get_func_label().upper()
-            if rsp_xcfun_label != scf_xcfun_label:
-                warn_msg = f'*** Warning: {rsp_xcfun_label} will be used in response'
-                warn_msg += f' but {scf_xcfun_label} was used in SCF. ***'
-                self.ostream.print_header(warn_msg)
-                warn_msg = '*** Please double check. ***'
-                self.ostream.print_header(warn_msg)
-
     def _pe_sanity_check(self, method_dict=None):
         """
         Checks PE settings and updates relevant attributes.

@@ -38,7 +38,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import scf_results_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, create_hdf5,
                          write_rsp_solution_with_multiple_keys)
@@ -304,8 +304,8 @@ class ComplexResponse(LinearSolver):
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
-        # double check SCF information
-        self._check_scf_results(scf_tensors)
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
 
         # check dft setup
         dft_sanity_check(self, 'compute')

@@ -34,7 +34,7 @@ from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import scf_results_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 
 
@@ -114,8 +114,8 @@ class TpaDriver(NonlinearSolver):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
-        # double check SCF information
-        self._check_scf_results(scf_tensors)
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
 
         # check dft setup
         dft_sanity_check(self, 'compute', 'nonlinear')
