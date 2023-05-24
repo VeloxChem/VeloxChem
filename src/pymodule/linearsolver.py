@@ -37,13 +37,13 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
-from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
+from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_datetime_string)
@@ -283,8 +283,7 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['response'].items()
+            key: val[0] for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -303,7 +302,7 @@ class LinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        self._dft_sanity_check('update_settings')
+        dft_sanity_check(self, 'update_settings')
 
         self._pe_sanity_check(method_dict)
 
@@ -376,42 +375,6 @@ class LinearSolver:
                 self.ostream.print_header(warn_msg)
                 warn_msg = '*** Please double check. ***'
                 self.ostream.print_header(warn_msg)
-
-    def _dft_sanity_check(self, flag='compute'):
-        """
-        Checks DFT settings and updates relevant attributes.
-
-        :param flag:
-            The flag indicating the routine in which the sanity check is
-            being called.
-        """
-
-        # Hartree-Fock: xcfun is None or 'hf'
-        if (self.xcfun is None or
-            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
-            self._dft = False
-
-        # DFT: xcfun is functional object or string (other than 'hf')
-        else:
-            if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'LinearSolver: Undefined XC functional')
-            self._dft = True
-
-        # check grid level
-        if self._dft and self.grid_level is not None:
-            if (self.grid_level < 1 or self.grid_level > 8):
-                warn_msg = f'Invalid DFT grid level {self.grid_level}. '
-                warn_msg += 'Using default value.'
-                self.ostream.print_warning(warn_msg)
-                self.grid_level = None
-            elif (flag == 'compute' and
-                  self.grid_level < get_default_grid_level(self.xcfun)):
-                warn_msg = 'DFT grid level is below the recommended value. '
-                warn_msg += 'Please double check.'
-                self.ostream.print_warning(warn_msg)
-            self.ostream.flush()
 
     def _pe_sanity_check(self, method_dict=None):
         """

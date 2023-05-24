@@ -36,6 +36,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
+from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, create_hdf5,
                          write_rsp_solution_with_multiple_keys)
@@ -246,7 +247,7 @@ class C6Driver(LinearSolver):
         self._check_scf_results(scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check()
+        dft_sanity_check(self, 'compute')
 
         # check pe setup
         self._pe_sanity_check()
@@ -304,8 +305,10 @@ class C6Driver(LinearSolver):
 
         v_grad = None
         if self.rank == mpi_master():
-            v_grad = {(op, iw): v for op, v in zip(self.b_components, b_grad)
-                      for iw in imagfreqs}
+            v_grad = {
+                (op, iw): v for op, v in zip(self.b_components, b_grad)
+                for iw in imagfreqs
+            }
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():

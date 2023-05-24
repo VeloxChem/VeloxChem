@@ -38,6 +38,7 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
+from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, create_hdf5,
                          write_rsp_solution_with_multiple_keys)
@@ -307,7 +308,7 @@ class ComplexResponse(LinearSolver):
         self._check_scf_results(scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check()
+        dft_sanity_check(self, 'compute')
 
         # check pe setup
         self._pe_sanity_check()
@@ -366,8 +367,10 @@ class ComplexResponse(LinearSolver):
                                                 self.b_components, molecule,
                                                 basis, scf_tensors)
             if self.rank == mpi_master():
-                v_grad = {(op, w): v for op, v in zip(self.b_components, b_grad)
-                          for w in self.frequencies}
+                v_grad = {
+                    (op, w): v for op, v in zip(self.b_components, b_grad)
+                    for w in self.frequencies
+                }
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
