@@ -40,7 +40,6 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -55,7 +54,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level
-from .sanitychecks import molecule_sanity_check
+from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_tensors
 
@@ -412,7 +411,7 @@ class ScfDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        self._dft_sanity_check('update_settings')
+        dft_sanity_check(self, 'update_settings')
 
         self._pe_sanity_check(method_dict)
 
@@ -428,42 +427,6 @@ class ScfDriver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
-
-    def _dft_sanity_check(self, flag='compute'):
-        """
-        Checks DFT settings and updates relevant attributes.
-
-        :param flag:
-            The flag indicating the routine in which the sanity check is
-            being called.
-        """
-
-        # Hartree-Fock: xcfun is None or 'hf'
-        if (self.xcfun is None or
-            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
-            self._dft = False
-
-        # DFT: xcfun is functional object or string (other than 'hf')
-        else:
-            if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'ScfDriver: Undefined XC functional')
-            self._dft = True
-
-        # check grid level
-        if self._dft and self.grid_level is not None:
-            if (self.grid_level < 1 or self.grid_level > 8):
-                warn_msg = f'Invalid DFT grid level {self.grid_level}. '
-                warn_msg += 'Using default value.'
-                self.ostream.print_warning(warn_msg)
-                self.grid_level = None
-            elif (flag == 'compute' and
-                  self.grid_level < get_default_grid_level(self.xcfun)):
-                warn_msg = 'DFT grid level is below the recommended value. '
-                warn_msg += 'Please double check.'
-                self.ostream.print_warning(warn_msg)
-            self.ostream.flush()
 
     def _pe_sanity_check(self, method_dict=None):
         """
@@ -525,7 +488,7 @@ class ScfDriver:
         molecule_sanity_check(molecule)
 
         # check dft setup
-        self._dft_sanity_check()
+        dft_sanity_check(self, 'compute')
 
         # check pe setup
         self._pe_sanity_check()
