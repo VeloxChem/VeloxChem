@@ -25,11 +25,13 @@
 
 from pathlib import Path
 import time as tm
+import re
 
 from .veloxchemlib import SADGuessDriver
 from .veloxchemlib import mpi_master
 from .molecularorbitals import MolecularOrbitals
 from .aodensitymatrix import AODensityMatrix
+from .errorhandler import assert_msg_critical
 
 
 class DensityGuess:
@@ -51,6 +53,7 @@ class DensityGuess:
 
         self._guess_type = guess_type
         self._checkpoint_file = checkpoint_file
+        self._guess_unpaired_electrons = ''
 
     def __str__(self):
         """
@@ -81,6 +84,16 @@ class DensityGuess:
         """
 
         self._guess_type = value
+
+    def set_unpaired_electrons(self, value):
+        """
+        Sets the _guess_unpaired_electrons attribute.
+        """
+
+        assert_msg_critical(
+            isinstance(value, str),
+            'Initial Guess: Expecting a string for for unpaired electrons')
+        self._guess_unpaired_electrons = value
 
     def validate_checkpoint(self, rank, comm, nuclear_charges, basis_set,
                             scf_type):
@@ -178,6 +191,22 @@ class DensityGuess:
             sad_drv = SADGuessDriver(comm)
 
             density_type = 'restricted' if scf_type == 'restricted' else 'unrestricted'
+
+            natoms = molecule.number_of_atoms()
+            unpaired_electrons_on_atoms = [0 for a in range(natoms)]
+
+            if self._guess_unpaired_electrons:
+                for entry in self._guess_unpaired_electrons.split(','):
+                    m = re.search(r'^(.*)\((.*)\)$', entry.strip())
+                    assert_msg_critical(
+                        m is not None,
+                        'Initial Guess: Invalid input for unpaired electrons')
+                    atom_index = int(m.group(1).strip()) - 1
+                    num_unpaired_elec = float(m.group(2).strip())
+                    unpaired_electrons_on_atoms[atom_index] = num_unpaired_elec
+
+                sad_drv.set_number_of_unpaired_electrons_on_atoms(
+                    unpaired_electrons_on_atoms)
 
             den_mat = sad_drv.compute(molecule, min_basis, ao_basis,
                                       density_type)

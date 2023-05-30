@@ -193,6 +193,9 @@ class ScfDriver:
         self.dispersion = False
         self._d4_energy = 0.0
 
+        # for open-shell system: unpaired electrons for initial guess
+        self.guess_unpaired_electrons = ''
+
         # dft
         self.xcfun = None
         self.grid_level = None
@@ -249,6 +252,8 @@ class ScfDriver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
+                'guess_unpaired_electrons':
+                    ('str', 'unpaired electrons for initila guess'),
             },
             'method_settings': {
                 'dispersion': ('bool', 'use D4 dispersion correction'),
@@ -514,6 +519,9 @@ class ScfDriver:
                 self._molecular_orbitals = MolecularOrbitals(self._ref_mol_orbs)
         else:
             self._den_guess = DensityGuess('SAD')
+            if self.guess_unpaired_electrons:
+                self._den_guess.set_unpaired_electrons(
+                    self.guess_unpaired_electrons)
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy()
