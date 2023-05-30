@@ -268,8 +268,9 @@ class CSADGuessDriver
      @param nelec the number of excessive alpha or beta electrons.
      @return a vector of vector containing the occupation numbers for each atom in the molecule.
      */
-    std::vector<std::vector<double>> getOccupationNumbersForMolecule(const CMolecule& molecule,
-                                                                     const double     nelec) const;
+    std::vector<std::vector<double>> getAlphaBetaOccupationNumbersForMolecule(const CMolecule& molecule,
+                                                                              const double     netCharge,
+                                                                              const double     numberOfUnpairedElectrons) const;
 };
 
 #endif /* SADGuessDriver_hpp */
