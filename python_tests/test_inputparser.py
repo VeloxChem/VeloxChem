@@ -29,6 +29,7 @@ def test_full_input(tmpdir):
     ip = InputParser(str(inpfile))
 
     expected = {
+        'keyline': '',
         'jobs': {
             'task': 'scf',
         },
