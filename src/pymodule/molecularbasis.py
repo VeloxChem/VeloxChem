@@ -221,7 +221,7 @@ def _MolecularBasis_read(mol,
 
 
 @staticmethod
-def _MolecularBasis_get_avail_basis(element_label = None):
+def _MolecularBasis_get_avail_basis(element_label=None):
     """
     Gets the names of available basis sets for an element.
     If no element is provided, return all available basis sets.
@@ -271,3 +271,6 @@ def _MolecularBasis_deepcopy(self, memo):
 MolecularBasis.read = _MolecularBasis_read
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
 MolecularBasis.__deepcopy__ = _MolecularBasis_deepcopy
+
+# aliases
+MolecularBasis.get_available_basis = _MolecularBasis_get_avail_basis
