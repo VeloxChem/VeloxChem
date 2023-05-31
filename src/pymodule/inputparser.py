@@ -77,13 +77,34 @@ class InputParser:
         errmsg = f'InputParser: bad syntax in file {self.inpname}. '
         errmsg += 'You may check for incorrect, incomplete or empty groups.'
 
+        self.input_dict = {}
+        input_groups = {}
         group = None
 
-        input_groups = {}
-
         with open(str(self.inpname), 'r') as f_inp:
+            input_lines = f_inp.readlines()
 
-            for line in f_inp:
+            # process the lines before the first group marked by "@"
+            # and save as "keyline" in dictionary
+
+            keyline = ''
+            line_of_first_group = 0
+
+            for line in input_lines:
+                line = line.strip()
+                line = re.sub(r'!.*', '', line)
+                line = re.sub(r'#.*', '', line)
+                if line.startswith('@'):
+                    break
+
+                keyline += ' '.join(line.split()) + ' '
+                line_of_first_group += 1
+
+            self.input_dict['keyline'] = keyline.strip()
+
+            # process the remaining part of the input file
+
+            for line in input_lines[line_of_first_group:]:
 
                 # remove comment and extra space
                 line = line.strip()
@@ -105,6 +126,11 @@ class InputParser:
                 if line[0] == '@' and line.lower() != '@end':
                     assert_msg_critical(group is None, errmsg)
                     group = '_'.join(line[1:].strip().lower().split())
+                    # make sure that groups are not named "keyline"
+                    assert_msg_critical(
+                        group != 'keyline',
+                        'Input: "keyline" is reserved and should not be used as input'
+                    )
                     input_groups[group] = []
 
                 # end of group
@@ -119,8 +145,6 @@ class InputParser:
                 # outside group
                 else:
                     assert_msg_critical(self.is_basis_set, errmsg)
-
-        self.input_dict = {}
 
         for group in input_groups:
             self.input_dict[group] = {}
@@ -160,7 +184,9 @@ class InputParser:
 
         # check empty group
         for group in self.input_dict:
-            assert_msg_critical(len(self.input_dict[group]), errmsg)
+            # note that "keyline" is a string and it may be empty
+            if group != 'keyline':
+                assert_msg_critical(len(self.input_dict[group]), errmsg)
 
         # save filename
         if self.outname not in [None, sys.stdout]:
