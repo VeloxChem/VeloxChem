@@ -148,7 +148,9 @@ class MpiTask:
 
             # create molecule
 
-            if 'molecule' in self.input_dict:
+            if ('molecule' in self.input_dict and
+                (('xyz' in self.input_dict['molecule']) ^
+                 ('xyzfile' in self.input_dict['molecule']))):
                 self.molecule = Molecule.from_dict(self.input_dict['molecule'])
 
                 self.ostream.print_block(self.molecule.get_string())
@@ -165,7 +167,9 @@ class MpiTask:
 
                 basis_name = self.input_dict['method_settings']['basis'].upper()
 
-                if 'molecule' in self.input_dict:
+                if ('molecule' in self.input_dict and
+                    (('xyz' in self.input_dict['molecule']) ^
+                     ('xyzfile' in self.input_dict['molecule']))):
                     self.ao_basis = MolecularBasis.read(self.molecule,
                                                         basis_name, basis_path,
                                                         self.ostream)
@@ -182,7 +186,9 @@ class MpiTask:
 
         # broadcast molecule and basis set
 
-        if 'molecule' in self.input_dict:
+        if ('molecule' in self.input_dict and
+            (('xyz' in self.input_dict['molecule']) ^
+             ('xyzfile' in self.input_dict['molecule']))):
             self.molecule.broadcast(self.mpi_rank, self.mpi_comm)
             self.ao_basis.broadcast(self.mpi_rank, self.mpi_comm)
             self.min_basis.broadcast(self.mpi_rank, self.mpi_comm)
