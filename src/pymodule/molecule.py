@@ -174,10 +174,10 @@ def _Molecule_from_xyz_string(xyz):
     try:
         natoms = int(lines[0].strip())
     except (ValueError, TypeError):
-        assert_msg_critical(False, 'Invalid number of atoms in XYZ string')
+        assert_msg_critical(False, 'Invalid number of atoms in XYZ input')
 
     assert_msg_critical(natoms == len(lines[2:]),
-                        'Inconsistent number of atoms in XYZ string')
+                        'Inconsistent number of atoms in XYZ input')
 
     coords_str = '\n'.join(lines[2:])
     return Molecule.read_str(coords_str, 'angstrom')
@@ -195,11 +195,21 @@ def _Molecule_from_dict(mol_dict):
         The molecule.
     """
 
-    xyzstr = '\n'.join(mol_dict['xyz'])
+    assert_msg_critical(('xyz' in mol_dict) ^ ('xyzfile' in mol_dict),
+                        'Molecule: Expecting either "xyz" or "xyzfile" input')
 
-    units = 'angstrom'
-    if 'units' in mol_dict:
-        units = mol_dict['units'].lower()
+    if 'xyz' in mol_dict:
+        xyzstr = '\n'.join(mol_dict['xyz'])
+        units = 'angstrom'
+        if 'units' in mol_dict:
+            units = mol_dict['units'].lower()
+        mol = Molecule.read_str(xyzstr, units)
+
+    elif 'xyzfile' in mol_dict:
+        assert_msg_critical(
+            'units' not in mol_dict,
+            'Molecule: Cannot have both "units" and "xyzfile" input')
+        mol = Molecule.read_xyz(mol_dict['xyzfile'])
 
     charge = 0.0
     if 'charge' in mol_dict:
@@ -209,7 +219,6 @@ def _Molecule_from_dict(mol_dict):
     if 'multiplicity' in mol_dict:
         multiplicity = int(mol_dict['multiplicity'])
 
-    mol = Molecule.read_str(xyzstr, units)
     mol.set_charge(charge)
     mol.set_multiplicity(multiplicity)
     mol.check_multiplicity()

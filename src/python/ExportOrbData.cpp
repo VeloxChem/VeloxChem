@@ -417,7 +417,8 @@ export_orbdata(py::module& m)
 
     PyClass<CSADGuessDriver>(m, "SADGuessDriver")
         .def(py::init(&vlx_general::create<CSADGuessDriver>), "comm"_a = py::none())
-        .def("compute", &CSADGuessDriver::compute, "Computes SAD initial guess.", "molecule"_a, "basis_1"_a, "basis_2"_a, "densityType"_a);
+        .def("compute", &CSADGuessDriver::compute, "Computes SAD initial guess.", "molecule"_a, "basis_1"_a, "basis_2"_a, "densityType"_a)
+        .def("set_number_of_unpaired_electrons_on_atoms", &CSADGuessDriver::setNumberOfUnpairedElectronsOnAtoms, "Sets number of unpaired electrons on atoms for SAD initial guess.", "num_unpaired_electrons"_a);
     
     // CPackedGtoPairContainer class
 

@@ -221,9 +221,10 @@ def _MolecularBasis_read(mol,
 
 
 @staticmethod
-def _MolecularBasis_get_avail_basis(element_label):
+def _MolecularBasis_get_avail_basis(element_label=None):
     """
     Gets the names of available basis sets for an element.
+    If no element is provided, return all available basis sets.
 
     :param element_label:
         The label of the chemical element.
@@ -239,13 +240,16 @@ def _MolecularBasis_get_avail_basis(element_label):
 
     for x in basis_files:
         name = _basis_file_to_name(x.name)
-        basis = InputParser(str(x)).input_dict
-        # check that the given element appears as key
-        # and that its value is a non-empty list
-        elem = f'atombasis_{element_label.lower()}'
-        if elem in basis.keys():
-            if basis[elem]:
-                avail_basis.add(name)
+        if element_label is None:
+            avail_basis.add(name)
+        else:
+            basis = InputParser(str(x)).input_dict
+            # check that the given element appears as key
+            # and that its value is a non-empty list
+            elem = f'atombasis_{element_label.lower()}'
+            if elem in basis.keys():
+                if basis[elem]:
+                    avail_basis.add(name)
 
     return sorted(list(avail_basis))
 
@@ -267,3 +271,6 @@ def _MolecularBasis_deepcopy(self, memo):
 MolecularBasis.read = _MolecularBasis_read
 MolecularBasis.get_avail_basis = _MolecularBasis_get_avail_basis
 MolecularBasis.__deepcopy__ = _MolecularBasis_deepcopy
+
+# aliases
+MolecularBasis.get_available_basis = _MolecularBasis_get_avail_basis
