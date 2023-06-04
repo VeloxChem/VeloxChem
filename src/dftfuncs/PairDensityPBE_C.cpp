@@ -127,11 +127,11 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double dzeta_dpi = pair_density / (std::pow(2,-0.5) * density * std::pow(-pair_density, (3 / 2)));
 
-            double dom_dzeta = omega_fact * (4/3) * (std::pow(1+zeta,(1/3))-std::pow(1-zeta,(1/3)));
+            double dom_dzeta = omega_fact * fourthird * (std::pow(1.0+zeta, onethird)-std::pow(1.0-zeta,onethird));
 
-            double dmu_dzeta = (1/3)*(std::pow(1+zeta,-(1/3))-std::pow(1-zeta,-(1/3)));
+            double dmu_dzeta = onethird * (std::pow(1.0+zeta,-onethird)-std::pow(1.0-zeta,-onethird));
 
-            double dzeta_drho = - zeta*(1/density);
+            double dzeta_drho = - zeta/density;
 
             dom_drho = dom_dzeta * dzeta_drho;
 
@@ -201,63 +201,63 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double r3 = r * r * r;
 
-        double DrDrho = -(1 / 3) * frg * std::pow(density,-(4 / 3));
+        double dr_drho = -(1.0 / 3.0) * frg * std::pow(density,-(4.0 / 3.0));
 
         double h1 = -2.0 * t1 * (u1 * r + 1.0);
 
         double q1 = t1 * (v1 * r12 + w1 * r + x1 * r32 + y1 * r2);
 
-        double g1 = std::log((0.5/q1) + 1);
+        double g1 = std::log((0.5/q1) + 1.0);
 
         double e1 = h1 * g1;
 
-        double dh1_dr = - 2 * t1 * u1;
+        double dh1_dr = - 2.0 * t1 * u1;
 
         double dg1_dq1 = -0.5 / (std::pow(q1,2)+0.5*q1);
 
-        double dq1_dr = t1*(0.5*v1*std::pow(r,-(1/2))+w1+x1*(3/2)*std::pow(r,0.5)+2*y1*r);
+        double dq1_dr = t1*(0.5*v1*std::pow(r,-(1.0/2.0))+w1+x1*(3.0/2.0)*std::pow(r,0.5)+2.0*y1*r);
 
         double h2 = -2.0 * t2 * (u2 * r + 1.0);
 
         double q2 = t2 * (v2 * r12 + w2 * r + x2 * r32 + y2 * r2);
 
-        double g2 = std::log((0.5 / q2) + 1);
+        double g2 = std::log((0.5 / q2) + 1.0);
 
         double e2 = h2 * g2;
 
-        double dh2_dr = - 2 * t2 * u2;
+        double dh2_dr = - 2.0 * t2 * u2;
 
         double dg2_dq2 = -0.5 / (std::pow(q2, 2) + 0.5 * q2);
 
-        double dq2_dr = t2 * (0.5 * v2 * std::pow(r, -(1 / 2)) + w2 + x2 * (3 / 2) * std::pow(r,0.5) + 2 * y2 * r);
+        double dq2_dr = t2 * (0.5 * v2 * std::pow(r, -(1.0 / 2.0)) + w2 + x2 * (3.0 / 2.0) * std::pow(r,0.5) + 2.0 * y2 * r);
 
         double h3 = -2.0 * t3 * (u3 * r + 1.0);
 
         double q3 = t3 * (v3 * r12 + w3 * r + x3 * r32 + y3 * r2);
 
-        double g3 = std::log((0.5 / q3) + 1);
+        double g3 = std::log((0.5 / q3) + 1.0);
 
         double e3 = h3 * g3;
 
-        double dh3_dr = - 2 * t3 * u3;
+        double dh3_dr = - 2.0 * t3 * u3;
 
         double dg3_dq3 = -0.5 / (std::pow(q3, 2) + 0.5 * q3);
 
-        double dq3_dr = t3 * (0.5 * v3 * std::pow(r, -(1 / 2)) + w3 + x3 * (3 / 2) * std::pow(r,0.5) + 2 * y3 * r);
+        double dq3_dr = t3 * (0.5 * v3 * std::pow(r, -(1.0 / 2.0)) + w3 + x3 * (3.0 / 2.0) * std::pow(r,0.5) + 2.0 * y3 * r);
 
         double epsilon = e1 - e3 * omega * (1.0 - zeta4) / c + (e2 - e1) * omega * zeta4;
 
-        double der1_drho = DrDrho*(dh1_dr*g1 + dg1_dq1*dq1_dr*h1);
+        double der1_drho = dr_drho*(dh1_dr*g1 + dg1_dq1*dq1_dr*h1);
 
-        double der2_drho = DrDrho*(dh2_dr*g2 + dg2_dq2*dq2_dr*h2);
+        double der2_drho = dr_drho*(dh2_dr*g2 + dg2_dq2*dq2_dr*h2);
 
-        double der3_drho = DrDrho*(dh3_dr*g3 + dg3_dq3*dq3_dr*h3);
+        double der3_drho = dr_drho*(dh3_dr*g3 + dg3_dq3*dq3_dr*h3);
 
         double deps_de1 = 1-omega*zeta4;
 
         double deps_de2 = omega*zeta4;
 
-        double deps_de3 = -omega*(1+zeta4);
+        double deps_de3 = -omega*(1-zeta4);
 
         double deps_dom = zeta4*(e2-e1)-(e3/c)*(1+zeta4);
 
@@ -272,11 +272,17 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double d2 = d2fact * density_gradient / (u_ab2 * std::pow(density, 7.0 / 3.0));
 
-        double dd_dsigma = (1/density_gradient) * d2;
+        double dd_dsigma = d2fact / (u_ab2 * std::pow(density, 7.0 / 3.0));
+
+        double dd_drho = -d2 * (2*(1.0/u_ab)*dmu_drho +(7.0/3.0)*(1/density));
+
+        double dd_dpi = -d2 * (2/u_ab) * dmu_dpi;
 
         double d4 = d2 * d2;
 
-        double hx = exp(-2.0 * l / lambda2 * epsilon / u_ab3);
+        double G = -2.0 * l / lambda2 * epsilon / u_ab3;
+
+        double hx = exp(G);
 
         double N_ab =  (2.0 * l / lambda)* 1 / ( hx - 1.0);
 
@@ -286,33 +292,29 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double f = 2.0 * l / lambda;
 
-        exc[g] = 0.5 * lambda2 / l * u_ab3 * std::log(1.0 + f * (N_ab * d4 + d2) / (N_ab * d2 + N2 * d4 + 1.0)) + epsilon;
+        double Q = 0.5 * lambda2/l *u_ab3;
 
-        double Q = (1/2)*(lambda2/l)*u_ab3;
+        double P = std::log(1.0 + f * (N_ab * d4 + d2) / (N_ab * d2 + N2 * d4 + 1.0));
 
-        double P = std::log(1+ f*((N_ab*d4+d2)/(N_ab*d2+N2*d4+1)));
+        exc[g] = Q * P + epsilon;
 
-        double dQ_dmu = (3/2)*(lambda2/l)*u_ab2;
+        double dQ_dmu = 0.5 * 3.0 *(lambda2/l)*u_ab2;
 
         double dQ_drho = dQ_dmu * dmu_drho;
 
         double dQ_dpi = dQ_dmu * dmu_dpi;
 
-        double G = -(2*l/lambda2)*(epsilon/u_ab3);
+        double dG_drho = (2*l/lambda2)*((3*epsilon/(u_ab3*u_ab))*dmu_drho - depsilon_drho / u_ab3);
+
+        double dG_dpi = (2*l/lambda2)*((3*epsilon/(u_ab3*u_ab))*dmu_dpi - depsilon_dpi / u_ab3);
 
         double U = exp(G)-1;
 
         double M = 1/U;
 
-        double dG_drho = (2*l/lambda2)*((3*epsilon/(u_ab3*u_ab))*dmu_drho - (1/u_ab3)*depsilon_drho);
+        double dM_dU = -1/std::pow(U,2);
 
-        double dG_dpi = (2*l/lambda2)*((3*epsilon/(u_ab3*u_ab))*dmu_dpi - (1/u_ab3)*depsilon_dpi);
-
-        double dU_dG = dG_drho * exp(G);
-
-        double dM_dU = -(1/std::pow(U,2));
-
-        double dP_dN = -f*(std::pow(d2,3)*N_ab*(d2*N_ab+2))/((std::pow(d2*N_ab,2)+d2*N_ab+1)*(f*d2*(d2*N_ab+1)+std::pow(d2*N_ab,2)+d2*N_ab+1));
+        double dP_dN = -f*(d4*d2*N_ab*(d2*N_ab+2))/((N_ab * d2 + N2 * d4 + 1.0)*(f* (N_ab * d4 + d2) + N2 * d4 + d2*N_ab+1));
 
         double dP_dd =  1/((std::pow(d2*N_ab,2)+ d2*N_ab + 1)*(f*d2*(d2*N_ab+1) + std::pow(d2*N_ab,2) + d2*N_ab + 1));
 
@@ -322,19 +324,14 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double dN_dpi = f * dM_dU * dG_dpi * exp(G);
 
-        double dd_drho = -d2 * (2*(1/u_ab)*dmu_drho +(7/3)*(1/density));
-
-        double dd_dpi = -d2 * (2/u_ab) * dmu_dpi;
-
         double dP_drho = dP_dN * dN_drho + dP_dd * dd_drho;
 
         double dP_dpi = dP_dN * dN_dpi + dP_dd * dd_dpi;
 
-        vrho[2 * g + 0] = P * dQ_drho + Q * dP_drho + depsilon_drho;
-        vrho[2 * g + 0] = P * dQ_dpi + Q * dP_dpi + depsilon_dpi;
-        vrho[2 * g + 1] = 0.0;
+        vrho[2 * g + 0] = (P * dQ_drho + Q * dP_drho + depsilon_drho)*density + exc[g];
+        vrho[2 * g + 1] = (P * dQ_dpi + Q * dP_dpi + depsilon_dpi)*density;
 
-        vsigma[3 * g + 0] = Q * dP_dd * dd_dsigma;
+        vsigma[3 * g + 0] = density*(Q * dP_dd * dd_dsigma);
         vsigma[3 * g + 1] = 0.0;
         vsigma[3 * g + 2] = 0.0;
     }

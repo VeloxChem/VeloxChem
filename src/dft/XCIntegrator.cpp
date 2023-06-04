@@ -5049,7 +5049,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
 
 void
 CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
-                                       CDense4DTensor&                 moTwoBodyGradient,
+                                       CDense4DTensor&                 tensorWxc,
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
                                        const CAODensityMatrix&         densityMatrix,
@@ -5261,18 +5261,28 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
 
         timer.stop("XC functional eval.");
 
-        auto partial_mat_Vxc =
-            _integratePartialVxcFockForGGA(npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer);
+        // Compute Vxc matrix
 
-        // TODO (MGD) 2-body gradient
-
-        // distribute partial Vxc to full Kohn-Sham matrix
+        // TODO (MGD) gradient not correct for vsigma[1] and vsigma[2]
 
         timer.start("Vxc matrix dist.");
+
+        auto partial_mat_Vxc =
+            _integratePartialVxcFockForGGA(npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer);
 
         submat::distributeSubMatrixToKohnSham(aoFockMatrix, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
+
+        // Compute Wxc tensor
+
+        timer.start("Wxc matrix dist.");
+
+        auto partial_tensorWxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi, sub_active_mos, vrho, timer);
+
+        submat::distributeSubmatrixTo4DTensor(tensorWxc, partial_tensorWxc, aoinds, aocount);
+
+        timer.stop("Wxc matrix dist.");
 
         // compute partial contribution to XC energy
 
