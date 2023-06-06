@@ -121,11 +121,9 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double zeta  = delta / density;
 
-            omega = omega_fact * (std::pow(1.0 + zeta, fourthird) + std::pow(std::max(1.0 - zeta, 0.0), fourthird) - 2.0);
+            omega = omega_fact * (std::pow(1.0 + zeta, fourthird) + std::pow(1.0 - zeta, fourthird) - 2.0);
 
-            u_ab = 0.5 * std::pow(1.0 + zeta, twothird) + 0.5 * std::pow(std::max(1.0 - zeta, 0.0), twothird);
-
-            double dzeta_dpi = pair_density / (std::pow(2,-0.5) * density * std::pow(-pair_density, (3 / 2)));
+            u_ab = 0.5 * std::pow(1.0 + zeta, twothird) + 0.5 * std::pow(1.0 - zeta, twothird);
 
             double dom_dzeta = omega_fact * fourthird * (std::pow(1.0+zeta, onethird)-std::pow(1.0-zeta,onethird));
 
@@ -135,11 +133,23 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             dom_drho = dom_dzeta * dzeta_drho;
 
-            dom_dpi = dom_dzeta * dzeta_dpi;
-
             dmu_drho = dmu_dzeta * dzeta_drho;
 
-            dmu_dpi= dmu_dzeta * dzeta_dpi;
+            if (pair_density < -1.0e-12)
+            {
+                double dzeta_dpi = - 1.0 /(delta * density);
+
+                dom_dpi = dom_dzeta * dzeta_dpi;
+
+                dmu_dpi= dmu_dzeta * dzeta_dpi;
+            }
+            else
+            {
+                dom_dpi = - omega_fact * fourthird * twothird / (density * density);
+
+                dmu_dpi = onethird * twothird / (density * density);
+            }
+
         }
 
         // Imaginary case
@@ -175,15 +185,24 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double dmu_dtheta2 = -1 * std::pow(r,(1/3))*std::sin(theta2);
 
-            double deta_dpi = 1/(std::pow(2*pair_density,0.5)*density);
-
             dom_drho = dom_dr * dr_deta * deta_drho + dom_dtheta * dtheta_deta * deta_drho;
 
             dmu_drho = dmu_dr * dr_deta * deta_drho + dmu_dtheta2 * dtheta2_deta * deta_drho;
 
-            dom_dpi = dom_dr * dr_deta * deta_dpi + dom_dtheta * dtheta_deta * deta_dpi;
+            if (pair_density > 1.0e-12)
+            {
+                double deta_dpi = 1/(std::pow(2*pair_density,0.5)*density);
 
-            dmu_dpi = dmu_dr * dr_deta * deta_dpi + dmu_dtheta2 * dtheta2_deta * deta_dpi;
+                dom_dpi = dom_dr * dr_deta * deta_dpi + dom_dtheta * dtheta_deta * deta_dpi;
+
+                dmu_dpi = dmu_dr * dr_deta * deta_dpi + dmu_dtheta2 * dtheta2_deta * deta_dpi;
+            }
+            else
+            {
+                dom_dpi = - omega_fact * fourthird * twothird / (density * density);
+
+                dmu_dpi = onethird * twothird / (density * density);
+            }
         }
 
         double u_ab2 = u_ab * u_ab;

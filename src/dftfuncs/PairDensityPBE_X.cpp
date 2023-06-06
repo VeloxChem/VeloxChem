@@ -80,8 +80,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double rho53 = std::pow(density, f53);
 
-        // double rho83 = std::pow(density, f83);
-
         double rho2 = std::pow(density, 2.0);
 
         double pair_density = rho[2 * g + 1];
@@ -100,6 +98,12 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         double gradR = 0.25 * sig * (1.0 + delta2 / rho2);
 
         double gradI = 0.25 * sig * zeta;
+
+        double dgradR_rho  = -0.5 * sig * zeta2 / density;
+
+        double dgradI_rho = -0.25 * sig * delta / rho2;
+
+        double dgradR_pi  = -0.5 * sig / rho2;
 
         double f_zeta = 0.0;
 
@@ -120,7 +124,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         {
             double fa = std::pow(1.0 + zeta, f43);
 
-            double fb = std::pow(std::max(1.0 - zeta, 0.0), f43);
+            double fb = std::pow(1.0 - zeta, f43);
 
             f_zeta = (fa + fb);
 
@@ -157,10 +161,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             dF_rho      = -f43 * zeta / density * f1_zeta;
 
-            double dgradR_rho  = -0.5 * sig * zeta2 / density;
-
-            double dgradI_rho  = -0.25 * sig * delta / rho2;
-
             double dFxc_a_pref = -R / std::pow(alpha, 2.0) * mus2r / std::pow(rhoa, f83);
 
             double dFxc_b_pref = -R / std::pow(beta, 2.0) * mus2r / std::pow(rhob, f83);
@@ -173,21 +173,36 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             // pi
 
-            double dfa_pi     = -f43 / (density * delta) * std::pow((1 + zeta), f13);
+            if (pair_density < -1.0e-12)
+            {
+                double dfa_pi     = -f43 / (density * delta) * std::pow((1 + zeta), f13);
 
-            double dfb_pi     = f43 / (density * delta) * std::pow((1 - zeta), f13);
+                double dfb_pi     = f43 / (density * delta) * std::pow((1 - zeta), f13);
 
-            dF_pi      = dfa_pi + dfb_pi;
+                dF_pi      = dfa_pi + dfb_pi;
 
-            double dgradR_pi  = -0.5 * sig / rho2;
+                double dgradI_pi  = -0.25 * sig / (density * delta);
 
-            double dgradI_pi  = -0.25 * sig / (density * delta);
+                double dFxc_a_pi  = dFxc_a_pref * (dgradR_pi + dgradI_pi + f43 * grada2 / rhoa / delta);
 
-            double dFxc_a_pi  = dFxc_a_pref * (dgradR_pi + dgradI_pi + f43 * grada2 / rhoa / delta);
+                double dFxc_b_pi  = dFxc_b_pref * (dgradR_pi - dgradI_pi - f43 * gradb2 / rhob / delta);
 
-            double dFxc_b_pi  = dFxc_b_pref * (dgradR_pi - dgradI_pi - f43 * gradb2 / rhob / delta);
+                // 2* f43 / rhoa  * 0.25 * sig /rho
 
-            dFg_pi     = (dfa_pi * Fxc_a + fa * dFxc_a_pi) + (dfb_pi * Fxc_b + fb * dFxc_b_pi);
+                dFg_pi     = (dfa_pi * Fxc_a + fa * dFxc_a_pi) + (dfb_pi * Fxc_b + fb * dFxc_b_pi);
+            }
+            else
+            {
+                dF_pi      = -f43 * f23 / rho2;
+
+                double rho83 = std::pow(0.5 * density, f83);
+
+                double A = 1.0 + mus2r * 0.25 * sig / rho83;
+
+                dFg_pi = 8.0 / 9.0 * R / A - R * mus2r * sig / std::pow(A,2) / rho83 + 25.0/36.0 * R * std::pow(mus2r * sig/rho83, 2) / std::pow(A,3);
+
+                dFg_pi = - dFg_pi / rho2;
+            }
 
             // sigma
 
@@ -238,10 +253,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             dF_rho     = -f83 / (density * std::pow(r, f23)) * f1_zeta;
 
-            double dgradR_rho = -0.5 * sig * zeta2 / density;
-
-            double dgradI_rho = -0.25 * sig * delta / rho2;
-
             double ddm_pref = 0.5 * std::pow(0.5 * density * r , f53);
 
             double dmR_rho = f83 * ddm_pref * (r + density * dr_rho) * std::cos(2 * theta) + denom_pref * (-2 * std::sin(2 * theta)) * dtheta_rho + mus2r * dgradR_rho;
@@ -260,29 +271,42 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
                 ((f83 * rho53 * r_final + rho83 * drf_rho) * std::cos(theta_final) - rho83 * r_final * std::sin(theta_final) * dtheta_f_rho);
 
             // pi
-            double dr_pi     = -1.0 / (r * std::pow(density, 2.0));
+            if (pair_density > 1.0e-12)
+            {
+                double dr_pi     = -1.0 / (r * std::pow(density, 2.0));
 
-            double dtheta_pi = -f43 / (std::pow(r, 2.0) * density * delta);
+                double dtheta_pi = -f43 / (std::pow(r, 2.0) * density * delta);
 
-            dF_pi     = f83 * std::pow(r, f13) * std::cos(theta) * dr_pi - 2 * std::pow(r, f43) * std::sin(theta) * dtheta_pi;
+                dF_pi     = f83 * std::pow(r, f13) * std::cos(theta) * dr_pi - 2 * std::pow(r, f43) * std::sin(theta) * dtheta_pi;
 
-            double dgradR_pi = -0.5 * sig / rho2;
+                double dgradI_pi = -0.25 * sig / (density * delta);
 
-            double dgradI_pi = -0.25 * sig / (density * delta);
+                double dmR_pi    = ddm_pref * density * (f83 * std::cos(2 * theta) * dr_pi) - 2.0 * denom_pref * std::sin(2 * theta) * dtheta_pi + mus2r * dgradR_pi;
 
-            double dmR_pi    = ddm_pref * density * (f83 * std::cos(2 * theta) * dr_pi) - 2.0 * denom_pref * std::sin(2 * theta) * dtheta_pi + mus2r * dgradR_pi;
+                double dmI_pi    = ddm_pref * density * (f83 * std::sin(2 * theta) * dr_pi) + 2.0 * denom_pref * std::cos(2 * theta) * dtheta_pi + mus2r * dgradI_pi;
 
-            double dmI_pi    = ddm_pref * density * (f83 * std::sin(2 * theta) * dr_pi) + 2.0 * denom_pref * std::cos(2 * theta) * dtheta_pi + mus2r * dgradI_pi;
+                double drm_pi      = 1.0 / r_denom * (denom_R * dmR_pi + denom_I * dmI_pi);
 
-            double drm_pi      = 1.0 / r_denom * (denom_R * dmR_pi + denom_I * dmI_pi);
+                double dtheta_m_pi = 1.0 / (std::pow(denom_R / denom_I, 2) + 1) * (dmR_pi / denom_I - denom_R / std::pow(denom_I, 2) * dmI_pi);
 
-            double dtheta_m_pi = 1.0 / (std::pow(denom_R / denom_I, 2) + 1) * (dmR_pi / denom_I - denom_R / std::pow(denom_I, 2) * dmI_pi);
+                double drf_pi      = std::pow(0.5, f83) * (4 * std::pow(r, 3.0) / r_denom * dr_pi - std::pow(r, 4.0) / std::pow(r_denom, 2) * drm_pi);
 
-            double drf_pi      = std::pow(0.5, f83) * (4 * std::pow(r, 3.0) / r_denom * dr_pi - std::pow(r, 4.0) / std::pow(r_denom, 2) * drm_pi);
+                double dtheta_f_pi = 3.0 * dtheta_pi - dtheta_m_pi;
 
-            double dtheta_f_pi = 3.0 * dtheta_pi - dtheta_m_pi;
+                dFg_pi      = 2.0 * R * rho83 * (drf_pi * std::cos(theta_final) - r_final * std::sin(theta_final) * dtheta_f_pi);
+            }
+            else
+            {
+                dF_pi      = -f43 * f23 / rho2;
 
-            dFg_pi      = 2.0 * R * rho83 * (drf_pi * std::cos(theta_final) - r_final * std::sin(theta_final) * dtheta_f_pi);
+                double rho83_2 = std::pow(0.5 * density, f83);
+
+                double A = 1.0 + mus2r * 0.25 * sig / rho83_2;
+
+                dFg_pi = 8.0 / 9.0 * R / A - R * mus2r * sig / std::pow(A,2) / rho83_2 + 25.0/36.0 * R * std::pow(mus2r * sig/rho83_2, 2) / std::pow(A,3);
+
+                dFg_pi = - dFg_pi / rho2;
+            }
 
             // sigma
 

@@ -97,18 +97,18 @@ class TestPDFT:
             return None, None, None, None
 
     def test_O2_ROSlater(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slater', 'pslater')
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slater', 'tslater')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
     def test_O2_ROLDA(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slda', 'plda')
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slda', 'tlda')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
     def test_O2_ROGGA(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'ppbe')
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'tpbe')
         if is_mpi_master():
             assert abs(-16.924117087238564 - pdft) < 1.0e-6
