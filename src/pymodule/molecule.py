@@ -229,10 +229,21 @@ def _Molecule_from_dict(mol_dict):
 
 def _Molecule_center_of_mass(self):
     """
-    Computes center of mass of a molecule.
+    Computes center of mass of a molecule in Bohr.
 
     :return:
-        The center of mass.
+        The center of mass in Bohr.
+    """
+
+    return self.center_of_mass_in_bohr()
+
+
+def _Molecule_center_of_mass_in_bohr(self):
+    """
+    Computes center of mass of a molecule in Bohr.
+
+    :return:
+        The center of mass in Bohr.
     """
 
     masses = self.masses_to_numpy()
@@ -245,6 +256,17 @@ def _Molecule_center_of_mass(self):
     z_center = np.sum(z_coords * masses) / np.sum(masses)
 
     return x_center, y_center, z_center
+
+
+def _Molecule_center_of_mass_in_angstrom(self):
+    """
+    Computes center of mass of a molecule in Angstrom.
+
+    :return:
+        The center of mass in Angstrom.
+    """
+
+    return self.center_of_mass_in_bohr() * bohr_in_angstroms()
 
 
 def _Molecule_more_info(self):
@@ -381,7 +403,7 @@ def _Molecule_write_xyz(self, xyz_filename):
 
 def _Molecule_moments_of_inertia(self):
     """
-    Calculates the moment of inertia tensor and principle axes
+    Calculates the moment of inertia tensor and principle axes.
 
     :return:
         The principle moments of inertia.
@@ -389,7 +411,7 @@ def _Molecule_moments_of_inertia(self):
 
     masses = self.masses_to_numpy()
     coordinates = self.get_coordinates_in_bohr()
-    center_of_mass = np.array(self.center_of_mass())
+    center_of_mass = np.array(self.center_of_mass_in_bohr())
     natm = self.number_of_atoms()
 
     # Coordinates in the center-of-mass frame
@@ -488,6 +510,8 @@ Molecule.read_xyz = _Molecule_read_xyz
 Molecule.from_xyz_string = _Molecule_from_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
+Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
+Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom
 Molecule.more_info = _Molecule_more_info
 Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates

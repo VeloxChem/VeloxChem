@@ -351,7 +351,7 @@ class ExcitonModelDriver:
         self.elec_trans_dipoles = np.zeros((total_num_states, 3))
         self.velo_trans_dipoles = np.zeros((total_num_states, 3))
         self.magn_trans_dipoles = np.zeros((total_num_states, 3))
-        self.center_of_mass = molecule.center_of_mass()
+        self.center_of_mass = molecule.center_of_mass_in_bohr()
 
         self.state_info = [{
             'type': '',

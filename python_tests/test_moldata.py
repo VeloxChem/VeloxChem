@@ -115,7 +115,7 @@ class TestMolData:
     def test_center_of_mass(self):
 
         mol = self.nh3_molecule()
-        mol_com = mol.center_of_mass()
+        mol_com = mol.center_of_mass_in_bohr()
         ref_com = np.array([-3.831697, 3.070437, -0.031436])
         assert np.max(np.abs(ref_com - mol_com)) < 1.0e-6
 
