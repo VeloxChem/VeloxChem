@@ -413,13 +413,15 @@ class OptimizationDriver:
 
         g_mol = geometric.molecule.Molecule()
         g_mol.elem = opt_mol.get_labels()
-        g_mol.xyzs = [opt_mol.get_coordinates() * geometric.nifty.bohr2ang]
+        g_mol.xyzs = [
+            opt_mol.get_coordinates_in_bohr() * geometric.nifty.bohr2ang
+        ]
 
         ic = geometric.internal.DelocalizedInternalCoordinates(g_mol,
                                                                build=True)
 
-        ref_geom = ref_mol.get_coordinates() * geometric.nifty.bohr2ang
-        opt_geom = opt_mol.get_coordinates() * geometric.nifty.bohr2ang
+        ref_geom = ref_mol.get_coordinates_in_bohr() * geometric.nifty.bohr2ang
+        opt_geom = opt_mol.get_coordinates_in_bohr() * geometric.nifty.bohr2ang
 
         bonds = []
         angles = []

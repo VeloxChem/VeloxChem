@@ -714,7 +714,7 @@ class RespChargesDriver:
             a_m = np.zeros(a.shape)
             b_m = np.zeros(b.shape)
 
-            coords = molecules[m].get_coordinates()
+            coords = molecules[m].get_coordinates_in_bohr()
 
             for i in range(n_atoms):
                 if constr[i] != -1:
@@ -758,7 +758,7 @@ class RespChargesDriver:
         """
 
         n_atoms = molecule.number_of_atoms()
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
         labels = molecule.get_labels()
         covalent_radii = molecule.covalent_radii_to_numpy()
 
@@ -836,7 +836,7 @@ class RespChargesDriver:
         """
 
         grid = []
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         for layer in range(self.number_layers):
 
@@ -908,7 +908,7 @@ class RespChargesDriver:
 
         # classical electrostatic potential
 
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
         elem_ids = molecule.elem_ids_to_numpy()
 
         if self.rank == mpi_master():
@@ -972,7 +972,7 @@ class RespChargesDriver:
         rrms = 0.0
 
         for m in range(len(molecules)):
-            coords = molecules[m].get_coordinates()
+            coords = molecules[m].get_coordinates_in_bohr()
             chi_square = 0.0
             norm = 0.0
             for i in range(esp[m].size):
@@ -1027,7 +1027,7 @@ class RespChargesDriver:
             else:
                 pdb_fname = f'{filename}.pdb'
             with open(pdb_fname, 'w') as f_pdb:
-                coords = mol.get_coordinates() * bohr_in_angstroms()
+                coords = mol.get_coordinates_in_angstrom()
                 for j in range(mol.number_of_atoms()):
                     cur_str = '{:6s}{:5d} {:^4s} {:3s}  {:4d}    '.format(
                         'ATOM', j + 1,

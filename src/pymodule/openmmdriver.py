@@ -100,7 +100,7 @@ class OpenMMDriver:
         from openmm.unit import nanometer, md_unit_system
 
         if self.rank == mpi_master():
-            coords_nm = molecule.get_coordinates() * bohr_in_angstroms() * 0.1
+            coords_nm = molecule.get_coordinates_in_angstrom() * 0.1
 
             self.simulation.context.setPositions(coords_nm * nanometer)
             state = self.simulation.context.getState(

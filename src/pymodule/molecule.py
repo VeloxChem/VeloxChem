@@ -296,10 +296,21 @@ def _Molecule_get_labels(self):
 
 def _Molecule_get_coordinates(self):
     """
-    Returns atom coordinates in atomic units.
+    Returns atom coordinates in Bohr (for backward compatibility).
 
     :return:
-        A numpy array of atom coordinates (nx3) in atomic units.
+        A numpy array of atom coordinates (nx3) in Bohr.
+    """
+
+    return self.get_coordinates_in_bohr()
+
+
+def _Molecule_get_coordinates_in_bohr(self):
+    """
+    Returns atom coordinates in Bohr.
+
+    :return:
+        A numpy array of atom coordinates (nx3) in Bohr.
     """
 
     return np.array([
@@ -307,6 +318,17 @@ def _Molecule_get_coordinates(self):
         self.y_to_numpy(),
         self.z_to_numpy(),
     ]).T.copy()
+
+
+def _Molecule_get_coordinates_in_angstrom(self):
+    """
+    Returns atom coordinates in Angstrom.
+
+    :return:
+        A numpy array of atom coordinates (nx3) in Angstrom.
+    """
+
+    return self.get_coordinates_in_bohr() * bohr_in_angstroms()
 
 
 def _Molecule_get_xyz_string(self):
@@ -469,6 +491,8 @@ Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.more_info = _Molecule_more_info
 Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates
+Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
+Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
 Molecule.get_xyz_string = _Molecule_get_xyz_string
 Molecule.write_xyz = _Molecule_write_xyz
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
