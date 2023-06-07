@@ -152,7 +152,7 @@ class ScfHessianDriver(HessianDriver):
         natm = molecule.number_of_atoms()
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # Hessian
         hessian = np.zeros((natm, 3, natm, 3))

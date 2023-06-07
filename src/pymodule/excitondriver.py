@@ -277,8 +277,8 @@ class ExcitonModelDriver:
         natoms_1 = mol_1.number_of_atoms()
         natoms_2 = mol_2.number_of_atoms()
 
-        coords_1 = mol_1.get_coordinates()
-        coords_2 = mol_2.get_coordinates()
+        coords_1 = mol_1.get_coordinates_in_bohr()
+        coords_2 = mol_2.get_coordinates_in_bohr()
 
         min_dist_2 = None
         for atom_ind_1 in range(natoms_1):

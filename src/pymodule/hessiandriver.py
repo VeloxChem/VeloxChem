@@ -225,7 +225,7 @@ class HessianDriver:
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-        coords = molecule.get_coordinates().reshape(natm * 3)
+        coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
         self.frequencies, self.normal_modes, gibbs_energy = (
             geometric.normal_modes.frequency_analysis(
@@ -404,7 +404,7 @@ class HessianDriver:
         nuc_contrib = np.zeros((natm, natm, 3, 3))
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
         nuclear_charges = molecule.elem_ids_to_numpy()

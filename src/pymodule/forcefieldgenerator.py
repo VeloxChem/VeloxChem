@@ -478,7 +478,7 @@ class ForceFieldGenerator:
 
         # molecular information
 
-        coords = self.molecule.get_coordinates()
+        coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
         connected = self.get_connectivity()
 
@@ -1275,7 +1275,7 @@ class ForceFieldGenerator:
             A 2d array containing the connectivity information of the molecule.
         """
 
-        coords = self.molecule.get_coordinates()
+        coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
         covalent_radii = self.molecule.covalent_radii_to_numpy()
 

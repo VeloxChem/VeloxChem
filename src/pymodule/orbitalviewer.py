@@ -119,7 +119,7 @@ class OrbitalViewer:
 
         # Define box size
         self.atomnr = molecule.elem_ids_to_numpy()
-        self.coords = molecule.get_coordinates()
+        self.coords = molecule.get_coordinates_in_bohr()
         xmin = self.coords[:, 0].min() - self.grid_margins
         xmax = self.coords[:, 0].max() + self.grid_margins
         ymin = self.coords[:, 1].min() - self.grid_margins
@@ -411,7 +411,7 @@ class OrbitalViewer:
 
         natoms = molecule.number_of_atoms()
         atomnr = molecule.elem_ids_to_numpy() - 1
-        coords = molecule.get_coordinates().astype('float32')
+        coords = molecule.get_coordinates_in_bohr().astype('float32')
 
         # Create a list of colors and radii
         colors = []

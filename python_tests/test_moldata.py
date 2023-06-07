@@ -328,19 +328,28 @@ class TestMolData:
             mol.write_xyz(fname)
 
             ref_labels = mol.get_labels()
-            ref_coords = mol.get_coordinates()
+            ref_coords_au = mol.get_coordinates_in_bohr()
+            ref_coords_ang = mol.get_coordinates_in_angstrom()
 
             mol_2 = Molecule.read_xyz(fname)
             assert ref_labels == mol_2.get_labels()
             assert np.max(
-                np.abs(ref_coords - mol_2.get_coordinates())) < 1.0e-10
+                np.abs(ref_coords_au -
+                       mol_2.get_coordinates_in_bohr())) < 1.0e-10
+            assert np.max(
+                np.abs(ref_coords_ang -
+                       mol_2.get_coordinates_in_angstrom())) < 1.0e-10
 
             with open(fname, 'r') as f_xyz:
                 lines = f_xyz.readlines()
                 mol_3 = Molecule.from_xyz_string(''.join(lines))
                 assert ref_labels == mol_3.get_labels()
                 assert np.max(
-                    np.abs(ref_coords - mol_3.get_coordinates())) < 1.0e-10
+                    np.abs(ref_coords_au -
+                           mol_3.get_coordinates_in_bohr())) < 1.0e-10
+                assert np.max(
+                    np.abs(ref_coords_ang -
+                           mol_3.get_coordinates_in_angstrom())) < 1.0e-10
 
             if fpath.is_file():
                 fpath.unlink()

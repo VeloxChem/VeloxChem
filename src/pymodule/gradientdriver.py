@@ -149,7 +149,7 @@ class GradientDriver:
         labels = molecule.get_labels()
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
@@ -370,7 +370,7 @@ class GradientDriver:
         nuc_contrib = np.zeros((natm, 3))
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
         nuclear_charges = molecule.elem_ids_to_numpy()

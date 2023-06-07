@@ -941,7 +941,7 @@ class ScfDriver:
                     fock_mat.add_matrix(DenseMatrix(efpot), 0, 'beta')
 
                 self._ef_nuc_energy = 0.0
-                coords = molecule.get_coordinates()
+                coords = molecule.get_coordinates_in_bohr()
                 elem_ids = molecule.elem_ids_to_numpy()
                 for i in range(molecule.number_of_atoms()):
                     self._ef_nuc_energy -= np.dot(
@@ -1167,7 +1167,7 @@ class ScfDriver:
 
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
-                coords = molecule.get_coordinates()
+                coords = molecule.get_coordinates_in_bohr()
                 nuclear_charges = molecule.elem_ids_to_numpy()
                 self._dipole_origin = np.sum(coords.T * nuclear_charges,
                                              axis=1) / np.sum(nuclear_charges)

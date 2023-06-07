@@ -340,7 +340,7 @@ def _Molecule_get_xyz_string(self):
     """
 
     labels = self.get_labels()
-    coords = self.get_coordinates()
+    coords = self.get_coordinates_in_bohr()
 
     natoms = len(labels)
     xyz = f'{natoms}\n\n'
@@ -388,7 +388,7 @@ def _Molecule_moments_of_inertia(self):
     """
 
     masses = self.masses_to_numpy()
-    coordinates = self.get_coordinates()
+    coordinates = self.get_coordinates_in_bohr()
     center_of_mass = np.array(self.center_of_mass())
     natm = self.number_of_atoms()
 

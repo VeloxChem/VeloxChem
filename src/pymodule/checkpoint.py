@@ -58,7 +58,8 @@ def create_hdf5(fname, molecule, basis, dft_func_label, potfile_text):
 
         hf.create_dataset('nuclear_charges', data=molecule.elem_ids_to_numpy())
 
-        hf.create_dataset('atom_coordinates', data=molecule.get_coordinates())
+        hf.create_dataset('atom_coordinates',
+                          data=molecule.get_coordinates_in_bohr())
 
         hf.create_dataset('basis_set', data=np.string_([basis.get_label()]))
 

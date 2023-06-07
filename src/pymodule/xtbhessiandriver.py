@@ -119,7 +119,7 @@ class XtbHessianDriver(HessianDriver):
         natm = molecule.number_of_atoms()
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         if self.rank == mpi_master():
             # Hessian

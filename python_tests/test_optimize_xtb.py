@@ -36,7 +36,7 @@ class TestOptimizeXTB:
         opt_mol = opt_drv.compute(task.molecule, xtb_drv)
 
         if is_mpi_master(task.mpi_comm):
-            opt_coords = opt_mol.get_coordinates()
+            opt_coords = opt_mol.get_coordinates_in_bohr()
             assert np.max(np.abs(opt_coords - ref_coords)) < 1.0e-6
 
             inpfile = Path(inpfile)

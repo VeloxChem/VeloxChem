@@ -375,7 +375,7 @@ class NumerovDriver:
             'NumerovDriver.generate_pec: Only applicable to diatomic molecules')
 
         # get data for PEC scan
-        mol_coords = molecule.get_coordinates()
+        mol_coords = molecule.get_coordinates_in_bohr()
         self.eq_bond_len = np.linalg.norm(mol_coords[0] - mol_coords[1])
         bond_lengths = self.pec_displacements + self.eq_bond_len
 

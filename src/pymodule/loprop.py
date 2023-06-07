@@ -256,7 +256,7 @@ class LoPropDriver:
                 it += ao_per_atom[a]
 
             # coord_matrix, the rab matrix in equation above
-            molecule_coord = molecule.get_coordinates()
+            molecule_coord = molecule.get_coordinates_in_bohr()
             coord_matrix = np.zeros((natoms, natoms, 3))
             for i in range(natoms):
                 # a==b: rab=ra
