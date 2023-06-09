@@ -134,12 +134,15 @@ export_general(py::module& m)
 
     m.def("assert_msg_critical", &errors::assertMsgCritical, "Prints message and aborts in case of a critical error.", "condition"_a, "message"_a);
 
+    m.def("bohr_in_angstrom", &units::getBohrValueInAngstroms, "Gets Bohr value in Angstroms.");
     m.def("bohr_in_angstroms", &units::getBohrValueInAngstroms, "Gets Bohr value in Angstroms.");
     m.def("hartree_in_ev", &units::getHartreeValueInElectronVolts, "Gets Hartree value in electronvolts.");
     m.def("hartree_in_kcalpermol", &units::getHartreeValueInKiloCaloriePerMole, "Gets Hartree value in kcal/mol.");
     m.def("hartree_in_inverse_nm", &units::getHartreeValueInInverseNanometer, "Gets Hartree value in inverse nanometer.");
+    m.def("hartree_in_wavenumber", &units::getHartreeValueInWavenumbers, "Gets Hartree value in reciprocal cm.");
     m.def("hartree_in_wavenumbers", &units::getHartreeValueInWavenumbers, "Gets Hartree value in reciprocal cm.");
     m.def("electron_mass_in_amu", &units::getElectronMassInAtomicMassUnit, "Gets electron mass in amu.");
+    m.def("amu_in_electron_mass", &units::getAtomicMassUnitInElectronMasses, "Gets atomic mass unit in electron masses.");
     m.def("amu_in_electron_masses", &units::getAtomicMassUnitInElectronMasses, "Gets atomic mass unit in electron masses.");
     m.def("amu_in_kg", &units::getAtomicMassUnitInKg, "Gets atomic mass unit in kg.");
     m.def("speed_of_light_in_vacuum_in_SI", &units::getSpeedOfLightInVacuumInSI, "Gets speed of light in vacuum in SI.");
