@@ -28,7 +28,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import Molecule
-from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_wavenumber,
+from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_wavenumber,
                            hartree_in_ev, amu_in_electron_mass,
                            boltzmann_in_hartreeperkelvin)
 from .outputstream import OutputStream
@@ -399,7 +399,7 @@ class NumerovDriver:
 
         for n, x in enumerate(bond_lengths):
             geometry = Molecule.read_str('{}  0 0 0\n{}  {} 0 0'.format(
-                atom1, atom2, x * bohr_in_angstroms()))
+                atom1, atom2, x * bohr_in_angstrom()))
 
             scf_drv.compute(geometry, ao_basis, min_basis)
             scf_prop.compute_scf_prop(geometry, ao_basis, scf_drv.scf_tensors)
@@ -791,8 +791,8 @@ class NumerovDriver:
             key: value for key, value in zip(['i', 'f'], [*pec_energies])
         }
         self.eq_bond_len = (bond_lengths[np.argmin(self.pec_energies['i'])] /
-                            bohr_in_angstroms())
-        self.pec_displacements = (np.array(bond_lengths) / bohr_in_angstroms() -
+                            bohr_in_angstrom())
+        self.pec_displacements = (np.array(bond_lengths) / bohr_in_angstrom() -
                                   self.eq_bond_len)
         self.pec_data = True
 
@@ -915,8 +915,8 @@ class NumerovDriver:
             cur_str += '{:>16s}'.format('rel. ES energy')
         self.ostream.print_header(cur_str.ljust(width))
         for bl, gs_e, es_e in zip(bond_lengths, gs_energies, es_energies):
-            cur_str = 'Bond distance: {:10.4f} angs '.format(
-                bl * bohr_in_angstroms())
+            cur_str = 'Bond distance: {:10.4f} angs '.format(bl *
+                                                             bohr_in_angstrom())
             cur_str += '{:12.5f} eV '.format(gs_e * hartree_in_ev())
             if es_e:
                 cur_str += '{:12.5f} eV'.format(es_e * hartree_in_ev())

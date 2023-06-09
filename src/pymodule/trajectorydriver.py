@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import hartree_in_inverse_nm
 from .molecule import Molecule
@@ -150,7 +150,7 @@ class TrajectoryDriver:
             if 'angstrom' in units:
                 length_factor = 1.0
             elif 'bohr' in units:
-                length_factor = bohr_in_angstroms()
+                length_factor = bohr_in_angstrom()
             elif 'nm' in units:
                 length_factor = 10.0
 

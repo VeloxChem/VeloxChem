@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import ChemicalElement, DispersionModel
-from veloxchem.veloxchemlib import bohr_in_angstroms, is_mpi_master
+from veloxchem.veloxchemlib import bohr_in_angstrom, is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.mpitask import MpiTask
 from veloxchem.optimizationdriver import OptimizationDriver
@@ -59,7 +59,7 @@ class TestMolData:
         mol_3 = Molecule(labels, array, 'au')
         mol_4 = Molecule(labels, arrayT.T, 'au')
 
-        array_ang = array * bohr_in_angstroms()
+        array_ang = array * bohr_in_angstrom()
 
         mol_5 = Molecule(labels, array_ang)
         mol_6 = Molecule(labels, array_ang, 'angstrom')
@@ -189,7 +189,7 @@ class TestMolData:
             1.55
         ])
 
-        ref_radii /= bohr_in_angstroms()
+        ref_radii /= bohr_in_angstrom()
 
         assert (atom_radii == ref_radii).all()
 

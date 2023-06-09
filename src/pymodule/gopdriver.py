@@ -29,7 +29,7 @@ import random
 import sys
 
 from .veloxchemlib import CommonNeighbors
-from .veloxchemlib import bohr_in_angstroms, hartree_in_kcalpermol
+from .veloxchemlib import bohr_in_angstrom, hartree_in_kcalpermol
 from .outputstream import OutputStream
 from .molecule import Molecule
 from .treeblock import TreeBlock
@@ -126,13 +126,13 @@ class GlobalOptimizationDriver:
         if self.cna_bond is None:
             self.cna_bond = 3.0
         else:
-            self.cna_bond /= bohr_in_angstroms()
+            self.cna_bond /= bohr_in_angstrom()
 
         # update CNA bond environment cut-off radius
         if self.cna_rcut is None:
             self.cna_rcut = 4.5
         else:
-            self.cna_rcut /= bohr_in_angstroms()
+            self.cna_rcut /= bohr_in_angstrom()
 
         # update tree growth unit
         self.tree_growth_unit = TreeBlock(self.block_data)
@@ -334,7 +334,7 @@ class GlobalOptimizationDriver:
                 return None
             refxyz = molecule.get_atom_coordinates(refids)
             radius = self.tree_growth_unit.bond_lengths[index]
-            radius /= bohr_in_angstroms()
+            radius /= bohr_in_angstrom()
 
             minrad = 0.9 * radius
 

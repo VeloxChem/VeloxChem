@@ -28,7 +28,7 @@ import numpy as np
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 
 from .errorhandler import assert_msg_critical
 
@@ -266,7 +266,7 @@ def _Molecule_center_of_mass_in_angstrom(self):
         The center of mass in Angstrom.
     """
 
-    return self.center_of_mass_in_bohr() * bohr_in_angstroms()
+    return self.center_of_mass_in_bohr() * bohr_in_angstrom()
 
 
 def _Molecule_more_info(self):
@@ -350,7 +350,7 @@ def _Molecule_get_coordinates_in_angstrom(self):
         A numpy array of atom coordinates (nx3) in Angstrom.
     """
 
-    return self.get_coordinates_in_bohr() * bohr_in_angstroms()
+    return self.get_coordinates_in_bohr() * bohr_in_angstrom()
 
 
 def _Molecule_get_xyz_string(self):
@@ -368,9 +368,9 @@ def _Molecule_get_xyz_string(self):
     xyz = f'{natoms}\n\n'
 
     for a in range(natoms):
-        xa = coords[a][0] * bohr_in_angstroms()
-        ya = coords[a][1] * bohr_in_angstroms()
-        za = coords[a][2] * bohr_in_angstroms()
+        xa = coords[a][0] * bohr_in_angstrom()
+        ya = coords[a][1] * bohr_in_angstrom()
+        za = coords[a][2] * bohr_in_angstrom()
         xyz += f'{labels[a]:<6s} {xa:22.12f} {ya:22.12f} {za:22.12f}\n'
 
     return xyz
@@ -386,9 +386,9 @@ def _Molecule_write_xyz(self, xyz_filename):
 
     elem_ids = self.elem_ids_to_numpy()
 
-    xs = self.x_to_numpy() * bohr_in_angstroms()
-    ys = self.y_to_numpy() * bohr_in_angstroms()
-    zs = self.z_to_numpy() * bohr_in_angstroms()
+    xs = self.x_to_numpy() * bohr_in_angstrom()
+    ys = self.y_to_numpy() * bohr_in_angstrom()
+    zs = self.z_to_numpy() * bohr_in_angstrom()
 
     with open(str(xyz_filename), 'w') as fh:
 

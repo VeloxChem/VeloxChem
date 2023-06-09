@@ -31,7 +31,7 @@ import time as tm
 import tempfile
 
 from .veloxchemlib import CommonNeighbors
-from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstroms
+from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
 from .inputparser import parse_input, print_keywords, get_datetime_string
@@ -147,13 +147,13 @@ class OptimizationDriver:
         if self.cna_bond is None:
             self.cna_bond = 3.0
         else:
-            self.cna_bond /= bohr_in_angstroms()
+            self.cna_bond /= bohr_in_angstrom()
 
         # update CNA bond environment cut-off radius
         if self.cna_rcut is None:
             self.cna_rcut = 4.5
         else:
-            self.cna_rcut /= bohr_in_angstroms()
+            self.cna_rcut /= bohr_in_angstrom()
 
         if 'filename' in opt_dict:
             self.filename = opt_dict['filename']

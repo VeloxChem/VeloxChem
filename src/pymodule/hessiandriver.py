@@ -30,7 +30,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import GridDriver, XCMolecularHessian
-from .veloxchemlib import (mpi_master, bohr_in_angstroms, avogadro_constant,
+from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .veloxchemlib import parse_xc_func
@@ -245,7 +245,7 @@ class HessianDriver:
         # Constants and conversion factors
         c = speed_of_light_in_vacuum_in_SI()
         alpha = fine_structure_constant()
-        bohr_in_km = bohr_in_angstroms() * 1e-13
+        bohr_in_km = bohr_in_angstrom() * 1e-13
         cm_to_m = 1e-2  # centimeters in meters
         N_to_mdyne = 1e+8  # Newton in milli dyne
         m_to_A = 1e+10  # meters in Angstroms

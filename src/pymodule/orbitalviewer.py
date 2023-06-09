@@ -28,7 +28,7 @@ import math
 
 from .veloxchemlib import VisualizationDriver, CubicGrid
 from .veloxchemlib import molorb
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 
 
 class OrbitalViewer:
@@ -439,7 +439,7 @@ class OrbitalViewer:
         for i in range(natoms):
             color_i = colors[i]
             for j in range(i + 1, natoms):
-                bond = (radii[i] + radii[j]) / bohr_in_angstroms()
+                bond = (radii[i] + radii[j]) / bohr_in_angstrom()
                 if np.linalg.norm(coords[i, :] - coords[j, :]) > 1.25 * bond:
                     continue
                 color_j = colors[j]

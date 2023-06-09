@@ -38,7 +38,7 @@ from .veloxchemlib import (KineticEnergyIntegralsDriver,
                            ElectronRepulsionIntegralsDriver)
 from .veloxchemlib import GridDriver, XCIntegrator
 from .veloxchemlib import denmat, fockmat, mpi_master
-from .veloxchemlib import (hartree_in_ev, bohr_in_angstroms,
+from .veloxchemlib import (hartree_in_ev, bohr_in_angstrom,
                            rotatory_strength_in_cgs)
 from .veloxchemlib import get_dimer_ao_indices, parse_xc_func
 from .outputstream import OutputStream
@@ -334,7 +334,7 @@ class ExcitonModelDriver:
                 mol_B = monomer_molecules[ind_B]
                 min_dist_AB = self.get_minimal_distance(mol_A, mol_B)
                 if (self.dimer_cutoff_radius is None or min_dist_AB
-                        < self.dimer_cutoff_radius / bohr_in_angstroms()):
+                        < self.dimer_cutoff_radius / bohr_in_angstrom()):
                     dimer_pairs.append((ind_A, ind_B))
 
         npairs = len(dimer_pairs)

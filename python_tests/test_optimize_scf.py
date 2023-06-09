@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import bohr_in_angstroms
+from veloxchem.veloxchemlib import bohr_in_angstrom
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -67,6 +67,6 @@ class TestOptimizeSCF:
             [-1.965745778628, 2.619171893222, 0.031449914839],
             [-2.496768727202, 1.280798298868, 0.793505674044],
             [-2.536814090843, 1.362016810479, -0.833073376431],
-        ]) / bohr_in_angstroms()
+        ]) / bohr_in_angstrom()
 
         self.run_opt(inpfile, basis_label, ref_coords)

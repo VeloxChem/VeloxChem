@@ -29,7 +29,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import boltzmann_in_evperkelvin
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import mpi_master
@@ -766,7 +766,7 @@ class RespChargesDriver:
 
         # connect atoms with distances close to sum of covalent radii with
         # tolerance of 0.4 Angstrom
-        tolerance = 0.4 / bohr_in_angstroms()
+        tolerance = 0.4 / bohr_in_angstrom()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
                 r_ij = np.linalg.norm(coords[i] - coords[j])
@@ -847,7 +847,7 @@ class RespChargesDriver:
             for atom in range(molecule.number_of_atoms()):
                 # number of points fitting on the equator
                 n_eq = int(2.0 * np.pi * r[atom] * np.sqrt(self.density) *
-                           bohr_in_angstroms())
+                           bohr_in_angstrom())
 
                 # number of latitudes
                 n_i = n_eq // 2

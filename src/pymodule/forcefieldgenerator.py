@@ -30,7 +30,7 @@ import tempfile
 import sys
 import re
 
-from .veloxchemlib import mpi_master, bohr_in_angstroms, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
@@ -611,7 +611,7 @@ class ForceFieldGenerator:
 
             for i, j in bond_indices:
                 r_eq = np.linalg.norm(coords[i] - coords[j])
-                r_eq *= bohr_in_angstroms() * 0.1
+                r_eq *= bohr_in_angstrom() * 0.1
 
                 at_1 = atom_types[i]
                 at_2 = atom_types[j]
@@ -1280,7 +1280,7 @@ class ForceFieldGenerator:
         covalent_radii = self.molecule.covalent_radii_to_numpy()
 
         connectivity = np.full((n_atoms, n_atoms), False, dtype='bool')
-        tolerance = 0.4 / bohr_in_angstroms()
+        tolerance = 0.4 / bohr_in_angstrom()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
                 r_ij = np.linalg.norm(coords[i] - coords[j])
