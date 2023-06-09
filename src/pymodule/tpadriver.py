@@ -28,7 +28,7 @@ import numpy as np
 import time
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master, hartree_in_wavenumbers
+from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
@@ -68,7 +68,7 @@ class TpaDriver(NonlinearSolver):
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
-        self.damping = 1000.0 / hartree_in_wavenumbers()
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         # input keywords
         self._input_keywords['response'].update({

@@ -28,9 +28,8 @@ import numpy as np
 import sys
 
 from .veloxchemlib import Molecule
-from .veloxchemlib import (mpi_master, bohr_in_angstroms,
-                           hartree_in_wavenumbers, hartree_in_ev,
-                           amu_in_electron_masses,
+from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_wavenumber,
+                           hartree_in_ev, amu_in_electron_mass,
                            boltzmann_in_hartreeperkelvin)
 from .outputstream import OutputStream
 from .scfrestdriver import ScfRestrictedDriver
@@ -650,7 +649,7 @@ class NumerovDriver:
                        np.sum([tm**2 for tm in trans_moms]))
 
         # (forbidden) Q branch
-        exc_energies['Q'] = vib_exc_energy * hartree_in_wavenumbers()
+        exc_energies['Q'] = vib_exc_energy * hartree_in_wavenumber()
         osc_str['Q'] = vib_osc_str
 
         # rotational resolution
@@ -665,7 +664,7 @@ class NumerovDriver:
         for j in range(0, self.n_rot_states):
             exc_energies['R'] = np.append(exc_energies['R'],
                                           (vib_exc_energy + 2.0 * B *
-                                           (j + 1)) * hartree_in_wavenumbers())
+                                           (j + 1)) * hartree_in_wavenumber())
 
             R_j = (2 * j + 1) * np.exp((-B * j * (j + 1)) / (kB * self.temp))
             osc_str['R'] = np.append(osc_str['R'], R_j)
@@ -680,7 +679,7 @@ class NumerovDriver:
         for j in range(1, self.n_rot_states):
             exc_energies['P'] = np.append(exc_energies['P'],
                                           (vib_exc_energy - 2.0 * B * j) *
-                                          hartree_in_wavenumbers())
+                                          hartree_in_wavenumber())
 
             P_j = (2 * j + 1) * np.exp((-B * j * (j + 1)) / (kB * self.temp))
             osc_str['P'] = np.append(osc_str['P'], P_j)
@@ -742,7 +741,7 @@ class NumerovDriver:
                 [tm**2 for tm in abs_vib_trans_moms])
 
             exc_energies[a] = np.append(exc_energies[a],
-                                        abs_energy * hartree_in_wavenumbers())
+                                        abs_energy * hartree_in_wavenumber())
             osc_str[a] = np.append(osc_str[a], abs_f)
 
             # emission spectrum
@@ -754,7 +753,7 @@ class NumerovDriver:
                 [tm**2 for tm in em_vib_trans_moms])
 
             exc_energies[e] = np.append(exc_energies[e],
-                                        em_energy * hartree_in_wavenumbers())
+                                        em_energy * hartree_in_wavenumber())
             osc_str[e] = np.append(osc_str[e], em_f)
 
         return (exc_energies, osc_str)
@@ -818,7 +817,7 @@ class NumerovDriver:
             The reduced mass in amu.
         """
 
-        self.reduced_mass = reduced_mass * amu_in_electron_masses()
+        self.reduced_mass = reduced_mass * amu_in_electron_mass()
 
     def print_PEC_header(self, scf_drv):
         """

@@ -30,7 +30,7 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import (mpi_master, hartree_in_wavenumbers, hartree_in_ev,
+from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
                            fine_structure_constant,
                            extinction_coefficient_from_beta)
 from .outputstream import OutputStream
@@ -86,7 +86,7 @@ class ComplexResponse(LinearSolver):
         self.cpp_flag = 'absorption'
 
         self.frequencies = (0,)
-        self.damping = 1000.0 / hartree_in_wavenumbers()
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
