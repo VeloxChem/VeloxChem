@@ -229,7 +229,7 @@ def _Molecule_from_dict(mol_dict):
 
 def _Molecule_center_of_mass(self):
     """
-    Computes center of mass of a molecule in Bohr.
+    Computes center of mass of a molecule in Bohr (for backward compatibility).
 
     :return:
         The center of mass in Bohr.
@@ -362,15 +362,13 @@ def _Molecule_get_xyz_string(self):
     """
 
     labels = self.get_labels()
-    coords = self.get_coordinates_in_bohr()
+    coords_in_angstrom = self.get_coordinates_in_angstrom()
 
     natoms = len(labels)
     xyz = f'{natoms}\n\n'
 
     for a in range(natoms):
-        xa = coords[a][0] * bohr_in_angstrom()
-        ya = coords[a][1] * bohr_in_angstrom()
-        za = coords[a][2] * bohr_in_angstrom()
+        xa, ya, za = coords_in_angstrom[a]
         xyz += f'{labels[a]:<6s} {xa:22.12f} {ya:22.12f} {za:22.12f}\n'
 
     return xyz
@@ -384,21 +382,8 @@ def _Molecule_write_xyz(self, xyz_filename):
         The name of the xyz file.
     """
 
-    elem_ids = self.elem_ids_to_numpy()
-
-    xs = self.x_to_numpy() * bohr_in_angstrom()
-    ys = self.y_to_numpy() * bohr_in_angstrom()
-    zs = self.z_to_numpy() * bohr_in_angstrom()
-
     with open(str(xyz_filename), 'w') as fh:
-
-        fh.write(f"{self.number_of_atoms():d}\n\n")
-
-        for elem_id, x, y, z in zip(elem_ids, xs, ys, zs):
-            elem = ChemicalElement()
-            elem.set_atom_type(elem_id)
-            fh.write(
-                f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}\n')
+        fh.write(self.get_xyz_string())
 
 
 def _Molecule_moments_of_inertia(self):
@@ -529,5 +514,6 @@ Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
 Molecule.__deepcopy__ = _Molecule_deepcopy
 
 # aliases
-Molecule.read_xyz_file = _Molecule_read_xyz
 Molecule.read_xyz_string = _Molecule_from_xyz_string
+Molecule.read_xyz_file = _Molecule_read_xyz
+Molecule.write_xyz_file = _Molecule_write_xyz
