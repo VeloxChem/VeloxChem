@@ -111,4 +111,4 @@ class TestPDFT:
     def test_O2_ROGGA(self):
         ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'tpbe')
         if is_mpi_master():
-            assert abs(-16.924117087238564 - pdft) < 1.0e-6
+            assert abs(-16.911864099412625 - pdft) < 1.0e-6
