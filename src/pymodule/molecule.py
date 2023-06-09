@@ -441,6 +441,9 @@ def _Molecule_is_linear(self):
         True if linear, False otherwise.
     """
 
+    assert_msg_critical(self.number_of_atoms() >= 2,
+                        'Molecule.is_linear: Need at least two atoms')
+
     # Get principle moments of inertia
     Ivals = self.moments_of_inertia()
 
@@ -450,13 +453,14 @@ def _Molecule_is_linear(self):
         if abs(Ivals[i]) > 1.0e-10:
             Rotational_DoF += 1
 
+    assert_msg_critical(
+        Rotational_DoF in [2, 3],
+        'Molecule.is_linear: Unexpected rotational degrees of freedom')
+
     if Rotational_DoF == 2:
         return True
     elif Rotational_DoF == 3:
         return False
-    # TODO: Raise an error if rotational DoFs are not 2 or 3
-    else:
-        pass
 
 
 def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):

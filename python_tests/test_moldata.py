@@ -119,6 +119,26 @@ class TestMolData:
         ref_com = np.array([-3.831697, 3.070437, -0.031436])
         assert np.max(np.abs(ref_com - mol_com)) < 1.0e-6
 
+    def test_is_linear(self):
+
+        mol = self.nh3_molecule()
+        assert (not mol.is_linear())
+
+        mol_str = """
+            H  0.0  0.0  0.0
+            H  0.0  0.0  1.5
+        """
+        mol = Molecule.read_str(mol_str, units='au')
+        assert mol.is_linear()
+
+        mol_str = """
+            C  0.0  0.0  0.0
+            O  0.0  0.0  2.2
+            O  0.0  0.0 -2.2
+        """
+        mol = Molecule.read_str(mol_str, units='au')
+        assert mol.is_linear()
+
     def test_setters_and_getters(self):
 
         mol = self.nh3_molecule()
