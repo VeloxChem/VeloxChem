@@ -1019,7 +1019,8 @@ class ScfDriver:
             self.write_checkpoint(molecule.elem_ids_to_numpy(),
                                   ao_basis.get_label())
 
-        if self.rank == mpi_master() and not self._first_step:
+        if (self.rank == mpi_master() and (not self._first_step) and
+                self.is_converged):
             S = ovl_mat.to_numpy()
 
             C_alpha = self.molecular_orbitals.alpha_to_numpy()
@@ -1068,8 +1069,7 @@ class ScfDriver:
                 # pe info
                 self._scf_tensors['potfile'] = self.potfile
 
-            if self.is_converged:
-                self._write_final_hdf5(molecule, ao_basis)
+            self._write_final_hdf5(molecule, ao_basis)
 
         else:
             self._scf_tensors = None
