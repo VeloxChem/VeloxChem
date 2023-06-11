@@ -387,7 +387,7 @@ class TrajectoryDriver:
             # run SCF
             scf_drv = ScfRestrictedDriver(local_comm, ostream)
             scf_drv.update_settings({}, self.method_dict)
-            scf_drv.compute(qm_mol, qm_basis)
+            scf_results = scf_drv.compute(qm_mol, qm_basis)
 
             if local_rank == mpi_master():
                 scf_energy = scf_drv.get_scf_energy()
@@ -395,7 +395,7 @@ class TrajectoryDriver:
             # run response for spectrum
             abs_spec = Absorption({'nstates': self.nstates}, self.method_dict)
             abs_spec.init_driver(local_comm, ostream)
-            abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_tensors)
+            abs_spec.compute(qm_mol, qm_basis, scf_results)
 
             if local_rank == mpi_master():
                 excitation_energies = abs_spec.get_property('eigenvalues')

@@ -329,7 +329,7 @@ class RespChargesDriver:
                     'checkpoint_file': self.filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
-                scf_drv.compute(mol, bas)
+                scf_results = scf_drv.compute(mol, bas)
 
             else:
                 filename = str(
@@ -346,12 +346,12 @@ class RespChargesDriver:
                     'checkpoint_file': filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
-                scf_drv.compute(mol, bas)
+                scf_results = scf_drv.compute(mol, bas)
                 ostream.close()
 
             grid_m = self.get_grid_points(mol)
             esp_m = self.get_electrostatic_potential(grid_m, mol, bas,
-                                                     scf_drv.scf_tensors)
+                                                     scf_results)
             scf_energy_m = scf_drv.get_scf_energy()
 
             if self.rank == mpi_master():
@@ -881,7 +881,7 @@ class RespChargesDriver:
 
         return np.array(grid)
 
-    def get_electrostatic_potential(self, grid, molecule, basis, scf_tensors):
+    def get_electrostatic_potential(self, grid, molecule, basis, scf_results):
         """
         Gets the QM ESP on the grid points.
 
@@ -891,15 +891,15 @@ class RespChargesDriver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
+        :param scf_results:
+            The dictionary containing SCF results.
 
         :return:
             The ESP at each grid point listed in an array.
         """
 
         if self.rank == mpi_master():
-            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+            D = scf_results['D_alpha'] + scf_results['D_beta']
         else:
             D = None
         D = self.comm.bcast(D, root=mpi_master())

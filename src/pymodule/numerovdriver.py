@@ -401,8 +401,8 @@ class NumerovDriver:
             geometry = Molecule.read_str('{}  0 0 0\n{}  {} 0 0'.format(
                 atom1, atom2, x * bohr_in_angstrom()))
 
-            scf_drv.compute(geometry, ao_basis, min_basis)
-            scf_prop.compute_scf_prop(geometry, ao_basis, scf_drv.scf_tensors)
+            scf_results = scf_drv.compute(geometry, ao_basis, min_basis)
+            scf_prop.compute_scf_prop(geometry, ao_basis, scf_results)
 
             # save energies and dipole moments
             pec_energies['i'].append(scf_drv.scf_energy)
@@ -436,7 +436,7 @@ class NumerovDriver:
                         }, self.method_dict)
 
                     rsp_prop.init_driver(self.comm, OutputStream(None))
-                    rsp_prop.compute(geometry, ao_basis, scf_drv.scf_tensors)
+                    rsp_prop.compute(geometry, ao_basis, scf_results)
 
                     total_energy = (rsp_prop.rsp_property['eigenvalues'][-1] +
                                     scf_drv.scf_energy)
