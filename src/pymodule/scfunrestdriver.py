@@ -143,7 +143,7 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return diff_den
 
-    def _store_diis_data(self, fock_mat, den_mat, e_grad):
+    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
         """
         Stores spin unrestricted open shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
@@ -152,27 +152,26 @@ class ScfUnrestrictedDriver(ScfDriver):
             The Fock/Kohn-Sham matrix.
         :param den_mat:
             The density matrix.
+        :param ovl_mat:
+            The overlap matrix (used in ROSCF).
         :param e_grad:
             The electronic gradient.
         """
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and e_grad < self.diis_thresh:
 
-            if e_grad < self.diis_thresh:
+            if len(self._fock_matrices_alpha) == self.max_err_vecs:
+                self._fock_matrices_alpha.popleft()
+                self._fock_matrices_beta.popleft()
 
-                if len(self._fock_matrices) == self.max_err_vecs:
+                self._density_matrices_alpha.popleft()
+                self._density_matrices_beta.popleft()
 
-                    self._fock_matrices.popleft()
-                    self._den_matrices.popleft()
+            self._fock_matrices_alpha.append(fock_mat.alpha_to_numpy(0))
+            self._fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
 
-                    self._fock_matrices_beta.popleft()
-                    self._den_matrices_beta.popleft()
-
-                self._fock_matrices.append(fock_mat.alpha_to_numpy(0))
-                self._den_matrices.append(den_mat.alpha_to_numpy(0))
-
-                self._fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
-                self._den_matrices_beta.append(den_mat.beta_to_numpy(0))
+            self._density_matrices_alpha.append(den_mat.alpha_to_numpy(0))
+            self._density_matrices_beta.append(den_mat.beta_to_numpy(0))
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
@@ -193,19 +192,19 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
 
-            if len(self._fock_matrices) == 1:
+            if len(self._fock_matrices_alpha) == 1:
 
-                return (np.copy(self._fock_matrices[0]),
+                return (np.copy(self._fock_matrices_alpha[0]),
                         np.copy(self._fock_matrices_beta[0]))
 
-            if len(self._fock_matrices) > 1:
+            if len(self._fock_matrices_alpha) > 1:
 
                 acc_diis = CTwoDiis()
 
                 acc_diis.compute_error_vectors_unrestricted(
-                    self._fock_matrices, self._fock_matrices_beta,
-                    self._den_matrices, self._den_matrices_beta, ovl_mat,
-                    oao_mat)
+                    self._fock_matrices_alpha, self._fock_matrices_beta,
+                    self._density_matrices_alpha, self._density_matrices_beta,
+                    ovl_mat, oao_mat)
 
                 weights = acc_diis.compute_weights()
 
@@ -227,10 +226,10 @@ class ScfUnrestrictedDriver(ScfDriver):
             The scaled Fock/Kohn-Sham matrices.
         """
 
-        effmat_a = np.zeros(self._fock_matrices[0].shape)
+        effmat_a = np.zeros(self._fock_matrices_alpha[0].shape)
         effmat_b = np.zeros(self._fock_matrices_beta[0].shape)
 
-        for w, fa, fb in zip(weights, self._fock_matrices,
+        for w, fa, fb in zip(weights, self._fock_matrices_alpha,
                              self._fock_matrices_beta):
 
             effmat_a += w * fa

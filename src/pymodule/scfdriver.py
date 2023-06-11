@@ -156,12 +156,12 @@ class ScfDriver:
         self._num_iter = 0
 
         # DIIS data
-        self._fock_matrices = deque()
+        self._fock_matrices_alpha = deque()
         self._fock_matrices_beta = deque()
         self._fock_matrices_proj = deque()
 
-        self._den_matrices = deque()
-        self._den_matrices_beta = deque()
+        self._density_matrices_alpha = deque()
+        self._density_matrices_beta = deque()
 
         # density matrix and molecular orbitals
         self._density = AODensityMatrix()
@@ -609,13 +609,12 @@ class ScfDriver:
 
             self._comp_diis(molecule, ao_basis, val_basis, profiler)
 
-        self._fock_matrices.clear()
-        self._den_matrices.clear()
-
+        self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
-        self._den_matrices_beta.clear()
-
         self._fock_matrices_proj.clear()
+
+        self._density_matrices_alpha.clear()
+        self._density_matrices_beta.clear()
 
         profiler.end(self.ostream, scf_flag=True)
 
@@ -803,13 +802,12 @@ class ScfDriver:
 
         diis_start_time = tm.time()
 
-        self._fock_matrices.clear()
-        self._den_matrices.clear()
-
+        self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
-        self._den_matrices_beta.clear()
-
         self._fock_matrices_proj.clear()
+
+        self._density_matrices_alpha.clear()
+        self._density_matrices_beta.clear()
 
         ovl_mat, kin_mat, npot_mat, dipole_mats = self._comp_one_ints(
             molecule, ao_basis)
@@ -824,8 +822,6 @@ class ScfDriver:
             t0 = tm.time()
 
             oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
-            self._scf_tensors = {'S': ovl_mat.to_numpy()}
-
             self.ostream.print_info('Orthogonalization matrix computed in' +
                                     ' {:.2f} sec.'.format(tm.time() - t0))
             self.ostream.print_blank()
@@ -991,7 +987,7 @@ class ScfDriver:
 
             profiler.start_timer('FockDiag')
 
-            self._store_diis_data(fock_mat, den_mat, e_grad)
+            self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
@@ -1671,7 +1667,7 @@ class ScfDriver:
 
         return 0.0
 
-    def _store_diis_data(self, fock_mat, den_mat):
+    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
         """
         Stores Fock/Kohn-Sham and density matrices for current iteration.
 
@@ -1679,6 +1675,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix.
         :param den_mat:
             The density matrix.
+        :param ovl_mat:
+            The overlap matrix (used in ROSCF).
         :param e_grad:
             The electronic gradient.
         """
