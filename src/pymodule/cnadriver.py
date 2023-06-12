@@ -187,7 +187,7 @@ class CnaAnalysisDriver:
             The list of molecule files.
         """
         
-        molecules = [Molecule.read_xyz(finp) for finp in mol_files]
+        molecules = [Molecule.read_xyz_file(finp) for finp in mol_files]
         cnas = []
         for mol in molecules:
             mcna = CommonNeighbors(mol, self.cna_bond)
@@ -218,7 +218,7 @@ class CnaAnalysisDriver:
             The list of molecule files.
         """
         
-        molecules = [Molecule.read_xyz(finp) for finp in mol_files]
+        molecules = [Molecule.read_xyz_file(finp) for finp in mol_files]
         for mol in molecules:
             cdata = self.get_coord_numbers(mol)
             # print('@Coordination Data: ', cdata[0], ' ', cdata[1], ' ', cdata[2])

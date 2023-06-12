@@ -110,7 +110,7 @@ def _Molecule_read_smiles(smiles_str):
 
     xyz = Molecule._smiles_to_xyz(smiles_str, optimize=True)
 
-    return Molecule.from_xyz_string(xyz)
+    return Molecule.read_xyz_string(xyz)
 
 
 @staticmethod
@@ -140,7 +140,7 @@ def _Molecule_read_str(xyzstr, units='angstrom'):
 
 
 @staticmethod
-def _Molecule_read_xyz(xyzfile):
+def _Molecule_read_xyz_file(xyzfile):
     """
     Reads molecule from file in XYZ format.
 
@@ -154,11 +154,11 @@ def _Molecule_read_xyz(xyzfile):
     with Path(xyzfile).open('r') as fh:
         xyzstr = fh.read()
 
-    return Molecule.from_xyz_string(xyzstr)
+    return Molecule.read_xyz_string(xyzstr)
 
 
 @staticmethod
-def _Molecule_from_xyz_string(xyz):
+def _Molecule_read_xyz_string(xyz):
     """
     Generate molecule from string in XYZ format.
 
@@ -209,7 +209,7 @@ def _Molecule_from_dict(mol_dict):
         assert_msg_critical(
             'units' not in mol_dict,
             'Molecule: Cannot have both "units" and "xyzfile" input')
-        mol = Molecule.read_xyz(mol_dict['xyzfile'])
+        mol = Molecule.read_xyz_file(mol_dict['xyzfile'])
 
     charge = 0.0
     if 'charge' in mol_dict:
@@ -374,7 +374,7 @@ def _Molecule_get_xyz_string(self):
     return xyz
 
 
-def _Molecule_write_xyz(self, xyz_filename):
+def _Molecule_write_xyz_file(self, xyz_filename):
     """
     Writes molecular geometry to xyz file.
 
@@ -495,8 +495,8 @@ Molecule._smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.draw_2d_svg = _Molecule_draw_2d_svg
 Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_str = _Molecule_read_str
-Molecule.read_xyz = _Molecule_read_xyz
-Molecule.from_xyz_string = _Molecule_from_xyz_string
+Molecule.read_xyz_file = _Molecule_read_xyz_file
+Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
 Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
@@ -507,13 +507,13 @@ Molecule.get_coordinates = _Molecule_get_coordinates
 Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
 Molecule.get_xyz_string = _Molecule_get_xyz_string
-Molecule.write_xyz = _Molecule_write_xyz
+Molecule.write_xyz_file = _Molecule_write_xyz_file
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
 Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
 Molecule.__deepcopy__ = _Molecule_deepcopy
 
-# aliases
-Molecule.read_xyz_string = _Molecule_from_xyz_string
-Molecule.read_xyz_file = _Molecule_read_xyz
-Molecule.write_xyz_file = _Molecule_write_xyz
+# aliases for backward compatibility
+Molecule.read_xyz = _Molecule_read_xyz_file
+Molecule.from_xyz_string = _Molecule_read_xyz_string
+Molecule.write_xyz = _Molecule_write_xyz_file

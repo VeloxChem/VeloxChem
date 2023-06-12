@@ -351,7 +351,7 @@ class TestMolData:
             ref_coords_au = mol.get_coordinates_in_bohr()
             ref_coords_ang = mol.get_coordinates_in_angstrom()
 
-            mol_2 = Molecule.read_xyz(fname)
+            mol_2 = Molecule.read_xyz_file(fname)
             assert ref_labels == mol_2.get_labels()
             assert np.max(
                 np.abs(ref_coords_au -
@@ -362,7 +362,7 @@ class TestMolData:
 
             with open(fname, 'r') as f_xyz:
                 lines = f_xyz.readlines()
-                mol_3 = Molecule.from_xyz_string(''.join(lines))
+                mol_3 = Molecule.read_xyz_string(''.join(lines))
                 assert ref_labels == mol_3.get_labels()
                 assert np.max(
                     np.abs(ref_coords_au -

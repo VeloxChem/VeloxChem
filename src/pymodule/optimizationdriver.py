@@ -404,7 +404,7 @@ class OptimizationDriver:
 
         if isinstance(ref_mol, str):
             if Path(ref_mol).is_file():
-                ref_mol = Molecule.read_xyz(ref_mol)
+                ref_mol = Molecule.read_xyz_file(ref_mol)
             else:
                 return errmsg
 
@@ -718,7 +718,7 @@ class OptimizationDriver:
         cna_ref = None
         if xyz_filename is not None:
             if Path(xyz_filename).is_file():
-                ref_mol = Molecule.read_xyz(xyz_filename)
+                ref_mol = Molecule.read_xyz_file(xyz_filename)
             else:
                 return '*** Note: invalid reference xyz file!'
             cna_ref = CommonNeighbors(ref_mol, self.cna_bond)
