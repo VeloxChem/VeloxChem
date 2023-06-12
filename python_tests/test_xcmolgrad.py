@@ -43,7 +43,7 @@ class TestXCMolGrad:
             H  0.0000000000  -0.7695699584   0.5948147012
         """
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         xcfun = 'slater'
 
@@ -63,7 +63,7 @@ class TestXCMolGrad:
             H  0.0000000000  -0.7695699584   0.5948147012
         """
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         xcfun = 'blyp'
 

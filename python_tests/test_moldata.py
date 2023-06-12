@@ -48,7 +48,7 @@ class TestMolData:
         xyzstr = self.nh3_xyzstr()
 
         mol_1 = Molecule(labels, coords, 'au')
-        mol_2 = Molecule.read_str(xyzstr, 'au')
+        mol_2 = Molecule.read_molecule_string(xyzstr, 'au')
 
         array = np.array(coords)
         arrayT = np.zeros((array.shape[1], array.shape[0]))
@@ -128,7 +128,7 @@ class TestMolData:
             H  0.0  0.0  0.0
             H  0.0  0.0  1.5
         """
-        mol = Molecule.read_str(mol_str, units='au')
+        mol = Molecule.read_molecule_string(mol_str, units='au')
         assert mol.is_linear()
 
         mol_str = """
@@ -136,7 +136,7 @@ class TestMolData:
             O  0.0  0.0  2.2
             O  0.0  0.0 -2.2
         """
-        mol = Molecule.read_str(mol_str, units='au')
+        mol = Molecule.read_molecule_string(mol_str, units='au')
         assert mol.is_linear()
 
     def test_setters_and_getters(self):
@@ -169,18 +169,18 @@ class TestMolData:
 
         # fake molecule made of H,Li,C,N,O,S,Cu,Zn,Br,Ag,Au,Hg
 
-        mol = Molecule.read_str("""H    0.0   0.0   0.0
-                                   Li   0.0   0.0   1.0
-                                   C    0.0   0.0   2.0
-                                   N    0.0   0.0   3.0
-                                   O    0.0   0.0   4.0
-                                   S    0.0   0.0   5.0
-                                   Cu   0.0   0.0   6.0
-                                   Zn   0.0   0.0   7.0
-                                   Br   0.0   0.0   8.0
-                                   Ag   0.0   0.0   9.0
-                                   Au   0.0   0.0  10.0
-                                   Hg   0.0   0.0  11.0""")
+        mol = Molecule.read_molecule_string("""H    0.0   0.0   0.0
+                                               Li   0.0   0.0   1.0
+                                               C    0.0   0.0   2.0
+                                               N    0.0   0.0   3.0
+                                               O    0.0   0.0   4.0
+                                               S    0.0   0.0   5.0
+                                               Cu   0.0   0.0   6.0
+                                               Zn   0.0   0.0   7.0
+                                               Br   0.0   0.0   8.0
+                                               Ag   0.0   0.0   9.0
+                                               Au   0.0   0.0  10.0
+                                               Hg   0.0   0.0  11.0""")
 
         atom_radii = mol.vdw_radii_to_numpy()
 
@@ -310,8 +310,9 @@ class TestMolData:
             H          -2.669421889714        2.207640216349        0.385962694800
         """
 
-        init_mol = Molecule.read_str(init_xyz_str, units='angstrom')
-        final_mol = Molecule.read_str(final_xyz_str, units='angstrom')
+        init_mol = Molecule.read_molecule_string(init_xyz_str, units='angstrom')
+        final_mol = Molecule.read_molecule_string(final_xyz_str,
+                                                  units='angstrom')
 
         ic_rmsd = OptimizationDriver.get_ic_rmsd(final_mol, init_mol)
         ref_ic_rmsd = {

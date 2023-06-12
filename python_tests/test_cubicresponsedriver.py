@@ -22,7 +22,8 @@ class TestCrf:
 
         scf_settings = {'conv_thresh': 1.0e-8}
 
-        molecule = Molecule.read_str(molecule_string, units='ang')
+        molecule = Molecule.read_molecule_string(molecule_string,
+                                                 units='angstrom')
         molecule.set_charge(0)
         molecule.set_multiplicity(1)
 

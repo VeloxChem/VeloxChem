@@ -26,7 +26,7 @@ class TestCheckpoint:
             H   0.0   1.4   1.1
             H   0.0  -1.4   1.1
         """
-        mol = Molecule.read_str(mol_str, units='bohr')
+        mol = Molecule.read_molecule_string(mol_str, units='bohr')
         bas = MolecularBasis.read(mol, 'aug-cc-pvdz', ostream=None)
 
         return mol, bas
@@ -115,14 +115,14 @@ class TestCheckpoint:
         solver._write_checkpoint(mol, bas, dft_dict, pe_dict, labels)
 
         solver._read_checkpoint(labels)
-        assert np.max(
-            np.abs(backup_data['bger'] - solver._dist_bger.data)) < 1.0e-12
-        assert np.max(
-            np.abs(backup_data['bung'] - solver._dist_bung.data)) < 1.0e-12
-        assert np.max(
-            np.abs(backup_data['e2bger'] - solver._dist_e2bger.data)) < 1.0e-12
-        assert np.max(
-            np.abs(backup_data['e2bung'] - solver._dist_e2bung.data)) < 1.0e-12
+        assert np.max(np.abs(backup_data['bger'] -
+                             solver._dist_bger.data)) < 1.0e-12
+        assert np.max(np.abs(backup_data['bung'] -
+                             solver._dist_bung.data)) < 1.0e-12
+        assert np.max(np.abs(backup_data['e2bger'] -
+                             solver._dist_e2bger.data)) < 1.0e-12
+        assert np.max(np.abs(backup_data['e2bung'] -
+                             solver._dist_e2bung.data)) < 1.0e-12
 
         if is_mpi_master(comm) and fpath.is_file():
             fpath.unlink()

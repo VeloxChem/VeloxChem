@@ -35,7 +35,9 @@ class TestVisualization:
                         'alpha')
 
         points = [[0.3 + 1.0 * ix, 0.6 + 1.0 * iy, 0.9 + 1.0 * iz]
-                  for ix in range(2) for iy in range(3) for iz in range(3)]
+                  for ix in range(2)
+                  for iy in range(3)
+                  for iz in range(3)]
         mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis, mol_orbs,
                                 homo, 'alpha')
 
@@ -120,7 +122,7 @@ class TestVisualization:
             H   0.0   1.4   1.1
             H   0.0  -1.4   1.1
         """
-        mol = Molecule.read_str(mol_str, units='bohr')
+        mol = Molecule.read_molecule_string(mol_str, units='bohr')
         num_points = [2, 3, 5]
 
         vis_drv = VisualizationDriver()

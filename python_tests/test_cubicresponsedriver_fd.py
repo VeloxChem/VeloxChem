@@ -22,7 +22,7 @@ class TestCrfFD:
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
         """
-        molecule = Molecule.read_str(molecule_string, units='au')
+        molecule = Molecule.read_molecule_string(molecule_string, units='au')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         a, b, c, d = components

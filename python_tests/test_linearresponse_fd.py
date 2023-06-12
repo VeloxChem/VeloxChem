@@ -25,7 +25,7 @@ class TestLrfFD:
         scf_conv_thresh = 1.0e-8
         rsp_conv_thresh = 1.0e-5
 
-        molecule = Molecule.read_str(molecule_string, units='au')
+        molecule = Molecule.read_molecule_string(molecule_string, units='au')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         # LR driver

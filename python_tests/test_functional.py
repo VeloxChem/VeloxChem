@@ -26,7 +26,7 @@ class TestFunctionalExcVxc:
         grid_level = 1
         tol = 1.0e-10
 
-        molecule = Molecule.read_str(mol_str, units="angstrom")
+        molecule = Molecule.read_molecule_string(mol_str, units="angstrom")
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
@@ -98,7 +98,7 @@ class TestFunctionalExcVxc:
         grid_level = 1
         tol = 1.0e-10
 
-        molecule = Molecule.read_str(mol_str, units="angstrom")
+        molecule = Molecule.read_molecule_string(mol_str, units="angstrom")
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()

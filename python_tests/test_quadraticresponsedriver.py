@@ -19,7 +19,8 @@ class TestQrf:
         """
         basis_set_label = '6-31G'
 
-        molecule = Molecule.read_str(molecule_string, units='ang')
+        molecule = Molecule.read_molecule_string(molecule_string,
+                                                 units='angstrom')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()

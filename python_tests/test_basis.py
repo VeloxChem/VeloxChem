@@ -46,7 +46,7 @@ class TestBasis:
 
         if is_mpi_master():
 
-            molecule = Molecule.read_str(mol_text, units='angstrom')
+            molecule = Molecule.read_molecule_string(mol_text, units='angstrom')
 
             here = Path(__file__).parent
             basis_file = here / 'inputs' / basis_name
