@@ -18,16 +18,17 @@ class TestTPA:
         method_settings = {'xcfun': 'BP86'}
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(scf_settings, method_settings)
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
-        return scf_drv.scf_tensors
+        return scf_results
 
     def run_tpa(self, inpfile, tpa_type, w, ref_result):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
 
-        scf_tensors = self.run_scf(task)
+        scf_results = self.run_scf(task)
 
         tpa_prop = TPA(
             {
@@ -38,16 +39,16 @@ class TestTPA:
             }, {'xcfun': 'BP86'})
 
         tpa_prop.init_driver(task.mpi_comm, task.ostream)
-        tpa_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        tpa_prop.compute(task.molecule, task.ao_basis, scf_results)
 
         if is_mpi_master(task.mpi_comm):
             tpa_result = tpa_prop.rsp_property
 
             for key in ref_result:
-                assert abs(tpa_result[key][
-                    (w, -w, w)].real / ref_result[key].real - 1.0) < 1.0e-6
-                assert abs(tpa_result[key][
-                    (w, -w, w)].imag / ref_result[key].imag - 1.0) < 1.0e-6
+                assert abs(tpa_result[key][(w, -w, w)].real /
+                           ref_result[key].real - 1.0) < 1.0e-6
+                assert abs(tpa_result[key][(w, -w, w)].imag /
+                           ref_result[key].imag - 1.0) < 1.0e-6
 
     def test_tpa_full(self):
 

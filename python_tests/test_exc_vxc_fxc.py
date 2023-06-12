@@ -35,11 +35,11 @@ class TestExcVxc:
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
         gs_density = scf_drv.density
 
         if scf_drv.rank == 0:
-            mo = scf_drv.scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             nvir = mo.shape[1] - nocc
             mo_occ = mo[:, :nocc]
@@ -137,11 +137,11 @@ class TestExcVxc:
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
         gs_density = scf_drv.density
 
         if scf_drv.rank == 0:
-            mo = scf_drv.scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             nvir = mo.shape[1] - nocc
             mo_occ = mo[:, :nocc]

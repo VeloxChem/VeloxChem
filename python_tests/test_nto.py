@@ -25,7 +25,8 @@ class TestNTO:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         # run TDA/RPA
 
@@ -44,8 +45,7 @@ class TestNTO:
         elif flag == 'rpa':
             rsp_drv = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
         rsp_drv.update_settings(rsp_dict, task.input_dict['method_settings'])
-        rsp_results = rsp_drv.compute(task.molecule, task.ao_basis,
-                                      scf_drv.scf_tensors)
+        rsp_results = rsp_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         if is_mpi_master(task.mpi_comm):
             eig_vals = rsp_results['eigenvalues']

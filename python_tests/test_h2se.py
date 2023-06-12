@@ -53,14 +53,15 @@ class TestH2Se:
         task.molecule.check_multiplicity()
 
         scf_unrest_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
-        scf_unrest_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_unrest_results = scf_unrest_drv.compute(task.molecule,
+                                                    task.ao_basis,
+                                                    task.min_basis)
 
         e_uhf = scf_unrest_drv.get_scf_energy()
         assert abs(-2400.38319890 - e_uhf) < 1.0e-8
 
         if is_mpi_master(task.mpi_comm):
-            s2 = scf_unrest_drv.compute_s2(task.molecule,
-                                           scf_unrest_drv.scf_tensors)
+            s2 = scf_unrest_drv.compute_s2(task.molecule, scf_unrest_results)
             assert abs(0.7619 - s2) < 1.0e-4
 
         task.finish()
@@ -74,8 +75,8 @@ class TestH2Se:
         task = MpiTask([inpfile, None])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-        scf_tensors = scf_drv.scf_tensors
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         # TDA
         tda_exci = TdaEigenSolver(task.mpi_comm, task.ostream)
@@ -87,7 +88,7 @@ class TestH2Se:
         })
 
         tda_results = tda_exci.compute(task.molecule, task.ao_basis,
-                                       scf_tensors)
+                                       scf_results)
 
         if is_mpi_master(task.mpi_comm):
 
@@ -119,7 +120,7 @@ class TestH2Se:
             'conv_thresh': 1.0e-4,
         })
 
-        rpa_results = lreig.compute(task.molecule, task.ao_basis, scf_tensors)
+        rpa_results = lreig.compute(task.molecule, task.ao_basis, scf_results)
 
         if is_mpi_master(task.mpi_comm):
 
@@ -152,7 +153,7 @@ class TestH2Se:
         })
 
         lr_results = lr_solver.compute(task.molecule, task.ao_basis,
-                                       scf_tensors)
+                                       scf_results)
 
         if is_mpi_master(task.mpi_comm):
 

@@ -18,13 +18,13 @@ class TestE2:
         task = MpiTask([inpfile, outfile])
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
-        scf_tensors = scf_drv.scf_tensors
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         # E[2]
 
         lreig_solver = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-        E2 = lreig_solver.get_e2(task.molecule, task.ao_basis, scf_tensors)
+        E2 = lreig_solver.get_e2(task.molecule, task.ao_basis, scf_results)
 
         if is_mpi_master(task.mpi_comm):
 

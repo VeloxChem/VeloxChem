@@ -32,13 +32,13 @@ class TestCrf:
         scf_drv.ostream.mute()
         method_settings = {'xcfun': 'SLDA', 'grid_level': 4}
         scf_drv.update_settings(scf_settings, method_settings)
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
-        return scf_drv.scf_tensors, molecule, basis, method_settings
+        return scf_results, molecule, basis, method_settings
 
     def run_crf(self, ref_result):
 
-        scf_tensors, molecule, ao_basis, method_settings = self.run_scf()
+        scf_results, molecule, ao_basis, method_settings = self.run_scf()
 
         wb = 0
         wc = 0
@@ -59,7 +59,7 @@ class TestCrf:
         crf_prop = CubicResponseDriver()
         crf_prop.ostream.mute()
         crf_prop.update_settings(rsp_settings, method_settings)
-        crf_result = crf_prop.compute(molecule, ao_basis, scf_tensors)
+        crf_result = crf_prop.compute(molecule, ao_basis, scf_results)
 
         if is_mpi_master():
             for key in ref_result:

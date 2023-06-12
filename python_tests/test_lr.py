@@ -21,9 +21,10 @@ class TestLR:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
-        return scf_drv.scf_tensors
+        return scf_results
 
     def run_lr(self, inpfile, potfile, xcfun_label, raw_data):
 
@@ -36,7 +37,7 @@ class TestLR:
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
-        scf_tensors = self.run_scf(task)
+        scf_results = self.run_scf(task)
 
         ref_freqs = [0.0, 0.05, 0.1]
         ref_freqs_str = [str(x) for x in ref_freqs]
@@ -48,13 +49,15 @@ class TestLR:
                 'frequencies': ','.join(ref_freqs_str),
                 'batch_size': choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         if is_mpi_master(task.mpi_comm):
             self.check_printout(lr_drv, lr_results)
             prop = np.array([
-                -lr_results['response_functions'][(a, b, w)] for w in ref_freqs
-                for a in 'xyz' for b in 'xyz'
+                -lr_results['response_functions'][(a, b, w)]
+                for w in ref_freqs
+                for a in 'xyz'
+                for b in 'xyz'
             ])
             assert np.max(np.abs(prop - ref_prop)) < 1.0e-4
 

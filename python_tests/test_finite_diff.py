@@ -20,11 +20,11 @@ class TestFiniteDifference:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-        scf_prop.compute_scf_prop(task.molecule, task.ao_basis,
-                                  scf_drv.scf_tensors)
+        scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_results)
 
         cart = 2  # z-component
         delta_ef = 1.0e-4
@@ -38,21 +38,21 @@ class TestFiniteDifference:
 
         scf_drv_plus = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv_plus.update_settings(task.input_dict['scf'], method_dict_plus)
-        scf_drv_plus.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results_plus = scf_drv_plus.compute(task.molecule, task.ao_basis,
+                                                task.min_basis)
 
         lr_prop_plus = Polarizability({'frequencies': '0'}, method_dict_plus)
         lr_prop_plus.init_driver(task.mpi_comm, task.ostream)
-        lr_prop_plus.compute(task.molecule, task.ao_basis,
-                             scf_drv_plus.scf_tensors)
+        lr_prop_plus.compute(task.molecule, task.ao_basis, scf_results_plus)
 
         scf_drv_minus = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv_minus.update_settings(task.input_dict['scf'], method_dict_minus)
-        scf_drv_minus.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results_minus = scf_drv_minus.compute(task.molecule, task.ao_basis,
+                                                  task.min_basis)
 
         lr_prop_minus = Polarizability({'frequencies': '0'}, method_dict_minus)
         lr_prop_minus.init_driver(task.mpi_comm, task.ostream)
-        lr_prop_minus.compute(task.molecule, task.ao_basis,
-                              scf_drv_minus.scf_tensors)
+        lr_prop_minus.compute(task.molecule, task.ao_basis, scf_results_minus)
 
         if is_mpi_master(task.mpi_comm):
             e_scf_plus = scf_drv_plus.scf_energy

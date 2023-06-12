@@ -31,13 +31,13 @@ class TestCrf:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.update_settings(scf_settings)
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
-        return scf_drv.scf_tensors, molecule, basis
+        return scf_results, molecule, basis
 
     def run_crf(self, ref_result):
 
-        scf_tensors, molecule, ao_basis = self.run_scf()
+        scf_results, molecule, ao_basis = self.run_scf()
 
         wb = -0.1
         wc = 0.3
@@ -58,7 +58,7 @@ class TestCrf:
         crf_prop = CubicResponseDriver()
         crf_prop.ostream.mute()
         crf_prop.update_settings(rsp_settings)
-        crf_result = crf_prop.compute(molecule, ao_basis, scf_tensors)
+        crf_result = crf_prop.compute(molecule, ao_basis, scf_results)
 
         if is_mpi_master():
             for key in ref_result:

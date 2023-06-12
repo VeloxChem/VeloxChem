@@ -28,7 +28,8 @@ class TestRPA:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         ref_exc_ene = [float(line.split()[1]) for line in data_lines]
         ref_osc_str = [float(line.split()[3]) for line in data_lines]
@@ -43,7 +44,7 @@ class TestRPA:
             task.input_dict['method_settings'],
         )
         rpa_results = rpa_solver.compute(task.molecule, task.ao_basis,
-                                         scf_drv.scf_tensors)
+                                         scf_results)
 
         if is_mpi_master(task.mpi_comm):
             exc_ene = rpa_results['eigenvalues'] * hartree_in_ev()
