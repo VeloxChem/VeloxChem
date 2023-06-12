@@ -362,8 +362,9 @@ class ForceFieldGenerator:
                     'ForceFieldGenerator.read_qm_scan_xyz_files: ' +
                     'inconsistent number of atoms')
 
-                xyz_str = ''.join(xyz_lines[i_start + 2:i_end])
-                geometries.append(Molecule.read_str(xyz_str, units='angstrom'))
+                mol_str = ''.join(xyz_lines[i_start + 2:i_end])
+                geometries.append(
+                    Molecule.read_molecule_string(mol_str, units='angstrom'))
 
             self.scan_geometries.append(geometries)
 

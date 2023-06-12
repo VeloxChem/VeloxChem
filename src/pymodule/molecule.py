@@ -114,11 +114,11 @@ def _Molecule_read_smiles(smiles_str):
 
 
 @staticmethod
-def _Molecule_read_str(xyzstr, units='angstrom'):
+def _Molecule_read_molecule_string(mol_str, units='angstrom'):
     """
     Reads molecule from a string containing Cartesian coordinates.
 
-    :param xyzstr:
+    :param mol_str:
         The string containing Cartesian coordinates.
     :param units:
         The unit of coordinates.
@@ -130,7 +130,7 @@ def _Molecule_read_str(xyzstr, units='angstrom'):
     labels = []
     coords = []
 
-    for line in xyzstr.strip().splitlines():
+    for line in mol_str.strip().splitlines():
         if line:
             content = line.split()
             labels.append(content[0])
@@ -179,8 +179,8 @@ def _Molecule_read_xyz_string(xyz):
     assert_msg_critical(natoms == len(lines[2:]),
                         'Inconsistent number of atoms in XYZ input')
 
-    coords_str = '\n'.join(lines[2:])
-    return Molecule.read_str(coords_str, 'angstrom')
+    mol_str = '\n'.join(lines[2:])
+    return Molecule.read_molecule_string(mol_str, 'angstrom')
 
 
 @staticmethod
@@ -199,11 +199,11 @@ def _Molecule_from_dict(mol_dict):
                         'Molecule: Expecting either "xyz" or "xyzfile" input')
 
     if 'xyz' in mol_dict:
-        xyzstr = '\n'.join(mol_dict['xyz'])
+        mol_str = '\n'.join(mol_dict['xyz'])
         units = 'angstrom'
         if 'units' in mol_dict:
             units = mol_dict['units'].lower()
-        mol = Molecule.read_str(xyzstr, units)
+        mol = Molecule.read_molecule_string(mol_str, units)
 
     elif 'xyzfile' in mol_dict:
         assert_msg_critical(
@@ -494,7 +494,7 @@ def _Molecule_deepcopy(self, memo):
 Molecule._smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.draw_2d_svg = _Molecule_draw_2d_svg
 Molecule.read_smiles = _Molecule_read_smiles
-Molecule.read_str = _Molecule_read_str
+Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
 Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
@@ -517,3 +517,4 @@ Molecule.__deepcopy__ = _Molecule_deepcopy
 Molecule.read_xyz = _Molecule_read_xyz_file
 Molecule.from_xyz_string = _Molecule_read_xyz_string
 Molecule.write_xyz = _Molecule_write_xyz_file
+Molecule.read_str = _Molecule_read_molecule_string

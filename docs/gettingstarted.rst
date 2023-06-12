@@ -66,7 +66,7 @@ Running in Jupyter notebook
         H 0 0 1.795239827225189
         H 1.693194615993441 0 -0.599043184453037"""
 
-    molecule = vlx.Molecule.read_str(molecule_string, units='angstrom')
+    molecule = vlx.Molecule.read_molecule_string(molecule_string, units='angstrom')
 
     basis = vlx.MolecularBasis.read(molecule, 'def2-svp')
 

@@ -232,11 +232,12 @@ class RespChargesDriver:
                     int(xyz_lines[i_start].split()[0]) == n_atoms,
                     'RespChargesDriver.compute: inconsistent number of atoms')
 
-                xyz_str = ''.join(xyz_lines[i_start + 2:i_end])
+                mol_str = ''.join(xyz_lines[i_start + 2:i_end])
 
                 if self.rank == mpi_master():
                     # create molecule
-                    mol = Molecule.read_str(xyz_str, units='angstrom')
+                    mol = Molecule.read_molecule_string(mol_str,
+                                                        units='angstrom')
                     mol.set_charge(self.net_charge)
                     mol.set_multiplicity(self.multiplicity)
                     # create basis set

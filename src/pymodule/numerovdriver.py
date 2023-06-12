@@ -398,8 +398,9 @@ class NumerovDriver:
         self.print_PEC_header(scf_drv)
 
         for n, x in enumerate(bond_lengths):
-            geometry = Molecule.read_str('{}  0 0 0\n{}  {} 0 0'.format(
-                atom1, atom2, x * bohr_in_angstrom()))
+            geometry = Molecule.read_molecule_string(
+                '{}  0 0 0\n{}  {} 0 0'.format(atom1, atom2,
+                                               x * bohr_in_angstrom()))
 
             scf_results = scf_drv.compute(geometry, ao_basis, min_basis)
             scf_prop.compute_scf_prop(geometry, ao_basis, scf_results)
