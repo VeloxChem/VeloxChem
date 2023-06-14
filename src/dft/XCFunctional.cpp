@@ -3649,3 +3649,25 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
                                  v4lapltau3,
                                  v4tau4);
 }
+
+const xc_func_type*
+CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
+{
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        auto family = funcptr->info->family;
+
+        if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
+        {
+            return funcptr;
+        }
+    }
+
+    std::string errmsg("XCFunctional.getFunctionalPointerToMetaGgaComponent: Cannot find meta-GGA functional component");
+
+    errors::assertMsgCritical(false, errmsg);
+
+    return nullptr;
+}

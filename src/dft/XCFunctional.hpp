@@ -540,6 +540,11 @@ class CXCFunctional
                               double*       v4lapl2tau2,
                               double*       v4lapltau3,
                               double*       v4tau4) const -> void;
+
+    /** Gets functional pointer to the first meta-GGA component.
+     * @return the pointer.
+     */
+    const xc_func_type* getFunctionalPointerToMetaGgaComponent() const;
 };
 
 #endif /* XCFunctional_hpp */
