@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "DensityGrid.hpp"
+#include "XCFunctional.hpp"
 
 namespace gridscreen {  // gridscreen namespace
 
@@ -339,6 +340,7 @@ void screenLxcForGGA(const int32_t npoints,
 /**
  Screens Lxc Fock for MGGA.
 
+ @param xcFunctionalPointer the pointer to the exchange-correlation functional.
  @param npoints the number of grid points.
  @param rho the density.
  @param sigma the dot product of density gradient.
@@ -380,7 +382,8 @@ void screenLxcForGGA(const int32_t npoints,
  @param v4lapltau3 ,
  @param v4tau4 ,
  */
-void screenLxcForMGGA(const int32_t npoints,
+void screenLxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                      const int32_t npoints,
                       const double* rho,
                       const double* sigma,
                       const double* lapl,

@@ -1185,7 +1185,8 @@ screenLxcForGGA(const int32_t npoints,
 }
 
 void
-screenLxcForMGGA(const int32_t npoints,
+screenLxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                 const int32_t npoints,
                  const double* rho,
                  const double* sigma,
                  const double* lapl,
@@ -1231,6 +1232,8 @@ screenLxcForMGGA(const int32_t npoints,
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
     double tauThreshold = getTauScreeningThreshold();
+
+    auto mgga_ptr = xcFunctionalPointer->getFunctionalPointerToMetaGgaComponent();
 
     for (int32_t g = 0; g < npoints; g++)
     {
@@ -1375,55 +1378,53 @@ screenLxcForMGGA(const int32_t npoints,
             v4rhosigma3[20 * g + 17] = 0.0;
             v4rhosigma3[20 * g + 18] = 0.0;
 
-            // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24)
-            v4rhosigma2lapl[36 * g + 0]  = 0.0;
-            v4rhosigma2lapl[36 * g + 1]  = 0.0;
-            v4rhosigma2lapl[36 * g + 2]  = 0.0;
-            v4rhosigma2lapl[36 * g + 3]  = 0.0;
-            v4rhosigma2lapl[36 * g + 4]  = 0.0;
-            v4rhosigma2lapl[36 * g + 5]  = 0.0;
-            v4rhosigma2lapl[36 * g + 6]  = 0.0;
-            v4rhosigma2lapl[36 * g + 7]  = 0.0;
-            v4rhosigma2lapl[36 * g + 8]  = 0.0;
-            v4rhosigma2lapl[36 * g + 9]  = 0.0;
-            v4rhosigma2lapl[36 * g + 10] = 0.0;
-            v4rhosigma2lapl[36 * g + 11] = 0.0;
-            v4rhosigma2lapl[36 * g + 12] = 0.0;
-            v4rhosigma2lapl[36 * g + 13] = 0.0;
-            v4rhosigma2lapl[36 * g + 14] = 0.0;
-            v4rhosigma2lapl[36 * g + 15] = 0.0;
-            v4rhosigma2lapl[36 * g + 16] = 0.0;
-            v4rhosigma2lapl[36 * g + 17] = 0.0;
-            v4rhosigma2lapl[36 * g + 18] = 0.0;
-            v4rhosigma2lapl[36 * g + 19] = 0.0;
-            v4rhosigma2lapl[36 * g + 20] = 0.0;
-            v4rhosigma2lapl[36 * g + 21] = 0.0;
-            v4rhosigma2lapl[36 * g + 22] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 0]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 1]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 2]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 3]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 4]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 5]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 6]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 7]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 8]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 9]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 10] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 11] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 12] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 13] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 14] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 15] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 16] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 17] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 18] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 19] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 20] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 21] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 22] = 0.0;
 
-            // v4rhosigma2tau: inconsistent size in libxc (36 vs 24)
-            v4rhosigma2tau[36 * g + 0]  = 0.0;
-            v4rhosigma2tau[36 * g + 1]  = 0.0;
-            v4rhosigma2tau[36 * g + 2]  = 0.0;
-            v4rhosigma2tau[36 * g + 3]  = 0.0;
-            v4rhosigma2tau[36 * g + 4]  = 0.0;
-            v4rhosigma2tau[36 * g + 5]  = 0.0;
-            v4rhosigma2tau[36 * g + 6]  = 0.0;
-            v4rhosigma2tau[36 * g + 7]  = 0.0;
-            v4rhosigma2tau[36 * g + 8]  = 0.0;
-            v4rhosigma2tau[36 * g + 9]  = 0.0;
-            v4rhosigma2tau[36 * g + 10] = 0.0;
-            v4rhosigma2tau[36 * g + 11] = 0.0;
-            v4rhosigma2tau[36 * g + 12] = 0.0;
-            v4rhosigma2tau[36 * g + 13] = 0.0;
-            v4rhosigma2tau[36 * g + 14] = 0.0;
-            v4rhosigma2tau[36 * g + 15] = 0.0;
-            v4rhosigma2tau[36 * g + 16] = 0.0;
-            v4rhosigma2tau[36 * g + 17] = 0.0;
-            v4rhosigma2tau[36 * g + 18] = 0.0;
-            v4rhosigma2tau[36 * g + 19] = 0.0;
-            v4rhosigma2tau[36 * g + 20] = 0.0;
-            v4rhosigma2tau[36 * g + 21] = 0.0;
-            v4rhosigma2tau[36 * g + 22] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 0]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 1]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 2]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 3]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 4]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 5]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 6]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 7]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 8]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 9]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 10] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 11] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 12] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 13] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 14] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 15] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 16] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 17] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 18] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 19] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 20] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 21] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 22] = 0.0;
 
             v4rhosigmalapl2[18 * g + 0]  = 0.0;
             v4rhosigmalapl2[18 * g + 1]  = 0.0;
@@ -1467,24 +1468,23 @@ screenLxcForMGGA(const int32_t npoints,
             v4rhosigmalapltau[24 * g + 21] = 0.0;
             v4rhosigmalapltau[24 * g + 22] = 0.0;
 
-            // v4rhosigmatau2: inconsistent size in libxc (36 vs 18)
-            v4rhosigmatau2[36 * g + 0]  = 0.0;
-            v4rhosigmatau2[36 * g + 1]  = 0.0;
-            v4rhosigmatau2[36 * g + 2]  = 0.0;
-            v4rhosigmatau2[36 * g + 3]  = 0.0;
-            v4rhosigmatau2[36 * g + 4]  = 0.0;
-            v4rhosigmatau2[36 * g + 5]  = 0.0;
-            v4rhosigmatau2[36 * g + 6]  = 0.0;
-            v4rhosigmatau2[36 * g + 7]  = 0.0;
-            v4rhosigmatau2[36 * g + 8]  = 0.0;
-            v4rhosigmatau2[36 * g + 9]  = 0.0;
-            v4rhosigmatau2[36 * g + 10] = 0.0;
-            v4rhosigmatau2[36 * g + 11] = 0.0;
-            v4rhosigmatau2[36 * g + 12] = 0.0;
-            v4rhosigmatau2[36 * g + 13] = 0.0;
-            v4rhosigmatau2[36 * g + 14] = 0.0;
-            v4rhosigmatau2[36 * g + 15] = 0.0;
-            v4rhosigmatau2[36 * g + 16] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 0]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 1]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 2]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 3]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 4]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 5]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 6]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 7]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 8]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 9]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 10] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 11] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 12] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 13] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 14] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 15] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 16] = 0.0;
 
             v4rholapl3[8 * g + 0] = 0.0;
             v4rholapl3[8 * g + 1] = 0.0;
@@ -1561,26 +1561,25 @@ screenLxcForMGGA(const int32_t npoints,
             v4sigma3lapl[20 * g + 17] = 0.0;
             v4sigma3lapl[20 * g + 18] = 0.0;
 
-            // v4sigma3tau: inconsistent size in libxc (30 vs 20)
-            v4sigma3tau[30 * g + 0]  = 0.0;
-            v4sigma3tau[30 * g + 1]  = 0.0;
-            v4sigma3tau[30 * g + 2]  = 0.0;
-            v4sigma3tau[30 * g + 3]  = 0.0;
-            v4sigma3tau[30 * g + 4]  = 0.0;
-            v4sigma3tau[30 * g + 5]  = 0.0;
-            v4sigma3tau[30 * g + 6]  = 0.0;
-            v4sigma3tau[30 * g + 7]  = 0.0;
-            v4sigma3tau[30 * g + 8]  = 0.0;
-            v4sigma3tau[30 * g + 9]  = 0.0;
-            v4sigma3tau[30 * g + 10] = 0.0;
-            v4sigma3tau[30 * g + 11] = 0.0;
-            v4sigma3tau[30 * g + 12] = 0.0;
-            v4sigma3tau[30 * g + 13] = 0.0;
-            v4sigma3tau[30 * g + 14] = 0.0;
-            v4sigma3tau[30 * g + 15] = 0.0;
-            v4sigma3tau[30 * g + 16] = 0.0;
-            v4sigma3tau[30 * g + 17] = 0.0;
-            v4sigma3tau[30 * g + 18] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 0]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 1]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 2]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 3]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 4]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 5]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 6]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 7]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 8]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 9]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 10] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 11] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 12] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 13] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 14] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 15] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 16] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 17] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 18] = 0.0;
 
             v4sigma2lapl2[18 * g + 0]  = 0.0;
             v4sigma2lapl2[18 * g + 1]  = 0.0;
@@ -1879,55 +1878,53 @@ screenLxcForMGGA(const int32_t npoints,
             v4rhosigma3[20 * g + 18] = 0.0;
             v4rhosigma3[20 * g + 19] = 0.0;
 
-            // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24)
-            v4rhosigma2lapl[36 * g + 1]  = 0.0;
-            v4rhosigma2lapl[36 * g + 2]  = 0.0;
-            v4rhosigma2lapl[36 * g + 3]  = 0.0;
-            v4rhosigma2lapl[36 * g + 4]  = 0.0;
-            v4rhosigma2lapl[36 * g + 5]  = 0.0;
-            v4rhosigma2lapl[36 * g + 6]  = 0.0;
-            v4rhosigma2lapl[36 * g + 7]  = 0.0;
-            v4rhosigma2lapl[36 * g + 8]  = 0.0;
-            v4rhosigma2lapl[36 * g + 9]  = 0.0;
-            v4rhosigma2lapl[36 * g + 10] = 0.0;
-            v4rhosigma2lapl[36 * g + 11] = 0.0;
-            v4rhosigma2lapl[36 * g + 12] = 0.0;
-            v4rhosigma2lapl[36 * g + 13] = 0.0;
-            v4rhosigma2lapl[36 * g + 14] = 0.0;
-            v4rhosigma2lapl[36 * g + 15] = 0.0;
-            v4rhosigma2lapl[36 * g + 16] = 0.0;
-            v4rhosigma2lapl[36 * g + 17] = 0.0;
-            v4rhosigma2lapl[36 * g + 18] = 0.0;
-            v4rhosigma2lapl[36 * g + 19] = 0.0;
-            v4rhosigma2lapl[36 * g + 20] = 0.0;
-            v4rhosigma2lapl[36 * g + 21] = 0.0;
-            v4rhosigma2lapl[36 * g + 22] = 0.0;
-            v4rhosigma2lapl[36 * g + 23] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 1]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 2]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 3]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 4]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 5]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 6]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 7]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 8]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 9]  = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 10] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 11] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 12] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 13] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 14] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 15] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 16] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 17] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 18] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 19] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 20] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 21] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 22] = 0.0;
+            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 23] = 0.0;
 
-            // v4rhosigma2tau: inconsistent size in libxc (36 vs 24)
-            v4rhosigma2tau[36 * g + 1]  = 0.0;
-            v4rhosigma2tau[36 * g + 2]  = 0.0;
-            v4rhosigma2tau[36 * g + 3]  = 0.0;
-            v4rhosigma2tau[36 * g + 4]  = 0.0;
-            v4rhosigma2tau[36 * g + 5]  = 0.0;
-            v4rhosigma2tau[36 * g + 6]  = 0.0;
-            v4rhosigma2tau[36 * g + 7]  = 0.0;
-            v4rhosigma2tau[36 * g + 8]  = 0.0;
-            v4rhosigma2tau[36 * g + 9]  = 0.0;
-            v4rhosigma2tau[36 * g + 10] = 0.0;
-            v4rhosigma2tau[36 * g + 11] = 0.0;
-            v4rhosigma2tau[36 * g + 12] = 0.0;
-            v4rhosigma2tau[36 * g + 13] = 0.0;
-            v4rhosigma2tau[36 * g + 14] = 0.0;
-            v4rhosigma2tau[36 * g + 15] = 0.0;
-            v4rhosigma2tau[36 * g + 16] = 0.0;
-            v4rhosigma2tau[36 * g + 17] = 0.0;
-            v4rhosigma2tau[36 * g + 18] = 0.0;
-            v4rhosigma2tau[36 * g + 19] = 0.0;
-            v4rhosigma2tau[36 * g + 20] = 0.0;
-            v4rhosigma2tau[36 * g + 21] = 0.0;
-            v4rhosigma2tau[36 * g + 22] = 0.0;
-            v4rhosigma2tau[36 * g + 23] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 1]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 2]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 3]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 4]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 5]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 6]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 7]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 8]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 9]  = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 10] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 11] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 12] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 13] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 14] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 15] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 16] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 17] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 18] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 19] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 20] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 21] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 22] = 0.0;
+            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 23] = 0.0;
 
             v4rhosigmalapl2[18 * g + 1]  = 0.0;
             v4rhosigmalapl2[18 * g + 2]  = 0.0;
@@ -1971,24 +1968,23 @@ screenLxcForMGGA(const int32_t npoints,
             v4rhosigmalapltau[24 * g + 22] = 0.0;
             v4rhosigmalapltau[24 * g + 23] = 0.0;
 
-            // v4rhosigmatau2: inconsistent size in libxc (36 vs 18)
-            v4rhosigmatau2[36 * g + 1]  = 0.0;
-            v4rhosigmatau2[36 * g + 2]  = 0.0;
-            v4rhosigmatau2[36 * g + 3]  = 0.0;
-            v4rhosigmatau2[36 * g + 4]  = 0.0;
-            v4rhosigmatau2[36 * g + 5]  = 0.0;
-            v4rhosigmatau2[36 * g + 6]  = 0.0;
-            v4rhosigmatau2[36 * g + 7]  = 0.0;
-            v4rhosigmatau2[36 * g + 8]  = 0.0;
-            v4rhosigmatau2[36 * g + 9]  = 0.0;
-            v4rhosigmatau2[36 * g + 10] = 0.0;
-            v4rhosigmatau2[36 * g + 11] = 0.0;
-            v4rhosigmatau2[36 * g + 12] = 0.0;
-            v4rhosigmatau2[36 * g + 13] = 0.0;
-            v4rhosigmatau2[36 * g + 14] = 0.0;
-            v4rhosigmatau2[36 * g + 15] = 0.0;
-            v4rhosigmatau2[36 * g + 16] = 0.0;
-            v4rhosigmatau2[36 * g + 17] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 1]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 2]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 3]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 4]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 5]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 6]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 7]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 8]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 9]  = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 10] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 11] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 12] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 13] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 14] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 15] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 16] = 0.0;
+            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 17] = 0.0;
 
             v4rholapl3[8 * g + 1] = 0.0;
             v4rholapl3[8 * g + 2] = 0.0;
@@ -2065,26 +2061,25 @@ screenLxcForMGGA(const int32_t npoints,
             v4sigma3lapl[20 * g + 18] = 0.0;
             v4sigma3lapl[20 * g + 19] = 0.0;
 
-            // v4sigma3tau: inconsistent size in libxc (30 vs 20)
-            v4sigma3tau[30 * g + 1]  = 0.0;
-            v4sigma3tau[30 * g + 2]  = 0.0;
-            v4sigma3tau[30 * g + 3]  = 0.0;
-            v4sigma3tau[30 * g + 4]  = 0.0;
-            v4sigma3tau[30 * g + 5]  = 0.0;
-            v4sigma3tau[30 * g + 6]  = 0.0;
-            v4sigma3tau[30 * g + 7]  = 0.0;
-            v4sigma3tau[30 * g + 8]  = 0.0;
-            v4sigma3tau[30 * g + 9]  = 0.0;
-            v4sigma3tau[30 * g + 10] = 0.0;
-            v4sigma3tau[30 * g + 11] = 0.0;
-            v4sigma3tau[30 * g + 12] = 0.0;
-            v4sigma3tau[30 * g + 13] = 0.0;
-            v4sigma3tau[30 * g + 14] = 0.0;
-            v4sigma3tau[30 * g + 15] = 0.0;
-            v4sigma3tau[30 * g + 16] = 0.0;
-            v4sigma3tau[30 * g + 17] = 0.0;
-            v4sigma3tau[30 * g + 18] = 0.0;
-            v4sigma3tau[30 * g + 19] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 1]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 2]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 3]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 4]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 5]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 6]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 7]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 8]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 9]  = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 10] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 11] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 12] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 13] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 14] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 15] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 16] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 17] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 18] = 0.0;
+            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 19] = 0.0;
 
             v4sigma2lapl2[18 * g + 1]  = 0.0;
             v4sigma2lapl2[18 * g + 2]  = 0.0;

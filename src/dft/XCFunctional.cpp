@@ -3602,7 +3602,8 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
         mem::free(stage_v4tau4);
     }
 
-    gridscreen::screenLxcForMGGA(np,
+    gridscreen::screenLxcForMGGA(this,
+                                 np,
                                  rho,
                                  sigma,
                                  lapl,
