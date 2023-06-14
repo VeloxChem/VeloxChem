@@ -1112,6 +1112,7 @@ class CXCIntegrator
     /**
      Integrates meta-GGA contribution to (fourth-order) Lxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -1191,7 +1192,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialLxcFockForMGGA(const int32_t            npoints,
+    CDenseMatrix _integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
+                                                 const int32_t            npoints,
                                                  const double*            weights,
                                                  const CDenseMatrix&      gtoValues,
                                                  const CDenseMatrix&      gtoValuesX,

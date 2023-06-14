@@ -4283,6 +4283,8 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     CMemBlock<double> v3tau3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
 
     // Fourth-order
+    auto mgga_ptr = xcFunctional.getFunctionalPointerToMetaGgaComponent();
+
     CMemBlock<double> v4rho4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rho3sigma_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rho3lapl_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
@@ -4294,18 +4296,18 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     CMemBlock<double> v4rho2lapltau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rho2tau2_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rhosigma3_data(20 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigma2lapl_data(36 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigma2tau_data(36 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rhosigma2lapl_data(mgga_ptr->dim.v4rhosigma2lapl * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rhosigma2tau_data(mgga_ptr->dim.v4rhosigma2tau * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rhosigmalapl2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rhosigmalapltau_data(24 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigmatau2_data(36 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4rhosigmatau2_data(mgga_ptr->dim.v4rhosigmatau2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rholapl3_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rholapl2tau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rholapltau2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4rhotau3_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4sigma4_data(15 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4sigma3lapl_data(20 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigma3tau_data(30 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v4sigma3tau_data(mgga_ptr->dim.v4sigma3tau * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4sigma2lapl2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4sigma2lapltau_data(24 * molecularGrid.getMaxNumberOfGridPointsPerBox());
     CMemBlock<double> v4sigma2tau2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
@@ -4709,7 +4711,8 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
         {
             // compute partial contribution to Lxc matrix
 
-            auto partial_mat_Lxc = _integratePartialLxcFockForMGGA(npoints,
+            auto partial_mat_Lxc = _integratePartialLxcFockForMGGA(xcFunctional,
+                                                                   npoints,
                                                                    local_weights,
                                                                    mat_chi,
                                                                    mat_chi_x,
@@ -9129,7 +9132,8 @@ CXCIntegrator::_integratePartialLxcFockForGGA(const int32_t            npoints,
 }
 
 CDenseMatrix
-CXCIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoints,
+CXCIntegrator::_integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
+                                               const int32_t            npoints,
                                                const double*            weights,
                                                const CDenseMatrix&      gtoValues,
                                                const CDenseMatrix&      gtoValuesX,
@@ -9368,6 +9372,8 @@ CXCIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoints,
     auto G_gga_x_val = mat_G_gga_x.values();
     auto G_gga_y_val = mat_G_gga_y.values();
     auto G_gga_z_val = mat_G_gga_z.values();
+
+    auto mgga_ptr = xcFunctional.getFunctionalPointerToMetaGgaComponent();
 
     #pragma omp parallel
     {
@@ -9995,55 +10001,53 @@ CXCIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoints,
                 auto v4rhosigma3_bccb = v4rhosigma3[20 * g + 17];
                 auto v4rhosigma3_bcbb = v4rhosigma3[20 * g + 18];
 
-                // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24)
-                // auto v4rhosigma2lapl_aaaa = v4rhosigma2lapl[36 * g + 0];
-                // auto v4rhosigma2lapl_aaab = v4rhosigma2lapl[36 * g + 1];
-                // auto v4rhosigma2lapl_aaca = v4rhosigma2lapl[36 * g + 2];
-                // auto v4rhosigma2lapl_aacb = v4rhosigma2lapl[36 * g + 3];
-                // auto v4rhosigma2lapl_aaba = v4rhosigma2lapl[36 * g + 4];
-                // auto v4rhosigma2lapl_aabb = v4rhosigma2lapl[36 * g + 5];
-                // auto v4rhosigma2lapl_acca = v4rhosigma2lapl[36 * g + 6];
-                // auto v4rhosigma2lapl_accb = v4rhosigma2lapl[36 * g + 7];
-                // auto v4rhosigma2lapl_acba = v4rhosigma2lapl[36 * g + 8];
-                // auto v4rhosigma2lapl_acbb = v4rhosigma2lapl[36 * g + 9];
-                // auto v4rhosigma2lapl_abba = v4rhosigma2lapl[36 * g + 10];
-                // auto v4rhosigma2lapl_abbb = v4rhosigma2lapl[36 * g + 11];
-                // auto v4rhosigma2lapl_baaa = v4rhosigma2lapl[36 * g + 12];
-                // auto v4rhosigma2lapl_baab = v4rhosigma2lapl[36 * g + 13];
-                // auto v4rhosigma2lapl_baca = v4rhosigma2lapl[36 * g + 14];
-                // auto v4rhosigma2lapl_bacb = v4rhosigma2lapl[36 * g + 15];
-                // auto v4rhosigma2lapl_baba = v4rhosigma2lapl[36 * g + 16];
-                // auto v4rhosigma2lapl_babb = v4rhosigma2lapl[36 * g + 17];
-                // auto v4rhosigma2lapl_bcca = v4rhosigma2lapl[36 * g + 18];
-                // auto v4rhosigma2lapl_bccb = v4rhosigma2lapl[36 * g + 19];
-                // auto v4rhosigma2lapl_bcba = v4rhosigma2lapl[36 * g + 20];
-                // auto v4rhosigma2lapl_bcbb = v4rhosigma2lapl[36 * g + 21];
-                // auto v4rhosigma2lapl_bbba = v4rhosigma2lapl[36 * g + 22];
+                // auto v4rhosigma2lapl_aaaa = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 0];
+                // auto v4rhosigma2lapl_aaab = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 1];
+                // auto v4rhosigma2lapl_aaca = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 2];
+                // auto v4rhosigma2lapl_aacb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 3];
+                // auto v4rhosigma2lapl_aaba = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 4];
+                // auto v4rhosigma2lapl_aabb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 5];
+                // auto v4rhosigma2lapl_acca = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 6];
+                // auto v4rhosigma2lapl_accb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 7];
+                // auto v4rhosigma2lapl_acba = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 8];
+                // auto v4rhosigma2lapl_acbb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 9];
+                // auto v4rhosigma2lapl_abba = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 10];
+                // auto v4rhosigma2lapl_abbb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 11];
+                // auto v4rhosigma2lapl_baaa = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 12];
+                // auto v4rhosigma2lapl_baab = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 13];
+                // auto v4rhosigma2lapl_baca = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 14];
+                // auto v4rhosigma2lapl_bacb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 15];
+                // auto v4rhosigma2lapl_baba = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 16];
+                // auto v4rhosigma2lapl_babb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 17];
+                // auto v4rhosigma2lapl_bcca = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 18];
+                // auto v4rhosigma2lapl_bccb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 19];
+                // auto v4rhosigma2lapl_bcba = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 20];
+                // auto v4rhosigma2lapl_bcbb = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 21];
+                // auto v4rhosigma2lapl_bbba = v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 22];
 
-                // v4rhosigma2tau: inconsistent size in libxc (36 vs 24)
-                auto v4rhosigma2tau_aaaa = v4rhosigma2tau[36 * g + 0];
-                auto v4rhosigma2tau_aaab = v4rhosigma2tau[36 * g + 1];
-                auto v4rhosigma2tau_aaca = v4rhosigma2tau[36 * g + 2];
-                auto v4rhosigma2tau_aacb = v4rhosigma2tau[36 * g + 3];
-                auto v4rhosigma2tau_aaba = v4rhosigma2tau[36 * g + 4];
-                auto v4rhosigma2tau_aabb = v4rhosigma2tau[36 * g + 5];
-                auto v4rhosigma2tau_acca = v4rhosigma2tau[36 * g + 6];
-                auto v4rhosigma2tau_accb = v4rhosigma2tau[36 * g + 7];
-                auto v4rhosigma2tau_acba = v4rhosigma2tau[36 * g + 8];
-                auto v4rhosigma2tau_acbb = v4rhosigma2tau[36 * g + 9];
-                auto v4rhosigma2tau_abba = v4rhosigma2tau[36 * g + 10];
-                auto v4rhosigma2tau_abbb = v4rhosigma2tau[36 * g + 11];
-                auto v4rhosigma2tau_baaa = v4rhosigma2tau[36 * g + 12];
-                auto v4rhosigma2tau_baab = v4rhosigma2tau[36 * g + 13];
-                auto v4rhosigma2tau_baca = v4rhosigma2tau[36 * g + 14];
-                auto v4rhosigma2tau_bacb = v4rhosigma2tau[36 * g + 15];
-                auto v4rhosigma2tau_baba = v4rhosigma2tau[36 * g + 16];
-                auto v4rhosigma2tau_babb = v4rhosigma2tau[36 * g + 17];
-                auto v4rhosigma2tau_bcca = v4rhosigma2tau[36 * g + 18];
-                auto v4rhosigma2tau_bccb = v4rhosigma2tau[36 * g + 19];
-                auto v4rhosigma2tau_bcba = v4rhosigma2tau[36 * g + 20];
-                auto v4rhosigma2tau_bcbb = v4rhosigma2tau[36 * g + 21];
-                auto v4rhosigma2tau_bbba = v4rhosigma2tau[36 * g + 22];
+                auto v4rhosigma2tau_aaaa = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 0];
+                auto v4rhosigma2tau_aaab = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 1];
+                auto v4rhosigma2tau_aaca = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 2];
+                auto v4rhosigma2tau_aacb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 3];
+                auto v4rhosigma2tau_aaba = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 4];
+                auto v4rhosigma2tau_aabb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 5];
+                auto v4rhosigma2tau_acca = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 6];
+                auto v4rhosigma2tau_accb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 7];
+                auto v4rhosigma2tau_acba = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 8];
+                auto v4rhosigma2tau_acbb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 9];
+                auto v4rhosigma2tau_abba = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 10];
+                auto v4rhosigma2tau_abbb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 11];
+                auto v4rhosigma2tau_baaa = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 12];
+                auto v4rhosigma2tau_baab = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 13];
+                auto v4rhosigma2tau_baca = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 14];
+                auto v4rhosigma2tau_bacb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 15];
+                auto v4rhosigma2tau_baba = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 16];
+                auto v4rhosigma2tau_babb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 17];
+                auto v4rhosigma2tau_bcca = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 18];
+                auto v4rhosigma2tau_bccb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 19];
+                auto v4rhosigma2tau_bcba = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 20];
+                auto v4rhosigma2tau_bcbb = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 21];
+                auto v4rhosigma2tau_bbba = v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 22];
 
                 // auto v4rhosigmalapl2_aaaa = v4rhosigmalapl2[18 * g + 0];
                 // auto v4rhosigmalapl2_aaab = v4rhosigmalapl2[18 * g + 1];
@@ -10087,24 +10091,23 @@ CXCIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoints,
                 // auto v4rhosigmalapltau_bbab = v4rhosigmalapltau[24 * g + 21];
                 // auto v4rhosigmalapltau_bbba = v4rhosigmalapltau[24 * g + 22];
 
-                // v4rhosigmatau2: inconsistent size in libxc (36 vs 18)
-                auto v4rhosigmatau2_aaaa = v4rhosigmatau2[36 * g + 0];
-                auto v4rhosigmatau2_aaab = v4rhosigmatau2[36 * g + 1];
-                auto v4rhosigmatau2_aabb = v4rhosigmatau2[36 * g + 2];
-                auto v4rhosigmatau2_acaa = v4rhosigmatau2[36 * g + 3];
-                auto v4rhosigmatau2_acab = v4rhosigmatau2[36 * g + 4];
-                auto v4rhosigmatau2_acbb = v4rhosigmatau2[36 * g + 5];
-                auto v4rhosigmatau2_abaa = v4rhosigmatau2[36 * g + 6];
-                auto v4rhosigmatau2_abab = v4rhosigmatau2[36 * g + 7];
-                auto v4rhosigmatau2_abbb = v4rhosigmatau2[36 * g + 8];
-                auto v4rhosigmatau2_baaa = v4rhosigmatau2[36 * g + 9];
-                auto v4rhosigmatau2_baab = v4rhosigmatau2[36 * g + 10];
-                auto v4rhosigmatau2_babb = v4rhosigmatau2[36 * g + 11];
-                auto v4rhosigmatau2_bcaa = v4rhosigmatau2[36 * g + 12];
-                auto v4rhosigmatau2_bcab = v4rhosigmatau2[36 * g + 13];
-                auto v4rhosigmatau2_bcbb = v4rhosigmatau2[36 * g + 14];
-                auto v4rhosigmatau2_bbaa = v4rhosigmatau2[36 * g + 15];
-                auto v4rhosigmatau2_bbab = v4rhosigmatau2[36 * g + 16];
+                auto v4rhosigmatau2_aaaa = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 0];
+                auto v4rhosigmatau2_aaab = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 1];
+                auto v4rhosigmatau2_aabb = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 2];
+                auto v4rhosigmatau2_acaa = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 3];
+                auto v4rhosigmatau2_acab = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 4];
+                auto v4rhosigmatau2_acbb = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 5];
+                auto v4rhosigmatau2_abaa = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 6];
+                auto v4rhosigmatau2_abab = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 7];
+                auto v4rhosigmatau2_abbb = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 8];
+                auto v4rhosigmatau2_baaa = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 9];
+                auto v4rhosigmatau2_baab = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 10];
+                auto v4rhosigmatau2_babb = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 11];
+                auto v4rhosigmatau2_bcaa = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 12];
+                auto v4rhosigmatau2_bcab = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 13];
+                auto v4rhosigmatau2_bcbb = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 14];
+                auto v4rhosigmatau2_bbaa = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 15];
+                auto v4rhosigmatau2_bbab = v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 16];
 
                 // auto v4rholapl3_aaaa = v4rholapl3[8 * g + 0];
                 // auto v4rholapl3_aaab = v4rholapl3[8 * g + 1];
@@ -10181,26 +10184,25 @@ CXCIntegrator::_integratePartialLxcFockForMGGA(const int32_t            npoints,
                 // auto v4sigma3lapl_cbbb = v4sigma3lapl[20 * g + 17];
                 // auto v4sigma3lapl_bbba = v4sigma3lapl[20 * g + 18];
 
-                // v4sigma3tau: inconsistent size in libxc (30 vs 20)
-                auto v4sigma3tau_aaaa = v4sigma3tau[30 * g + 0];
-                auto v4sigma3tau_aaab = v4sigma3tau[30 * g + 1];
-                auto v4sigma3tau_aaca = v4sigma3tau[30 * g + 2];
-                auto v4sigma3tau_aacb = v4sigma3tau[30 * g + 3];
-                auto v4sigma3tau_aaba = v4sigma3tau[30 * g + 4];
-                auto v4sigma3tau_aabb = v4sigma3tau[30 * g + 5];
-                auto v4sigma3tau_acca = v4sigma3tau[30 * g + 6];
-                auto v4sigma3tau_accb = v4sigma3tau[30 * g + 7];
-                auto v4sigma3tau_acba = v4sigma3tau[30 * g + 8];
-                auto v4sigma3tau_acbb = v4sigma3tau[30 * g + 9];
-                auto v4sigma3tau_abba = v4sigma3tau[30 * g + 10];
-                auto v4sigma3tau_abbb = v4sigma3tau[30 * g + 11];
-                auto v4sigma3tau_ccca = v4sigma3tau[30 * g + 12];
-                auto v4sigma3tau_cccb = v4sigma3tau[30 * g + 13];
-                auto v4sigma3tau_ccba = v4sigma3tau[30 * g + 14];
-                auto v4sigma3tau_ccbb = v4sigma3tau[30 * g + 15];
-                auto v4sigma3tau_cbba = v4sigma3tau[30 * g + 16];
-                auto v4sigma3tau_cbbb = v4sigma3tau[30 * g + 17];
-                auto v4sigma3tau_bbba = v4sigma3tau[30 * g + 18];
+                auto v4sigma3tau_aaaa = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 0];
+                auto v4sigma3tau_aaab = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 1];
+                auto v4sigma3tau_aaca = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 2];
+                auto v4sigma3tau_aacb = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 3];
+                auto v4sigma3tau_aaba = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 4];
+                auto v4sigma3tau_aabb = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 5];
+                auto v4sigma3tau_acca = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 6];
+                auto v4sigma3tau_accb = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 7];
+                auto v4sigma3tau_acba = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 8];
+                auto v4sigma3tau_acbb = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 9];
+                auto v4sigma3tau_abba = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 10];
+                auto v4sigma3tau_abbb = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 11];
+                auto v4sigma3tau_ccca = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 12];
+                auto v4sigma3tau_cccb = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 13];
+                auto v4sigma3tau_ccba = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 14];
+                auto v4sigma3tau_ccbb = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 15];
+                auto v4sigma3tau_cbba = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 16];
+                auto v4sigma3tau_cbbb = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 17];
+                auto v4sigma3tau_bbba = v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 18];
 
                 // auto v4sigma2lapl2_aaaa = v4sigma2lapl2[18 * g + 0];
                 // auto v4sigma2lapl2_aaab = v4sigma2lapl2[18 * g + 1];
