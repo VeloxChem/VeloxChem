@@ -221,6 +221,7 @@ export_dft(py::module& m)
         .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of XC functional.")
         .def("get_func_label", &CXCFunctional::getFunctionalLabel, "Gets name of XC functional.")
         .def("get_frac_exact_exchange", &CXCFunctional::getFractionOfExactExchange, "Gets fraction of exact Hartree-Fock exchange in XC functional.")
+        .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.")
         .def(
             "compute_exc_vxc_for_lda",
             [](const CXCFunctional& self, const py::array_t<double>& rho) -> py::list {

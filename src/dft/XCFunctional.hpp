@@ -555,6 +555,11 @@ class CXCFunctional
      * @return the pointer.
      */
     const xc_func_type* getFunctionalPointerToMetaGgaComponent() const;
+
+    /** Gets dimension of derivatives.
+     * @return dimension of derivatives.
+     */
+    const int32_t getDimensionOfDerivatives() const;
 };
 
 #endif /* XCFunctional_hpp */

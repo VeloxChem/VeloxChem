@@ -192,15 +192,7 @@ CXCFunctional::_allocateStagingBuffer()
 {
     if (_stagingBuffer == nullptr)
     {
-        // TODO write function to compute this number based on functional
-        // family and order of derivatives available
-        int32_t n_xc_outputs = 0;
-
-        if (_familyOfFunctional == std::string("LDA")) n_xc_outputs = 15;
-
-        if (_familyOfFunctional == std::string("GGA")) n_xc_outputs = 126;
-
-        if (_familyOfFunctional == std::string("MGGA")) n_xc_outputs = 767;
+        auto n_xc_outputs = getDimensionOfDerivatives();
 
         _stagingBuffer = mem::malloc<double>(n_xc_outputs * _ldStaging);
     }
@@ -3677,4 +3669,133 @@ CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
     errors::assertMsgCritical(false, errmsg);
 
     return nullptr;
+}
+
+const int32_t
+CXCFunctional::getDimensionOfDerivatives() const
+{
+    int n_xc_outputs = 0;
+
+    if (_familyOfFunctional == std::string("LDA"))
+    {
+        auto ldafunc = getFunctionalPointerToLdaComponent();
+        const auto dim = &(ldafunc->dim);
+
+        n_xc_outputs += dim->zk;
+
+        n_xc_outputs += dim->vrho;
+
+        n_xc_outputs += dim->v2rho2;
+
+        n_xc_outputs += dim->v3rho3;
+
+        n_xc_outputs += dim->v4rho4;
+    }
+    else if (_familyOfFunctional == std::string("GGA"))
+    {
+        auto ggafunc = getFunctionalPointerToGgaComponent();
+        const auto dim = &(ggafunc->dim);
+
+        n_xc_outputs += dim->zk;
+
+        n_xc_outputs += dim->vrho;
+        n_xc_outputs += dim->vsigma;
+
+        n_xc_outputs += dim->v2rho2;
+        n_xc_outputs += dim->v2rhosigma;
+        n_xc_outputs += dim->v2sigma2;
+
+        n_xc_outputs += dim->v3rho3;
+        n_xc_outputs += dim->v3rho2sigma;
+        n_xc_outputs += dim->v3rhosigma2;
+        n_xc_outputs += dim->v3sigma3;
+
+        n_xc_outputs += dim->v4rho4;
+        n_xc_outputs += dim->v4rho3sigma;
+        n_xc_outputs += dim->v4rho2sigma2;
+        n_xc_outputs += dim->v4rhosigma3;
+        n_xc_outputs += dim->v4sigma4;
+    }
+    else if (_familyOfFunctional == std::string("MGGA"))
+    {
+        auto mggafunc = getFunctionalPointerToMetaGgaComponent();
+        const auto dim = &(mggafunc->dim);
+
+        n_xc_outputs += dim->zk;
+
+        n_xc_outputs += dim->vrho;
+        n_xc_outputs += dim->vsigma;
+        n_xc_outputs += dim->vlapl;
+        n_xc_outputs += dim->vtau;
+
+        n_xc_outputs += dim->v2rho2;
+        n_xc_outputs += dim->v2rhosigma;
+        n_xc_outputs += dim->v2rholapl;
+        n_xc_outputs += dim->v2rhotau;
+        n_xc_outputs += dim->v2sigma2;
+        n_xc_outputs += dim->v2sigmalapl;
+        n_xc_outputs += dim->v2sigmatau;
+        n_xc_outputs += dim->v2lapl2;
+        n_xc_outputs += dim->v2lapltau;
+        n_xc_outputs += dim->v2tau2;
+
+        n_xc_outputs += dim->v3rho3;
+        n_xc_outputs += dim->v3rho2sigma;
+        n_xc_outputs += dim->v3rho2lapl;
+        n_xc_outputs += dim->v3rho2tau;
+        n_xc_outputs += dim->v3rhosigma2;
+        n_xc_outputs += dim->v3rhosigmalapl;
+        n_xc_outputs += dim->v3rhosigmatau;
+        n_xc_outputs += dim->v3rholapl2;
+        n_xc_outputs += dim->v3rholapltau;
+        n_xc_outputs += dim->v3rhotau2;
+        n_xc_outputs += dim->v3sigma3;
+        n_xc_outputs += dim->v3sigma2lapl;
+        n_xc_outputs += dim->v3sigma2tau;
+        n_xc_outputs += dim->v3sigmalapl2;
+        n_xc_outputs += dim->v3sigmalapltau;
+        n_xc_outputs += dim->v3sigmatau2;
+        n_xc_outputs += dim->v3lapl3;
+        n_xc_outputs += dim->v3lapl2tau;
+        n_xc_outputs += dim->v3lapltau2;
+        n_xc_outputs += dim->v3tau3;
+
+        n_xc_outputs += dim->v4rho4;
+        n_xc_outputs += dim->v4rho3sigma;
+        n_xc_outputs += dim->v4rho3lapl;
+        n_xc_outputs += dim->v4rho3tau;
+        n_xc_outputs += dim->v4rho2sigma2;
+        n_xc_outputs += dim->v4rho2sigmalapl;
+        n_xc_outputs += dim->v4rho2sigmatau;
+        n_xc_outputs += dim->v4rho2lapl2;
+        n_xc_outputs += dim->v4rho2lapltau;
+        n_xc_outputs += dim->v4rho2tau2;
+        n_xc_outputs += dim->v4rhosigma3;
+        n_xc_outputs += dim->v4rhosigma2lapl;
+        n_xc_outputs += dim->v4rhosigma2tau;
+        n_xc_outputs += dim->v4rhosigmalapl2;
+        n_xc_outputs += dim->v4rhosigmalapltau;
+        n_xc_outputs += dim->v4rhosigmatau2;
+        n_xc_outputs += dim->v4rholapl3;
+        n_xc_outputs += dim->v4rholapl2tau;
+        n_xc_outputs += dim->v4rholapltau2;
+        n_xc_outputs += dim->v4rhotau3;
+        n_xc_outputs += dim->v4sigma4;
+        n_xc_outputs += dim->v4sigma3lapl;
+        n_xc_outputs += dim->v4sigma3tau;
+        n_xc_outputs += dim->v4sigma2lapl2;
+        n_xc_outputs += dim->v4sigma2lapltau;
+        n_xc_outputs += dim->v4sigma2tau2;
+        n_xc_outputs += dim->v4sigmalapl3;
+        n_xc_outputs += dim->v4sigmalapl2tau;
+        n_xc_outputs += dim->v4sigmalapltau2;
+        n_xc_outputs += dim->v4sigmatau3;
+        n_xc_outputs += dim->v4lapl4;
+        n_xc_outputs += dim->v4lapl3tau;
+        n_xc_outputs += dim->v4lapl2tau2;
+        n_xc_outputs += dim->v4lapltau3;
+        n_xc_outputs += dim->v4tau4;
+    }
+
+    return static_cast<int32_t>(n_xc_outputs);
 }

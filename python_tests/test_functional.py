@@ -46,6 +46,7 @@ class TestFunctionalExcVxc:
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
         func = parse_xc_func('slda')
+        assert func.get_dimension_of_derivatives() == 15
 
         func_ref = XCFunctional(
             'slda',
@@ -118,6 +119,7 @@ class TestFunctionalExcVxc:
         vxc.reduce_sum(scf_drv.rank, scf_drv.nodes, scf_drv.comm)
 
         func = parse_xc_func('b3lyp')
+        assert func.get_dimension_of_derivatives() == 126
 
         func_ref = XCFunctional(
             'b3lyp',
