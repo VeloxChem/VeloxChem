@@ -147,6 +147,27 @@ class CXCComponent
      @return the pointer.
      */
     const xc_func_type* getFunctionalPointer() const;
+
+    /**
+     Checks if the functional component is LDA.
+
+     @return true if the funcitonal is LDA, otherwise false.
+     */
+    bool isLDA() const;
+
+    /**
+     Checks if the functional component is GGA.
+
+     @return true if the funcitonal is GGA, otherwise false.
+     */
+    bool isGGA() const;
+
+    /**
+     Checks if the functional component is meta-GGA.
+
+     @return true if the funcitonal is meta-GGA, otherwise false.
+     */
+    bool isMetaGGA() const;
 };
 
 #endif /* XCComponent_hpp */
