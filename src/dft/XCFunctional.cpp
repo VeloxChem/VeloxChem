@@ -209,6 +209,231 @@ CXCFunctional::_freeStagingBuffer()
     }
 }
 
+std::unordered_map<std::string, std::array<int32_t, 2>>
+CXCFunctional::_getIndicesAndCountsOfDerivatives() const
+{
+    std::unordered_map<std::string, std::array<int32_t, 2>> indices_and_counts;
+
+    if (_familyOfFunctional == std::string("LDA"))
+    {
+        auto ldafunc = getFunctionalPointerToLdaComponent();
+        const auto dim = &(ldafunc->dim);
+
+        int n_xc_outputs = 0;
+
+        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        n_xc_outputs += dim->zk;
+
+        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        n_xc_outputs += dim->vrho;
+
+        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        n_xc_outputs += dim->v2rho2;
+
+        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        n_xc_outputs += dim->v3rho3;
+
+        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        n_xc_outputs += dim->v4rho4;
+    }
+    else if (_familyOfFunctional == std::string("GGA"))
+    {
+        auto ggafunc = getFunctionalPointerToGgaComponent();
+        const auto dim = &(ggafunc->dim);
+
+        int n_xc_outputs = 0;
+
+        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        n_xc_outputs += dim->zk;
+
+        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        n_xc_outputs += dim->vrho;
+        indices_and_counts["vsigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->vsigma});
+        n_xc_outputs += dim->vsigma;
+
+        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        n_xc_outputs += dim->v2rho2;
+        indices_and_counts["v2rhosigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhosigma});
+        n_xc_outputs += dim->v2rhosigma;
+        indices_and_counts["v2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigma2});
+        n_xc_outputs += dim->v2sigma2;
+
+        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        n_xc_outputs += dim->v3rho3;
+        indices_and_counts["v3rho2sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2sigma});
+        n_xc_outputs += dim->v3rho2sigma;
+        indices_and_counts["v3rhosigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigma2});
+        n_xc_outputs += dim->v3rhosigma2;
+        indices_and_counts["v3sigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma3});
+        n_xc_outputs += dim->v3sigma3;
+
+        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        n_xc_outputs += dim->v4rho4;
+        indices_and_counts["v4rho3sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3sigma});
+        n_xc_outputs += dim->v4rho3sigma;
+        indices_and_counts["v4rho2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigma2});
+        n_xc_outputs += dim->v4rho2sigma2;
+        indices_and_counts["v4rhosigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma3});
+        n_xc_outputs += dim->v4rhosigma3;
+        indices_and_counts["v4sigma4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma4});
+        n_xc_outputs += dim->v4sigma4;
+    }
+    else if (_familyOfFunctional == std::string("MGGA"))
+    {
+        auto mggafunc = getFunctionalPointerToMetaGgaComponent();
+        const auto dim = &(mggafunc->dim);
+
+        int n_xc_outputs = 0;
+
+        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        n_xc_outputs += dim->zk;
+
+        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        n_xc_outputs += dim->vrho;
+        indices_and_counts["vsigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->vsigma});
+        n_xc_outputs += dim->vsigma;
+        indices_and_counts["vlapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->vlapl});
+        n_xc_outputs += dim->vlapl;
+        indices_and_counts["vtau"] = std::array<int32_t, 2>({n_xc_outputs, dim->vtau});
+        n_xc_outputs += dim->vtau;
+
+        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        n_xc_outputs += dim->v2rho2;
+        indices_and_counts["v2rhosigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhosigma});
+        n_xc_outputs += dim->v2rhosigma;
+        indices_and_counts["v2rholapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rholapl});
+        n_xc_outputs += dim->v2rholapl;
+        indices_and_counts["v2rhotau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhotau});
+        n_xc_outputs += dim->v2rhotau;
+        indices_and_counts["v2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigma2});
+        n_xc_outputs += dim->v2sigma2;
+        indices_and_counts["v2sigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigmalapl});
+        n_xc_outputs += dim->v2sigmalapl;
+        indices_and_counts["v2sigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigmatau});
+        n_xc_outputs += dim->v2sigmatau;
+        indices_and_counts["v2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2lapl2});
+        n_xc_outputs += dim->v2lapl2;
+        indices_and_counts["v2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2lapltau});
+        n_xc_outputs += dim->v2lapltau;
+        indices_and_counts["v2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2tau2});
+        n_xc_outputs += dim->v2tau2;
+
+        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        n_xc_outputs += dim->v3rho3;
+        indices_and_counts["v3rho2sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2sigma});
+        n_xc_outputs += dim->v3rho2sigma;
+        indices_and_counts["v3rho2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2lapl});
+        n_xc_outputs += dim->v3rho2lapl;
+        indices_and_counts["v3rho2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2tau});
+        n_xc_outputs += dim->v3rho2tau;
+        indices_and_counts["v3rhosigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigma2});
+        n_xc_outputs += dim->v3rhosigma2;
+        indices_and_counts["v3rhosigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigmalapl});
+        n_xc_outputs += dim->v3rhosigmalapl;
+        indices_and_counts["v3rhosigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigmatau});
+        n_xc_outputs += dim->v3rhosigmatau;
+        indices_and_counts["v3rholapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rholapl2});
+        n_xc_outputs += dim->v3rholapl2;
+        indices_and_counts["v3rholapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rholapltau});
+        n_xc_outputs += dim->v3rholapltau;
+        indices_and_counts["v3rhotau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhotau2});
+        n_xc_outputs += dim->v3rhotau2;
+        indices_and_counts["v3sigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma3});
+        n_xc_outputs += dim->v3sigma3;
+        indices_and_counts["v3sigma2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma2lapl});
+        n_xc_outputs += dim->v3sigma2lapl;
+        indices_and_counts["v3sigma2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma2tau});
+        n_xc_outputs += dim->v3sigma2tau;
+        indices_and_counts["v3sigmalapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmalapl2});
+        n_xc_outputs += dim->v3sigmalapl2;
+        indices_and_counts["v3sigmalapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmalapltau});
+        n_xc_outputs += dim->v3sigmalapltau;
+        indices_and_counts["v3sigmatau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmatau2});
+        n_xc_outputs += dim->v3sigmatau2;
+        indices_and_counts["v3lapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapl3});
+        n_xc_outputs += dim->v3lapl3;
+        indices_and_counts["v3lapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapl2tau});
+        n_xc_outputs += dim->v3lapl2tau;
+        indices_and_counts["v3lapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapltau2});
+        n_xc_outputs += dim->v3lapltau2;
+        indices_and_counts["v3tau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3tau3});
+        n_xc_outputs += dim->v3tau3;
+
+        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        n_xc_outputs += dim->v4rho4;
+        indices_and_counts["v4rho3sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3sigma});
+        n_xc_outputs += dim->v4rho3sigma;
+        indices_and_counts["v4rho3lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3lapl});
+        n_xc_outputs += dim->v4rho3lapl;
+        indices_and_counts["v4rho3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3tau});
+        n_xc_outputs += dim->v4rho3tau;
+        indices_and_counts["v4rho2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigma2});
+        n_xc_outputs += dim->v4rho2sigma2;
+        indices_and_counts["v4rho2sigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigmalapl});
+        n_xc_outputs += dim->v4rho2sigmalapl;
+        indices_and_counts["v4rho2sigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigmatau});
+        n_xc_outputs += dim->v4rho2sigmatau;
+        indices_and_counts["v4rho2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2lapl2});
+        n_xc_outputs += dim->v4rho2lapl2;
+        indices_and_counts["v4rho2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2lapltau});
+        n_xc_outputs += dim->v4rho2lapltau;
+        indices_and_counts["v4rho2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2tau2});
+        n_xc_outputs += dim->v4rho2tau2;
+        indices_and_counts["v4rhosigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma3});
+        n_xc_outputs += dim->v4rhosigma3;
+        indices_and_counts["v4rhosigma2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma2lapl});
+        n_xc_outputs += dim->v4rhosigma2lapl;
+        indices_and_counts["v4rhosigma2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma2tau});
+        n_xc_outputs += dim->v4rhosigma2tau;
+        indices_and_counts["v4rhosigmalapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmalapl2});
+        n_xc_outputs += dim->v4rhosigmalapl2;
+        indices_and_counts["v4rhosigmalapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmalapltau});
+        n_xc_outputs += dim->v4rhosigmalapltau;
+        indices_and_counts["v4rhosigmatau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmatau2});
+        n_xc_outputs += dim->v4rhosigmatau2;
+        indices_and_counts["v4rholapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapl3});
+        n_xc_outputs += dim->v4rholapl3;
+        indices_and_counts["v4rholapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapl2tau});
+        n_xc_outputs += dim->v4rholapl2tau;
+        indices_and_counts["v4rholapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapltau2});
+        n_xc_outputs += dim->v4rholapltau2;
+        indices_and_counts["v4rhotau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhotau3});
+        n_xc_outputs += dim->v4rhotau3;
+        indices_and_counts["v4sigma4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma4});
+        n_xc_outputs += dim->v4sigma4;
+        indices_and_counts["v4sigma3lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma3lapl});
+        n_xc_outputs += dim->v4sigma3lapl;
+        indices_and_counts["v4sigma3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma3tau});
+        n_xc_outputs += dim->v4sigma3tau;
+        indices_and_counts["v4sigma2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2lapl2});
+        n_xc_outputs += dim->v4sigma2lapl2;
+        indices_and_counts["v4sigma2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2lapltau});
+        n_xc_outputs += dim->v4sigma2lapltau;
+        indices_and_counts["v4sigma2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2tau2});
+        n_xc_outputs += dim->v4sigma2tau2;
+        indices_and_counts["v4sigmalapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapl3});
+        n_xc_outputs += dim->v4sigmalapl3;
+        indices_and_counts["v4sigmalapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapl2tau});
+        n_xc_outputs += dim->v4sigmalapl2tau;
+        indices_and_counts["v4sigmalapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapltau2});
+        n_xc_outputs += dim->v4sigmalapltau2;
+        indices_and_counts["v4sigmatau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmatau3});
+        n_xc_outputs += dim->v4sigmatau3;
+        indices_and_counts["v4lapl4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl4});
+        n_xc_outputs += dim->v4lapl4;
+        indices_and_counts["v4lapl3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl3tau});
+        n_xc_outputs += dim->v4lapl3tau;
+        indices_and_counts["v4lapl2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl2tau2});
+        n_xc_outputs += dim->v4lapl2tau2;
+        indices_and_counts["v4lapltau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapltau3});
+        n_xc_outputs += dim->v4lapltau3;
+        indices_and_counts["v4tau4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4tau4});
+        n_xc_outputs += dim->v4tau4;
+    }
+
+    return indices_and_counts;
+}
+
 CXCFunctional&
 CXCFunctional::operator=(const CXCFunctional& source)
 {
@@ -3674,128 +3899,29 @@ CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
 const int32_t
 CXCFunctional::getDimensionOfDerivatives() const
 {
-    int n_xc_outputs = 0;
+    auto indices_and_counts = _getIndicesAndCountsOfDerivatives();
 
     if (_familyOfFunctional == std::string("LDA"))
     {
-        auto ldafunc = getFunctionalPointerToLdaComponent();
-        const auto dim = &(ldafunc->dim);
+        auto final_index = indices_and_counts["v4rho4"][0];
+        auto final_count = indices_and_counts["v4rho4"][1];
 
-        n_xc_outputs += dim->zk;
-
-        n_xc_outputs += dim->vrho;
-
-        n_xc_outputs += dim->v2rho2;
-
-        n_xc_outputs += dim->v3rho3;
-
-        n_xc_outputs += dim->v4rho4;
+        return static_cast<int32_t>(final_index + final_count);
     }
     else if (_familyOfFunctional == std::string("GGA"))
     {
-        auto ggafunc = getFunctionalPointerToGgaComponent();
-        const auto dim = &(ggafunc->dim);
+        auto final_index = indices_and_counts["v4sigma4"][0];
+        auto final_count = indices_and_counts["v4sigma4"][1];
 
-        n_xc_outputs += dim->zk;
-
-        n_xc_outputs += dim->vrho;
-        n_xc_outputs += dim->vsigma;
-
-        n_xc_outputs += dim->v2rho2;
-        n_xc_outputs += dim->v2rhosigma;
-        n_xc_outputs += dim->v2sigma2;
-
-        n_xc_outputs += dim->v3rho3;
-        n_xc_outputs += dim->v3rho2sigma;
-        n_xc_outputs += dim->v3rhosigma2;
-        n_xc_outputs += dim->v3sigma3;
-
-        n_xc_outputs += dim->v4rho4;
-        n_xc_outputs += dim->v4rho3sigma;
-        n_xc_outputs += dim->v4rho2sigma2;
-        n_xc_outputs += dim->v4rhosigma3;
-        n_xc_outputs += dim->v4sigma4;
+        return static_cast<int32_t>(final_index + final_count);
     }
     else if (_familyOfFunctional == std::string("MGGA"))
     {
-        auto mggafunc = getFunctionalPointerToMetaGgaComponent();
-        const auto dim = &(mggafunc->dim);
+        auto final_index = indices_and_counts["v4tau4"][0];
+        auto final_count = indices_and_counts["v4tau4"][1];
 
-        n_xc_outputs += dim->zk;
-
-        n_xc_outputs += dim->vrho;
-        n_xc_outputs += dim->vsigma;
-        n_xc_outputs += dim->vlapl;
-        n_xc_outputs += dim->vtau;
-
-        n_xc_outputs += dim->v2rho2;
-        n_xc_outputs += dim->v2rhosigma;
-        n_xc_outputs += dim->v2rholapl;
-        n_xc_outputs += dim->v2rhotau;
-        n_xc_outputs += dim->v2sigma2;
-        n_xc_outputs += dim->v2sigmalapl;
-        n_xc_outputs += dim->v2sigmatau;
-        n_xc_outputs += dim->v2lapl2;
-        n_xc_outputs += dim->v2lapltau;
-        n_xc_outputs += dim->v2tau2;
-
-        n_xc_outputs += dim->v3rho3;
-        n_xc_outputs += dim->v3rho2sigma;
-        n_xc_outputs += dim->v3rho2lapl;
-        n_xc_outputs += dim->v3rho2tau;
-        n_xc_outputs += dim->v3rhosigma2;
-        n_xc_outputs += dim->v3rhosigmalapl;
-        n_xc_outputs += dim->v3rhosigmatau;
-        n_xc_outputs += dim->v3rholapl2;
-        n_xc_outputs += dim->v3rholapltau;
-        n_xc_outputs += dim->v3rhotau2;
-        n_xc_outputs += dim->v3sigma3;
-        n_xc_outputs += dim->v3sigma2lapl;
-        n_xc_outputs += dim->v3sigma2tau;
-        n_xc_outputs += dim->v3sigmalapl2;
-        n_xc_outputs += dim->v3sigmalapltau;
-        n_xc_outputs += dim->v3sigmatau2;
-        n_xc_outputs += dim->v3lapl3;
-        n_xc_outputs += dim->v3lapl2tau;
-        n_xc_outputs += dim->v3lapltau2;
-        n_xc_outputs += dim->v3tau3;
-
-        n_xc_outputs += dim->v4rho4;
-        n_xc_outputs += dim->v4rho3sigma;
-        n_xc_outputs += dim->v4rho3lapl;
-        n_xc_outputs += dim->v4rho3tau;
-        n_xc_outputs += dim->v4rho2sigma2;
-        n_xc_outputs += dim->v4rho2sigmalapl;
-        n_xc_outputs += dim->v4rho2sigmatau;
-        n_xc_outputs += dim->v4rho2lapl2;
-        n_xc_outputs += dim->v4rho2lapltau;
-        n_xc_outputs += dim->v4rho2tau2;
-        n_xc_outputs += dim->v4rhosigma3;
-        n_xc_outputs += dim->v4rhosigma2lapl;
-        n_xc_outputs += dim->v4rhosigma2tau;
-        n_xc_outputs += dim->v4rhosigmalapl2;
-        n_xc_outputs += dim->v4rhosigmalapltau;
-        n_xc_outputs += dim->v4rhosigmatau2;
-        n_xc_outputs += dim->v4rholapl3;
-        n_xc_outputs += dim->v4rholapl2tau;
-        n_xc_outputs += dim->v4rholapltau2;
-        n_xc_outputs += dim->v4rhotau3;
-        n_xc_outputs += dim->v4sigma4;
-        n_xc_outputs += dim->v4sigma3lapl;
-        n_xc_outputs += dim->v4sigma3tau;
-        n_xc_outputs += dim->v4sigma2lapl2;
-        n_xc_outputs += dim->v4sigma2lapltau;
-        n_xc_outputs += dim->v4sigma2tau2;
-        n_xc_outputs += dim->v4sigmalapl3;
-        n_xc_outputs += dim->v4sigmalapl2tau;
-        n_xc_outputs += dim->v4sigmalapltau2;
-        n_xc_outputs += dim->v4sigmatau3;
-        n_xc_outputs += dim->v4lapl4;
-        n_xc_outputs += dim->v4lapl3tau;
-        n_xc_outputs += dim->v4lapl2tau2;
-        n_xc_outputs += dim->v4lapltau3;
-        n_xc_outputs += dim->v4tau4;
+        return static_cast<int32_t>(final_index + final_count);
     }
 
-    return static_cast<int32_t>(n_xc_outputs);
+    return 0;
 }

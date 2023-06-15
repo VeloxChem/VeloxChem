@@ -34,6 +34,7 @@
 #include <string>
 #include <tuple>
 #include <vector>
+#include <unordered_map>
 
 #include "Buffer.hpp"
 #include "DensityGrid.hpp"
@@ -77,6 +78,9 @@ class CXCFunctional
 
     /** Frees the staging buffer. */
     void _freeStagingBuffer();
+
+    /** Gets indices and counts of derivatives.  */
+    std::unordered_map<std::string, std::array<int32_t, 2>> _getIndicesAndCountsOfDerivatives() const;
 
    public:
     /** Creates an exchange-correlation functional object.
@@ -542,21 +546,25 @@ class CXCFunctional
                               double*       v4tau4) const -> void;
 
     /** Gets functional pointer to the first LDA component.
+     *
      * @return the pointer.
      */
     const xc_func_type* getFunctionalPointerToLdaComponent() const;
 
     /** Gets functional pointer to the first GGA component.
+     *
      * @return the pointer.
      */
     const xc_func_type* getFunctionalPointerToGgaComponent() const;
 
     /** Gets functional pointer to the first meta-GGA component.
+     *
      * @return the pointer.
      */
     const xc_func_type* getFunctionalPointerToMetaGgaComponent() const;
 
     /** Gets dimension of derivatives.
+     *
      * @return dimension of derivatives.
      */
     const int32_t getDimensionOfDerivatives() const;
