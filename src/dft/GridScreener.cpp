@@ -1233,1008 +1233,302 @@ screenLxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 
     double tauThreshold = getTauScreeningThreshold();
 
-    auto mgga_ptr = xcFunctionalPointer->getFunctionalPointerToMetaGgaComponent();
+    auto mggafunc = xcFunctionalPointer->getFunctionalPointerToMetaGgaComponent();
 
-    for (int32_t g = 0; g < npoints; g++)
+    const auto dim = &(mggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a, sigma_aa and tau_a
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
-            v4rho4[5 * g + 0] = 0.0;
-            v4rho4[5 * g + 1] = 0.0;
-            v4rho4[5 * g + 2] = 0.0;
-            v4rho4[5 * g + 3] = 0.0;
-
-            v4rho3sigma[12 * g + 0]  = 0.0;
-            v4rho3sigma[12 * g + 1]  = 0.0;
-            v4rho3sigma[12 * g + 2]  = 0.0;
-            v4rho3sigma[12 * g + 3]  = 0.0;
-            v4rho3sigma[12 * g + 4]  = 0.0;
-            v4rho3sigma[12 * g + 5]  = 0.0;
-            v4rho3sigma[12 * g + 6]  = 0.0;
-            v4rho3sigma[12 * g + 7]  = 0.0;
-            v4rho3sigma[12 * g + 8]  = 0.0;
-            v4rho3sigma[12 * g + 9]  = 0.0;
-            v4rho3sigma[12 * g + 10] = 0.0;
-
-            v4rho3lapl[8 * g + 0] = 0.0;
-            v4rho3lapl[8 * g + 1] = 0.0;
-            v4rho3lapl[8 * g + 2] = 0.0;
-            v4rho3lapl[8 * g + 3] = 0.0;
-            v4rho3lapl[8 * g + 4] = 0.0;
-            v4rho3lapl[8 * g + 5] = 0.0;
-            v4rho3lapl[8 * g + 6] = 0.0;
-
-            v4rho3tau[8 * g + 0] = 0.0;
-            v4rho3tau[8 * g + 1] = 0.0;
-            v4rho3tau[8 * g + 2] = 0.0;
-            v4rho3tau[8 * g + 3] = 0.0;
-            v4rho3tau[8 * g + 4] = 0.0;
-            v4rho3tau[8 * g + 5] = 0.0;
-            v4rho3tau[8 * g + 6] = 0.0;
-
-            v4rho2sigma2[18 * g + 0]  = 0.0;
-            v4rho2sigma2[18 * g + 1]  = 0.0;
-            v4rho2sigma2[18 * g + 2]  = 0.0;
-            v4rho2sigma2[18 * g + 3]  = 0.0;
-            v4rho2sigma2[18 * g + 4]  = 0.0;
-            v4rho2sigma2[18 * g + 5]  = 0.0;
-            v4rho2sigma2[18 * g + 6]  = 0.0;
-            v4rho2sigma2[18 * g + 7]  = 0.0;
-            v4rho2sigma2[18 * g + 8]  = 0.0;
-            v4rho2sigma2[18 * g + 9]  = 0.0;
-            v4rho2sigma2[18 * g + 10] = 0.0;
-            v4rho2sigma2[18 * g + 11] = 0.0;
-            v4rho2sigma2[18 * g + 12] = 0.0;
-            v4rho2sigma2[18 * g + 13] = 0.0;
-            v4rho2sigma2[18 * g + 14] = 0.0;
-            v4rho2sigma2[18 * g + 15] = 0.0;
-            v4rho2sigma2[18 * g + 16] = 0.0;
-
-            v4rho2sigmalapl[18 * g + 0]  = 0.0;
-            v4rho2sigmalapl[18 * g + 1]  = 0.0;
-            v4rho2sigmalapl[18 * g + 2]  = 0.0;
-            v4rho2sigmalapl[18 * g + 3]  = 0.0;
-            v4rho2sigmalapl[18 * g + 4]  = 0.0;
-            v4rho2sigmalapl[18 * g + 5]  = 0.0;
-            v4rho2sigmalapl[18 * g + 6]  = 0.0;
-            v4rho2sigmalapl[18 * g + 7]  = 0.0;
-            v4rho2sigmalapl[18 * g + 8]  = 0.0;
-            v4rho2sigmalapl[18 * g + 9]  = 0.0;
-            v4rho2sigmalapl[18 * g + 10] = 0.0;
-            v4rho2sigmalapl[18 * g + 11] = 0.0;
-            v4rho2sigmalapl[18 * g + 12] = 0.0;
-            v4rho2sigmalapl[18 * g + 13] = 0.0;
-            v4rho2sigmalapl[18 * g + 14] = 0.0;
-            v4rho2sigmalapl[18 * g + 15] = 0.0;
-            v4rho2sigmalapl[18 * g + 16] = 0.0;
-
-            v4rho2sigmatau[18 * g + 0]  = 0.0;
-            v4rho2sigmatau[18 * g + 1]  = 0.0;
-            v4rho2sigmatau[18 * g + 2]  = 0.0;
-            v4rho2sigmatau[18 * g + 3]  = 0.0;
-            v4rho2sigmatau[18 * g + 4]  = 0.0;
-            v4rho2sigmatau[18 * g + 5]  = 0.0;
-            v4rho2sigmatau[18 * g + 6]  = 0.0;
-            v4rho2sigmatau[18 * g + 7]  = 0.0;
-            v4rho2sigmatau[18 * g + 8]  = 0.0;
-            v4rho2sigmatau[18 * g + 9]  = 0.0;
-            v4rho2sigmatau[18 * g + 10] = 0.0;
-            v4rho2sigmatau[18 * g + 11] = 0.0;
-            v4rho2sigmatau[18 * g + 12] = 0.0;
-            v4rho2sigmatau[18 * g + 13] = 0.0;
-            v4rho2sigmatau[18 * g + 14] = 0.0;
-            v4rho2sigmatau[18 * g + 15] = 0.0;
-            v4rho2sigmatau[18 * g + 16] = 0.0;
-
-            v4rho2lapl2[9 * g + 0] = 0.0;
-            v4rho2lapl2[9 * g + 1] = 0.0;
-            v4rho2lapl2[9 * g + 2] = 0.0;
-            v4rho2lapl2[9 * g + 3] = 0.0;
-            v4rho2lapl2[9 * g + 4] = 0.0;
-            v4rho2lapl2[9 * g + 5] = 0.0;
-            v4rho2lapl2[9 * g + 6] = 0.0;
-            v4rho2lapl2[9 * g + 7] = 0.0;
-
-            v4rho2lapltau[12 * g + 0]  = 0.0;
-            v4rho2lapltau[12 * g + 1]  = 0.0;
-            v4rho2lapltau[12 * g + 2]  = 0.0;
-            v4rho2lapltau[12 * g + 3]  = 0.0;
-            v4rho2lapltau[12 * g + 4]  = 0.0;
-            v4rho2lapltau[12 * g + 5]  = 0.0;
-            v4rho2lapltau[12 * g + 6]  = 0.0;
-            v4rho2lapltau[12 * g + 7]  = 0.0;
-            v4rho2lapltau[12 * g + 8]  = 0.0;
-            v4rho2lapltau[12 * g + 9]  = 0.0;
-            v4rho2lapltau[12 * g + 10] = 0.0;
-
-            v4rho2tau2[9 * g + 0] = 0.0;
-            v4rho2tau2[9 * g + 1] = 0.0;
-            v4rho2tau2[9 * g + 2] = 0.0;
-            v4rho2tau2[9 * g + 3] = 0.0;
-            v4rho2tau2[9 * g + 4] = 0.0;
-            v4rho2tau2[9 * g + 5] = 0.0;
-            v4rho2tau2[9 * g + 6] = 0.0;
-            v4rho2tau2[9 * g + 7] = 0.0;
-
-            v4rhosigma3[20 * g + 0]  = 0.0;
-            v4rhosigma3[20 * g + 1]  = 0.0;
-            v4rhosigma3[20 * g + 2]  = 0.0;
-            v4rhosigma3[20 * g + 3]  = 0.0;
-            v4rhosigma3[20 * g + 4]  = 0.0;
-            v4rhosigma3[20 * g + 5]  = 0.0;
-            v4rhosigma3[20 * g + 6]  = 0.0;
-            v4rhosigma3[20 * g + 7]  = 0.0;
-            v4rhosigma3[20 * g + 8]  = 0.0;
-            v4rhosigma3[20 * g + 9]  = 0.0;
-            v4rhosigma3[20 * g + 10] = 0.0;
-            v4rhosigma3[20 * g + 11] = 0.0;
-            v4rhosigma3[20 * g + 12] = 0.0;
-            v4rhosigma3[20 * g + 13] = 0.0;
-            v4rhosigma3[20 * g + 14] = 0.0;
-            v4rhosigma3[20 * g + 15] = 0.0;
-            v4rhosigma3[20 * g + 16] = 0.0;
-            v4rhosigma3[20 * g + 17] = 0.0;
-            v4rhosigma3[20 * g + 18] = 0.0;
-
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 0]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 1]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 2]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 3]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 4]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 5]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 6]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 7]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 8]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 9]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 10] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 11] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 12] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 13] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 14] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 15] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 16] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 17] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 18] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 19] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 20] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 21] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 22] = 0.0;
-
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 0]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 1]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 2]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 3]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 4]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 5]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 6]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 7]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 8]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 9]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 10] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 11] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 12] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 13] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 14] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 15] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 16] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 17] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 18] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 19] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 20] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 21] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 22] = 0.0;
-
-            v4rhosigmalapl2[18 * g + 0]  = 0.0;
-            v4rhosigmalapl2[18 * g + 1]  = 0.0;
-            v4rhosigmalapl2[18 * g + 2]  = 0.0;
-            v4rhosigmalapl2[18 * g + 3]  = 0.0;
-            v4rhosigmalapl2[18 * g + 4]  = 0.0;
-            v4rhosigmalapl2[18 * g + 5]  = 0.0;
-            v4rhosigmalapl2[18 * g + 6]  = 0.0;
-            v4rhosigmalapl2[18 * g + 7]  = 0.0;
-            v4rhosigmalapl2[18 * g + 8]  = 0.0;
-            v4rhosigmalapl2[18 * g + 9]  = 0.0;
-            v4rhosigmalapl2[18 * g + 10] = 0.0;
-            v4rhosigmalapl2[18 * g + 11] = 0.0;
-            v4rhosigmalapl2[18 * g + 12] = 0.0;
-            v4rhosigmalapl2[18 * g + 13] = 0.0;
-            v4rhosigmalapl2[18 * g + 14] = 0.0;
-            v4rhosigmalapl2[18 * g + 15] = 0.0;
-            v4rhosigmalapl2[18 * g + 16] = 0.0;
-
-            v4rhosigmalapltau[24 * g + 0]  = 0.0;
-            v4rhosigmalapltau[24 * g + 1]  = 0.0;
-            v4rhosigmalapltau[24 * g + 2]  = 0.0;
-            v4rhosigmalapltau[24 * g + 3]  = 0.0;
-            v4rhosigmalapltau[24 * g + 4]  = 0.0;
-            v4rhosigmalapltau[24 * g + 5]  = 0.0;
-            v4rhosigmalapltau[24 * g + 6]  = 0.0;
-            v4rhosigmalapltau[24 * g + 7]  = 0.0;
-            v4rhosigmalapltau[24 * g + 8]  = 0.0;
-            v4rhosigmalapltau[24 * g + 9]  = 0.0;
-            v4rhosigmalapltau[24 * g + 10] = 0.0;
-            v4rhosigmalapltau[24 * g + 11] = 0.0;
-            v4rhosigmalapltau[24 * g + 12] = 0.0;
-            v4rhosigmalapltau[24 * g + 13] = 0.0;
-            v4rhosigmalapltau[24 * g + 14] = 0.0;
-            v4rhosigmalapltau[24 * g + 15] = 0.0;
-            v4rhosigmalapltau[24 * g + 16] = 0.0;
-            v4rhosigmalapltau[24 * g + 17] = 0.0;
-            v4rhosigmalapltau[24 * g + 18] = 0.0;
-            v4rhosigmalapltau[24 * g + 19] = 0.0;
-            v4rhosigmalapltau[24 * g + 20] = 0.0;
-            v4rhosigmalapltau[24 * g + 21] = 0.0;
-            v4rhosigmalapltau[24 * g + 22] = 0.0;
-
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 0]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 1]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 2]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 3]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 4]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 5]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 6]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 7]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 8]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 9]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 10] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 11] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 12] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 13] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 14] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 15] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 16] = 0.0;
-
-            v4rholapl3[8 * g + 0] = 0.0;
-            v4rholapl3[8 * g + 1] = 0.0;
-            v4rholapl3[8 * g + 2] = 0.0;
-            v4rholapl3[8 * g + 3] = 0.0;
-            v4rholapl3[8 * g + 4] = 0.0;
-            v4rholapl3[8 * g + 5] = 0.0;
-            v4rholapl3[8 * g + 6] = 0.0;
-
-            v4rholapl2tau[12 * g + 0]  = 0.0;
-            v4rholapl2tau[12 * g + 1]  = 0.0;
-            v4rholapl2tau[12 * g + 2]  = 0.0;
-            v4rholapl2tau[12 * g + 3]  = 0.0;
-            v4rholapl2tau[12 * g + 4]  = 0.0;
-            v4rholapl2tau[12 * g + 5]  = 0.0;
-            v4rholapl2tau[12 * g + 6]  = 0.0;
-            v4rholapl2tau[12 * g + 7]  = 0.0;
-            v4rholapl2tau[12 * g + 8]  = 0.0;
-            v4rholapl2tau[12 * g + 9]  = 0.0;
-            v4rholapl2tau[12 * g + 10] = 0.0;
-
-            v4rholapltau2[12 * g + 0]  = 0.0;
-            v4rholapltau2[12 * g + 1]  = 0.0;
-            v4rholapltau2[12 * g + 2]  = 0.0;
-            v4rholapltau2[12 * g + 3]  = 0.0;
-            v4rholapltau2[12 * g + 4]  = 0.0;
-            v4rholapltau2[12 * g + 5]  = 0.0;
-            v4rholapltau2[12 * g + 6]  = 0.0;
-            v4rholapltau2[12 * g + 7]  = 0.0;
-            v4rholapltau2[12 * g + 8]  = 0.0;
-            v4rholapltau2[12 * g + 9]  = 0.0;
-            v4rholapltau2[12 * g + 10] = 0.0;
-
-            v4rhotau3[8 * g + 0] = 0.0;
-            v4rhotau3[8 * g + 1] = 0.0;
-            v4rhotau3[8 * g + 2] = 0.0;
-            v4rhotau3[8 * g + 3] = 0.0;
-            v4rhotau3[8 * g + 4] = 0.0;
-            v4rhotau3[8 * g + 5] = 0.0;
-            v4rhotau3[8 * g + 6] = 0.0;
-
-            v4sigma4[15 * g + 0]  = 0.0;
-            v4sigma4[15 * g + 1]  = 0.0;
-            v4sigma4[15 * g + 2]  = 0.0;
-            v4sigma4[15 * g + 3]  = 0.0;
-            v4sigma4[15 * g + 4]  = 0.0;
-            v4sigma4[15 * g + 5]  = 0.0;
-            v4sigma4[15 * g + 6]  = 0.0;
-            v4sigma4[15 * g + 7]  = 0.0;
-            v4sigma4[15 * g + 8]  = 0.0;
-            v4sigma4[15 * g + 9]  = 0.0;
-            v4sigma4[15 * g + 10] = 0.0;
-            v4sigma4[15 * g + 11] = 0.0;
-            v4sigma4[15 * g + 12] = 0.0;
-            v4sigma4[15 * g + 13] = 0.0;
-
-            v4sigma3lapl[20 * g + 0]  = 0.0;
-            v4sigma3lapl[20 * g + 1]  = 0.0;
-            v4sigma3lapl[20 * g + 2]  = 0.0;
-            v4sigma3lapl[20 * g + 3]  = 0.0;
-            v4sigma3lapl[20 * g + 4]  = 0.0;
-            v4sigma3lapl[20 * g + 5]  = 0.0;
-            v4sigma3lapl[20 * g + 6]  = 0.0;
-            v4sigma3lapl[20 * g + 7]  = 0.0;
-            v4sigma3lapl[20 * g + 8]  = 0.0;
-            v4sigma3lapl[20 * g + 9]  = 0.0;
-            v4sigma3lapl[20 * g + 10] = 0.0;
-            v4sigma3lapl[20 * g + 11] = 0.0;
-            v4sigma3lapl[20 * g + 12] = 0.0;
-            v4sigma3lapl[20 * g + 13] = 0.0;
-            v4sigma3lapl[20 * g + 14] = 0.0;
-            v4sigma3lapl[20 * g + 15] = 0.0;
-            v4sigma3lapl[20 * g + 16] = 0.0;
-            v4sigma3lapl[20 * g + 17] = 0.0;
-            v4sigma3lapl[20 * g + 18] = 0.0;
-
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 0]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 1]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 2]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 3]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 4]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 5]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 6]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 7]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 8]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 9]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 10] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 11] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 12] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 13] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 14] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 15] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 16] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 17] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 18] = 0.0;
-
-            v4sigma2lapl2[18 * g + 0]  = 0.0;
-            v4sigma2lapl2[18 * g + 1]  = 0.0;
-            v4sigma2lapl2[18 * g + 2]  = 0.0;
-            v4sigma2lapl2[18 * g + 3]  = 0.0;
-            v4sigma2lapl2[18 * g + 4]  = 0.0;
-            v4sigma2lapl2[18 * g + 5]  = 0.0;
-            v4sigma2lapl2[18 * g + 6]  = 0.0;
-            v4sigma2lapl2[18 * g + 7]  = 0.0;
-            v4sigma2lapl2[18 * g + 8]  = 0.0;
-            v4sigma2lapl2[18 * g + 9]  = 0.0;
-            v4sigma2lapl2[18 * g + 10] = 0.0;
-            v4sigma2lapl2[18 * g + 11] = 0.0;
-            v4sigma2lapl2[18 * g + 12] = 0.0;
-            v4sigma2lapl2[18 * g + 13] = 0.0;
-            v4sigma2lapl2[18 * g + 14] = 0.0;
-            v4sigma2lapl2[18 * g + 15] = 0.0;
-            v4sigma2lapl2[18 * g + 16] = 0.0;
-
-            v4sigma2lapltau[24 * g + 0]  = 0.0;
-            v4sigma2lapltau[24 * g + 1]  = 0.0;
-            v4sigma2lapltau[24 * g + 2]  = 0.0;
-            v4sigma2lapltau[24 * g + 3]  = 0.0;
-            v4sigma2lapltau[24 * g + 4]  = 0.0;
-            v4sigma2lapltau[24 * g + 5]  = 0.0;
-            v4sigma2lapltau[24 * g + 6]  = 0.0;
-            v4sigma2lapltau[24 * g + 7]  = 0.0;
-            v4sigma2lapltau[24 * g + 8]  = 0.0;
-            v4sigma2lapltau[24 * g + 9]  = 0.0;
-            v4sigma2lapltau[24 * g + 10] = 0.0;
-            v4sigma2lapltau[24 * g + 11] = 0.0;
-            v4sigma2lapltau[24 * g + 12] = 0.0;
-            v4sigma2lapltau[24 * g + 13] = 0.0;
-            v4sigma2lapltau[24 * g + 14] = 0.0;
-            v4sigma2lapltau[24 * g + 15] = 0.0;
-            v4sigma2lapltau[24 * g + 16] = 0.0;
-            v4sigma2lapltau[24 * g + 17] = 0.0;
-            v4sigma2lapltau[24 * g + 18] = 0.0;
-            v4sigma2lapltau[24 * g + 19] = 0.0;
-            v4sigma2lapltau[24 * g + 20] = 0.0;
-            v4sigma2lapltau[24 * g + 21] = 0.0;
-            v4sigma2lapltau[24 * g + 22] = 0.0;
-
-            v4sigma2tau2[18 * g + 0]  = 0.0;
-            v4sigma2tau2[18 * g + 1]  = 0.0;
-            v4sigma2tau2[18 * g + 2]  = 0.0;
-            v4sigma2tau2[18 * g + 3]  = 0.0;
-            v4sigma2tau2[18 * g + 4]  = 0.0;
-            v4sigma2tau2[18 * g + 5]  = 0.0;
-            v4sigma2tau2[18 * g + 6]  = 0.0;
-            v4sigma2tau2[18 * g + 7]  = 0.0;
-            v4sigma2tau2[18 * g + 8]  = 0.0;
-            v4sigma2tau2[18 * g + 9]  = 0.0;
-            v4sigma2tau2[18 * g + 10] = 0.0;
-            v4sigma2tau2[18 * g + 11] = 0.0;
-            v4sigma2tau2[18 * g + 12] = 0.0;
-            v4sigma2tau2[18 * g + 13] = 0.0;
-            v4sigma2tau2[18 * g + 14] = 0.0;
-            v4sigma2tau2[18 * g + 15] = 0.0;
-            v4sigma2tau2[18 * g + 16] = 0.0;
-
-            v4sigmalapl3[12 * g + 0]  = 0.0;
-            v4sigmalapl3[12 * g + 1]  = 0.0;
-            v4sigmalapl3[12 * g + 2]  = 0.0;
-            v4sigmalapl3[12 * g + 3]  = 0.0;
-            v4sigmalapl3[12 * g + 4]  = 0.0;
-            v4sigmalapl3[12 * g + 5]  = 0.0;
-            v4sigmalapl3[12 * g + 6]  = 0.0;
-            v4sigmalapl3[12 * g + 7]  = 0.0;
-            v4sigmalapl3[12 * g + 8]  = 0.0;
-            v4sigmalapl3[12 * g + 9]  = 0.0;
-            v4sigmalapl3[12 * g + 10] = 0.0;
-
-            v4sigmalapl2tau[18 * g + 0]  = 0.0;
-            v4sigmalapl2tau[18 * g + 1]  = 0.0;
-            v4sigmalapl2tau[18 * g + 2]  = 0.0;
-            v4sigmalapl2tau[18 * g + 3]  = 0.0;
-            v4sigmalapl2tau[18 * g + 4]  = 0.0;
-            v4sigmalapl2tau[18 * g + 5]  = 0.0;
-            v4sigmalapl2tau[18 * g + 6]  = 0.0;
-            v4sigmalapl2tau[18 * g + 7]  = 0.0;
-            v4sigmalapl2tau[18 * g + 8]  = 0.0;
-            v4sigmalapl2tau[18 * g + 9]  = 0.0;
-            v4sigmalapl2tau[18 * g + 10] = 0.0;
-            v4sigmalapl2tau[18 * g + 11] = 0.0;
-            v4sigmalapl2tau[18 * g + 12] = 0.0;
-            v4sigmalapl2tau[18 * g + 13] = 0.0;
-            v4sigmalapl2tau[18 * g + 14] = 0.0;
-            v4sigmalapl2tau[18 * g + 15] = 0.0;
-            v4sigmalapl2tau[18 * g + 16] = 0.0;
-
-            v4sigmalapltau2[18 * g + 0]  = 0.0;
-            v4sigmalapltau2[18 * g + 1]  = 0.0;
-            v4sigmalapltau2[18 * g + 2]  = 0.0;
-            v4sigmalapltau2[18 * g + 3]  = 0.0;
-            v4sigmalapltau2[18 * g + 4]  = 0.0;
-            v4sigmalapltau2[18 * g + 5]  = 0.0;
-            v4sigmalapltau2[18 * g + 6]  = 0.0;
-            v4sigmalapltau2[18 * g + 7]  = 0.0;
-            v4sigmalapltau2[18 * g + 8]  = 0.0;
-            v4sigmalapltau2[18 * g + 9]  = 0.0;
-            v4sigmalapltau2[18 * g + 10] = 0.0;
-            v4sigmalapltau2[18 * g + 11] = 0.0;
-            v4sigmalapltau2[18 * g + 12] = 0.0;
-            v4sigmalapltau2[18 * g + 13] = 0.0;
-            v4sigmalapltau2[18 * g + 14] = 0.0;
-            v4sigmalapltau2[18 * g + 15] = 0.0;
-            v4sigmalapltau2[18 * g + 16] = 0.0;
-
-            v4sigmatau3[12 * g + 0]  = 0.0;
-            v4sigmatau3[12 * g + 1]  = 0.0;
-            v4sigmatau3[12 * g + 2]  = 0.0;
-            v4sigmatau3[12 * g + 3]  = 0.0;
-            v4sigmatau3[12 * g + 4]  = 0.0;
-            v4sigmatau3[12 * g + 5]  = 0.0;
-            v4sigmatau3[12 * g + 6]  = 0.0;
-            v4sigmatau3[12 * g + 7]  = 0.0;
-            v4sigmatau3[12 * g + 8]  = 0.0;
-            v4sigmatau3[12 * g + 9]  = 0.0;
-            v4sigmatau3[12 * g + 10] = 0.0;
-
-            v4lapl4[5 * g + 0] = 0.0;
-            v4lapl4[5 * g + 1] = 0.0;
-            v4lapl4[5 * g + 2] = 0.0;
-            v4lapl4[5 * g + 3] = 0.0;
-
-            v4lapl3tau[8 * g + 0] = 0.0;
-            v4lapl3tau[8 * g + 1] = 0.0;
-            v4lapl3tau[8 * g + 2] = 0.0;
-            v4lapl3tau[8 * g + 3] = 0.0;
-            v4lapl3tau[8 * g + 4] = 0.0;
-            v4lapl3tau[8 * g + 5] = 0.0;
-            v4lapl3tau[8 * g + 6] = 0.0;
-
-            v4lapl2tau2[9 * g + 0] = 0.0;
-            v4lapl2tau2[9 * g + 1] = 0.0;
-            v4lapl2tau2[9 * g + 2] = 0.0;
-            v4lapl2tau2[9 * g + 3] = 0.0;
-            v4lapl2tau2[9 * g + 4] = 0.0;
-            v4lapl2tau2[9 * g + 5] = 0.0;
-            v4lapl2tau2[9 * g + 6] = 0.0;
-            v4lapl2tau2[9 * g + 7] = 0.0;
-
-            v4lapltau3[8 * g + 0] = 0.0;
-            v4lapltau3[8 * g + 1] = 0.0;
-            v4lapltau3[8 * g + 2] = 0.0;
-            v4lapltau3[8 * g + 3] = 0.0;
-            v4lapltau3[8 * g + 4] = 0.0;
-            v4lapltau3[8 * g + 5] = 0.0;
-            v4lapltau3[8 * g + 6] = 0.0;
-
-            v4tau4[5 * g + 0] = 0.0;
-            v4tau4[5 * g + 1] = 0.0;
-            v4tau4[5 * g + 2] = 0.0;
-            v4tau4[5 * g + 3] = 0.0;
+            for (int ind = 0; ind < dim->v4rho4 - 1; ind++)
+            {
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho3sigma - 1; ind++)
+            {
+                v4rho3sigma[dim->v4rho3sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho3lapl - 1; ind++)
+            {
+                v4rho3lapl[dim->v4rho3lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho3tau - 1; ind++)
+            {
+                v4rho3tau[dim->v4rho3tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2sigma2 - 1; ind++)
+            {
+                v4rho2sigma2[dim->v4rho2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2sigmalapl - 1; ind++)
+            {
+                v4rho2sigmalapl[dim->v4rho2sigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2sigmatau - 1; ind++)
+            {
+                v4rho2sigmatau[dim->v4rho2sigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2lapl2 - 1; ind++)
+            {
+                v4rho2lapl2[dim->v4rho2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2lapltau - 1; ind++)
+            {
+                v4rho2lapltau[dim->v4rho2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2tau2 - 1; ind++)
+            {
+                v4rho2tau2[dim->v4rho2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigma3 - 1; ind++)
+            {
+                v4rhosigma3[dim->v4rhosigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigma2lapl - 1; ind++)
+            {
+                v4rhosigma2lapl[dim->v4rhosigma2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigma2tau - 1; ind++)
+            {
+                v4rhosigma2tau[dim->v4rhosigma2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigmalapl2 - 1; ind++)
+            {
+                v4rhosigmalapl2[dim->v4rhosigmalapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigmalapltau - 1; ind++)
+            {
+                v4rhosigmalapltau[dim->v4rhosigmalapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigmatau2 - 1; ind++)
+            {
+                v4rhosigmatau2[dim->v4rhosigmatau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rholapl3 - 1; ind++)
+            {
+                v4rholapl3[dim->v4rholapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rholapl2tau - 1; ind++)
+            {
+                v4rholapl2tau[dim->v4rholapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rholapltau2 - 1; ind++)
+            {
+                v4rholapltau2[dim->v4rholapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhotau3 - 1; ind++)
+            {
+                v4rhotau3[dim->v4rhotau3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma4 - 1; ind++)
+            {
+                v4sigma4[dim->v4sigma4 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma3lapl - 1; ind++)
+            {
+                v4sigma3lapl[dim->v4sigma3lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma3tau - 1; ind++)
+            {
+                v4sigma3tau[dim->v4sigma3tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma2lapl2 - 1; ind++)
+            {
+                v4sigma2lapl2[dim->v4sigma2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma2lapltau - 1; ind++)
+            {
+                v4sigma2lapltau[dim->v4sigma2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma2tau2 - 1; ind++)
+            {
+                v4sigma2tau2[dim->v4sigma2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigmalapl3 - 1; ind++)
+            {
+                v4sigmalapl3[dim->v4sigmalapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigmalapl2tau - 1; ind++)
+            {
+                v4sigmalapl2tau[dim->v4sigmalapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigmalapltau2 - 1; ind++)
+            {
+                v4sigmalapltau2[dim->v4sigmalapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigmatau3 - 1; ind++)
+            {
+                v4sigmatau3[dim->v4sigmatau3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4lapl4 - 1; ind++)
+            {
+                v4lapl4[dim->v4lapl4 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4lapl3tau - 1; ind++)
+            {
+                v4lapl3tau[dim->v4lapl3tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4lapl2tau2 - 1; ind++)
+            {
+                v4lapl2tau2[dim->v4lapl2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4lapltau3 - 1; ind++)
+            {
+                v4lapltau3[dim->v4lapltau3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4tau4 - 1; ind++)
+            {
+                v4tau4[dim->v4tau4 * g + ind] = 0.0;
+            }
         }
 
         // rho_b, sigma_bb and tau_b
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
-            v4rho4[5 * g + 1] = 0.0;
-            v4rho4[5 * g + 2] = 0.0;
-            v4rho4[5 * g + 3] = 0.0;
-            v4rho4[5 * g + 4] = 0.0;
-
-            v4rho3sigma[12 * g + 1]  = 0.0;
-            v4rho3sigma[12 * g + 2]  = 0.0;
-            v4rho3sigma[12 * g + 3]  = 0.0;
-            v4rho3sigma[12 * g + 4]  = 0.0;
-            v4rho3sigma[12 * g + 5]  = 0.0;
-            v4rho3sigma[12 * g + 6]  = 0.0;
-            v4rho3sigma[12 * g + 7]  = 0.0;
-            v4rho3sigma[12 * g + 8]  = 0.0;
-            v4rho3sigma[12 * g + 9]  = 0.0;
-            v4rho3sigma[12 * g + 10] = 0.0;
-            v4rho3sigma[12 * g + 11] = 0.0;
-
-            v4rho3lapl[8 * g + 1] = 0.0;
-            v4rho3lapl[8 * g + 2] = 0.0;
-            v4rho3lapl[8 * g + 3] = 0.0;
-            v4rho3lapl[8 * g + 4] = 0.0;
-            v4rho3lapl[8 * g + 5] = 0.0;
-            v4rho3lapl[8 * g + 6] = 0.0;
-            v4rho3lapl[8 * g + 7] = 0.0;
-
-            v4rho3tau[8 * g + 1] = 0.0;
-            v4rho3tau[8 * g + 2] = 0.0;
-            v4rho3tau[8 * g + 3] = 0.0;
-            v4rho3tau[8 * g + 4] = 0.0;
-            v4rho3tau[8 * g + 5] = 0.0;
-            v4rho3tau[8 * g + 6] = 0.0;
-            v4rho3tau[8 * g + 7] = 0.0;
-
-            v4rho2sigma2[18 * g + 1]  = 0.0;
-            v4rho2sigma2[18 * g + 2]  = 0.0;
-            v4rho2sigma2[18 * g + 3]  = 0.0;
-            v4rho2sigma2[18 * g + 4]  = 0.0;
-            v4rho2sigma2[18 * g + 5]  = 0.0;
-            v4rho2sigma2[18 * g + 6]  = 0.0;
-            v4rho2sigma2[18 * g + 7]  = 0.0;
-            v4rho2sigma2[18 * g + 8]  = 0.0;
-            v4rho2sigma2[18 * g + 9]  = 0.0;
-            v4rho2sigma2[18 * g + 10] = 0.0;
-            v4rho2sigma2[18 * g + 11] = 0.0;
-            v4rho2sigma2[18 * g + 12] = 0.0;
-            v4rho2sigma2[18 * g + 13] = 0.0;
-            v4rho2sigma2[18 * g + 14] = 0.0;
-            v4rho2sigma2[18 * g + 15] = 0.0;
-            v4rho2sigma2[18 * g + 16] = 0.0;
-            v4rho2sigma2[18 * g + 17] = 0.0;
-
-            v4rho2sigmalapl[18 * g + 1]  = 0.0;
-            v4rho2sigmalapl[18 * g + 2]  = 0.0;
-            v4rho2sigmalapl[18 * g + 3]  = 0.0;
-            v4rho2sigmalapl[18 * g + 4]  = 0.0;
-            v4rho2sigmalapl[18 * g + 5]  = 0.0;
-            v4rho2sigmalapl[18 * g + 6]  = 0.0;
-            v4rho2sigmalapl[18 * g + 7]  = 0.0;
-            v4rho2sigmalapl[18 * g + 8]  = 0.0;
-            v4rho2sigmalapl[18 * g + 9]  = 0.0;
-            v4rho2sigmalapl[18 * g + 10] = 0.0;
-            v4rho2sigmalapl[18 * g + 11] = 0.0;
-            v4rho2sigmalapl[18 * g + 12] = 0.0;
-            v4rho2sigmalapl[18 * g + 13] = 0.0;
-            v4rho2sigmalapl[18 * g + 14] = 0.0;
-            v4rho2sigmalapl[18 * g + 15] = 0.0;
-            v4rho2sigmalapl[18 * g + 16] = 0.0;
-            v4rho2sigmalapl[18 * g + 17] = 0.0;
-
-            v4rho2sigmatau[18 * g + 1]  = 0.0;
-            v4rho2sigmatau[18 * g + 2]  = 0.0;
-            v4rho2sigmatau[18 * g + 3]  = 0.0;
-            v4rho2sigmatau[18 * g + 4]  = 0.0;
-            v4rho2sigmatau[18 * g + 5]  = 0.0;
-            v4rho2sigmatau[18 * g + 6]  = 0.0;
-            v4rho2sigmatau[18 * g + 7]  = 0.0;
-            v4rho2sigmatau[18 * g + 8]  = 0.0;
-            v4rho2sigmatau[18 * g + 9]  = 0.0;
-            v4rho2sigmatau[18 * g + 10] = 0.0;
-            v4rho2sigmatau[18 * g + 11] = 0.0;
-            v4rho2sigmatau[18 * g + 12] = 0.0;
-            v4rho2sigmatau[18 * g + 13] = 0.0;
-            v4rho2sigmatau[18 * g + 14] = 0.0;
-            v4rho2sigmatau[18 * g + 15] = 0.0;
-            v4rho2sigmatau[18 * g + 16] = 0.0;
-            v4rho2sigmatau[18 * g + 17] = 0.0;
-
-            v4rho2lapl2[9 * g + 1] = 0.0;
-            v4rho2lapl2[9 * g + 2] = 0.0;
-            v4rho2lapl2[9 * g + 3] = 0.0;
-            v4rho2lapl2[9 * g + 4] = 0.0;
-            v4rho2lapl2[9 * g + 5] = 0.0;
-            v4rho2lapl2[9 * g + 6] = 0.0;
-            v4rho2lapl2[9 * g + 7] = 0.0;
-            v4rho2lapl2[9 * g + 8] = 0.0;
-
-            v4rho2lapltau[12 * g + 1]  = 0.0;
-            v4rho2lapltau[12 * g + 2]  = 0.0;
-            v4rho2lapltau[12 * g + 3]  = 0.0;
-            v4rho2lapltau[12 * g + 4]  = 0.0;
-            v4rho2lapltau[12 * g + 5]  = 0.0;
-            v4rho2lapltau[12 * g + 6]  = 0.0;
-            v4rho2lapltau[12 * g + 7]  = 0.0;
-            v4rho2lapltau[12 * g + 8]  = 0.0;
-            v4rho2lapltau[12 * g + 9]  = 0.0;
-            v4rho2lapltau[12 * g + 10] = 0.0;
-            v4rho2lapltau[12 * g + 11] = 0.0;
-
-            v4rho2tau2[9 * g + 1] = 0.0;
-            v4rho2tau2[9 * g + 2] = 0.0;
-            v4rho2tau2[9 * g + 3] = 0.0;
-            v4rho2tau2[9 * g + 4] = 0.0;
-            v4rho2tau2[9 * g + 5] = 0.0;
-            v4rho2tau2[9 * g + 6] = 0.0;
-            v4rho2tau2[9 * g + 7] = 0.0;
-            v4rho2tau2[9 * g + 8] = 0.0;
-
-            v4rhosigma3[20 * g + 1]  = 0.0;
-            v4rhosigma3[20 * g + 2]  = 0.0;
-            v4rhosigma3[20 * g + 3]  = 0.0;
-            v4rhosigma3[20 * g + 4]  = 0.0;
-            v4rhosigma3[20 * g + 5]  = 0.0;
-            v4rhosigma3[20 * g + 6]  = 0.0;
-            v4rhosigma3[20 * g + 7]  = 0.0;
-            v4rhosigma3[20 * g + 8]  = 0.0;
-            v4rhosigma3[20 * g + 9]  = 0.0;
-            v4rhosigma3[20 * g + 10] = 0.0;
-            v4rhosigma3[20 * g + 11] = 0.0;
-            v4rhosigma3[20 * g + 12] = 0.0;
-            v4rhosigma3[20 * g + 13] = 0.0;
-            v4rhosigma3[20 * g + 14] = 0.0;
-            v4rhosigma3[20 * g + 15] = 0.0;
-            v4rhosigma3[20 * g + 16] = 0.0;
-            v4rhosigma3[20 * g + 17] = 0.0;
-            v4rhosigma3[20 * g + 18] = 0.0;
-            v4rhosigma3[20 * g + 19] = 0.0;
-
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 1]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 2]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 3]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 4]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 5]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 6]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 7]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 8]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 9]  = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 10] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 11] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 12] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 13] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 14] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 15] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 16] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 17] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 18] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 19] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 20] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 21] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 22] = 0.0;
-            v4rhosigma2lapl[mgga_ptr->dim.v4rhosigma2lapl * g + 23] = 0.0;
-
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 1]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 2]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 3]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 4]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 5]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 6]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 7]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 8]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 9]  = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 10] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 11] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 12] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 13] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 14] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 15] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 16] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 17] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 18] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 19] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 20] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 21] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 22] = 0.0;
-            v4rhosigma2tau[mgga_ptr->dim.v4rhosigma2tau * g + 23] = 0.0;
-
-            v4rhosigmalapl2[18 * g + 1]  = 0.0;
-            v4rhosigmalapl2[18 * g + 2]  = 0.0;
-            v4rhosigmalapl2[18 * g + 3]  = 0.0;
-            v4rhosigmalapl2[18 * g + 4]  = 0.0;
-            v4rhosigmalapl2[18 * g + 5]  = 0.0;
-            v4rhosigmalapl2[18 * g + 6]  = 0.0;
-            v4rhosigmalapl2[18 * g + 7]  = 0.0;
-            v4rhosigmalapl2[18 * g + 8]  = 0.0;
-            v4rhosigmalapl2[18 * g + 9]  = 0.0;
-            v4rhosigmalapl2[18 * g + 10] = 0.0;
-            v4rhosigmalapl2[18 * g + 11] = 0.0;
-            v4rhosigmalapl2[18 * g + 12] = 0.0;
-            v4rhosigmalapl2[18 * g + 13] = 0.0;
-            v4rhosigmalapl2[18 * g + 14] = 0.0;
-            v4rhosigmalapl2[18 * g + 15] = 0.0;
-            v4rhosigmalapl2[18 * g + 16] = 0.0;
-            v4rhosigmalapl2[18 * g + 17] = 0.0;
-
-            v4rhosigmalapltau[24 * g + 1]  = 0.0;
-            v4rhosigmalapltau[24 * g + 2]  = 0.0;
-            v4rhosigmalapltau[24 * g + 3]  = 0.0;
-            v4rhosigmalapltau[24 * g + 4]  = 0.0;
-            v4rhosigmalapltau[24 * g + 5]  = 0.0;
-            v4rhosigmalapltau[24 * g + 6]  = 0.0;
-            v4rhosigmalapltau[24 * g + 7]  = 0.0;
-            v4rhosigmalapltau[24 * g + 8]  = 0.0;
-            v4rhosigmalapltau[24 * g + 9]  = 0.0;
-            v4rhosigmalapltau[24 * g + 10] = 0.0;
-            v4rhosigmalapltau[24 * g + 11] = 0.0;
-            v4rhosigmalapltau[24 * g + 12] = 0.0;
-            v4rhosigmalapltau[24 * g + 13] = 0.0;
-            v4rhosigmalapltau[24 * g + 14] = 0.0;
-            v4rhosigmalapltau[24 * g + 15] = 0.0;
-            v4rhosigmalapltau[24 * g + 16] = 0.0;
-            v4rhosigmalapltau[24 * g + 17] = 0.0;
-            v4rhosigmalapltau[24 * g + 18] = 0.0;
-            v4rhosigmalapltau[24 * g + 19] = 0.0;
-            v4rhosigmalapltau[24 * g + 20] = 0.0;
-            v4rhosigmalapltau[24 * g + 21] = 0.0;
-            v4rhosigmalapltau[24 * g + 22] = 0.0;
-            v4rhosigmalapltau[24 * g + 23] = 0.0;
-
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 1]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 2]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 3]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 4]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 5]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 6]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 7]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 8]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 9]  = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 10] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 11] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 12] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 13] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 14] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 15] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 16] = 0.0;
-            v4rhosigmatau2[mgga_ptr->dim.v4rhosigmatau2 * g + 17] = 0.0;
-
-            v4rholapl3[8 * g + 1] = 0.0;
-            v4rholapl3[8 * g + 2] = 0.0;
-            v4rholapl3[8 * g + 3] = 0.0;
-            v4rholapl3[8 * g + 4] = 0.0;
-            v4rholapl3[8 * g + 5] = 0.0;
-            v4rholapl3[8 * g + 6] = 0.0;
-            v4rholapl3[8 * g + 7] = 0.0;
-
-            v4rholapl2tau[12 * g + 1]  = 0.0;
-            v4rholapl2tau[12 * g + 2]  = 0.0;
-            v4rholapl2tau[12 * g + 3]  = 0.0;
-            v4rholapl2tau[12 * g + 4]  = 0.0;
-            v4rholapl2tau[12 * g + 5]  = 0.0;
-            v4rholapl2tau[12 * g + 6]  = 0.0;
-            v4rholapl2tau[12 * g + 7]  = 0.0;
-            v4rholapl2tau[12 * g + 8]  = 0.0;
-            v4rholapl2tau[12 * g + 9]  = 0.0;
-            v4rholapl2tau[12 * g + 10] = 0.0;
-            v4rholapl2tau[12 * g + 11] = 0.0;
-
-            v4rholapltau2[12 * g + 1]  = 0.0;
-            v4rholapltau2[12 * g + 2]  = 0.0;
-            v4rholapltau2[12 * g + 3]  = 0.0;
-            v4rholapltau2[12 * g + 4]  = 0.0;
-            v4rholapltau2[12 * g + 5]  = 0.0;
-            v4rholapltau2[12 * g + 6]  = 0.0;
-            v4rholapltau2[12 * g + 7]  = 0.0;
-            v4rholapltau2[12 * g + 8]  = 0.0;
-            v4rholapltau2[12 * g + 9]  = 0.0;
-            v4rholapltau2[12 * g + 10] = 0.0;
-            v4rholapltau2[12 * g + 11] = 0.0;
-
-            v4rhotau3[8 * g + 1] = 0.0;
-            v4rhotau3[8 * g + 2] = 0.0;
-            v4rhotau3[8 * g + 3] = 0.0;
-            v4rhotau3[8 * g + 4] = 0.0;
-            v4rhotau3[8 * g + 5] = 0.0;
-            v4rhotau3[8 * g + 6] = 0.0;
-            v4rhotau3[8 * g + 7] = 0.0;
-
-            v4sigma4[15 * g + 1]  = 0.0;
-            v4sigma4[15 * g + 2]  = 0.0;
-            v4sigma4[15 * g + 3]  = 0.0;
-            v4sigma4[15 * g + 4]  = 0.0;
-            v4sigma4[15 * g + 5]  = 0.0;
-            v4sigma4[15 * g + 6]  = 0.0;
-            v4sigma4[15 * g + 7]  = 0.0;
-            v4sigma4[15 * g + 8]  = 0.0;
-            v4sigma4[15 * g + 9]  = 0.0;
-            v4sigma4[15 * g + 10] = 0.0;
-            v4sigma4[15 * g + 11] = 0.0;
-            v4sigma4[15 * g + 12] = 0.0;
-            v4sigma4[15 * g + 13] = 0.0;
-            v4sigma4[15 * g + 14] = 0.0;
-
-            v4sigma3lapl[20 * g + 1]  = 0.0;
-            v4sigma3lapl[20 * g + 2]  = 0.0;
-            v4sigma3lapl[20 * g + 3]  = 0.0;
-            v4sigma3lapl[20 * g + 4]  = 0.0;
-            v4sigma3lapl[20 * g + 5]  = 0.0;
-            v4sigma3lapl[20 * g + 6]  = 0.0;
-            v4sigma3lapl[20 * g + 7]  = 0.0;
-            v4sigma3lapl[20 * g + 8]  = 0.0;
-            v4sigma3lapl[20 * g + 9]  = 0.0;
-            v4sigma3lapl[20 * g + 10] = 0.0;
-            v4sigma3lapl[20 * g + 11] = 0.0;
-            v4sigma3lapl[20 * g + 12] = 0.0;
-            v4sigma3lapl[20 * g + 13] = 0.0;
-            v4sigma3lapl[20 * g + 14] = 0.0;
-            v4sigma3lapl[20 * g + 15] = 0.0;
-            v4sigma3lapl[20 * g + 16] = 0.0;
-            v4sigma3lapl[20 * g + 17] = 0.0;
-            v4sigma3lapl[20 * g + 18] = 0.0;
-            v4sigma3lapl[20 * g + 19] = 0.0;
-
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 1]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 2]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 3]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 4]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 5]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 6]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 7]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 8]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 9]  = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 10] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 11] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 12] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 13] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 14] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 15] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 16] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 17] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 18] = 0.0;
-            v4sigma3tau[mgga_ptr->dim.v4sigma3tau * g + 19] = 0.0;
-
-            v4sigma2lapl2[18 * g + 1]  = 0.0;
-            v4sigma2lapl2[18 * g + 2]  = 0.0;
-            v4sigma2lapl2[18 * g + 3]  = 0.0;
-            v4sigma2lapl2[18 * g + 4]  = 0.0;
-            v4sigma2lapl2[18 * g + 5]  = 0.0;
-            v4sigma2lapl2[18 * g + 6]  = 0.0;
-            v4sigma2lapl2[18 * g + 7]  = 0.0;
-            v4sigma2lapl2[18 * g + 8]  = 0.0;
-            v4sigma2lapl2[18 * g + 9]  = 0.0;
-            v4sigma2lapl2[18 * g + 10] = 0.0;
-            v4sigma2lapl2[18 * g + 11] = 0.0;
-            v4sigma2lapl2[18 * g + 12] = 0.0;
-            v4sigma2lapl2[18 * g + 13] = 0.0;
-            v4sigma2lapl2[18 * g + 14] = 0.0;
-            v4sigma2lapl2[18 * g + 15] = 0.0;
-            v4sigma2lapl2[18 * g + 16] = 0.0;
-            v4sigma2lapl2[18 * g + 17] = 0.0;
-
-            v4sigma2lapltau[24 * g + 1]  = 0.0;
-            v4sigma2lapltau[24 * g + 2]  = 0.0;
-            v4sigma2lapltau[24 * g + 3]  = 0.0;
-            v4sigma2lapltau[24 * g + 4]  = 0.0;
-            v4sigma2lapltau[24 * g + 5]  = 0.0;
-            v4sigma2lapltau[24 * g + 6]  = 0.0;
-            v4sigma2lapltau[24 * g + 7]  = 0.0;
-            v4sigma2lapltau[24 * g + 8]  = 0.0;
-            v4sigma2lapltau[24 * g + 9]  = 0.0;
-            v4sigma2lapltau[24 * g + 10] = 0.0;
-            v4sigma2lapltau[24 * g + 11] = 0.0;
-            v4sigma2lapltau[24 * g + 12] = 0.0;
-            v4sigma2lapltau[24 * g + 13] = 0.0;
-            v4sigma2lapltau[24 * g + 14] = 0.0;
-            v4sigma2lapltau[24 * g + 15] = 0.0;
-            v4sigma2lapltau[24 * g + 16] = 0.0;
-            v4sigma2lapltau[24 * g + 17] = 0.0;
-            v4sigma2lapltau[24 * g + 18] = 0.0;
-            v4sigma2lapltau[24 * g + 19] = 0.0;
-            v4sigma2lapltau[24 * g + 20] = 0.0;
-            v4sigma2lapltau[24 * g + 21] = 0.0;
-            v4sigma2lapltau[24 * g + 22] = 0.0;
-            v4sigma2lapltau[24 * g + 23] = 0.0;
-
-            v4sigma2tau2[18 * g + 1]  = 0.0;
-            v4sigma2tau2[18 * g + 2]  = 0.0;
-            v4sigma2tau2[18 * g + 3]  = 0.0;
-            v4sigma2tau2[18 * g + 4]  = 0.0;
-            v4sigma2tau2[18 * g + 5]  = 0.0;
-            v4sigma2tau2[18 * g + 6]  = 0.0;
-            v4sigma2tau2[18 * g + 7]  = 0.0;
-            v4sigma2tau2[18 * g + 8]  = 0.0;
-            v4sigma2tau2[18 * g + 9]  = 0.0;
-            v4sigma2tau2[18 * g + 10] = 0.0;
-            v4sigma2tau2[18 * g + 11] = 0.0;
-            v4sigma2tau2[18 * g + 12] = 0.0;
-            v4sigma2tau2[18 * g + 13] = 0.0;
-            v4sigma2tau2[18 * g + 14] = 0.0;
-            v4sigma2tau2[18 * g + 15] = 0.0;
-            v4sigma2tau2[18 * g + 16] = 0.0;
-            v4sigma2tau2[18 * g + 17] = 0.0;
-
-            v4sigmalapl3[12 * g + 1]  = 0.0;
-            v4sigmalapl3[12 * g + 2]  = 0.0;
-            v4sigmalapl3[12 * g + 3]  = 0.0;
-            v4sigmalapl3[12 * g + 4]  = 0.0;
-            v4sigmalapl3[12 * g + 5]  = 0.0;
-            v4sigmalapl3[12 * g + 6]  = 0.0;
-            v4sigmalapl3[12 * g + 7]  = 0.0;
-            v4sigmalapl3[12 * g + 8]  = 0.0;
-            v4sigmalapl3[12 * g + 9]  = 0.0;
-            v4sigmalapl3[12 * g + 10] = 0.0;
-            v4sigmalapl3[12 * g + 11] = 0.0;
-
-            v4sigmalapl2tau[18 * g + 1]  = 0.0;
-            v4sigmalapl2tau[18 * g + 2]  = 0.0;
-            v4sigmalapl2tau[18 * g + 3]  = 0.0;
-            v4sigmalapl2tau[18 * g + 4]  = 0.0;
-            v4sigmalapl2tau[18 * g + 5]  = 0.0;
-            v4sigmalapl2tau[18 * g + 6]  = 0.0;
-            v4sigmalapl2tau[18 * g + 7]  = 0.0;
-            v4sigmalapl2tau[18 * g + 8]  = 0.0;
-            v4sigmalapl2tau[18 * g + 9]  = 0.0;
-            v4sigmalapl2tau[18 * g + 10] = 0.0;
-            v4sigmalapl2tau[18 * g + 11] = 0.0;
-            v4sigmalapl2tau[18 * g + 12] = 0.0;
-            v4sigmalapl2tau[18 * g + 13] = 0.0;
-            v4sigmalapl2tau[18 * g + 14] = 0.0;
-            v4sigmalapl2tau[18 * g + 15] = 0.0;
-            v4sigmalapl2tau[18 * g + 16] = 0.0;
-            v4sigmalapl2tau[18 * g + 17] = 0.0;
-
-            v4sigmalapltau2[18 * g + 1]  = 0.0;
-            v4sigmalapltau2[18 * g + 2]  = 0.0;
-            v4sigmalapltau2[18 * g + 3]  = 0.0;
-            v4sigmalapltau2[18 * g + 4]  = 0.0;
-            v4sigmalapltau2[18 * g + 5]  = 0.0;
-            v4sigmalapltau2[18 * g + 6]  = 0.0;
-            v4sigmalapltau2[18 * g + 7]  = 0.0;
-            v4sigmalapltau2[18 * g + 8]  = 0.0;
-            v4sigmalapltau2[18 * g + 9]  = 0.0;
-            v4sigmalapltau2[18 * g + 10] = 0.0;
-            v4sigmalapltau2[18 * g + 11] = 0.0;
-            v4sigmalapltau2[18 * g + 12] = 0.0;
-            v4sigmalapltau2[18 * g + 13] = 0.0;
-            v4sigmalapltau2[18 * g + 14] = 0.0;
-            v4sigmalapltau2[18 * g + 15] = 0.0;
-            v4sigmalapltau2[18 * g + 16] = 0.0;
-            v4sigmalapltau2[18 * g + 17] = 0.0;
-
-            v4sigmatau3[12 * g + 1]  = 0.0;
-            v4sigmatau3[12 * g + 2]  = 0.0;
-            v4sigmatau3[12 * g + 3]  = 0.0;
-            v4sigmatau3[12 * g + 4]  = 0.0;
-            v4sigmatau3[12 * g + 5]  = 0.0;
-            v4sigmatau3[12 * g + 6]  = 0.0;
-            v4sigmatau3[12 * g + 7]  = 0.0;
-            v4sigmatau3[12 * g + 8]  = 0.0;
-            v4sigmatau3[12 * g + 9]  = 0.0;
-            v4sigmatau3[12 * g + 10] = 0.0;
-            v4sigmatau3[12 * g + 11] = 0.0;
-
-            v4lapl4[5 * g + 1] = 0.0;
-            v4lapl4[5 * g + 2] = 0.0;
-            v4lapl4[5 * g + 3] = 0.0;
-            v4lapl4[5 * g + 4] = 0.0;
-
-            v4lapl3tau[8 * g + 1] = 0.0;
-            v4lapl3tau[8 * g + 2] = 0.0;
-            v4lapl3tau[8 * g + 3] = 0.0;
-            v4lapl3tau[8 * g + 4] = 0.0;
-            v4lapl3tau[8 * g + 5] = 0.0;
-            v4lapl3tau[8 * g + 6] = 0.0;
-            v4lapl3tau[8 * g + 7] = 0.0;
-
-            v4lapl2tau2[9 * g + 1] = 0.0;
-            v4lapl2tau2[9 * g + 2] = 0.0;
-            v4lapl2tau2[9 * g + 3] = 0.0;
-            v4lapl2tau2[9 * g + 4] = 0.0;
-            v4lapl2tau2[9 * g + 5] = 0.0;
-            v4lapl2tau2[9 * g + 6] = 0.0;
-            v4lapl2tau2[9 * g + 7] = 0.0;
-            v4lapl2tau2[9 * g + 8] = 0.0;
-
-            v4lapltau3[8 * g + 1] = 0.0;
-            v4lapltau3[8 * g + 2] = 0.0;
-            v4lapltau3[8 * g + 3] = 0.0;
-            v4lapltau3[8 * g + 4] = 0.0;
-            v4lapltau3[8 * g + 5] = 0.0;
-            v4lapltau3[8 * g + 6] = 0.0;
-            v4lapltau3[8 * g + 7] = 0.0;
-
-            v4tau4[5 * g + 1] = 0.0;
-            v4tau4[5 * g + 2] = 0.0;
-            v4tau4[5 * g + 3] = 0.0;
-            v4tau4[5 * g + 4] = 0.0;
+            for (int ind = 1; ind < dim->v4rho4; ind++)
+            {
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho3sigma; ind++)
+            {
+                v4rho3sigma[dim->v4rho3sigma * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho3lapl; ind++)
+            {
+                v4rho3lapl[dim->v4rho3lapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho3tau; ind++)
+            {
+                v4rho3tau[dim->v4rho3tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho2sigma2; ind++)
+            {
+                v4rho2sigma2[dim->v4rho2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho2sigmalapl; ind++)
+            {
+                v4rho2sigmalapl[dim->v4rho2sigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho2sigmatau; ind++)
+            {
+                v4rho2sigmatau[dim->v4rho2sigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho2lapl2; ind++)
+            {
+                v4rho2lapl2[dim->v4rho2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho2lapltau; ind++)
+            {
+                v4rho2lapltau[dim->v4rho2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho2tau2; ind++)
+            {
+                v4rho2tau2[dim->v4rho2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rhosigma3; ind++)
+            {
+                v4rhosigma3[dim->v4rhosigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rhosigma2lapl; ind++)
+            {
+                v4rhosigma2lapl[dim->v4rhosigma2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rhosigma2tau; ind++)
+            {
+                v4rhosigma2tau[dim->v4rhosigma2tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rhosigmalapl2; ind++)
+            {
+                v4rhosigmalapl2[dim->v4rhosigmalapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rhosigmalapltau; ind++)
+            {
+                v4rhosigmalapltau[dim->v4rhosigmalapltau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rhosigmatau2; ind++)
+            {
+                v4rhosigmatau2[dim->v4rhosigmatau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rholapl3; ind++)
+            {
+                v4rholapl3[dim->v4rholapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rholapl2tau; ind++)
+            {
+                v4rholapl2tau[dim->v4rholapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rholapltau2; ind++)
+            {
+                v4rholapltau2[dim->v4rholapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rhotau3; ind++)
+            {
+                v4rhotau3[dim->v4rhotau3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigma4; ind++)
+            {
+                v4sigma4[dim->v4sigma4 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigma3lapl; ind++)
+            {
+                v4sigma3lapl[dim->v4sigma3lapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigma3tau; ind++)
+            {
+                v4sigma3tau[dim->v4sigma3tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigma2lapl2; ind++)
+            {
+                v4sigma2lapl2[dim->v4sigma2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigma2lapltau; ind++)
+            {
+                v4sigma2lapltau[dim->v4sigma2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigma2tau2; ind++)
+            {
+                v4sigma2tau2[dim->v4sigma2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigmalapl3; ind++)
+            {
+                v4sigmalapl3[dim->v4sigmalapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigmalapl2tau; ind++)
+            {
+                v4sigmalapl2tau[dim->v4sigmalapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigmalapltau2; ind++)
+            {
+                v4sigmalapltau2[dim->v4sigmalapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigmatau3; ind++)
+            {
+                v4sigmatau3[dim->v4sigmatau3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4lapl4; ind++)
+            {
+                v4lapl4[dim->v4lapl4 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4lapl3tau; ind++)
+            {
+                v4lapl3tau[dim->v4lapl3tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4lapl2tau2; ind++)
+            {
+                v4lapl2tau2[dim->v4lapl2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4lapltau3; ind++)
+            {
+                v4lapltau3[dim->v4lapltau3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4tau4; ind++)
+            {
+                v4tau4[dim->v4tau4 * g + ind] = 0.0;
+            }
         }
     }
 }
