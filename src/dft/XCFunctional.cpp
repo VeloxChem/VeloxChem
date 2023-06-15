@@ -104,13 +104,10 @@ CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
 
         // check functional family
 
-        // which family does this x-c mixture belong to?
-        auto family = funcptr->info->family;
-
         // LDA, GGA, metaGGA
-        isMGGA = (isMGGA || (family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA));
-        isGGA  = ((!isMGGA) && (isGGA || (family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA)));
-        isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || (family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA)));
+        isMGGA = (isMGGA || xccomp.isMetaGGA());
+        isGGA  = ((!isMGGA) && (isGGA || xccomp.isGGA()));
+        isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || xccomp.isLDA()));
 
         // check functional hybrid type
         // TODO use xc_hyb_type when it is available
@@ -591,9 +588,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
 
@@ -606,7 +601,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
@@ -664,9 +659,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_vxc(funcptr, np, rho, stage_vrho);
 
@@ -677,7 +670,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
 
@@ -745,9 +738,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
 
@@ -759,7 +750,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
                 v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
 
@@ -867,9 +858,7 @@ CXCFunctional::compute_kxc_for_gga(int32_t       np,
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
 
@@ -882,7 +871,7 @@ CXCFunctional::compute_kxc_for_gga(int32_t       np,
                 v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
 
@@ -1050,9 +1039,7 @@ CXCFunctional::compute_lxc_for_gga(int32_t       np,
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
 
@@ -1066,7 +1053,7 @@ CXCFunctional::compute_lxc_for_gga(int32_t       np,
                 v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_lxc(funcptr, np, rho, sigma, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4);
 
@@ -1214,9 +1201,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(int32_t       np,
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
 
@@ -1229,7 +1214,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
@@ -1246,7 +1231,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                 vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
+        else if (xccomp.isMetaGGA())
         {
             xc_mgga_exc_vxc(funcptr, np, rho, sigma, lapl, tau, stage_exc, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
 
@@ -1329,9 +1314,7 @@ CXCFunctional::compute_vxc_for_mgga(int32_t       np,
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_vxc(funcptr, np, rho, stage_vrho);
 
@@ -1342,7 +1325,7 @@ CXCFunctional::compute_vxc_for_mgga(int32_t       np,
                 vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
 
@@ -1357,7 +1340,7 @@ CXCFunctional::compute_vxc_for_mgga(int32_t       np,
                 vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
+        else if (xccomp.isMetaGGA())
         {
             xc_mgga_vxc(funcptr, np, rho, sigma, lapl, tau, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
 
@@ -1492,9 +1475,7 @@ CXCFunctional::compute_fxc_for_mgga(int32_t       np,
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
 
@@ -1506,7 +1487,7 @@ CXCFunctional::compute_fxc_for_mgga(int32_t       np,
                 v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
 
@@ -1533,7 +1514,7 @@ CXCFunctional::compute_fxc_for_mgga(int32_t       np,
                 v2sigma2[6 * g + 5] += c * stage_v2sigma2[6 * g + 5];
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
+        else if (xccomp.isMetaGGA())
         {
             xc_mgga_fxc(funcptr,
                         np,
@@ -1888,9 +1869,7 @@ CXCFunctional::compute_kxc_for_mgga(int32_t       np,
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
 
@@ -1903,7 +1882,7 @@ CXCFunctional::compute_kxc_for_mgga(int32_t       np,
                 v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
 
@@ -1951,7 +1930,7 @@ CXCFunctional::compute_kxc_for_mgga(int32_t       np,
                 v3sigma3[10 * g + 9] += c * stage_v3sigma3[10 * g + 9];
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
+        else if (xccomp.isMetaGGA())
         {
             xc_mgga_kxc(funcptr,
                         np,
@@ -2866,9 +2845,7 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
 
         const auto c = xccomp.getScalingFactor();
 
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
             xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
 
@@ -2882,7 +2859,7 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
                 v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        else if (xccomp.isGGA())
         {
             xc_gga_lxc(funcptr, np, rho, sigma, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4);
 
@@ -2967,7 +2944,7 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
                 v4sigma4[15 * g + 14] += c * stage_v4sigma4[15 * g + 14];
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
+        else if (xccomp.isMetaGGA())
         {
             xc_mgga_lxc(funcptr,
                         np,
@@ -3653,13 +3630,9 @@ CXCFunctional::getFunctionalPointerToLdaComponent() const
 {
     for (const auto& xccomp : _components)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
-
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        if (xccomp.isLDA())
         {
-            return funcptr;
+            return xccomp.getFunctionalPointer();
         }
     }
 
@@ -3675,13 +3648,9 @@ CXCFunctional::getFunctionalPointerToGgaComponent() const
 {
     for (const auto& xccomp : _components)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
-
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        if (xccomp.isGGA())
         {
-            return funcptr;
+            return xccomp.getFunctionalPointer();
         }
     }
 
@@ -3697,13 +3666,9 @@ CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
 {
     for (const auto& xccomp : _components)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
-
-        auto family = funcptr->info->family;
-
-        if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
+        if (xccomp.isMetaGGA())
         {
-            return funcptr;
+            return xccomp.getFunctionalPointer();
         }
     }
 
