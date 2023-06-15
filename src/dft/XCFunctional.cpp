@@ -3649,6 +3649,50 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
 }
 
 const xc_func_type*
+CXCFunctional::getFunctionalPointerToLdaComponent() const
+{
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        auto family = funcptr->info->family;
+
+        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+        {
+            return funcptr;
+        }
+    }
+
+    std::string errmsg("XCFunctional.getFunctionalPointerToLdaComponent: Cannot find LDA functional component");
+
+    errors::assertMsgCritical(false, errmsg);
+
+    return nullptr;
+}
+
+const xc_func_type*
+CXCFunctional::getFunctionalPointerToGgaComponent() const
+{
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        auto family = funcptr->info->family;
+
+        if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+        {
+            return funcptr;
+        }
+    }
+
+    std::string errmsg("XCFunctional.getFunctionalPointerToGgaComponent: Cannot find GGA functional component");
+
+    errors::assertMsgCritical(false, errmsg);
+
+    return nullptr;
+}
+
+const xc_func_type*
 CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
 {
     for (const auto& xccomp : _components)

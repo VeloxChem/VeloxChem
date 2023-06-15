@@ -541,6 +541,16 @@ class CXCFunctional
                               double*       v4lapltau3,
                               double*       v4tau4) const -> void;
 
+    /** Gets functional pointer to the first LDA component.
+     * @return the pointer.
+     */
+    const xc_func_type* getFunctionalPointerToLdaComponent() const;
+
+    /** Gets functional pointer to the first GGA component.
+     * @return the pointer.
+     */
+    const xc_func_type* getFunctionalPointerToGgaComponent() const;
+
     /** Gets functional pointer to the first meta-GGA component.
      * @return the pointer.
      */
