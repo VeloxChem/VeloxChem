@@ -216,8 +216,8 @@ CXCFunctional::_getIndicesAndCountsOfDerivatives() const
 
     if (_familyOfFunctional == std::string("LDA"))
     {
-        auto ldafunc = getFunctionalPointerToLdaComponent();
-        const auto dim = &(ldafunc->dim);
+        auto       ldafunc = getFunctionalPointerToLdaComponent();
+        const auto dim     = &(ldafunc->dim);
 
         int n_xc_outputs = 0;
 
@@ -238,8 +238,8 @@ CXCFunctional::_getIndicesAndCountsOfDerivatives() const
     }
     else if (_familyOfFunctional == std::string("GGA"))
     {
-        auto ggafunc = getFunctionalPointerToGgaComponent();
-        const auto dim = &(ggafunc->dim);
+        auto       ggafunc = getFunctionalPointerToGgaComponent();
+        const auto dim     = &(ggafunc->dim);
 
         int n_xc_outputs = 0;
 
@@ -280,8 +280,8 @@ CXCFunctional::_getIndicesAndCountsOfDerivatives() const
     }
     else if (_familyOfFunctional == std::string("MGGA"))
     {
-        auto mggafunc = getFunctionalPointerToMetaGgaComponent();
-        const auto dim = &(mggafunc->dim);
+        auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+        const auto dim      = &(mggafunc->dim);
 
         int n_xc_outputs = 0;
 
@@ -2472,8 +2472,8 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
 
-    auto mggafunc = getFunctionalPointerToMetaGgaComponent();
-    const auto dim = &(mggafunc->dim);
+    auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
     #pragma omp simd aligned(v4rho4, v4rho3sigma, v4rho3lapl, v4rho3tau, \
                              v4rho2sigma2, v4rho2sigmalapl, v4rho2sigmatau, v4rho2lapl2, \
@@ -3020,41 +3020,120 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
     // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_v4rho4            = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[220 * _ldStaging];
-    auto stage_v4rho3sigma       = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[225 * _ldStaging];
-    auto stage_v4rho3lapl        = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[237 * _ldStaging];
-    auto stage_v4rho3tau         = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[245 * _ldStaging];
-    auto stage_v4rho2sigma2      = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[253 * _ldStaging];
-    auto stage_v4rho2sigmalapl   = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[271 * _ldStaging];
-    auto stage_v4rho2sigmatau    = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[289 * _ldStaging];
-    auto stage_v4rho2lapl2       = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[307 * _ldStaging];
-    auto stage_v4rho2lapltau     = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[316 * _ldStaging];
-    auto stage_v4rho2tau2        = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[328 * _ldStaging];
-    auto stage_v4rhosigma3       = (alloc) ? mem::malloc<double>(20 * np) : &_stagingBuffer[337 * _ldStaging];
-    auto stage_v4rhosigma2lapl   = (alloc) ? mem::malloc<double>(36 * np) : &_stagingBuffer[357 * _ldStaging];  // TODO: use dim->v4rhosigma2lapl (36 vs 24);
-    auto stage_v4rhosigma2tau    = (alloc) ? mem::malloc<double>(36 * np) : &_stagingBuffer[393 * _ldStaging];  // TODO: use dim->v4rhosigma2tau (36 vs 24);
-    auto stage_v4rhosigmalapl2   = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[429 * _ldStaging];
-    auto stage_v4rhosigmalapltau = (alloc) ? mem::malloc<double>(24 * np) : &_stagingBuffer[447 * _ldStaging];
-    auto stage_v4rhosigmatau2    = (alloc) ? mem::malloc<double>(36 * np) : &_stagingBuffer[471 * _ldStaging];  // TODO: use dim->v4rhosigmatau2 (36 vs 18);
-    auto stage_v4rholapl3        = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[507 * _ldStaging];
-    auto stage_v4rholapl2tau     = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[515 * _ldStaging];
-    auto stage_v4rholapltau2     = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[527 * _ldStaging];
-    auto stage_v4rhotau3         = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[539 * _ldStaging];
-    auto stage_v4sigma4          = (alloc) ? mem::malloc<double>(15 * np) : &_stagingBuffer[547 * _ldStaging];
-    auto stage_v4sigma3lapl      = (alloc) ? mem::malloc<double>(20 * np) : &_stagingBuffer[562 * _ldStaging];
-    auto stage_v4sigma3tau       = (alloc) ? mem::malloc<double>(30 * np) : &_stagingBuffer[582 * _ldStaging];  // TODO: use dim->v4sigma3tau (30 vs 20);
-    auto stage_v4sigma2lapl2     = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[612 * _ldStaging];
-    auto stage_v4sigma2lapltau   = (alloc) ? mem::malloc<double>(24 * np) : &_stagingBuffer[630 * _ldStaging];
-    auto stage_v4sigma2tau2      = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[654 * _ldStaging];
-    auto stage_v4sigmalapl3      = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[672 * _ldStaging];
-    auto stage_v4sigmalapl2tau   = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[684 * _ldStaging];
-    auto stage_v4sigmalapltau2   = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[702 * _ldStaging];
-    auto stage_v4sigmatau3       = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[720 * _ldStaging];
-    auto stage_v4lapl4           = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[732 * _ldStaging];
-    auto stage_v4lapl3tau        = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[737 * _ldStaging];
-    auto stage_v4lapl2tau2       = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[745 * _ldStaging];
-    auto stage_v4lapltau3        = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[754 * _ldStaging];
-    auto stage_v4tau4            = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[762 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
+
+    double* stage_v4rho4            = nullptr;
+    double* stage_v4rho3sigma       = nullptr;
+    double* stage_v4rho3lapl        = nullptr;
+    double* stage_v4rho3tau         = nullptr;
+    double* stage_v4rho2sigma2      = nullptr;
+    double* stage_v4rho2sigmalapl   = nullptr;
+    double* stage_v4rho2sigmatau    = nullptr;
+    double* stage_v4rho2lapl2       = nullptr;
+    double* stage_v4rho2lapltau     = nullptr;
+    double* stage_v4rho2tau2        = nullptr;
+    double* stage_v4rhosigma3       = nullptr;
+    double* stage_v4rhosigma2lapl   = nullptr;
+    double* stage_v4rhosigma2tau    = nullptr;
+    double* stage_v4rhosigmalapl2   = nullptr;
+    double* stage_v4rhosigmalapltau = nullptr;
+    double* stage_v4rhosigmatau2    = nullptr;
+    double* stage_v4rholapl3        = nullptr;
+    double* stage_v4rholapl2tau     = nullptr;
+    double* stage_v4rholapltau2     = nullptr;
+    double* stage_v4rhotau3         = nullptr;
+    double* stage_v4sigma4          = nullptr;
+    double* stage_v4sigma3lapl      = nullptr;
+    double* stage_v4sigma3tau       = nullptr;
+    double* stage_v4sigma2lapl2     = nullptr;
+    double* stage_v4sigma2lapltau   = nullptr;
+    double* stage_v4sigma2tau2      = nullptr;
+    double* stage_v4sigmalapl3      = nullptr;
+    double* stage_v4sigmalapl2tau   = nullptr;
+    double* stage_v4sigmalapltau2   = nullptr;
+    double* stage_v4sigmatau3       = nullptr;
+    double* stage_v4lapl4           = nullptr;
+    double* stage_v4lapl3tau        = nullptr;
+    double* stage_v4lapl2tau2       = nullptr;
+    double* stage_v4lapltau3        = nullptr;
+    double* stage_v4tau4            = nullptr;
+
+    if (alloc)
+    {
+        stage_v4rho4            = mem::malloc<double>(ind_cnt["v4rho4"][1] * np);
+        stage_v4rho3sigma       = mem::malloc<double>(ind_cnt["v4rho3sigma"][1] * np);
+        stage_v4rho3lapl        = mem::malloc<double>(ind_cnt["v4rho3lapl"][1] * np);
+        stage_v4rho3tau         = mem::malloc<double>(ind_cnt["v4rho3tau"][1] * np);
+        stage_v4rho2sigma2      = mem::malloc<double>(ind_cnt["v4rho2sigma2"][1] * np);
+        stage_v4rho2sigmalapl   = mem::malloc<double>(ind_cnt["v4rho2sigmalapl"][1] * np);
+        stage_v4rho2sigmatau    = mem::malloc<double>(ind_cnt["v4rho2sigmatau"][1] * np);
+        stage_v4rho2lapl2       = mem::malloc<double>(ind_cnt["v4rho2lapl2"][1] * np);
+        stage_v4rho2lapltau     = mem::malloc<double>(ind_cnt["v4rho2lapltau"][1] * np);
+        stage_v4rho2tau2        = mem::malloc<double>(ind_cnt["v4rho2tau2"][1] * np);
+        stage_v4rhosigma3       = mem::malloc<double>(ind_cnt["v4rhosigma3"][1] * np);
+        stage_v4rhosigma2lapl   = mem::malloc<double>(ind_cnt["v4rhosigma2lapl"][1] * np);
+        stage_v4rhosigma2tau    = mem::malloc<double>(ind_cnt["v4rhosigma2tau"][1] * np);
+        stage_v4rhosigmalapl2   = mem::malloc<double>(ind_cnt["v4rhosigmalapl2"][1] * np);
+        stage_v4rhosigmalapltau = mem::malloc<double>(ind_cnt["v4rhosigmalapltau"][1] * np);
+        stage_v4rhosigmatau2    = mem::malloc<double>(ind_cnt["v4rhosigmatau2"][1] * np);
+        stage_v4rholapl3        = mem::malloc<double>(ind_cnt["v4rholapl3"][1] * np);
+        stage_v4rholapl2tau     = mem::malloc<double>(ind_cnt["v4rholapl2tau"][1] * np);
+        stage_v4rholapltau2     = mem::malloc<double>(ind_cnt["v4rholapltau2"][1] * np);
+        stage_v4rhotau3         = mem::malloc<double>(ind_cnt["v4rhotau3"][1] * np);
+        stage_v4sigma4          = mem::malloc<double>(ind_cnt["v4sigma4"][1] * np);
+        stage_v4sigma3lapl      = mem::malloc<double>(ind_cnt["v4sigma3lapl"][1] * np);
+        stage_v4sigma3tau       = mem::malloc<double>(ind_cnt["v4sigma3tau"][1] * np);
+        stage_v4sigma2lapl2     = mem::malloc<double>(ind_cnt["v4sigma2lapl2"][1] * np);
+        stage_v4sigma2lapltau   = mem::malloc<double>(ind_cnt["v4sigma2lapltau"][1] * np);
+        stage_v4sigma2tau2      = mem::malloc<double>(ind_cnt["v4sigma2tau2"][1] * np);
+        stage_v4sigmalapl3      = mem::malloc<double>(ind_cnt["v4sigmalapl3"][1] * np);
+        stage_v4sigmalapl2tau   = mem::malloc<double>(ind_cnt["v4sigmalapl2tau"][1] * np);
+        stage_v4sigmalapltau2   = mem::malloc<double>(ind_cnt["v4sigmalapltau2"][1] * np);
+        stage_v4sigmatau3       = mem::malloc<double>(ind_cnt["v4sigmatau3"][1] * np);
+        stage_v4lapl4           = mem::malloc<double>(ind_cnt["v4lapl4"][1] * np);
+        stage_v4lapl3tau        = mem::malloc<double>(ind_cnt["v4lapl3tau"][1] * np);
+        stage_v4lapl2tau2       = mem::malloc<double>(ind_cnt["v4lapl2tau2"][1] * np);
+        stage_v4lapltau3        = mem::malloc<double>(ind_cnt["v4lapltau3"][1] * np);
+        stage_v4tau4            = mem::malloc<double>(ind_cnt["v4tau4"][1] * np);
+    }
+    else
+    {
+        stage_v4rho4            = &_stagingBuffer[ind_cnt["v4rho4"][0] * _ldStaging];
+        stage_v4rho3sigma       = &_stagingBuffer[ind_cnt["v4rho3sigma"][0] * _ldStaging];
+        stage_v4rho3lapl        = &_stagingBuffer[ind_cnt["v4rho3lapl"][0] * _ldStaging];
+        stage_v4rho3tau         = &_stagingBuffer[ind_cnt["v4rho3tau"][0] * _ldStaging];
+        stage_v4rho2sigma2      = &_stagingBuffer[ind_cnt["v4rho2sigma2"][0] * _ldStaging];
+        stage_v4rho2sigmalapl   = &_stagingBuffer[ind_cnt["v4rho2sigmalapl"][0] * _ldStaging];
+        stage_v4rho2sigmatau    = &_stagingBuffer[ind_cnt["v4rho2sigmatau"][0] * _ldStaging];
+        stage_v4rho2lapl2       = &_stagingBuffer[ind_cnt["v4rho2lapl2"][0] * _ldStaging];
+        stage_v4rho2lapltau     = &_stagingBuffer[ind_cnt["v4rho2lapltau"][0] * _ldStaging];
+        stage_v4rho2tau2        = &_stagingBuffer[ind_cnt["v4rho2tau2"][0] * _ldStaging];
+        stage_v4rhosigma3       = &_stagingBuffer[ind_cnt["v4rhosigma3"][0] * _ldStaging];
+        stage_v4rhosigma2lapl   = &_stagingBuffer[ind_cnt["v4rhosigma2lapl"][0] * _ldStaging];
+        stage_v4rhosigma2tau    = &_stagingBuffer[ind_cnt["v4rhosigma2tau"][0] * _ldStaging];
+        stage_v4rhosigmalapl2   = &_stagingBuffer[ind_cnt["v4rhosigmalapl2"][0] * _ldStaging];
+        stage_v4rhosigmalapltau = &_stagingBuffer[ind_cnt["v4rhosigmalapltau"][0] * _ldStaging];
+        stage_v4rhosigmatau2    = &_stagingBuffer[ind_cnt["v4rhosigmatau2"][0] * _ldStaging];
+        stage_v4rholapl3        = &_stagingBuffer[ind_cnt["v4rholapl3"][0] * _ldStaging];
+        stage_v4rholapl2tau     = &_stagingBuffer[ind_cnt["v4rholapl2tau"][0] * _ldStaging];
+        stage_v4rholapltau2     = &_stagingBuffer[ind_cnt["v4rholapltau2"][0] * _ldStaging];
+        stage_v4rhotau3         = &_stagingBuffer[ind_cnt["v4rhotau3"][0] * _ldStaging];
+        stage_v4sigma4          = &_stagingBuffer[ind_cnt["v4sigma4"][0] * _ldStaging];
+        stage_v4sigma3lapl      = &_stagingBuffer[ind_cnt["v4sigma3lapl"][0] * _ldStaging];
+        stage_v4sigma3tau       = &_stagingBuffer[ind_cnt["v4sigma3tau"][0] * _ldStaging];
+        stage_v4sigma2lapl2     = &_stagingBuffer[ind_cnt["v4sigma2lapl2"][0] * _ldStaging];
+        stage_v4sigma2lapltau   = &_stagingBuffer[ind_cnt["v4sigma2lapltau"][0] * _ldStaging];
+        stage_v4sigma2tau2      = &_stagingBuffer[ind_cnt["v4sigma2tau2"][0] * _ldStaging];
+        stage_v4sigmalapl3      = &_stagingBuffer[ind_cnt["v4sigmalapl3"][0] * _ldStaging];
+        stage_v4sigmalapl2tau   = &_stagingBuffer[ind_cnt["v4sigmalapl2tau"][0] * _ldStaging];
+        stage_v4sigmalapltau2   = &_stagingBuffer[ind_cnt["v4sigmalapltau2"][0] * _ldStaging];
+        stage_v4sigmatau3       = &_stagingBuffer[ind_cnt["v4sigmatau3"][0] * _ldStaging];
+        stage_v4lapl4           = &_stagingBuffer[ind_cnt["v4lapl4"][0] * _ldStaging];
+        stage_v4lapl3tau        = &_stagingBuffer[ind_cnt["v4lapl3tau"][0] * _ldStaging];
+        stage_v4lapl2tau2       = &_stagingBuffer[ind_cnt["v4lapl2tau2"][0] * _ldStaging];
+        stage_v4lapltau3        = &_stagingBuffer[ind_cnt["v4lapltau3"][0] * _ldStaging];
+        stage_v4tau4            = &_stagingBuffer[ind_cnt["v4tau4"][0] * _ldStaging];
+    }
 
     for (const auto& xccomp : _components)
     {
