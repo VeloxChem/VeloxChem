@@ -719,7 +719,7 @@ class ScfDriver:
                 C_alpha = None
                 C_beta = None
 
-            n_ao = basis.get_dimensions_of_basis(molecule)
+            n_ao = basis.get_dimension_of_basis(molecule)
             err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
             err_array = 'ScfDriver.set_start_orbitals: invalid array'
 

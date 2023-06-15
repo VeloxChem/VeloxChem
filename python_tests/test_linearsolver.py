@@ -68,7 +68,7 @@ class TestLinearSolver:
         ostream = OutputStream(None)
 
         mol, bas = self.get_molecule_and_basis()
-        nao = bas.get_dimensions_of_basis(mol)
+        nao = bas.get_dimension_of_basis(mol)
 
         dmat = np.diag(np.ones(nao))
         dens = AODensityMatrix([dmat], denmat.rest)

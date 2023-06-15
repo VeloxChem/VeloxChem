@@ -246,9 +246,17 @@ export_orbdata(py::module& m)
             "py_comm"_a)
         .def("get_valence_basis", &CMolecularBasis::reduceToValenceBasis, "Reduces molecular basis to valence molecular basis.")
         .def("add_atom_basis", &CMolecularBasis::addAtomBasis, "Adds atom basis object to molecular basis.", "atomBasis"_a)
+        .def("get_dimension_of_basis",
+             &CMolecularBasis::getDimensionsOfBasis,
+             "Determines size of contracted AO basis for selected molecule.",
+             "molecule"_a)
         .def("get_dimensions_of_basis",
              &CMolecularBasis::getDimensionsOfBasis,
              "Determines size of contracted AO basis for selected molecule.",
+             "molecule"_a)
+        .def("get_dimension_of_primitive_basis",
+             &CMolecularBasis::getDimensionsOfPrimitiveBasis,
+             "Determines size of primitive AO basis for selected molecule.",
              "molecule"_a)
         .def("get_dimensions_of_primitive_basis",
              &CMolecularBasis::getDimensionsOfPrimitiveBasis,

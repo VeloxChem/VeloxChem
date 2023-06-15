@@ -170,7 +170,7 @@ class TestScfRestricted:
 
         mol = task.molecule
         bas = task.ao_basis
-        nao = bas.get_dimensions_of_basis(mol)
+        nao = bas.get_dimension_of_basis(mol)
 
         dmat = np.diag(np.ones(nao))
         dens = AODensityMatrix([dmat], denmat.rest)

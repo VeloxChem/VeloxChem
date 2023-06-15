@@ -80,7 +80,7 @@ def select_scf_driver(task, scf_type):
 
     # check number of MPI nodes
     if task.mpi_rank == mpi_master():
-        n_ao = task.ao_basis.get_dimensions_of_basis(task.molecule)
+        n_ao = task.ao_basis.get_dimension_of_basis(task.molecule)
         assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ao,
                             'SCF: too many MPI processes')
 
