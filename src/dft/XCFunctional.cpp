@@ -1865,515 +1865,342 @@ CXCFunctional::compute_kxc_for_mgga(int32_t       np,
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
 
-    #pragma omp simd aligned(v3rho3, v3rho2sigma, v3rho2lapl, v3rho2tau, \
-                             v3rhosigma2, v3rhosigmalapl, v3rhosigmatau, v3rholapl2, \
-                             v3rholapltau, v3rhotau2, v3sigma3, v3sigma2lapl, \
-                             v3sigma2tau, v3sigmalapl2, v3sigmalapltau, v3sigmatau2, \
-                             v3lapl3, v3lapl2tau, v3lapltau2, v3tau3 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        v3rho3[4 * g + 0] = 0;
-        v3rho3[4 * g + 1] = 0;
-        v3rho3[4 * g + 2] = 0;
-        v3rho3[4 * g + 3] = 0;
+    // set up staging buffers
 
-        v3rho2sigma[9 * g + 0] = 0;
-        v3rho2sigma[9 * g + 1] = 0;
-        v3rho2sigma[9 * g + 2] = 0;
-        v3rho2sigma[9 * g + 3] = 0;
-        v3rho2sigma[9 * g + 4] = 0;
-        v3rho2sigma[9 * g + 5] = 0;
-        v3rho2sigma[9 * g + 6] = 0;
-        v3rho2sigma[9 * g + 7] = 0;
-        v3rho2sigma[9 * g + 8] = 0;
-
-        v3rho2lapl[6 * g + 0] = 0;
-        v3rho2lapl[6 * g + 1] = 0;
-        v3rho2lapl[6 * g + 2] = 0;
-        v3rho2lapl[6 * g + 3] = 0;
-        v3rho2lapl[6 * g + 4] = 0;
-        v3rho2lapl[6 * g + 5] = 0;
-
-        v3rho2tau[6 * g + 0] = 0;
-        v3rho2tau[6 * g + 1] = 0;
-        v3rho2tau[6 * g + 2] = 0;
-        v3rho2tau[6 * g + 3] = 0;
-        v3rho2tau[6 * g + 4] = 0;
-        v3rho2tau[6 * g + 5] = 0;
-
-        v3rhosigma2[12 * g + 0]  = 0;
-        v3rhosigma2[12 * g + 1]  = 0;
-        v3rhosigma2[12 * g + 2]  = 0;
-        v3rhosigma2[12 * g + 3]  = 0;
-        v3rhosigma2[12 * g + 4]  = 0;
-        v3rhosigma2[12 * g + 5]  = 0;
-        v3rhosigma2[12 * g + 6]  = 0;
-        v3rhosigma2[12 * g + 7]  = 0;
-        v3rhosigma2[12 * g + 8]  = 0;
-        v3rhosigma2[12 * g + 9]  = 0;
-        v3rhosigma2[12 * g + 10] = 0;
-        v3rhosigma2[12 * g + 11] = 0;
-
-        v3rhosigmalapl[12 * g + 0]  = 0;
-        v3rhosigmalapl[12 * g + 1]  = 0;
-        v3rhosigmalapl[12 * g + 2]  = 0;
-        v3rhosigmalapl[12 * g + 3]  = 0;
-        v3rhosigmalapl[12 * g + 4]  = 0;
-        v3rhosigmalapl[12 * g + 5]  = 0;
-        v3rhosigmalapl[12 * g + 6]  = 0;
-        v3rhosigmalapl[12 * g + 7]  = 0;
-        v3rhosigmalapl[12 * g + 8]  = 0;
-        v3rhosigmalapl[12 * g + 9]  = 0;
-        v3rhosigmalapl[12 * g + 10] = 0;
-        v3rhosigmalapl[12 * g + 11] = 0;
-
-        v3rhosigmatau[12 * g + 0]  = 0;
-        v3rhosigmatau[12 * g + 1]  = 0;
-        v3rhosigmatau[12 * g + 2]  = 0;
-        v3rhosigmatau[12 * g + 3]  = 0;
-        v3rhosigmatau[12 * g + 4]  = 0;
-        v3rhosigmatau[12 * g + 5]  = 0;
-        v3rhosigmatau[12 * g + 6]  = 0;
-        v3rhosigmatau[12 * g + 7]  = 0;
-        v3rhosigmatau[12 * g + 8]  = 0;
-        v3rhosigmatau[12 * g + 9]  = 0;
-        v3rhosigmatau[12 * g + 10] = 0;
-        v3rhosigmatau[12 * g + 11] = 0;
-
-        v3rholapl2[6 * g + 0] = 0;
-        v3rholapl2[6 * g + 1] = 0;
-        v3rholapl2[6 * g + 2] = 0;
-        v3rholapl2[6 * g + 3] = 0;
-        v3rholapl2[6 * g + 4] = 0;
-        v3rholapl2[6 * g + 5] = 0;
-
-        v3rholapltau[8 * g + 0] = 0;
-        v3rholapltau[8 * g + 1] = 0;
-        v3rholapltau[8 * g + 2] = 0;
-        v3rholapltau[8 * g + 3] = 0;
-        v3rholapltau[8 * g + 4] = 0;
-        v3rholapltau[8 * g + 5] = 0;
-        v3rholapltau[8 * g + 6] = 0;
-        v3rholapltau[8 * g + 7] = 0;
-
-        v3rhotau2[6 * g + 0] = 0;
-        v3rhotau2[6 * g + 1] = 0;
-        v3rhotau2[6 * g + 2] = 0;
-        v3rhotau2[6 * g + 3] = 0;
-        v3rhotau2[6 * g + 4] = 0;
-        v3rhotau2[6 * g + 5] = 0;
-
-        v3sigma3[10 * g + 0] = 0;
-        v3sigma3[10 * g + 1] = 0;
-        v3sigma3[10 * g + 2] = 0;
-        v3sigma3[10 * g + 3] = 0;
-        v3sigma3[10 * g + 4] = 0;
-        v3sigma3[10 * g + 5] = 0;
-        v3sigma3[10 * g + 6] = 0;
-        v3sigma3[10 * g + 7] = 0;
-        v3sigma3[10 * g + 8] = 0;
-        v3sigma3[10 * g + 9] = 0;
-
-        v3sigma2lapl[12 * g + 0]  = 0;
-        v3sigma2lapl[12 * g + 1]  = 0;
-        v3sigma2lapl[12 * g + 2]  = 0;
-        v3sigma2lapl[12 * g + 3]  = 0;
-        v3sigma2lapl[12 * g + 4]  = 0;
-        v3sigma2lapl[12 * g + 5]  = 0;
-        v3sigma2lapl[12 * g + 6]  = 0;
-        v3sigma2lapl[12 * g + 7]  = 0;
-        v3sigma2lapl[12 * g + 8]  = 0;
-        v3sigma2lapl[12 * g + 9]  = 0;
-        v3sigma2lapl[12 * g + 10] = 0;
-        v3sigma2lapl[12 * g + 11] = 0;
-
-        v3sigma2tau[12 * g + 0]  = 0;
-        v3sigma2tau[12 * g + 1]  = 0;
-        v3sigma2tau[12 * g + 2]  = 0;
-        v3sigma2tau[12 * g + 3]  = 0;
-        v3sigma2tau[12 * g + 4]  = 0;
-        v3sigma2tau[12 * g + 5]  = 0;
-        v3sigma2tau[12 * g + 6]  = 0;
-        v3sigma2tau[12 * g + 7]  = 0;
-        v3sigma2tau[12 * g + 8]  = 0;
-        v3sigma2tau[12 * g + 9]  = 0;
-        v3sigma2tau[12 * g + 10] = 0;
-        v3sigma2tau[12 * g + 11] = 0;
-
-        v3sigmalapl2[9 * g + 0] = 0;
-        v3sigmalapl2[9 * g + 1] = 0;
-        v3sigmalapl2[9 * g + 2] = 0;
-        v3sigmalapl2[9 * g + 3] = 0;
-        v3sigmalapl2[9 * g + 4] = 0;
-        v3sigmalapl2[9 * g + 5] = 0;
-        v3sigmalapl2[9 * g + 6] = 0;
-        v3sigmalapl2[9 * g + 7] = 0;
-        v3sigmalapl2[9 * g + 8] = 0;
-
-        v3sigmalapltau[12 * g + 0]  = 0;
-        v3sigmalapltau[12 * g + 1]  = 0;
-        v3sigmalapltau[12 * g + 2]  = 0;
-        v3sigmalapltau[12 * g + 3]  = 0;
-        v3sigmalapltau[12 * g + 4]  = 0;
-        v3sigmalapltau[12 * g + 5]  = 0;
-        v3sigmalapltau[12 * g + 6]  = 0;
-        v3sigmalapltau[12 * g + 7]  = 0;
-        v3sigmalapltau[12 * g + 8]  = 0;
-        v3sigmalapltau[12 * g + 9]  = 0;
-        v3sigmalapltau[12 * g + 10] = 0;
-        v3sigmalapltau[12 * g + 11] = 0;
-
-        v3sigmatau2[9 * g + 0] = 0;
-        v3sigmatau2[9 * g + 1] = 0;
-        v3sigmatau2[9 * g + 2] = 0;
-        v3sigmatau2[9 * g + 3] = 0;
-        v3sigmatau2[9 * g + 4] = 0;
-        v3sigmatau2[9 * g + 5] = 0;
-        v3sigmatau2[9 * g + 6] = 0;
-        v3sigmatau2[9 * g + 7] = 0;
-        v3sigmatau2[9 * g + 8] = 0;
-
-        v3lapl3[4 * g + 0] = 0;
-        v3lapl3[4 * g + 1] = 0;
-        v3lapl3[4 * g + 2] = 0;
-        v3lapl3[4 * g + 3] = 0;
-
-        v3lapl2tau[6 * g + 0] = 0;
-        v3lapl2tau[6 * g + 1] = 0;
-        v3lapl2tau[6 * g + 2] = 0;
-        v3lapl2tau[6 * g + 3] = 0;
-        v3lapl2tau[6 * g + 4] = 0;
-        v3lapl2tau[6 * g + 5] = 0;
-
-        v3lapltau2[6 * g + 0] = 0;
-        v3lapltau2[6 * g + 1] = 0;
-        v3lapltau2[6 * g + 2] = 0;
-        v3lapltau2[6 * g + 3] = 0;
-        v3lapltau2[6 * g + 4] = 0;
-        v3lapltau2[6 * g + 5] = 0;
-
-        v3tau3[4 * g + 0] = 0;
-        v3tau3[4 * g + 1] = 0;
-        v3tau3[4 * g + 2] = 0;
-        v3tau3[4 * g + 3] = 0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_v3rho3         = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[55 * _ldStaging];
-    auto stage_v3rho2sigma    = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[59 * _ldStaging];
-    auto stage_v3rho2lapl     = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[68 * _ldStaging];
-    auto stage_v3rho2tau      = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[74 * _ldStaging];
-    auto stage_v3rhosigma2    = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[80 * _ldStaging];
-    auto stage_v3rhosigmalapl = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[92 * _ldStaging];
-    auto stage_v3rhosigmatau  = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[104 * _ldStaging];
-    auto stage_v3rholapl2     = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[116 * _ldStaging];
-    auto stage_v3rholapltau   = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[122 * _ldStaging];
-    auto stage_v3rhotau2      = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[130 * _ldStaging];
-    auto stage_v3sigma3       = (alloc) ? mem::malloc<double>(10 * np) : &_stagingBuffer[136 * _ldStaging];
-    auto stage_v3sigma2lapl   = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[146 * _ldStaging];
-    auto stage_v3sigma2tau    = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[158 * _ldStaging];
-    auto stage_v3sigmalapl2   = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[170 * _ldStaging];
-    auto stage_v3sigmalapltau = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[179 * _ldStaging];
-    auto stage_v3sigmatau2    = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[191 * _ldStaging];
-    auto stage_v3lapl3        = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[200 * _ldStaging];
-    auto stage_v3lapl2tau     = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[204 * _ldStaging];
-    auto stage_v3lapltau2     = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[210 * _ldStaging];
-    auto stage_v3tau3         = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[216 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_v3rho3         = nullptr;
+    double* stage_v3rho2sigma    = nullptr;
+    double* stage_v3rho2lapl     = nullptr;
+    double* stage_v3rho2tau      = nullptr;
+    double* stage_v3rhosigma2    = nullptr;
+    double* stage_v3rhosigmalapl = nullptr;
+    double* stage_v3rhosigmatau  = nullptr;
+    double* stage_v3rholapl2     = nullptr;
+    double* stage_v3rholapltau   = nullptr;
+    double* stage_v3rhotau2      = nullptr;
+    double* stage_v3sigma3       = nullptr;
+    double* stage_v3sigma2lapl   = nullptr;
+    double* stage_v3sigma2tau    = nullptr;
+    double* stage_v3sigmalapl2   = nullptr;
+    double* stage_v3sigmalapltau = nullptr;
+    double* stage_v3sigmatau2    = nullptr;
+    double* stage_v3lapl3        = nullptr;
+    double* stage_v3lapl2tau     = nullptr;
+    double* stage_v3lapltau2     = nullptr;
+    double* stage_v3tau3         = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_v3rho3         = mem::malloc<double>(ind_cnt["v3rho3"][1] * np);
+        stage_v3rho2sigma    = mem::malloc<double>(ind_cnt["v3rho2sigma"][1] * np);
+        stage_v3rho2lapl     = mem::malloc<double>(ind_cnt["v3rho2lapl"][1] * np);
+        stage_v3rho2tau      = mem::malloc<double>(ind_cnt["v3rho2tau"][1] * np);
+        stage_v3rhosigma2    = mem::malloc<double>(ind_cnt["v3rhosigma2"][1] * np);
+        stage_v3rhosigmalapl = mem::malloc<double>(ind_cnt["v3rhosigmalapl"][1] * np);
+        stage_v3rhosigmatau  = mem::malloc<double>(ind_cnt["v3rhosigmatau"][1] * np);
+        stage_v3rholapl2     = mem::malloc<double>(ind_cnt["v3rholapl2"][1] * np);
+        stage_v3rholapltau   = mem::malloc<double>(ind_cnt["v3rholapltau"][1] * np);
+        stage_v3rhotau2      = mem::malloc<double>(ind_cnt["v3rhotau2"][1] * np);
+        stage_v3sigma3       = mem::malloc<double>(ind_cnt["v3sigma3"][1] * np);
+        stage_v3sigma2lapl   = mem::malloc<double>(ind_cnt["v3sigma2lapl"][1] * np);
+        stage_v3sigma2tau    = mem::malloc<double>(ind_cnt["v3sigma2tau"][1] * np);
+        stage_v3sigmalapl2   = mem::malloc<double>(ind_cnt["v3sigmalapl2"][1] * np);
+        stage_v3sigmalapltau = mem::malloc<double>(ind_cnt["v3sigmalapltau"][1] * np);
+        stage_v3sigmatau2    = mem::malloc<double>(ind_cnt["v3sigmatau2"][1] * np);
+        stage_v3lapl3        = mem::malloc<double>(ind_cnt["v3lapl3"][1] * np);
+        stage_v3lapl2tau     = mem::malloc<double>(ind_cnt["v3lapl2tau"][1] * np);
+        stage_v3lapltau2     = mem::malloc<double>(ind_cnt["v3lapltau2"][1] * np);
+        stage_v3tau3         = mem::malloc<double>(ind_cnt["v3tau3"][1] * np);
+    }
+    else
+    {
+        stage_v3rho3         = &_stagingBuffer[ind_cnt["v3rho3"][0] * _ldStaging];
+        stage_v3rho2sigma    = &_stagingBuffer[ind_cnt["v3rho2sigma"][0] * _ldStaging];
+        stage_v3rho2lapl     = &_stagingBuffer[ind_cnt["v3rho2lapl"][0] * _ldStaging];
+        stage_v3rho2tau      = &_stagingBuffer[ind_cnt["v3rho2tau"][0] * _ldStaging];
+        stage_v3rhosigma2    = &_stagingBuffer[ind_cnt["v3rhosigma2"][0] * _ldStaging];
+        stage_v3rhosigmalapl = &_stagingBuffer[ind_cnt["v3rhosigmalapl"][0] * _ldStaging];
+        stage_v3rhosigmatau  = &_stagingBuffer[ind_cnt["v3rhosigmatau"][0] * _ldStaging];
+        stage_v3rholapl2     = &_stagingBuffer[ind_cnt["v3rholapl2"][0] * _ldStaging];
+        stage_v3rholapltau   = &_stagingBuffer[ind_cnt["v3rholapltau"][0] * _ldStaging];
+        stage_v3rhotau2      = &_stagingBuffer[ind_cnt["v3rhotau2"][0] * _ldStaging];
+        stage_v3sigma3       = &_stagingBuffer[ind_cnt["v3sigma3"][0] * _ldStaging];
+        stage_v3sigma2lapl   = &_stagingBuffer[ind_cnt["v3sigma2lapl"][0] * _ldStaging];
+        stage_v3sigma2tau    = &_stagingBuffer[ind_cnt["v3sigma2tau"][0] * _ldStaging];
+        stage_v3sigmalapl2   = &_stagingBuffer[ind_cnt["v3sigmalapl2"][0] * _ldStaging];
+        stage_v3sigmalapltau = &_stagingBuffer[ind_cnt["v3sigmalapltau"][0] * _ldStaging];
+        stage_v3sigmatau2    = &_stagingBuffer[ind_cnt["v3sigmatau2"][0] * _ldStaging];
+        stage_v3lapl3        = &_stagingBuffer[ind_cnt["v3lapl3"][0] * _ldStaging];
+        stage_v3lapl2tau     = &_stagingBuffer[ind_cnt["v3lapl2tau"][0] * _ldStaging];
+        stage_v3lapltau2     = &_stagingBuffer[ind_cnt["v3lapltau2"][0] * _ldStaging];
+        stage_v3tau3         = &_stagingBuffer[ind_cnt["v3tau3"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        if (xccomp.isLDA())
+    auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+
+        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+
+        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
-
-            #pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->v3rho3; ++ind)
             {
-                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2sigma; ++ind)
+            {
+                v3rho2sigma[dim->v3rho2sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2lapl; ++ind)
+            {
+                v3rho2lapl[dim->v3rho2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2tau; ++ind)
+            {
+                v3rho2tau[dim->v3rho2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigma2; ++ind)
+            {
+                v3rhosigma2[dim->v3rhosigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigmalapl; ++ind)
+            {
+                v3rhosigmalapl[dim->v3rhosigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigmatau; ++ind)
+            {
+                v3rhosigmatau[dim->v3rhosigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rholapl2; ++ind)
+            {
+                v3rholapl2[dim->v3rholapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rholapltau; ++ind)
+            {
+                v3rholapltau[dim->v3rholapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhotau2; ++ind)
+            {
+                v3rhotau2[dim->v3rhotau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma3; ++ind)
+            {
+                v3sigma3[dim->v3sigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma2lapl; ++ind)
+            {
+                v3sigma2lapl[dim->v3sigma2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma2tau; ++ind)
+            {
+                v3sigma2tau[dim->v3sigma2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmalapl2; ++ind)
+            {
+                v3sigmalapl2[dim->v3sigmalapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmalapltau; ++ind)
+            {
+                v3sigmalapltau[dim->v3sigmalapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmatau2; ++ind)
+            {
+                v3sigmatau2[dim->v3sigmatau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapl3; ++ind)
+            {
+                v3lapl3[dim->v3lapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapl2tau; ++ind)
+            {
+                v3lapl2tau[dim->v3lapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapltau2; ++ind)
+            {
+                v3lapltau2[dim->v3lapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3tau3; ++ind)
+            {
+                v3tau3[dim->v3tau3 * g + ind] = 0.0;
             }
         }
-        else if (xccomp.isGGA())
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, \
-                                     v3rhosigma2, stage_v3rhosigma2, v3sigma3, stage_v3sigma3 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+                xc_lda_kxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v3rho3 + dim->v3rho3 * grid_batch_offset);
 
-                v3rho2sigma[9 * g + 0] += c * stage_v3rho2sigma[9 * g + 0];
-                v3rho2sigma[9 * g + 1] += c * stage_v3rho2sigma[9 * g + 1];
-                v3rho2sigma[9 * g + 2] += c * stage_v3rho2sigma[9 * g + 2];
-                v3rho2sigma[9 * g + 3] += c * stage_v3rho2sigma[9 * g + 3];
-                v3rho2sigma[9 * g + 4] += c * stage_v3rho2sigma[9 * g + 4];
-                v3rho2sigma[9 * g + 5] += c * stage_v3rho2sigma[9 * g + 5];
-                v3rho2sigma[9 * g + 6] += c * stage_v3rho2sigma[9 * g + 6];
-                v3rho2sigma[9 * g + 7] += c * stage_v3rho2sigma[9 * g + 7];
-                v3rho2sigma[9 * g + 8] += c * stage_v3rho2sigma[9 * g + 8];
-
-                v3rhosigma2[12 * g + 0] += c * stage_v3rhosigma2[12 * g + 0];
-                v3rhosigma2[12 * g + 1] += c * stage_v3rhosigma2[12 * g + 1];
-                v3rhosigma2[12 * g + 2] += c * stage_v3rhosigma2[12 * g + 2];
-                v3rhosigma2[12 * g + 3] += c * stage_v3rhosigma2[12 * g + 3];
-                v3rhosigma2[12 * g + 4] += c * stage_v3rhosigma2[12 * g + 4];
-                v3rhosigma2[12 * g + 5] += c * stage_v3rhosigma2[12 * g + 5];
-                v3rhosigma2[12 * g + 6] += c * stage_v3rhosigma2[12 * g + 6];
-                v3rhosigma2[12 * g + 7] += c * stage_v3rhosigma2[12 * g + 7];
-                v3rhosigma2[12 * g + 8] += c * stage_v3rhosigma2[12 * g + 8];
-                v3rhosigma2[12 * g + 9] += c * stage_v3rhosigma2[12 * g + 9];
-                v3rhosigma2[12 * g + 10] += c * stage_v3rhosigma2[12 * g + 10];
-                v3rhosigma2[12 * g + 11] += c * stage_v3rhosigma2[12 * g + 11];
-
-                v3sigma3[10 * g + 0] += c * stage_v3sigma3[10 * g + 0];
-                v3sigma3[10 * g + 1] += c * stage_v3sigma3[10 * g + 1];
-                v3sigma3[10 * g + 2] += c * stage_v3sigma3[10 * g + 2];
-                v3sigma3[10 * g + 3] += c * stage_v3sigma3[10 * g + 3];
-                v3sigma3[10 * g + 4] += c * stage_v3sigma3[10 * g + 4];
-                v3sigma3[10 * g + 5] += c * stage_v3sigma3[10 * g + 5];
-                v3sigma3[10 * g + 6] += c * stage_v3sigma3[10 * g + 6];
-                v3sigma3[10 * g + 7] += c * stage_v3sigma3[10 * g + 7];
-                v3sigma3[10 * g + 8] += c * stage_v3sigma3[10 * g + 8];
-                v3sigma3[10 * g + 9] += c * stage_v3sigma3[10 * g + 9];
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                }
             }
-        }
-        else if (xccomp.isMetaGGA())
-        {
-            xc_mgga_kxc(funcptr,
-                        np,
-                        rho,
-                        sigma,
-                        lapl,
-                        tau,
-                        stage_v3rho3,
-                        stage_v3rho2sigma,
-                        stage_v3rho2lapl,
-                        stage_v3rho2tau,
-                        stage_v3rhosigma2,
-                        stage_v3rhosigmalapl,
-                        stage_v3rhosigmatau,
-                        stage_v3rholapl2,
-                        stage_v3rholapltau,
-                        stage_v3rhotau2,
-                        stage_v3sigma3,
-                        stage_v3sigma2lapl,
-                        stage_v3sigma2tau,
-                        stage_v3sigmalapl2,
-                        stage_v3sigmalapltau,
-                        stage_v3sigmatau2,
-                        stage_v3lapl3,
-                        stage_v3lapl2tau,
-                        stage_v3lapltau2,
-                        stage_v3tau3);
-
-            #pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, \
-                                     v3rho2lapl, stage_v3rho2lapl, v3rho2tau, stage_v3rho2tau, \
-                                     v3rhosigma2, stage_v3rhosigma2, v3rhosigmalapl, stage_v3rhosigmalapl, \
-                                     v3rhosigmatau, stage_v3rhosigmatau, v3rholapl2, stage_v3rholapl2, \
-                                     v3rholapltau, stage_v3rholapltau, v3rhotau2, stage_v3rhotau2, \
-                                     v3sigma3, stage_v3sigma3, v3sigma2lapl, stage_v3sigma2lapl, \
-                                     v3sigma2tau, stage_v3sigma2tau, v3sigmalapl2, stage_v3sigmalapl2, \
-                                     v3sigmalapltau, stage_v3sigmalapltau, v3sigmatau2, stage_v3sigmatau2, \
-                                     v3lapl3, stage_v3lapl3, v3lapl2tau, stage_v3lapl2tau, \
-                                     v3lapltau2, stage_v3lapltau2, v3tau3, stage_v3tau3 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            else if (xccomp.isGGA())
             {
-                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+                xc_gga_kxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_v3rho3 + dim->v3rho3 * grid_batch_offset,
+                           stage_v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                           stage_v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                           stage_v3sigma3 + dim->v3sigma3 * grid_batch_offset);
 
-                v3rho2sigma[9 * g + 0] += c * stage_v3rho2sigma[9 * g + 0];
-                v3rho2sigma[9 * g + 1] += c * stage_v3rho2sigma[9 * g + 1];
-                v3rho2sigma[9 * g + 2] += c * stage_v3rho2sigma[9 * g + 2];
-                v3rho2sigma[9 * g + 3] += c * stage_v3rho2sigma[9 * g + 3];
-                v3rho2sigma[9 * g + 4] += c * stage_v3rho2sigma[9 * g + 4];
-                v3rho2sigma[9 * g + 5] += c * stage_v3rho2sigma[9 * g + 5];
-                v3rho2sigma[9 * g + 6] += c * stage_v3rho2sigma[9 * g + 6];
-                v3rho2sigma[9 * g + 7] += c * stage_v3rho2sigma[9 * g + 7];
-                v3rho2sigma[9 * g + 8] += c * stage_v3rho2sigma[9 * g + 8];
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2sigma; ++ind)
+                    {
+                        v3rho2sigma[dim->v3rho2sigma * g + ind] += c * stage_v3rho2sigma[dim->v3rho2sigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigma2; ++ind)
+                    {
+                        v3rhosigma2[dim->v3rhosigma2 * g + ind] += c * stage_v3rhosigma2[dim->v3rhosigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma3; ++ind)
+                    {
+                        v3sigma3[dim->v3sigma3 * g + ind] += c * stage_v3sigma3[dim->v3sigma3 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isMetaGGA())
+            {
+                xc_mgga_kxc(funcptr,
+                            grid_batch_size,
+                            rho + dim->rho * grid_batch_offset,
+                            sigma + dim->sigma * grid_batch_offset,
+                            lapl + dim->lapl * grid_batch_offset,
+                            tau + dim->tau * grid_batch_offset,
+                            stage_v3rho3 + dim->v3rho3 * grid_batch_offset,
+                            stage_v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                            stage_v3rho2lapl + dim->v3rho2lapl * grid_batch_offset,
+                            stage_v3rho2tau + dim->v3rho2tau * grid_batch_offset,
+                            stage_v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                            stage_v3rhosigmalapl + dim->v3rhosigmalapl * grid_batch_offset,
+                            stage_v3rhosigmatau + dim->v3rhosigmatau * grid_batch_offset,
+                            stage_v3rholapl2 + dim->v3rholapl2 * grid_batch_offset,
+                            stage_v3rholapltau + dim->v3rholapltau * grid_batch_offset,
+                            stage_v3rhotau2 + dim->v3rhotau2 * grid_batch_offset,
+                            stage_v3sigma3 + dim->v3sigma3 * grid_batch_offset,
+                            stage_v3sigma2lapl + dim->v3sigma2lapl * grid_batch_offset,
+                            stage_v3sigma2tau + dim->v3sigma2tau * grid_batch_offset,
+                            stage_v3sigmalapl2 + dim->v3sigmalapl2 * grid_batch_offset,
+                            stage_v3sigmalapltau + dim->v3sigmalapltau * grid_batch_offset,
+                            stage_v3sigmatau2 + dim->v3sigmatau2 * grid_batch_offset,
+                            stage_v3lapl3 + dim->v3lapl3 * grid_batch_offset,
+                            stage_v3lapl2tau + dim->v3lapl2tau * grid_batch_offset,
+                            stage_v3lapltau2 + dim->v3lapltau2 * grid_batch_offset,
+                            stage_v3tau3 + dim->v3tau3 * grid_batch_offset);
 
-                v3rho2lapl[6 * g + 0] += c * stage_v3rho2lapl[6 * g + 0];
-                v3rho2lapl[6 * g + 1] += c * stage_v3rho2lapl[6 * g + 1];
-                v3rho2lapl[6 * g + 2] += c * stage_v3rho2lapl[6 * g + 2];
-                v3rho2lapl[6 * g + 3] += c * stage_v3rho2lapl[6 * g + 3];
-                v3rho2lapl[6 * g + 4] += c * stage_v3rho2lapl[6 * g + 4];
-                v3rho2lapl[6 * g + 5] += c * stage_v3rho2lapl[6 * g + 5];
-
-                v3rho2tau[6 * g + 0] += c * stage_v3rho2tau[6 * g + 0];
-                v3rho2tau[6 * g + 1] += c * stage_v3rho2tau[6 * g + 1];
-                v3rho2tau[6 * g + 2] += c * stage_v3rho2tau[6 * g + 2];
-                v3rho2tau[6 * g + 3] += c * stage_v3rho2tau[6 * g + 3];
-                v3rho2tau[6 * g + 4] += c * stage_v3rho2tau[6 * g + 4];
-                v3rho2tau[6 * g + 5] += c * stage_v3rho2tau[6 * g + 5];
-
-                v3rhosigma2[12 * g + 0] += c * stage_v3rhosigma2[12 * g + 0];
-                v3rhosigma2[12 * g + 1] += c * stage_v3rhosigma2[12 * g + 1];
-                v3rhosigma2[12 * g + 2] += c * stage_v3rhosigma2[12 * g + 2];
-                v3rhosigma2[12 * g + 3] += c * stage_v3rhosigma2[12 * g + 3];
-                v3rhosigma2[12 * g + 4] += c * stage_v3rhosigma2[12 * g + 4];
-                v3rhosigma2[12 * g + 5] += c * stage_v3rhosigma2[12 * g + 5];
-                v3rhosigma2[12 * g + 6] += c * stage_v3rhosigma2[12 * g + 6];
-                v3rhosigma2[12 * g + 7] += c * stage_v3rhosigma2[12 * g + 7];
-                v3rhosigma2[12 * g + 8] += c * stage_v3rhosigma2[12 * g + 8];
-                v3rhosigma2[12 * g + 9] += c * stage_v3rhosigma2[12 * g + 9];
-                v3rhosigma2[12 * g + 10] += c * stage_v3rhosigma2[12 * g + 10];
-                v3rhosigma2[12 * g + 11] += c * stage_v3rhosigma2[12 * g + 11];
-
-                v3rhosigmalapl[12 * g + 0] += c * stage_v3rhosigmalapl[12 * g + 0];
-                v3rhosigmalapl[12 * g + 1] += c * stage_v3rhosigmalapl[12 * g + 1];
-                v3rhosigmalapl[12 * g + 2] += c * stage_v3rhosigmalapl[12 * g + 2];
-                v3rhosigmalapl[12 * g + 3] += c * stage_v3rhosigmalapl[12 * g + 3];
-                v3rhosigmalapl[12 * g + 4] += c * stage_v3rhosigmalapl[12 * g + 4];
-                v3rhosigmalapl[12 * g + 5] += c * stage_v3rhosigmalapl[12 * g + 5];
-                v3rhosigmalapl[12 * g + 6] += c * stage_v3rhosigmalapl[12 * g + 6];
-                v3rhosigmalapl[12 * g + 7] += c * stage_v3rhosigmalapl[12 * g + 7];
-                v3rhosigmalapl[12 * g + 8] += c * stage_v3rhosigmalapl[12 * g + 8];
-                v3rhosigmalapl[12 * g + 9] += c * stage_v3rhosigmalapl[12 * g + 9];
-                v3rhosigmalapl[12 * g + 10] += c * stage_v3rhosigmalapl[12 * g + 10];
-                v3rhosigmalapl[12 * g + 11] += c * stage_v3rhosigmalapl[12 * g + 11];
-
-                v3rhosigmatau[12 * g + 0] += c * stage_v3rhosigmatau[12 * g + 0];
-                v3rhosigmatau[12 * g + 1] += c * stage_v3rhosigmatau[12 * g + 1];
-                v3rhosigmatau[12 * g + 2] += c * stage_v3rhosigmatau[12 * g + 2];
-                v3rhosigmatau[12 * g + 3] += c * stage_v3rhosigmatau[12 * g + 3];
-                v3rhosigmatau[12 * g + 4] += c * stage_v3rhosigmatau[12 * g + 4];
-                v3rhosigmatau[12 * g + 5] += c * stage_v3rhosigmatau[12 * g + 5];
-                v3rhosigmatau[12 * g + 6] += c * stage_v3rhosigmatau[12 * g + 6];
-                v3rhosigmatau[12 * g + 7] += c * stage_v3rhosigmatau[12 * g + 7];
-                v3rhosigmatau[12 * g + 8] += c * stage_v3rhosigmatau[12 * g + 8];
-                v3rhosigmatau[12 * g + 9] += c * stage_v3rhosigmatau[12 * g + 9];
-                v3rhosigmatau[12 * g + 10] += c * stage_v3rhosigmatau[12 * g + 10];
-                v3rhosigmatau[12 * g + 11] += c * stage_v3rhosigmatau[12 * g + 11];
-
-                v3rholapl2[6 * g + 0] += c * stage_v3rholapl2[6 * g + 0];
-                v3rholapl2[6 * g + 1] += c * stage_v3rholapl2[6 * g + 1];
-                v3rholapl2[6 * g + 2] += c * stage_v3rholapl2[6 * g + 2];
-                v3rholapl2[6 * g + 3] += c * stage_v3rholapl2[6 * g + 3];
-                v3rholapl2[6 * g + 4] += c * stage_v3rholapl2[6 * g + 4];
-                v3rholapl2[6 * g + 5] += c * stage_v3rholapl2[6 * g + 5];
-
-                v3rholapltau[8 * g + 0] += c * stage_v3rholapltau[8 * g + 0];
-                v3rholapltau[8 * g + 1] += c * stage_v3rholapltau[8 * g + 1];
-                v3rholapltau[8 * g + 2] += c * stage_v3rholapltau[8 * g + 2];
-                v3rholapltau[8 * g + 3] += c * stage_v3rholapltau[8 * g + 3];
-                v3rholapltau[8 * g + 4] += c * stage_v3rholapltau[8 * g + 4];
-                v3rholapltau[8 * g + 5] += c * stage_v3rholapltau[8 * g + 5];
-                v3rholapltau[8 * g + 6] += c * stage_v3rholapltau[8 * g + 6];
-                v3rholapltau[8 * g + 7] += c * stage_v3rholapltau[8 * g + 7];
-
-                v3rhotau2[6 * g + 0] += c * stage_v3rhotau2[6 * g + 0];
-                v3rhotau2[6 * g + 1] += c * stage_v3rhotau2[6 * g + 1];
-                v3rhotau2[6 * g + 2] += c * stage_v3rhotau2[6 * g + 2];
-                v3rhotau2[6 * g + 3] += c * stage_v3rhotau2[6 * g + 3];
-                v3rhotau2[6 * g + 4] += c * stage_v3rhotau2[6 * g + 4];
-                v3rhotau2[6 * g + 5] += c * stage_v3rhotau2[6 * g + 5];
-
-                v3sigma3[10 * g + 0] += c * stage_v3sigma3[10 * g + 0];
-                v3sigma3[10 * g + 1] += c * stage_v3sigma3[10 * g + 1];
-                v3sigma3[10 * g + 2] += c * stage_v3sigma3[10 * g + 2];
-                v3sigma3[10 * g + 3] += c * stage_v3sigma3[10 * g + 3];
-                v3sigma3[10 * g + 4] += c * stage_v3sigma3[10 * g + 4];
-                v3sigma3[10 * g + 5] += c * stage_v3sigma3[10 * g + 5];
-                v3sigma3[10 * g + 6] += c * stage_v3sigma3[10 * g + 6];
-                v3sigma3[10 * g + 7] += c * stage_v3sigma3[10 * g + 7];
-                v3sigma3[10 * g + 8] += c * stage_v3sigma3[10 * g + 8];
-                v3sigma3[10 * g + 9] += c * stage_v3sigma3[10 * g + 9];
-
-                v3sigma2lapl[12 * g + 0] += c * stage_v3sigma2lapl[12 * g + 0];
-                v3sigma2lapl[12 * g + 1] += c * stage_v3sigma2lapl[12 * g + 1];
-                v3sigma2lapl[12 * g + 2] += c * stage_v3sigma2lapl[12 * g + 2];
-                v3sigma2lapl[12 * g + 3] += c * stage_v3sigma2lapl[12 * g + 3];
-                v3sigma2lapl[12 * g + 4] += c * stage_v3sigma2lapl[12 * g + 4];
-                v3sigma2lapl[12 * g + 5] += c * stage_v3sigma2lapl[12 * g + 5];
-                v3sigma2lapl[12 * g + 6] += c * stage_v3sigma2lapl[12 * g + 6];
-                v3sigma2lapl[12 * g + 7] += c * stage_v3sigma2lapl[12 * g + 7];
-                v3sigma2lapl[12 * g + 8] += c * stage_v3sigma2lapl[12 * g + 8];
-                v3sigma2lapl[12 * g + 9] += c * stage_v3sigma2lapl[12 * g + 9];
-                v3sigma2lapl[12 * g + 10] += c * stage_v3sigma2lapl[12 * g + 10];
-                v3sigma2lapl[12 * g + 11] += c * stage_v3sigma2lapl[12 * g + 11];
-
-                v3sigma2tau[12 * g + 0] += c * stage_v3sigma2tau[12 * g + 0];
-                v3sigma2tau[12 * g + 1] += c * stage_v3sigma2tau[12 * g + 1];
-                v3sigma2tau[12 * g + 2] += c * stage_v3sigma2tau[12 * g + 2];
-                v3sigma2tau[12 * g + 3] += c * stage_v3sigma2tau[12 * g + 3];
-                v3sigma2tau[12 * g + 4] += c * stage_v3sigma2tau[12 * g + 4];
-                v3sigma2tau[12 * g + 5] += c * stage_v3sigma2tau[12 * g + 5];
-                v3sigma2tau[12 * g + 6] += c * stage_v3sigma2tau[12 * g + 6];
-                v3sigma2tau[12 * g + 7] += c * stage_v3sigma2tau[12 * g + 7];
-                v3sigma2tau[12 * g + 8] += c * stage_v3sigma2tau[12 * g + 8];
-                v3sigma2tau[12 * g + 9] += c * stage_v3sigma2tau[12 * g + 9];
-                v3sigma2tau[12 * g + 10] += c * stage_v3sigma2tau[12 * g + 10];
-                v3sigma2tau[12 * g + 11] += c * stage_v3sigma2tau[12 * g + 11];
-
-                v3sigmalapl2[9 * g + 0] += c * stage_v3sigmalapl2[9 * g + 0];
-                v3sigmalapl2[9 * g + 1] += c * stage_v3sigmalapl2[9 * g + 1];
-                v3sigmalapl2[9 * g + 2] += c * stage_v3sigmalapl2[9 * g + 2];
-                v3sigmalapl2[9 * g + 3] += c * stage_v3sigmalapl2[9 * g + 3];
-                v3sigmalapl2[9 * g + 4] += c * stage_v3sigmalapl2[9 * g + 4];
-                v3sigmalapl2[9 * g + 5] += c * stage_v3sigmalapl2[9 * g + 5];
-                v3sigmalapl2[9 * g + 6] += c * stage_v3sigmalapl2[9 * g + 6];
-                v3sigmalapl2[9 * g + 7] += c * stage_v3sigmalapl2[9 * g + 7];
-                v3sigmalapl2[9 * g + 8] += c * stage_v3sigmalapl2[9 * g + 8];
-
-                v3sigmalapltau[12 * g + 0] += c * stage_v3sigmalapltau[12 * g + 0];
-                v3sigmalapltau[12 * g + 1] += c * stage_v3sigmalapltau[12 * g + 1];
-                v3sigmalapltau[12 * g + 2] += c * stage_v3sigmalapltau[12 * g + 2];
-                v3sigmalapltau[12 * g + 3] += c * stage_v3sigmalapltau[12 * g + 3];
-                v3sigmalapltau[12 * g + 4] += c * stage_v3sigmalapltau[12 * g + 4];
-                v3sigmalapltau[12 * g + 5] += c * stage_v3sigmalapltau[12 * g + 5];
-                v3sigmalapltau[12 * g + 6] += c * stage_v3sigmalapltau[12 * g + 6];
-                v3sigmalapltau[12 * g + 7] += c * stage_v3sigmalapltau[12 * g + 7];
-                v3sigmalapltau[12 * g + 8] += c * stage_v3sigmalapltau[12 * g + 8];
-                v3sigmalapltau[12 * g + 9] += c * stage_v3sigmalapltau[12 * g + 9];
-                v3sigmalapltau[12 * g + 10] += c * stage_v3sigmalapltau[12 * g + 10];
-                v3sigmalapltau[12 * g + 11] += c * stage_v3sigmalapltau[12 * g + 11];
-
-                v3sigmatau2[9 * g + 0] += c * stage_v3sigmatau2[9 * g + 0];
-                v3sigmatau2[9 * g + 1] += c * stage_v3sigmatau2[9 * g + 1];
-                v3sigmatau2[9 * g + 2] += c * stage_v3sigmatau2[9 * g + 2];
-                v3sigmatau2[9 * g + 3] += c * stage_v3sigmatau2[9 * g + 3];
-                v3sigmatau2[9 * g + 4] += c * stage_v3sigmatau2[9 * g + 4];
-                v3sigmatau2[9 * g + 5] += c * stage_v3sigmatau2[9 * g + 5];
-                v3sigmatau2[9 * g + 6] += c * stage_v3sigmatau2[9 * g + 6];
-                v3sigmatau2[9 * g + 7] += c * stage_v3sigmatau2[9 * g + 7];
-                v3sigmatau2[9 * g + 8] += c * stage_v3sigmatau2[9 * g + 8];
-
-                v3lapl3[4 * g + 0] += c * stage_v3lapl3[4 * g + 0];
-                v3lapl3[4 * g + 1] += c * stage_v3lapl3[4 * g + 1];
-                v3lapl3[4 * g + 2] += c * stage_v3lapl3[4 * g + 2];
-                v3lapl3[4 * g + 3] += c * stage_v3lapl3[4 * g + 3];
-
-                v3lapl2tau[6 * g + 0] += c * stage_v3lapl2tau[6 * g + 0];
-                v3lapl2tau[6 * g + 1] += c * stage_v3lapl2tau[6 * g + 1];
-                v3lapl2tau[6 * g + 2] += c * stage_v3lapl2tau[6 * g + 2];
-                v3lapl2tau[6 * g + 3] += c * stage_v3lapl2tau[6 * g + 3];
-                v3lapl2tau[6 * g + 4] += c * stage_v3lapl2tau[6 * g + 4];
-                v3lapl2tau[6 * g + 5] += c * stage_v3lapl2tau[6 * g + 5];
-
-                v3lapltau2[6 * g + 0] += c * stage_v3lapltau2[6 * g + 0];
-                v3lapltau2[6 * g + 1] += c * stage_v3lapltau2[6 * g + 1];
-                v3lapltau2[6 * g + 2] += c * stage_v3lapltau2[6 * g + 2];
-                v3lapltau2[6 * g + 3] += c * stage_v3lapltau2[6 * g + 3];
-                v3lapltau2[6 * g + 4] += c * stage_v3lapltau2[6 * g + 4];
-                v3lapltau2[6 * g + 5] += c * stage_v3lapltau2[6 * g + 5];
-
-                v3tau3[4 * g + 0] += c * stage_v3tau3[4 * g + 0];
-                v3tau3[4 * g + 1] += c * stage_v3tau3[4 * g + 1];
-                v3tau3[4 * g + 2] += c * stage_v3tau3[4 * g + 2];
-                v3tau3[4 * g + 3] += c * stage_v3tau3[4 * g + 3];
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2sigma; ++ind)
+                    {
+                        v3rho2sigma[dim->v3rho2sigma * g + ind] += c * stage_v3rho2sigma[dim->v3rho2sigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2lapl; ++ind)
+                    {
+                        v3rho2lapl[dim->v3rho2lapl * g + ind] += c * stage_v3rho2lapl[dim->v3rho2lapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2tau; ++ind)
+                    {
+                        v3rho2tau[dim->v3rho2tau * g + ind] += c * stage_v3rho2tau[dim->v3rho2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigma2; ++ind)
+                    {
+                        v3rhosigma2[dim->v3rhosigma2 * g + ind] += c * stage_v3rhosigma2[dim->v3rhosigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigmalapl; ++ind)
+                    {
+                        v3rhosigmalapl[dim->v3rhosigmalapl * g + ind] += c * stage_v3rhosigmalapl[dim->v3rhosigmalapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigmatau; ++ind)
+                    {
+                        v3rhosigmatau[dim->v3rhosigmatau * g + ind] += c * stage_v3rhosigmatau[dim->v3rhosigmatau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rholapl2; ++ind)
+                    {
+                        v3rholapl2[dim->v3rholapl2 * g + ind] += c * stage_v3rholapl2[dim->v3rholapl2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rholapltau; ++ind)
+                    {
+                        v3rholapltau[dim->v3rholapltau * g + ind] += c * stage_v3rholapltau[dim->v3rholapltau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhotau2; ++ind)
+                    {
+                        v3rhotau2[dim->v3rhotau2 * g + ind] += c * stage_v3rhotau2[dim->v3rhotau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma3; ++ind)
+                    {
+                        v3sigma3[dim->v3sigma3 * g + ind] += c * stage_v3sigma3[dim->v3sigma3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma2lapl; ++ind)
+                    {
+                        v3sigma2lapl[dim->v3sigma2lapl * g + ind] += c * stage_v3sigma2lapl[dim->v3sigma2lapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma2tau; ++ind)
+                    {
+                        v3sigma2tau[dim->v3sigma2tau * g + ind] += c * stage_v3sigma2tau[dim->v3sigma2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigmalapl2; ++ind)
+                    {
+                        v3sigmalapl2[dim->v3sigmalapl2 * g + ind] += c * stage_v3sigmalapl2[dim->v3sigmalapl2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigmalapltau; ++ind)
+                    {
+                        v3sigmalapltau[dim->v3sigmalapltau * g + ind] += c * stage_v3sigmalapltau[dim->v3sigmalapltau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigmatau2; ++ind)
+                    {
+                        v3sigmatau2[dim->v3sigmatau2 * g + ind] += c * stage_v3sigmatau2[dim->v3sigmatau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3lapl3; ++ind)
+                    {
+                        v3lapl3[dim->v3lapl3 * g + ind] += c * stage_v3lapl3[dim->v3lapl3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3lapl2tau; ++ind)
+                    {
+                        v3lapl2tau[dim->v3lapl2tau * g + ind] += c * stage_v3lapl2tau[dim->v3lapl2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3lapltau2; ++ind)
+                    {
+                        v3lapltau2[dim->v3lapltau2 * g + ind] += c * stage_v3lapltau2[dim->v3lapltau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3tau3; ++ind)
+                    {
+                        v3tau3[dim->v3tau3 * g + ind] += c * stage_v3tau3[dim->v3tau3 * g + ind];
+                    }
+                }
             }
         }
     }
@@ -2402,7 +2229,8 @@ CXCFunctional::compute_kxc_for_mgga(int32_t       np,
         mem::free(stage_v3tau3);
     }
 
-    gridscreen::screenKxcForMGGA(np,
+    gridscreen::screenKxcForMGGA(this,
+                                 np,
                                  rho,
                                  sigma,
                                  lapl,

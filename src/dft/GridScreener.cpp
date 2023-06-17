@@ -615,31 +615,32 @@ screenKxcForGGA(const int32_t npoints,
 }
 
 void
-screenKxcForMGGA(const int32_t npoints,
-                 const double* rho,
-                 const double* sigma,
-                 const double* lapl,
-                 const double* tau,
-                 double*       v3rho3,
-                 double*       v3rho2sigma,
-                 double*       v3rho2lapl,
-                 double*       v3rho2tau,
-                 double*       v3rhosigma2,
-                 double*       v3rhosigmalapl,
-                 double*       v3rhosigmatau,
-                 double*       v3rholapl2,
-                 double*       v3rholapltau,
-                 double*       v3rhotau2,
-                 double*       v3sigma3,
-                 double*       v3sigma2lapl,
-                 double*       v3sigma2tau,
-                 double*       v3sigmalapl2,
-                 double*       v3sigmalapltau,
-                 double*       v3sigmatau2,
-                 double*       v3lapl3,
-                 double*       v3lapl2tau,
-                 double*       v3lapltau2,
-                 double*       v3tau3)
+screenKxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                 const int32_t        npoints,
+                 const double*        rho,
+                 const double*        sigma,
+                 const double*        lapl,
+                 const double*        tau,
+                 double*              v3rho3,
+                 double*              v3rho2sigma,
+                 double*              v3rho2lapl,
+                 double*              v3rho2tau,
+                 double*              v3rhosigma2,
+                 double*              v3rhosigmalapl,
+                 double*              v3rhosigmatau,
+                 double*              v3rholapl2,
+                 double*              v3rholapltau,
+                 double*              v3rhotau2,
+                 double*              v3sigma3,
+                 double*              v3sigma2lapl,
+                 double*              v3sigma2tau,
+                 double*              v3sigmalapl2,
+                 double*              v3sigmalapltau,
+                 double*              v3sigmatau2,
+                 double*              v3lapl3,
+                 double*              v3lapl2tau,
+                 double*              v3lapltau2,
+                 double*              v3tau3)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
@@ -647,346 +648,182 @@ screenKxcForMGGA(const int32_t npoints,
 
     double tauThreshold = getTauScreeningThreshold();
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto mggafunc = xcFunctionalPointer->getFunctionalPointerToMetaGgaComponent();
+
+    const auto dim = &(mggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a, sigma_aa and tau_a
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
-            v3rho3[4 * g + 0] = 0.0;
-            v3rho3[4 * g + 1] = 0.0;
-            v3rho3[4 * g + 2] = 0.0;
-
-            v3rho2sigma[9 * g + 0] = 0.0;
-            v3rho2sigma[9 * g + 1] = 0.0;
-            v3rho2sigma[9 * g + 2] = 0.0;
-            v3rho2sigma[9 * g + 3] = 0.0;
-            v3rho2sigma[9 * g + 4] = 0.0;
-            v3rho2sigma[9 * g + 5] = 0.0;
-            v3rho2sigma[9 * g + 6] = 0.0;
-            v3rho2sigma[9 * g + 7] = 0.0;
-
-            v3rho2lapl[6 * g + 0] = 0.0;
-            v3rho2lapl[6 * g + 1] = 0.0;
-            v3rho2lapl[6 * g + 2] = 0.0;
-            v3rho2lapl[6 * g + 3] = 0.0;
-            v3rho2lapl[6 * g + 4] = 0.0;
-
-            v3rho2tau[6 * g + 0] = 0.0;
-            v3rho2tau[6 * g + 1] = 0.0;
-            v3rho2tau[6 * g + 2] = 0.0;
-            v3rho2tau[6 * g + 3] = 0.0;
-            v3rho2tau[6 * g + 4] = 0.0;
-
-            v3rhosigma2[12 * g + 0]  = 0.0;
-            v3rhosigma2[12 * g + 1]  = 0.0;
-            v3rhosigma2[12 * g + 2]  = 0.0;
-            v3rhosigma2[12 * g + 3]  = 0.0;
-            v3rhosigma2[12 * g + 4]  = 0.0;
-            v3rhosigma2[12 * g + 5]  = 0.0;
-            v3rhosigma2[12 * g + 6]  = 0.0;
-            v3rhosigma2[12 * g + 7]  = 0.0;
-            v3rhosigma2[12 * g + 8]  = 0.0;
-            v3rhosigma2[12 * g + 9]  = 0.0;
-            v3rhosigma2[12 * g + 10] = 0.0;
-
-            v3rhosigmalapl[12 * g + 0]  = 0.0;
-            v3rhosigmalapl[12 * g + 1]  = 0.0;
-            v3rhosigmalapl[12 * g + 2]  = 0.0;
-            v3rhosigmalapl[12 * g + 3]  = 0.0;
-            v3rhosigmalapl[12 * g + 4]  = 0.0;
-            v3rhosigmalapl[12 * g + 5]  = 0.0;
-            v3rhosigmalapl[12 * g + 6]  = 0.0;
-            v3rhosigmalapl[12 * g + 7]  = 0.0;
-            v3rhosigmalapl[12 * g + 8]  = 0.0;
-            v3rhosigmalapl[12 * g + 9]  = 0.0;
-            v3rhosigmalapl[12 * g + 10] = 0.0;
-
-            v3rhosigmatau[12 * g + 0]  = 0.0;
-            v3rhosigmatau[12 * g + 1]  = 0.0;
-            v3rhosigmatau[12 * g + 2]  = 0.0;
-            v3rhosigmatau[12 * g + 3]  = 0.0;
-            v3rhosigmatau[12 * g + 4]  = 0.0;
-            v3rhosigmatau[12 * g + 5]  = 0.0;
-            v3rhosigmatau[12 * g + 6]  = 0.0;
-            v3rhosigmatau[12 * g + 7]  = 0.0;
-            v3rhosigmatau[12 * g + 8]  = 0.0;
-            v3rhosigmatau[12 * g + 9]  = 0.0;
-            v3rhosigmatau[12 * g + 10] = 0.0;
-
-            v3rholapl2[6 * g + 0] = 0.0;
-            v3rholapl2[6 * g + 1] = 0.0;
-            v3rholapl2[6 * g + 2] = 0.0;
-            v3rholapl2[6 * g + 3] = 0.0;
-            v3rholapl2[6 * g + 4] = 0.0;
-
-            v3rholapltau[8 * g + 0] = 0.0;
-            v3rholapltau[8 * g + 1] = 0.0;
-            v3rholapltau[8 * g + 2] = 0.0;
-            v3rholapltau[8 * g + 3] = 0.0;
-            v3rholapltau[8 * g + 4] = 0.0;
-            v3rholapltau[8 * g + 5] = 0.0;
-            v3rholapltau[8 * g + 6] = 0.0;
-
-            v3rhotau2[6 * g + 0] = 0.0;
-            v3rhotau2[6 * g + 1] = 0.0;
-            v3rhotau2[6 * g + 2] = 0.0;
-            v3rhotau2[6 * g + 3] = 0.0;
-            v3rhotau2[6 * g + 4] = 0.0;
-
-            v3sigma3[10 * g + 0] = 0.0;
-            v3sigma3[10 * g + 1] = 0.0;
-            v3sigma3[10 * g + 2] = 0.0;
-            v3sigma3[10 * g + 3] = 0.0;
-            v3sigma3[10 * g + 4] = 0.0;
-            v3sigma3[10 * g + 5] = 0.0;
-            v3sigma3[10 * g + 6] = 0.0;
-            v3sigma3[10 * g + 7] = 0.0;
-            v3sigma3[10 * g + 8] = 0.0;
-
-            v3sigma2lapl[12 * g + 0]  = 0.0;
-            v3sigma2lapl[12 * g + 1]  = 0.0;
-            v3sigma2lapl[12 * g + 2]  = 0.0;
-            v3sigma2lapl[12 * g + 3]  = 0.0;
-            v3sigma2lapl[12 * g + 4]  = 0.0;
-            v3sigma2lapl[12 * g + 5]  = 0.0;
-            v3sigma2lapl[12 * g + 6]  = 0.0;
-            v3sigma2lapl[12 * g + 7]  = 0.0;
-            v3sigma2lapl[12 * g + 8]  = 0.0;
-            v3sigma2lapl[12 * g + 9]  = 0.0;
-            v3sigma2lapl[12 * g + 10] = 0.0;
-
-            v3sigma2tau[12 * g + 0]  = 0.0;
-            v3sigma2tau[12 * g + 1]  = 0.0;
-            v3sigma2tau[12 * g + 2]  = 0.0;
-            v3sigma2tau[12 * g + 3]  = 0.0;
-            v3sigma2tau[12 * g + 4]  = 0.0;
-            v3sigma2tau[12 * g + 5]  = 0.0;
-            v3sigma2tau[12 * g + 6]  = 0.0;
-            v3sigma2tau[12 * g + 7]  = 0.0;
-            v3sigma2tau[12 * g + 8]  = 0.0;
-            v3sigma2tau[12 * g + 9]  = 0.0;
-            v3sigma2tau[12 * g + 10] = 0.0;
-
-            v3sigmalapl2[9 * g + 0] = 0.0;
-            v3sigmalapl2[9 * g + 1] = 0.0;
-            v3sigmalapl2[9 * g + 2] = 0.0;
-            v3sigmalapl2[9 * g + 3] = 0.0;
-            v3sigmalapl2[9 * g + 4] = 0.0;
-            v3sigmalapl2[9 * g + 5] = 0.0;
-            v3sigmalapl2[9 * g + 6] = 0.0;
-            v3sigmalapl2[9 * g + 7] = 0.0;
-
-            v3sigmalapltau[12 * g + 0]  = 0.0;
-            v3sigmalapltau[12 * g + 1]  = 0.0;
-            v3sigmalapltau[12 * g + 2]  = 0.0;
-            v3sigmalapltau[12 * g + 3]  = 0.0;
-            v3sigmalapltau[12 * g + 4]  = 0.0;
-            v3sigmalapltau[12 * g + 5]  = 0.0;
-            v3sigmalapltau[12 * g + 6]  = 0.0;
-            v3sigmalapltau[12 * g + 7]  = 0.0;
-            v3sigmalapltau[12 * g + 8]  = 0.0;
-            v3sigmalapltau[12 * g + 9]  = 0.0;
-            v3sigmalapltau[12 * g + 10] = 0.0;
-
-            v3sigmatau2[9 * g + 0] = 0.0;
-            v3sigmatau2[9 * g + 1] = 0.0;
-            v3sigmatau2[9 * g + 2] = 0.0;
-            v3sigmatau2[9 * g + 3] = 0.0;
-            v3sigmatau2[9 * g + 4] = 0.0;
-            v3sigmatau2[9 * g + 5] = 0.0;
-            v3sigmatau2[9 * g + 6] = 0.0;
-            v3sigmatau2[9 * g + 7] = 0.0;
-
-            v3lapl3[4 * g + 0] = 0.0;
-            v3lapl3[4 * g + 1] = 0.0;
-            v3lapl3[4 * g + 2] = 0.0;
-
-            v3lapl2tau[6 * g + 0] = 0.0;
-            v3lapl2tau[6 * g + 1] = 0.0;
-            v3lapl2tau[6 * g + 2] = 0.0;
-            v3lapl2tau[6 * g + 3] = 0.0;
-            v3lapl2tau[6 * g + 4] = 0.0;
-
-            v3lapltau2[6 * g + 0] = 0.0;
-            v3lapltau2[6 * g + 1] = 0.0;
-            v3lapltau2[6 * g + 2] = 0.0;
-            v3lapltau2[6 * g + 3] = 0.0;
-            v3lapltau2[6 * g + 4] = 0.0;
-
-            v3tau3[4 * g + 0] = 0.0;
-            v3tau3[4 * g + 1] = 0.0;
-            v3tau3[4 * g + 2] = 0.0;
+            for (int ind = 0; ind < dim->v3rho3 - 1; ind++)
+            {
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2sigma - 1; ind++)
+            {
+                v3rho2sigma[dim->v3rho2sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2lapl - 1; ind++)
+            {
+                v3rho2lapl[dim->v3rho2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2tau - 1; ind++)
+            {
+                v3rho2tau[dim->v3rho2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigma2 - 1; ind++)
+            {
+                v3rhosigma2[dim->v3rhosigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigmalapl - 1; ind++)
+            {
+                v3rhosigmalapl[dim->v3rhosigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigmatau - 1; ind++)
+            {
+                v3rhosigmatau[dim->v3rhosigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rholapl2 - 1; ind++)
+            {
+                v3rholapl2[dim->v3rholapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rholapltau - 1; ind++)
+            {
+                v3rholapltau[dim->v3rholapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhotau2 - 1; ind++)
+            {
+                v3rhotau2[dim->v3rhotau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma3 - 1; ind++)
+            {
+                v3sigma3[dim->v3sigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma2lapl - 1; ind++)
+            {
+                v3sigma2lapl[dim->v3sigma2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma2tau - 1; ind++)
+            {
+                v3sigma2tau[dim->v3sigma2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmalapl2 - 1; ind++)
+            {
+                v3sigmalapl2[dim->v3sigmalapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmalapltau - 1; ind++)
+            {
+                v3sigmalapltau[dim->v3sigmalapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmatau2 - 1; ind++)
+            {
+                v3sigmatau2[dim->v3sigmatau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapl3 - 1; ind++)
+            {
+                v3lapl3[dim->v3lapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapl2tau - 1; ind++)
+            {
+                v3lapl2tau[dim->v3lapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapltau2 - 1; ind++)
+            {
+                v3lapltau2[dim->v3lapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3tau3 - 1; ind++)
+            {
+                v3tau3[dim->v3tau3 * g + ind] = 0.0;
+            }
         }
 
         // rho_b, sigma_bb and tau_b
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
-            v3rho3[4 * g + 1] = 0.0;
-            v3rho3[4 * g + 2] = 0.0;
-            v3rho3[4 * g + 3] = 0.0;
-
-            v3rho2sigma[9 * g + 1] = 0.0;
-            v3rho2sigma[9 * g + 2] = 0.0;
-            v3rho2sigma[9 * g + 3] = 0.0;
-            v3rho2sigma[9 * g + 4] = 0.0;
-            v3rho2sigma[9 * g + 5] = 0.0;
-            v3rho2sigma[9 * g + 6] = 0.0;
-            v3rho2sigma[9 * g + 7] = 0.0;
-            v3rho2sigma[9 * g + 8] = 0.0;
-
-            v3rho2lapl[6 * g + 1] = 0.0;
-            v3rho2lapl[6 * g + 2] = 0.0;
-            v3rho2lapl[6 * g + 3] = 0.0;
-            v3rho2lapl[6 * g + 4] = 0.0;
-            v3rho2lapl[6 * g + 5] = 0.0;
-
-            v3rho2tau[6 * g + 1] = 0.0;
-            v3rho2tau[6 * g + 2] = 0.0;
-            v3rho2tau[6 * g + 3] = 0.0;
-            v3rho2tau[6 * g + 4] = 0.0;
-            v3rho2tau[6 * g + 5] = 0.0;
-
-            v3rhosigma2[12 * g + 1]  = 0.0;
-            v3rhosigma2[12 * g + 2]  = 0.0;
-            v3rhosigma2[12 * g + 3]  = 0.0;
-            v3rhosigma2[12 * g + 4]  = 0.0;
-            v3rhosigma2[12 * g + 5]  = 0.0;
-            v3rhosigma2[12 * g + 6]  = 0.0;
-            v3rhosigma2[12 * g + 7]  = 0.0;
-            v3rhosigma2[12 * g + 8]  = 0.0;
-            v3rhosigma2[12 * g + 9]  = 0.0;
-            v3rhosigma2[12 * g + 10] = 0.0;
-            v3rhosigma2[12 * g + 11] = 0.0;
-
-            v3rhosigmalapl[12 * g + 1]  = 0.0;
-            v3rhosigmalapl[12 * g + 2]  = 0.0;
-            v3rhosigmalapl[12 * g + 3]  = 0.0;
-            v3rhosigmalapl[12 * g + 4]  = 0.0;
-            v3rhosigmalapl[12 * g + 5]  = 0.0;
-            v3rhosigmalapl[12 * g + 6]  = 0.0;
-            v3rhosigmalapl[12 * g + 7]  = 0.0;
-            v3rhosigmalapl[12 * g + 8]  = 0.0;
-            v3rhosigmalapl[12 * g + 9]  = 0.0;
-            v3rhosigmalapl[12 * g + 10] = 0.0;
-            v3rhosigmalapl[12 * g + 11] = 0.0;
-
-            v3rhosigmatau[12 * g + 1]  = 0.0;
-            v3rhosigmatau[12 * g + 2]  = 0.0;
-            v3rhosigmatau[12 * g + 3]  = 0.0;
-            v3rhosigmatau[12 * g + 4]  = 0.0;
-            v3rhosigmatau[12 * g + 5]  = 0.0;
-            v3rhosigmatau[12 * g + 6]  = 0.0;
-            v3rhosigmatau[12 * g + 7]  = 0.0;
-            v3rhosigmatau[12 * g + 8]  = 0.0;
-            v3rhosigmatau[12 * g + 9]  = 0.0;
-            v3rhosigmatau[12 * g + 10] = 0.0;
-            v3rhosigmatau[12 * g + 11] = 0.0;
-
-            v3rholapl2[6 * g + 1] = 0.0;
-            v3rholapl2[6 * g + 2] = 0.0;
-            v3rholapl2[6 * g + 3] = 0.0;
-            v3rholapl2[6 * g + 4] = 0.0;
-            v3rholapl2[6 * g + 5] = 0.0;
-
-            v3rholapltau[8 * g + 1] = 0.0;
-            v3rholapltau[8 * g + 2] = 0.0;
-            v3rholapltau[8 * g + 3] = 0.0;
-            v3rholapltau[8 * g + 4] = 0.0;
-            v3rholapltau[8 * g + 5] = 0.0;
-            v3rholapltau[8 * g + 6] = 0.0;
-            v3rholapltau[8 * g + 7] = 0.0;
-
-            v3rhotau2[6 * g + 1] = 0.0;
-            v3rhotau2[6 * g + 2] = 0.0;
-            v3rhotau2[6 * g + 3] = 0.0;
-            v3rhotau2[6 * g + 4] = 0.0;
-            v3rhotau2[6 * g + 5] = 0.0;
-
-            v3sigma3[10 * g + 1] = 0.0;
-            v3sigma3[10 * g + 2] = 0.0;
-            v3sigma3[10 * g + 3] = 0.0;
-            v3sigma3[10 * g + 4] = 0.0;
-            v3sigma3[10 * g + 5] = 0.0;
-            v3sigma3[10 * g + 6] = 0.0;
-            v3sigma3[10 * g + 7] = 0.0;
-            v3sigma3[10 * g + 8] = 0.0;
-            v3sigma3[10 * g + 9] = 0.0;
-
-            v3sigma2lapl[12 * g + 1]  = 0.0;
-            v3sigma2lapl[12 * g + 2]  = 0.0;
-            v3sigma2lapl[12 * g + 3]  = 0.0;
-            v3sigma2lapl[12 * g + 4]  = 0.0;
-            v3sigma2lapl[12 * g + 5]  = 0.0;
-            v3sigma2lapl[12 * g + 6]  = 0.0;
-            v3sigma2lapl[12 * g + 7]  = 0.0;
-            v3sigma2lapl[12 * g + 8]  = 0.0;
-            v3sigma2lapl[12 * g + 9]  = 0.0;
-            v3sigma2lapl[12 * g + 10] = 0.0;
-            v3sigma2lapl[12 * g + 11] = 0.0;
-
-            v3sigma2tau[12 * g + 1]  = 0.0;
-            v3sigma2tau[12 * g + 2]  = 0.0;
-            v3sigma2tau[12 * g + 3]  = 0.0;
-            v3sigma2tau[12 * g + 4]  = 0.0;
-            v3sigma2tau[12 * g + 5]  = 0.0;
-            v3sigma2tau[12 * g + 6]  = 0.0;
-            v3sigma2tau[12 * g + 7]  = 0.0;
-            v3sigma2tau[12 * g + 8]  = 0.0;
-            v3sigma2tau[12 * g + 9]  = 0.0;
-            v3sigma2tau[12 * g + 10] = 0.0;
-            v3sigma2tau[12 * g + 11] = 0.0;
-
-            v3sigmalapl2[9 * g + 1] = 0.0;
-            v3sigmalapl2[9 * g + 2] = 0.0;
-            v3sigmalapl2[9 * g + 3] = 0.0;
-            v3sigmalapl2[9 * g + 4] = 0.0;
-            v3sigmalapl2[9 * g + 5] = 0.0;
-            v3sigmalapl2[9 * g + 6] = 0.0;
-            v3sigmalapl2[9 * g + 7] = 0.0;
-            v3sigmalapl2[9 * g + 8] = 0.0;
-
-            v3sigmalapltau[12 * g + 1]  = 0.0;
-            v3sigmalapltau[12 * g + 2]  = 0.0;
-            v3sigmalapltau[12 * g + 3]  = 0.0;
-            v3sigmalapltau[12 * g + 4]  = 0.0;
-            v3sigmalapltau[12 * g + 5]  = 0.0;
-            v3sigmalapltau[12 * g + 6]  = 0.0;
-            v3sigmalapltau[12 * g + 7]  = 0.0;
-            v3sigmalapltau[12 * g + 8]  = 0.0;
-            v3sigmalapltau[12 * g + 9]  = 0.0;
-            v3sigmalapltau[12 * g + 10] = 0.0;
-            v3sigmalapltau[12 * g + 11] = 0.0;
-
-            v3sigmatau2[9 * g + 1] = 0.0;
-            v3sigmatau2[9 * g + 2] = 0.0;
-            v3sigmatau2[9 * g + 3] = 0.0;
-            v3sigmatau2[9 * g + 4] = 0.0;
-            v3sigmatau2[9 * g + 5] = 0.0;
-            v3sigmatau2[9 * g + 6] = 0.0;
-            v3sigmatau2[9 * g + 7] = 0.0;
-            v3sigmatau2[9 * g + 8] = 0.0;
-
-            v3lapl3[4 * g + 1] = 0.0;
-            v3lapl3[4 * g + 2] = 0.0;
-            v3lapl3[4 * g + 3] = 0.0;
-
-            v3lapl2tau[6 * g + 1] = 0.0;
-            v3lapl2tau[6 * g + 2] = 0.0;
-            v3lapl2tau[6 * g + 3] = 0.0;
-            v3lapl2tau[6 * g + 4] = 0.0;
-            v3lapl2tau[6 * g + 5] = 0.0;
-
-            v3lapltau2[6 * g + 1] = 0.0;
-            v3lapltau2[6 * g + 2] = 0.0;
-            v3lapltau2[6 * g + 3] = 0.0;
-            v3lapltau2[6 * g + 4] = 0.0;
-            v3lapltau2[6 * g + 5] = 0.0;
-
-            v3tau3[4 * g + 1] = 0.0;
-            v3tau3[4 * g + 2] = 0.0;
-            v3tau3[4 * g + 3] = 0.0;
+            for (int ind = 1; ind < dim->v3rho3; ind++)
+            {
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rho2sigma; ind++)
+            {
+                v3rho2sigma[dim->v3rho2sigma * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rho2lapl; ind++)
+            {
+                v3rho2lapl[dim->v3rho2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rho2tau; ind++)
+            {
+                v3rho2tau[dim->v3rho2tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rhosigma2; ind++)
+            {
+                v3rhosigma2[dim->v3rhosigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rhosigmalapl; ind++)
+            {
+                v3rhosigmalapl[dim->v3rhosigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rhosigmatau; ind++)
+            {
+                v3rhosigmatau[dim->v3rhosigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rholapl2; ind++)
+            {
+                v3rholapl2[dim->v3rholapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rholapltau; ind++)
+            {
+                v3rholapltau[dim->v3rholapltau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rhotau2; ind++)
+            {
+                v3rhotau2[dim->v3rhotau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3sigma3; ind++)
+            {
+                v3sigma3[dim->v3sigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3sigma2lapl; ind++)
+            {
+                v3sigma2lapl[dim->v3sigma2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3sigma2tau; ind++)
+            {
+                v3sigma2tau[dim->v3sigma2tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3sigmalapl2; ind++)
+            {
+                v3sigmalapl2[dim->v3sigmalapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3sigmalapltau; ind++)
+            {
+                v3sigmalapltau[dim->v3sigmalapltau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3sigmatau2; ind++)
+            {
+                v3sigmatau2[dim->v3sigmatau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3lapl3; ind++)
+            {
+                v3lapl3[dim->v3lapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3lapl2tau; ind++)
+            {
+                v3lapl2tau[dim->v3lapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3lapltau2; ind++)
+            {
+                v3lapltau2[dim->v3lapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3tau3; ind++)
+            {
+                v3tau3[dim->v3tau3 * g + ind] = 0.0;
+            }
         }
     }
 }
@@ -1186,46 +1023,46 @@ screenLxcForGGA(const int32_t npoints,
 
 void
 screenLxcForMGGA(const CXCFunctional* xcFunctionalPointer,
-                 const int32_t npoints,
-                 const double* rho,
-                 const double* sigma,
-                 const double* lapl,
-                 const double* tau,
-                 double*       v4rho4,
-                 double*       v4rho3sigma,
-                 double*       v4rho3lapl,
-                 double*       v4rho3tau,
-                 double*       v4rho2sigma2,
-                 double*       v4rho2sigmalapl,
-                 double*       v4rho2sigmatau,
-                 double*       v4rho2lapl2,
-                 double*       v4rho2lapltau,
-                 double*       v4rho2tau2,
-                 double*       v4rhosigma3,
-                 double*       v4rhosigma2lapl,
-                 double*       v4rhosigma2tau,
-                 double*       v4rhosigmalapl2,
-                 double*       v4rhosigmalapltau,
-                 double*       v4rhosigmatau2,
-                 double*       v4rholapl3,
-                 double*       v4rholapl2tau,
-                 double*       v4rholapltau2,
-                 double*       v4rhotau3,
-                 double*       v4sigma4,
-                 double*       v4sigma3lapl,
-                 double*       v4sigma3tau,
-                 double*       v4sigma2lapl2,
-                 double*       v4sigma2lapltau,
-                 double*       v4sigma2tau2,
-                 double*       v4sigmalapl3,
-                 double*       v4sigmalapl2tau,
-                 double*       v4sigmalapltau2,
-                 double*       v4sigmatau3,
-                 double*       v4lapl4,
-                 double*       v4lapl3tau,
-                 double*       v4lapl2tau2,
-                 double*       v4lapltau3,
-                 double*       v4tau4)
+                 const int32_t        npoints,
+                 const double*        rho,
+                 const double*        sigma,
+                 const double*        lapl,
+                 const double*        tau,
+                 double*              v4rho4,
+                 double*              v4rho3sigma,
+                 double*              v4rho3lapl,
+                 double*              v4rho3tau,
+                 double*              v4rho2sigma2,
+                 double*              v4rho2sigmalapl,
+                 double*              v4rho2sigmatau,
+                 double*              v4rho2lapl2,
+                 double*              v4rho2lapltau,
+                 double*              v4rho2tau2,
+                 double*              v4rhosigma3,
+                 double*              v4rhosigma2lapl,
+                 double*              v4rhosigma2tau,
+                 double*              v4rhosigmalapl2,
+                 double*              v4rhosigmalapltau,
+                 double*              v4rhosigmatau2,
+                 double*              v4rholapl3,
+                 double*              v4rholapl2tau,
+                 double*              v4rholapltau2,
+                 double*              v4rhotau3,
+                 double*              v4sigma4,
+                 double*              v4sigma3lapl,
+                 double*              v4sigma3tau,
+                 double*              v4sigma2lapl2,
+                 double*              v4sigma2lapltau,
+                 double*              v4sigma2tau2,
+                 double*              v4sigmalapl3,
+                 double*              v4sigmalapl2tau,
+                 double*              v4sigmalapltau2,
+                 double*              v4sigmatau3,
+                 double*              v4lapl4,
+                 double*              v4lapl3tau,
+                 double*              v4lapl2tau2,
+                 double*              v4lapltau3,
+                 double*              v4tau4)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
