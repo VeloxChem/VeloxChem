@@ -547,51 +547,96 @@ CXCFunctional::getFractionOfExactExchange() const
 }
 
 auto
-CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* exc, double* vrho) const -> void
+CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* zk, double* vrho) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc  = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(exc, vrho : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_zk   = nullptr;
+    double* stage_vrho = nullptr;
+
+    if (alloc)
     {
-        exc[g] = 0.0;
-
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
+        stage_zk   = mem::malloc<double>(ind_cnt["zk"][1] * np);
+        stage_vrho = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+    }
+    else
+    {
+        stage_zk   = &_stagingBuffer[ind_cnt["zk"][0] * _ldStaging];
+        stage_vrho = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
+        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
 
-        #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            exc[g] += c * stage_exc[g];
+            for (int ind = 0; ind < dim->zk; ++ind)
+            {
+                zk[dim->zk * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vrho; ++ind)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+        }
 
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_exc_vxc(funcptr,
+                               grid_batch_size,
+                               rho + dim->rho * grid_batch_offset,
+                               stage_zk + dim->zk * grid_batch_offset,
+                               stage_vrho + dim->vrho * grid_batch_offset);
+
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
+            }
         }
     }
 
     if (alloc)
     {
-        mem::free(stage_exc);
+        mem::free(stage_zk);
         mem::free(stage_vrho);
     }
 
-    gridscreen::screenExcVxcForLDA(this, np, rho, exc, vrho);
+    gridscreen::screenExcVxcForLDA(this, np, rho, zk, vrho);
 }
 
 auto
@@ -600,31 +645,66 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(vrho : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_vrho = nullptr;
+
+    if (alloc)
     {
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
+        stage_vrho = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+    }
+    else
+    {
+        stage_vrho = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_vxc(funcptr, np, rho, stage_vrho);
+        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
 
-        #pragma omp simd aligned(vrho, stage_vrho : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+            for (int ind = 0; ind < dim->vrho; ++ind)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+        }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_vxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_vrho + dim->vrho * grid_batch_offset);
+
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
+            }
         }
     }
 
@@ -642,33 +722,66 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_v2rho2 = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(v2rho2 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_v2rho2 = nullptr;
+
+    if (alloc)
     {
-        v2rho2[3 * g + 0] = 0.0;
-        v2rho2[3 * g + 1] = 0.0;
-        v2rho2[3 * g + 2] = 0.0;
+        stage_v2rho2 = mem::malloc<double>(ind_cnt["v2rho2"][1] * np);
+    }
+    else
+    {
+        stage_v2rho2 = &_stagingBuffer[ind_cnt["v2rho2"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
+        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
 
-        #pragma omp simd aligned(v2rho2, stage_v2rho2 : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
-            v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
-            v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+            for (int ind = 0; ind < dim->v2rho2; ++ind)
+            {
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
+        }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_fxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v2rho2 + dim->v2rho2 * grid_batch_offset);
+
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v2rho2; ++ind)
+                    {
+                        v2rho2[dim->v2rho2 * g + ind] += c * stage_v2rho2[dim->v2rho2 * g + ind];
+                    }
+                }
+            }
         }
     }
 
@@ -686,35 +799,66 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_v3rho3 = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[6 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(v3rho3 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_v3rho3 = nullptr;
+
+    if (alloc)
     {
-        v3rho3[4 * g + 0] = 0.0;
-        v3rho3[4 * g + 1] = 0.0;
-        v3rho3[4 * g + 2] = 0.0;
-        v3rho3[4 * g + 3] = 0.0;
+        stage_v3rho3 = mem::malloc<double>(ind_cnt["v3rho3"][1] * np);
+    }
+    else
+    {
+        stage_v3rho3 = &_stagingBuffer[ind_cnt["v3rho3"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
+        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
 
-        #pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-            v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-            v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-            v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+            for (int ind = 0; ind < dim->v3rho3; ++ind)
+            {
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
+        }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_kxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v3rho3 + dim->v3rho3 * grid_batch_offset);
+
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                }
+            }
         }
     }
 
@@ -732,37 +876,66 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_v4rho4 = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[10 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(v4rho4 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_v4rho4 = nullptr;
+
+    if (alloc)
     {
-        v4rho4[5 * g + 0] = 0.0;
-        v4rho4[5 * g + 1] = 0.0;
-        v4rho4[5 * g + 2] = 0.0;
-        v4rho4[5 * g + 3] = 0.0;
-        v4rho4[5 * g + 4] = 0.0;
+        stage_v4rho4 = mem::malloc<double>(ind_cnt["v4rho4"][1] * np);
+    }
+    else
+    {
+        stage_v4rho4 = &_stagingBuffer[ind_cnt["v4rho4"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
+        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
 
-        #pragma omp simd aligned(v4rho4, stage_v4rho4 : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
-            v4rho4[5 * g + 1] += c * stage_v4rho4[5 * g + 1];
-            v4rho4[5 * g + 2] += c * stage_v4rho4[5 * g + 2];
-            v4rho4[5 * g + 3] += c * stage_v4rho4[5 * g + 3];
-            v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
+            for (int ind = 0; ind < dim->v4rho4; ++ind)
+            {
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
+        }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_lxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v4rho4 + dim->v4rho4 * grid_batch_offset);
+
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v4rho4; ++ind)
+                    {
+                        v4rho4[dim->v4rho4 * g + ind] += c * stage_v4rho4[dim->v4rho4 * g + ind];
+                    }
+                }
+            }
         }
     }
 
