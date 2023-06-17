@@ -1377,115 +1377,188 @@ CXCFunctional::compute_exc_vxc_for_mgga(int32_t       np,
                                         const double* sigma,
                                         const double* lapl,
                                         const double* tau,
-                                        double*       exc,
+                                        double*       zk,
                                         double*       vrho,
                                         double*       vsigma,
                                         double*       vlapl,
                                         double*       vtau) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
-                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for ExcVxc on grid");
 
-    #pragma omp simd aligned(exc, vrho, vsigma, vlapl, vtau : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        exc[g] = 0.0;
+    // set up staging buffers
 
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
-
-        vsigma[3 * g + 0] = 0.0;
-        vsigma[3 * g + 1] = 0.0;
-        vsigma[3 * g + 2] = 0.0;
-
-        vlapl[2 * g + 0] = 0.0;
-        vlapl[2 * g + 1] = 0.0;
-
-        vtau[2 * g + 0] = 0.0;
-        vtau[2 * g + 1] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-    auto stage_vlapl  = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[6 * _ldStaging];
-    auto stage_vtau   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[8 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_zk     = nullptr;
+    double* stage_vrho   = nullptr;
+    double* stage_vsigma = nullptr;
+    double* stage_vlapl  = nullptr;
+    double* stage_vtau   = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_zk     = mem::malloc<double>(ind_cnt["zk"][1] * np);
+        stage_vrho   = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+        stage_vsigma = mem::malloc<double>(ind_cnt["vsigma"][1] * np);
+        stage_vlapl  = mem::malloc<double>(ind_cnt["vlapl"][1] * np);
+        stage_vtau   = mem::malloc<double>(ind_cnt["vtau"][1] * np);
+    }
+    else
+    {
+        stage_zk     = &_stagingBuffer[ind_cnt["zk"][0] * _ldStaging];
+        stage_vrho   = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
+        stage_vsigma = &_stagingBuffer[ind_cnt["vsigma"][0] * _ldStaging];
+        stage_vlapl  = &_stagingBuffer[ind_cnt["vlapl"][0] * _ldStaging];
+        stage_vtau   = &_stagingBuffer[ind_cnt["vtau"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        if (xccomp.isLDA())
+    auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+
+        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+
+        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
-
-            #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->zk; ++ind)
             {
-                exc[g] += c * stage_exc[g];
-
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                zk[dim->zk * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vrho; ++ind)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma; ++ind)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vlapl; ++ind)
+            {
+                vlapl[dim->vlapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vtau; ++ind)
+            {
+                vtau[dim->vtau * g + ind] = 0.0;
             }
         }
-        else if (xccomp.isGGA())
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                exc[g] += c * stage_exc[g];
+                xc_lda_exc_vxc(funcptr,
+                               grid_batch_size,
+                               rho + dim->rho * grid_batch_offset,
+                               stage_zk + dim->zk * grid_batch_offset,
+                               stage_vrho + dim->vrho * grid_batch_offset);
 
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
-
-                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
             }
-        }
-        else if (xccomp.isMetaGGA())
-        {
-            xc_mgga_exc_vxc(funcptr, np, rho, sigma, lapl, tau, stage_exc, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
-
-            #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma, \
-                                     vlapl, stage_vlapl, vtau, stage_vtau : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            else if (xccomp.isGGA())
             {
-                exc[g] += c * stage_exc[g];
+                xc_gga_exc_vxc(funcptr,
+                               grid_batch_size,
+                               rho + dim->rho * grid_batch_offset,
+                               sigma + dim->sigma * grid_batch_offset,
+                               stage_zk + dim->zk * grid_batch_offset,
+                               stage_vrho + dim->vrho * grid_batch_offset,
+                               stage_vsigma + dim->vsigma * grid_batch_offset);
 
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vsigma; ++ind)
+                    {
+                        vsigma[dim->vsigma * g + ind] += c * stage_vsigma[dim->vsigma * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isMetaGGA())
+            {
+                xc_mgga_exc_vxc(funcptr,
+                                grid_batch_size,
+                                rho + dim->rho * grid_batch_offset,
+                                sigma + dim->sigma * grid_batch_offset,
+                                lapl + dim->lapl * grid_batch_offset,
+                                tau + dim->tau * grid_batch_offset,
+                                stage_zk + dim->zk * grid_batch_offset,
+                                stage_vrho + dim->vrho * grid_batch_offset,
+                                stage_vsigma + dim->vsigma * grid_batch_offset,
+                                stage_vlapl + dim->vlapl * grid_batch_offset,
+                                stage_vtau + dim->vtau * grid_batch_offset);
 
-                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
-
-                vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
-                vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
-
-                vtau[2 * g + 0] += c * stage_vtau[2 * g + 0];
-                vtau[2 * g + 1] += c * stage_vtau[2 * g + 1];
+                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vsigma; ++ind)
+                    {
+                        vsigma[dim->vsigma * g + ind] += c * stage_vsigma[dim->vsigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vlapl; ++ind)
+                    {
+                        vlapl[dim->vlapl * g + ind] += c * stage_vlapl[dim->vlapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vtau; ++ind)
+                    {
+                        vtau[dim->vtau * g + ind] += c * stage_vtau[dim->vtau * g + ind];
+                    }
+                }
             }
         }
     }
 
     if (alloc)
     {
-        mem::free(stage_exc);
+        mem::free(stage_zk);
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
         mem::free(stage_vlapl);
         mem::free(stage_vtau);
     }
 
-    gridscreen::screenExcVxcForMGGA(this, np, rho, sigma, lapl, tau, exc, vrho, vsigma, vlapl, vtau);
+    gridscreen::screenExcVxcForMGGA(this, np, rho, sigma, lapl, tau, zk, vrho, vsigma, vlapl, vtau);
 }
 
 auto
