@@ -64,7 +64,7 @@ double getTauScreeningThreshold();
  @param exc the functional value.
  @param vrho the 1st-order functional derivative wrt density.
  */
-void screenExcVxcForLDA(const int32_t npoints, const double* rho, double* exc, double* vrho);
+void screenExcVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* exc, double* vrho);
 
 /**
  Screens Vxc Fock for LDA.
@@ -73,7 +73,7 @@ void screenExcVxcForLDA(const int32_t npoints, const double* rho, double* exc, d
  @param rho the density.
  @param vrho the 1st-order functional derivative wrt density.
  */
-void screenVxcForLDA(const int32_t npoints, const double* rho, double* vrho);
+void screenVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* vrho);
 
 /**
  Screens Exc and Vxc Fock for GGA.
@@ -85,7 +85,13 @@ void screenVxcForLDA(const int32_t npoints, const double* rho, double* vrho);
  @param vrho the 1st-order functional derivative wrt rho.
  @param vsigma the 1st-order functional derivative wrt sigma.
  */
-void screenExcVxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
+void screenExcVxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                        const int32_t        npoints,
+                        const double*        rho,
+                        const double*        sigma,
+                        double*              exc,
+                        double*              vrho,
+                        double*              vsigma);
 
 /**
  Screens Vxc Fock for GGA.
@@ -96,7 +102,12 @@ void screenExcVxcForGGA(const int32_t npoints, const double* rho, const double* 
  @param vrho the 1st-order functional derivative wrt rho.
  @param vsigma the 1st-order functional derivative wrt sigma.
  */
-void screenVxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* vrho, double* vsigma);
+void screenVxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                     const int32_t        npoints,
+                     const double*        rho,
+                     const double*        sigma,
+                     double*              vrho,
+                     double*              vsigma);
 
 /**
  Screens Exc and Vxc Fock for meta-GGA.
@@ -112,16 +123,17 @@ void screenVxcForGGA(const int32_t npoints, const double* rho, const double* sig
  @param vlapl the 1st-order functional derivative wrt laplacian.
  @param vtau the 1st-order functional derivative wrt tau.
  */
-void screenExcVxcForMGGA(const int32_t npoints,
-                         const double* rho,
-                         const double* sigma,
-                         const double* lapl,
-                         const double* tau,
-                         double*       exc,
-                         double*       vrho,
-                         double*       vsigma,
-                         double*       vlapl,
-                         double*       vtau);
+void screenExcVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                         const int32_t        npoints,
+                         const double*        rho,
+                         const double*        sigma,
+                         const double*        lapl,
+                         const double*        tau,
+                         double*              exc,
+                         double*              vrho,
+                         double*              vsigma,
+                         double*              vlapl,
+                         double*              vtau);
 
 /**
  Screens Vxc Fock for meta-GGA.
@@ -136,15 +148,16 @@ void screenExcVxcForMGGA(const int32_t npoints,
  @param vlapl the 1st-order functional derivative wrt laplacian.
  @param vtau the 1st-order functional derivative wrt tau.
  */
-void screenVxcForMGGA(const int32_t npoints,
-                      const double* rho,
-                      const double* sigma,
-                      const double* lapl,
-                      const double* tau,
-                      double*       vrho,
-                      double*       vsigma,
-                      double*       vlapl,
-                      double*       vtau);
+void screenVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                      const int32_t        npoints,
+                      const double*        rho,
+                      const double*        sigma,
+                      const double*        lapl,
+                      const double*        tau,
+                      double*              vrho,
+                      double*              vsigma,
+                      double*              vlapl,
+                      double*              vtau);
 
 /**
  Screens Vxc Fock for PLDA.
@@ -175,7 +188,7 @@ void screenVxcForPGGA(const int32_t npoints, const double* rho, const double* si
  @param rho the density.
  @param v2rho2 the 2nd-order functional derivative wrt density.
  */
-void screenFxcForLDA(const int32_t npoints, const double* rho, double* v2rho2);
+void screenFxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v2rho2);
 
 /**
  Screens Fxc Fock for GGA.
@@ -187,7 +200,13 @@ void screenFxcForLDA(const int32_t npoints, const double* rho, double* v2rho2);
  @param v2rhosigma the 2nd-order functional derivative wrt rho and sigma.
  @param v2sigma2 the 2nd-order functional derivative wrt sigma.
  */
-void screenFxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2);
+void screenFxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                     const int32_t        npoints,
+                     const double*        rho,
+                     const double*        sigma,
+                     double*              v2rho2,
+                     double*              v2rhosigma,
+                     double*              v2sigma2);
 
 /**
  Screens Fxc Fock for meta-GGA.
@@ -208,21 +227,22 @@ void screenFxcForGGA(const int32_t npoints, const double* rho, const double* sig
  @param v2lapltau ,
  @param v2tau2 ,
  */
-void screenFxcForMGGA(const int32_t npoints,
-                      const double* rho,
-                      const double* sigma,
-                      const double* lapl,
-                      const double* tau,
-                      double*       v2rho2,
-                      double*       v2rhosigma,
-                      double*       v2rholapl,
-                      double*       v2rhotau,
-                      double*       v2sigma2,
-                      double*       v2sigmalapl,
-                      double*       v2sigmatau,
-                      double*       v2lapl2,
-                      double*       v2lapltau,
-                      double*       v2tau2);
+void screenFxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                      const int32_t        npoints,
+                      const double*        rho,
+                      const double*        sigma,
+                      const double*        lapl,
+                      const double*        tau,
+                      double*              v2rho2,
+                      double*              v2rhosigma,
+                      double*              v2rholapl,
+                      double*              v2rhotau,
+                      double*              v2sigma2,
+                      double*              v2sigmalapl,
+                      double*              v2sigmatau,
+                      double*              v2lapl2,
+                      double*              v2lapltau,
+                      double*              v2tau2);
 
 /**
  Screens Kxc Fock for LDA.
@@ -231,7 +251,7 @@ void screenFxcForMGGA(const int32_t npoints,
  @param rho the density.
  @param v3rho3 the 3rd-order functional derivative wrt rho.
  */
-void screenKxcForLDA(const int32_t npoints, const double* rho, double* v3rho3);
+void screenKxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v3rho3);
 
 /**
  Screens Kxc Fock for GGA.
@@ -244,13 +264,14 @@ void screenKxcForLDA(const int32_t npoints, const double* rho, double* v3rho3);
  @param v3rhosigma2 the 3rd-order functional derivative wrt rho and sigma.
  @param v3sigma2 the 3rd-order functional derivative wrt sigma.
  */
-void screenKxcForGGA(const int32_t npoints,
-                     const double* rho,
-                     const double* sigma,
-                     double*       v3rho3,
-                     double*       v3rho2sigma,
-                     double*       v3rhosigma2,
-                     double*       v3sigma3);
+void screenKxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                     const int32_t        npoints,
+                     const double*        rho,
+                     const double*        sigma,
+                     double*              v3rho3,
+                     double*              v3rho2sigma,
+                     double*              v3rhosigma2,
+                     double*              v3sigma3);
 
 /**
  Screens Kxc Fock for meta-GGA.
@@ -316,7 +337,7 @@ void screenKxcForMGGA(const CXCFunctional* xcFunctionalPointer,
  @param rho the density.
  @param v4rho4 the 4rd-order functional derivative wrt rho.
  */
-void screenLxcForLDA(const int32_t npoints, const double* rho, double* v4rho4);
+void screenLxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v4rho4);
 
 /**
  Screens Lxc Fock for GGA.
@@ -330,14 +351,15 @@ void screenLxcForLDA(const int32_t npoints, const double* rho, double* v4rho4);
  @param v4rhosigma3 the 4th-order functional derivative wrt rho and sigma.
  @param v4sigma4 the 4th-order functional derivative wrt sigma.
  */
-void screenLxcForGGA(const int32_t npoints,
-                     const double* rho,
-                     const double* sigma,
-                     double*       v4rho4,
-                     double*       v4rho3sigma,
-                     double*       v4rho2sigma2,
-                     double*       v4rhosigma3,
-                     double*       v4sigma4);
+void screenLxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                     const int32_t        npoints,
+                     const double*        rho,
+                     const double*        sigma,
+                     double*              v4rho4,
+                     double*              v4rho3sigma,
+                     double*              v4rho2sigma2,
+                     double*              v4rhosigma3,
+                     double*              v4sigma4);
 
 /**
  Screens Lxc Fock for MGGA.

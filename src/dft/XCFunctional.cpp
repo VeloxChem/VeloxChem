@@ -591,7 +591,7 @@ CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, doub
         mem::free(stage_vrho);
     }
 
-    gridscreen::screenExcVxcForLDA(np, rho, exc, vrho);
+    gridscreen::screenExcVxcForLDA(this, np, rho, exc, vrho);
 }
 
 auto
@@ -633,7 +633,7 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
         mem::free(stage_vrho);
     }
 
-    gridscreen::screenVxcForLDA(np, rho, vrho);
+    gridscreen::screenVxcForLDA(this, np, rho, vrho);
 }
 
 auto
@@ -677,7 +677,7 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
         mem::free(stage_v2rho2);
     }
 
-    gridscreen::screenFxcForLDA(np, rho, v2rho2);
+    gridscreen::screenFxcForLDA(this, np, rho, v2rho2);
 }
 
 auto
@@ -723,7 +723,7 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
         mem::free(stage_v3rho3);
     }
 
-    gridscreen::screenKxcForLDA(np, rho, v3rho3);
+    gridscreen::screenKxcForLDA(this, np, rho, v3rho3);
 }
 
 auto
@@ -771,7 +771,7 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
         mem::free(stage_v4rho4);
     }
 
-    gridscreen::screenLxcForLDA(np, rho, v4rho4);
+    gridscreen::screenLxcForLDA(this, np, rho, v4rho4);
 }
 
 auto
@@ -846,7 +846,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
         mem::free(stage_vsigma);
     }
 
-    gridscreen::screenExcVxcForGGA(np, rho, sigma, exc, vrho, vsigma);
+    gridscreen::screenExcVxcForGGA(this, np, rho, sigma, exc, vrho, vsigma);
 }
 
 auto
@@ -912,7 +912,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
         mem::free(stage_vsigma);
     }
 
-    gridscreen::screenVxcForGGA(np, rho, sigma, vrho, vsigma);
+    gridscreen::screenVxcForGGA(this, np, rho, sigma, vrho, vsigma);
 }
 
 auto
@@ -1005,7 +1005,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
         mem::free(stage_v2sigma2);
     }
 
-    gridscreen::screenFxcForGGA(np, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
+    gridscreen::screenFxcForGGA(this, np, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 }
 
 auto
@@ -1148,7 +1148,7 @@ CXCFunctional::compute_kxc_for_gga(int32_t       np,
         mem::free(stage_v3sigma3);
     }
 
-    gridscreen::screenKxcForGGA(np, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
+    gridscreen::screenKxcForGGA(this, np, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
 }
 
 auto
@@ -1368,7 +1368,7 @@ CXCFunctional::compute_lxc_for_gga(int32_t       np,
         mem::free(stage_v4sigma4);
     }
 
-    gridscreen::screenLxcForGGA(np, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4);
+    gridscreen::screenLxcForGGA(this, np, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4);
 }
 
 auto
@@ -1485,7 +1485,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(int32_t       np,
         mem::free(stage_vtau);
     }
 
-    gridscreen::screenExcVxcForMGGA(np, rho, sigma, lapl, tau, exc, vrho, vsigma, vlapl, vtau);
+    gridscreen::screenExcVxcForMGGA(this, np, rho, sigma, lapl, tau, exc, vrho, vsigma, vlapl, vtau);
 }
 
 auto
@@ -1590,7 +1590,7 @@ CXCFunctional::compute_vxc_for_mgga(int32_t       np,
         mem::free(stage_vtau);
     }
 
-    gridscreen::screenVxcForMGGA(np, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
+    gridscreen::screenVxcForMGGA(this, np, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
 }
 
 auto
@@ -1832,7 +1832,7 @@ CXCFunctional::compute_fxc_for_mgga(int32_t       np,
     }
 
     gridscreen::screenFxcForMGGA(
-        np, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
+        this, np, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
 }
 
 auto

@@ -46,11 +46,15 @@ getTauScreeningThreshold()
 }
 
 void
-screenExcVxcForLDA(const int32_t npoints, const double* rho, double* exc, double* vrho)
+screenExcVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* exc, double* vrho)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ldafunc = xcFunctionalPointer->getFunctionalPointerToLdaComponent();
+
+    const auto dim = &(ldafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho
         if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)))
@@ -59,48 +63,74 @@ screenExcVxcForLDA(const int32_t npoints, const double* rho, double* exc, double
         }
 
         // rho_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
         {
-            vrho[2 * g + 0] = 0.0;
+            for (int ind = 0; ind < dim->vrho - 1; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
         }
 
         // rho_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
         {
-            vrho[2 * g + 1] = 0.0;
+            for (int ind = 1; ind < dim->vrho; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenVxcForLDA(const int32_t npoints, const double* rho, double* vrho)
+screenVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* vrho)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ldafunc = xcFunctionalPointer->getFunctionalPointerToLdaComponent();
+
+    const auto dim = &(ldafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
         {
-            vrho[2 * g + 0] = 0.0;
+            for (int ind = 0; ind < dim->vrho - 1; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
         }
 
         // rho_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
         {
-            vrho[2 * g + 1] = 0.0;
+            for (int ind = 1; ind < dim->vrho; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenExcVxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma)
+screenExcVxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                   const int32_t        npoints,
+                   const double*        rho,
+                   const double*        sigma,
+                   double*              exc,
+                   double*              vrho,
+                   double*              vsigma)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ggafunc = xcFunctionalPointer->getFunctionalPointerToGgaComponent();
+
+    const auto dim = &(ggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho and sigma
         if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)) ||
@@ -112,54 +142,75 @@ screenExcVxcForGGA(const int32_t npoints, const double* rho, const double* sigma
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
-            vrho[2 * g + 0] = 0.0;
-
-            vsigma[3 * g + 0] = 0.0;
-            vsigma[3 * g + 1] = 0.0;
+            for (int ind = 0; ind < dim->vrho - 1; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma - 1; ind++)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
         }
 
         // rho_b and sigma_bb
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
-            vrho[2 * g + 1] = 0.0;
-
-            vsigma[3 * g + 1] = 0.0;
-            vsigma[3 * g + 2] = 0.0;
+            for (int ind = 1; ind < dim->vrho; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->vsigma; ind++)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenVxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* vrho, double* vsigma)
+screenVxcForGGA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, const double* sigma, double* vrho, double* vsigma)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ggafunc = xcFunctionalPointer->getFunctionalPointerToGgaComponent();
+
+    const auto dim = &(ggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
-            vrho[2 * g + 0] = 0.0;
-
-            vsigma[3 * g + 0] = 0.0;
-            vsigma[3 * g + 1] = 0.0;
+            for (int ind = 0; ind < dim->vrho - 1; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma - 1; ind++)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
         }
 
         // rho_b and sigma_bb
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
-            vrho[2 * g + 1] = 0.0;
-
-            vsigma[3 * g + 1] = 0.0;
-            vsigma[3 * g + 2] = 0.0;
+            for (int ind = 1; ind < dim->vrho; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->vsigma; ind++)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenExcVxcForMGGA(const int32_t npoints,
+screenExcVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                    const int32_t npoints,
                     const double* rho,
                     const double* sigma,
                     const double* lapl,
@@ -176,7 +227,11 @@ screenExcVxcForMGGA(const int32_t npoints,
 
     double tauThreshold = getTauScreeningThreshold();
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto mggafunc = xcFunctionalPointer->getFunctionalPointerToMetaGgaComponent();
+
+    const auto dim = &(mggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho, tau and sigma
         if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)) ||
@@ -190,28 +245,114 @@ screenExcVxcForMGGA(const int32_t npoints,
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
-            vrho[2 * g + 0] = 0.0;
-
-            vsigma[3 * g + 0] = 0.0;
-            vsigma[3 * g + 1] = 0.0;
-
-            vlapl[2 * g + 0] = 0.0;
-
-            vtau[2 * g + 0] = 0.0;
+            for (int ind = 0; ind < dim->vrho - 1; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma - 1; ind++)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vlapl - 1; ind++)
+            {
+                vlapl[dim->vlapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vtau - 1; ind++)
+            {
+                vtau[dim->vtau * g + ind] = 0.0;
+            }
         }
 
         // rho_b, sigma_bb and tau_b
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
-            vrho[2 * g + 1] = 0.0;
+            for (int ind = 1; ind < dim->vrho; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->vsigma; ind++)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->vlapl; ind++)
+            {
+                vlapl[dim->vlapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->vtau; ind++)
+            {
+                vtau[dim->vtau * g + ind] = 0.0;
+            }
+        }
+    }
+}
 
-            vsigma[3 * g + 1] = 0.0;
-            vsigma[3 * g + 2] = 0.0;
+void
+screenVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                 const int32_t npoints,
+                 const double* rho,
+                 const double* sigma,
+                 const double* lapl,
+                 const double* tau,
+                 double*       vrho,
+                 double*       vsigma,
+                 double*       vlapl,
+                 double*       vtau)
+{
+    double densityThreshold = getDensityScreeningThreshold();
 
-            vlapl[2 * g + 1] = 0.0;
+    double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
-            vtau[2 * g + 1] = 0.0;
+    double tauThreshold = getTauScreeningThreshold();
+
+    auto mggafunc = xcFunctionalPointer->getFunctionalPointerToMetaGgaComponent();
+
+    const auto dim = &(mggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
+    {
+        // rho_a, sigma_aa and tau_a
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
+            (std::fabs(tau[2 * g + 0]) <= tauThreshold))
+        {
+            for (int ind = 0; ind < dim->vrho - 1; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma - 1; ind++)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vlapl - 1; ind++)
+            {
+                vlapl[dim->vlapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vtau - 1; ind++)
+            {
+                vtau[dim->vtau * g + ind] = 0.0;
+            }
+        }
+
+        // rho_b, sigma_bb and tau_b
+        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
+            (std::fabs(tau[2 * g + 1]) <= tauThreshold))
+        {
+            for (int ind = 1; ind < dim->vrho; ind++)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->vsigma; ind++)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->vlapl; ind++)
+            {
+                vlapl[dim->vlapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->vtau; ind++)
+            {
+                vtau[dim->vtau * g + ind] = 0.0;
+            }
         }
     }
 }
