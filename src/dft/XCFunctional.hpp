@@ -33,8 +33,8 @@
 #include <ostream>
 #include <string>
 #include <tuple>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "Buffer.hpp"
 #include "DensityGrid.hpp"
@@ -282,7 +282,7 @@ class CXCFunctional
      * exchange-correlation kernel wrt contracted gradients. Size: 10*np, order:
      * [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 1), (0, 1, 2), (0, 2, 2), (1, 1, 1), (1, 1, 2), (1, 2, 2), (2, 2, 2)]
      */
-    auto compute_kxc_for_gga(int32_t       np,
+    auto compute_kxc_for_gga(const int32_t np,
                              const double* rho,
                              const double* sigma,
                              double*       v3rho3,
@@ -318,7 +318,7 @@ class CXCFunctional
      * [(0,0,0,0),(0,0,0,1),(0,0,0,2),(0,0,1,1),(0,0,1,2),(0,0,2,2),(0,1,1,1),(0,1,1,2),
      *  (0,1,2,2),(0,2,2,2),(1,1,1,1),(1,1,1,2),(1,1,2,2),(1,2,2,2),(2,2,2,2)]
      */
-    auto compute_lxc_for_gga(int32_t       np,
+    auto compute_lxc_for_gga(const int32_t np,
                              const double* rho,
                              const double* sigma,
                              double*       v4rho4,
@@ -340,7 +340,7 @@ class CXCFunctional
      * @param[in,out] vlapl values of the first derivative
      * @param[in,out] vtau alues of the first derivative
      */
-    auto compute_exc_vxc_for_mgga(int32_t       np,
+    auto compute_exc_vxc_for_mgga(const int32_t np,
                                   const double* rho,
                                   const double* sigma,
                                   const double* lapl,
@@ -363,7 +363,7 @@ class CXCFunctional
      * @param[in,out] vlapl values of the first derivative
      * @param[in,out] vtau alues of the first derivative
      */
-    auto compute_vxc_for_mgga(int32_t       np,
+    auto compute_vxc_for_mgga(const int32_t np,
                               const double* rho,
                               const double* sigma,
                               const double* lapl,
@@ -391,7 +391,7 @@ class CXCFunctional
      * @param[in,out] v2lapltau values of the second derivative
      * @param[in,out] v2tau2 values of the second derivative
      */
-    auto compute_fxc_for_mgga(int32_t       np,
+    auto compute_fxc_for_mgga(const int32_t np,
                               const double* rho,
                               const double* sigma,
                               const double* lapl,
@@ -435,7 +435,7 @@ class CXCFunctional
      * @param[in,out] v3lapltau2 values of the third derivative
      * @param[in,out] v3tau3 values of the third derivative
      */
-    auto compute_kxc_for_mgga(int32_t       np,
+    auto compute_kxc_for_mgga(const int32_t np,
                               const double* rho,
                               const double* sigma,
                               const double* lapl,
@@ -504,7 +504,7 @@ class CXCFunctional
      * @param[in,out] v4lapltau3 values of the fourth derivative
      * @param[in,out] v4tau4 values of the fourth derivative
      */
-    auto compute_lxc_for_mgga(int32_t       np,
+    auto compute_lxc_for_mgga(const int32_t np,
                               const double* rho,
                               const double* sigma,
                               const double* lapl,
