@@ -296,93 +296,108 @@ screenVxcForPGGA(const int32_t npoints, const double* rho, const double* sigma, 
 }
 
 void
-screenFxcForLDA(const int32_t npoints, const double* rho, double* v2rho2)
+screenFxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v2rho2)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ldafunc = xcFunctionalPointer->getFunctionalPointerToLdaComponent();
+
+    const auto dim = &(ldafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
         {
-            v2rho2[3 * g + 0] = 0.0;
-            v2rho2[3 * g + 1] = 0.0;
+            for (int ind = 0; ind < dim->v2rho2 - 1; ind++)
+            {
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
         }
 
         // rho_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
         {
-            v2rho2[3 * g + 1] = 0.0;
-            v2rho2[3 * g + 2] = 0.0;
+            for (int ind = 1; ind < dim->v2rho2; ind++)
+            {
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenFxcForGGA(const int32_t npoints, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2)
+screenFxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                const int32_t        npoints,
+                const double*        rho,
+                const double*        sigma,
+                double*              v2rho2,
+                double*              v2rhosigma,
+                double*              v2sigma2)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ggafunc = xcFunctionalPointer->getFunctionalPointerToGgaComponent();
+
+    const auto dim = &(ggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
-            v2rho2[3 * g + 0] = 0.0;
-            v2rho2[3 * g + 1] = 0.0;
-
-            v2rhosigma[6 * g + 0] = 0.0;
-            v2rhosigma[6 * g + 1] = 0.0;
-            v2rhosigma[6 * g + 2] = 0.0;
-            v2rhosigma[6 * g + 3] = 0.0;
-            v2rhosigma[6 * g + 4] = 0.0;
-
-            v2sigma2[6 * g + 0] = 0.0;
-            v2sigma2[6 * g + 1] = 0.0;
-            v2sigma2[6 * g + 2] = 0.0;
-            v2sigma2[6 * g + 3] = 0.0;
-            v2sigma2[6 * g + 4] = 0.0;
+            for (int ind = 0; ind < dim->v2rho2 - 1; ind++)
+            {
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2rhosigma - 1; ind++)
+            {
+                v2rhosigma[dim->v2rhosigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2sigma2 - 1; ind++)
+            {
+                v2sigma2[dim->v2sigma2 * g + ind] = 0.0;
+            }
         }
 
         // rho_b and sigma_bb
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
-            v2rho2[3 * g + 1] = 0.0;
-            v2rho2[3 * g + 2] = 0.0;
-
-            v2rhosigma[6 * g + 1] = 0.0;
-            v2rhosigma[6 * g + 2] = 0.0;
-            v2rhosigma[6 * g + 3] = 0.0;
-            v2rhosigma[6 * g + 4] = 0.0;
-            v2rhosigma[6 * g + 5] = 0.0;
-
-            v2sigma2[6 * g + 1] = 0.0;
-            v2sigma2[6 * g + 2] = 0.0;
-            v2sigma2[6 * g + 3] = 0.0;
-            v2sigma2[6 * g + 4] = 0.0;
-            v2sigma2[6 * g + 5] = 0.0;
+            for (int ind = 1; ind < dim->v2rho2; ind++)
+            {
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2rhosigma; ind++)
+            {
+                v2rhosigma[dim->v2rhosigma * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2sigma2; ind++)
+            {
+                v2sigma2[dim->v2sigma2 * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenFxcForMGGA(const int32_t npoints,
-                 const double* rho,
-                 const double* sigma,
-                 const double* lapl,
-                 const double* tau,
-                 double*       v2rho2,
-                 double*       v2rhosigma,
-                 double*       v2rholapl,
-                 double*       v2rhotau,
-                 double*       v2sigma2,
-                 double*       v2sigmalapl,
-                 double*       v2sigmatau,
-                 double*       v2lapl2,
-                 double*       v2lapltau,
-                 double*       v2tau2)
+screenFxcForMGGA(const CXCFunctional* xcFunctionalPointer,
+                 const int32_t        npoints,
+                 const double*        rho,
+                 const double*        sigma,
+                 const double*        lapl,
+                 const double*        tau,
+                 double*              v2rho2,
+                 double*              v2rhosigma,
+                 double*              v2rholapl,
+                 double*              v2rhotau,
+                 double*              v2sigma2,
+                 double*              v2sigmalapl,
+                 double*              v2sigmatau,
+                 double*              v2lapl2,
+                 double*              v2lapltau,
+                 double*              v2tau2)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
@@ -390,226 +405,197 @@ screenFxcForMGGA(const int32_t npoints,
 
     double tauThreshold = getTauScreeningThreshold();
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto mggafunc = xcFunctionalPointer->getFunctionalPointerToMetaGgaComponent();
+
+    const auto dim = &(mggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a, sigma_aa and tau_a
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 0]) <= tauThreshold))
         {
-            v2rho2[3 * g + 0] = 0.0;
-            v2rho2[3 * g + 1] = 0.0;
-
-            v2rhosigma[6 * g + 0] = 0.0;
-            v2rhosigma[6 * g + 1] = 0.0;
-            v2rhosigma[6 * g + 2] = 0.0;
-            v2rhosigma[6 * g + 3] = 0.0;
-            v2rhosigma[6 * g + 4] = 0.0;
-
-            v2rholapl[4 * g + 0] = 0.0;
-            v2rholapl[4 * g + 1] = 0.0;
-            v2rholapl[4 * g + 2] = 0.0;
-
-            v2rhotau[4 * g + 0] = 0.0;
-            v2rhotau[4 * g + 1] = 0.0;
-            v2rhotau[4 * g + 2] = 0.0;
-
-            v2sigma2[6 * g + 0] = 0.0;
-            v2sigma2[6 * g + 1] = 0.0;
-            v2sigma2[6 * g + 2] = 0.0;
-            v2sigma2[6 * g + 3] = 0.0;
-            v2sigma2[6 * g + 4] = 0.0;
-
-            v2sigmalapl[6 * g + 0] = 0.0;
-            v2sigmalapl[6 * g + 1] = 0.0;
-            v2sigmalapl[6 * g + 2] = 0.0;
-            v2sigmalapl[6 * g + 3] = 0.0;
-            v2sigmalapl[6 * g + 4] = 0.0;
-
-            v2sigmatau[6 * g + 0] = 0.0;
-            v2sigmatau[6 * g + 1] = 0.0;
-            v2sigmatau[6 * g + 2] = 0.0;
-            v2sigmatau[6 * g + 3] = 0.0;
-            v2sigmatau[6 * g + 4] = 0.0;
-
-            v2lapl2[3 * g + 0] = 0.0;
-            v2lapl2[3 * g + 1] = 0.0;
-
-            v2lapltau[4 * g + 0] = 0.0;
-            v2lapltau[4 * g + 1] = 0.0;
-            v2lapltau[4 * g + 2] = 0.0;
-
-            v2tau2[3 * g + 0] = 0.0;
-            v2tau2[3 * g + 1] = 0.0;
+            for (int ind = 0; ind < dim->v2rho2 - 1; ind++)
+            {
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2rhosigma - 1; ind++)
+            {
+                v2rhosigma[dim->v2rhosigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2rholapl - 1; ind++)
+            {
+                v2rholapl[dim->v2rholapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2rhotau - 1; ind++)
+            {
+                v2rhotau[dim->v2rhotau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2sigma2 - 1; ind++)
+            {
+                v2sigma2[dim->v2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2sigmalapl - 1; ind++)
+            {
+                v2sigmalapl[dim->v2sigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2sigmatau - 1; ind++)
+            {
+                v2sigmatau[dim->v2sigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2lapl2 - 1; ind++)
+            {
+                v2lapl2[dim->v2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2lapltau - 1; ind++)
+            {
+                v2lapltau[dim->v2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2tau2 - 1; ind++)
+            {
+                v2tau2[dim->v2tau2 * g + ind] = 0.0;
+            }
         }
 
         // rho_b, sigma_bb and tau_b
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
             (std::fabs(tau[2 * g + 1]) <= tauThreshold))
         {
-            v2rho2[3 * g + 1] = 0.0;
-            v2rho2[3 * g + 2] = 0.0;
-
-            v2rhosigma[6 * g + 1] = 0.0;
-            v2rhosigma[6 * g + 2] = 0.0;
-            v2rhosigma[6 * g + 3] = 0.0;
-            v2rhosigma[6 * g + 4] = 0.0;
-            v2rhosigma[6 * g + 5] = 0.0;
-
-            v2rholapl[4 * g + 1] = 0.0;
-            v2rholapl[4 * g + 2] = 0.0;
-            v2rholapl[4 * g + 3] = 0.0;
-
-            v2rhotau[4 * g + 1] = 0.0;
-            v2rhotau[4 * g + 2] = 0.0;
-            v2rhotau[4 * g + 3] = 0.0;
-
-            v2sigma2[6 * g + 1] = 0.0;
-            v2sigma2[6 * g + 2] = 0.0;
-            v2sigma2[6 * g + 3] = 0.0;
-            v2sigma2[6 * g + 4] = 0.0;
-            v2sigma2[6 * g + 5] = 0.0;
-
-            v2sigmalapl[6 * g + 1] = 0.0;
-            v2sigmalapl[6 * g + 2] = 0.0;
-            v2sigmalapl[6 * g + 3] = 0.0;
-            v2sigmalapl[6 * g + 4] = 0.0;
-            v2sigmalapl[6 * g + 5] = 0.0;
-
-            v2sigmatau[6 * g + 1] = 0.0;
-            v2sigmatau[6 * g + 2] = 0.0;
-            v2sigmatau[6 * g + 3] = 0.0;
-            v2sigmatau[6 * g + 4] = 0.0;
-            v2sigmatau[6 * g + 5] = 0.0;
-
-            v2lapl2[3 * g + 1] = 0.0;
-            v2lapl2[3 * g + 2] = 0.0;
-
-            v2lapltau[4 * g + 1] = 0.0;
-            v2lapltau[4 * g + 2] = 0.0;
-            v2lapltau[4 * g + 3] = 0.0;
-
-            v2tau2[3 * g + 1] = 0.0;
-            v2tau2[3 * g + 2] = 0.0;
+            for (int ind = 1; ind < dim->v2rho2; ind++)
+            {
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2rhosigma; ind++)
+            {
+                v2rhosigma[dim->v2rhosigma * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2rholapl; ind++)
+            {
+                v2rholapl[dim->v2rholapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2rhotau; ind++)
+            {
+                v2rhotau[dim->v2rhotau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2sigma2; ind++)
+            {
+                v2sigma2[dim->v2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2sigmalapl; ind++)
+            {
+                v2sigmalapl[dim->v2sigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2sigmatau; ind++)
+            {
+                v2sigmatau[dim->v2sigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2lapl2; ind++)
+            {
+                v2lapl2[dim->v2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2lapltau; ind++)
+            {
+                v2lapltau[dim->v2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v2tau2; ind++)
+            {
+                v2tau2[dim->v2tau2 * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenKxcForLDA(const int32_t npoints, const double* rho, double* v3rho3)
+screenKxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v3rho3)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ldafunc = xcFunctionalPointer->getFunctionalPointerToLdaComponent();
+
+    const auto dim = &(ldafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
         {
-            v3rho3[4 * g + 0] = 0.0;
-            v3rho3[4 * g + 1] = 0.0;
-            v3rho3[4 * g + 2] = 0.0;
+            for (int ind = 0; ind < dim->v3rho3 - 1; ind++)
+            {
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
         }
 
         // rho_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
         {
-            v3rho3[4 * g + 1] = 0.0;
-            v3rho3[4 * g + 2] = 0.0;
-            v3rho3[4 * g + 3] = 0.0;
+            for (int ind = 1; ind < dim->v3rho3; ind++)
+            {
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenKxcForGGA(const int32_t npoints,
-                const double* rho,
-                const double* sigma,
-                double*       v3rho3,
-                double*       v3rho2sigma,
-                double*       v3rhosigma2,
-                double*       v3sigma3)
+screenKxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                const int32_t        npoints,
+                const double*        rho,
+                const double*        sigma,
+                double*              v3rho3,
+                double*              v3rho2sigma,
+                double*              v3rhosigma2,
+                double*              v3sigma3)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ggafunc = xcFunctionalPointer->getFunctionalPointerToGgaComponent();
+
+    const auto dim = &(ggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
-            v3rho3[4 * g + 0] = 0.0;
-            v3rho3[4 * g + 1] = 0.0;
-            v3rho3[4 * g + 2] = 0.0;
-
-            v3rho2sigma[9 * g + 0] = 0.0;
-            v3rho2sigma[9 * g + 1] = 0.0;
-            v3rho2sigma[9 * g + 2] = 0.0;
-            v3rho2sigma[9 * g + 3] = 0.0;
-            v3rho2sigma[9 * g + 4] = 0.0;
-            v3rho2sigma[9 * g + 5] = 0.0;
-            v3rho2sigma[9 * g + 6] = 0.0;
-            v3rho2sigma[9 * g + 7] = 0.0;
-
-            v3rhosigma2[12 * g + 0]  = 0.0;
-            v3rhosigma2[12 * g + 1]  = 0.0;
-            v3rhosigma2[12 * g + 2]  = 0.0;
-            v3rhosigma2[12 * g + 3]  = 0.0;
-            v3rhosigma2[12 * g + 4]  = 0.0;
-            v3rhosigma2[12 * g + 5]  = 0.0;
-            v3rhosigma2[12 * g + 6]  = 0.0;
-            v3rhosigma2[12 * g + 7]  = 0.0;
-            v3rhosigma2[12 * g + 8]  = 0.0;
-            v3rhosigma2[12 * g + 9]  = 0.0;
-            v3rhosigma2[12 * g + 10] = 0.0;
-
-            v3sigma3[10 * g + 0] = 0.0;
-            v3sigma3[10 * g + 1] = 0.0;
-            v3sigma3[10 * g + 2] = 0.0;
-            v3sigma3[10 * g + 3] = 0.0;
-            v3sigma3[10 * g + 4] = 0.0;
-            v3sigma3[10 * g + 5] = 0.0;
-            v3sigma3[10 * g + 6] = 0.0;
-            v3sigma3[10 * g + 7] = 0.0;
-            v3sigma3[10 * g + 8] = 0.0;
+            for (int ind = 0; ind < dim->v3rho3 - 1; ind++)
+            {
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2sigma - 1; ind++)
+            {
+                v3rho2sigma[dim->v3rho2sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigma2 - 1; ind++)
+            {
+                v3rhosigma2[dim->v3rhosigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma3 - 1; ind++)
+            {
+                v3sigma3[dim->v3sigma3 * g + ind] = 0.0;
+            }
         }
 
         // rho_b and sigma_bb
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
-            v3rho3[4 * g + 1] = 0.0;
-            v3rho3[4 * g + 2] = 0.0;
-            v3rho3[4 * g + 3] = 0.0;
-
-            v3rho2sigma[9 * g + 1] = 0.0;
-            v3rho2sigma[9 * g + 2] = 0.0;
-            v3rho2sigma[9 * g + 3] = 0.0;
-            v3rho2sigma[9 * g + 4] = 0.0;
-            v3rho2sigma[9 * g + 5] = 0.0;
-            v3rho2sigma[9 * g + 6] = 0.0;
-            v3rho2sigma[9 * g + 7] = 0.0;
-            v3rho2sigma[9 * g + 8] = 0.0;
-
-            v3rhosigma2[12 * g + 1]  = 0.0;
-            v3rhosigma2[12 * g + 2]  = 0.0;
-            v3rhosigma2[12 * g + 3]  = 0.0;
-            v3rhosigma2[12 * g + 4]  = 0.0;
-            v3rhosigma2[12 * g + 5]  = 0.0;
-            v3rhosigma2[12 * g + 6]  = 0.0;
-            v3rhosigma2[12 * g + 7]  = 0.0;
-            v3rhosigma2[12 * g + 8]  = 0.0;
-            v3rhosigma2[12 * g + 9]  = 0.0;
-            v3rhosigma2[12 * g + 10] = 0.0;
-            v3rhosigma2[12 * g + 11] = 0.0;
-
-            v3sigma3[10 * g + 1] = 0.0;
-            v3sigma3[10 * g + 2] = 0.0;
-            v3sigma3[10 * g + 3] = 0.0;
-            v3sigma3[10 * g + 4] = 0.0;
-            v3sigma3[10 * g + 5] = 0.0;
-            v3sigma3[10 * g + 6] = 0.0;
-            v3sigma3[10 * g + 7] = 0.0;
-            v3sigma3[10 * g + 8] = 0.0;
-            v3sigma3[10 * g + 9] = 0.0;
+            for (int ind = 1; ind < dim->v3rho3; ind++)
+            {
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rho2sigma; ind++)
+            {
+                v3rho2sigma[dim->v3rho2sigma * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3rhosigma2; ind++)
+            {
+                v3rhosigma2[dim->v3rhosigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v3sigma3; ind++)
+            {
+                v3sigma3[dim->v3sigma3 * g + ind] = 0.0;
+            }
         }
     }
 }
@@ -829,194 +815,105 @@ screenKxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 }
 
 void
-screenLxcForLDA(const int32_t npoints, const double* rho, double* v4rho4)
+screenLxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v4rho4)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ldafunc = xcFunctionalPointer->getFunctionalPointerToLdaComponent();
+
+    const auto dim = &(ldafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
         {
-            v4rho4[5 * g + 0] = 0.0;
-            v4rho4[5 * g + 1] = 0.0;
-            v4rho4[5 * g + 2] = 0.0;
-            v4rho4[5 * g + 3] = 0.0;
+            for (int ind = 0; ind < dim->v4rho4 - 1; ind++)
+            {
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
         }
 
         // rho_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold))
+        if (std::fabs(rho[2 * g + 1]) <= densityThreshold)
         {
-            v4rho4[5 * g + 1] = 0.0;
-            v4rho4[5 * g + 2] = 0.0;
-            v4rho4[5 * g + 3] = 0.0;
-            v4rho4[5 * g + 4] = 0.0;
+            for (int ind = 1; ind < dim->v4rho4; ind++)
+            {
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
         }
     }
 }
 
 void
-screenLxcForGGA(const int32_t npoints,
-                const double* rho,
-                const double* sigma,
-                double*       v4rho4,
-                double*       v4rho3sigma,
-                double*       v4rho2sigma2,
-                double*       v4rhosigma3,
-                double*       v4sigma4)
+screenLxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                const int32_t        npoints,
+                const double*        rho,
+                const double*        sigma,
+                double*              v4rho4,
+                double*              v4rho3sigma,
+                double*              v4rho2sigma2,
+                double*              v4rhosigma3,
+                double*              v4sigma4)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
     double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
 
-    for (int32_t g = 0; g < npoints; g++)
+    auto ggafunc = xcFunctionalPointer->getFunctionalPointerToGgaComponent();
+
+    const auto dim = &(ggafunc->dim);
+
+    for (int g = 0; g < static_cast<int>(npoints); g++)
     {
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
         {
-            v4rho4[5 * g + 0] = 0.0;
-            v4rho4[5 * g + 1] = 0.0;
-            v4rho4[5 * g + 2] = 0.0;
-            v4rho4[5 * g + 3] = 0.0;
-
-            v4rho3sigma[12 * g + 0]  = 0.0;
-            v4rho3sigma[12 * g + 1]  = 0.0;
-            v4rho3sigma[12 * g + 2]  = 0.0;
-            v4rho3sigma[12 * g + 3]  = 0.0;
-            v4rho3sigma[12 * g + 4]  = 0.0;
-            v4rho3sigma[12 * g + 5]  = 0.0;
-            v4rho3sigma[12 * g + 6]  = 0.0;
-            v4rho3sigma[12 * g + 7]  = 0.0;
-            v4rho3sigma[12 * g + 8]  = 0.0;
-            v4rho3sigma[12 * g + 9]  = 0.0;
-            v4rho3sigma[12 * g + 10] = 0.0;
-
-            v4rho2sigma2[18 * g + 0]  = 0.0;
-            v4rho2sigma2[18 * g + 1]  = 0.0;
-            v4rho2sigma2[18 * g + 2]  = 0.0;
-            v4rho2sigma2[18 * g + 3]  = 0.0;
-            v4rho2sigma2[18 * g + 4]  = 0.0;
-            v4rho2sigma2[18 * g + 5]  = 0.0;
-            v4rho2sigma2[18 * g + 6]  = 0.0;
-            v4rho2sigma2[18 * g + 7]  = 0.0;
-            v4rho2sigma2[18 * g + 8]  = 0.0;
-            v4rho2sigma2[18 * g + 9]  = 0.0;
-            v4rho2sigma2[18 * g + 10] = 0.0;
-            v4rho2sigma2[18 * g + 11] = 0.0;
-            v4rho2sigma2[18 * g + 12] = 0.0;
-            v4rho2sigma2[18 * g + 13] = 0.0;
-            v4rho2sigma2[18 * g + 14] = 0.0;
-            v4rho2sigma2[18 * g + 15] = 0.0;
-            v4rho2sigma2[18 * g + 16] = 0.0;
-
-            v4rhosigma3[20 * g + 0]  = 0.0;
-            v4rhosigma3[20 * g + 1]  = 0.0;
-            v4rhosigma3[20 * g + 2]  = 0.0;
-            v4rhosigma3[20 * g + 3]  = 0.0;
-            v4rhosigma3[20 * g + 4]  = 0.0;
-            v4rhosigma3[20 * g + 5]  = 0.0;
-            v4rhosigma3[20 * g + 6]  = 0.0;
-            v4rhosigma3[20 * g + 7]  = 0.0;
-            v4rhosigma3[20 * g + 8]  = 0.0;
-            v4rhosigma3[20 * g + 9]  = 0.0;
-            v4rhosigma3[20 * g + 10] = 0.0;
-            v4rhosigma3[20 * g + 11] = 0.0;
-            v4rhosigma3[20 * g + 12] = 0.0;
-            v4rhosigma3[20 * g + 13] = 0.0;
-            v4rhosigma3[20 * g + 14] = 0.0;
-            v4rhosigma3[20 * g + 15] = 0.0;
-            v4rhosigma3[20 * g + 16] = 0.0;
-            v4rhosigma3[20 * g + 17] = 0.0;
-            v4rhosigma3[20 * g + 18] = 0.0;
-
-            v4sigma4[15 * g + 0]  = 0.0;
-            v4sigma4[15 * g + 1]  = 0.0;
-            v4sigma4[15 * g + 2]  = 0.0;
-            v4sigma4[15 * g + 3]  = 0.0;
-            v4sigma4[15 * g + 4]  = 0.0;
-            v4sigma4[15 * g + 5]  = 0.0;
-            v4sigma4[15 * g + 6]  = 0.0;
-            v4sigma4[15 * g + 7]  = 0.0;
-            v4sigma4[15 * g + 8]  = 0.0;
-            v4sigma4[15 * g + 9]  = 0.0;
-            v4sigma4[15 * g + 10] = 0.0;
-            v4sigma4[15 * g + 11] = 0.0;
-            v4sigma4[15 * g + 12] = 0.0;
-            v4sigma4[15 * g + 13] = 0.0;
+            for (int ind = 0; ind < dim->v4rho4 - 1; ind++)
+            {
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho3sigma - 1; ind++)
+            {
+                v4rho3sigma[dim->v4rho3sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2sigma2 - 1; ind++)
+            {
+                v4rho2sigma2[dim->v4rho2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigma3 - 1; ind++)
+            {
+                v4rhosigma3[dim->v4rhosigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma4 - 1; ind++)
+            {
+                v4sigma4[dim->v4sigma4 * g + ind] = 0.0;
+            }
         }
 
         // rho_b and sigma_bb
         if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold))
         {
-            v4rho4[5 * g + 1] = 0.0;
-            v4rho4[5 * g + 2] = 0.0;
-            v4rho4[5 * g + 3] = 0.0;
-            v4rho4[5 * g + 4] = 0.0;
-
-            v4rho3sigma[12 * g + 1]  = 0.0;
-            v4rho3sigma[12 * g + 2]  = 0.0;
-            v4rho3sigma[12 * g + 3]  = 0.0;
-            v4rho3sigma[12 * g + 4]  = 0.0;
-            v4rho3sigma[12 * g + 5]  = 0.0;
-            v4rho3sigma[12 * g + 6]  = 0.0;
-            v4rho3sigma[12 * g + 7]  = 0.0;
-            v4rho3sigma[12 * g + 8]  = 0.0;
-            v4rho3sigma[12 * g + 9]  = 0.0;
-            v4rho3sigma[12 * g + 10] = 0.0;
-            v4rho3sigma[12 * g + 11] = 0.0;
-
-            v4rho2sigma2[18 * g + 1]  = 0.0;
-            v4rho2sigma2[18 * g + 2]  = 0.0;
-            v4rho2sigma2[18 * g + 3]  = 0.0;
-            v4rho2sigma2[18 * g + 4]  = 0.0;
-            v4rho2sigma2[18 * g + 5]  = 0.0;
-            v4rho2sigma2[18 * g + 6]  = 0.0;
-            v4rho2sigma2[18 * g + 7]  = 0.0;
-            v4rho2sigma2[18 * g + 8]  = 0.0;
-            v4rho2sigma2[18 * g + 9]  = 0.0;
-            v4rho2sigma2[18 * g + 10] = 0.0;
-            v4rho2sigma2[18 * g + 11] = 0.0;
-            v4rho2sigma2[18 * g + 12] = 0.0;
-            v4rho2sigma2[18 * g + 13] = 0.0;
-            v4rho2sigma2[18 * g + 14] = 0.0;
-            v4rho2sigma2[18 * g + 15] = 0.0;
-            v4rho2sigma2[18 * g + 16] = 0.0;
-            v4rho2sigma2[18 * g + 17] = 0.0;
-
-            v4rhosigma3[20 * g + 1]  = 0.0;
-            v4rhosigma3[20 * g + 2]  = 0.0;
-            v4rhosigma3[20 * g + 3]  = 0.0;
-            v4rhosigma3[20 * g + 4]  = 0.0;
-            v4rhosigma3[20 * g + 5]  = 0.0;
-            v4rhosigma3[20 * g + 6]  = 0.0;
-            v4rhosigma3[20 * g + 7]  = 0.0;
-            v4rhosigma3[20 * g + 8]  = 0.0;
-            v4rhosigma3[20 * g + 9]  = 0.0;
-            v4rhosigma3[20 * g + 10] = 0.0;
-            v4rhosigma3[20 * g + 11] = 0.0;
-            v4rhosigma3[20 * g + 12] = 0.0;
-            v4rhosigma3[20 * g + 13] = 0.0;
-            v4rhosigma3[20 * g + 14] = 0.0;
-            v4rhosigma3[20 * g + 15] = 0.0;
-            v4rhosigma3[20 * g + 16] = 0.0;
-            v4rhosigma3[20 * g + 17] = 0.0;
-            v4rhosigma3[20 * g + 18] = 0.0;
-            v4rhosigma3[20 * g + 19] = 0.0;
-
-            v4sigma4[15 * g + 1]  = 0.0;
-            v4sigma4[15 * g + 2]  = 0.0;
-            v4sigma4[15 * g + 3]  = 0.0;
-            v4sigma4[15 * g + 4]  = 0.0;
-            v4sigma4[15 * g + 5]  = 0.0;
-            v4sigma4[15 * g + 6]  = 0.0;
-            v4sigma4[15 * g + 7]  = 0.0;
-            v4sigma4[15 * g + 8]  = 0.0;
-            v4sigma4[15 * g + 9]  = 0.0;
-            v4sigma4[15 * g + 10] = 0.0;
-            v4sigma4[15 * g + 11] = 0.0;
-            v4sigma4[15 * g + 12] = 0.0;
-            v4sigma4[15 * g + 13] = 0.0;
-            v4sigma4[15 * g + 14] = 0.0;
+            for (int ind = 1; ind < dim->v4rho4; ind++)
+            {
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho3sigma; ind++)
+            {
+                v4rho3sigma[dim->v4rho3sigma * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rho2sigma2; ind++)
+            {
+                v4rho2sigma2[dim->v4rho2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4rhosigma3; ind++)
+            {
+                v4rhosigma3[dim->v4rhosigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 1; ind < dim->v4sigma4; ind++)
+            {
+                v4sigma4[dim->v4sigma4 * g + ind] = 0.0;
+            }
         }
     }
 }
