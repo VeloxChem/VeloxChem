@@ -288,7 +288,9 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     // memory blocks for GTOs on grid points
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -304,15 +306,20 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
+
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+
+    CMemBlock<double> exc_data(dim->zk * max_npoints_per_box);
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
-    auto rho  = rho_data.data();
+    auto rho = rho_data.data();
+
     auto exc  = exc_data.data();
     auto vrho = vrho_data.data();
 
@@ -550,11 +557,13 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // memory blocks for GTOs on grid points
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
+
+    CMemBlock2D<double> gaox(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoy(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoz(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -570,15 +579,18 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
+
+    CMemBlock<double> exc_data(dim->zk * max_npoints_per_box);
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
+    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
@@ -841,11 +853,13 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
     // memory blocks for GTOs on grid points
     // TODO implement Laplacian dependence
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
+
+    CMemBlock2D<double> gaox(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoy(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoz(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -861,19 +875,22 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> lapl_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> tau_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
-    CMemBlock<double> exc_data(1 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vlapl_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vtau_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
+    CMemBlock<double> lapl_data(dim->lapl * max_npoints_per_box);
+    CMemBlock<double> tau_data(dim->tau * max_npoints_per_box);
+
+    CMemBlock<double> exc_data(dim->zk * max_npoints_per_box);
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
+    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+    CMemBlock<double> vlapl_data(dim->vlapl * max_npoints_per_box);
+    CMemBlock<double> vtau_data(dim->vtau * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
@@ -1133,7 +1150,9 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     // memory blocks for GTOs on grid points
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -1149,16 +1168,23 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhow_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
+
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+
+    CMemBlock<double> rhow_data(dim->rho * max_npoints_per_box);
+
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
-    auto rho    = rho_data.data();
-    auto rhow   = rhow_data.data();
+    auto rho = rho_data.data();
+
+    auto rhow = rhow_data.data();
+
     auto v2rho2 = v2rho2_data.data();
 
     // coordinates and weights of grid points
@@ -1356,11 +1382,13 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     // memory blocks for GTOs on grid points
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
+
+    CMemBlock2D<double> gaox(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoy(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoz(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -1376,30 +1404,37 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhow_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhowgrad_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
+
+    CMemBlock<double> rhow_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhowgrad_data(dim->rho * 3 * max_npoints_per_box);
+
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
+    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    CMemBlock<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
+    CMemBlock<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
-    auto rho      = rho_data.data();
-    auto rhow     = rhow_data.data();
-    auto rhograd  = rhograd_data.data();
-    auto rhowgrad = rhowgrad_data.data();
-    auto sigma    = sigma_data.data();
+    auto rho     = rho_data.data();
+    auto rhograd = rhograd_data.data();
+    auto sigma   = sigma_data.data();
 
-    auto vrho       = vrho_data.data();
-    auto vsigma     = vsigma_data.data();
+    auto rhow     = rhow_data.data();
+    auto rhowgrad = rhowgrad_data.data();
+
+    auto vrho   = vrho_data.data();
+    auto vsigma = vsigma_data.data();
+
     auto v2rho2     = v2rho2_data.data();
     auto v2rhosigma = v2rhosigma_data.data();
     auto v2sigma2   = v2sigma2_data.data();
@@ -1629,11 +1664,13 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // memory blocks for GTOs on grid points
     // TODO implement Laplacian dependence
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
+
+    CMemBlock2D<double> gaox(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoy(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoz(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -1649,38 +1686,41 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
+
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
     // ground-state
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> lapl_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> tau_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
+    CMemBlock<double> lapl_data(dim->lapl * max_npoints_per_box);
+    CMemBlock<double> tau_data(dim->tau * max_npoints_per_box);
 
     // perturbed
-    CMemBlock<double> rhowgrad_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhow_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> tauw_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> laplw_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rhow_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhowgrad_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> laplw_data(dim->lapl * max_npoints_per_box);
+    CMemBlock<double> tauw_data(dim->tau * max_npoints_per_box);
 
     // First-order
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vlapl_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vtau_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
+    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+    CMemBlock<double> vlapl_data(dim->vlapl * max_npoints_per_box);
+    CMemBlock<double> vtau_data(dim->vtau * max_npoints_per_box);
 
     // Second-order
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2lapl2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2tau2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2v2rholapl_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2v2rhotau_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2lapltau_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigmalapl_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigmatau_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    CMemBlock<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
+    CMemBlock<double> v2rholapl_data(dim->v2rholapl * max_npoints_per_box);
+    CMemBlock<double> v2rhotau_data(dim->v2rhotau * max_npoints_per_box);
+    CMemBlock<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
+    CMemBlock<double> v2sigmalapl_data(dim->v2sigmalapl * max_npoints_per_box);
+    CMemBlock<double> v2sigmatau_data(dim->v2sigmatau * max_npoints_per_box);
+    CMemBlock<double> v2lapl2_data(dim->v2lapl2 * max_npoints_per_box);
+    CMemBlock<double> v2lapltau_data(dim->v2lapltau * max_npoints_per_box);
+    CMemBlock<double> v2tau2_data(dim->v2tau2 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
@@ -1694,8 +1734,8 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // Perturbed
     auto rhow     = rhow_data.data();
     auto rhowgrad = rhowgrad_data.data();
-    auto tauw     = tauw_data.data();
     auto laplw    = laplw_data.data();
+    auto tauw     = tauw_data.data();
 
     // First-order
     auto vrho   = vrho_data.data();
@@ -1705,15 +1745,15 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
     // Second-order
     auto v2rho2      = v2rho2_data.data();
-    auto v2lapl2     = v2lapl2_data.data();
-    auto v2tau2      = v2tau2_data.data();
-    auto v2rholapl   = v2v2rholapl_data.data();
-    auto v2rhotau    = v2v2rhotau_data.data();
-    auto v2lapltau   = v2lapltau_data.data();
     auto v2rhosigma  = v2rhosigma_data.data();
+    auto v2rholapl   = v2rholapl_data.data();
+    auto v2rhotau    = v2rhotau_data.data();
+    auto v2sigma2    = v2sigma2_data.data();
     auto v2sigmalapl = v2sigmalapl_data.data();
     auto v2sigmatau  = v2sigmatau_data.data();
-    auto v2sigma2    = v2sigma2_data.data();
+    auto v2lapl2     = v2lapl2_data.data();
+    auto v2lapltau   = v2lapltau_data.data();
+    auto v2tau2      = v2tau2_data.data();
 
     // coordinates and weights of grid points
 
@@ -1955,7 +1995,9 @@ CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     // memory blocks for GTOs on grid points
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -1971,12 +2013,15 @@ CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
 
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    CMemBlock<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
@@ -2203,11 +2248,13 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     // memory blocks for GTOs on grid points
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
+
+    CMemBlock2D<double> gaox(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoy(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoz(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -2223,23 +2270,26 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
 
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
+    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
 
-    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho2sigma_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhosigma2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigma3_data(10 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    CMemBlock<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
+    CMemBlock<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
+
+    CMemBlock<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
+    CMemBlock<double> v3rho2sigma_data(dim->v3rho2sigma * max_npoints_per_box);
+    CMemBlock<double> v3rhosigma2_data(dim->v3rhosigma2 * max_npoints_per_box);
+    CMemBlock<double> v3sigma3_data(dim->v3sigma3 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
@@ -2512,11 +2562,13 @@ CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // memory blocks for GTOs on grid points
     // TODO implement Laplacian dependence
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
+
+    CMemBlock2D<double> gaox(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoy(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoz(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -2532,58 +2584,61 @@ CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
-    // ground-state
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> lapl_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> tau_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
+
+    // Input
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
+    CMemBlock<double> lapl_data(dim->lapl * max_npoints_per_box);
+    CMemBlock<double> tau_data(dim->tau * max_npoints_per_box);
 
     // First-order
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vlapl_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vtau_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
+    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+    CMemBlock<double> vlapl_data(dim->vlapl * max_npoints_per_box);
+    CMemBlock<double> vtau_data(dim->vtau * max_npoints_per_box);
 
     // Second-order
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2lapl2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2tau2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2v2rholapl_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2v2rhotau_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2lapltau_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigmalapl_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigmatau_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    CMemBlock<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
+    CMemBlock<double> v2rholapl_data(dim->v2rholapl * max_npoints_per_box);
+    CMemBlock<double> v2rhotau_data(dim->v2rhotau * max_npoints_per_box);
+    CMemBlock<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
+    CMemBlock<double> v2sigmalapl_data(dim->v2sigmalapl * max_npoints_per_box);
+    CMemBlock<double> v2sigmatau_data(dim->v2sigmatau * max_npoints_per_box);
+    CMemBlock<double> v2lapl2_data(dim->v2lapl2 * max_npoints_per_box);
+    CMemBlock<double> v2lapltau_data(dim->v2lapltau * max_npoints_per_box);
+    CMemBlock<double> v2tau2_data(dim->v2tau2 * max_npoints_per_box);
 
     // Third-order
-    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho2sigma_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho2lapl_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho2tau_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhosigma2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhosigmalapl_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhosigmatau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rholapl2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rholapltau_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhotau2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigma3_data(10 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigma2lapl_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigma2tau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigmalapl2_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigmalapltau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigmatau2_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3lapl3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3lapl2tau_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3lapltau2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3tau3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
+    CMemBlock<double> v3rho2sigma_data(dim->v3rho2sigma * max_npoints_per_box);
+    CMemBlock<double> v3rho2lapl_data(dim->v3rho2lapl * max_npoints_per_box);
+    CMemBlock<double> v3rho2tau_data(dim->v3rho2tau * max_npoints_per_box);
+    CMemBlock<double> v3rhosigma2_data(dim->v3rhosigma2 * max_npoints_per_box);
+    CMemBlock<double> v3rhosigmalapl_data(dim->v3rhosigmalapl * max_npoints_per_box);
+    CMemBlock<double> v3rhosigmatau_data(dim->v3rhosigmatau * max_npoints_per_box);
+    CMemBlock<double> v3rholapl2_data(dim->v3rholapl2 * max_npoints_per_box);
+    CMemBlock<double> v3rholapltau_data(dim->v3rholapltau * max_npoints_per_box);
+    CMemBlock<double> v3rhotau2_data(dim->v3rhotau2 * max_npoints_per_box);
+    CMemBlock<double> v3sigma3_data(dim->v3sigma3 * max_npoints_per_box);
+    CMemBlock<double> v3sigma2lapl_data(dim->v3sigma2lapl * max_npoints_per_box);
+    CMemBlock<double> v3sigma2tau_data(dim->v3sigma2tau * max_npoints_per_box);
+    CMemBlock<double> v3sigmalapl2_data(dim->v3sigmalapl2 * max_npoints_per_box);
+    CMemBlock<double> v3sigmalapltau_data(dim->v3sigmalapltau * max_npoints_per_box);
+    CMemBlock<double> v3sigmatau2_data(dim->v3sigmatau2 * max_npoints_per_box);
+    CMemBlock<double> v3lapl3_data(dim->v3lapl3 * max_npoints_per_box);
+    CMemBlock<double> v3lapl2tau_data(dim->v3lapl2tau * max_npoints_per_box);
+    CMemBlock<double> v3lapltau2_data(dim->v3lapltau2 * max_npoints_per_box);
+    CMemBlock<double> v3tau3_data(dim->v3tau3 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
-    // Ground-state
+    // Input
     auto rho     = rho_data.data();
     auto rhograd = rhograd_data.data();
     auto sigma   = sigma_data.data();
@@ -2598,15 +2653,15 @@ CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
     // Second-order
     auto v2rho2      = v2rho2_data.data();
-    auto v2lapl2     = v2lapl2_data.data();
-    auto v2tau2      = v2tau2_data.data();
-    auto v2rholapl   = v2v2rholapl_data.data();
-    auto v2rhotau    = v2v2rhotau_data.data();
-    auto v2lapltau   = v2lapltau_data.data();
     auto v2rhosigma  = v2rhosigma_data.data();
+    auto v2rholapl   = v2rholapl_data.data();
+    auto v2rhotau    = v2rhotau_data.data();
+    auto v2sigma2    = v2sigma2_data.data();
     auto v2sigmalapl = v2sigmalapl_data.data();
     auto v2sigmatau  = v2sigmatau_data.data();
-    auto v2sigma2    = v2sigma2_data.data();
+    auto v2lapl2     = v2lapl2_data.data();
+    auto v2lapltau   = v2lapltau_data.data();
+    auto v2tau2      = v2tau2_data.data();
 
     // Third-order
     auto v3rho3         = v3rho3_data.data();
@@ -2931,7 +2986,9 @@ CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     // memory blocks for GTOs on grid points
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -2947,13 +3004,16 @@ CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
 
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    CMemBlock<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
+    CMemBlock<double> v4rho4_data(dim->v4rho4 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
@@ -3206,10 +3266,13 @@ CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     // memory blocks for GTOs on grid points
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
+
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
+
+    CMemBlock2D<double> gaox(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoy(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoz(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -3225,29 +3288,32 @@ CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
+    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
 
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
 
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
+    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
 
-    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho2sigma_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhosigma2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigma3_data(10 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    CMemBlock<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
+    CMemBlock<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
 
-    CMemBlock<double> v4rho4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho3sigma_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho2sigma2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigma3_data(20 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigma4_data(15 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
+    CMemBlock<double> v3rho2sigma_data(dim->v3rho2sigma * max_npoints_per_box);
+    CMemBlock<double> v3rhosigma2_data(dim->v3rhosigma2 * max_npoints_per_box);
+    CMemBlock<double> v3sigma3_data(dim->v3sigma3 * max_npoints_per_box);
+
+    CMemBlock<double> v4rho4_data(dim->v4rho4 * max_npoints_per_box);
+    CMemBlock<double> v4rho3sigma_data(dim->v4rho3sigma * max_npoints_per_box);
+    CMemBlock<double> v4rho2sigma2_data(dim->v4rho2sigma2 * max_npoints_per_box);
+    CMemBlock<double> v4rhosigma3_data(dim->v4rhosigma3 * max_npoints_per_box);
+    CMemBlock<double> v4sigma4_data(dim->v4sigma4 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
@@ -3576,11 +3642,13 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // memory blocks for GTOs on grid points
     // TODO implement Laplacian dependence
 
-    CMemBlock2D<double> gaos(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CMemBlock2D<double> gaox(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoy(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
-    CMemBlock2D<double> gaoz(molecularGrid.getMaxNumberOfGridPointsPerBox(), naos);
+    CMemBlock2D<double> gaos(max_npoints_per_box, naos);
+
+    CMemBlock2D<double> gaox(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoy(max_npoints_per_box, naos);
+    CMemBlock2D<double> gaoz(max_npoints_per_box, naos);
 
     // indices for keeping track of GTOs
 
@@ -3596,98 +3664,98 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
     // density and functional derivatives
 
-    CMemBlock<double> local_weights_data(molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    // ground-state
-    CMemBlock<double> rho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> lapl_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> tau_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> rhograd_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> sigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    // First-order
-    CMemBlock<double> vrho_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vsigma_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vlapl_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> vtau_data(2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    // Second-order
-    CMemBlock<double> v2rho2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2lapl2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2tau2_data(3 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2v2rholapl_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2v2rhotau_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2lapltau_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2rhosigma_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigmalapl_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigmatau_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v2sigma2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    // Third-order
-    CMemBlock<double> v3rho3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho2sigma_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho2lapl_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rho2tau_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhosigma2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhosigmalapl_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhosigmatau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rholapl2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rholapltau_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3rhotau2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigma3_data(10 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigma2lapl_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigma2tau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigmalapl2_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigmalapltau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3sigmatau2_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3lapl3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3lapl2tau_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3lapltau2_data(6 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v3tau3_data(4 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-
-    // Fourth-order
     auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
     const auto dim      = &(mggafunc->dim);
 
-    CMemBlock<double> v4rho4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho3sigma_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho3lapl_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho3tau_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho2sigma2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho2sigmalapl_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho2sigmatau_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho2lapl2_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho2lapltau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rho2tau2_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigma3_data(20 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigma2lapl_data(dim->v4rhosigma2lapl * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigma2tau_data(dim->v4rhosigma2tau * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigmalapl2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigmalapltau_data(24 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhosigmatau2_data(dim->v4rhosigmatau2 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rholapl3_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rholapl2tau_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rholapltau2_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4rhotau3_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigma4_data(15 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigma3lapl_data(20 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigma3tau_data(dim->v4sigma3tau * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigma2lapl2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigma2lapltau_data(24 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigma2tau2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigmalapl3_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigmalapl2tau_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigmalapltau2_data(18 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4sigmatau3_data(12 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4lapl4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4lapl3tau_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4lapl2tau2_data(9 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4lapltau3_data(8 * molecularGrid.getMaxNumberOfGridPointsPerBox());
-    CMemBlock<double> v4tau4_data(5 * molecularGrid.getMaxNumberOfGridPointsPerBox());
+    CMemBlock<double> local_weights_data(max_npoints_per_box);
+
+    // Input
+    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
+    CMemBlock<double> rhograd_data(dim->rho * 3 * max_npoints_per_box);
+    CMemBlock<double> sigma_data(dim->sigma * max_npoints_per_box);
+    CMemBlock<double> lapl_data(dim->lapl * max_npoints_per_box);
+    CMemBlock<double> tau_data(dim->tau * max_npoints_per_box);
+
+    // First-order
+    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
+    CMemBlock<double> vsigma_data(dim->vsigma * max_npoints_per_box);
+    CMemBlock<double> vlapl_data(dim->vlapl * max_npoints_per_box);
+    CMemBlock<double> vtau_data(dim->vtau * max_npoints_per_box);
+
+    // Second-order
+    CMemBlock<double> v2rho2_data(dim->v2rho2 * max_npoints_per_box);
+    CMemBlock<double> v2rhosigma_data(dim->v2rhosigma * max_npoints_per_box);
+    CMemBlock<double> v2rholapl_data(dim->v2rholapl * max_npoints_per_box);
+    CMemBlock<double> v2rhotau_data(dim->v2rhotau * max_npoints_per_box);
+    CMemBlock<double> v2sigma2_data(dim->v2sigma2 * max_npoints_per_box);
+    CMemBlock<double> v2sigmalapl_data(dim->v2sigmalapl * max_npoints_per_box);
+    CMemBlock<double> v2sigmatau_data(dim->v2sigmatau * max_npoints_per_box);
+    CMemBlock<double> v2lapl2_data(dim->v2lapl2 * max_npoints_per_box);
+    CMemBlock<double> v2lapltau_data(dim->v2lapltau * max_npoints_per_box);
+    CMemBlock<double> v2tau2_data(dim->v2tau2 * max_npoints_per_box);
+
+    // Third-order
+    CMemBlock<double> v3rho3_data(dim->v3rho3 * max_npoints_per_box);
+    CMemBlock<double> v3rho2sigma_data(dim->v3rho2sigma * max_npoints_per_box);
+    CMemBlock<double> v3rho2lapl_data(dim->v3rho2lapl * max_npoints_per_box);
+    CMemBlock<double> v3rho2tau_data(dim->v3rho2tau * max_npoints_per_box);
+    CMemBlock<double> v3rhosigma2_data(dim->v3rhosigma2 * max_npoints_per_box);
+    CMemBlock<double> v3rhosigmalapl_data(dim->v3rhosigmalapl * max_npoints_per_box);
+    CMemBlock<double> v3rhosigmatau_data(dim->v3rhosigmatau * max_npoints_per_box);
+    CMemBlock<double> v3rholapl2_data(dim->v3rholapl2 * max_npoints_per_box);
+    CMemBlock<double> v3rholapltau_data(dim->v3rholapltau * max_npoints_per_box);
+    CMemBlock<double> v3rhotau2_data(dim->v3rhotau2 * max_npoints_per_box);
+    CMemBlock<double> v3sigma3_data(dim->v3sigma3 * max_npoints_per_box);
+    CMemBlock<double> v3sigma2lapl_data(dim->v3sigma2lapl * max_npoints_per_box);
+    CMemBlock<double> v3sigma2tau_data(dim->v3sigma2tau * max_npoints_per_box);
+    CMemBlock<double> v3sigmalapl2_data(dim->v3sigmalapl2 * max_npoints_per_box);
+    CMemBlock<double> v3sigmalapltau_data(dim->v3sigmalapltau * max_npoints_per_box);
+    CMemBlock<double> v3sigmatau2_data(dim->v3sigmatau2 * max_npoints_per_box);
+    CMemBlock<double> v3lapl3_data(dim->v3lapl3 * max_npoints_per_box);
+    CMemBlock<double> v3lapl2tau_data(dim->v3lapl2tau * max_npoints_per_box);
+    CMemBlock<double> v3lapltau2_data(dim->v3lapltau2 * max_npoints_per_box);
+    CMemBlock<double> v3tau3_data(dim->v3tau3 * max_npoints_per_box);
+
+    // Fourth-order
+    CMemBlock<double> v4rho4_data(dim->v4rho4 * max_npoints_per_box);
+    CMemBlock<double> v4rho3sigma_data(dim->v4rho3sigma * max_npoints_per_box);
+    CMemBlock<double> v4rho3lapl_data(dim->v4rho3lapl * max_npoints_per_box);
+    CMemBlock<double> v4rho3tau_data(dim->v4rho3tau * max_npoints_per_box);
+    CMemBlock<double> v4rho2sigma2_data(dim->v4rho2sigma2 * max_npoints_per_box);
+    CMemBlock<double> v4rho2sigmalapl_data(dim->v4rho2sigmalapl * max_npoints_per_box);
+    CMemBlock<double> v4rho2sigmatau_data(dim->v4rho2sigmatau * max_npoints_per_box);
+    CMemBlock<double> v4rho2lapl2_data(dim->v4rho2lapl2 * max_npoints_per_box);
+    CMemBlock<double> v4rho2lapltau_data(dim->v4rho2lapltau * max_npoints_per_box);
+    CMemBlock<double> v4rho2tau2_data(dim->v4rho2tau2 * max_npoints_per_box);
+    CMemBlock<double> v4rhosigma3_data(dim->v4rhosigma3 * max_npoints_per_box);
+    CMemBlock<double> v4rhosigma2lapl_data(dim->v4rhosigma2lapl * max_npoints_per_box);
+    CMemBlock<double> v4rhosigma2tau_data(dim->v4rhosigma2tau * max_npoints_per_box);
+    CMemBlock<double> v4rhosigmalapl2_data(dim->v4rhosigmalapl2 * max_npoints_per_box);
+    CMemBlock<double> v4rhosigmalapltau_data(dim->v4rhosigmalapltau * max_npoints_per_box);
+    CMemBlock<double> v4rhosigmatau2_data(dim->v4rhosigmatau2 * max_npoints_per_box);
+    CMemBlock<double> v4rholapl3_data(dim->v4rholapl3 * max_npoints_per_box);
+    CMemBlock<double> v4rholapl2tau_data(dim->v4rholapl2tau * max_npoints_per_box);
+    CMemBlock<double> v4rholapltau2_data(dim->v4rholapltau2 * max_npoints_per_box);
+    CMemBlock<double> v4rhotau3_data(dim->v4rhotau3 * max_npoints_per_box);
+    CMemBlock<double> v4sigma4_data(dim->v4sigma4 * max_npoints_per_box);
+    CMemBlock<double> v4sigma3lapl_data(dim->v4sigma3lapl * max_npoints_per_box);
+    CMemBlock<double> v4sigma3tau_data(dim->v4sigma3tau * max_npoints_per_box);
+    CMemBlock<double> v4sigma2lapl2_data(dim->v4sigma2lapl2 * max_npoints_per_box);
+    CMemBlock<double> v4sigma2lapltau_data(dim->v4sigma2lapltau * max_npoints_per_box);
+    CMemBlock<double> v4sigma2tau2_data(dim->v4sigma2tau2 * max_npoints_per_box);
+    CMemBlock<double> v4sigmalapl3_data(dim->v4sigmalapl3 * max_npoints_per_box);
+    CMemBlock<double> v4sigmalapl2tau_data(dim->v4sigmalapl2tau * max_npoints_per_box);
+    CMemBlock<double> v4sigmalapltau2_data(dim->v4sigmalapltau2 * max_npoints_per_box);
+    CMemBlock<double> v4sigmatau3_data(dim->v4sigmatau3 * max_npoints_per_box);
+    CMemBlock<double> v4lapl4_data(dim->v4lapl4 * max_npoints_per_box);
+    CMemBlock<double> v4lapl3tau_data(dim->v4lapl3tau * max_npoints_per_box);
+    CMemBlock<double> v4lapl2tau2_data(dim->v4lapl2tau2 * max_npoints_per_box);
+    CMemBlock<double> v4lapltau3_data(dim->v4lapltau3 * max_npoints_per_box);
+    CMemBlock<double> v4tau4_data(dim->v4tau4 * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
-    // Ground-state
+    // Input
     auto rho     = rho_data.data();
     auto rhograd = rhograd_data.data();
     auto sigma   = sigma_data.data();
@@ -3702,15 +3770,15 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
     // Second-order
     auto v2rho2      = v2rho2_data.data();
-    auto v2lapl2     = v2lapl2_data.data();
-    auto v2tau2      = v2tau2_data.data();
-    auto v2rholapl   = v2v2rholapl_data.data();
-    auto v2rhotau    = v2v2rhotau_data.data();
-    auto v2lapltau   = v2lapltau_data.data();
     auto v2rhosigma  = v2rhosigma_data.data();
+    auto v2rholapl   = v2rholapl_data.data();
+    auto v2rhotau    = v2rhotau_data.data();
+    auto v2sigma2    = v2sigma2_data.data();
     auto v2sigmalapl = v2sigmalapl_data.data();
     auto v2sigmatau  = v2sigmatau_data.data();
-    auto v2sigma2    = v2sigma2_data.data();
+    auto v2lapl2     = v2lapl2_data.data();
+    auto v2lapltau   = v2lapltau_data.data();
+    auto v2tau2      = v2tau2_data.data();
 
     // Third-order
     auto v3rho3         = v3rho3_data.data();
