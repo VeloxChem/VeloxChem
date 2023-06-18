@@ -154,6 +154,10 @@ class ScfHessianDriver(HessianDriver):
         # atom coordinates (nx3)
         coords = molecule.get_coordinates_in_bohr()
 
+        # charge and spin multiplicity
+        charge = molecule.get_charge()
+        multiplicity = molecule.get_multiplicity()
+
         # Hessian
         hessian = np.zeros((natm, 3, natm, 3))
 
@@ -187,6 +191,8 @@ class ScfHessianDriver(HessianDriver):
                 # Plus x
                 coords[i, x] += self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
+                new_mol.set_charge(charge)
+                new_mol.set_multiplicity(multiplicity)
                 scf_results = scf_drv.compute(new_mol, ao_basis)
                 assert_msg_critical(scf_drv.is_converged,
                                     'ScfHessianDriver: SCF did not converge')
@@ -203,6 +209,8 @@ class ScfHessianDriver(HessianDriver):
                 # Minus x
                 coords[i, x] -= 2.0 * self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
+                new_mol.set_charge(charge)
+                new_mol.set_multiplicity(multiplicity)
                 scf_results = scf_drv.compute(new_mol, ao_basis)
                 assert_msg_critical(scf_drv.is_converged,
                                     'ScfHessianDriver: SCF did not converge')
@@ -247,6 +255,8 @@ class ScfHessianDriver(HessianDriver):
                             # Plus y
                             coords[j, y] += self.delta_h
                             new_mol = Molecule(labels, coords, units='au')
+                            new_mol.set_charge(charge)
+                            new_mol.set_multiplicity(multiplicity)
                             scf_results = scf_drv.compute(new_mol, ao_basis)
                             assert_msg_critical(
                                 scf_drv.is_converged,
@@ -256,6 +266,8 @@ class ScfHessianDriver(HessianDriver):
                             # Plus x, plus y
                             coords[i, x] += self.delta_h
                             new_mol = Molecule(labels, coords, units='au')
+                            new_mol.set_charge(charge)
+                            new_mol.set_multiplicity(multiplicity)
                             scf_results = scf_drv.compute(new_mol, ao_basis)
                             assert_msg_critical(
                                 scf_drv.is_converged,
@@ -266,6 +278,8 @@ class ScfHessianDriver(HessianDriver):
                             # Minus y
                             coords[j, y] -= 2.0 * self.delta_h
                             new_mol = Molecule(labels, coords, units='au')
+                            new_mol.set_charge(charge)
+                            new_mol.set_multiplicity(multiplicity)
                             scf_results = scf_drv.compute(new_mol, ao_basis)
                             assert_msg_critical(
                                 scf_drv.is_converged,
@@ -275,6 +289,8 @@ class ScfHessianDriver(HessianDriver):
                             # Minus x, minus y:
                             coords[i, x] -= self.delta_h
                             new_mol = Molecule(labels, coords, units='au')
+                            new_mol.set_charge(charge)
+                            new_mol.set_multiplicity(multiplicity)
                             scf_results = scf_drv.compute(new_mol, ao_basis)
                             assert_msg_critical(
                                 scf_drv.is_converged,
