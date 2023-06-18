@@ -628,6 +628,9 @@ CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, doub
                 }
             }
         }
+
+        gridscreen::screenExcVxcForLDA(
+            this, grid_batch_size, rho + dim->rho * grid_batch_offset, zk + dim->zk * grid_batch_offset, vrho + dim->vrho * grid_batch_offset);
     }
 
     if (alloc)
@@ -635,8 +638,6 @@ CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, doub
         mem::free(stage_zk);
         mem::free(stage_vrho);
     }
-
-    gridscreen::screenExcVxcForLDA(this, np, rho, zk, vrho);
 }
 
 auto
@@ -706,14 +707,14 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
                 }
             }
         }
+
+        gridscreen::screenVxcForLDA(this, grid_batch_size, rho + dim->rho * grid_batch_offset, vrho + dim->vrho * grid_batch_offset);
     }
 
     if (alloc)
     {
         mem::free(stage_vrho);
     }
-
-    gridscreen::screenVxcForLDA(this, np, rho, vrho);
 }
 
 auto
@@ -783,14 +784,14 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
                 }
             }
         }
+
+        gridscreen::screenFxcForLDA(this, grid_batch_size, rho + dim->rho * grid_batch_offset, v2rho2 + dim->v2rho2 * grid_batch_offset);
     }
 
     if (alloc)
     {
         mem::free(stage_v2rho2);
     }
-
-    gridscreen::screenFxcForLDA(this, np, rho, v2rho2);
 }
 
 auto
@@ -860,14 +861,14 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
                 }
             }
         }
+
+        gridscreen::screenKxcForLDA(this, grid_batch_size, rho + dim->rho * grid_batch_offset, v3rho3 + dim->v3rho3 * grid_batch_offset);
     }
 
     if (alloc)
     {
         mem::free(stage_v3rho3);
     }
-
-    gridscreen::screenKxcForLDA(this, np, rho, v3rho3);
 }
 
 auto
@@ -937,14 +938,14 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
                 }
             }
         }
+
+        gridscreen::screenLxcForLDA(this, grid_batch_size, rho + dim->rho * grid_batch_offset, v4rho4 + dim->v4rho4 * grid_batch_offset);
     }
 
     if (alloc)
     {
         mem::free(stage_v4rho4);
     }
-
-    gridscreen::screenLxcForLDA(this, np, rho, v4rho4);
 }
 
 auto
@@ -1063,6 +1064,14 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
                 }
             }
         }
+
+        gridscreen::screenExcVxcForGGA(this,
+                                       grid_batch_size,
+                                       rho + dim->rho * grid_batch_offset,
+                                       sigma + dim->sigma * grid_batch_offset,
+                                       zk + dim->zk * grid_batch_offset,
+                                       vrho + dim->vrho * grid_batch_offset,
+                                       vsigma + dim->vsigma * grid_batch_offset);
     }
 
     if (alloc)
@@ -1071,8 +1080,6 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
     }
-
-    gridscreen::screenExcVxcForGGA(this, np, rho, sigma, zk, vrho, vsigma);
 }
 
 auto
@@ -1170,6 +1177,13 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
                 }
             }
         }
+
+        gridscreen::screenVxcForGGA(this,
+                                    grid_batch_size,
+                                    rho + dim->rho * grid_batch_offset,
+                                    sigma + dim->sigma * grid_batch_offset,
+                                    vrho + dim->vrho * grid_batch_offset,
+                                    vsigma + dim->vsigma * grid_batch_offset);
     }
 
     if (alloc)
@@ -1177,8 +1191,6 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
     }
-
-    gridscreen::screenVxcForGGA(this, np, rho, sigma, vrho, vsigma);
 }
 
 auto
@@ -1289,6 +1301,14 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
                 }
             }
         }
+
+        gridscreen::screenFxcForGGA(this,
+                                    grid_batch_size,
+                                    rho + dim->rho * grid_batch_offset,
+                                    sigma + dim->sigma * grid_batch_offset,
+                                    v2rho2 + dim->v2rho2 * grid_batch_offset,
+                                    v2rhosigma + dim->v2rhosigma * grid_batch_offset,
+                                    v2sigma2 + dim->v2sigma2 * grid_batch_offset);
     }
 
     if (alloc)
@@ -1297,8 +1317,6 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
         mem::free(stage_v2rhosigma);
         mem::free(stage_v2sigma2);
     }
-
-    gridscreen::screenFxcForGGA(this, np, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 }
 
 auto
@@ -1426,6 +1444,15 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
                 }
             }
         }
+
+        gridscreen::screenKxcForGGA(this,
+                                    grid_batch_size,
+                                    rho + dim->rho * grid_batch_offset,
+                                    sigma + dim->sigma * grid_batch_offset,
+                                    v3rho3 + dim->v3rho3 * grid_batch_offset,
+                                    v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                                    v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                                    v3sigma3 + dim->v3sigma3 * grid_batch_offset);
     }
 
     if (alloc)
@@ -1435,8 +1462,6 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
         mem::free(stage_v3rhosigma2);
         mem::free(stage_v3sigma3);
     }
-
-    gridscreen::screenKxcForGGA(this, np, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
 }
 
 auto
@@ -1577,6 +1602,16 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
                 }
             }
         }
+
+        gridscreen::screenLxcForGGA(this,
+                                    grid_batch_size,
+                                    rho + dim->rho * grid_batch_offset,
+                                    sigma + dim->sigma * grid_batch_offset,
+                                    v4rho4 + dim->v4rho4 * grid_batch_offset,
+                                    v4rho3sigma + dim->v4rho3sigma * grid_batch_offset,
+                                    v4rho2sigma2 + dim->v4rho2sigma2 * grid_batch_offset,
+                                    v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
+                                    v4sigma4 + dim->v4sigma4 * grid_batch_offset);
     }
 
     if (alloc)
@@ -1587,8 +1622,6 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
         mem::free(stage_v4rhosigma3);
         mem::free(stage_v4sigma4);
     }
-
-    gridscreen::screenLxcForGGA(this, np, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4);
 }
 
 auto
@@ -1767,6 +1800,18 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
                 }
             }
         }
+
+        gridscreen::screenExcVxcForMGGA(this,
+                                        grid_batch_size,
+                                        rho + dim->rho * grid_batch_offset,
+                                        sigma + dim->sigma * grid_batch_offset,
+                                        lapl + dim->lapl * grid_batch_offset,
+                                        tau + dim->tau * grid_batch_offset,
+                                        zk + dim->zk * grid_batch_offset,
+                                        vrho + dim->vrho * grid_batch_offset,
+                                        vsigma + dim->vsigma * grid_batch_offset,
+                                        vlapl + dim->vlapl * grid_batch_offset,
+                                        vtau + dim->vtau * grid_batch_offset);
     }
 
     if (alloc)
@@ -1777,8 +1822,6 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
         mem::free(stage_vlapl);
         mem::free(stage_vtau);
     }
-
-    gridscreen::screenExcVxcForMGGA(this, np, rho, sigma, lapl, tau, zk, vrho, vsigma, vlapl, vtau);
 }
 
 auto
@@ -1931,6 +1974,17 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
                 }
             }
         }
+
+        gridscreen::screenVxcForMGGA(this,
+                                     grid_batch_size,
+                                     rho + dim->rho * grid_batch_offset,
+                                     sigma + dim->sigma * grid_batch_offset,
+                                     lapl + dim->lapl * grid_batch_offset,
+                                     tau + dim->tau * grid_batch_offset,
+                                     vrho + dim->vrho * grid_batch_offset,
+                                     vsigma + dim->vsigma * grid_batch_offset,
+                                     vlapl + dim->vlapl * grid_batch_offset,
+                                     vtau + dim->vtau * grid_batch_offset);
     }
 
     if (alloc)
@@ -1940,8 +1994,6 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
         mem::free(stage_vlapl);
         mem::free(stage_vtau);
     }
-
-    gridscreen::screenVxcForMGGA(this, np, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
 }
 
 auto
@@ -2177,6 +2229,23 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
                 }
             }
         }
+
+        gridscreen::screenFxcForMGGA(this,
+                                     grid_batch_size,
+                                     rho + dim->rho * grid_batch_offset,
+                                     sigma + dim->sigma * grid_batch_offset,
+                                     lapl + dim->lapl * grid_batch_offset,
+                                     tau + dim->tau * grid_batch_offset,
+                                     v2rho2 + dim->v2rho2 * grid_batch_offset,
+                                     v2rhosigma + dim->v2rhosigma * grid_batch_offset,
+                                     v2rholapl + dim->v2rholapl * grid_batch_offset,
+                                     v2rhotau + dim->v2rhotau * grid_batch_offset,
+                                     v2sigma2 + dim->v2sigma2 * grid_batch_offset,
+                                     v2sigmalapl + dim->v2sigmalapl * grid_batch_offset,
+                                     v2sigmatau + dim->v2sigmatau * grid_batch_offset,
+                                     v2lapl2 + dim->v2lapl2 * grid_batch_offset,
+                                     v2lapltau + dim->v2lapltau * grid_batch_offset,
+                                     v2tau2 + dim->v2tau2 * grid_batch_offset);
     }
 
     if (alloc)
@@ -2192,9 +2261,6 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
         mem::free(stage_v2lapltau);
         mem::free(stage_v2tau2);
     }
-
-    gridscreen::screenFxcForMGGA(
-        this, np, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
 }
 
 auto
@@ -2565,6 +2631,33 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
                 }
             }
         }
+
+        gridscreen::screenKxcForMGGA(this,
+                                     grid_batch_size,
+                                     rho + dim->rho * grid_batch_offset,
+                                     sigma + dim->sigma * grid_batch_offset,
+                                     lapl + dim->lapl * grid_batch_offset,
+                                     tau + dim->tau * grid_batch_offset,
+                                     v3rho3 + dim->v3rho3 * grid_batch_offset,
+                                     v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                                     v3rho2lapl + dim->v3rho2lapl * grid_batch_offset,
+                                     v3rho2tau + dim->v3rho2tau * grid_batch_offset,
+                                     v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                                     v3rhosigmalapl + dim->v3rhosigmalapl * grid_batch_offset,
+                                     v3rhosigmatau + dim->v3rhosigmatau * grid_batch_offset,
+                                     v3rholapl2 + dim->v3rholapl2 * grid_batch_offset,
+                                     v3rholapltau + dim->v3rholapltau * grid_batch_offset,
+                                     v3rhotau2 + dim->v3rhotau2 * grid_batch_offset,
+                                     v3sigma3 + dim->v3sigma3 * grid_batch_offset,
+                                     v3sigma2lapl + dim->v3sigma2lapl * grid_batch_offset,
+                                     v3sigma2tau + dim->v3sigma2tau * grid_batch_offset,
+                                     v3sigmalapl2 + dim->v3sigmalapl2 * grid_batch_offset,
+                                     v3sigmalapltau + dim->v3sigmalapltau * grid_batch_offset,
+                                     v3sigmatau2 + dim->v3sigmatau2 * grid_batch_offset,
+                                     v3lapl3 + dim->v3lapl3 * grid_batch_offset,
+                                     v3lapl2tau + dim->v3lapl2tau * grid_batch_offset,
+                                     v3lapltau2 + dim->v3lapltau2 * grid_batch_offset,
+                                     v3tau3 + dim->v3tau3 * grid_batch_offset);
     }
 
     if (alloc)
@@ -2590,33 +2683,6 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
         mem::free(stage_v3lapltau2);
         mem::free(stage_v3tau3);
     }
-
-    gridscreen::screenKxcForMGGA(this,
-                                 np,
-                                 rho,
-                                 sigma,
-                                 lapl,
-                                 tau,
-                                 v3rho3,
-                                 v3rho2sigma,
-                                 v3rho2lapl,
-                                 v3rho2tau,
-                                 v3rhosigma2,
-                                 v3rhosigmalapl,
-                                 v3rhosigmatau,
-                                 v3rholapl2,
-                                 v3rholapltau,
-                                 v3rhotau2,
-                                 v3sigma3,
-                                 v3sigma2lapl,
-                                 v3sigma2tau,
-                                 v3sigmalapl2,
-                                 v3sigmalapltau,
-                                 v3sigmatau2,
-                                 v3lapl3,
-                                 v3lapl2tau,
-                                 v3lapltau2,
-                                 v3tau3);
 }
 
 auto
@@ -3187,6 +3253,48 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
                 }
             }
         }
+
+        gridscreen::screenLxcForMGGA(this,
+                                     grid_batch_size,
+                                     rho + dim->rho * grid_batch_offset,
+                                     sigma + dim->sigma * grid_batch_offset,
+                                     lapl + dim->lapl * grid_batch_offset,
+                                     tau + dim->tau * grid_batch_offset,
+                                     v4rho4 + dim->v4rho4 * grid_batch_offset,
+                                     v4rho3sigma + dim->v4rho3sigma * grid_batch_offset,
+                                     v4rho3lapl + dim->v4rho3lapl * grid_batch_offset,
+                                     v4rho3tau + dim->v4rho3tau * grid_batch_offset,
+                                     v4rho2sigma2 + dim->v4rho2sigma2 * grid_batch_offset,
+                                     v4rho2sigmalapl + dim->v4rho2sigmalapl * grid_batch_offset,
+                                     v4rho2sigmatau + dim->v4rho2sigmatau * grid_batch_offset,
+                                     v4rho2lapl2 + dim->v4rho2lapl2 * grid_batch_offset,
+                                     v4rho2lapltau + dim->v4rho2lapltau * grid_batch_offset,
+                                     v4rho2tau2 + dim->v4rho2tau2 * grid_batch_offset,
+                                     v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
+                                     v4rhosigma2lapl + dim->v4rhosigma2lapl * grid_batch_offset,
+                                     v4rhosigma2tau + dim->v4rhosigma2tau * grid_batch_offset,
+                                     v4rhosigmalapl2 + dim->v4rhosigmalapl2 * grid_batch_offset,
+                                     v4rhosigmalapltau + dim->v4rhosigmalapltau * grid_batch_offset,
+                                     v4rhosigmatau2 + dim->v4rhosigmatau2 * grid_batch_offset,
+                                     v4rholapl3 + dim->v4rholapl3 * grid_batch_offset,
+                                     v4rholapl2tau + dim->v4rholapl2tau * grid_batch_offset,
+                                     v4rholapltau2 + dim->v4rholapltau2 * grid_batch_offset,
+                                     v4rhotau3 + dim->v4rhotau3 * grid_batch_offset,
+                                     v4sigma4 + dim->v4sigma4 * grid_batch_offset,
+                                     v4sigma3lapl + dim->v4sigma3lapl * grid_batch_offset,
+                                     v4sigma3tau + dim->v4sigma3tau * grid_batch_offset,
+                                     v4sigma2lapl2 + dim->v4sigma2lapl2 * grid_batch_offset,
+                                     v4sigma2lapltau + dim->v4sigma2lapltau * grid_batch_offset,
+                                     v4sigma2tau2 + dim->v4sigma2tau2 * grid_batch_offset,
+                                     v4sigmalapl3 + dim->v4sigmalapl3 * grid_batch_offset,
+                                     v4sigmalapl2tau + dim->v4sigmalapl2tau * grid_batch_offset,
+                                     v4sigmalapltau2 + dim->v4sigmalapltau2 * grid_batch_offset,
+                                     v4sigmatau3 + dim->v4sigmatau3 * grid_batch_offset,
+                                     v4lapl4 + dim->v4lapl4 * grid_batch_offset,
+                                     v4lapl3tau + dim->v4lapl3tau * grid_batch_offset,
+                                     v4lapl2tau2 + dim->v4lapl2tau2 * grid_batch_offset,
+                                     v4lapltau3 + dim->v4lapltau3 * grid_batch_offset,
+                                     v4tau4 + dim->v4tau4 * grid_batch_offset);
     }
 
     if (alloc)
@@ -3227,48 +3335,6 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
         mem::free(stage_v4lapltau3);
         mem::free(stage_v4tau4);
     }
-
-    gridscreen::screenLxcForMGGA(this,
-                                 np,
-                                 rho,
-                                 sigma,
-                                 lapl,
-                                 tau,
-                                 v4rho4,
-                                 v4rho3sigma,
-                                 v4rho3lapl,
-                                 v4rho3tau,
-                                 v4rho2sigma2,
-                                 v4rho2sigmalapl,
-                                 v4rho2sigmatau,
-                                 v4rho2lapl2,
-                                 v4rho2lapltau,
-                                 v4rho2tau2,
-                                 v4rhosigma3,
-                                 v4rhosigma2lapl,
-                                 v4rhosigma2tau,
-                                 v4rhosigmalapl2,
-                                 v4rhosigmalapltau,
-                                 v4rhosigmatau2,
-                                 v4rholapl3,
-                                 v4rholapl2tau,
-                                 v4rholapltau2,
-                                 v4rhotau3,
-                                 v4sigma4,
-                                 v4sigma3lapl,
-                                 v4sigma3tau,
-                                 v4sigma2lapl2,
-                                 v4sigma2lapltau,
-                                 v4sigma2tau2,
-                                 v4sigmalapl3,
-                                 v4sigmalapl2tau,
-                                 v4sigmalapltau2,
-                                 v4sigmatau3,
-                                 v4lapl4,
-                                 v4lapl3tau,
-                                 v4lapl2tau2,
-                                 v4lapltau3,
-                                 v4tau4);
 }
 
 const xc_func_type*
