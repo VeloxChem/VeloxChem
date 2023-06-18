@@ -221,7 +221,7 @@ CXCFunctional::_getIndicesAndCountsOfDerivatives() const
         auto       ldafunc = getFunctionalPointerToLdaComponent();
         const auto dim     = &(ldafunc->dim);
 
-        int n_xc_outputs = 0;
+        int32_t n_xc_outputs = 0;
 
         indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
         n_xc_outputs += dim->zk;
@@ -243,7 +243,7 @@ CXCFunctional::_getIndicesAndCountsOfDerivatives() const
         auto       ggafunc = getFunctionalPointerToGgaComponent();
         const auto dim     = &(ggafunc->dim);
 
-        int n_xc_outputs = 0;
+        int32_t n_xc_outputs = 0;
 
         indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
         n_xc_outputs += dim->zk;
@@ -285,7 +285,7 @@ CXCFunctional::_getIndicesAndCountsOfDerivatives() const
         auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
         const auto dim      = &(mggafunc->dim);
 
-        int n_xc_outputs = 0;
+        int32_t n_xc_outputs = 0;
 
         indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
         n_xc_outputs += dim->zk;
@@ -583,11 +583,11 @@ CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, doub
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->zk; ++ind)
             {
@@ -615,7 +615,7 @@ CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, doub
                                stage_zk + dim->zk * grid_batch_offset,
                                stage_vrho + dim->vrho * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->zk; ++ind)
                     {
@@ -674,11 +674,11 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->vrho; ++ind)
             {
@@ -698,7 +698,7 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
             {
                 xc_lda_vxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_vrho + dim->vrho * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->vrho; ++ind)
                     {
@@ -751,11 +751,11 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v2rho2; ++ind)
             {
@@ -775,7 +775,7 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
             {
                 xc_lda_fxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v2rho2 + dim->v2rho2 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v2rho2; ++ind)
                     {
@@ -828,11 +828,11 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v3rho3; ++ind)
             {
@@ -852,7 +852,7 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
             {
                 xc_lda_kxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v3rho3 + dim->v3rho3 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v3rho3; ++ind)
                     {
@@ -905,11 +905,11 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v4rho4; ++ind)
             {
@@ -929,7 +929,7 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
             {
                 xc_lda_lxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v4rho4 + dim->v4rho4 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v4rho4; ++ind)
                     {
@@ -989,11 +989,11 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->zk; ++ind)
             {
@@ -1025,7 +1025,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
                                stage_zk + dim->zk * grid_batch_offset,
                                stage_vrho + dim->vrho * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->zk; ++ind)
                     {
@@ -1047,7 +1047,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
                                stage_vrho + dim->vrho * grid_batch_offset,
                                stage_vsigma + dim->vsigma * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->zk; ++ind)
                     {
@@ -1119,11 +1119,11 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->vrho; ++ind)
             {
@@ -1147,7 +1147,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
             {
                 xc_lda_vxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_vrho + dim->vrho * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->vrho; ++ind)
                     {
@@ -1164,7 +1164,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
                            stage_vrho + dim->vrho * grid_batch_offset,
                            stage_vsigma + dim->vsigma * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->vrho; ++ind)
                     {
@@ -1234,11 +1234,11 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v2rho2; ++ind)
             {
@@ -1266,7 +1266,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
             {
                 xc_lda_fxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v2rho2 + dim->v2rho2 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v2rho2; ++ind)
                     {
@@ -1284,7 +1284,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
                            stage_v2rhosigma + dim->v2rhosigma * grid_batch_offset,
                            stage_v2sigma2 + dim->v2sigma2 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v2rho2; ++ind)
                     {
@@ -1368,11 +1368,11 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v3rho3; ++ind)
             {
@@ -1404,7 +1404,7 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
             {
                 xc_lda_kxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v3rho3 + dim->v3rho3 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v3rho3; ++ind)
                     {
@@ -1423,7 +1423,7 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
                            stage_v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
                            stage_v3sigma3 + dim->v3sigma3 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v3rho3; ++ind)
                     {
@@ -1517,11 +1517,11 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v4rho4; ++ind)
             {
@@ -1557,7 +1557,7 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
             {
                 xc_lda_lxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v4rho4 + dim->v4rho4 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v4rho4; ++ind)
                     {
@@ -1577,7 +1577,7 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
                            stage_v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
                            stage_v4sigma4 + dim->v4sigma4 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v4rho4; ++ind)
                     {
@@ -1679,11 +1679,11 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->zk; ++ind)
             {
@@ -1723,7 +1723,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
                                stage_zk + dim->zk * grid_batch_offset,
                                stage_vrho + dim->vrho * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->zk; ++ind)
                     {
@@ -1745,7 +1745,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
                                stage_vrho + dim->vrho * grid_batch_offset,
                                stage_vsigma + dim->vsigma * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->zk; ++ind)
                     {
@@ -1775,7 +1775,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
                                 stage_vlapl + dim->vlapl * grid_batch_offset,
                                 stage_vtau + dim->vtau * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->zk; ++ind)
                     {
@@ -1875,11 +1875,11 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->vrho; ++ind)
             {
@@ -1911,7 +1911,7 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
             {
                 xc_lda_vxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_vrho + dim->vrho * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->vrho; ++ind)
                     {
@@ -1928,7 +1928,7 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
                            stage_vrho + dim->vrho * grid_batch_offset,
                            stage_vsigma + dim->vsigma * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->vrho; ++ind)
                     {
@@ -1953,7 +1953,7 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
                             stage_vlapl + dim->vlapl * grid_batch_offset,
                             stage_vtau + dim->vtau * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->vrho; ++ind)
                     {
@@ -2071,11 +2071,11 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v2rho2; ++ind)
             {
@@ -2131,7 +2131,7 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
             {
                 xc_lda_fxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v2rho2 + dim->v2rho2 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v2rho2; ++ind)
                     {
@@ -2149,7 +2149,7 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
                            stage_v2rhosigma + dim->v2rhosigma * grid_batch_offset,
                            stage_v2sigma2 + dim->v2sigma2 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v2rho2; ++ind)
                     {
@@ -2184,7 +2184,7 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
                             stage_v2lapltau + dim->v2lapltau * grid_batch_offset,
                             stage_v2tau2 + dim->v2tau2 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v2rho2; ++ind)
                     {
@@ -2378,11 +2378,11 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v3rho3; ++ind)
             {
@@ -2478,7 +2478,7 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
             {
                 xc_lda_kxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v3rho3 + dim->v3rho3 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v3rho3; ++ind)
                     {
@@ -2497,7 +2497,7 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
                            stage_v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
                            stage_v3sigma3 + dim->v3sigma3 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v3rho3; ++ind)
                     {
@@ -2546,7 +2546,7 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
                             stage_v3lapltau2 + dim->v3lapltau2 * grid_batch_offset,
                             stage_v3tau3 + dim->v3tau3 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v3rho3; ++ind)
                     {
@@ -2860,11 +2860,11 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
     {
         auto thread_id = omp_get_thread_num();
 
-        auto grid_batch_size = static_cast<int>(mpi::batch_size(np, thread_id, nthreads));
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        auto grid_batch_offset = static_cast<int>(mpi::batch_offset(np, thread_id, nthreads));
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
             for (int ind = 0; ind < dim->v4rho4; ++ind)
             {
@@ -3020,7 +3020,7 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
             {
                 xc_lda_lxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v4rho4 + dim->v4rho4 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v4rho4; ++ind)
                     {
@@ -3040,7 +3040,7 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
                            stage_v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
                            stage_v4sigma4 + dim->v4sigma4 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v4rho4; ++ind)
                     {
@@ -3108,7 +3108,7 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
                             stage_v4lapltau3 + dim->v4lapltau3 * grid_batch_offset,
                             stage_v4tau4 + dim->v4tau4 * grid_batch_offset);
 
-                for (int g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
                 {
                     for (int ind = 0; ind < dim->v4rho4; ++ind)
                     {
@@ -3401,21 +3401,21 @@ CXCFunctional::getDimensionOfDerivatives() const
         auto final_index = indices_and_counts["v4rho4"][0];
         auto final_count = indices_and_counts["v4rho4"][1];
 
-        return static_cast<int32_t>(final_index + final_count);
+        return final_index + final_count;
     }
     else if (_familyOfFunctional == std::string("GGA"))
     {
         auto final_index = indices_and_counts["v4sigma4"][0];
         auto final_count = indices_and_counts["v4sigma4"][1];
 
-        return static_cast<int32_t>(final_index + final_count);
+        return final_index + final_count;
     }
     else if (_familyOfFunctional == std::string("MGGA"))
     {
         auto final_index = indices_and_counts["v4tau4"][0];
         auto final_count = indices_and_counts["v4tau4"][1];
 
-        return static_cast<int32_t>(final_index + final_count);
+        return final_index + final_count;
     }
 
     return 0;
