@@ -553,6 +553,7 @@ class CXCIntegrator
     /**
      Integrates LDA contribution to (second-order) Fxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -561,16 +562,18 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForLDA(const int32_t       npoints,
-                                                const double*       weights,
-                                                const CDenseMatrix& gtoValues,
-                                                const double*       rhow,
-                                                const double*       v2rho2,
-                                                CMultiTimer&        timer) const;
+    CDenseMatrix _integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
+                                                const int32_t        npoints,
+                                                const double*        weights,
+                                                const CDenseMatrix&  gtoValues,
+                                                const double*        rhow,
+                                                const double*        v2rho2,
+                                                CMultiTimer&         timer) const;
 
     /**
      Integrates GGA contribution to (second-order) Fxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -587,24 +590,26 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForGGA(const int32_t       npoints,
-                                                const double*       weights,
-                                                const CDenseMatrix& gtoValues,
-                                                const CDenseMatrix& gtoValuesX,
-                                                const CDenseMatrix& gtoValuesY,
-                                                const CDenseMatrix& gtoValuesZ,
-                                                const double*       rhow,
-                                                const double*       rhograd,
-                                                const double*       rhowgrad,
-                                                const double*       vsigma,
-                                                const double*       v2rho2,
-                                                const double*       v2rhosigma,
-                                                const double*       v2sigma2,
-                                                CMultiTimer&        timer) const;
+    CDenseMatrix _integratePartialFxcFockForGGA(const CXCFunctional& xcFunctional,
+                                                const int32_t        npoints,
+                                                const double*        weights,
+                                                const CDenseMatrix&  gtoValues,
+                                                const CDenseMatrix&  gtoValuesX,
+                                                const CDenseMatrix&  gtoValuesY,
+                                                const CDenseMatrix&  gtoValuesZ,
+                                                const double*        rhow,
+                                                const double*        rhograd,
+                                                const double*        rhowgrad,
+                                                const double*        vsigma,
+                                                const double*        v2rho2,
+                                                const double*        v2rhosigma,
+                                                const double*        v2sigma2,
+                                                CMultiTimer&         timer) const;
 
     /**
      Integrates meta-GGA contribution to (second-order) Fxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -634,32 +639,33 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForMGGA(const int32_t       npoints,
-                                                 const double*       local_weights,
-                                                 const CDenseMatrix& gtoValues,
-                                                 const CDenseMatrix& gtoValuesX,
-                                                 const CDenseMatrix& gtoValuesY,
-                                                 const CDenseMatrix& gtoValuesZ,
-                                                 const double*       rhow,
-                                                 const double*       rhograd,
-                                                 const double*       rhowgrad,
-                                                 const double*       tauw,
-                                                 const double*       laplw,
-                                                 const double*       vrho,
-                                                 const double*       vsigma,
-                                                 const double*       vlapl,
-                                                 const double*       vtau,
-                                                 const double*       v2rho2,
-                                                 const double*       v2lapl2,
-                                                 const double*       v2tau2,
-                                                 const double*       v2rholapl,
-                                                 const double*       v2rhotau,
-                                                 const double*       v2lapltau,
-                                                 const double*       v2rhosigma,
-                                                 const double*       v2sigmalapl,
-                                                 const double*       v2sigmatau,
-                                                 const double*       v2sigma2,
-                                                 CMultiTimer&        timer) const;
+    CDenseMatrix _integratePartialFxcFockForMGGA(const CXCFunctional& xcFunctional,
+                                                 const int32_t        npoints,
+                                                 const double*        local_weights,
+                                                 const CDenseMatrix&  gtoValues,
+                                                 const CDenseMatrix&  gtoValuesX,
+                                                 const CDenseMatrix&  gtoValuesY,
+                                                 const CDenseMatrix&  gtoValuesZ,
+                                                 const double*        rhow,
+                                                 const double*        rhograd,
+                                                 const double*        rhowgrad,
+                                                 const double*        tauw,
+                                                 const double*        laplw,
+                                                 const double*        vrho,
+                                                 const double*        vsigma,
+                                                 const double*        vlapl,
+                                                 const double*        vtau,
+                                                 const double*        v2rho2,
+                                                 const double*        v2lapl2,
+                                                 const double*        v2tau2,
+                                                 const double*        v2rholapl,
+                                                 const double*        v2rhotau,
+                                                 const double*        v2lapltau,
+                                                 const double*        v2rhosigma,
+                                                 const double*        v2sigmalapl,
+                                                 const double*        v2sigmatau,
+                                                 const double*        v2sigma2,
+                                                 CMultiTimer&         timer) const;
 
     /**
      Integrates LDA contribution to (third-order) Kxc matrix.

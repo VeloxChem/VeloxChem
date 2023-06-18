@@ -1300,7 +1300,7 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
 
             // compute partial contribution to Fxc matrix
 
-            auto partial_mat_Fxc = _integratePartialFxcFockForLDA(npoints, local_weights, mat_chi, rhow, v2rho2, timer);
+            auto partial_mat_Fxc = _integratePartialFxcFockForLDA(xcFunctional, npoints, local_weights, mat_chi, rhow, v2rho2, timer);
 
             // distribute partial Fxc to full Fock matrix
 
@@ -1558,7 +1558,8 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
 
             // compute partial contribution to Fxc matrix
 
-            auto partial_mat_Fxc = _integratePartialFxcFockForGGA(npoints,
+            auto partial_mat_Fxc = _integratePartialFxcFockForGGA(xcFunctional,
+                                                                  npoints,
                                                                   local_weights,
                                                                   mat_chi,
                                                                   mat_chi_x,
@@ -1870,7 +1871,8 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
 
             // compute partial contribution to Fxc matrix
 
-            auto partial_mat_Fxc = _integratePartialFxcFockForMGGA(npoints,
+            auto partial_mat_Fxc = _integratePartialFxcFockForMGGA(xcFunctional,
+                                                                   npoints,
                                                                    local_weights,
                                                                    mat_chi,
                                                                    mat_chi_x,
@@ -5290,12 +5292,13 @@ CXCIntegrator::_integratePartialVxcFockForMGGAOpenShell(const int32_t       npoi
 }
 
 CDenseMatrix
-CXCIntegrator::_integratePartialFxcFockForLDA(const int32_t       npoints,
-                                              const double*       weights,
-                                              const CDenseMatrix& gtoValues,
-                                              const double*       rhow,
-                                              const double*       v2rho2,
-                                              CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
+                                              const int32_t        npoints,
+                                              const double*        weights,
+                                              const CDenseMatrix&  gtoValues,
+                                              const double*        rhow,
+                                              const double*        v2rho2,
+                                              CMultiTimer&         timer) const
 {
     // GTO values on grid points
 
@@ -5310,6 +5313,9 @@ CXCIntegrator::_integratePartialFxcFockForLDA(const int32_t       npoints,
     CDenseMatrix mat_G(naos, npoints);
 
     auto G_val = mat_G.values();
+
+    auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
 
     #pragma omp parallel
     {
@@ -5328,8 +5334,19 @@ CXCIntegrator::_integratePartialFxcFockForLDA(const int32_t       npoints,
             #pragma omp simd aligned(weights, v2rho2, rhow, G_val, chi_val : VLX_ALIGN)
             for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
-                G_val[nu_offset + g] =
-                    weights[g] * (v2rho2[3 * g + 0] * rhow[2 * g + 0] + v2rho2[3 * g + 1] * rhow[2 * g + 1]) * chi_val[nu_offset + g];
+                auto rhow_a = rhow[2 * g + 0];
+                auto rhow_b = rhow[2 * g + 1];
+
+                // functional derivatives
+
+                // first-order
+
+                // second-order
+
+                auto v2rho2_aa = v2rho2[dim->v2rho2 * g + 0];
+                auto v2rho2_ab = v2rho2[dim->v2rho2 * g + 1];
+
+                G_val[nu_offset + g] = weights[g] * (v2rho2_aa * rhow_a + v2rho2_ab * rhow_b) * chi_val[nu_offset + g];
             }
         }
     }
@@ -5348,29 +5365,28 @@ CXCIntegrator::_integratePartialFxcFockForLDA(const int32_t       npoints,
 }
 
 CDenseMatrix
-CXCIntegrator::_integratePartialFxcFockForGGA(const int32_t       npoints,
-                                              const double*       weights,
-                                              const CDenseMatrix& gtoValues,
-                                              const CDenseMatrix& gtoValuesX,
-                                              const CDenseMatrix& gtoValuesY,
-                                              const CDenseMatrix& gtoValuesZ,
-                                              const double*       rhow,
-                                              const double*       rhograd,
-                                              const double*       rhowgrad,
-                                              const double*       vsigma,
-                                              const double*       v2rho2,
-                                              const double*       v2rhosigma,
-                                              const double*       v2sigma2,
-                                              CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialFxcFockForGGA(const CXCFunctional& xcFunctional,
+                                              const int32_t        npoints,
+                                              const double*        weights,
+                                              const CDenseMatrix&  gtoValues,
+                                              const CDenseMatrix&  gtoValuesX,
+                                              const CDenseMatrix&  gtoValuesY,
+                                              const CDenseMatrix&  gtoValuesZ,
+                                              const double*        rhow,
+                                              const double*        rhograd,
+                                              const double*        rhowgrad,
+                                              const double*        vsigma,
+                                              const double*        v2rho2,
+                                              const double*        v2rhosigma,
+                                              const double*        v2sigma2,
+                                              CMultiTimer&         timer) const
 {
     // GTO values on grid points
 
     auto chi_val = gtoValues.values();
 
     auto chi_x_val = gtoValuesX.values();
-
     auto chi_y_val = gtoValuesY.values();
-
     auto chi_z_val = gtoValuesZ.values();
 
     // eq.(30), JCTC 2021, 17, 1512-1521
@@ -5380,12 +5396,13 @@ CXCIntegrator::_integratePartialFxcFockForGGA(const int32_t       npoints,
     auto naos = gtoValues.getNumberOfRows();
 
     CDenseMatrix mat_G(naos, npoints);
-
     CDenseMatrix mat_G_gga(naos, npoints);
 
-    auto G_val = mat_G.values();
-
+    auto G_val     = mat_G.values();
     auto G_gga_val = mat_G_gga.values();
+
+    auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
     #pragma omp parallel
     {
@@ -5408,44 +5425,79 @@ CXCIntegrator::_integratePartialFxcFockForGGA(const int32_t       npoints,
             {
                 double w = weights[g];
 
-                auto grhow_grho_aa = 2.0 * (rhowgrad[6 * g + 0] * rhograd[6 * g + 0] + rhowgrad[6 * g + 1] * rhograd[6 * g + 1] +
-                                            rhowgrad[6 * g + 2] * rhograd[6 * g + 2]);
+                auto rhow_a = rhow[2 * g + 0];
+                auto rhow_b = rhow[2 * g + 1];
 
-                auto grhow_grho_bb = 2.0 * (rhowgrad[6 * g + 3] * rhograd[6 * g + 3] + rhowgrad[6 * g + 4] * rhograd[6 * g + 4] +
-                                            rhowgrad[6 * g + 5] * rhograd[6 * g + 5]);
+                auto rhowgrad_ax = rhowgrad[6 * g + 0];
+                auto rhowgrad_ay = rhowgrad[6 * g + 1];
+                auto rhowgrad_az = rhowgrad[6 * g + 2];
+                auto rhowgrad_bx = rhowgrad[6 * g + 3];
+                auto rhowgrad_by = rhowgrad[6 * g + 4];
+                auto rhowgrad_bz = rhowgrad[6 * g + 5];
 
-                auto grhow_grho_ab =
-                    (rhowgrad[6 * g + 0] * rhograd[6 * g + 3] + rhowgrad[6 * g + 1] * rhograd[6 * g + 4] + rhowgrad[6 * g + 2] * rhograd[6 * g + 5] +
+                auto rhograd_ax = rhograd[6 * g + 0];
+                auto rhograd_ay = rhograd[6 * g + 1];
+                auto rhograd_az = rhograd[6 * g + 2];
+                auto rhograd_bx = rhograd[6 * g + 3];
+                auto rhograd_by = rhograd[6 * g + 4];
+                auto rhograd_bz = rhograd[6 * g + 5];
 
-                     rhowgrad[6 * g + 3] * rhograd[6 * g + 0] + rhowgrad[6 * g + 4] * rhograd[6 * g + 1] + rhowgrad[6 * g + 5] * rhograd[6 * g + 2]);
+                auto grhow_grho_aa = 2.0 * (rhowgrad_ax * rhograd_ax + rhowgrad_ay * rhograd_ay + rhowgrad_az * rhograd_az);
+
+                auto grhow_grho_bb = 2.0 * (rhowgrad_bx * rhograd_bx + rhowgrad_by * rhograd_by + rhowgrad_bz * rhograd_bz);
+
+                auto grhow_grho_ab = (rhowgrad_ax * rhograd_bx + rhowgrad_ay * rhograd_by + rhowgrad_az * rhograd_bz +
+
+                                      rhowgrad_bx * rhograd_ax + rhowgrad_by * rhograd_ay + rhowgrad_bz * rhograd_az);
+
+                // functional derivatives
+
+                // first-order
+
+                auto vsigma_a = vsigma[dim->vsigma * g + 0];
+                auto vsigma_c = vsigma[dim->vsigma * g + 1];
+
+                // second-order
+
+                auto v2rho2_aa = v2rho2[dim->v2rho2 * g + 0];
+                auto v2rho2_ab = v2rho2[dim->v2rho2 * g + 1];
+
+                auto v2rhosigma_aa = v2rhosigma[dim->v2rhosigma * g + 0];
+                auto v2rhosigma_ac = v2rhosigma[dim->v2rhosigma * g + 1];
+                auto v2rhosigma_ab = v2rhosigma[dim->v2rhosigma * g + 2];
+                auto v2rhosigma_ba = v2rhosigma[dim->v2rhosigma * g + 3];
+                auto v2rhosigma_bc = v2rhosigma[dim->v2rhosigma * g + 4];
+
+                auto v2sigma2_aa = v2sigma2[dim->v2sigma2 * g + 0];
+                auto v2sigma2_ac = v2sigma2[dim->v2sigma2 * g + 1];
+                auto v2sigma2_ab = v2sigma2[dim->v2sigma2 * g + 2];
+                auto v2sigma2_cc = v2sigma2[dim->v2sigma2 * g + 3];
+                auto v2sigma2_cb = v2sigma2[dim->v2sigma2 * g + 4];
 
                 // scalar contribution
 
-                double f_0 = v2rho2[3 * g + 0] * rhow[2 * g + 0] + v2rho2[3 * g + 1] * rhow[2 * g + 1] +
-
-                             v2rhosigma[6 * g + 0] * grhow_grho_aa + v2rhosigma[6 * g + 1] * grhow_grho_ab + v2rhosigma[6 * g + 2] * grhow_grho_bb;
+                double f_0 = v2rho2_aa * rhow_a + v2rho2_ab * rhow_b + v2rhosigma_aa * grhow_grho_aa + v2rhosigma_ac * grhow_grho_ab +
+                             v2rhosigma_ab * grhow_grho_bb;
 
                 G_val[nu_offset + g] = w * f_0 * chi_val[nu_offset + g];
 
                 // vector contribution
 
-                double f_aa = v2rhosigma[6 * g + 0] * rhow[2 * g + 0] + v2rhosigma[6 * g + 3] * rhow[2 * g + 1] +
+                double f_aa = v2rhosigma_aa * rhow_a + v2rhosigma_ba * rhow_b + v2sigma2_aa * grhow_grho_aa + v2sigma2_ac * grhow_grho_ab +
+                              v2sigma2_ab * grhow_grho_bb;
 
-                              v2sigma2[6 * g + 0] * grhow_grho_aa + v2sigma2[6 * g + 1] * grhow_grho_ab + v2sigma2[6 * g + 2] * grhow_grho_bb;
-
-                double f_ab = v2rhosigma[6 * g + 1] * rhow[2 * g + 0] + v2rhosigma[6 * g + 4] * rhow[2 * g + 1] +
-
-                              v2sigma2[6 * g + 1] * grhow_grho_aa + v2sigma2[6 * g + 3] * grhow_grho_ab + v2sigma2[6 * g + 4] * grhow_grho_bb;
+                double f_ab = v2rhosigma_ac * rhow_a + v2rhosigma_bc * rhow_b + v2sigma2_ac * grhow_grho_aa + v2sigma2_cc * grhow_grho_ab +
+                              v2sigma2_cb * grhow_grho_bb;
 
                 double xcomp = 0.0, ycomp = 0.0, zcomp = 0.0;
 
-                xcomp += 2.0 * f_aa * rhograd[6 * g + 0] + f_ab * rhograd[6 * g + 3];
-                ycomp += 2.0 * f_aa * rhograd[6 * g + 1] + f_ab * rhograd[6 * g + 4];
-                zcomp += 2.0 * f_aa * rhograd[6 * g + 2] + f_ab * rhograd[6 * g + 5];
+                xcomp += 2.0 * f_aa * rhograd_ax + f_ab * rhograd_bx;
+                ycomp += 2.0 * f_aa * rhograd_ay + f_ab * rhograd_by;
+                zcomp += 2.0 * f_aa * rhograd_az + f_ab * rhograd_bz;
 
-                xcomp += 2.0 * vsigma[3 * g + 0] * rhowgrad[6 * g + 0] + vsigma[3 * g + 1] * rhowgrad[6 * g + 3];
-                ycomp += 2.0 * vsigma[3 * g + 0] * rhowgrad[6 * g + 1] + vsigma[3 * g + 1] * rhowgrad[6 * g + 4];
-                zcomp += 2.0 * vsigma[3 * g + 0] * rhowgrad[6 * g + 2] + vsigma[3 * g + 1] * rhowgrad[6 * g + 5];
+                xcomp += 2.0 * vsigma_a * rhowgrad_ax + vsigma_c * rhowgrad_bx;
+                ycomp += 2.0 * vsigma_a * rhowgrad_ay + vsigma_c * rhowgrad_by;
+                zcomp += 2.0 * vsigma_a * rhowgrad_az + vsigma_c * rhowgrad_bz;
 
                 G_gga_val[nu_offset + g] =
                     w * (xcomp * chi_x_val[nu_offset + g] + ycomp * chi_y_val[nu_offset + g] + zcomp * chi_z_val[nu_offset + g]);
@@ -5473,32 +5525,33 @@ CXCIntegrator::_integratePartialFxcFockForGGA(const int32_t       npoints,
 }
 
 CDenseMatrix
-CXCIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
-                                               const double*       weights,
-                                               const CDenseMatrix& gtoValues,
-                                               const CDenseMatrix& gtoValuesX,
-                                               const CDenseMatrix& gtoValuesY,
-                                               const CDenseMatrix& gtoValuesZ,
-                                               const double*       rhow,
-                                               const double*       rhograd,
-                                               const double*       rhowgrad,
-                                               const double*       tauw,
-                                               const double*       laplw,
-                                               const double*       vrho,
-                                               const double*       vsigma,
-                                               const double*       vlapl,
-                                               const double*       vtau,
-                                               const double*       v2rho2,
-                                               const double*       v2lapl2,
-                                               const double*       v2tau2,
-                                               const double*       v2rholapl,
-                                               const double*       v2rhotau,
-                                               const double*       v2lapltau,
-                                               const double*       v2rhosigma,
-                                               const double*       v2sigmalapl,
-                                               const double*       v2sigmatau,
-                                               const double*       v2sigma2,
-                                               CMultiTimer&        timer) const
+CXCIntegrator::_integratePartialFxcFockForMGGA(const CXCFunctional& xcFunctional,
+                                               const int32_t        npoints,
+                                               const double*        weights,
+                                               const CDenseMatrix&  gtoValues,
+                                               const CDenseMatrix&  gtoValuesX,
+                                               const CDenseMatrix&  gtoValuesY,
+                                               const CDenseMatrix&  gtoValuesZ,
+                                               const double*        rhow,
+                                               const double*        rhograd,
+                                               const double*        rhowgrad,
+                                               const double*        tauw,
+                                               const double*        laplw,
+                                               const double*        vrho,
+                                               const double*        vsigma,
+                                               const double*        vlapl,
+                                               const double*        vtau,
+                                               const double*        v2rho2,
+                                               const double*        v2lapl2,
+                                               const double*        v2tau2,
+                                               const double*        v2rholapl,
+                                               const double*        v2rhotau,
+                                               const double*        v2lapltau,
+                                               const double*        v2rhosigma,
+                                               const double*        v2sigmalapl,
+                                               const double*        v2sigmatau,
+                                               const double*        v2sigma2,
+                                               CMultiTimer&         timer) const
 {
     // eq.(30), JCTC 2021, 17, 1512-1521
 
@@ -5529,6 +5582,9 @@ CXCIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
     auto chi_x_val = gtoValuesX.values();
     auto chi_y_val = gtoValuesY.values();
     auto chi_z_val = gtoValuesZ.values();
+
+    auto       mggafunc = xcFunctional.getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
     #pragma omp parallel
     {
@@ -5568,54 +5624,55 @@ CXCIntegrator::_integratePartialFxcFockForMGGA(const int32_t       npoints,
                 double rwa_z = rhowgrad[6 * g + 2];
 
                 // functional derivatives
+
                 // first-order
-                double vsigma_a = vsigma[3 * g + 0];
-                double vsigma_c = vsigma[3 * g + 1];
+
+                auto vsigma_a = vsigma[dim->vsigma * g + 0];
+                auto vsigma_c = vsigma[dim->vsigma * g + 1];
+
                 // second-order
-                double v2rho2_aa = v2rho2[3 * g + 0];
-                double v2rho2_ab = v2rho2[3 * g + 1];
 
-                double v2rhosigma_aa = v2rhosigma[6 * g + 0];
-                double v2rhosigma_ac = v2rhosigma[6 * g + 1];
-                double v2rhosigma_ab = v2rhosigma[6 * g + 2];
-                double v2rhosigma_ba = v2rhosigma[6 * g + 3];
-                double v2rhosigma_bc = v2rhosigma[6 * g + 4];
-                double v2sigma2_aa   = v2sigma2[6 * g + 0];
-                double v2sigma2_ac   = v2sigma2[6 * g + 1];
-                double v2sigma2_ab   = v2sigma2[6 * g + 2];
-                double v2sigma2_cc   = v2sigma2[6 * g + 3];
-                double v2sigma2_cb   = v2sigma2[6 * g + 4];
+                auto v2rho2_aa = v2rho2[dim->v2rho2 * g + 0];
+                auto v2rho2_ab = v2rho2[dim->v2rho2 * g + 1];
 
-                // second-order meta-gga
-                // double v2rholapl_aa = v2rholapl[4 * g + 0];
-                // double v2rholapl_ab = v2rholapl[4 * g + 1];
-                // double v2rholapl_ba = v2rholapl[4 * g + 2];
+                auto v2rhosigma_aa = v2rhosigma[dim->v2rhosigma * g + 0];
+                auto v2rhosigma_ac = v2rhosigma[dim->v2rhosigma * g + 1];
+                auto v2rhosigma_ab = v2rhosigma[dim->v2rhosigma * g + 2];
+                auto v2rhosigma_ba = v2rhosigma[dim->v2rhosigma * g + 3];
+                auto v2rhosigma_bc = v2rhosigma[dim->v2rhosigma * g + 4];
 
-                double v2rhotau_aa = v2rhotau[4 * g + 0];
-                double v2rhotau_ab = v2rhotau[4 * g + 1];
-                double v2rhotau_ba = v2rhotau[4 * g + 2];
+                // auto v2rholapl_aa = v2rholapl[dim->v2rholapl * g + 0];
+                // auto v2rholapl_ab = v2rholapl[dim->v2rholapl * g + 1];
 
-                // double v2lapltau_aa = v2lapltau[4 * g + 0];
-                // double v2lapltau_ab = v2lapltau[4 * g + 1];
-                // double v2lapltau_ba = v2lapltau[4 * g + 2];
+                auto v2rhotau_aa = v2rhotau[dim->v2rhotau * g + 0];
+                auto v2rhotau_ab = v2rhotau[dim->v2rhotau * g + 1];
+                auto v2rhotau_ba = v2rhotau[dim->v2rhotau * g + 2];
 
-                // double v2lapl2_aa = v2lapl2[3 * g + 0];
-                // double v2lapl2_ab = v2lapl2[3 * g + 1];
+                auto v2sigma2_aa = v2sigma2[dim->v2sigma2 * g + 0];
+                auto v2sigma2_ac = v2sigma2[dim->v2sigma2 * g + 1];
+                auto v2sigma2_ab = v2sigma2[dim->v2sigma2 * g + 2];
+                auto v2sigma2_cc = v2sigma2[dim->v2sigma2 * g + 3];
+                auto v2sigma2_cb = v2sigma2[dim->v2sigma2 * g + 4];
 
-                double v2tau2_aa = v2tau2[3 * g + 0];
-                double v2tau2_ab = v2tau2[3 * g + 1];
+                // auto v2sigmalapl_aa = v2sigmalapl[dim->v2sigmalapl * g + 0];
+                // auto v2sigmalapl_ab = v2sigmalapl[dim->v2sigmalapl * g + 1];
+                // auto v2sigmalapl_ca = v2sigmalapl[dim->v2sigmalapl * g + 2];
+                // auto v2sigmalapl_cb = v2sigmalapl[dim->v2sigmalapl * g + 3];
 
-                // double v2sigmalapl_aa = v2sigmalapl[6 * g + 0];
-                // double v2sigmalapl_ab = v2sigmalapl[6 * g + 1];
-                // double v2sigmalapl_ca = v2sigmalapl[6 * g + 2];
-                // double v2sigmalapl_cb = v2sigmalapl[6 * g + 3];
-                // double v2sigmalapl_ba = v2sigmalapl[6 * g + 4];
+                auto v2sigmatau_aa = v2sigmatau[dim->v2sigmatau * g + 0];
+                auto v2sigmatau_ab = v2sigmatau[dim->v2sigmatau * g + 1];
+                auto v2sigmatau_ca = v2sigmatau[dim->v2sigmatau * g + 2];
+                auto v2sigmatau_cb = v2sigmatau[dim->v2sigmatau * g + 3];
+                auto v2sigmatau_ba = v2sigmatau[dim->v2sigmatau * g + 4];
 
-                double v2sigmatau_aa = v2sigmatau[6 * g + 0];
-                double v2sigmatau_ab = v2sigmatau[6 * g + 1];
-                double v2sigmatau_ca = v2sigmatau[6 * g + 2];
-                double v2sigmatau_cb = v2sigmatau[6 * g + 3];
-                double v2sigmatau_ba = v2sigmatau[6 * g + 4];
+                // auto v2lapl2_aa = v2lapl2[dim->v2lapl2 * g + 0];
+                // auto v2lapl2_ab = v2lapl2[dim->v2lapl2 * g + 1];
+
+                // auto v2lapltau_aa = v2lapltau[dim->v2lapltau * g + 0];
+                // auto v2lapltau_ba = v2lapltau[dim->v2lapltau * g + 2];
+
+                auto v2tau2_aa = v2tau2[dim->v2tau2 * g + 0];
+                auto v2tau2_ab = v2tau2[dim->v2tau2 * g + 1];
 
                 // sums of functional derivatives that can be used in the restricted case
 
