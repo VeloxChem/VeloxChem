@@ -822,6 +822,7 @@ class CXCIntegrator
     /**
      Integrates LDA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -833,7 +834,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForLDA2(const int32_t            npoints,
+    CDenseMatrix _integratePartialKxcFockForLDA2(const CXCFunctional&     xcFunctional,
+                                                 const int32_t            npoints,
                                                  const double*            weights,
                                                  const CDenseMatrix&      gtoValues,
                                                  const double*            v2rho2,
@@ -846,6 +848,7 @@ class CXCIntegrator
     /**
      Integrates GGA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -867,7 +870,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForGGA2(const int32_t            npoints,
+    CDenseMatrix _integratePartialKxcFockForGGA2(const CXCFunctional&     xcFunctional,
+                                                 const int32_t            npoints,
                                                  const double*            weights,
                                                  const CDenseMatrix&      gtoValues,
                                                  const CDenseMatrix&      gtoValuesX,
@@ -890,6 +894,7 @@ class CXCIntegrator
     /**
      Integrates meta-GGA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -934,7 +939,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForMGGA2(const int32_t            npoints,
+    CDenseMatrix _integratePartialKxcFockForMGGA2(const CXCFunctional&     xcFunctional,
+                                                  const int32_t            npoints,
                                                   const double*            weights,
                                                   const CDenseMatrix&      gtoValues,
                                                   const CDenseMatrix&      gtoValuesX,
