@@ -56,24 +56,24 @@ CDensityGrid::CDensityGrid(const int32_t nGridPoints, const int32_t nDensityMatr
 
     int32_t ncomp = 0;
 
-    if (xcFuncType == xcfun::lda) ncomp = (_gridType == dengrid::ab) ? 2 : 1;
+    if (_gridType == dengrid::ab)
+    {
+        if (xcFuncType == xcfun::lda) ncomp = 2;
 
-    if (xcFuncType == xcfun::gga) ncomp = (_gridType == dengrid::ab) ? 11 : 5;
+        if (xcFuncType == xcfun::gga) ncomp = 11;
 
-    if (xcFuncType == xcfun::mgga) ncomp = (_gridType == dengrid::ab) ? 15 : 7;
+        if (xcFuncType == xcfun::mgga) ncomp = 15;
+    }
 
     _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
 }
 
-CDensityGrid::CDensityGrid(const int32_t nGridPoints,
-                           const int32_t nDensityMatrices,
-                           const int32_t nComponents,
-                           const dengrid gridType)
+CDensityGrid::CDensityGrid(const int32_t nGridPoints, const int32_t nDensityMatrices, const int32_t nComponents, const dengrid gridType)
 {
     _gridType = gridType;
-    
+
     _nDensityMatrices = nDensityMatrices;
-    
+
     _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * nComponents);
 }
 
@@ -162,227 +162,6 @@ CDensityGrid::slice(const int32_t nGridPoints)
     }
 }
 
-void
-CDensityGrid::updateBetaDensities()
-{
-    if (_gridType != dengrid::ab) return;
-
-    auto ngpoints = getNumberOfGridPoints();
-
-    if ((2 * _nDensityMatrices) == _densityValues.blocks())
-    {
-        for (int32_t i = 0; i < _nDensityMatrices; i++)
-        {
-            auto rhoa = alphaDensity(i);
-
-            auto rhob = betaDensity(i);
-
-            #pragma omp simd aligned(rhoa, rhob : VLX_ALIGN)
-            for (int32_t j = 0; j < ngpoints; j++)
-            {
-                rhob[j] = rhoa[j];
-            }
-        }
-    }
-
-    if ((11 * _nDensityMatrices) == _densityValues.blocks())
-    {
-        for (int32_t i = 0; i < _nDensityMatrices; i++)
-        {
-            auto rhoa = alphaDensity(i);
-
-            auto rhob = betaDensity(i);
-
-            auto grada_x = alphaDensityGradientX(i);
-
-            auto gradb_x = betaDensityGradientX(i);
-
-            auto grada_y = alphaDensityGradientY(i);
-
-            auto gradb_y = betaDensityGradientY(i);
-
-            auto grada_z = alphaDensityGradientZ(i);
-
-            auto gradb_z = betaDensityGradientZ(i);
-
-            #pragma omp simd aligned(rhoa, rhob, grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z : VLX_ALIGN)
-            for (int32_t j = 0; j < ngpoints; j++)
-            {
-                rhob[j] = rhoa[j];
-
-                gradb_x[j] = grada_x[j];
-
-                gradb_y[j] = grada_y[j];
-
-                gradb_z[j] = grada_z[j];
-            }
-        }
-    }
-
-    if ((13 * _nDensityMatrices) == _densityValues.blocks())
-    {
-        for (int32_t i = 0; i < _nDensityMatrices; i++)
-        {
-            auto rhoa = alphaDensity(i);
-
-            auto rhob = betaDensity(i);
-
-            auto grada_x = alphaDensityGradientX(i);
-
-            auto gradb_x = betaDensityGradientX(i);
-
-            auto grada_y = alphaDensityGradientY(i);
-
-            auto gradb_y = betaDensityGradientY(i);
-
-            auto grada_z = alphaDensityGradientZ(i);
-
-            auto gradb_z = betaDensityGradientZ(i);
-
-            auto taua = alphaDensitytau(i);
-
-            auto taub = betaDensitytau(i);
-
-            #pragma omp simd aligned(rhoa, rhob, grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z, taua, taub : VLX_ALIGN)
-            for (int32_t j = 0; j < ngpoints; j++)
-            {
-                rhob[j] = rhoa[j];
-
-                gradb_x[j] = grada_x[j];
-
-                gradb_y[j] = grada_y[j];
-
-                gradb_z[j] = grada_z[j];
-
-                taub[j] = taua[j];
-            }
-        }
-    }
-}
-
-void
-CDensityGrid::computeDensityNorms()
-{
-    auto ngpoints = getNumberOfGridPoints();
-
-    if (_gridType == dengrid::ab)
-    {
-        if ((11 * _nDensityMatrices) == _densityValues.blocks())
-        {
-            for (int32_t i = 0; i < _nDensityMatrices; i++)
-            {
-                auto grada_x = alphaDensityGradientX(i);
-
-                auto gradb_x = betaDensityGradientX(i);
-
-                auto grada_y = alphaDensityGradientY(i);
-
-                auto gradb_y = betaDensityGradientY(i);
-
-                auto grada_z = alphaDensityGradientZ(i);
-
-                auto gradb_z = betaDensityGradientZ(i);
-
-                auto grada = alphaDensityGradient(i);
-
-                auto gradb = betaDensityGradient(i);
-
-                auto gradab = mixedDensityGradient(i);
-
-                #pragma omp simd aligned(grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z, grada, gradb, gradab : VLX_ALIGN)
-                for (int32_t j = 0; j < ngpoints; j++)
-                {
-                    grada[j] = std::sqrt(grada_x[j] * grada_x[j] + grada_y[j] * grada_y[j] + grada_z[j] * grada_z[j]);
-
-                    gradb[j] = std::sqrt(gradb_x[j] * gradb_x[j] + gradb_y[j] * gradb_y[j] + gradb_z[j] * gradb_z[j]);
-
-                    gradab[j] = grada_x[j] * gradb_x[j] + grada_y[j] * gradb_y[j] + grada_z[j] * gradb_z[j];
-                }
-            }
-        }
-
-        if ((13 * _nDensityMatrices) == _densityValues.blocks())
-        {
-            for (int32_t i = 0; i < _nDensityMatrices; i++)
-            {
-                auto grada_x = alphaDensityGradientX(i);
-
-                auto gradb_x = betaDensityGradientX(i);
-
-                auto grada_y = alphaDensityGradientY(i);
-
-                auto gradb_y = betaDensityGradientY(i);
-
-                auto grada_z = alphaDensityGradientZ(i);
-
-                auto gradb_z = betaDensityGradientZ(i);
-
-                auto grada = alphaDensityGradient(i);
-
-                auto gradb = betaDensityGradient(i);
-
-                auto gradab = mixedDensityGradient(i);
-
-                #pragma omp simd aligned(grada_x, gradb_x, grada_y, gradb_y, grada_z, gradb_z, grada, gradb, gradab : VLX_ALIGN)
-                for (int32_t j = 0; j < ngpoints; j++)
-                {
-                    grada[j] = std::sqrt(grada_x[j] * grada_x[j] + grada_y[j] * grada_y[j] + grada_z[j] * grada_z[j]);
-
-                    gradb[j] = std::sqrt(gradb_x[j] * gradb_x[j] + gradb_y[j] * gradb_y[j] + gradb_z[j] * gradb_z[j]);
-
-                    gradab[j] = grada_x[j] * gradb_x[j] + grada_y[j] * gradb_y[j] + grada_z[j] * gradb_z[j];
-                }
-            }
-        }
-    }
-
-    if (_gridType == dengrid::lima)
-    {
-        if ((5 * _nDensityMatrices) == _densityValues.blocks())
-        {
-            for (int32_t i = 0; i < _nDensityMatrices; i++)
-            {
-                auto gradb_x = betaDensityGradientX(i);
-
-                auto gradb_y = betaDensityGradientY(i);
-
-                auto gradb_z = betaDensityGradientZ(i);
-
-                auto gradb = betaDensityGradient(i);
-
-                #pragma omp simd aligned(gradb_x, gradb_y, gradb_z, gradb : VLX_ALIGN)
-                for (int32_t j = 0; j < ngpoints; j++)
-                {
-                    gradb[j] = std::sqrt(gradb_x[j] * gradb_x[j] + gradb_y[j] * gradb_y[j] + gradb_z[j] * gradb_z[j]);
-                }
-            }
-        }
-    }
-
-    if (_gridType == dengrid::limb)
-    {
-        if ((5 * _nDensityMatrices) == _densityValues.blocks())
-        {
-            for (int32_t i = 0; i < _nDensityMatrices; i++)
-            {
-                auto grada_x = alphaDensityGradientX(i);
-
-                auto grada_y = alphaDensityGradientY(i);
-
-                auto grada_z = alphaDensityGradientZ(i);
-
-                auto grada = alphaDensityGradient(i);
-
-                #pragma omp simd aligned(grada_x, grada_y, grada_z, grada : VLX_ALIGN)
-                for (int32_t j = 0; j < ngpoints; j++)
-                {
-                    grada[j] = std::sqrt(grada_x[j] * grada_x[j] + grada_y[j] * grada_y[j] + grada_z[j] * grada_z[j]);
-                }
-            }
-        }
-    }
-}
-
 int32_t
 CDensityGrid::getNumberOfGridPoints() const
 {
@@ -404,25 +183,23 @@ CDensityGrid::getDensityGridType() const
 const double*
 CDensityGrid::alphaDensity(const int32_t iDensityMatrix) const
 {
-    if (_gridType == dengrid::lima) return nullptr;
+    if (_gridType == dengrid::ab) return _densityValues.data(iDensityMatrix);
 
-    return _densityValues.data(iDensityMatrix);
+    return nullptr;
 }
 
 double*
 CDensityGrid::alphaDensity(const int32_t iDensityMatrix)
 {
-    if (_gridType == dengrid::lima) return nullptr;
+    if (_gridType == dengrid::ab) return _densityValues.data(iDensityMatrix);
 
-    return _densityValues.data(iDensityMatrix);
+    return nullptr;
 }
 
 const double*
 CDensityGrid::betaDensity(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::lima) return _densityValues.data(iDensityMatrix);
 
     return nullptr;
 }
@@ -432,8 +209,6 @@ CDensityGrid::betaDensity(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::lima) return _densityValues.data(iDensityMatrix);
-
     return nullptr;
 }
 
@@ -441,8 +216,6 @@ const double*
 CDensityGrid::alphaDensityGradient(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::limb) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
 
     return nullptr;
 }
@@ -452,8 +225,6 @@ CDensityGrid::alphaDensityGradient(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::limb) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-
     return nullptr;
 }
 
@@ -462,8 +233,6 @@ CDensityGrid::betaDensityGradient(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::lima) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
-
     return nullptr;
 }
 
@@ -471,8 +240,6 @@ double*
 CDensityGrid::betaDensityGradient(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::lima) return _densityValues.data(_nDensityMatrices + iDensityMatrix);
 
     return nullptr;
 }
@@ -498,8 +265,6 @@ CDensityGrid::alphaDensityGradientX(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::limb) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-
     return nullptr;
 }
 
@@ -507,8 +272,6 @@ double*
 CDensityGrid::alphaDensityGradientX(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(5 * _nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::limb) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
 
     return nullptr;
 }
@@ -518,8 +281,6 @@ CDensityGrid::alphaDensityGradientY(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(6 * _nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::limb) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-
     return nullptr;
 }
 
@@ -527,8 +288,6 @@ double*
 CDensityGrid::alphaDensityGradientY(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(6 * _nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::limb) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
 
     return nullptr;
 }
@@ -538,8 +297,6 @@ CDensityGrid::alphaDensityGradientZ(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(7 * _nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::limb) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
-
     return nullptr;
 }
 
@@ -547,8 +304,6 @@ double*
 CDensityGrid::alphaDensityGradientZ(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(7 * _nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::limb) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
 
     return nullptr;
 }
@@ -558,8 +313,6 @@ CDensityGrid::betaDensityGradientX(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(8 * _nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::lima) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
-
     return nullptr;
 }
 
@@ -567,8 +320,6 @@ double*
 CDensityGrid::betaDensityGradientX(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(8 * _nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::lima) return _densityValues.data(2 * _nDensityMatrices + iDensityMatrix);
 
     return nullptr;
 }
@@ -578,8 +329,6 @@ CDensityGrid::betaDensityGradientY(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(9 * _nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::lima) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
-
     return nullptr;
 }
 
@@ -587,8 +336,6 @@ double*
 CDensityGrid::betaDensityGradientY(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(9 * _nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::lima) return _densityValues.data(3 * _nDensityMatrices + iDensityMatrix);
 
     return nullptr;
 }
@@ -598,8 +345,6 @@ CDensityGrid::betaDensityGradientZ(const int32_t iDensityMatrix) const
 {
     if (_gridType == dengrid::ab) return _densityValues.data(10 * _nDensityMatrices + iDensityMatrix);
 
-    if (_gridType == dengrid::lima) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
-
     return nullptr;
 }
 
@@ -607,8 +352,6 @@ double*
 CDensityGrid::betaDensityGradientZ(const int32_t iDensityMatrix)
 {
     if (_gridType == dengrid::ab) return _densityValues.data(10 * _nDensityMatrices + iDensityMatrix);
-
-    if (_gridType == dengrid::lima) return _densityValues.data(4 * _nDensityMatrices + iDensityMatrix);
 
     return nullptr;
 }

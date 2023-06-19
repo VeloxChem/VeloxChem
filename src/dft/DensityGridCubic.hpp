@@ -1781,15 +1781,6 @@ const double* sl_gamZ(const int32_t iDensityMatrix) const;
     */
     double* gamY(const int32_t iDensityMatrix);
 
-
-    double prod3_r(double B_r, double B_i, double C_r, double C_i, double D_r, double D_i);
-    
-    double prod3_i(double B_r, double B_i, double C_r, double C_i, double D_r, double D_i);
-
-    double prod2_r(double B_r, double B_i, double C_r, double C_i);
-
-    double prod2_i(double B_r, double B_i, double C_r, double C_i);
-
     /**
     Gets constant pointer to products of one-time and two-time transformed density product values.
 
@@ -2400,6 +2391,20 @@ double* t_piZZ(const int32_t iDensityMatrix);
      */
 
 const double* t_piZZ(const int32_t iDensityMatrix) const;
+
+    inline double prod3_r(double B_r, double B_i, double C_r, double C_i, double D_r, double D_i)
+    {
+        return (B_r * C_r * D_r - B_i * D_i * C_r - C_i * D_i * B_r - B_i * C_i * D_r);
+    }
+
+    inline double prod3_i(double B_r, double B_i, double C_r, double C_i, double D_r, double D_i)
+    {
+        return (- B_i * C_i * D_i + B_i * C_r * D_r + C_i * B_r * D_r + D_i * B_r * C_r);
+    }
+
+    inline double prod2_r(double B_r, double B_i, double C_r, double C_i) { return (B_r * C_r - B_i * C_i); }
+
+    inline double prod2_i(double B_r, double B_i, double C_r, double C_i) { return (B_i * C_r + B_r * C_i); }
 
     /**
      Generates products of one-time transformed densities to be used for quadratic response.

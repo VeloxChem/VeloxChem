@@ -59,21 +59,13 @@ CDensityGridCubic::CDensityGridCubic(const int32_t nGridPoints, const int32_t nD
 
     int32_t ncomp = 0;
 
-    if (xcFuncType == xcfun::lda)
+    if (_gridType == dengrid::ab)
     {
-        ncomp = (_gridType == dengrid::ab) ? 3 : 3;
-    }
-    else if (xcFuncType == xcfun::gga)
-    {
-        ncomp = (_gridType == dengrid::ab) ? 66 : 66;
-    }
-    else if (xcFuncType == xcfun::mgga)
-    {
-        ncomp = (_gridType == dengrid::ab) ? 130 : 6;
-    }
-    else
-    {
-        errors::assertMsgCritical(false, std::string("DensityGridCubic: ") + std::string("Invalid functional type"));
+        if (xcFuncType == xcfun::lda) ncomp = 3;
+
+        if (xcFuncType == xcfun::gga) ncomp = 66;
+
+        if (xcFuncType == xcfun::mgga) ncomp = 130;
     }
 
     _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
@@ -177,17 +169,17 @@ CDensityGridCubic::getDensityGridType() const
 const double*
 CDensityGridCubic::pi(const int32_t iDensityMatrix) const
 {
-    if (_gridType == dengrid::lima) return nullptr;
+    if (_gridType == dengrid::ab) return _densityValues.data(iDensityMatrix);
 
-    return _densityValues.data(iDensityMatrix);
+    return nullptr;
 }
 
 double*
 CDensityGridCubic::pi(const int32_t iDensityMatrix)
 {
-    if (_gridType == dengrid::lima) return nullptr;
+    if (_gridType == dengrid::ab) return _densityValues.data(iDensityMatrix);
 
-    return _densityValues.data(iDensityMatrix);
+    return nullptr;
 }
 
 const double*
@@ -2304,45 +2296,6 @@ const double*
 
         return nullptr;
     }
-
-
-double
-CDensityGridCubic::prod3_r(double B_r, double B_i, double C_r, double C_i, double D_r, double D_i)
-{
-    double BCD  =  (B_r * C_r * D_r 
-                  - B_i * D_i * C_r 
-                  - C_i * D_i * B_r 
-                  - B_i * C_i * D_r);
-    return BCD;
-}
-
-double
-CDensityGridCubic::prod3_i(double B_r, double B_i, double C_r, double C_i, double D_r, double D_i)
-{
-    double BCD  =  (- B_i * C_i * D_i 
-                    + B_i * C_r * D_r 
-                    + C_i * B_r * D_r 
-                    + D_i * B_r * C_r);
-    return BCD;
-}
-
-
-double
-CDensityGridCubic::prod2_r(double B_r, double B_i, double C_r, double C_i)
-{
-    double BC  =  (B_r * C_r- B_i * C_i);
-
-    return BC;
-}
-
-double
-CDensityGridCubic::prod2_i(double B_r, double B_i, double C_r, double C_i)
-{
-    double BC  =  (B_i * C_r + B_r * C_i);
-
-    return BC;
-}
-
 
 void
 CDensityGridCubic::DensityProd(const CDensityGrid& rwDensityGrid,

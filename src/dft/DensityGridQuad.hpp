@@ -563,9 +563,9 @@ class CDensityGridQuad
 
     const double* sl_gamZ(const int32_t iDensityMatrix) const;
 
-    double prod2_r(double B_r, double B_i, double C_r, double C_i);
+    inline double prod2_r(double B_r, double B_i, double C_r, double C_i) { return (B_r * C_r - B_i * C_i); }
 
-    double prod2_i(double B_r, double B_i, double C_r, double C_i);
+    inline double prod2_i(double B_r, double B_i, double C_r, double C_i) { return (B_i * C_r + B_r * C_i); }
 
     /**
      Generates products of one-time transformed densities to be used for quadratic response.

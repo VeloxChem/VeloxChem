@@ -59,21 +59,13 @@ CDensityGridQuad::CDensityGridQuad(const int32_t nGridPoints, const int32_t nDen
 
     int32_t ncomp = 0;
 
-    if (xcFuncType == xcfun::lda)
+    if (_gridType == dengrid::ab)
     {
-        ncomp = (_gridType == dengrid::ab) ? 1 : 1;
-    }
-    else if (xcFuncType == xcfun::gga)
-    {
-        ncomp = (_gridType == dengrid::ab) ? 13 : 5;
-    }
-    else if (xcFuncType == xcfun::mgga)
-    {
-        ncomp = (_gridType == dengrid::ab) ? 24 : 6;
-    }
-    else
-    {
-        errors::assertMsgCritical(false, std::string("DensityGridQuad: ") + std::string("Invalid functional type"));
+        if (xcFuncType == xcfun::lda) ncomp =  1;
+
+        if (xcFuncType == xcfun::gga) ncomp =  13;
+
+        if (xcFuncType == xcfun::mgga) ncomp = 24;
     }
 
     _densityValues = CMemBlock2D<double>(nGridPoints, _nDensityMatrices * ncomp);
@@ -115,22 +107,6 @@ CDensityGridQuad::operator=(const CDensityGridQuad& source)
     _densityValues = source._densityValues;
 
     return *this;
-}
-
-double
-CDensityGridQuad::prod2_r(double B_r, double B_i, double C_r, double C_i)
-{
-    double BC  =  (B_r * C_r- B_i * C_i);
-
-    return BC;
-}
-
-double
-CDensityGridQuad::prod2_i(double B_r, double B_i, double C_r, double C_i)
-{
-    double BC  =  (B_i * C_r + B_r * C_i);
-
-    return BC;
 }
 
 CDensityGridQuad&
@@ -192,17 +168,17 @@ CDensityGridQuad::getDensityGridType() const
 const double*
 CDensityGridQuad::gam(const int32_t iDensityMatrix) const
 {
-    if (_gridType == dengrid::lima) return nullptr;
+    if (_gridType == dengrid::ab) return _densityValues.data(iDensityMatrix);
 
-    return _densityValues.data(iDensityMatrix);
+    return nullptr;
 }
 
 double*
 CDensityGridQuad::gam(const int32_t iDensityMatrix)
 {
-    if (_gridType == dengrid::lima) return nullptr;
+    if (_gridType == dengrid::ab) return _densityValues.data(iDensityMatrix);
 
-    return _densityValues.data(iDensityMatrix);
+    return nullptr;
 }
 
 const double*
