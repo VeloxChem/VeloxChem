@@ -1104,7 +1104,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "TPA_QUAD")
+        else if (fstr::upcase(quadMode) == "TPA_QUAD")
         {
             for (int32_t j = 0; j < numdens / 4; j++)
             {
@@ -8205,7 +8205,7 @@ CDensityGridQuad::DensityProd(const CDensityGrid& rwDensityGrid,
                 }
             }
         }
-        if (fstr::upcase(quadMode) == "TPA_QUAD")
+        else if (fstr::upcase(quadMode) == "TPA_QUAD")
         {
             for (int32_t j = 0; j < numdens / 4; j++)
             {
