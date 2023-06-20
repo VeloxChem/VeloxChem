@@ -302,8 +302,8 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
-        'wave function', 'mp2', 'ump2', 'gradient', 'hessian', 'optimize',
-        'response', 'pulses', 'visualization', 'loprop'
+        'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'hessian',
+        'optimize', 'response', 'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -312,7 +312,7 @@ def main():
     scf_type = 'restricted'
     if task_type in ['uhf', 'uscf', 'ump2']:
         scf_type = 'unrestricted'
-    elif task_type in ['rohf', 'roscf']:
+    elif task_type in ['rohf', 'roscf', 'romp2']:
         scf_type = 'restricted_openshell'
 
     if run_scf:
@@ -502,7 +502,7 @@ def main():
 
     # MP2 perturbation theory
 
-    if task_type in ['mp2', 'ump2']:
+    if task_type in ['mp2', 'ump2', 'romp2']:
         mp2_dict = task.input_dict['mp2'] if 'mp2' in task.input_dict else {}
         mp2_dict = updated_dict_with_eri_settings(mp2_dict, scf_drv)
 

@@ -282,9 +282,8 @@ class Mp2Driver:
             The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
-        assert_msg_critical(
-            scf_type == 'restricted',
-            'Mp2Driver.compute_distributed: Only implemented restricted MP2')
+        assert_msg_critical(scf_type != 'restricted_openshell',
+                            'Restricted open-shell MP2 not implemented')
 
         # subcommunicators
 
@@ -313,20 +312,54 @@ class Mp2Driver:
 
         if local_master:
             e_mp2 = 0.0
+
             mol_orbs.broadcast(cross_comm.Get_rank(), cross_comm)
-            nocc = molecule.number_of_alpha_electrons()
 
-            mo = mol_orbs.alpha_to_numpy()
-            mo_occ = mo[:, :nocc].copy()
-            mo_vir = mo[:, nocc:].copy()
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
 
-            orb_ene = mol_orbs.ea_to_numpy()
-            evir = orb_ene[nocc:]
-            eab = evir.reshape(-1, 1) + evir
+            mo_a = mol_orbs.alpha_to_numpy()
+            mo_b = mol_orbs.beta_to_numpy()
 
-            mo_ints_ids = [
-                (i, j) for i in range(nocc) for j in range(i + 1, nocc)
-            ] + [(i, i) for i in range(nocc)]
+            mo_occ_a = mo_a[:, :nocc_a].copy()
+            mo_vir_a = mo_a[:, nocc_a:].copy()
+
+            mo_occ_b = mo_b[:, :nocc_b].copy()
+            mo_vir_b = mo_b[:, nocc_b:].copy()
+
+            orb_ene_a = mol_orbs.ea_to_numpy()
+            orb_ene_b = mol_orbs.eb_to_numpy()
+
+            evir_a = orb_ene_a[nocc_a:]
+            evir_b = orb_ene_b[nocc_b:]
+
+            evv_aa = evir_a.reshape(-1, 1) + evir_a
+            evv_bb = evir_b.reshape(-1, 1) + evir_b
+            evv_ab = evir_a.reshape(-1, 1) + evir_b
+
+            if scf_type == 'restricted':
+
+                mo_ints_ids = [((i, j), 'aa')
+                               for i in range(nocc_a)
+                               for j in range(i + 1, nocc_a)]
+                mo_ints_ids += [((i, i), 'aa') for i in range(nocc_a)]
+
+            elif scf_type == 'unrestricted':
+
+                mo_ints_ids = [((i, j), 'aa')
+                               for i in range(nocc_a)
+                               for j in range(i + 1, nocc_a)]
+                mo_ints_ids += [((i, i), 'aa') for i in range(nocc_a)]
+
+                mo_ints_ids += [((i, j), 'bb')
+                                for i in range(nocc_b)
+                                for j in range(i + 1, nocc_b)]
+                mo_ints_ids += [((i, i), 'bb') for i in range(nocc_b)]
+
+                mo_ints_ids += [
+                    ((i, j), 'ab') for i in range(nocc_a) for j in range(nocc_b)
+                ]
+
             self.print_header(len(mo_ints_ids))
             valstr = 'Monitoring calculation on master node.'
             self.ostream.print_header(valstr.ljust(80))
@@ -366,11 +399,33 @@ class Mp2Driver:
                 batch_ids = mo_ints_ids[batch_start:batch_end]
 
                 dks = []
-                for i, j in batch_ids:
-                    mo_ij = np.zeros((nocc, nocc))
-                    mo_ij[i, j] = 1.0
-                    dks.append(np.linalg.multi_dot([mo_occ, mo_ij, mo_occ.T]))
+
+                for (i, j), spin in batch_ids:
+
+                    if spin == 'aa':
+                        mo_ij_aa = np.zeros((nocc_a, nocc_a))
+                        mo_ij_aa[i, j] = 1.0
+                        dks.append(
+                            np.linalg.multi_dot(
+                                [mo_occ_a, mo_ij_aa, mo_occ_a.T]))
+
+                    elif spin == 'bb':
+                        mo_ij_bb = np.zeros((nocc_b, nocc_b))
+                        mo_ij_bb[i, j] = 1.0
+                        dks.append(
+                            np.linalg.multi_dot(
+                                [mo_occ_b, mo_ij_bb, mo_occ_b.T]))
+
+                    elif spin == 'ab':
+                        mo_ij_ab = np.zeros((nocc_a, nocc_b))
+                        mo_ij_ab[i, j] = 1.0
+                        dks.append(
+                            np.linalg.multi_dot(
+                                [mo_occ_a, mo_ij_ab, mo_occ_b.T]))
+
+                # Note: use restricted AODensityMatrix and Fock build
                 dens = AODensityMatrix(dks, denmat.rest)
+
             else:
                 dens = AODensityMatrix()
 
@@ -385,17 +440,46 @@ class Mp2Driver:
                             local_comm)
 
             if local_master:
-                for ind, (i, j) in enumerate(batch_ids):
-                    f_ao = fock.alpha_to_numpy(ind)
-                    f_vv = np.linalg.multi_dot([mo_vir.T, f_ao, mo_vir])
-                    de = orb_ene[i] + orb_ene[j] - eab
 
-                    ab = f_vv
-                    e_mp2 += np.sum(ab * (2.0 * ab - ab.T) / de)
+                if scf_type == 'restricted':
 
-                    if i != j:
-                        ba = f_vv.T
-                        e_mp2 += np.sum(ba * (2.0 * ba - ba.T) / de)
+                    for ind, ((i, j), spin) in enumerate(batch_ids):
+                        f_aa = fock.alpha_to_numpy(ind)
+                        vv = np.linalg.multi_dot([mo_vir_a.T, f_aa, mo_vir_a])
+                        de = orb_ene_a[i] + orb_ene_a[j] - evv_aa
+                        e_mp2 += np.sum(vv * (2.0 * vv - vv.T) / de)
+                        if i != j:
+                            e_mp2 += np.sum(vv.T * (2.0 * vv.T - vv) / de)
+
+                elif scf_type == 'unrestricted':
+
+                    for ind, ((i, j), spin) in enumerate(batch_ids):
+                        if spin == 'aa':
+                            f_aa = fock.alpha_to_numpy(ind)
+                            vv = np.linalg.multi_dot(
+                                [mo_vir_a.T, f_aa, mo_vir_a])
+                            de = orb_ene_a[i] + orb_ene_a[j] - evv_aa
+                            e_mp2 += 0.5 * np.sum(vv * (vv - vv.T) / de)
+                            if i != j:
+                                e_mp2 += 0.5 * np.sum(vv.T * (vv.T - vv) / de)
+
+                        elif spin == 'bb':
+                            # Note: use alpha_to_numpy due to restricted Fock
+                            f_bb = fock.alpha_to_numpy(ind)
+                            vv = np.linalg.multi_dot(
+                                [mo_vir_b.T, f_bb, mo_vir_b])
+                            de = orb_ene_b[i] + orb_ene_b[j] - evv_bb
+                            e_mp2 += 0.5 * np.sum(vv * (vv - vv.T) / de)
+                            if i != j:
+                                e_mp2 += 0.5 * np.sum(vv.T * (vv.T - vv) / de)
+
+                        elif spin == 'ab':
+                            # Note: use alpha_to_numpy due to restricted Fock
+                            f_ab = fock.alpha_to_numpy(ind)
+                            vv = np.linalg.multi_dot(
+                                [mo_vir_a.T, f_ab, mo_vir_b])
+                            de = orb_ene_a[i] + orb_ene_b[j] - evv_ab
+                            e_mp2 += np.sum(vv * vv / de)
 
             if global_master:
                 valstr = '{:d} / {:d}'.format(batch_end - mo_ints_start,

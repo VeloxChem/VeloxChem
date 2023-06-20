@@ -36,19 +36,17 @@ class TestMOIntegralsDriver:
         mol_orbs = scf_drv.mol_orbs
 
         # mp2
+        e_ref = -0.28529088
+
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
-
         if is_mpi_master(task.mpi_comm):
-            e_ref = -0.28529088
-            e_mp2 = mp2_result['mp2_energy']
-            assert abs(e_ref - e_mp2) < 1.0e-8
+            assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-8
 
         mp2_drv.update_settings({'conventional': 'yes'})
-        mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
-
+        mp2_result_2 = mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
         if is_mpi_master(task.mpi_comm):
-            assert abs(e_ref - mp2_drv.e_mp2) < 1.0e-8
+            assert abs(e_ref - mp2_result_2['mp2_energy']) < 1.0e-8
 
         # extra test: collect moints batches to master node
         moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
@@ -103,15 +101,19 @@ class TestMOIntegralsDriver:
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
         # mp2
+        e_ref = -0.26775296
+
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
-        mp2_drv.conventional = True
         mp2_result = mp2_drv.compute(task.molecule, task.ao_basis,
                                      scf_drv.mol_orbs, scf_drv.scf_type)
-
         if is_mpi_master(task.mpi_comm):
-            e_ref = -0.26775296
-            e_mp2 = mp2_result['mp2_energy']
-            assert abs(e_ref - e_mp2) < 1.0e-7
+            assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-7
+
+        mp2_drv.conventional = True
+        mp2_result_2 = mp2_drv.compute(task.molecule, task.ao_basis,
+                                       scf_drv.mol_orbs, scf_drv.scf_type)
+        if is_mpi_master(task.mpi_comm):
+            assert abs(e_ref - mp2_result_2['mp2_energy']) < 1.0e-7
 
     def test_mp2_update_settings(self):
 
