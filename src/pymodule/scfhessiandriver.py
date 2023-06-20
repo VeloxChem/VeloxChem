@@ -195,7 +195,7 @@ class ScfHessianDriver(HessianDriver):
         self.ostream.flush()
 
 
-    def compute_numerical(self, molecule, ao_basis, min_basis):
+    def compute_numerical(self, molecule, ao_basis, min_basis=None):
         """
         Performs the calculation of a numerical Hessian based only
         on the energy.
@@ -773,6 +773,150 @@ class ScfHessianDriver(HessianDriver):
         return (hessian_cphf_coeff_rhs + hessian_first_integral_derivatives
                          + hessian_eri_overlap)
 
+
+
+    def construct_fock_matrix_cphf(self, molecule, ao_basis, cphf_ov):
+        """
+        Contracts the CPHF coefficients with the two-electron
+        integrals and returns an auxiliary fock matrix as a
+        numpy array.
+
+        :param molecule: The Molecule.
+        :param ao_basis: The AO Basis.
+        :param chpf_ov: The occupied-virtual block of the 
+                        CPHF coefficients.
+        """
+        natm = molecule.number_of_atoms()
+        nocc = molecule.number_of_alpha_electrons()
+        mo = self.scf_drv.scf_tensors['C']
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nao = mo.shape[0]
+        density = self.scf_drv.scf_tensors['D_alpha']
+        mo_energies = self.scf_drv.scf_tensors['E']
+        eocc = mo_energies[:nocc]
+        eo_diag = np.diag(eocc)
+        epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
+        # Transform the CPHF coefficients to AO:
+        uia_ao = np.einsum('mk,xykb,nb->xymn', mo_occ, 
+                            cphf_ov, mo_vir).reshape((3*natm, nao, nao))
+        
+        # create AODensity and Fock matrix objects, contract with ERI
+        uia_ao_list = list([uia_ao[x] for x in range(natm * 3)])
+        ao_density_uia = AODensityMatrix(uia_ao_list, denmat.rest)
+
+        fock_uia = AOFockMatrix(ao_density_uia)
+
+        fock_flag = fockmat.rgenjk
+        for i in range(natm*3):
+            fock_uia.set_fock_type(fock_flag, i)
+
+        # We use comp_lr_fock from CphfSolver to compute the eri
+        # and xc contributions
+        cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv)
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+        # ERI information
+        eri_dict = cphf_solver._init_eri(molecule, ao_basis)
+        # DFT information
+        dft_dict = cphf_solver._init_dft(molecule, self.scf_drv.scf_tensors)
+        # PE information
+        pe_dict = cphf_solver._init_pe(molecule, ao_basis)
+
+        profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
+
+        cphf_solver._comp_lr_fock(fock_uia, ao_density_uia, molecule, ao_basis,
+                                 eri_dict, dft_dict, pe_dict, profiler)
+
+        # TODO: can this be done in a different way?
+        fock_uia_numpy = np.zeros((natm,3,nao,nao))
+        for i in range(natm):
+            for x in range(3):
+                fock_uia_numpy[i,x] = fock_uia.to_numpy(3*i + x)
+
+        return fock_uia_numpy
+
+    def compute_perturbed_energy_weighted_density_matrix(self, molecule,
+                                                         ao_basis):
+        """
+        Calculates the perturbed energy weighted density matrix
+        and returns it as a numpy array.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+
+        """
+        natm = molecule.number_of_atoms()
+        nocc = molecule.number_of_alpha_electrons()
+        mo = self.scf_drv.scf_tensors['C']
+        mo_occ = mo[:, :nocc].copy()
+        mo_vir = mo[:, nocc:].copy()
+        nao = mo.shape[0]
+        nmo = mo.shape[1]
+        nvir = nmo - nocc
+        mo_energies = self.scf_drv.scf_tensors['E']
+        eocc = mo_energies[:nocc]
+        eoo = eocc.reshape(-1, 1) + eocc #ei+ej
+        scf_tensors = self.scf_drv.scf_tensors
+        # Set up a CPHF solver
+        cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv)
+        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
+
+        # Solve the CPHF equations
+        cphf_solver.compute(molecule, ao_basis, scf_tensors)
+
+        # Extract the relevant results
+        cphf_solution_dict = cphf_solver.cphf_results
+        cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
+        ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
+        cphf_oo = -0.5 * ovlp_deriv_oo
+
+        fock_uij = cphf_solution_dict['fock_uij']
+        fock_deriv_ao = cphf_solution_dict['fock_deriv_ao']
+        fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
+                                   fock_deriv_ao, mo_occ)
+        fock_uia_numpy = self.construct_fock_matrix_cphf(molecule, ao_basis,
+                                                         cphf_ov)
+
+        # (ei+ej)S^\chi_ij
+        orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo, ovlp_deriv_oo)
+
+        fock_cphf_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uij, mo_occ)
+
+        fock_cphf_ov = ( np.einsum('mi,xymn,nj->xyij', mo_occ,
+                                   fock_uia_numpy, mo_occ)
+                        +np.einsum('mj,xymn,ni->xyij', mo_occ,
+                                   fock_uia_numpy, mo_occ)
+                        )
+
+        orben_perturbed_density = ( np.einsum('i,mj,xyij,ni->xymn',
+                                            eocc, mo_occ, cphf_oo, mo_occ)
+                                  + np.einsum('i,mi,xyij,nj->xymn',
+                                            eocc, mo_occ, cphf_oo, mo_occ)
+                                  + np.einsum('i,ma,xyia,ni->xymn',
+                                            eocc, mo_vir, cphf_ov, mo_occ)
+                                  +np.einsum('i,mi,xyia,na->xymn',
+                                            eocc, mo_occ, cphf_ov, mo_vir)
+                                 )
+
+        # Construct the derivative of the omega multipliers:
+        perturbed_omega_ao = - ( orben_perturbed_density
+                                + np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                            fock_deriv_oo, mo_occ)
+                                -0.5*np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                                orben_ovlp_deriv_oo, mo_occ)
+                                + 2*np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                            fock_cphf_oo, mo_occ)
+                                + np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                            fock_cphf_ov, mo_occ)
+                                )
+        return perturbed_omega_ao
 
     # TODO: make this option available
     def compute_numerical_with_analytical_gradient(self, molecule, ao_basis,
