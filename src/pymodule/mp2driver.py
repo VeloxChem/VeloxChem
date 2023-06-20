@@ -147,7 +147,7 @@ class Mp2Driver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-    def compute(self, molecule, ao_basis, mol_orbs):
+    def compute(self, molecule, ao_basis, mol_orbs, scf_type='restricted'):
         """
         Performs MP2 calculation.
 
@@ -157,14 +157,22 @@ class Mp2Driver:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
+        :param scf_type:
+            The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
         if self.conventional:
-            return self.compute_conventional(molecule, ao_basis, mol_orbs)
+            return self.compute_conventional(molecule, ao_basis, mol_orbs,
+                                             scf_type)
         else:
-            return self.compute_distributed(molecule, ao_basis, mol_orbs)
+            return self.compute_distributed(molecule, ao_basis, mol_orbs,
+                                            scf_type)
 
-    def compute_conventional(self, molecule, ao_basis, mol_orbs):
+    def compute_conventional(self,
+                             molecule,
+                             ao_basis,
+                             mol_orbs,
+                             scf_type='restricted'):
         """
         Performs conventional MP2 calculation.
 
@@ -174,36 +182,93 @@ class Mp2Driver:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
+        :param scf_type:
+            The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
         moints_drv = MOIntegralsDriver(self.comm, self.ostream)
 
         if self.rank == mpi_master():
 
-            orb_ene = mol_orbs.ea_to_numpy()
-            nocc = molecule.number_of_alpha_electrons()
-            eocc = orb_ene[:nocc]
-            evir = orb_ene[nocc:]
-            e_vv = evir.reshape(-1, 1) + evir
-
             self.e_mp2 = 0.0
-            phys_oovv = moints_drv.compute_in_memory(molecule, ao_basis,
-                                                     mol_orbs, 'phys_oovv')
-            for i in range(phys_oovv.shape[0]):
-                for j in range(phys_oovv.shape[1]):
-                    ab = phys_oovv[i, j, :, :]
-                    denom = e_vv - eocc[i] - eocc[j]
-                    self.e_mp2 -= np.sum(ab * (2.0 * ab - ab.T) / denom)
 
-            mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
-            self.ostream.print_header(mp2_str.ljust(92))
-            self.ostream.print_blank()
+            if scf_type == 'restricted':
+
+                orb_ene = mol_orbs.ea_to_numpy()
+                nocc = molecule.number_of_alpha_electrons()
+                eocc = orb_ene[:nocc]
+                evir = orb_ene[nocc:]
+                e_vv = evir.reshape(-1, 1) + evir
+
+                phys_oovv = moints_drv.compute_in_memory(
+                    molecule, ao_basis, mol_orbs, 'phys_oovv')
+                for i in range(phys_oovv.shape[0]):
+                    for j in range(phys_oovv.shape[1]):
+                        ab = phys_oovv[i, j, :, :]
+                        denom = e_vv - eocc[i] - eocc[j]
+                        self.e_mp2 -= np.sum(ab * (2.0 * ab - ab.T) / denom)
+
+                mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
+                self.ostream.print_header(mp2_str.ljust(92))
+                self.ostream.print_blank()
+
+            elif scf_type == 'unrestricted':
+
+                orb_ene_a = mol_orbs.ea_to_numpy()
+                orb_ene_b = mol_orbs.eb_to_numpy()
+
+                nocc_a = molecule.number_of_alpha_electrons()
+                nocc_b = molecule.number_of_beta_electrons()
+
+                eocc_a = orb_ene_a[:nocc_a]
+                evir_a = orb_ene_a[nocc_a:]
+
+                eocc_b = orb_ene_b[:nocc_b]
+                evir_b = orb_ene_b[nocc_b:]
+
+                e_vv_aa = evir_a.reshape(-1, 1) + evir_a
+                e_vv_bb = evir_b.reshape(-1, 1) + evir_b
+                e_vv_ab = evir_a.reshape(-1, 1) + evir_b
+
+                phys_oovv_aaaa = moints_drv.compute_in_memory(
+                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'aaaa')
+                phys_oovv_bbbb = moints_drv.compute_in_memory(
+                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'bbbb')
+                phys_oovv_abab = moints_drv.compute_in_memory(
+                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'abab')
+
+                for i in range(phys_oovv_aaaa.shape[0]):
+                    for j in range(phys_oovv_aaaa.shape[1]):
+                        vv = phys_oovv_aaaa[i, j, :, :]
+                        denom = e_vv_aa - eocc_a[i] - eocc_a[j]
+                        self.e_mp2 -= 0.5 * np.sum(vv * (vv - vv.T) / denom)
+
+                for i in range(phys_oovv_bbbb.shape[0]):
+                    for j in range(phys_oovv_bbbb.shape[1]):
+                        vv = phys_oovv_bbbb[i, j, :, :]
+                        denom = e_vv_bb - eocc_b[i] - eocc_b[j]
+                        self.e_mp2 -= 0.5 * np.sum(vv * (vv - vv.T) / denom)
+
+                for i in range(phys_oovv_abab.shape[0]):
+                    for j in range(phys_oovv_abab.shape[1]):
+                        vv = phys_oovv_abab[i, j, :, :]
+                        denom = e_vv_ab - eocc_a[i] - eocc_b[j]
+                        self.e_mp2 -= np.sum(vv * vv / denom)
+
+                mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
+                self.ostream.print_header(mp2_str.ljust(92))
+                self.ostream.print_blank()
+
+            elif scf_type == 'restricted_openshell':
+
+                assert_msg_critical(
+                    False, 'Restricted open-shell MP2 not implemented')
 
             return {'mp2_energy': self.e_mp2}
         else:
             return None
 
-    def compute_distributed(self, molecule, basis, mol_orbs):
+    def compute_distributed(self, molecule, basis, mol_orbs, scf_type):
         """
         Performs MP2 calculation via distributed Fock builds.
 
@@ -213,7 +278,13 @@ class Mp2Driver:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
+        :param scf_type:
+            The SCF type (restricted, unrestricted, restricted_openshell).
         """
+
+        assert_msg_critical(
+            scf_type == 'restricted',
+            'Mp2Driver.compute_distributed: Only implemented restricted MP2')
 
         # subcommunicators
 

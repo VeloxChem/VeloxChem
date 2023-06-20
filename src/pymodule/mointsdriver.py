@@ -93,7 +93,12 @@ class MOIntegralsDriver:
         # output stream
         self.ostream = ostream
 
-    def compute_in_memory(self, molecule, basis, mol_orbs, moints_name):
+    def compute_in_memory(self,
+                          molecule,
+                          basis,
+                          mol_orbs,
+                          moints_name,
+                          moints_spin='aaaa'):
         """
         Performs in-memory MO integrals calculation for a molecule and a basis
         set.
@@ -106,15 +111,24 @@ class MOIntegralsDriver:
             The molecular orbitals.
         :param moints_name:
             The name of MO integrals to be calculated, such as 'chem_oovv'.
+        :param moints_spin:
+            The spin of MO integrals to be calculated, such as 'aabb'.
 
         :return:
             The computed MO integrals.
         """
 
-        mo = mol_orbs.alpha_to_numpy()
-        nocc = molecule.number_of_alpha_electrons()
-        mo_occ = mo[:, :nocc]
-        mo_vir = mo[:, nocc:]
+        mo_a = mol_orbs.alpha_to_numpy()
+        mo_b = mol_orbs.beta_to_numpy()
+
+        nocc_a = molecule.number_of_alpha_electrons()
+        nocc_b = molecule.number_of_beta_electrons()
+
+        mo_occ_a = mo_a[:, :nocc_a].copy()
+        mo_vir_a = mo_a[:, nocc_a:].copy()
+
+        mo_occ_b = mo_b[:, :nocc_b].copy()
+        mo_vir_b = mo_b[:, nocc_b:].copy()
 
         # get the type of MO integral, such as 'oovv'
 
@@ -135,15 +149,22 @@ class MOIntegralsDriver:
 
         # MO coefficients
 
-        mo_coef_dict = {'o': mo_occ, 'v': mo_vir}
+        mo_coef_dict = {
+            'oa': mo_occ_a,
+            'va': mo_vir_a,
+            'ob': mo_occ_b,
+            'vb': mo_vir_b,
+        }
         if chem_notation:
-            mo_coefs = [mo_coef_dict[x] for x in moints_type]
+            mo_coefs = [
+                mo_coef_dict[t + s] for t, s in zip(moints_type, moints_spin)
+            ]
         elif phys_notation:
             mo_coefs = [
-                mo_coef_dict[moints_type[0]],
-                mo_coef_dict[moints_type[2]],
-                mo_coef_dict[moints_type[1]],
-                mo_coef_dict[moints_type[3]],
+                mo_coef_dict[moints_type[0] + moints_spin[0]],
+                mo_coef_dict[moints_type[2] + moints_spin[2]],
+                mo_coef_dict[moints_type[1] + moints_spin[1]],
+                mo_coef_dict[moints_type[3] + moints_spin[3]],
             ]
 
         # AO integrals
