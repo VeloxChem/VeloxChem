@@ -562,44 +562,8 @@ class ScfHessianDriver(HessianDriver):
                                             eocc, mo_occ, cphf_ov, mo_vir)
                                  )
 
-        # Transform the CPHF coefficients to AO:
-        uia_ao = np.einsum('mk,xykb,nb->xymn', mo_occ, cphf_ov, mo_vir).reshape((3*natm, nao, nao))
-
-        # create AODensity and Fock matrix objects, contract with ERI
-        uia_ao_list = list([uia_ao[x] for x in range(natm * 3)])
-        ao_density_uia = AODensityMatrix(uia_ao_list, denmat.rest)
-
-        fock_uia = AOFockMatrix(ao_density_uia)
-
-        fock_flag = fockmat.rgenjk
-        for i in range(natm*3):
-            fock_uia.set_fock_type(fock_flag, i)
-
-        # TODO: remove commented out code.
-        #eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        #screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
-        #                            self.scf_drv.eri_thresh, molecule, ao_basis)
-        #eri_drv.compute(fock_uia, ao_density_uia, molecule, ao_basis, screening)
-
-        # We use comp_lr_fock from CphfSolver to compute the eri
-        # and xc contributions
-        cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv) # TODO: remove scf_drv
-        cphf_solver.update_settings(self.cphf_dict, self.method_dict)
-        # ERI information
-        eri_dict = cphf_solver._init_eri(molecule, ao_basis)
-        # DFT information
-        dft_dict = cphf_solver._init_dft(molecule, self.scf_drv.scf_tensors)
-        # PE information
-        pe_dict = cphf_solver._init_pe(molecule, ao_basis)
-
-        cphf_solver._comp_lr_fock(fock_uia, ao_density_uia, molecule, ao_basis,
-                                 eri_dict, dft_dict, pe_dict, profiler)
-
-        # TODO: can this be done in a different way?
-        fock_uia_numpy = np.zeros((natm,3,nao,nao))
-        for i in range(natm):
-            for x in range(3):
-                fock_uia_numpy[i,x] = fock_uia.to_numpy(3*i + x)
+        fock_uia_numpy = self.construct_fock_matrix_cphf(molecule,
+                                                    ao_basis, cphf_ov)
 
         fock_cphf_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uij, mo_occ)
 
