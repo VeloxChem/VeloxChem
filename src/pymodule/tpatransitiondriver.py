@@ -30,7 +30,9 @@ import time
 import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master
+from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_ev,
+                           fine_structure_constant,
+                           speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
@@ -56,8 +58,6 @@ class TpaTransitionDriver(NonlinearSolver):
 
     Instance variables
         - is_converged: The flag for convergence.
-        - comp: The list of all the gamma tensor components
-        - damping: The damping parameter.
         - lindep_thresh: The threshold for removing linear dependence in the
           trial vectors.
         - conv_thresh: The convergence threshold for the solver.
@@ -349,7 +349,7 @@ class TpaTransitionDriver(NonlinearSolver):
         profiler.check_memory_usage('E[3]')
 
         ret_dict = {}
-        M = {}
+        M_tensors = {}
         excited_state_dipole_moments = {}
 
         # Compute dipole vector
@@ -357,7 +357,7 @@ class TpaTransitionDriver(NonlinearSolver):
         scf_prop.compute_scf_prop(molecule, ao_basis, scf_tensors)
 
         for w_ind, w in enumerate(freqs):
-            m = {}
+            m = np.zeros((3, 3), dtype='complex128')
 
             N0_x = ComplexResponse.get_full_solution_vector(Nx[('x', 0)])
             N0_y = ComplexResponse.get_full_solution_vector(Nx[('y', 0)])
@@ -466,7 +466,7 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
 
-                m.update({('x', 'x'): val_E3 + val_A2 + val_X2})
+                m[0, 0] = val_E3 + val_A2 + val_X2
 
                 # yy
 
@@ -482,7 +482,7 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
 
-                m.update({('y', 'y'): val_E3 + val_A2 + val_X2})
+                m[1, 1] = val_E3 + val_A2 + val_X2
 
                 # zz
                 B2Nc = self._x2_contract(kc, op_z, d_a_mo, nocc, norb)
@@ -497,7 +497,7 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
 
-                m.update({('z', 'z'): val_E3 + val_A2 + val_X2})
+                m[2, 2] = val_E3 + val_A2 + val_X2
 
                 # A = x B = y
                 B2Nc = self._x2_contract(kc, op_y, d_a_mo, nocc, norb)
@@ -514,8 +514,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
 
-                m.update({('x', 'y'): val_E3 + val_A2 + val_X2})
-                m.update({('y', 'x'): val_E3 + val_A2 + val_X2})
+                m[0, 1] = val_E3 + val_A2 + val_X2
+                m[1, 0] = val_E3 + val_A2 + val_X2
 
                 # A = x B = z
 
@@ -533,8 +533,8 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
 
-                m.update({('x', 'z'): val_E3 + val_A2 + val_X2})
-                m.update({('z', 'x'): val_E3 + val_A2 + val_X2})
+                m[0, 2] = val_E3 + val_A2 + val_X2
+                m[2, 0] = val_E3 + val_A2 + val_X2
 
                 # yz
 
@@ -552,102 +552,67 @@ class TpaTransitionDriver(NonlinearSolver):
                 val_A2 = -(NbA2Nc + NcA2Nb)
                 val_E3 = NaE3NbNc
 
-                m.update({('y', 'z'): val_E3 + val_A2 + val_X2})
-                m.update({('z', 'y'): val_E3 + val_A2 + val_X2})
+                m[1, 2] = val_E3 + val_A2 + val_X2
+                m[2, 1] = val_E3 + val_A2 + val_X2
 
-                M.update({w: m})
+                M_tensors.update({w: m})
 
-        tensors = {}
         diagonalized_tensors = {}
+
         if self.rank == mpi_master():
-            for key, data in M.items():
-                tensor = self.dict_to_tensor(data)
-                tensors[key] = tensor
-                diagonalized_tensors[key] = self.diagonalize_tensor(tensor)
+            for key, tensor in M_tensors.items():
+                eigvals, eigvecs = np.linalg.eigh(tensor)
+                diagonalized_tensors[key] = np.diag(eigvals)
 
         self.ostream.print_blank()
-        w_str = 'Two-photon transition tensor M (a.u.): '
+        w_str = 'Summary of Two-photon Absorption'
         self.ostream.print_header(w_str)
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
-        # TODO: replace au2ev
-        au2ev = 27.211386
+        # conversion factor for TPA cross-sections in GM
+        # a0 in cm, c in cm/s, gamma (0.1 eV) in au
+        alpha = fine_structure_constant()
+        a0 = bohr_in_angstroms() * 1.0e-8
+        c = speed_of_light_in_vacuum_in_SI() * 100.0
+        gamma = 0.1 / hartree_in_ev()
+        au2gm = (8.0 * np.pi**2 * alpha * a0**5) / (c * gamma) * 1.0e+50
+
         if self.rank == mpi_master():
-            for w in freqs:
-                self.ostream.print_header('Energy (a.u.): {:.4f}'.format(-w))
+            tpa_strengths = {'linear': {}, 'circular': {}}
+            tpa_cross_sections = {'linear': {}, 'circular': {}}
 
-                title = '{:>20s} {:>20s} {:>20s}'.format('x', 'y', 'z')
-                width = len(title)
-                self.ostream.print_header(title.ljust(width))
-                self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component(tensors[w], width)
-                self.ostream.print_blank()
+            for w in M_tensors.keys():
+                Df = 0.0
+                Dg = 0.0
+                for i in range(3):
+                    for j in range(3):
+                        Mii = M_tensors[w][(i, i)]
+                        Mij = M_tensors[w][(i, j)]
+                        Mjj = M_tensors[w][(j, j)]
+                        Df += (Mii * Mjj).real
+                        Dg += (Mij * Mij).real
+                Df /= 30.0
+                Dg /= 30.0
 
-            self.ostream.print_blank()
-            w_str = 'Diagonalized two-photon transition tensor M (a.u.): '
-            self.ostream.print_header(w_str)
-            self.ostream.print_header('=' * (len(w_str) + 2))
-            self.ostream.print_blank()
+                D_linear = 2.0 * Df + 4.0 * Dg
+                D_circular = -2.0 * Df + 6.0 * Dg
 
-            for w in freqs:
-                self.ostream.print_header('Energy (a.u.): {:.4f}'.format(-w))
+                tpa_strengths['linear'][w] = D_linear
+                tpa_strengths['circular'][w] = D_circular
 
-                title = '{:>20s} {:>20s} {:>20s}'.format('x', 'y', 'z')
-                width = len(title)
-                self.ostream.print_header(title.ljust(width))
-                self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component(diagonalized_tensors[w], width)
-                self.ostream.print_blank()
-
-            Df = {}
-            Dg = {}
-            Dlin = {}
-            Dcirc = {}
-            sigma_lin = {}
-            sigma_circ = {}
-
-            self.ostream.print_blank()
-            w_str = 'Two-photon cross-section (Linear polarization): '
-            self.ostream.print_header(w_str)
-            self.ostream.print_header('=' * (len(w_str) + 2))
-            self.ostream.print_blank()
-
-            title = '{:12s} {:>20s} {:>20s} {:>20s} {:>20s}'.format(
-                'Photon Energy (eV)', 'Df', 'Dg', 'D', 'Sigma (GM)')
-            width = len(title)
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
-
-            for w in M.keys():
-                Df[w] = 0
-                Dg[w] = 0
-                for i in 'xyz':
-                    for j in 'xzy':
-                        Df[w] += (1 / 30 * (M[w][(i, i)] * M[w][(j, j)])).real
-                        Dg[w] += (1 / 30 * (M[w][(i, j)] * M[w][(i, j)])).real
-
-                Dlin[w] = (2 * Df[w] + 4 * Dg[w]).real
-                Dcirc[w] = (-2 * Df[w] + 6 * Dg[w]).real
-
-                # TODO: document factor of 2.17...
-                sigma_lin[-2 * au2ev * w] = (2.1701544363663383 * w**2 *
-                                             Dlin[w]).real
-                sigma_circ[-2 * au2ev * w] = (2.1701544363663383 * w**2 *
-                                              Dcirc[w]).real
-
-            for w in M.keys():
-                self._print_sigma(-au2ev * w, Df[w], Dg[w], Dlin[w],
-                                  sigma_lin[-2 * au2ev * w], width)
-
-            sigma = {'linear': sigma_lin, 'circular': sigma_circ}
+                tpa_cross_sections['linear'][w] = au2gm * w**2 * D_linear
+                tpa_cross_sections['circular'][w] = au2gm * w**2 * D_circular
 
             profiler.check_memory_usage('End of QRF')
 
+            self.print_results(freqs, M_tensors, tpa_strengths,
+                               tpa_cross_sections)
+
             ret_dict = {
-                'transition_moments': M,
-                'cross_sections': sigma,
-                'linear_polarization_tpa_strengths': Dlin,
+                'transition_moments': M_tensors,
+                'cross_sections': tpa_cross_sections,
+                'tpa_strengths': tpa_strengths,
                 'excited_state_dipole_moments': excited_state_dipole_moments,
                 'ground_state_dipole_moments':
                     scf_prop.get_property('dipole moment')
@@ -995,37 +960,81 @@ class TpaTransitionDriver(NonlinearSolver):
             'z', value[2][0].real, value[2][1].real, value[2][2].real)
         self.ostream.print_header(w_str.ljust(width))
 
-    def _print_sigma(self, w, Df, Dg, D, sigma, width):
+    def print_results(self, freqs, M_tensors, tpa_strengths,
+                      tpa_cross_sections):
         """
-        Prints QRF component.
+        Prints the results of TPA calculation.
 
-        :param label:
-            The label
-        :param freq:
-            The frequency
-        :param value:
-            The complex value
-        :param width:
-            The width for the output
+        :param freqs:
+            List of frequencies.
+        :param M_tensors:
+            TPA transition moments.
+        :param tpa_strengths:
+            TPA strengths.
+        :param tpa_cross_sections:
+            TPA cross sections.
         """
 
-        w_str = '{:20.4f} {:>20.8f} {:>20.8f} {:>20.8f} {:>20.8f}'.format(
-            w, Df, Dg, D, sigma)
-        self.ostream.print_header(w_str.ljust(width))
+        width = 92
 
-    # Function to convert a dictionary to a 3x3 tensor
-    def dict_to_tensor(self, dict_data):
-        tensor = np.zeros((3, 3), dtype=complex)
-        index_map = {'x': 0, 'y': 1, 'z': 2}
+        self.ostream.print_blank()
+        title = 'Components of TPA Transition Moments (a.u.)'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * width)
 
-        for key, value in dict_data.items():
-            i = index_map[key[0]]
-            j = index_map[key[1]]
-            tensor[i, j] = value
+        title = '  {:<9s} {:>12s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s}{:>11s} '.format(
+            'Ex. State', 'Ex. Energy', 'Sxx  ', 'Syy  ', 'Szz  ', 'Sxy  ',
+            'Sxz  ', 'Syz  ')
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header('-' * width)
 
-        return tensor
+        for w_ind, w in enumerate(freqs):
+            exec_str = '{:7d}   '.format(w_ind + 1)
+            exec_str += '{:11.6f} eV'.format(-w * hartree_in_ev())
+            exec_str += '{:11.4f}'.format(M_tensors[w][0, 0].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w][1, 1].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w][2, 2].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w][0, 1].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w][0, 2].real)
+            exec_str += '{:11.4f}'.format(M_tensors[w][1, 2].real)
+            self.ostream.print_header(exec_str.ljust(width))
+        self.ostream.print_blank()
+        self.ostream.print_blank()
 
-    def diagonalize_tensor(self, tensor):
-        eigenvalues, eigenvectors = np.linalg.eigh(tensor)
-        diagonalized_tensor = np.diag(eigenvalues)
-        return diagonalized_tensor
+        title = 'TPA Strength and Cross-Section (Linear Polarization)'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * width)
+
+        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
+            'Ex. State', 'Ex. Energy', 'TPA strength    ',
+            'TPA cross-section    ')
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header('-' * width)
+
+        for w_ind, w in enumerate(freqs):
+            exec_str = '{:7d}   '.format(w_ind + 1)
+            exec_str += '{:11.6f} eV'.format(-w * hartree_in_ev())
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['linear'][w])
+            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['linear'][w])
+            self.ostream.print_header(exec_str.ljust(width))
+        self.ostream.print_blank()
+        self.ostream.print_blank()
+
+        title = 'TPA Strength and Cross-Section (Circular Polarization)'
+        self.ostream.print_header(title)
+        self.ostream.print_header('-' * width)
+
+        title = '  {:<9s} {:>12s}{:>28s}{:>28s}'.format(
+            'Ex. State', 'Ex. Energy', 'TPA strength    ',
+            'TPA cross-section    ')
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header('-' * width)
+
+        for w_ind, w in enumerate(freqs):
+            exec_str = '{:7d}   '.format(w_ind + 1)
+            exec_str += '{:11.6f} eV'.format(-w * hartree_in_ev())
+            exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][w])
+            exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][w])
+            self.ostream.print_header(exec_str.ljust(width))
+        self.ostream.print_blank()
+        self.ostream.print_blank()

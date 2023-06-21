@@ -100,6 +100,7 @@ from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
 from .shgdriver import ShgDriver
+from .tpatransitiondriver import TpaTransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
 from .respchargesdriver import RespChargesDriver
