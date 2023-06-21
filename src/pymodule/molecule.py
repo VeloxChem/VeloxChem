@@ -82,9 +82,9 @@ def _Molecule_draw_2d_svg(smiles_str, width=300, height=300):
         from IPython.display import SVG
         from IPython.display import display
 
-        mol_no_hydrogen = Molecule._smiles_to_xyz(smiles_str,
-                                                  optimize=True,
-                                                  no_hydrogen=True)
+        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
+                                                 optimize=True,
+                                                 no_hydrogen=True)
 
         drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
         drawer.DrawMolecule(mol_no_hydrogen)
@@ -108,7 +108,7 @@ def _Molecule_read_smiles(smiles_str):
         The molecule.
     """
 
-    xyz = Molecule._smiles_to_xyz(smiles_str, optimize=True)
+    xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
 
     return Molecule.read_xyz_string(xyz)
 
@@ -492,6 +492,7 @@ def _Molecule_deepcopy(self, memo):
 
 
 Molecule._smiles_to_xyz = _Molecule_smiles_to_xyz
+Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.draw_2d_svg = _Molecule_draw_2d_svg
 Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
