@@ -163,6 +163,9 @@ class LinearResponseEigenSolver(LinearSolver):
         self._dist_e2bger = None
         self._dist_e2bung = None
 
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
+
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
 
@@ -251,6 +254,7 @@ class LinearResponseEigenSolver(LinearSolver):
         profiler.check_memory_usage('Initial guess')
 
         exc_energies = {}
+        exc_focks = {}
         exc_solutions = {}
         exc_residuals = {}
         relative_residual_norm = {}
@@ -329,6 +333,18 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 e2x_ger = self._dist_e2bger.matmul_AB_no_gather(c_ger[:, k])
                 e2x_ung = self._dist_e2bung.matmul_AB_no_gather(c_ung[:, k])
+
+                if self.nonlinear:
+                    fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
+                        c_ger[:, k])
+                    fock_realung = self._dist_fock_ung.matmul_AB_no_gather(
+                        c_ung[:, k])
+
+                    fock_full_data = (fock_realger.data + fock_realung.data)
+
+                    exc_focks[k] = DistributedArray(fock_full_data,
+                                                    self.comm,
+                                                    distribute=False)
 
                 s2x_ger = x_ger.data
                 s2x_ung = x_ung.data
@@ -574,44 +590,71 @@ class LinearResponseEigenSolver(LinearSolver):
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-            if self.rank == mpi_master():
+            if not self.nonlinear:
+
+                if self.rank == mpi_master():
+                    osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
+                                               axis=1) * eigvals
+                    rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
+                                     axis=1) * rotatory_strength_in_cgs()
+
+                    ret_dict = {
+                        'eigenvalues': eigvals,
+                        'eigenvectors_distributed': exc_solutions,
+                        'electric_transition_dipoles': elec_trans_dipoles,
+                        'velocity_transition_dipoles': velo_trans_dipoles,
+                        'magnetic_transition_dipoles': magn_trans_dipoles,
+                        'oscillator_strengths': osc,
+                        'rotatory_strengths': rot_vel,
+                        'excitation_details': excitation_details,
+                    }
+
+                    if self.nto:
+                        ret_dict['nto_lambdas'] = nto_lambdas
+                        ret_dict['nto_cubes'] = nto_cube_files
+
+                    if self.detach_attach:
+                        ret_dict['density_cubes'] = dens_cube_files
+
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                        checkpoint_text = 'Response solution vectors written to file: '
+                        checkpoint_text += final_h5_fname
+                        self.ostream.print_info(checkpoint_text)
+                        self.ostream.print_blank()
+
+                    self._print_results(ret_dict)
+
+                    return ret_dict
+                else:
+                    return {
+                        'eigenvalues': eigvals,
+                        'eigenvectors_distributed': exc_solutions,
+                    }
+
+            else:
+                if self.rank != mpi_master():
+                    elec_trans_dipoles = None
+                    excitation_details = None
+
+                elec_trans_dipoles = self.comm.bcast(elec_trans_dipoles,
+                                                     root=mpi_master())
+                excitation_details = self.comm.bcast(excitation_details,
+                                                     root=mpi_master())
+
                 osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
                                            axis=1) * eigvals
-                rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
-                                 axis=1) * rotatory_strength_in_cgs()
 
                 ret_dict = {
                     'eigenvalues': eigvals,
                     'eigenvectors_distributed': exc_solutions,
-                    'electric_transition_dipoles': elec_trans_dipoles,
-                    'velocity_transition_dipoles': velo_trans_dipoles,
-                    'magnetic_transition_dipoles': magn_trans_dipoles,
+                    'focks': exc_focks,
                     'oscillator_strengths': osc,
-                    'rotatory_strengths': rot_vel,
                     'excitation_details': excitation_details,
+                    'electric_transition_dipoles': elec_trans_dipoles,
                 }
-
-                if self.nto:
-                    ret_dict['nto_lambdas'] = nto_lambdas
-                    ret_dict['nto_cubes'] = nto_cube_files
-
-                if self.detach_attach:
-                    ret_dict['density_cubes'] = dens_cube_files
-
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    checkpoint_text = 'Response solution vectors written to file: '
-                    checkpoint_text += final_h5_fname
-                    self.ostream.print_info(checkpoint_text)
-                    self.ostream.print_blank()
-
-                self._print_results(ret_dict)
 
                 return ret_dict
-            else:
-                return {
-                    'eigenvalues': eigvals,
-                    'eigenvectors_distributed': exc_solutions,
-                }
 
         return None
 

@@ -450,14 +450,15 @@ class NonlinearSolver:
 
         mode_is_valid = mode.lower() in [
             'crf', 'tpa', 'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf',
-            'shg', 'shg_red'
+            'shg', 'shg_red', 'tpa_quad'
         ]
         assert_msg_critical(mode_is_valid,
                             'NonlinearSolver: Invalid mode ' + mode.lower())
 
         mode_is_cubic = mode.lower() in ['crf', 'tpa']
         mode_is_quadratic = mode.lower() in [
-            'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg', 'shg_red'
+            'crf_ii', 'tpa_ii', 'redtpa_i', 'redtpa_ii', 'qrf', 'shg',
+            'shg_red', 'tpa_quad'
         ]
 
         # determine number of batches
@@ -534,6 +535,17 @@ class NonlinearSolver:
                     # 6 second-order densities
                     # see get_densities in shgdriver
                     size_1, size_2 = 6, 6
+
+                elif mode.lower() == 'tpa_quad':
+                    # 5 first-order densities
+                    # 4 second-order densities
+                    # see get_densities in shgdriver
+                    size_1, size_2 = 5, 4
+
+                else:
+                    assert_msg_critical(
+                        False, 'NonlinearSolver: Cannot get sizes for mode ' +
+                        mode.lower())
 
                 if mode_is_cubic:
                     batch_size = max((batch_size // (size_2 + size_3)) * size_3,
@@ -898,11 +910,19 @@ class NonlinearSolver:
         """
 
         if X.ndim == 1:
-            new_yz = np.zeros_like(X)
-            half_len = X.shape[0] // 2
-            new_yz[:half_len] = -X.real[half_len:] + 1j * X.imag[half_len:]
-            new_yz[half_len:] = -X.real[:half_len] + 1j * X.imag[:half_len]
-            return new_yz
+            if X.dtype == np.dtype('complex128'):
+                new_yz = np.zeros_like(X)
+                half_len = X.shape[0] // 2
+                new_yz[:half_len] = -X.real[half_len:] + 1j * X.imag[half_len:]
+                new_yz[half_len:] = -X.real[:half_len] + 1j * X.imag[:half_len]
+                return new_yz
+
+            elif X.dtype == np.dtype('float64'):
+                new_yz = np.zeros_like(X)
+                half_len = X.shape[0] // 2
+                new_yz[:half_len] = -X[half_len:]
+                new_yz[half_len:] = -X[:half_len]
+                return new_yz
 
         return None
 
