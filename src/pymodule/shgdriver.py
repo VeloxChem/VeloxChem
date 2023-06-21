@@ -692,7 +692,7 @@ class ShgDriver(NonlinearSolver):
                                                        key_freq_pairs)
             self.restart = self.comm.bcast(self.restart, mpi_master())
 
-        # examine checkpoint for distributed Focks
+        # read or compute distributed Focks
 
         if self.restart:
             dist_focks = read_distributed_focks(fock_file, self.comm,

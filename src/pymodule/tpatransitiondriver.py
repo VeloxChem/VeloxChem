@@ -85,11 +85,14 @@ class TpaTransitionDriver(NonlinearSolver):
 
         # cpp settings
         self.damping = 0.0
+
+        # tpa transition settings
         self.nstates = 3
 
         # input keywords
-        self._input_keywords['response'].update(
-            {'nstates': ('int', 'number of excited states')})
+        self._input_keywords['response'].update({
+            'nstates': ('int', 'number of excited states'),
+        })
 
     def update_settings(self, rsp_dict, method_dict=None):
         """
@@ -149,7 +152,7 @@ class TpaTransitionDriver(NonlinearSolver):
         nbeta = molecule.number_of_beta_electrons()
         assert_msg_critical(
             nalpha == nbeta,
-            'QuadaticResponseDriver: not implemented for unrestricted case')
+            'TpaTransitionDriver: not implemented for unrestricted case')
 
         if self.rank == mpi_master():
             S = scf_tensors['S']
@@ -160,7 +163,6 @@ class TpaTransitionDriver(NonlinearSolver):
         else:
             d_a_mo = None
             norb = None
-
         d_a_mo = self.comm.bcast(d_a_mo, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
 
@@ -263,7 +265,6 @@ class TpaTransitionDriver(NonlinearSolver):
 
         Nx = N_results['solutions']
         Focks = N_results['focks']
-
         Focks.update(rpa_results['focks'])
 
         profiler.check_memory_usage('CPP')
@@ -323,9 +324,9 @@ class TpaTransitionDriver(NonlinearSolver):
             mo = None
             F0 = None
             norb = None
-
         F0 = self.comm.bcast(F0, root=mpi_master())
         norb = self.comm.bcast(norb, root=mpi_master())
+
         nocc = molecule.number_of_alpha_electrons()
 
         dft_dict = self._init_dft(molecule, scf_tensors)
@@ -339,7 +340,7 @@ class TpaTransitionDriver(NonlinearSolver):
         # computing the compounded first-order Fock matrices
         fock_dict = self.get_fock_dict(freqs, first_order_dens,
                                        second_order_dens, F0, mo, molecule,
-                                       ao_basis, dft_dict)
+                                       ao_basis, dft_dict, profiler)
 
         profiler.check_memory_usage('Focks')
 
@@ -570,6 +571,7 @@ class TpaTransitionDriver(NonlinearSolver):
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
 
+        # TODO: replace au2ev
         au2ev = 27.211386
         if self.rank == mpi_master():
             for w in freqs:
@@ -627,6 +629,8 @@ class TpaTransitionDriver(NonlinearSolver):
 
                 Dlin[w] = (2 * Df[w] + 4 * Dg[w]).real
                 Dcirc[w] = (-2 * Df[w] + 6 * Dg[w]).real
+
+                # TODO: document factor of 2.17...
                 sigma_lin[-2 * au2ev * w] = (2.1701544363663383 * w**2 *
                                              Dlin[w]).real
                 sigma_circ[-2 * au2ev * w] = (2.1701544363663383 * w**2 *
@@ -773,7 +777,8 @@ class TpaTransitionDriver(NonlinearSolver):
                       mo,
                       molecule,
                       ao_basis,
-                      dft_dict=None):
+                      dft_dict=None,
+                      profiler=None):
         """
         Computes the Fock matrices for a quadratic response function
 
@@ -797,7 +802,15 @@ class TpaTransitionDriver(NonlinearSolver):
         if self.rank == mpi_master():
             self._print_fock_header()
 
-        keys = ['F(bc)_x', 'F(bc)_y', 'F(bc)_z', 'F(cc)']
+        # generate key-frequency pairs
+
+        key_freq_pairs = []
+
+        for wb in wi:
+            for key in ['F(bc)_x', 'F(bc)_y', 'F(bc)_z', 'F(cc)']:
+                key_freq_pairs.append((key, wb))
+
+        # examine checkpoint for distributed Focks
 
         if self.checkpoint_file is not None:
             fock_file = str(
@@ -807,40 +820,35 @@ class TpaTransitionDriver(NonlinearSolver):
 
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = check_distributed_focks(fock_file, keys, wi)
+                self.restart = check_distributed_focks(fock_file,
+                                                       key_freq_pairs)
             self.restart = self.comm.bcast(self.restart, mpi_master())
 
+        # read or compute distributed Focks
+
         if self.restart:
-            focks = read_distributed_focks(fock_file, keys, wi, self.comm,
-                                           self.ostream)
-            focks['F0'] = F0
-            return focks
+            focks = read_distributed_focks(fock_file, self.comm, self.ostream)
+        else:
+            time_start_fock = time.time()
 
-        time_start_fock = time.time()
-        dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
-                                         dft_dict, first_order_dens,
-                                         second_order_dens, None, 'tpa_quad')
-        time_end_fock = time.time()
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                             dft_dict, first_order_dens,
+                                             second_order_dens, None,
+                                             'tpa_quad', profiler)
 
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
+            self._print_fock_time(time.time() - time_start_fock)
+
+            write_distributed_focks(fock_file, dist_focks, key_freq_pairs,
+                                    self.comm, self.ostream)
 
         focks = {'F0': F0}
-        for key in keys:
-            focks[key] = {}
 
-        fock_index = 0
-        for wb in wi:
-            for key in keys:
-                focks[key][wb] = DistributedArray(dist_focks.data[:,
-                                                                  fock_index],
-                                                  self.comm,
-                                                  distribute=False)
-                fock_index += 1
-
-        # TODO
-        # write_distributed_focks(fock_file, focks, keys, wi, self.comm,
-        #                         self.ostream)
+        for fock_index, (key, wb) in enumerate(key_freq_pairs):
+            if key not in focks:
+                focks[key] = {}
+            focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index],
+                                              self.comm,
+                                              distribute=False)
 
         return focks
 
