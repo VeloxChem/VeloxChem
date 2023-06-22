@@ -29,7 +29,8 @@ import time
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_ev,
-                           hartree_in_wavenumber, fine_structure_constant,
+                           hartree_in_inverse_nm, hartree_in_wavenumber,
+                           fine_structure_constant,
                            speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
@@ -106,9 +107,9 @@ class TpaDriver(NonlinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
-              A dictonary containing the isotropic T[4], T[3], X[3], A[3],
-              X[2], A[2] contractions and the isotropic cubic response
-              functions for TPA
+            A dictonary containing the isotropic T[4], T[3], X[3], A[3], X[2],
+            A[2] contractions and the isotropic cubic response functions for
+            TPA.
         """
 
         if self.norm_thresh is None:
@@ -402,9 +403,6 @@ class TpaDriver(NonlinearSolver):
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-            self.print_results(self.frequencies, gamma, self.comp, t4_dict,
-                               t3_dict, other_dict)
-
             result.update(other_dict)
 
             result.update({
@@ -413,6 +411,8 @@ class TpaDriver(NonlinearSolver):
                 'gamma': gamma,
                 'w': self.frequencies
             })
+
+            self.print_results(self.frequencies, self.comp, result)
 
         profiler.check_memory_usage('End of TPA')
 
@@ -793,24 +793,17 @@ class TpaDriver(NonlinearSolver):
         else:
             return {}
 
-    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
+    def print_results(self, freqs, comp, result):
         """
         Prints the results from the TPA calculation.
 
         :param freqs:
             List of frequencies
-        :param gamma:
-            A dictonary containing the isotropic cubic response functions for
-            TPA
         :param comp:
             List of gamma tensors components
-        :param t4_dict:
-            A dictonary containing the isotropic T[4] contractions
-        :param t3_dict:
-            A dictonary containing the isotropic T[3] contractions
-        :param tpa_dict:
-            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
-            contractions
+        :param result:
+            A dictonary containing the isotropic gamma, T[4], T[3], X[3], A[3],
+            X[2] and A[2] contractions.
         """
 
         return None
@@ -883,16 +876,27 @@ class TpaDriver(NonlinearSolver):
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
 
-    def get_spectrum(self, gamma):
+    def get_spectrum(self, result, x_unit):
         """
         Gets two-photon absorption spectrum.
 
-        :param gamma:
-            The second-order hyperpolarizability.
+        :param result:
+            A dictonary containing the isotropic T[4], T[3], X[3], A[3], X[2],
+            A[2] contractions and the isotropic cubic response functions for
+            TPA.
+        :param x_unit:
+            The unit of x-axis.
 
         :return:
-            A list containing the energies in a.u. and cross-sections in GM.
+            A dictionary containing photon energies and TPA cross-sections.
         """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'TpaDriver.get_spectrum: x_unit should be au, ev or nm')
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
 
         # conversion factor for TPA cross-sections in GM
         # * a0 in cm
@@ -903,13 +907,32 @@ class TpaDriver(NonlinearSolver):
         c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
         au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
 
-        spectrum = []
+        gamma = result['gamma']
+
+        spectrum = {'x_data': [], 'y_data': [], 'x_label': '', 'y_label': ''}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'TPA cross-section [GM]'
 
         for w in self.frequencies:
             if w == 0.0:
                 continue
+
+            if x_unit.lower() == 'au':
+                spectrum['x_data'].append(w)
+            elif x_unit.lower() == 'ev':
+                spectrum['x_data'].append(au2ev * w)
+            elif x_unit.lower() == 'nm':
+                spectrum['x_data'].append(auxnm / w)
+
             cross_section_in_GM = gamma[(w, -w, w)].imag * w**2 * au2gm
-            spectrum.append((w, cross_section_in_GM))
+            spectrum['y_data'].append(cross_section_in_GM)
 
         return spectrum
 
@@ -936,13 +959,20 @@ class TpaDriver(NonlinearSolver):
             self.ostream.print_blank()
             return
 
+        assert_msg_critical(
+            '[a.u.]' in spectrum['x_label'],
+            'TpaDriver.print_spectrum: In valid unit in x_label')
+        assert_msg_critical(
+            '[GM]' in spectrum['y_label'],
+            'TpaDriver.print_spectrum: In valid unit in y_label')
+
         title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
                                                'Frequency[eV]',
                                                'TPA cross-section[GM]')
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_header(('-' * len(title)).ljust(width))
 
-        for w, cross_section in spectrum:
+        for w, cross_section in zip(spectrum['x_data'], spectrum['y_data']):
             output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
                 w, w * hartree_in_ev(), cross_section)
             self.ostream.print_header(output.ljust(width))

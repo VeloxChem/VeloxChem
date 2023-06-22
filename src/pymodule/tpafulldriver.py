@@ -1864,30 +1864,28 @@ class TpaFullDriver(TpaDriver):
         else:
             return None
 
-    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
+    def print_results(self, freqs, comp, result):
         """
         Prints the results from the TPA calculation.
 
         :param freqs:
             List of frequencies
-        :param gamma:
-            A dictonary containing the isotropic cubic response functions for
-            TPA
         :param comp:
             List of gamma tensors components
-        :param t4_dict:
-            A dictonary containing the isotropic T[4] contractions
-        :param t3_dict:
-            A dictonary containing the isotropic T[3] contractions
-        :param tpa_dict:
-            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
-            contractions
+        :param result:
+            A dictonary containing the isotropic gamma, T[4], T[3], X[3], A[3],
+            X[2] and A[2] contractions.
         """
 
-        NaX3NyNz = tpa_dict['NaX3NyNz']
-        NaA3NxNy = tpa_dict['NaA3NxNy']
-        NaX2Nyz = tpa_dict['NaX2Nyz']
-        NxA2Nyz = tpa_dict['NxA2Nyz']
+        gamma = result['gamma']
+
+        t4_dict = result['t4_dict']
+        t3_dict = result['t3_dict']
+
+        NaX3NyNz = result['NaX3NyNz']
+        NaA3NxNy = result['NaA3NxNy']
+        NaX2Nyz = result['NaX2Nyz']
+        NxA2Nyz = result['NxA2Nyz']
 
         self.ostream.print_blank()
 
@@ -1923,7 +1921,7 @@ class TpaFullDriver(TpaDriver):
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()
 
-        spectrum = self.get_spectrum(gamma)
+        spectrum = self.get_spectrum(result, x_unit='au')
         self.print_spectrum(spectrum, width)
 
         self.ostream.print_blank()

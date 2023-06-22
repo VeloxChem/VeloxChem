@@ -951,30 +951,25 @@ class TpaReducedDriver(TpaDriver):
 
         return None
 
-    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, other_dict):
+    def print_results(self, freqs, comp, result):
         """
         Prints the results from the reduced TPA calculation.
 
         :param freqs:
             List of frequencies
-        :param gamma:
-            A dictonary containing the reduced isotropic cubic response
-            functions for TPA
         :param comp:
             List of gamma tensors components
-        :param t4_dict:
-            A dictonary containing the isotropic T[4] contractions (None for
-            one-photon off-resonance TPA calculations)
-        :param t3_dict:
-            A dictonary containing the isotropic T[3] contractions for
-            one-photon off-resonance TPA calculations
-        :param other_dict:
-            A dictonary containing the isotropic X[2] and A[2] contractions for
-            one-photo off-resonance TPA calculations
+        :param result:
+            A dictonary containing the isotropic gamma, T[4], T[3], X[3], A[3],
+            X[2] and A[2] contractions.
         """
 
-        NaX2Nyz = other_dict['NaX2Nyz']
-        NxA2Nyz = other_dict['NxA2Nyz']
+        gamma = result['gamma']
+
+        t3_dict = result['t3_dict']
+
+        NaX2Nyz = result['NaX2Nyz']
+        NxA2Nyz = result['NxA2Nyz']
 
         self.ostream.print_blank()
 
@@ -1015,7 +1010,7 @@ class TpaReducedDriver(TpaDriver):
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()
 
-        spectrum = self.get_spectrum(gamma)
+        spectrum = self.get_spectrum(result, x_unit='au')
         self.print_spectrum(spectrum, width)
 
         self.ostream.print_blank()
