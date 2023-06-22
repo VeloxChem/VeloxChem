@@ -28,7 +28,9 @@ import numpy as np
 import time
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master, hartree_in_wavenumber
+from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_ev,
+                           hartree_in_wavenumber, fine_structure_constant,
+                           speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
@@ -880,3 +882,69 @@ class TpaDriver(NonlinearSolver):
         w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
+
+    def get_spectrum(self, gamma):
+        """
+        Gets two-photon absorption spectrum.
+
+        :param gamma:
+            The second-order hyperpolarizability.
+
+        :return:
+            A list containing the energies in a.u. and cross-sections in GM.
+        """
+
+        # conversion factor for TPA cross-sections in GM
+        # * a0 in cm
+        # * c in cm/s
+        # * broadening parameter not included in au2gm
+        alpha = fine_structure_constant()
+        a0_in_cm = bohr_in_angstroms() * 1.0e-8
+        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
+        au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
+
+        spectrum = []
+
+        for w in self.frequencies:
+            if w == 0.0:
+                continue
+            cross_section_in_GM = gamma[(w, -w, w)].imag * w**2 * au2gm
+            spectrum.append((w, cross_section_in_GM))
+
+        return spectrum
+
+    def print_spectrum(self, spectrum, width):
+        """
+        Prints two-photon absorption spectrum.
+
+        :param spectrum:
+            The spectrum.
+        :param width:
+            The width of the output.
+        """
+
+        self.ostream.print_blank()
+
+        title = 'Two-Photon Absorption Spectrum'
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('=' * len(title)).ljust(width))
+        self.ostream.print_blank()
+
+        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
+            text = '*** No two-photon absorption spectrum at zero frequency.'
+            self.ostream.print_header(text.ljust(width))
+            self.ostream.print_blank()
+            return
+
+        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'TPA cross-section[GM]')
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('-' * len(title)).ljust(width))
+
+        for w, cross_section in spectrum:
+            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
+                w, w * hartree_in_ev(), cross_section)
+            self.ostream.print_header(output.ljust(width))
+
+        self.ostream.print_blank()

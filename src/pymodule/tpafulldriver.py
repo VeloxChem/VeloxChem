@@ -1923,4 +1923,7 @@ class TpaFullDriver(TpaDriver):
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()
 
+        spectrum = self.get_spectrum(gamma)
+        self.print_spectrum(spectrum, width)
+
         self.ostream.print_blank()
