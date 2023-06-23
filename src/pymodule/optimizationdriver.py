@@ -178,12 +178,10 @@ class OptimizationDriver:
         """
 
         if self.hessian or self.transition:
-            geometric_repo = 'https://github.com/leeping/geomeTRIC.git'
             err_msg = (
                 'The installed geometric package does not support\n' +
                 '  Hessian or transition state search. Please install\n' +
-                '  the latest geometric via\n' +
-                f'  python3 -m pip install git+{geometric_repo}\n')
+                '  the latest geometric via pip or conda.\n')
             assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
         self.print_header()

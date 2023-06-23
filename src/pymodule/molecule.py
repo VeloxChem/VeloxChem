@@ -174,10 +174,11 @@ def _Molecule_read_xyz_string(xyz):
     try:
         natoms = int(lines[0].strip())
     except (ValueError, TypeError):
-        assert_msg_critical(False, 'Invalid number of atoms in XYZ input')
+        assert_msg_critical(False,
+                            'Molecule: Invalid number of atoms in XYZ input')
 
     assert_msg_critical(natoms == len(lines[2:]),
-                        'Inconsistent number of atoms in XYZ input')
+                        'Molecule: Inconsistent number of atoms in XYZ input')
 
     mol_str = '\n'.join(lines[2:])
     return Molecule.read_molecule_string(mol_str, 'angstrom')

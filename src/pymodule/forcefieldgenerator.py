@@ -926,7 +926,7 @@ class ForceFieldGenerator:
             from scipy.optimize import curve_fit
         except ImportError:
             raise ImportError('Unable to import scipy. Please install scipy ' +
-                              'via \'python3 -m pip install scipy\'')
+                              'via pip or conda.')
 
         # Ryckaert-Bellemans function
 

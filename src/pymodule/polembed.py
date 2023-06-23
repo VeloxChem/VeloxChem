@@ -31,8 +31,8 @@ from mpi4py import MPI
 try:
     import cppe
 except ImportError:
-    raise ImportError('Unable to import cppe. Please install cppe via ' +
-                      '\'python3 -m pip install cppe\'')
+    raise ImportError(
+        'Unable to import cppe. Please install cppe via pip or conda.')
 
 from .errorhandler import assert_msg_critical
 from .inputparser import InputParser

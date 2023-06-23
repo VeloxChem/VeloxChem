@@ -93,16 +93,15 @@ class OrbitalViewer:
 
     def help_string_k3d(self):
 
-        return ('Unable to import k3d. Please install k3d via\n' +
-                '  python3 -m pip install k3d\n' +
+        return ('Unable to import k3d. Please install k3d via pip or conda,\n' +
+                '  and then run\n' +
                 '  jupyter nbextension install --py --sys-prefix k3d\n' +
                 '  jupyter nbextension enable --py --sys-prefix k3d\n')
 
     def help_string_widgets_and_display(self):
 
         return ('Unable to import ipywidgets or IPython.display.\n' +
-                'Please install jupyter notebook via\n' +
-                '  python3 -m pip install jupyter')
+                'Please install jupyter notebook via pip or conda.')
 
     def initialize(self, molecule, basis):
         """

@@ -129,15 +129,18 @@ class LinearResponseEigenSolver(LinearSolver):
 
         if self.cube_origin is not None:
             assert_msg_critical(
-                len(self.cube_origin) == 3, 'cube origin: Need 3 numbers')
+                len(self.cube_origin) == 3,
+                'LinearResponseEigenSolver: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
-                len(self.cube_stepsize) == 3, 'cube stepsize: Need 3 numbers')
+                len(self.cube_stepsize) == 3,
+                'LinearResponseEigenSolver: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
-                len(self.cube_points) == 3, 'cube points: Need 3 integers')
+                len(self.cube_points) == 3,
+                'LinearResponseEigenSolver: cube points needs 3 integers')
 
     def compute(self, molecule, basis, scf_tensors):
         """

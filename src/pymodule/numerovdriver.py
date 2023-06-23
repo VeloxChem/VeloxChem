@@ -208,7 +208,7 @@ class NumerovDriver:
             from scipy import interpolate
         except ImportError:
             raise ImportError('Unable to import scipy. Please install scipy ' +
-                              'via \'python3 -m pip install scipy\'')
+                              'via pip or conda.')
 
         if not self.pec_data:
             # carry out PEC scan

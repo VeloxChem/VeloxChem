@@ -214,9 +214,8 @@ class TrajectoryDriver:
             import MDAnalysis as mda
             from MDAnalysis.topology.guessers import guess_atom_element
         except ImportError:
-            raise ImportError(
-                'Unable to import MDAnalysis. Please install ' +
-                'MDAnalysis via \'python3 -m pip install MDAnalysis\'')
+            raise ImportError('Unable to import MDAnalysis. Please install ' +
+                              'MDAnalysis via pip or conda.')
 
         self.print_header()
 
@@ -635,9 +634,8 @@ class TrajectoryDriver:
         try:
             from matplotlib import pyplot as plt
         except ImportError:
-            raise ImportError(
-                'Unable to import matplotlib. Please install ' +
-                'matplotlib via \'python3 -m pip install matplotlib\'')
+            raise ImportError('Unable to import matplotlib. Please install ' +
+                              'matplotlib via pip or conda.')
 
         # calculate the average spectrum
         y_averaged = np.sum(y, axis=0) / y.shape[0]

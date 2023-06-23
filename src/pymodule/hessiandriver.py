@@ -163,7 +163,7 @@ class HessianDriver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Gradient driver: Undefined XC functional')
+                                'Hessian driver: Undefined XC functional')
 
         if self.do_four_point:
             self.numerical = True
@@ -215,11 +215,9 @@ class HessianDriver:
             The response driver (for excited state vibrational analysis).
         """
 
-        geometric_repo = 'https://github.com/leeping/geomeTRIC.git'
         err_msg = ('The installed geometric package does not support\n' +
                    '  vibrational analysis. Please install the latest\n' +
-                   '  geometric via\n' +
-                   f'  python3 -m pip install git+{geometric_repo}\n')
+                   '  geometric via pip or conda.\n')
         assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
         # number of atoms, elements, and coordinates
