@@ -390,7 +390,7 @@ class TpaDriver(NonlinearSolver):
 
         profiler.check_memory_usage('T[4],T[3]')
 
-        result = {}
+        ret_dict = {}
 
         if self.rank == mpi_master():
             gamma = {}
@@ -403,20 +403,20 @@ class TpaDriver(NonlinearSolver):
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-            result.update(other_dict)
+            ret_dict.update(other_dict)
 
-            result.update({
+            ret_dict.update({
                 't4_dict': t4_dict,
                 't3_dict': t3_dict,
                 'gamma': gamma,
                 'frequencies': list(self.frequencies),
             })
 
-            self.print_results(self.frequencies, self.comp, result)
+            self._print_results(ret_dict)
 
         profiler.check_memory_usage('End of TPA')
 
-        return result
+        return ret_dict
 
     def get_densities(self, wi, Nx, mo, nocc, norb):
         """
@@ -793,17 +793,12 @@ class TpaDriver(NonlinearSolver):
         else:
             return {}
 
-    def print_results(self, freqs, comp, result):
+    def _print_results(self, rsp_results):
         """
         Prints the results from the TPA calculation.
 
-        :param freqs:
-            List of frequencies
-        :param comp:
-            List of gamma tensors components
-        :param result:
-            A dictonary containing the isotropic gamma, T[4], T[3], X[3], A[3],
-            X[2] and A[2] contractions.
+        :param rsp_results:
+            A dictonary containing the results of response calculation.
         """
 
         return None
@@ -877,14 +872,12 @@ class TpaDriver(NonlinearSolver):
         self.ostream.print_header(w_str.ljust(width))
 
     @staticmethod
-    def get_spectrum(result, x_unit):
+    def get_spectrum(rsp_results, x_unit):
         """
         Gets two-photon absorption spectrum.
 
-        :param result:
-            A dictonary containing the isotropic T[4], T[3], X[3], A[3], X[2],
-            A[2] contractions and the isotropic cubic response functions for
-            TPA.
+        :param rsp_results:
+            A dictonary containing the results of response calculation.
         :param x_unit:
             The unit of x-axis.
 
@@ -908,9 +901,9 @@ class TpaDriver(NonlinearSolver):
         c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
         au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
 
-        gamma = result['gamma']
+        gamma = rsp_results['gamma']
 
-        spectrum = {'x_data': [], 'y_data': [], 'x_label': '', 'y_label': ''}
+        spectrum = {'x_data': [], 'y_data': []}
 
         if x_unit.lower() == 'au':
             spectrum['x_label'] = 'Photon energy [a.u.]'
@@ -921,7 +914,7 @@ class TpaDriver(NonlinearSolver):
 
         spectrum['y_label'] = 'TPA cross-section [GM]'
 
-        freqs = result['frequencies']
+        freqs = rsp_results['frequencies']
 
         for w in freqs:
             if w == 0.0:
@@ -935,11 +928,12 @@ class TpaDriver(NonlinearSolver):
                 spectrum['x_data'].append(auxnm / w)
 
             cross_section_in_GM = gamma[(w, -w, w)].imag * w**2 * au2gm
+
             spectrum['y_data'].append(cross_section_in_GM)
 
         return spectrum
 
-    def print_spectrum(self, spectrum, width):
+    def _print_spectrum(self, spectrum, width):
         """
         Prints two-photon absorption spectrum.
 
@@ -964,10 +958,10 @@ class TpaDriver(NonlinearSolver):
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
-            'TpaDriver.print_spectrum: In valid unit in x_label')
+            'TpaDriver._print_spectrum: In valid unit in x_label')
         assert_msg_critical(
             '[GM]' in spectrum['y_label'],
-            'TpaDriver.print_spectrum: In valid unit in y_label')
+            'TpaDriver._print_spectrum: In valid unit in y_label')
 
         title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
                                                'Frequency[eV]',
