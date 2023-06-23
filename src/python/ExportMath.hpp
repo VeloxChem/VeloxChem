@@ -8,8 +8,7 @@ namespace vlx_math {  // vlx_math namespace
 /**
  Exports classes/functions in src/math to python.
  */
-auto
-export_math(py::module& m) -> void;
+auto export_math(py::module& m) -> void;
 
 }  // namespace vlx_math
 

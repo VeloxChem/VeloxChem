@@ -8,8 +8,7 @@ namespace vlx_orbdata {  // vlx_orbdata namespace
 /**
  Exports classes/functions in src/orbdata to python.
  */
-auto
-export_orbdata(py::module& m) -> void;
+auto export_orbdata(py::module& m) -> void;
 
 }  // namespace vlx_orbdata
 

@@ -5,12 +5,11 @@
 #include "AngularMomentum.hpp"
 
 CSubMatrix::CSubMatrix()
-    
+
     : _values(nullptr)
 
     , _dimensions({0, 0, 0, 0})
 {
-    
 }
 
 CSubMatrix::CSubMatrix(const T4Index& dimensions)
@@ -21,12 +20,11 @@ CSubMatrix::CSubMatrix(const T4Index& dimensions)
 {
     if (const auto nelements = _dimensions[2] * _dimensions[3]; nelements > 0)
     {
-        _values = (double*) std::malloc(nelements * sizeof(double));
+        _values = (double*)std::malloc(nelements * sizeof(double));
     }
 }
 
-CSubMatrix::CSubMatrix(const std::vector<double>& values,
-                       const T4Index&             dimensions)
+CSubMatrix::CSubMatrix(const std::vector<double>& values, const T4Index& dimensions)
 
     : _values(nullptr)
 
@@ -34,8 +32,8 @@ CSubMatrix::CSubMatrix(const std::vector<double>& values,
 {
     if (const auto nelements = _dimensions[2] * _dimensions[3]; nelements > 0)
     {
-        _values = (double*) std::malloc(nelements * sizeof(double));
-        
+        _values = (double*)std::malloc(nelements * sizeof(double));
+
         std::memcpy(_values, values.data(), nelements * sizeof(double));
     }
 }
@@ -49,8 +47,8 @@ CSubMatrix::CSubMatrix(const CSubMatrix& other)
 {
     if (const auto nelements = _dimensions[2] * _dimensions[3]; nelements > 0)
     {
-        _values = (double*) std::malloc(nelements * sizeof(double));
-        
+        _values = (double*)std::malloc(nelements * sizeof(double));
+
         std::memcpy(_values, other._values, nelements * sizeof(double));
     }
 }
@@ -64,15 +62,14 @@ CSubMatrix::~CSubMatrix()
 }
 
 auto
-CSubMatrix::setOffsets(const int64_t row_offset,
-                       const int64_t col_offset) -> void
+CSubMatrix::setOffsets(const int64_t row_offset, const int64_t col_offset) -> void
 {
     _dimensions[0] = row_offset;
-    
+
     _dimensions[1] = col_offset;
 }
 
-auto 
+auto
 CSubMatrix::setValues(const std::vector<double>& values) -> void
 {
     if (const auto nelements = _dimensions[2] * _dimensions[3]; nelements == values.size())
@@ -93,9 +90,9 @@ CSubMatrix::getValues() const -> std::vector<double>
     if (const auto nelements = _dimensions[2] * _dimensions[3]; nelements > 0)
     {
         std::vector<double> values(nelements, 0.0);
-        
+
         std::memcpy(values.data(), _values, nelements * sizeof(double));
-        
+
         return values;
     }
     else
@@ -105,7 +102,7 @@ CSubMatrix::getValues() const -> std::vector<double>
 }
 
 auto
-CSubMatrix::getData() ->  double*
+CSubMatrix::getData() -> double*
 {
     return _values;
 }

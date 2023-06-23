@@ -1,8 +1,7 @@
 #include "StringFormat.hpp"
 
-#include <cctype>
-
 #include <algorithm>
+#include <cctype>
 #include <iterator>
 #include <sstream>
 
@@ -12,19 +11,17 @@ auto
 upcase(const std::string& source) -> std::string
 {
     std::string str;
-    
+
     for (size_t i = 0; i < source.size(); i++)
     {
         str.push_back(std::toupper(source[i]));
     }
-        
+
     return str;
 }
 
 auto
-format(const std::string& source,
-       const size_t       width,
-       const fmt_t        aligment) -> std::string
+format(const std::string& source, const size_t width, const fmt_t aligment) -> std::string
 {
     auto str = source;
 
@@ -56,10 +53,7 @@ format(const std::string& source,
 }
 
 auto
-to_string(const double source,
-          const size_t presicion,
-          const size_t width,
-          const fmt_t  aligment) -> std::string
+to_string(const double source, const size_t presicion, const size_t width, const fmt_t aligment) -> std::string
 {
     std::stringstream ss;
 
@@ -77,8 +71,7 @@ to_string(const double source,
 }
 
 auto
-to_string(const double source,
-          const size_t presicion) -> std::string
+to_string(const double source, const size_t presicion) -> std::string
 {
     std::stringstream ss;
 
@@ -92,9 +85,7 @@ to_string(const double source,
 }
 
 auto
-to_string(const int64_t source,
-          const size_t  width,
-          const fmt_t   aligment) -> std::string
+to_string(const int64_t source, const size_t width, const fmt_t aligment) -> std::string
 {
     auto str = std::to_string(source);
 

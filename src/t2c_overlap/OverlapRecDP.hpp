@@ -4,11 +4,11 @@
 #include <cstdint>
 
 #include "GtoBlock.hpp"
-#include "SubMatrix.hpp"
-#include "SimdTypes.hpp"
 #include "MatrixType.hpp"
+#include "SimdTypes.hpp"
+#include "SubMatrix.hpp"
 
-namespace ovlrec { // ovlrec namespace
+namespace ovlrec {  // ovlrec namespace
 
 /**
  Evaluates <D||P>  integrals for given pair of GTOs blocks.
@@ -20,13 +20,12 @@ namespace ovlrec { // ovlrec namespace
  @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
  @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
 */
-auto
-compOverlapDP(      CSubMatrix* matrix,
-              const CGtoBlock&  bra_gto_block,
-              const CGtoBlock&  ket_gto_block,
-              const bool        ang_order,
-              const int64_t     bra_first,
-              const int64_t     bra_last) -> void;
+auto compOverlapDP(CSubMatrix*      matrix,
+                   const CGtoBlock& bra_gto_block,
+                   const CGtoBlock& ket_gto_block,
+                   const bool       ang_order,
+                   const int64_t    bra_first,
+                   const int64_t    bra_last) -> void;
 
 /**
  Evaluates block of primitive <D_XX||P> integrals.
@@ -44,19 +43,18 @@ compOverlapDP(      CSubMatrix* matrix,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapDP_XX_T(      TDoubleArray& buffer_x,
-                                  TDoubleArray& buffer_y,
-                                  TDoubleArray& buffer_z,
-                            const double        bra_exp,
-                            const double        bra_norm,
-                            const TPoint3D&     bra_coord,
-                            const TDoubleArray& ket_exps,
-                            const TDoubleArray& ket_norms,
-                            const TDoubleArray& ket_coords_x,
-                            const TDoubleArray& ket_coords_y,
-                            const TDoubleArray& ket_coords_z,
-                            const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapDP_XX_T(TDoubleArray&       buffer_x,
+                                 TDoubleArray&       buffer_y,
+                                 TDoubleArray&       buffer_z,
+                                 const double        bra_exp,
+                                 const double        bra_norm,
+                                 const TPoint3D&     bra_coord,
+                                 const TDoubleArray& ket_exps,
+                                 const TDoubleArray& ket_norms,
+                                 const TDoubleArray& ket_coords_x,
+                                 const TDoubleArray& ket_coords_y,
+                                 const TDoubleArray& ket_coords_z,
+                                 const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <D_XY||P> integrals.
@@ -74,19 +72,18 @@ compPrimitiveOverlapDP_XX_T(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapDP_XY_T(      TDoubleArray& buffer_x,
-                                  TDoubleArray& buffer_y,
-                                  TDoubleArray& buffer_z,
-                            const double        bra_exp,
-                            const double        bra_norm,
-                            const TPoint3D&     bra_coord,
-                            const TDoubleArray& ket_exps,
-                            const TDoubleArray& ket_norms,
-                            const TDoubleArray& ket_coords_x,
-                            const TDoubleArray& ket_coords_y,
-                            const TDoubleArray& ket_coords_z,
-                            const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapDP_XY_T(TDoubleArray&       buffer_x,
+                                 TDoubleArray&       buffer_y,
+                                 TDoubleArray&       buffer_z,
+                                 const double        bra_exp,
+                                 const double        bra_norm,
+                                 const TPoint3D&     bra_coord,
+                                 const TDoubleArray& ket_exps,
+                                 const TDoubleArray& ket_norms,
+                                 const TDoubleArray& ket_coords_x,
+                                 const TDoubleArray& ket_coords_y,
+                                 const TDoubleArray& ket_coords_z,
+                                 const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <D_XZ||P> integrals.
@@ -104,19 +101,18 @@ compPrimitiveOverlapDP_XY_T(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapDP_XZ_T(      TDoubleArray& buffer_x,
-                                  TDoubleArray& buffer_y,
-                                  TDoubleArray& buffer_z,
-                            const double        bra_exp,
-                            const double        bra_norm,
-                            const TPoint3D&     bra_coord,
-                            const TDoubleArray& ket_exps,
-                            const TDoubleArray& ket_norms,
-                            const TDoubleArray& ket_coords_x,
-                            const TDoubleArray& ket_coords_y,
-                            const TDoubleArray& ket_coords_z,
-                            const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapDP_XZ_T(TDoubleArray&       buffer_x,
+                                 TDoubleArray&       buffer_y,
+                                 TDoubleArray&       buffer_z,
+                                 const double        bra_exp,
+                                 const double        bra_norm,
+                                 const TPoint3D&     bra_coord,
+                                 const TDoubleArray& ket_exps,
+                                 const TDoubleArray& ket_norms,
+                                 const TDoubleArray& ket_coords_x,
+                                 const TDoubleArray& ket_coords_y,
+                                 const TDoubleArray& ket_coords_z,
+                                 const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <D_YY||P> integrals.
@@ -134,19 +130,18 @@ compPrimitiveOverlapDP_XZ_T(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapDP_YY_T(      TDoubleArray& buffer_x,
-                                  TDoubleArray& buffer_y,
-                                  TDoubleArray& buffer_z,
-                            const double        bra_exp,
-                            const double        bra_norm,
-                            const TPoint3D&     bra_coord,
-                            const TDoubleArray& ket_exps,
-                            const TDoubleArray& ket_norms,
-                            const TDoubleArray& ket_coords_x,
-                            const TDoubleArray& ket_coords_y,
-                            const TDoubleArray& ket_coords_z,
-                            const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapDP_YY_T(TDoubleArray&       buffer_x,
+                                 TDoubleArray&       buffer_y,
+                                 TDoubleArray&       buffer_z,
+                                 const double        bra_exp,
+                                 const double        bra_norm,
+                                 const TPoint3D&     bra_coord,
+                                 const TDoubleArray& ket_exps,
+                                 const TDoubleArray& ket_norms,
+                                 const TDoubleArray& ket_coords_x,
+                                 const TDoubleArray& ket_coords_y,
+                                 const TDoubleArray& ket_coords_z,
+                                 const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <D_YZ||P> integrals.
@@ -164,19 +159,18 @@ compPrimitiveOverlapDP_YY_T(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapDP_YZ_T(      TDoubleArray& buffer_x,
-                                  TDoubleArray& buffer_y,
-                                  TDoubleArray& buffer_z,
-                            const double        bra_exp,
-                            const double        bra_norm,
-                            const TPoint3D&     bra_coord,
-                            const TDoubleArray& ket_exps,
-                            const TDoubleArray& ket_norms,
-                            const TDoubleArray& ket_coords_x,
-                            const TDoubleArray& ket_coords_y,
-                            const TDoubleArray& ket_coords_z,
-                            const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapDP_YZ_T(TDoubleArray&       buffer_x,
+                                 TDoubleArray&       buffer_y,
+                                 TDoubleArray&       buffer_z,
+                                 const double        bra_exp,
+                                 const double        bra_norm,
+                                 const TPoint3D&     bra_coord,
+                                 const TDoubleArray& ket_exps,
+                                 const TDoubleArray& ket_norms,
+                                 const TDoubleArray& ket_coords_x,
+                                 const TDoubleArray& ket_coords_y,
+                                 const TDoubleArray& ket_coords_z,
+                                 const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <D_ZZ||P> integrals.
@@ -194,20 +188,19 @@ compPrimitiveOverlapDP_YZ_T(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapDP_ZZ_T(      TDoubleArray& buffer_x,
-                                  TDoubleArray& buffer_y,
-                                  TDoubleArray& buffer_z,
-                            const double        bra_exp,
-                            const double        bra_norm,
-                            const TPoint3D&     bra_coord,
-                            const TDoubleArray& ket_exps,
-                            const TDoubleArray& ket_norms,
-                            const TDoubleArray& ket_coords_x,
-                            const TDoubleArray& ket_coords_y,
-                            const TDoubleArray& ket_coords_z,
-                            const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapDP_ZZ_T(TDoubleArray&       buffer_x,
+                                 TDoubleArray&       buffer_y,
+                                 TDoubleArray&       buffer_z,
+                                 const double        bra_exp,
+                                 const double        bra_norm,
+                                 const TPoint3D&     bra_coord,
+                                 const TDoubleArray& ket_exps,
+                                 const TDoubleArray& ket_norms,
+                                 const TDoubleArray& ket_coords_x,
+                                 const TDoubleArray& ket_coords_y,
+                                 const TDoubleArray& ket_coords_z,
+                                 const int64_t       ket_dim) -> void;
 
-} // ovlrec namespace
+}  // namespace ovlrec
 
 #endif /* OverlapRecDP_hpp */

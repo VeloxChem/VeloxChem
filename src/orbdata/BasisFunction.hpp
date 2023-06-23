@@ -32,8 +32,7 @@ class CBasisFunction
      Rescales normalization factors to match normalization of spherical (l,0)
      component of basis function.
      */
-    auto
-    _rescale() -> void;
+    auto _rescale() -> void;
 
     /**
      Computes overlap between two primitive Gaussian functions.
@@ -42,9 +41,7 @@ class CBasisFunction
      @param j the index of second primitve Gaussain function.
      @return the overlap between two primitive Gaussian functions.
      */
-    auto
-    _overlap(const size_t i,
-             const size_t j) const -> double;
+    auto _overlap(const size_t i, const size_t j) const -> double;
 
    public:
     /**
@@ -59,9 +56,7 @@ class CBasisFunction
      @param norms the vector of normalization factors of primitive Gaussian functions.
      @param angmom the angular momentum of basis function.
      */
-    CBasisFunction(const std::vector<double>& exponents,
-                   const std::vector<double>& norms,
-                   const int64_t              angmom);
+    CBasisFunction(const std::vector<double>& exponents, const std::vector<double>& norms, const int64_t angmom);
 
     /**
      Sets exponents of primittive Gaussian functions with specific vector of
@@ -69,8 +64,7 @@ class CBasisFunction
 
      @param exponents the vector of exponents.
      */
-    auto
-    setExponents(const std::vector<double>& exponents) -> void;
+    auto setExponents(const std::vector<double>& exponents) -> void;
 
     /**
      Sets normalization factors of primitive Gaussian functions with specific
@@ -78,16 +72,14 @@ class CBasisFunction
 
      @param norms the vector of normalization factors.
      */
-    auto
-    setNormalizationFactors(const std::vector<double>& norms) -> void;
+    auto setNormalizationFactors(const std::vector<double>& norms) -> void;
 
     /**
      Set angular momentum of basis function.
 
      @param angmom the angular momentum.
      */
-    auto
-    setAngularMomentum(const int64_t angmom) -> void;
+    auto setAngularMomentum(const int64_t angmom) -> void;
 
     /**
      Adds primittive Gaussian function to basis function.
@@ -95,47 +87,40 @@ class CBasisFunction
      @param exponent the exponent of primitive Gaussian function.
      @param norm the normalization factor of primitive Gaussian function.
      */
-    auto
-    add(const double exponent,
-        const double norm) -> void;
+    auto add(const double exponent, const double norm) -> void;
 
     /**
      Normalizes basis function.
      */
-    auto
-    normalize() -> void;
+    auto normalize() -> void;
 
     /**
      Gets vector of exponents of primitive Gaussian functions.
 
      @return the vector of exponents.
      */
-    auto
-    getExponents() const -> std::vector<double>;
+    auto getExponents() const -> std::vector<double>;
 
     /**
      Gets vector of normalization factors of primitive Gaussian functions.
 
      @return the vector of normalization factors.
      */
-    auto
-    getNormalizationFactors() const -> std::vector<double>;
+    auto getNormalizationFactors() const -> std::vector<double>;
 
     /**
      Gets angular momentum of basis function.
 
      @return the angular momentum.
      */
-    auto
-    getAngularMomentum() const -> int64_t;
+    auto getAngularMomentum() const -> int64_t;
 
     /**
      Gets number of primitive Gaussian functions in basis function.
 
      @return the number of primitive Gaussian functions.
      */
-    auto
-    getNumberOfPrimitiveFunctions() const -> int64_t;
+    auto getNumberOfPrimitiveFunctions() const -> int64_t;
 };
 
 #endif /* BasisFunction_hpp */

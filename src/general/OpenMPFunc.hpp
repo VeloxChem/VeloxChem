@@ -4,21 +4,20 @@
 #include <cstdint>
 #include <vector>
 
-#include "omp.h"
-
-#include "T4Index.hpp"
 #include "GtoBlock.hpp"
 #include "GtoFunc.hpp"
+#include "T4Index.hpp"
+#include "omp.h"
 
 using TGraph = std::vector<T4Index>;
 
 using TWorkGroup = std::vector<TGraph>;
 
-namespace omp { // omp namespace
+namespace omp {  // omp namespace
 
 /**
  Sets number of OMP threads available.
- 
+
  @param nthreads the number of OMP threads.
  */
 inline auto
@@ -29,7 +28,7 @@ setNumberOfThreads(const int nthreads) -> void
 
 /**
  Gets number of OMP threads available.
- 
+
  @return the number of OMP threads.
  */
 inline auto
@@ -49,7 +48,7 @@ setStaticScheduler() -> void
 
 /**
  Gets thread identifier in parallel region.
- 
+
  @return the thread identifier.
  */
 inline auto
@@ -60,24 +59,21 @@ getThreadIdentifier() -> int
 
 /**
  Generates work group for OMP tasks manager.
- 
+
  @param gto_blocks the vector of basis function blocks.
  @return the work group.
  */
-auto
-makeWorkGroup(const std::vector<CGtoBlock>& gto_blocks) -> TWorkGroup;
+auto makeWorkGroup(const std::vector<CGtoBlock>& gto_blocks) -> TWorkGroup;
 
 /**
  Generates work group for OMP tasks manager.
- 
+
  @param bra_gto_blocks the vector of basis function blocks on bra side.
  @param ket_gto_blocks the vector of basis function blocks on ket side.
  @return the work group.
  */
-auto
-makeWorkGroup(const std::vector<CGtoBlock>& bra_gto_blocks,
-              const std::vector<CGtoBlock>& ket_gto_blocks) -> TWorkGroup;
+auto makeWorkGroup(const std::vector<CGtoBlock>& bra_gto_blocks, const std::vector<CGtoBlock>& ket_gto_blocks) -> TWorkGroup;
 
-}  // omp namespace
+}  // namespace omp
 
 #endif /* OpenMPFunc_hpp */

@@ -4,9 +4,7 @@
 
 #include "MathConst.hpp"
 
-CBasisFunction::CBasisFunction(const std::vector<double>& exponents,
-                               const std::vector<double>& norms,
-                               const int64_t              angmom)
+CBasisFunction::CBasisFunction(const std::vector<double>& exponents, const std::vector<double>& norms, const int64_t angmom)
 
     : _exponents(exponents)
 
@@ -36,8 +34,7 @@ CBasisFunction::setAngularMomentum(const int64_t angmom) -> void
 }
 
 auto
-CBasisFunction::add(const double exponent,
-                    const double norm) -> void
+CBasisFunction::add(const double exponent, const double norm) -> void
 {
     _exponents.push_back(exponent);
 
@@ -56,11 +53,11 @@ CBasisFunction::normalize() -> void
         // uncontracted GTO
 
         if (npgtos == 1) _norms[0] = 1.0;
-        
+
         // normalize primitive GTOs
 
         _rescale();
-        
+
         // compute contracted GTO self-overlap
 
         double fovl = 0.0;
@@ -74,7 +71,7 @@ CBasisFunction::normalize() -> void
                 fovl += 2.0 * _overlap(i, j);
             }
         }
-        
+
         // renormaliza primitive GTOs
 
         fovl = 1.0 / std::sqrt(fovl);
@@ -116,12 +113,12 @@ CBasisFunction::_rescale() -> void
     if (const auto npgtos = _exponents.size(); npgtos > 0)
     {
         const auto fpi = 2.0 / mathconst::getPiValue();
-      
+
         for (size_t i = 0; i < npgtos; i++)
         {
             _norms[i] *= std::pow(_exponents[i] * fpi, 0.75);
         }
-        
+
         if (_angmom == 1)
         {
             for (size_t i = 0; i < npgtos; i++)
@@ -163,8 +160,8 @@ CBasisFunction::_rescale() -> void
             for (size_t i = 0; i < npgtos; i++)
             {
                 _norms[i] *= fact * _exponents[i] * _exponents[i]
-                
-                          * std::sqrt(_exponents[i]);
+
+                             * std::sqrt(_exponents[i]);
             }
         }
         else if (_angmom == 6)
@@ -174,8 +171,8 @@ CBasisFunction::_rescale() -> void
             for (size_t i = 0; i < npgtos; i++)
             {
                 _norms[i] *= fact * _exponents[i] * _exponents[i]
-                
-                           * _exponents[i];
+
+                             * _exponents[i];
             }
         }
         else
@@ -186,14 +183,13 @@ CBasisFunction::_rescale() -> void
 }
 
 auto
-CBasisFunction::_overlap(const size_t i,
-                         const size_t j) const -> double
+CBasisFunction::_overlap(const size_t i, const size_t j) const -> double
 {
     const auto fab = 1.0 / (_exponents[i] + _exponents[j]);
-    
+
     const auto fovl = _norms[i] * _norms[j]
-    
-                    * std::pow(mathconst::getPiValue() * fab, 1.5);
+
+                      * std::pow(mathconst::getPiValue() * fab, 1.5);
 
     if (_angmom == 0)
     {

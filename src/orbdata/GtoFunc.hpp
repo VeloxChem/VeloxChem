@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <vector>
 
-#include "Molecule.hpp"
-#include "MolecularBasis.hpp"
 #include "GtoBlock.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
 
 namespace gtofunc {  // gtofunc namespace
 
@@ -17,9 +17,7 @@ namespace gtofunc {  // gtofunc namespace
  @param molecule the molecule.
  @return the vector of contracted GTOs blocks.
  */
-auto
-makeGtoBlocks(const CMolecularBasis& basis,
-              const CMolecule&       molecule) -> std::vector<CGtoBlock>;
+auto makeGtoBlocks(const CMolecularBasis& basis, const CMolecule& molecule) -> std::vector<CGtoBlock>;
 
 /**
  Creates vector of contracted GTOs blocks.
@@ -29,10 +27,7 @@ makeGtoBlocks(const CMolecularBasis& basis,
  @param atoms the vector of atoms to select contracted GTOs.
  @return the vector of contracted GTOs blocks.
  */
-auto
-makeGtoBlocks(const CMolecularBasis&      basis,
-              const CMolecule&            molecule,
-              const std::vector<int64_t>& atoms) -> std::vector<CGtoBlock>;
+auto makeGtoBlocks(const CMolecularBasis& basis, const CMolecule& molecule, const std::vector<int64_t>& atoms) -> std::vector<CGtoBlock>;
 
 }  // namespace gtofunc
 

@@ -8,8 +8,7 @@ namespace vlx_general {  // vlx_general namespace
 /**
  Exports classes/functions in src/general to python.
  */
-auto
-export_general(py::module& m) -> void;
+auto export_general(py::module& m) -> void;
 
 }  // namespace vlx_general
 

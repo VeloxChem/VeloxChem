@@ -1,8 +1,8 @@
 #ifndef MatrixFunc_hpp
 #define MatrixFunc_hpp
 
-#include "MolecularBasis.hpp"
 #include "Matrix.hpp"
+#include "MolecularBasis.hpp"
 
 namespace matfunc {  // matfunc namespace
 
@@ -13,9 +13,7 @@ namespace matfunc {  // matfunc namespace
  @param mtype the matrix type.
  @return the matrix.
  */
-auto
-makeMatrix(const CMolecularBasis& basis,
-           const mat_t            mtype) -> CMatrix;
+auto makeMatrix(const CMolecularBasis& basis, const mat_t mtype) -> CMatrix;
 
 /**
  Creates matrix.
@@ -24,9 +22,7 @@ makeMatrix(const CMolecularBasis& basis,
  @param ket_basis the molecular basis on ket side.
  @return the matrix.
  */
-auto
-makeMatrix(const CMolecularBasis& bra_basis,
-           const CMolecularBasis& ket_basis) -> CMatrix;
+auto makeMatrix(const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis) -> CMatrix;
 
 }  // namespace matfunc
 

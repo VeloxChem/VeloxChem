@@ -4,11 +4,11 @@
 #include <cstdint>
 
 #include "GtoBlock.hpp"
-#include "SubMatrix.hpp"
-#include "SimdTypes.hpp"
 #include "MatrixType.hpp"
+#include "SimdTypes.hpp"
+#include "SubMatrix.hpp"
 
-namespace ovlrec { // ovlrec namespace
+namespace ovlrec {  // ovlrec namespace
 
 /**
  Evaluates <S||D>  integrals for given pair of GTOs blocks.
@@ -20,13 +20,12 @@ namespace ovlrec { // ovlrec namespace
  @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
  @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
 */
-auto
-compOverlapSD(      CSubMatrix* matrix,
-              const CGtoBlock&  bra_gto_block,
-              const CGtoBlock&  ket_gto_block,
-              const bool        ang_order,
-              const int64_t     bra_first,
-              const int64_t     bra_last) -> void;
+auto compOverlapSD(CSubMatrix*      matrix,
+                   const CGtoBlock& bra_gto_block,
+                   const CGtoBlock& ket_gto_block,
+                   const bool       ang_order,
+                   const int64_t    bra_first,
+                   const int64_t    bra_last) -> void;
 
 /**
  Evaluates block of primitive <S||D> integrals.
@@ -47,23 +46,22 @@ compOverlapSD(      CSubMatrix* matrix,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapSD(      TDoubleArray& buffer_xx,
-                             TDoubleArray& buffer_xy,
-                             TDoubleArray& buffer_xz,
-                             TDoubleArray& buffer_yy,
-                             TDoubleArray& buffer_yz,
-                             TDoubleArray& buffer_zz,
-                       const double        bra_exp,
-                       const double        bra_norm,
-                       const TPoint3D&     bra_coord,
-                       const TDoubleArray& ket_exps,
-                       const TDoubleArray& ket_norms,
-                       const TDoubleArray& ket_coords_x,
-                       const TDoubleArray& ket_coords_y,
-                       const TDoubleArray& ket_coords_z,
-                       const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapSD(TDoubleArray&       buffer_xx,
+                            TDoubleArray&       buffer_xy,
+                            TDoubleArray&       buffer_xz,
+                            TDoubleArray&       buffer_yy,
+                            TDoubleArray&       buffer_yz,
+                            TDoubleArray&       buffer_zz,
+                            const double        bra_exp,
+                            const double        bra_norm,
+                            const TPoint3D&     bra_coord,
+                            const TDoubleArray& ket_exps,
+                            const TDoubleArray& ket_norms,
+                            const TDoubleArray& ket_coords_x,
+                            const TDoubleArray& ket_coords_y,
+                            const TDoubleArray& ket_coords_z,
+                            const int64_t       ket_dim) -> void;
 
-} // ovlrec namespace
+}  // namespace ovlrec
 
 #endif /* OverlapRecSD_hpp */

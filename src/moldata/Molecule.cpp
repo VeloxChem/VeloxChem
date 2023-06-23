@@ -1,19 +1,16 @@
 
 #include "Molecule.hpp"
 
-#include <cstdlib>
 #include <cmath>
-
-#include <sstream>
+#include <cstdlib>
 #include <iostream>
+#include <sstream>
 
 #include "ChemicalElement.hpp"
-#include "StringFormat.hpp"
 #include "Codata.hpp"
+#include "StringFormat.hpp"
 
-CMolecule::CMolecule(const std::vector<int64_t>&  identifiers,
-                     const std::vector<TPoint3D>& coordinates,
-                     const std::string&           units)
+CMolecule::CMolecule(const std::vector<int64_t>& identifiers, const std::vector<TPoint3D>& coordinates, const std::string& units)
 {
     if (const auto natoms = identifiers.size(); coordinates.size() == natoms)
     {
@@ -21,12 +18,10 @@ CMolecule::CMolecule(const std::vector<int64_t>&  identifiers,
         {
             addAtom(identifiers[i], coordinates[i], units);
         }
-    } 
+    }
 }
 
-CMolecule::CMolecule(const std::vector<std::string>& labels,
-                     const std::vector<TPoint3D>&    coordinates,
-                     const std::string&              units)
+CMolecule::CMolecule(const std::vector<std::string>& labels, const std::vector<TPoint3D>& coordinates, const std::string& units)
 {
     if (const auto natoms = labels.size(); coordinates.size() == natoms)
     {
@@ -37,42 +32,39 @@ CMolecule::CMolecule(const std::vector<std::string>& labels,
     }
 }
 
-CMolecule::CMolecule(const CMolecule& molfrag_one,
-                     const CMolecule& molfrag_two)
+CMolecule::CMolecule(const CMolecule& molfrag_one, const CMolecule& molfrag_two)
 {
     // copy geometrical data from molecule A
-    
+
     _identifiers = molfrag_one._identifiers;
-    
+
     _coordinates = molfrag_one._coordinates;
 
     // append geometrical data from molecule B
-    
+
     if (const auto natoms = molfrag_two.getNumberOfAtoms(); natoms > 0)
     {
         for (int64_t i = 0; i < natoms; i++)
         {
             _identifiers.push_back(molfrag_two._identifiers[i]);
-            
+
             _coordinates.push_back(molfrag_two._coordinates[i]);
         }
     }
 
     // set charge and spin state
-    
+
     _charge = molfrag_one._charge + molfrag_two._charge;
-    
+
     const auto spin_one = (molfrag_one._multiplicity - 1) / 2;
-    
+
     const auto spin_two = (molfrag_two._multiplicity - 1) / 2;
-    
+
     _multiplicity = 2 * (spin_one + spin_two) + 1;
 }
 
 auto
-CMolecule::addAtom(const std::string& label,
-                   const TPoint3D&    coordinates,
-                   const std::string& units) -> void
+CMolecule::addAtom(const std::string& label, const TPoint3D& coordinates, const std::string& units) -> void
 {
     if (CChemicalElement elem; elem.setAtomType(fstr::upcase(label)))
     {
@@ -81,21 +73,17 @@ CMolecule::addAtom(const std::string& label,
 }
 
 auto
-CMolecule::addAtom(const int64_t      identifier,
-                   const TPoint3D&    coordinates,
-                   const std::string& units) -> void
+CMolecule::addAtom(const int64_t identifier, const TPoint3D& coordinates, const std::string& units) -> void
 {
     if (CChemicalElement elem; (identifier >= 0) && (identifier <= elem.getMaxIdentifier()))
     {
         _identifiers.push_back(identifier);
-        
+
         if (_isAnngstroms(units))
         {
             const auto fact = 1.0 / units::getBohrValueInAngstroms();
-            
-            _coordinates.push_back({coordinates[0] * fact,
-                                    coordinates[1] * fact,
-                                    coordinates[2] * fact});
+
+            _coordinates.push_back({coordinates[0] * fact, coordinates[1] * fact, coordinates[2] * fact});
         }
         else
         {
@@ -105,9 +93,9 @@ CMolecule::addAtom(const int64_t      identifier,
     else
     {
         std::cerr << "*** Unsupported chemical element with elemental number ";
-        
-        std::cerr << identifier << " is encountered!!!"  << std::endl;
-        
+
+        std::cerr << identifier << " is encountered!!!" << std::endl;
+
         std::exit(EXIT_FAILURE);
     }
 }
@@ -125,7 +113,7 @@ CMolecule::setMultiplicity(const int64_t multiplicity) -> void
 }
 
 auto
-CMolecule::getCharge() const ->  double
+CMolecule::getCharge() const -> double
 {
     return _charge;
 }
@@ -146,7 +134,7 @@ auto
 CMolecule::getNumberOfAtoms(const int64_t identifier) const -> int64_t
 {
     int64_t count = 0;
-    
+
     if (const auto natoms = getNumberOfAtoms(); natoms > 0)
     {
         for (int64_t i = 0; i < natoms; i++)
@@ -154,17 +142,15 @@ CMolecule::getNumberOfAtoms(const int64_t identifier) const -> int64_t
             if (_identifiers[i] == identifier) count++;
         }
     }
-    
+
     return count;
 }
 
 auto
-CMolecule::getNumberOfAtoms(const int64_t iatom,
-                            const int64_t natoms,
-                            const int64_t identifier) const -> int64_t
+CMolecule::getNumberOfAtoms(const int64_t iatom, const int64_t natoms, const int64_t identifier) const -> int64_t
 {
     int64_t count = 0;
-    
+
     if (natoms > 0)
     {
         for (int64_t i = iatom; i < (iatom + natoms); i++)
@@ -172,7 +158,7 @@ CMolecule::getNumberOfAtoms(const int64_t iatom,
             if (_identifiers[i] == identifier) count++;
         }
     }
-    
+
     return count;
 }
 
@@ -180,7 +166,7 @@ auto
 CMolecule::getElementalComposition() const -> std::set<int64_t>
 {
     std::set<int64_t> elem_comp;
-    
+
     if (const auto natoms = getNumberOfAtoms(); natoms > 0)
     {
         for (int64_t i = 0; i < natoms; i++)
@@ -188,7 +174,7 @@ CMolecule::getElementalComposition() const -> std::set<int64_t>
             elem_comp.insert(_identifiers[i]);
         }
     }
-    
+
     return elem_comp;
 }
 
@@ -196,17 +182,17 @@ auto
 CMolecule::getNumberOfElectrons() const -> int64_t
 {
     auto qsum = -_charge;
-    
+
     if (const auto natoms = getNumberOfAtoms(); natoms > 0)
     {
         auto charges = getCharges();
-        
+
         for (int64_t i = 0; i < natoms; i++)
         {
             qsum += charges[i];
         }
     }
-    
+
     return qsum;
 }
 
@@ -224,16 +210,16 @@ CMolecule::getCoordinates(const std::string& units) const -> std::vector<TPoint3
         if (const auto natoms = getNumberOfAtoms(); natoms > 0)
         {
             std::vector<TPoint3D> coords;
-            
+
             const auto fact = units::getBohrValueInAngstroms();
-            
-            for (int64_t i  = 0; i < natoms; i++)
+
+            for (int64_t i = 0; i < natoms; i++)
             {
                 const auto rxyz = _coordinates[i];
-                
+
                 coords.push_back({rxyz[0] * fact, rxyz[1] * fact, rxyz[2] * fact});
             }
-            
+
             return coords;
         }
         else
@@ -253,7 +239,7 @@ CMolecule::getCharges() const -> std::vector<double>
     if (const auto natoms = getNumberOfAtoms(); natoms > 0)
     {
         std::vector<double> charges;
-        
+
         for (int64_t i = 0; i < natoms; i++)
         {
             if (CChemicalElement elem; elem.setAtomType(_identifiers[i]))
@@ -265,7 +251,7 @@ CMolecule::getCharges() const -> std::vector<double>
                 charges.push_back(0.0);
             }
         }
-        
+
         return charges;
     }
     else
@@ -280,7 +266,7 @@ CMolecule::getMasses() const -> std::vector<double>
     if (const auto natoms = getNumberOfAtoms(); natoms > 0)
     {
         std::vector<double> masses;
-        
+
         for (int64_t i = 0; i < natoms; i++)
         {
             if (CChemicalElement elem; elem.setAtomType(_identifiers[i]))
@@ -292,7 +278,7 @@ CMolecule::getMasses() const -> std::vector<double>
                 masses.push_back(0.0);
             }
         }
-        
+
         return masses;
     }
     else
@@ -307,12 +293,12 @@ CMolecule::getLabels() const -> std::vector<std::string>
     if (const auto natoms = getNumberOfAtoms(); natoms > 0)
     {
         std::vector<std::string> labels;
-        
+
         for (int64_t i = 0; i < natoms; i++)
         {
             labels.push_back(getLabel(i));
         }
-        
+
         return labels;
     }
     else
@@ -335,15 +321,14 @@ CMolecule::getLabel(const int64_t iatom) const -> std::string
 }
 
 auto
-CMolecule::getAtomCoordinates(const int64_t      iatom,
-                              const std::string& units) const -> TPoint3D
+CMolecule::getAtomCoordinates(const int64_t iatom, const std::string& units) const -> TPoint3D
 {
     if (_isAnngstroms(units))
     {
         const auto fact = units::getBohrValueInAngstroms();
-        
+
         const auto rxyz = _coordinates[iatom];
-        
+
         return {rxyz[0] * fact, rxyz[1] * fact, rxyz[2] * fact};
     }
     else
@@ -357,17 +342,17 @@ CMolecule::getAtomIndexes(const std::string& label) const -> std::vector<int64_t
 {
     if (CChemicalElement elem; elem.setAtomType(label))
     {
-        if (const auto natoms =  getNumberOfAtoms(); natoms > 0)
+        if (const auto natoms = getNumberOfAtoms(); natoms > 0)
         {
             std::vector<int64_t> indexes;
-            
+
             const auto idatm = elem.getIdentifier();
-            
+
             for (int64_t i = 0; i < natoms; i++)
             {
                 if (idatm == _identifiers[i]) indexes.push_back(i);
             }
-            
+
             return indexes;
         }
         else
@@ -385,31 +370,31 @@ auto
 CMolecule::getNuclearRepulsionEnergy() const -> double
 {
     double nenergy = 0.0;
-    
+
     if (const auto natoms = getNumberOfAtoms(); natoms > 1)
     {
         const auto charges = getCharges();
-        
+
         for (int64_t i = 0; i < natoms; i++)
         {
             if (_identifiers[i] != 0)
             {
                 const auto [ax, ay, az] = _coordinates[i];
-            
+
                 const auto zea = charges[i];
-                
+
                 for (int64_t j = i + 1; j < natoms; j++)
                 {
                     if (_identifiers[j] != 0)
                     {
                         const auto [bx, by, bz] = _coordinates[j];
-                        
+
                         const auto rabx = ax - bx;
-                        
+
                         const auto raby = ay - by;
-                        
+
                         const auto rabz = az - bz;
-                        
+
                         nenergy += zea * charges[j] / std::sqrt(rabx * rabx + raby * raby + rabz * rabz);
                     }
                 }
@@ -426,27 +411,27 @@ CMolecule::checkProximity(const double minDistance) const -> bool
     if (const auto natoms = getNumberOfAtoms(); natoms > 0)
     {
         const auto r2min = minDistance * minDistance;
-        
+
         for (int64_t i = 0; i < natoms; i++)
         {
             if (_identifiers[i] != 0)
             {
                 const auto [ax, ay, az] = _coordinates[i];
-                
+
                 for (int64_t j = i + 1; j < natoms; j++)
                 {
                     if (_identifiers[j] != 0)
                     {
                         const auto [bx, by, bz] = _coordinates[j];
-                        
+
                         const auto rabx = ax - bx;
-                        
+
                         const auto raby = ay - by;
-                        
+
                         const auto rabz = az - bz;
-                        
+
                         const auto r2ab = rabx * rabx + raby * raby + rabz * rabz;
-                        
+
                         if (r2ab < r2min) return false;
                     }
                 }
@@ -479,11 +464,11 @@ CMolecule::printGeometry() const -> std::string
     ss << fstr::format(std::string("Coordinate Z"), 20, fmt_t::right);
 
     ss << "  \n\n";
-    
-    if (const auto natoms = getNumberOfAtoms();  natoms > 0)
+
+    if (const auto natoms = getNumberOfAtoms(); natoms > 0)
     {
         const auto labels = getLabels();
-        
+
         const auto coords = getCoordinates("angstrom");
 
         for (int64_t i = 0; i < natoms; i++)
@@ -491,35 +476,31 @@ CMolecule::printGeometry() const -> std::string
             if (_identifiers[i] != 0)
             {
                 std::string label("  ");
-                
+
                 label.append(labels[i]);
-                
+
                 ss << fstr::format(label, 6, fmt_t::left);
-                
+
                 const auto [rx, ry, rz] = coords[i];
-                
+
                 ss << fstr::to_string(rx, 12, 22, fmt_t::right);
-                
+
                 ss << fstr::to_string(ry, 12, 22, fmt_t::right);
-                
+
                 ss << fstr::to_string(rz, 12, 22, fmt_t::right);
-                
+
                 ss << "\n";
             }
         }
 
         ss << "\n";
     }
-    
+
     return ss.str();
 }
 
 auto
 CMolecule::_isAnngstroms(const std::string& units) const -> bool
 {
-    return (units.length() >= 3) &&
-           (fstr::upcase(units) == std::string("ANGSTROM").substr(0, units.length()));
+    return (units.length() >= 3) && (fstr::upcase(units) == std::string("ANGSTROM").substr(0, units.length()));
 }
-
-
-

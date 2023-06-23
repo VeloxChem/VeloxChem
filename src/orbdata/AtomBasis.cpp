@@ -1,12 +1,9 @@
 #include "AtomBasis.hpp"
 
-#include "StringFormat.hpp"
 #include "ChemicalElement.hpp"
+#include "StringFormat.hpp"
 
-CAtomBasis::CAtomBasis(const std::vector<CBasisFunction>& functions,
-                       const int64_t                      identifier,
-                       const std::string&                 name,
-                       const std::string&                 ecp_label)
+CAtomBasis::CAtomBasis(const std::vector<CBasisFunction>& functions, const int64_t identifier, const std::string& name, const std::string& ecp_label)
 
     : _functions(functions)
 
@@ -16,7 +13,6 @@ CAtomBasis::CAtomBasis(const std::vector<CBasisFunction>& functions,
 
     , _ecp_label(ecp_label)
 {
-    
 }
 
 auto
@@ -47,13 +43,13 @@ auto
 CAtomBasis::reduceToValenceBasis() const -> CAtomBasis
 {
     CAtomBasis vbasis;
-    
+
     vbasis.setIdentifier(_identifier);
-    
+
     vbasis.setName(_name + "(Valence)");
-    
-    vbasis.setEffectiveCorePotentialLabel(_ecp_label); 
-    
+
+    vbasis.setEffectiveCorePotentialLabel(_ecp_label);
+
     if (CChemicalElement elem; elem.setAtomType(_identifier))
     {
         if (const auto mang = elem.getMaxAngularMomentum(); mang >= 0)
@@ -70,7 +66,7 @@ CAtomBasis::reduceToValenceBasis() const -> CAtomBasis
             }
         }
     }
-    
+
     return vbasis;
 }
 
@@ -110,7 +106,7 @@ CAtomBasis::getMaxAngularMomentum() const -> int64_t
     if (const auto ncgtos = _functions.size(); ncgtos > 0)
     {
         auto mang = _functions[0].getAngularMomentum();
-        
+
         for (size_t i = 1; i < ncgtos; i++)
         {
             if (const auto angmom = _functions[i].getAngularMomentum(); angmom > mang)
@@ -118,7 +114,7 @@ CAtomBasis::getMaxAngularMomentum() const -> int64_t
                 mang = angmom;
             }
         }
-        
+
         return mang;
     }
     else
@@ -133,12 +129,12 @@ CAtomBasis::getNumberOfBasisFunctions(const int64_t angmom) const -> int64_t
     if (const auto ncgtos = _functions.size(); ncgtos > 0)
     {
         auto ngtos = 0;
-        
+
         for (size_t i = 0; i < ncgtos; i++)
         {
             if (_functions[i].getAngularMomentum() == angmom) ngtos++;
         }
-        
+
         return ngtos;
     }
     else
@@ -148,19 +144,17 @@ CAtomBasis::getNumberOfBasisFunctions(const int64_t angmom) const -> int64_t
 }
 
 auto
-CAtomBasis::getNumberOfBasisFunctions(const int64_t angmom,
-                                      const int64_t npgtos) const -> int64_t
+CAtomBasis::getNumberOfBasisFunctions(const int64_t angmom, const int64_t npgtos) const -> int64_t
 {
     if (const auto ncgtos = _functions.size(); ncgtos > 0)
     {
         auto ngtos = 0;
-        
+
         for (size_t i = 0; i < ncgtos; i++)
         {
-            if ((_functions[i].getAngularMomentum() == angmom) &&
-                (_functions[i].getNumberOfPrimitiveFunctions() == npgtos)) ngtos++;
+            if ((_functions[i].getAngularMomentum() == angmom) && (_functions[i].getNumberOfPrimitiveFunctions() == npgtos)) ngtos++;
         }
-        
+
         return ngtos;
     }
     else
@@ -175,7 +169,7 @@ CAtomBasis::getNumberOfPrimitiveFunctions(const int64_t angmom) const -> int64_t
     if (const auto ncgtos = _functions.size(); ncgtos > 0)
     {
         auto npgtos = 0;
-        
+
         for (size_t i = 0; i < ncgtos; i++)
         {
             if (_functions[i].getAngularMomentum() == angmom)
@@ -183,7 +177,7 @@ CAtomBasis::getNumberOfPrimitiveFunctions(const int64_t angmom) const -> int64_t
                 npgtos += _functions[i].getNumberOfPrimitiveFunctions();
             }
         }
-        
+
         return npgtos;
     }
     else
@@ -198,7 +192,7 @@ CAtomBasis::getContractionDepths(const int64_t angmom) const -> std::set<int64_t
     if (const auto ncgtos = _functions.size(); ncgtos > 0)
     {
         std::set<int64_t> depths;
-        
+
         for (size_t i = 0; i < ncgtos; i++)
         {
             if (_functions[i].getAngularMomentum() == angmom)
@@ -206,7 +200,7 @@ CAtomBasis::getContractionDepths(const int64_t angmom) const -> std::set<int64_t
                 depths.insert(_functions[i].getNumberOfPrimitiveFunctions());
             }
         }
-        
+
         return depths;
     }
     else
@@ -279,7 +273,7 @@ CAtomBasis::getBasisFunctions(const int64_t angmom) const -> std::vector<CBasisF
     if (const auto ncgtos = _functions.size(); ncgtos > 0)
     {
         std::vector<CBasisFunction> gtos;
-        
+
         for (size_t i = 0; i < ncgtos; i++)
         {
             if (_functions[i].getAngularMomentum() == angmom)
@@ -287,7 +281,7 @@ CAtomBasis::getBasisFunctions(const int64_t angmom) const -> std::vector<CBasisF
                 gtos.push_back(_functions[i]);
             }
         }
-        
+
         return gtos;
     }
     else
@@ -297,22 +291,20 @@ CAtomBasis::getBasisFunctions(const int64_t angmom) const -> std::vector<CBasisF
 }
 
 auto
-CAtomBasis::getBasisFunctions(const int64_t angmom,
-                              const int64_t npgtos) const ->std::vector<CBasisFunction>
+CAtomBasis::getBasisFunctions(const int64_t angmom, const int64_t npgtos) const -> std::vector<CBasisFunction>
 {
     if (const auto ncgtos = _functions.size(); ncgtos > 0)
     {
         std::vector<CBasisFunction> gtos;
-        
+
         for (size_t i = 0; i < ncgtos; i++)
         {
-            if ((_functions[i].getAngularMomentum() == angmom) &&
-                (_functions[i].getNumberOfPrimitiveFunctions() == npgtos))
+            if ((_functions[i].getAngularMomentum() == angmom) && (_functions[i].getNumberOfPrimitiveFunctions() == npgtos))
             {
                 gtos.push_back(_functions[i]);
             }
         }
-        
+
         return gtos;
     }
     else

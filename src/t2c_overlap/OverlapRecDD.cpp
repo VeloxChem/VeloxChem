@@ -6,13 +6,10 @@
 #include "MathConst.hpp"
 #include "T2CDistributor.hpp"
 
-namespace ovlrec { // ovlrec namespace
+namespace ovlrec {  // ovlrec namespace
 
 auto
-compOverlapDD(      CSubMatrix* matrix,
-              const CGtoBlock&  gto_block,
-              const int64_t     bra_first,
-              const int64_t     bra_last) -> void
+compOverlapDD(CSubMatrix* matrix, const CGtoBlock& gto_block, const int64_t bra_first, const int64_t bra_last) -> void
 
 {
     // spherical transformation factors
@@ -69,14 +66,9 @@ compOverlapDD(      CSubMatrix* matrix,
 
         const auto ket_dim = ket_last - ket_first;
 
-        simd::loadCoordinates(ket_coords_x,
-                              ket_coords_y,
-                              ket_coords_z,
-                              gto_coords,
-                              ket_first,
-                              ket_last);
+        simd::loadCoordinates(ket_coords_x, ket_coords_y, ket_coords_z, gto_coords, ket_first, ket_last);
 
-        for (int64_t j = bra_first; j < bra_last; j++) 
+        for (int64_t j = bra_first; j < bra_last; j++)
         {
             const auto bra_coord = gto_coords[j];
 
@@ -126,54 +118,37 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, gto_indexes, 2, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, gto_indexes,
-                                4, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, gto_indexes, 4, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, gto_indexes,
-                                2, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, gto_indexes, 2, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, 0.5 * f2_3 * 0.5 * f2_3, gto_indexes,
-                                4, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, 0.5 * f2_3 * 0.5 * f2_3, gto_indexes, 4, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xy, -f2_3, gto_indexes,
-                                2, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xy, -f2_3, gto_indexes, 2, 0, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xy, 0.5 * f2_3 * f2_3, gto_indexes,
-                                4, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xy, 0.5 * f2_3 * f2_3, gto_indexes, 4, 0, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xz, -f2_3, gto_indexes,
-                                2, 3, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xz, -f2_3, gto_indexes, 2, 3, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xz, 0.5 * f2_3 * f2_3, gto_indexes,
-                                4, 3, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xz, 0.5 * f2_3 * f2_3, gto_indexes, 4, 3, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, gto_indexes, 2, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -0.5 * f2_3, gto_indexes,
-                                4, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -0.5 * f2_3, gto_indexes, 4, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, gto_indexes,
-                                2, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, gto_indexes, 2, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -0.5 * f2_3 * 0.5 * f2_3, gto_indexes,
-                                4, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -0.5 * f2_3 * 0.5 * f2_3, gto_indexes, 4, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yz, -f2_3, gto_indexes,
-                                2, 1, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yz, -f2_3, gto_indexes, 2, 1, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yz, 0.5 * f2_3 * f2_3, gto_indexes,
-                                4, 1, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yz, 0.5 * f2_3 * f2_3, gto_indexes, 4, 1, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_zz, -2.0, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_zz, -2.0, gto_indexes, 2, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_zz, 0.5 * f2_3 * 2.0, gto_indexes,
-                                4, 2, j, ket_first, ket_last);
-
+            t2cfunc::distribute(matrix, buffer_zz, 0.5 * f2_3 * 2.0, gto_indexes, 4, 2, j, ket_first, ket_last);
 
             // compute primitive integrals block (XY)
 
@@ -221,30 +196,21 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, -f2_3, gto_indexes,
-                                0, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, -f2_3, gto_indexes, 0, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, gto_indexes,
-                                0, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, gto_indexes, 0, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, gto_indexes,
-                                0, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, gto_indexes, 0, 0, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, gto_indexes,
-                                0, 3, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, gto_indexes, 0, 3, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3, gto_indexes,
-                                0, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3, gto_indexes, 0, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, gto_indexes,
-                                0, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, gto_indexes, 0, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, gto_indexes,
-                                0, 1, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, gto_indexes, 0, 1, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, gto_indexes,
-                                0, 2, j, ket_first, ket_last);
-
+            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, gto_indexes, 0, 2, j, ket_first, ket_last);
 
             // compute primitive integrals block (XZ)
 
@@ -292,30 +258,21 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, -f2_3, gto_indexes,
-                                3, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, -f2_3, gto_indexes, 3, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, gto_indexes,
-                                3, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, gto_indexes, 3, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, gto_indexes,
-                                3, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, gto_indexes, 3, 0, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, gto_indexes,
-                                3, 3, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, gto_indexes, 3, 3, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3, gto_indexes,
-                                3, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3, gto_indexes, 3, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, gto_indexes,
-                                3, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, gto_indexes, 3, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, gto_indexes,
-                                3, 1, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, gto_indexes, 3, 1, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, gto_indexes,
-                                3, 2, j, ket_first, ket_last);
-
+            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, gto_indexes, 3, 2, j, ket_first, ket_last);
 
             // compute primitive integrals block (YY)
 
@@ -363,54 +320,37 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, gto_indexes, 2, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, 0.5 * f2_3, gto_indexes,
-                                4, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, 0.5 * f2_3, gto_indexes, 4, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, gto_indexes,
-                                2, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, gto_indexes, 2, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3 * 0.5 * f2_3, gto_indexes,
-                                4, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3 * 0.5 * f2_3, gto_indexes, 4, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xy, -f2_3, gto_indexes,
-                                2, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xy, -f2_3, gto_indexes, 2, 0, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xy, -0.5 * f2_3 * f2_3, gto_indexes,
-                                4, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xy, -0.5 * f2_3 * f2_3, gto_indexes, 4, 0, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xz, -f2_3, gto_indexes,
-                                2, 3, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xz, -f2_3, gto_indexes, 2, 3, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xz, -0.5 * f2_3 * f2_3, gto_indexes,
-                                4, 3, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xz, -0.5 * f2_3 * f2_3, gto_indexes, 4, 3, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, gto_indexes, 2, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, gto_indexes,
-                                4, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, gto_indexes, 4, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, gto_indexes,
-                                2, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, gto_indexes, 2, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3 * 0.5 * f2_3, gto_indexes,
-                                4, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3 * 0.5 * f2_3, gto_indexes, 4, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yz, -f2_3, gto_indexes,
-                                2, 1, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yz, -f2_3, gto_indexes, 2, 1, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yz, -0.5 * f2_3 * f2_3, gto_indexes,
-                                4, 1, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yz, -0.5 * f2_3 * f2_3, gto_indexes, 4, 1, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_zz, -2.0, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_zz, -2.0, gto_indexes, 2, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_zz, -0.5 * f2_3 * 2.0, gto_indexes,
-                                4, 2, j, ket_first, ket_last);
-
+            t2cfunc::distribute(matrix, buffer_zz, -0.5 * f2_3 * 2.0, gto_indexes, 4, 2, j, ket_first, ket_last);
 
             // compute primitive integrals block (YZ)
 
@@ -458,30 +398,21 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, -f2_3, gto_indexes,
-                                1, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, -f2_3, gto_indexes, 1, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, gto_indexes,
-                                1, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, gto_indexes, 1, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, gto_indexes,
-                                1, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, gto_indexes, 1, 0, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, gto_indexes,
-                                1, 3, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, gto_indexes, 1, 3, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3, gto_indexes,
-                                1, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3, gto_indexes, 1, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, gto_indexes,
-                                1, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, gto_indexes, 1, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, gto_indexes,
-                                1, 1, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, gto_indexes, 1, 1, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, gto_indexes,
-                                1, 2, j, ket_first, ket_last);
-
+            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, gto_indexes, 1, 2, j, ket_first, ket_last);
 
             // compute primitive integrals block (ZZ)
 
@@ -529,42 +460,32 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, -2.0, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, -2.0, gto_indexes, 2, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xx, 2.0 * 0.5 * f2_3, gto_indexes,
-                                2, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xx, 2.0 * 0.5 * f2_3, gto_indexes, 2, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xy, 2.0 * f2_3, gto_indexes,
-                                2, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xy, 2.0 * f2_3, gto_indexes, 2, 0, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_xz, 2.0 * f2_3, gto_indexes,
-                                2, 3, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_xz, 2.0 * f2_3, gto_indexes, 2, 3, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -2.0, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -2.0, gto_indexes, 2, 2, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yy, -2.0 * 0.5 * f2_3, gto_indexes,
-                                2, 4, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yy, -2.0 * 0.5 * f2_3, gto_indexes, 2, 4, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_yz, 2.0 * f2_3, gto_indexes,
-                                2, 1, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer_yz, 2.0 * f2_3, gto_indexes, 2, 1, j, ket_first, ket_last);
 
-            t2cfunc::distribute(matrix, buffer_zz, 2.0 * 2.0, gto_indexes,
-                                2, 2, j, ket_first, ket_last);
-
-
+            t2cfunc::distribute(matrix, buffer_zz, 2.0 * 2.0, gto_indexes, 2, 2, j, ket_first, ket_last);
         }
     }
 }
 
 auto
-compOverlapDD(      CSubMatrix* matrix,
-              const CGtoBlock&  bra_gto_block,
-              const CGtoBlock&  ket_gto_block,
-              const int64_t     bra_first,
-              const int64_t     bra_last,
-              const mat_t       mat_type) -> void
+compOverlapDD(CSubMatrix*      matrix,
+              const CGtoBlock& bra_gto_block,
+              const CGtoBlock& ket_gto_block,
+              const int64_t    bra_first,
+              const int64_t    bra_last,
+              const mat_t      mat_type) -> void
 
 {
     // spherical transformation factors
@@ -635,14 +556,9 @@ compOverlapDD(      CSubMatrix* matrix,
 
         const auto ket_dim = ket_last - ket_first;
 
-        simd::loadCoordinates(ket_coords_x,
-                              ket_coords_y,
-                              ket_coords_z,
-                              ket_gto_coords,
-                              ket_first,
-                              ket_last);
+        simd::loadCoordinates(ket_coords_x, ket_coords_y, ket_coords_z, ket_gto_coords, ket_first, ket_last);
 
-        for (int64_t j = bra_first; j < bra_last; j++) 
+        for (int64_t j = bra_first; j < bra_last; j++)
         {
             const auto bra_coord = bra_gto_coords[j];
 
@@ -692,54 +608,38 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, 0.5 * f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, 0.5 * f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xy, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xy, -f2_3, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xy, 0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xy, 0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xz, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xz, -f2_3, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xz, 0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xz, 0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -0.5 * f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(
+                matrix, buffer_yy, -0.5 * f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yz, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yz, -f2_3, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yz, 0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yz, 0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_zz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_zz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_zz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, mat_type);
-
+            t2cfunc::distribute(matrix, buffer_zz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, mat_type);
 
             // compute primitive integrals block (XY)
 
@@ -787,30 +687,21 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, -f2_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, mat_type);
-
+            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, mat_type);
 
             // compute primitive integrals block (XZ)
 
@@ -858,30 +749,21 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, -f2_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, mat_type);
-
+            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, mat_type);
 
             // compute primitive integrals block (YY)
 
@@ -929,54 +811,38 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, -0.5 * f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(
+                matrix, buffer_xx, -0.5 * f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xy, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xy, -f2_3, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xy, -0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xy, -0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xz, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xz, -f2_3, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xz, -0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xz, -0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, 0.5 * f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yz, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yz, -f2_3, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yz, -0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yz, -0.5 * f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_zz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_zz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_zz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, mat_type);
-
+            t2cfunc::distribute(matrix, buffer_zz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, mat_type);
 
             // compute primitive integrals block (YZ)
 
@@ -1024,30 +890,21 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, -f2_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xy, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -f2_3 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yz, f2_3 * f2_3, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, mat_type);
-
+            t2cfunc::distribute(matrix, buffer_zz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, mat_type);
 
             // compute primitive integrals block (ZZ)
 
@@ -1095,42 +952,32 @@ compOverlapDD(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_xx, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xx, 2.0 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xx, 2.0 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xy, 2.0 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xy, 2.0 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_xz, 2.0 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_xz, 2.0 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yy, -2.0 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yy, -2.0 * 0.5 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_yz, 2.0 * f2_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer_yz, 2.0 * f2_3, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, mat_type);
 
-            t2cfunc::distribute(matrix, buffer_zz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, mat_type);
-
-
+            t2cfunc::distribute(matrix, buffer_zz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, mat_type);
         }
     }
 }
 
 auto
-compPrimitiveOverlapDD_XX_T(      TDoubleArray& buffer_xx,
-                                  TDoubleArray& buffer_xy,
-                                  TDoubleArray& buffer_xz,
-                                  TDoubleArray& buffer_yy,
-                                  TDoubleArray& buffer_yz,
-                                  TDoubleArray& buffer_zz,
+compPrimitiveOverlapDD_XX_T(TDoubleArray&       buffer_xx,
+                            TDoubleArray&       buffer_xy,
+                            TDoubleArray&       buffer_xz,
+                            TDoubleArray&       buffer_yy,
+                            TDoubleArray&       buffer_yz,
+                            TDoubleArray&       buffer_zz,
                             const double        bra_exp,
                             const double        bra_norm,
                             const TPoint3D&     bra_coord,
@@ -1181,17 +1028,7 @@ compPrimitiveOverlapDD_XX_T(      TDoubleArray& buffer_xx,
 
     auto fints_zz = buffer_zz.data();
 
-    #pragma omp simd aligned(fints_xx,\
-                             fints_xy,\
-                             fints_xz,\
-                             fints_yy,\
-                             fints_yz,\
-                             fints_zz,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_xx, fints_xy, fints_xz, fints_yy, fints_yz, fints_zz, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1216,27 +1053,30 @@ compPrimitiveOverlapDD_XX_T(      TDoubleArray& buffer_xx,
 
         const auto rpb_z = bra_exp * ab_z * fe_0;
 
-        fints_xx[i] += fss * (2.0 * fe_0 * rpa_x * rpb_x + (1.0 / 2.0) * fe_0 * rpa_x * rpa_x + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (3.0 / 4.0) * fe_0 * fe_0 + rpa_x * rpa_x * rpb_x * rpb_x);
+        fints_xx[i] += fss * (2.0 * fe_0 * rpa_x * rpb_x + (1.0 / 2.0) * fe_0 * rpa_x * rpa_x + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x +
+                              (3.0 / 4.0) * fe_0 * fe_0 + rpa_x * rpa_x * rpb_x * rpb_x);
 
         fints_xy[i] += fss * (fe_0 * rpa_x * rpb_y + (1.0 / 2.0) * fe_0 * rpb_y * rpb_x + rpa_x * rpa_x * rpb_y * rpb_x);
 
         fints_xz[i] += fss * (fe_0 * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpb_z * rpb_x + rpa_x * rpa_x * rpb_z * rpb_x);
 
-        fints_yy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpa_x + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 + rpa_x * rpa_x * rpb_y * rpb_y);
+        fints_yy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpa_x + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_x * rpa_x * rpb_y * rpb_y);
 
         fints_yz[i] += fss * ((1.0 / 2.0) * fe_0 * rpb_z * rpb_y + rpa_x * rpa_x * rpb_z * rpb_y);
 
-        fints_zz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpa_x + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 + rpa_x * rpa_x * rpb_z * rpb_z);
+        fints_zz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpa_x + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_x * rpa_x * rpb_z * rpb_z);
     }
 }
 
 auto
-compPrimitiveOverlapDD_XY_T(      TDoubleArray& buffer_xx,
-                                  TDoubleArray& buffer_xy,
-                                  TDoubleArray& buffer_xz,
-                                  TDoubleArray& buffer_yy,
-                                  TDoubleArray& buffer_yz,
-                                  TDoubleArray& buffer_zz,
+compPrimitiveOverlapDD_XY_T(TDoubleArray&       buffer_xx,
+                            TDoubleArray&       buffer_xy,
+                            TDoubleArray&       buffer_xz,
+                            TDoubleArray&       buffer_yy,
+                            TDoubleArray&       buffer_yz,
+                            TDoubleArray&       buffer_zz,
                             const double        bra_exp,
                             const double        bra_norm,
                             const TPoint3D&     bra_coord,
@@ -1287,17 +1127,7 @@ compPrimitiveOverlapDD_XY_T(      TDoubleArray& buffer_xx,
 
     auto fints_zz = buffer_zz.data();
 
-    #pragma omp simd aligned(fints_xx,\
-                             fints_xy,\
-                             fints_xz,\
-                             fints_yy,\
-                             fints_yz,\
-                             fints_zz,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_xx, fints_xy, fints_xz, fints_yy, fints_yz, fints_zz, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1326,7 +1156,8 @@ compPrimitiveOverlapDD_XY_T(      TDoubleArray& buffer_xx,
 
         fints_xx[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpa_x + fe_0 * rpa_y * rpb_x + rpa_y * rpa_x * rpb_x * rpb_x);
 
-        fints_xy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_y + (1.0 / 2.0) * fe_0 * rpa_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 + rpa_y * rpa_x * rpb_y * rpb_x);
+        fints_xy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_y + (1.0 / 2.0) * fe_0 * rpa_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_y * rpa_x * rpb_y * rpb_x);
 
         fints_xz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_z + rpa_y * rpa_x * rpb_z * rpb_x);
 
@@ -1339,12 +1170,12 @@ compPrimitiveOverlapDD_XY_T(      TDoubleArray& buffer_xx,
 }
 
 auto
-compPrimitiveOverlapDD_XZ_T(      TDoubleArray& buffer_xx,
-                                  TDoubleArray& buffer_xy,
-                                  TDoubleArray& buffer_xz,
-                                  TDoubleArray& buffer_yy,
-                                  TDoubleArray& buffer_yz,
-                                  TDoubleArray& buffer_zz,
+compPrimitiveOverlapDD_XZ_T(TDoubleArray&       buffer_xx,
+                            TDoubleArray&       buffer_xy,
+                            TDoubleArray&       buffer_xz,
+                            TDoubleArray&       buffer_yy,
+                            TDoubleArray&       buffer_yz,
+                            TDoubleArray&       buffer_zz,
                             const double        bra_exp,
                             const double        bra_norm,
                             const TPoint3D&     bra_coord,
@@ -1395,17 +1226,7 @@ compPrimitiveOverlapDD_XZ_T(      TDoubleArray& buffer_xx,
 
     auto fints_zz = buffer_zz.data();
 
-    #pragma omp simd aligned(fints_xx,\
-                             fints_xy,\
-                             fints_xz,\
-                             fints_yy,\
-                             fints_yz,\
-                             fints_zz,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_xx, fints_xy, fints_xz, fints_yy, fints_yz, fints_zz, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1436,7 +1257,8 @@ compPrimitiveOverlapDD_XZ_T(      TDoubleArray& buffer_xx,
 
         fints_xy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_y + rpa_z * rpa_x * rpb_y * rpb_x);
 
-        fints_xz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpa_x * rpb_z * rpb_x);
+        fints_xz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_z * rpa_x * rpb_z * rpb_x);
 
         fints_yy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_x + rpa_z * rpa_x * rpb_y * rpb_y);
 
@@ -1447,12 +1269,12 @@ compPrimitiveOverlapDD_XZ_T(      TDoubleArray& buffer_xx,
 }
 
 auto
-compPrimitiveOverlapDD_YY_T(      TDoubleArray& buffer_xx,
-                                  TDoubleArray& buffer_xy,
-                                  TDoubleArray& buffer_xz,
-                                  TDoubleArray& buffer_yy,
-                                  TDoubleArray& buffer_yz,
-                                  TDoubleArray& buffer_zz,
+compPrimitiveOverlapDD_YY_T(TDoubleArray&       buffer_xx,
+                            TDoubleArray&       buffer_xy,
+                            TDoubleArray&       buffer_xz,
+                            TDoubleArray&       buffer_yy,
+                            TDoubleArray&       buffer_yz,
+                            TDoubleArray&       buffer_zz,
                             const double        bra_exp,
                             const double        bra_norm,
                             const TPoint3D&     bra_coord,
@@ -1503,17 +1325,7 @@ compPrimitiveOverlapDD_YY_T(      TDoubleArray& buffer_xx,
 
     auto fints_zz = buffer_zz.data();
 
-    #pragma omp simd aligned(fints_xx,\
-                             fints_xy,\
-                             fints_xz,\
-                             fints_yy,\
-                             fints_yz,\
-                             fints_zz,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_xx, fints_xy, fints_xz, fints_yy, fints_yz, fints_zz, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1538,27 +1350,30 @@ compPrimitiveOverlapDD_YY_T(      TDoubleArray& buffer_xx,
 
         const auto rpb_z = bra_exp * ab_z * fe_0;
 
-        fints_xx[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpa_y + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 + rpa_y * rpa_y * rpb_x * rpb_x);
+        fints_xx[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpa_y + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_y * rpa_y * rpb_x * rpb_x);
 
         fints_xy[i] += fss * (fe_0 * rpa_y * rpb_x + (1.0 / 2.0) * fe_0 * rpb_y * rpb_x + rpa_y * rpa_y * rpb_y * rpb_x);
 
         fints_xz[i] += fss * ((1.0 / 2.0) * fe_0 * rpb_z * rpb_x + rpa_y * rpa_y * rpb_z * rpb_x);
 
-        fints_yy[i] += fss * (2.0 * fe_0 * rpa_y * rpb_y + (1.0 / 2.0) * fe_0 * rpa_y * rpa_y + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (3.0 / 4.0) * fe_0 * fe_0 + rpa_y * rpa_y * rpb_y * rpb_y);
+        fints_yy[i] += fss * (2.0 * fe_0 * rpa_y * rpb_y + (1.0 / 2.0) * fe_0 * rpa_y * rpa_y + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y +
+                              (3.0 / 4.0) * fe_0 * fe_0 + rpa_y * rpa_y * rpb_y * rpb_y);
 
         fints_yz[i] += fss * (fe_0 * rpa_y * rpb_z + (1.0 / 2.0) * fe_0 * rpb_z * rpb_y + rpa_y * rpa_y * rpb_z * rpb_y);
 
-        fints_zz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpa_y + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 + rpa_y * rpa_y * rpb_z * rpb_z);
+        fints_zz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpa_y + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_y * rpa_y * rpb_z * rpb_z);
     }
 }
 
 auto
-compPrimitiveOverlapDD_YZ_T(      TDoubleArray& buffer_xx,
-                                  TDoubleArray& buffer_xy,
-                                  TDoubleArray& buffer_xz,
-                                  TDoubleArray& buffer_yy,
-                                  TDoubleArray& buffer_yz,
-                                  TDoubleArray& buffer_zz,
+compPrimitiveOverlapDD_YZ_T(TDoubleArray&       buffer_xx,
+                            TDoubleArray&       buffer_xy,
+                            TDoubleArray&       buffer_xz,
+                            TDoubleArray&       buffer_yy,
+                            TDoubleArray&       buffer_yz,
+                            TDoubleArray&       buffer_zz,
                             const double        bra_exp,
                             const double        bra_norm,
                             const TPoint3D&     bra_coord,
@@ -1609,17 +1424,7 @@ compPrimitiveOverlapDD_YZ_T(      TDoubleArray& buffer_xx,
 
     auto fints_zz = buffer_zz.data();
 
-    #pragma omp simd aligned(fints_xx,\
-                             fints_xy,\
-                             fints_xz,\
-                             fints_yy,\
-                             fints_yz,\
-                             fints_zz,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_xx, fints_xy, fints_xz, fints_yy, fints_yz, fints_zz, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1654,19 +1459,20 @@ compPrimitiveOverlapDD_YZ_T(      TDoubleArray& buffer_xx,
 
         fints_yy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_y + fe_0 * rpa_z * rpb_y + rpa_z * rpa_y * rpb_y * rpb_y);
 
-        fints_yz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpa_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpa_y * rpb_z * rpb_y);
+        fints_yz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpa_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_z * rpa_y * rpb_z * rpb_y);
 
         fints_zz[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_y + fe_0 * rpa_y * rpb_z + rpa_z * rpa_y * rpb_z * rpb_z);
     }
 }
 
 auto
-compPrimitiveOverlapDD_ZZ_T(      TDoubleArray& buffer_xx,
-                                  TDoubleArray& buffer_xy,
-                                  TDoubleArray& buffer_xz,
-                                  TDoubleArray& buffer_yy,
-                                  TDoubleArray& buffer_yz,
-                                  TDoubleArray& buffer_zz,
+compPrimitiveOverlapDD_ZZ_T(TDoubleArray&       buffer_xx,
+                            TDoubleArray&       buffer_xy,
+                            TDoubleArray&       buffer_xz,
+                            TDoubleArray&       buffer_yy,
+                            TDoubleArray&       buffer_yz,
+                            TDoubleArray&       buffer_zz,
                             const double        bra_exp,
                             const double        bra_norm,
                             const TPoint3D&     bra_coord,
@@ -1717,17 +1523,7 @@ compPrimitiveOverlapDD_ZZ_T(      TDoubleArray& buffer_xx,
 
     auto fints_zz = buffer_zz.data();
 
-    #pragma omp simd aligned(fints_xx,\
-                             fints_xy,\
-                             fints_xz,\
-                             fints_yy,\
-                             fints_yz,\
-                             fints_zz,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_xx, fints_xy, fints_xz, fints_yy, fints_yz, fints_zz, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1752,19 +1548,21 @@ compPrimitiveOverlapDD_ZZ_T(      TDoubleArray& buffer_xx,
 
         const auto rpb_z = bra_exp * ab_z * fe_0;
 
-        fints_xx[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpa_z * rpb_x * rpb_x);
+        fints_xx[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_z * rpa_z * rpb_x * rpb_x);
 
         fints_xy[i] += fss * ((1.0 / 2.0) * fe_0 * rpb_y * rpb_x + rpa_z * rpa_z * rpb_y * rpb_x);
 
         fints_xz[i] += fss * (fe_0 * rpa_z * rpb_x + (1.0 / 2.0) * fe_0 * rpb_z * rpb_x + rpa_z * rpa_z * rpb_z * rpb_x);
 
-        fints_yy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpa_z * rpb_y * rpb_y);
+        fints_yy[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 +
+                              rpa_z * rpa_z * rpb_y * rpb_y);
 
         fints_yz[i] += fss * (fe_0 * rpa_z * rpb_y + (1.0 / 2.0) * fe_0 * rpb_z * rpb_y + rpa_z * rpa_z * rpb_z * rpb_y);
 
-        fints_zz[i] += fss * (2.0 * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpa_z * rpa_z + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpa_z * rpb_z * rpb_z);
+        fints_zz[i] += fss * (2.0 * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpa_z * rpa_z + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z +
+                              (3.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpa_z * rpb_z * rpb_z);
     }
 }
 
-} // ovlrec namespace
-
+}  // namespace ovlrec

@@ -11,21 +11,18 @@ namespace vlx_t2cintegrals {  // vlx_t2cintegrals namespace
 void
 export_t2cintegrals(py::module& m)
 {
-   
     // COverlapDriver class
 
     PyClass<COverlapDriver>(m, "OverlapDriver")
         .def(py::init<>())
-        .def("compute",
-             [](const COverlapDriver& ovl_drv,
-                const CMolecularBasis& basis,
-                const CMolecule&       molecule) -> std::shared_ptr<CMatrix>
-             {
-                return std::make_shared<CMatrix>(ovl_drv.compute(basis, molecule)); 
-             },
-             "Computes overlap matrix for given molecule and basis.");
-    
+        .def(
+            "compute",
+            [](const COverlapDriver& ovl_drv, const CMolecularBasis& basis, const CMolecule& molecule) -> std::shared_ptr<CMatrix> {
+                return std::make_shared<CMatrix>(ovl_drv.compute(basis, molecule));
+            },
+            "Computes overlap matrix for given molecule and basis.");
+
     // ...
 }
 
-}  // namespace vlx_orbdata
+}  // namespace vlx_t2cintegrals

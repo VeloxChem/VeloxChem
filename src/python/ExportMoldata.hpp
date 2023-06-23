@@ -8,8 +8,7 @@ namespace vlx_moldata {  // vlx_moldata namespace
 /**
  Exports classes/functions in src/moldata to python.
  */
-auto
-export_moldata(py::module& m) -> void;
+auto export_moldata(py::module& m) -> void;
 
 }  // namespace vlx_moldata
 

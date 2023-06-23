@@ -6,15 +6,15 @@
 #include "MathConst.hpp"
 #include "T2CDistributor.hpp"
 
-namespace ovlrec { // ovlrec namespace
+namespace ovlrec {  // ovlrec namespace
 
 auto
-compOverlapPF(      CSubMatrix* matrix,
-              const CGtoBlock&  bra_gto_block,
-              const CGtoBlock&  ket_gto_block,
-              const bool        ang_order,
-              const int64_t     bra_first,
-              const int64_t     bra_last) -> void
+compOverlapPF(CSubMatrix*      matrix,
+              const CGtoBlock& bra_gto_block,
+              const CGtoBlock& ket_gto_block,
+              const bool       ang_order,
+              const int64_t    bra_first,
+              const int64_t    bra_last) -> void
 
 {
     // spherical transformation factors
@@ -83,14 +83,9 @@ compOverlapPF(      CSubMatrix* matrix,
 
         const auto ket_dim = ket_last - ket_first;
 
-        simd::loadCoordinates(ket_coords_x,
-                              ket_coords_y,
-                              ket_coords_z,
-                              ket_gto_coords,
-                              ket_first,
-                              ket_last);
+        simd::loadCoordinates(ket_coords_x, ket_coords_y, ket_coords_z, ket_gto_coords, ket_first, ket_last);
 
-        for (int64_t j = bra_first; j < bra_last; j++) 
+        for (int64_t j = bra_first; j < bra_last; j++)
         {
             const auto bra_coord = bra_gto_coords[j];
 
@@ -131,24 +126,17 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_x, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_z, -f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XXY)
 
@@ -187,24 +175,17 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_x, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_z, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, -f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XXZ)
 
@@ -243,24 +224,17 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, -3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_x, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_z, -3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XYY)
 
@@ -299,24 +273,17 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_x, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_z, -f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XYZ)
 
@@ -355,15 +322,11 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZZ)
 
@@ -402,15 +365,11 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YYY)
 
@@ -449,24 +408,17 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_x, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_z, -f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, -f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YYZ)
 
@@ -505,24 +457,17 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, -3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_x, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_z, -3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZZ)
 
@@ -561,15 +506,11 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix, buffer_z, 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZZ)
 
@@ -608,24 +549,19 @@ compOverlapPF(      CSubMatrix* matrix,
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer_x, 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_x, 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_y, 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix, buffer_y, 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix, buffer_z, 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
-
-
+            t2cfunc::distribute(matrix, buffer_z, 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
         }
     }
 }
 
 auto
-compPrimitiveOverlapPF_T_XXX(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_XXX(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -670,14 +606,7 @@ compPrimitiveOverlapPF_T_XXX(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -702,7 +631,8 @@ compPrimitiveOverlapPF_T_XXX(      TDoubleArray& buffer_x,
 
         const auto rpb_x = bra_exp * ab_x * fe_0;
 
-        fints_x[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_x * rpb_x + (3.0 / 2.0) * fe_0 * rpb_x * rpb_x + (3.0 / 4.0) * fe_0 * fe_0 + rpa_x * rpb_x * rpb_x * rpb_x);
+        fints_x[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_x * rpb_x + (3.0 / 2.0) * fe_0 * rpb_x * rpb_x + (3.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_x * rpb_x * rpb_x * rpb_x);
 
         fints_y[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_y * rpb_x + rpa_y * rpb_x * rpb_x * rpb_x);
 
@@ -711,9 +641,9 @@ compPrimitiveOverlapPF_T_XXX(      TDoubleArray& buffer_x,
 }
 
 auto
-compPrimitiveOverlapPF_T_XXY(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_XXY(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -758,14 +688,7 @@ compPrimitiveOverlapPF_T_XXY(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -794,16 +717,17 @@ compPrimitiveOverlapPF_T_XXY(      TDoubleArray& buffer_x,
 
         fints_x[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpb_y + fe_0 * rpb_y * rpb_x + rpa_x * rpb_y * rpb_x * rpb_x);
 
-        fints_y[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_y + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 + rpa_y * rpb_y * rpb_x * rpb_x);
+        fints_y[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_y + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_y * rpb_y * rpb_x * rpb_x);
 
         fints_z[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_y + rpa_z * rpb_y * rpb_x * rpb_x);
     }
 }
 
 auto
-compPrimitiveOverlapPF_T_XXZ(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_XXZ(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -848,14 +772,7 @@ compPrimitiveOverlapPF_T_XXZ(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -886,14 +803,15 @@ compPrimitiveOverlapPF_T_XXZ(      TDoubleArray& buffer_x,
 
         fints_y[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_z + rpa_y * rpb_z * rpb_x * rpb_x);
 
-        fints_z[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpb_z * rpb_x * rpb_x);
+        fints_z[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpb_x * rpb_x + (1.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_z * rpb_z * rpb_x * rpb_x);
     }
 }
 
 auto
-compPrimitiveOverlapPF_T_XYY(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_XYY(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -938,14 +856,7 @@ compPrimitiveOverlapPF_T_XYY(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -972,7 +883,8 @@ compPrimitiveOverlapPF_T_XYY(      TDoubleArray& buffer_x,
 
         const auto rpb_y = bra_exp * ab_y * fe_0;
 
-        fints_x[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpb_x + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 + rpa_x * rpb_y * rpb_y * rpb_x);
+        fints_x[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpb_x + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_x * rpb_y * rpb_y * rpb_x);
 
         fints_y[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_x + fe_0 * rpb_y * rpb_x + rpa_y * rpb_y * rpb_y * rpb_x);
 
@@ -981,9 +893,9 @@ compPrimitiveOverlapPF_T_XYY(      TDoubleArray& buffer_x,
 }
 
 auto
-compPrimitiveOverlapPF_T_XYZ(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_XYZ(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -1028,14 +940,7 @@ compPrimitiveOverlapPF_T_XYZ(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1073,9 +978,9 @@ compPrimitiveOverlapPF_T_XYZ(      TDoubleArray& buffer_x,
 }
 
 auto
-compPrimitiveOverlapPF_T_XZZ(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_XZZ(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -1120,14 +1025,7 @@ compPrimitiveOverlapPF_T_XZZ(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1154,7 +1052,8 @@ compPrimitiveOverlapPF_T_XZZ(      TDoubleArray& buffer_x,
 
         const auto rpb_z = bra_exp * ab_z * fe_0;
 
-        fints_x[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpb_x + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 + rpa_x * rpb_z * rpb_z * rpb_x);
+        fints_x[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpb_x + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_x * rpb_z * rpb_z * rpb_x);
 
         fints_y[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_x + rpa_y * rpb_z * rpb_z * rpb_x);
 
@@ -1163,9 +1062,9 @@ compPrimitiveOverlapPF_T_XZZ(      TDoubleArray& buffer_x,
 }
 
 auto
-compPrimitiveOverlapPF_T_YYY(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_YYY(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -1210,14 +1109,7 @@ compPrimitiveOverlapPF_T_YYY(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1244,16 +1136,17 @@ compPrimitiveOverlapPF_T_YYY(      TDoubleArray& buffer_x,
 
         fints_x[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_x * rpb_y + rpa_x * rpb_y * rpb_y * rpb_y);
 
-        fints_y[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_y * rpb_y + (3.0 / 2.0) * fe_0 * rpb_y * rpb_y + (3.0 / 4.0) * fe_0 * fe_0 + rpa_y * rpb_y * rpb_y * rpb_y);
+        fints_y[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_y * rpb_y + (3.0 / 2.0) * fe_0 * rpb_y * rpb_y + (3.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_y * rpb_y * rpb_y * rpb_y);
 
         fints_z[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_z * rpb_y + rpa_z * rpb_y * rpb_y * rpb_y);
     }
 }
 
 auto
-compPrimitiveOverlapPF_T_YYZ(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_YYZ(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -1298,14 +1191,7 @@ compPrimitiveOverlapPF_T_YYZ(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1336,14 +1222,15 @@ compPrimitiveOverlapPF_T_YYZ(      TDoubleArray& buffer_x,
 
         fints_y[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_z + fe_0 * rpb_z * rpb_y + rpa_y * rpb_z * rpb_y * rpb_y);
 
-        fints_z[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpb_z * rpb_y * rpb_y);
+        fints_z[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * rpb_y * rpb_y + (1.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_z * rpb_z * rpb_y * rpb_y);
     }
 }
 
 auto
-compPrimitiveOverlapPF_T_YZZ(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_YZZ(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -1388,14 +1275,7 @@ compPrimitiveOverlapPF_T_YZZ(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1424,16 +1304,17 @@ compPrimitiveOverlapPF_T_YZZ(      TDoubleArray& buffer_x,
 
         fints_x[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_x * rpb_y + rpa_x * rpb_z * rpb_z * rpb_y);
 
-        fints_y[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_y + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 + rpa_y * rpb_z * rpb_z * rpb_y);
+        fints_y[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_y * rpb_y + (1.0 / 2.0) * fe_0 * rpb_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_y * rpb_z * rpb_z * rpb_y);
 
         fints_z[i] += fss * ((1.0 / 2.0) * fe_0 * rpa_z * rpb_y + fe_0 * rpb_z * rpb_y + rpa_z * rpb_z * rpb_z * rpb_y);
     }
 }
 
 auto
-compPrimitiveOverlapPF_T_ZZZ(      TDoubleArray& buffer_x,
-                                   TDoubleArray& buffer_y,
-                                   TDoubleArray& buffer_z,
+compPrimitiveOverlapPF_T_ZZZ(TDoubleArray&       buffer_x,
+                             TDoubleArray&       buffer_y,
+                             TDoubleArray&       buffer_z,
                              const double        bra_exp,
                              const double        bra_norm,
                              const TPoint3D&     bra_coord,
@@ -1478,14 +1359,7 @@ compPrimitiveOverlapPF_T_ZZZ(      TDoubleArray& buffer_x,
 
     auto fints_z = buffer_z.data();
 
-    #pragma omp simd aligned(fints_x,\
-                             fints_y,\
-                             fints_z,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints_x, fints_y, fints_z, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -1514,9 +1388,9 @@ compPrimitiveOverlapPF_T_ZZZ(      TDoubleArray& buffer_x,
 
         fints_y[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_y * rpb_z + rpa_y * rpb_z * rpb_z * rpb_z);
 
-        fints_z[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_z * rpb_z + (3.0 / 2.0) * fe_0 * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 + rpa_z * rpb_z * rpb_z * rpb_z);
+        fints_z[i] += fss * ((3.0 / 2.0) * fe_0 * rpa_z * rpb_z + (3.0 / 2.0) * fe_0 * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 +
+                             rpa_z * rpb_z * rpb_z * rpb_z);
     }
 }
 
-} // ovlrec namespace
-
+}  // namespace ovlrec

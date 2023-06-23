@@ -6,13 +6,10 @@
 #include "MathConst.hpp"
 #include "T2CDistributor.hpp"
 
-namespace ovlrec { // ovlrec namespace
+namespace ovlrec {  // ovlrec namespace
 
 auto
-compOverlapSS(      CSubMatrix* matrix,
-              const CGtoBlock&  gto_block,
-              const int64_t     bra_first,
-              const int64_t     bra_last) -> void
+compOverlapSS(CSubMatrix* matrix, const CGtoBlock& gto_block, const int64_t bra_first, const int64_t bra_last) -> void
 
 {
     // intialize GTOs data
@@ -55,14 +52,9 @@ compOverlapSS(      CSubMatrix* matrix,
 
         const auto ket_dim = ket_last - ket_first;
 
-        simd::loadCoordinates(ket_coords_x,
-                              ket_coords_y,
-                              ket_coords_z,
-                              gto_coords,
-                              ket_first,
-                              ket_last);
+        simd::loadCoordinates(ket_coords_x, ket_coords_y, ket_coords_z, gto_coords, ket_first, ket_last);
 
-        for (int64_t j = bra_first; j < bra_last; j++) 
+        for (int64_t j = bra_first; j < bra_last; j++)
         {
             const auto bra_coord = gto_coords[j];
 
@@ -84,32 +76,23 @@ compOverlapSS(      CSubMatrix* matrix,
 
                     const auto bra_norm = gto_norms[bra_index];
 
-                    ovlrec::compPrimitiveOverlapSS(buffer,
-                                                   bra_exp,
-                                                   bra_norm,
-                                                   bra_coord,
-                                                   ket_exps,
-                                                   ket_norms,
-                                                   ket_coords_x,
-                                                   ket_coords_y,
-                                                   ket_coords_z,
-                                                   ket_dim);
+                    ovlrec::compPrimitiveOverlapSS(
+                        buffer, bra_exp, bra_norm, bra_coord, ket_exps, ket_norms, ket_coords_x, ket_coords_y, ket_coords_z, ket_dim);
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer, gto_indexes,
-                                0, 0, j, ket_first, ket_last);
+            t2cfunc::distribute(matrix, buffer, gto_indexes, 0, 0, j, ket_first, ket_last);
         }
     }
 }
 
 auto
-compOverlapSS(      CSubMatrix* matrix,
-              const CGtoBlock&  bra_gto_block,
-              const CGtoBlock&  ket_gto_block,
-              const int64_t     bra_first,
-              const int64_t     bra_last,
-              const mat_t       mat_type) -> void
+compOverlapSS(CSubMatrix*      matrix,
+              const CGtoBlock& bra_gto_block,
+              const CGtoBlock& ket_gto_block,
+              const int64_t    bra_first,
+              const int64_t    bra_last,
+              const mat_t      mat_type) -> void
 
 {
     // intialize GTOs data on bra side
@@ -166,14 +149,9 @@ compOverlapSS(      CSubMatrix* matrix,
 
         const auto ket_dim = ket_last - ket_first;
 
-        simd::loadCoordinates(ket_coords_x,
-                              ket_coords_y,
-                              ket_coords_z,
-                              ket_gto_coords,
-                              ket_first,
-                              ket_last);
+        simd::loadCoordinates(ket_coords_x, ket_coords_y, ket_coords_z, ket_gto_coords, ket_first, ket_last);
 
-        for (int64_t j = bra_first; j < bra_last; j++) 
+        for (int64_t j = bra_first; j < bra_last; j++)
         {
             const auto bra_coord = bra_gto_coords[j];
 
@@ -195,27 +173,18 @@ compOverlapSS(      CSubMatrix* matrix,
 
                     const auto bra_norm = bra_gto_norms[bra_index];
 
-                    ovlrec::compPrimitiveOverlapSS(buffer,
-                                                   bra_exp,
-                                                   bra_norm,
-                                                   bra_coord,
-                                                   ket_exps,
-                                                   ket_norms,
-                                                   ket_coords_x,
-                                                   ket_coords_y,
-                                                   ket_coords_z,
-                                                   ket_dim);
+                    ovlrec::compPrimitiveOverlapSS(
+                        buffer, bra_exp, bra_norm, bra_coord, ket_exps, ket_norms, ket_coords_x, ket_coords_y, ket_coords_z, ket_dim);
                 }
             }
 
-            t2cfunc::distribute(matrix, buffer, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, mat_type);
+            t2cfunc::distribute(matrix, buffer, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, mat_type);
         }
     }
 }
 
 auto
-compPrimitiveOverlapSS(      TDoubleArray& buffer,
+compPrimitiveOverlapSS(TDoubleArray&       buffer,
                        const double        bra_exp,
                        const double        bra_norm,
                        const TPoint3D&     bra_coord,
@@ -256,12 +225,7 @@ compPrimitiveOverlapSS(      TDoubleArray& buffer,
 
     auto fints = buffer.data();
 
-    #pragma omp simd aligned(fints,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
-                             ket_rz : 64)
+#pragma omp simd aligned(fints, ket_fe, ket_fn, ket_rx, ket_ry, ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
         const auto ab_x = bra_rx - ket_rx[i];
@@ -280,5 +244,4 @@ compPrimitiveOverlapSS(      TDoubleArray& buffer,
     }
 }
 
-} // ovlrec namespace
-
+}  // namespace ovlrec

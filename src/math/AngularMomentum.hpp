@@ -28,8 +28,7 @@ to_SphericalComponents(const int64_t angmom) -> int64_t
   @return the number of spherical components.
 */
 inline auto
-to_SphericalComponents(const int64_t bra_angmom,
-                       const int64_t ket_angmom) -> int64_t
+to_SphericalComponents(const int64_t bra_angmom, const int64_t ket_angmom) -> int64_t
 {
     return (2 * bra_angmom + 1) * (2 * ket_angmom + 1);
 }
@@ -54,11 +53,9 @@ to_CartesianComponents(const int64_t angmom) -> int64_t
  @return the number of Cartesian momentum.
  */
 inline auto
-to_CartesianComponents(const int64_t bra_angmom,
-                       const int64_t ket_angmom) -> int64_t
+to_CartesianComponents(const int64_t bra_angmom, const int64_t ket_angmom) -> int64_t
 {
-    return ((bra_angmom + 1) * (bra_angmom + 2) / 2) *
-           ((ket_angmom + 1) * (ket_angmom + 2) / 2);
+    return ((bra_angmom + 1) * (bra_angmom + 2) / 2) * ((ket_angmom + 1) * (ket_angmom + 2) / 2);
 }
 
 /**
@@ -68,9 +65,7 @@ to_CartesianComponents(const int64_t bra_angmom,
  @param component the spherical component of angular momentum.
  @return the string of angular momentum component.
  */
-auto
-getStringOfAngularMomentum(const int64_t angmom,
-                           const int64_t component) -> std::string;
+auto getStringOfAngularMomentum(const int64_t angmom, const int64_t component) -> std::string;
 
 }  // namespace angmom
 

@@ -1,9 +1,6 @@
 #include "ChemicalElement.hpp"
 
-CChemicalElement::CChemicalElement(const std::string& label,
-                                   const double       charge,
-                                   const double       mass,
-                                   const int64_t      number)
+CChemicalElement::CChemicalElement(const std::string& label, const double charge, const double mass, const int64_t number)
 
     : _label(label)
 
@@ -641,7 +638,7 @@ CChemicalElement::setAtomType(const int64_t identifier) -> bool
             _selectDummyAtom();
 
             break;
-            
+
         case 1:
 
             _selectHydrogenAtom();
@@ -1820,7 +1817,7 @@ CChemicalElement::getMaxAngularMomentum() const -> int64_t
 auto
 CChemicalElement::getMaxIdentifier() const -> int64_t
 {
-    return 86; 
+    return 86;
 }
 
 auto
@@ -6982,4 +6979,3 @@ CChemicalElement::_selectRadonIsotopeMass(const int64_t label) -> bool
             break;
     }
 }
-

@@ -4,11 +4,11 @@
 #include <cstdint>
 
 #include "GtoBlock.hpp"
-#include "SubMatrix.hpp"
-#include "SimdTypes.hpp"
 #include "MatrixType.hpp"
+#include "SimdTypes.hpp"
+#include "SubMatrix.hpp"
 
-namespace ovlrec { // ovlrec namespace
+namespace ovlrec {  // ovlrec namespace
 
 /**
  Evaluates <P||G>  integrals for given pair of GTOs blocks.
@@ -20,13 +20,12 @@ namespace ovlrec { // ovlrec namespace
  @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
  @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
 */
-auto
-compOverlapPG(      CSubMatrix* matrix,
-              const CGtoBlock&  bra_gto_block,
-              const CGtoBlock&  ket_gto_block,
-              const bool        ang_order,
-              const int64_t     bra_first,
-              const int64_t     bra_last) -> void;
+auto compOverlapPG(CSubMatrix*      matrix,
+                   const CGtoBlock& bra_gto_block,
+                   const CGtoBlock& ket_gto_block,
+                   const bool       ang_order,
+                   const int64_t    bra_first,
+                   const int64_t    bra_last) -> void;
 
 /**
  Evaluates block of primitive <P||G_XXXX> integrals.
@@ -44,19 +43,18 @@ compOverlapPG(      CSubMatrix* matrix,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XXXX(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XXXX(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XXXY> integrals.
@@ -74,19 +72,18 @@ compPrimitiveOverlapPG_T_XXXX(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XXXY(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XXXY(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XXXZ> integrals.
@@ -104,19 +101,18 @@ compPrimitiveOverlapPG_T_XXXY(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XXXZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XXXZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XXYY> integrals.
@@ -134,19 +130,18 @@ compPrimitiveOverlapPG_T_XXXZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XXYY(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XXYY(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XXYZ> integrals.
@@ -164,19 +159,18 @@ compPrimitiveOverlapPG_T_XXYY(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XXYZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XXYZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XXZZ> integrals.
@@ -194,19 +188,18 @@ compPrimitiveOverlapPG_T_XXYZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XXZZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XXZZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XYYY> integrals.
@@ -224,19 +217,18 @@ compPrimitiveOverlapPG_T_XXZZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XYYY(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XYYY(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XYYZ> integrals.
@@ -254,19 +246,18 @@ compPrimitiveOverlapPG_T_XYYY(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XYYZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XYYZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XYZZ> integrals.
@@ -284,19 +275,18 @@ compPrimitiveOverlapPG_T_XYYZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XYZZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XYZZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_XZZZ> integrals.
@@ -314,19 +304,18 @@ compPrimitiveOverlapPG_T_XYZZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_XZZZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_XZZZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_YYYY> integrals.
@@ -344,19 +333,18 @@ compPrimitiveOverlapPG_T_XZZZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_YYYY(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_YYYY(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_YYYZ> integrals.
@@ -374,19 +362,18 @@ compPrimitiveOverlapPG_T_YYYY(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_YYYZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_YYYZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_YYZZ> integrals.
@@ -404,19 +391,18 @@ compPrimitiveOverlapPG_T_YYYZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_YYZZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_YYZZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_YZZZ> integrals.
@@ -434,19 +420,18 @@ compPrimitiveOverlapPG_T_YYZZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_YZZZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_YZZZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
 /**
  Evaluates block of primitive <P||G_ZZZZ> integrals.
@@ -464,20 +449,19 @@ compPrimitiveOverlapPG_T_YZZZ(      TDoubleArray& buffer_x,
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOverlapPG_T_ZZZZ(      TDoubleArray& buffer_x,
-                                    TDoubleArray& buffer_y,
-                                    TDoubleArray& buffer_z,
-                              const double        bra_exp,
-                              const double        bra_norm,
-                              const TPoint3D&     bra_coord,
-                              const TDoubleArray& ket_exps,
-                              const TDoubleArray& ket_norms,
-                              const TDoubleArray& ket_coords_x,
-                              const TDoubleArray& ket_coords_y,
-                              const TDoubleArray& ket_coords_z,
-                              const int64_t       ket_dim) -> void;
+auto compPrimitiveOverlapPG_T_ZZZZ(TDoubleArray&       buffer_x,
+                                   TDoubleArray&       buffer_y,
+                                   TDoubleArray&       buffer_z,
+                                   const double        bra_exp,
+                                   const double        bra_norm,
+                                   const TPoint3D&     bra_coord,
+                                   const TDoubleArray& ket_exps,
+                                   const TDoubleArray& ket_norms,
+                                   const TDoubleArray& ket_coords_x,
+                                   const TDoubleArray& ket_coords_y,
+                                   const TDoubleArray& ket_coords_z,
+                                   const int64_t       ket_dim) -> void;
 
-} // ovlrec namespace
+}  // namespace ovlrec
 
 #endif /* OverlapRecPG_hpp */

@@ -5,8 +5,7 @@
 namespace angmom {  // angmom namespace
 
 auto
-getStringOfAngularMomentum(const int64_t angmom,
-                           const int64_t component) -> std::string
+getStringOfAngularMomentum(const int64_t angmom, const int64_t component) -> std::string
 {
     if (angmom == 0) return std::string("s  ");
 
@@ -33,24 +32,21 @@ getStringOfAngularMomentum(const int64_t angmom,
 
     if (angmom == 4)
     {
-        const std::array<std::string, 9> clist({"g-4", "g-3", "g-2", "g-1", "g0 ", "g+1", "g+2",
-                                                "g+3", "g+4"});
+        const std::array<std::string, 9> clist({"g-4", "g-3", "g-2", "g-1", "g0 ", "g+1", "g+2", "g+3", "g+4"});
 
         return clist[component];
     }
 
     if (angmom == 5)
     {
-        const std::array<std::string, 11> clist({"h-5", "h-4", "h-3", "h-2", "h-1", "h0 ", "h+1",
-                                                 "h+2", "h+3", "h+4", "h+5"});
+        const std::array<std::string, 11> clist({"h-5", "h-4", "h-3", "h-2", "h-1", "h0 ", "h+1", "h+2", "h+3", "h+4", "h+5"});
 
         return clist[component];
     }
 
     if (angmom == 6)
     {
-        const std::array<std::string, 13> clist({"i-6", "i-5", "i-4", "i-3", "i-2", "i-1", "i0 ",
-                                                 "i+1", "i+2", "i+3", "i+4", "i+5", "i+6"});
+        const std::array<std::string, 13> clist({"i-6", "i-5", "i-4", "i-3", "i-2", "i-1", "i0 ", "i+1", "i+2", "i+3", "i+4", "i+5", "i+6"});
 
         return clist[component];
     }
