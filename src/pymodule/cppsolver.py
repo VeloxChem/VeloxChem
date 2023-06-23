@@ -1015,27 +1015,34 @@ class ComplexResponse(LinearSolver):
 
         return spectrum
 
-    def _print_results(self, rsp_results):
+    def _print_results(self, rsp_results, ostream=None):
         """
         Prints response resutls to output stream.
 
         :param rsp_results:
             The dictionary containing response results.
+        :param ostream:
+            The output stream.
         """
 
         if self.cpp_flag == 'absorption':
-            self._print_absorption_results(rsp_results)
+            self._print_absorption_results(rsp_results, ostream)
 
         elif self.cpp_flag == 'ecd':
-            self._print_ecd_results(rsp_results)
+            self._print_ecd_results(rsp_results, ostream)
 
-    def _print_absorption_results(self, rsp_results):
+    def _print_absorption_results(self, rsp_results, ostream=None):
         """
         Prints absorption results to output stream.
 
         :param rsp_results:
             The dictionary containing response results.
+        :param ostream:
+            The output stream.
         """
+
+        if ostream is None:
+            ostream = self.ostream
 
         width = 92
 
@@ -1043,15 +1050,15 @@ class ComplexResponse(LinearSolver):
         rsp_funcs = rsp_results['response_functions']
 
         title = 'Response Functions at Given Frequencies'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('=' * len(title)).ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
 
         for w in freqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
                 'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
+            ostream.print_header(title.ljust(width))
+            ostream.print_header(('-' * len(title)).ljust(width))
 
             for a in self.a_components:
                 for b in self.b_components:
@@ -1060,27 +1067,27 @@ class ComplexResponse(LinearSolver):
                         a.lower(), b.lower(), w)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
                         ops_label, rsp_func_val.real, rsp_func_val.imag)
-                    self.ostream.print_header(output.ljust(width))
-            self.ostream.print_blank()
+                    ostream.print_header(output.ljust(width))
+            ostream.print_blank()
 
         spectrum = self.get_spectrum(rsp_results, 'au')
 
         title = 'Linear Absorption Cross-Section'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('=' * len(title)).ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
 
         if len(freqs) == 1 and freqs[0] == 0.0:
             text = '*** No linear absorption spectrum at zero frequency.'
-            self.ostream.print_header(text.ljust(width))
-            self.ostream.print_blank()
+            ostream.print_header(text.ljust(width))
+            ostream.print_blank()
             return
 
         title = 'Reference: '
         title += 'J. Kauczor and P. Norman, '
         title += 'J. Chem. Theory Comput. 2014, 10, 2449-2455.'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_blank()
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
@@ -1094,38 +1101,43 @@ class ComplexResponse(LinearSolver):
         title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
                                                'Frequency[eV]',
                                                'sigma(w)[a.u.]')
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
 
         for w, sigma in zip(spectrum['x_data'], spectrum['y_data']):
             output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
                 w, w * hartree_in_ev(), sigma)
-            self.ostream.print_header(output.ljust(width))
+            ostream.print_header(output.ljust(width))
 
-        self.ostream.print_blank()
+        ostream.print_blank()
 
-    def _print_ecd_results(self, rsp_results):
+    def _print_ecd_results(self, rsp_results, ostream=None):
         """
         Prints ECD results to output stream.
 
         :param rsp_results:
             The dictionary containing response results.
+        :param ostream:
+            The output stream.
         """
+
+        if ostream is None:
+            ostream = self.ostream
 
         width = 92
 
         rsp_funcs = rsp_results['response_functions']
 
         title = 'Response Functions at Given Frequencies'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('=' * len(title)).ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
 
         for w in self.frequencies:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
                 'MagDip', 'LinMom', 'Frequency', 'Real', 'Imaginary')
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
+            ostream.print_header(title.ljust(width))
+            ostream.print_header(('-' * len(title)).ljust(width))
 
             for a in self.a_components:
                 for b in self.b_components:
@@ -1134,27 +1146,27 @@ class ComplexResponse(LinearSolver):
                         a.lower(), b.lower(), w)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
                         ops_label, rsp_func_val.real, rsp_func_val.imag)
-                    self.ostream.print_header(output.ljust(width))
-            self.ostream.print_blank()
+                    ostream.print_header(output.ljust(width))
+            ostream.print_blank()
 
         spectrum = self.get_spectrum(rsp_results, 'au')
 
         title = 'Circular Dichroism Spectrum'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('=' * len(title)).ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('=' * len(title)).ljust(width))
+        ostream.print_blank()
 
         if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
             text = '*** No circular dichroism spectrum at zero frequency.'
-            self.ostream.print_header(text.ljust(width))
-            self.ostream.print_blank()
+            ostream.print_header(text.ljust(width))
+            ostream.print_blank()
             return
 
         title = 'Reference: '
         title += 'A. Jiemchooroj and P. Norman, '
         title += 'J. Chem. Phys. 126, 134102 (2007).'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_blank()
+        ostream.print_header(title.ljust(width))
+        ostream.print_blank()
 
         assert_msg_critical(
             '[a.u.]' in spectrum['x_label'],
@@ -1166,12 +1178,12 @@ class ComplexResponse(LinearSolver):
         title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
                                                'Frequency[eV]',
                                                'Delta_epsilon[L mol^-1 cm^-1]')
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('-' * len(title)).ljust(width))
+        ostream.print_header(title.ljust(width))
+        ostream.print_header(('-' * len(title)).ljust(width))
 
         for w, Delta_epsilon in zip(spectrum['x_data'], spectrum['y_data']):
             output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
                 w, w * hartree_in_ev(), Delta_epsilon)
-            self.ostream.print_header(output.ljust(width))
+            ostream.print_header(output.ljust(width))
 
-        self.ostream.print_blank()
+        ostream.print_blank()

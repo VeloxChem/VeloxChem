@@ -50,26 +50,27 @@ class TestCppEcd:
         if is_mpi_master(task.mpi_comm):
             self.check_printout(cpp_drv, cpp_results)
 
-            spectrum = cpp_drv.get_spectrum(cpp_results['response_functions'])
-            for i, (w, Delta_epsilon) in enumerate(spectrum):
+            spectrum = cpp_drv.get_spectrum(cpp_results, 'au')
+            for i, (w, Delta_epsilon) in enumerate(
+                    zip(spectrum['x_data'], spectrum['y_data'])):
                 ref_w, ref_Delta_epsilon = ref_spectrum[i]
                 assert abs(w - ref_w) < 1.0e-6
                 assert abs(Delta_epsilon - ref_Delta_epsilon) < 1.0e-8
 
     def check_printout(self, cpp_drv, cpp_results):
 
-        rsp_func = cpp_results['response_functions']
-
         here = Path(__file__).parent
         random_string = get_random_string_serial()
         fpath = here / 'inputs' / f'vlx_printout_cpp_ecd_{random_string}.out'
 
         ostream = OutputStream(fpath)
-        cpp_drv._print_results(rsp_func, ostream)
+        cpp_drv._print_results(cpp_results, ostream)
         ostream.close()
 
         with fpath.open('r') as f_out:
             lines = f_out.readlines()
+
+        rsp_func = cpp_results['response_functions']
 
         for key, val in rsp_func.items():
             key_found = False
