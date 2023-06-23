@@ -31,7 +31,7 @@ import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_ev,
-                           fine_structure_constant,
+                           hartree_in_inverse_nm, fine_structure_constant,
                            speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .outputstream import OutputStream
@@ -1038,3 +1038,90 @@ class TpaTransitionDriver(NonlinearSolver):
             self.ostream.print_header(exec_str.ljust(width))
         self.ostream.print_blank()
         self.ostream.print_blank()
+
+    @staticmethod
+    def get_spectrum(result, x_data, x_unit, b_value, b_unit):
+        """
+        Gets two-photon absorption spectrum.
+
+        :param result:
+            A dictonary containing the result of TPA transition calculation.
+        :param x_data:
+            The list or array of x values.
+        :param x_unit:
+            The unit of x values.
+        :param b_value:
+            The value of the broadening parameter.
+        :param b_unit:
+            The unit of the broadening parameter.
+
+        :return:
+            A dictionary containing photon energies and TPA cross-sections.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'TpaTransitionDriver.get_spectrum: x_data should be au, ev or nm')
+
+        assert_msg_critical(
+            b_unit.lower() in ['au', 'ev'],
+            'TpaTransitionDriver.get_spectrum: broadening parameter should be au or ev'
+        )
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        # conversion factor for TPA cross-sections in GM
+        # * a0 in cm
+        # * c in cm/s
+        # * broadening parameter not included in au2gm
+        alpha = fine_structure_constant()
+        a0_in_cm = bohr_in_angstroms() * 1.0e-8
+        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
+        au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
+
+        tpa_ene_au = []
+        tpa_ene_ev = []
+        tpa_str = []
+
+        for w, s in result['tpa_strengths']['linear'].items():
+            tpa_ene_au.append(-w)
+            tpa_ene_ev.append(-w * au2ev)
+            tpa_str.append(s)
+
+        spectrum = {}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'TPA cross-section [GM]'
+
+        if x_unit.lower() == 'au':
+            x_data_au = list(x_data)
+        elif x_unit.lower() == 'ev':
+            x_data_au = [x / au2ev for x in x_data]
+        elif x_unit.lower() == 'nm':
+            x_data_au = [auxnm / x for x in x_data]
+
+        if b_unit.lower() == 'au':
+            b_au = b_value
+        elif b_unit.lower() == 'ev':
+            b_au = b_value / au2ev
+
+        y_data = []
+
+        for x_au in x_data_au:
+            y = 0.0
+            for e, s in zip(tpa_ene_au, tpa_str):
+                b_factor = b_au / ((e * 2 - x_au * 2)**2 + b_au**2)
+                y += au2gm * b_factor * (s * x_au**2)
+            y_data.append(y)
+
+        spectrum['x_data'] = list(x_data)
+        spectrum['y_data'] = y_data
+
+        return spectrum

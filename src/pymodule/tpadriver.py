@@ -409,7 +409,7 @@ class TpaDriver(NonlinearSolver):
                 't4_dict': t4_dict,
                 't3_dict': t3_dict,
                 'gamma': gamma,
-                'w': self.frequencies
+                'frequencies': list(self.frequencies),
             })
 
             self.print_results(self.frequencies, self.comp, result)
@@ -876,7 +876,8 @@ class TpaDriver(NonlinearSolver):
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
 
-    def get_spectrum(self, result, x_unit):
+    @staticmethod
+    def get_spectrum(result, x_unit):
         """
         Gets two-photon absorption spectrum.
 
@@ -920,7 +921,9 @@ class TpaDriver(NonlinearSolver):
 
         spectrum['y_label'] = 'TPA cross-section [GM]'
 
-        for w in self.frequencies:
+        freqs = result['frequencies']
+
+        for w in freqs:
             if w == 0.0:
                 continue
 
