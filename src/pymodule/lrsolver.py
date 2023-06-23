@@ -665,23 +665,26 @@ class LinearResponseSolver(LinearSolver):
 
         width = 92
 
-        for w in self.frequencies:
-            w_str = 'Polarizability (w={:.4f})'.format(w)
-            ostream.print_header(w_str.ljust(width))
-            ostream.print_header(('-' * len(w_str)).ljust(width))
+        dipole_ops = ['dipole', 'electric dipole', 'electric_dipole']
 
-            valstr = '{:<5s}'.format('')
-            for b in self.b_components:
-                valstr += '{:>15s}'.format(b.upper())
-            ostream.print_header(valstr.ljust(width))
+        if self.a_operator in dipole_ops and self.b_operator in dipole_ops:
 
-            for a in self.a_components:
-                valstr = '{:<5s}'.format(a.upper())
+            for w in self.frequencies:
+                w_str = 'Polarizability (w={:.4f})'.format(w)
+                ostream.print_header(w_str.ljust(width))
+                ostream.print_header(('-' * len(w_str)).ljust(width))
+
+                valstr = '{:<5s}'.format('')
                 for b in self.b_components:
-                    prop = -rsp_funcs[(a, b, w)]
-                    valstr += '{:15.8f}'.format(prop)
+                    valstr += '{:>15s}'.format(b.upper())
                 ostream.print_header(valstr.ljust(width))
 
-            ostream.print_blank()
+                for a in self.a_components:
+                    valstr = '{:<5s}'.format(a.upper())
+                    for b in self.b_components:
+                        prop = -rsp_funcs[(a, b, w)]
+                        valstr += '{:15.8f}'.format(prop)
+                    ostream.print_header(valstr.ljust(width))
+                ostream.print_blank()
 
         ostream.flush()

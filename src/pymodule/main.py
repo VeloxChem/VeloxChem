@@ -53,6 +53,7 @@ from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
+from .rsptpatransition import TpaTransition
 from .rsptpa import TPA
 from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
@@ -147,25 +148,32 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type in [
             'linear absorption cross-section',
             'linear absorption (cpp)',
+            'linear absorption(cpp)',
             'absorption (cpp)',
+            'absorption(cpp)',
     ]:
         rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
 
     elif prop_type in [
             'circular dichroism spectrum',
             'circular dichroism (cpp)',
+            'circular dichroism(cpp)',
             'ecd (cpp)',
+            'ecd(cpp)',
     ]:
         rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
 
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
 
-    elif prop_type == 'tpa':
-        rsp_prop = TPA(rsp_dict, method_dict)
-
     elif prop_type == 'shg':
         rsp_prop = SHG(rsp_dict, method_dict)
+
+    elif prop_type == 'tpa transition':
+        rsp_prop = TpaTransition(rsp_dict, method_dict)
+
+    elif prop_type == 'tpa':
+        rsp_prop = TPA(rsp_dict, method_dict)
 
     elif prop_type == 'custom':
         rsp_prop = CustomProperty(rsp_dict, method_dict)

@@ -792,7 +792,8 @@ class TpaTransitionDriver(NonlinearSolver):
         # read or compute distributed Focks
 
         if self.restart:
-            focks = read_distributed_focks(fock_file, self.comm, self.ostream)
+            dist_focks = read_distributed_focks(fock_file, self.comm,
+                                                self.ostream)
         else:
             time_start_fock = time.time()
 
@@ -1031,7 +1032,7 @@ class TpaTransitionDriver(NonlinearSolver):
 
         for w_ind, w in enumerate(freqs):
             exec_str = '{:7d}   '.format(w_ind + 1)
-            exec_str += '{:11.6f} eV'.format(-w * hartree_in_ev())
+            exec_str += '{:11.6f} eV'.format(w * hartree_in_ev())
             exec_str += '{:20.6f} a.u.'.format(tpa_strengths['circular'][-w])
             exec_str += '{:20.6f} GM'.format(tpa_cross_sections['circular'][-w])
             self.ostream.print_header(exec_str.ljust(width))

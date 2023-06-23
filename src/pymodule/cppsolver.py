@@ -83,7 +83,7 @@ class ComplexResponse(LinearSolver):
         self.b_operator = 'electric dipole'
         self.b_components = 'xyz'
 
-        self.cpp_flag = 'absorption'
+        self.cpp_flag = None
 
         self.frequencies = (0,)
         self.damping = 1000.0 / hartree_in_wavenumber()
@@ -289,8 +289,6 @@ class ComplexResponse(LinearSolver):
             dictionarry containing solutions and kappa values when called from
             a non-linear response module.
         """
-
-        self.set_cpp_flag(self.cpp_flag)
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -1025,15 +1023,17 @@ class ComplexResponse(LinearSolver):
             The output stream.
         """
 
+        self._print_response_functions(rsp_results, ostream)
+
         if self.cpp_flag == 'absorption':
             self._print_absorption_results(rsp_results, ostream)
 
         elif self.cpp_flag == 'ecd':
             self._print_ecd_results(rsp_results, ostream)
 
-    def _print_absorption_results(self, rsp_results, ostream=None):
+    def _print_response_functions(self, rsp_results, ostream=None):
         """
-        Prints absorption results to output stream.
+        Prints response functions to output stream.
 
         :param rsp_results:
             The dictionary containing response results.
@@ -1054,9 +1054,23 @@ class ComplexResponse(LinearSolver):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
+        operator_to_name = {
+            'dipole': 'Dipole',
+            'electric dipole': 'Dipole',
+            'electric_dipole': 'Dipole',
+            'linear_momentum': 'LinMom',
+            'linear momentum': 'LinMom',
+            'angular_momentum': 'AngMom',
+            'angular momentum': 'AngMom',
+            'magnetic dipole': 'MagDip',
+            'magnetic_dipole': 'MagDip',
+        }
+        a_name = operator_to_name[self.a_operator]
+        b_name = operator_to_name[self.b_operator]
+
         for w in freqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
+                a_name, b_name, 'Frequency', 'Real', 'Imaginary')
             ostream.print_header(title.ljust(width))
             ostream.print_header(('-' * len(title)).ljust(width))
 
@@ -1070,12 +1084,29 @@ class ComplexResponse(LinearSolver):
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
 
+    def _print_absorption_results(self, rsp_results, ostream=None):
+        """
+        Prints absorption results to output stream.
+
+        :param rsp_results:
+            The dictionary containing response results.
+        :param ostream:
+            The output stream.
+        """
+
+        if ostream is None:
+            ostream = self.ostream
+
+        width = 92
+
         spectrum = self.get_spectrum(rsp_results, 'au')
 
         title = 'Linear Absorption Cross-Section'
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
+
+        freqs = rsp_results['frequencies']
 
         if len(freqs) == 1 and freqs[0] == 0.0:
             text = '*** No linear absorption spectrum at zero frequency.'
@@ -1126,29 +1157,6 @@ class ComplexResponse(LinearSolver):
 
         width = 92
 
-        rsp_funcs = rsp_results['response_functions']
-
-        title = 'Response Functions at Given Frequencies'
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('=' * len(title)).ljust(width))
-        ostream.print_blank()
-
-        for w in self.frequencies:
-            title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'MagDip', 'LinMom', 'Frequency', 'Real', 'Imaginary')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
-
-            for a in self.a_components:
-                for b in self.b_components:
-                    rsp_func_val = rsp_funcs[(a, b, w)]
-                    ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
-                        a.lower(), b.lower(), w)
-                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, rsp_func_val.real, rsp_func_val.imag)
-                    ostream.print_header(output.ljust(width))
-            ostream.print_blank()
-
         spectrum = self.get_spectrum(rsp_results, 'au')
 
         title = 'Circular Dichroism Spectrum'
@@ -1156,7 +1164,9 @@ class ComplexResponse(LinearSolver):
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
+        freqs = rsp_results['frequencies']
+
+        if len(freqs) == 1 and freqs[0] == 0.0:
             text = '*** No circular dichroism spectrum at zero frequency.'
             ostream.print_header(text.ljust(width))
             ostream.print_blank()

@@ -23,8 +23,6 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-from .veloxchemlib import hartree_in_ev
-from .veloxchemlib import rotatory_strength_in_cgs
 from .rspproperty import ResponseProperty
 
 
@@ -36,11 +34,6 @@ class Absorption(ResponseProperty):
         The dictionary of response input.
     :param method_dict:
         The dictionary of method settings.
-
-    Instance variables
-        - rsp_dict: The dictionary of response input.
-        - method_dict: The dictionary of method settings.
-        - rsp_property: The dictionary of response property.
     """
 
     def __init__(self, rsp_dict=None, method_dict=None):

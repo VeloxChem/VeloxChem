@@ -229,12 +229,22 @@ class LinearResponseEigenSolver(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        rsp_vector_labels = [
-            'LR_eigen_bger_half_size',
-            'LR_eigen_bung_half_size',
-            'LR_eigen_e2bger_half_size',
-            'LR_eigen_e2bung_half_size',
-        ]
+        if self.nonlinear:
+            rsp_vector_labels = [
+                'LR_eigen_bger_half_size',
+                'LR_eigen_bung_half_size',
+                'LR_eigen_e2bger_half_size',
+                'LR_eigen_e2bung_half_size',
+                'LR_eigen_fock_ger',
+                'LR_eigen_fock_ung',
+            ]
+        else:
+            rsp_vector_labels = [
+                'LR_eigen_bger_half_size',
+                'LR_eigen_bung_half_size',
+                'LR_eigen_e2bger_half_size',
+                'LR_eigen_e2bung_half_size',
+            ]
 
         # read initial guess from restart file
         if self.restart:
