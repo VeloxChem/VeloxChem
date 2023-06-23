@@ -30,9 +30,11 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
-from .veloxchemlib import denmat
 from .veloxchemlib import XCFunctional, MolecularGrid
+from .veloxchemlib import denmat
+from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
+                           hartree_in_inverse_nm, fine_structure_constant,
+                           extinction_coefficient_from_beta)
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
@@ -1024,3 +1026,155 @@ class LinearResponseEigenSolver(LinearSolver):
                 new_rsp_drv.key = deepcopy(val)
 
         return new_rsp_drv
+
+    @staticmethod
+    def get_absorption_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
+        """
+        Gets absorption spectrum.
+
+        :param rsp_results:
+            A dictonary containing the result of response calculation.
+        :param x_data:
+            The list or array of x values.
+        :param x_unit:
+            The unit of x values.
+        :param b_value:
+            The value of the broadening parameter.
+        :param b_unit:
+            The unit of the broadening parameter.
+
+        :return:
+            A dictionary containing the spectrum.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'LinearResponseEigenSolver.get_absorption_spectrum: ' +
+            'x_data should be au, ev or nm')
+
+        assert_msg_critical(
+            b_unit.lower() in ['au', 'ev'],
+            'LinearResponseEigenSolver.get_absorption_spectrum: ' +
+            'broadening parameter should be au or ev')
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        exc_ene_au = rsp_results['eigenvalues']
+        osc_str = rsp_results['oscillator_strengths']
+
+        spectrum = {}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'Absorption cross-section [a.u.]'
+
+        if x_unit.lower() == 'au':
+            x_data_au = list(x_data)
+        elif x_unit.lower() == 'ev':
+            x_data_au = [x / au2ev for x in x_data]
+        elif x_unit.lower() == 'nm':
+            x_data_au = [auxnm / x for x in x_data]
+
+        if b_unit.lower() == 'au':
+            b_au = b_value
+        elif b_unit.lower() == 'ev':
+            b_au = b_value / au2ev
+
+        y_data = []
+
+        sigma_factor = 2.0 * np.pi * fine_structure_constant()
+
+        for x_au in x_data_au:
+            y = 0.0
+            for e, f in zip(exc_ene_au, osc_str):
+                b_factor = b_au / ((e - x_au)**2 + b_au**2)
+                y += sigma_factor * b_factor * f
+            y_data.append(y)
+
+        spectrum['x_data'] = list(x_data)
+        spectrum['y_data'] = y_data
+
+        return spectrum
+
+    @staticmethod
+    def get_ecd_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
+        """
+        Gets ECD spectrum.
+
+        :param rsp_results:
+            A dictonary containing the result of response calculation.
+        :param x_data:
+            The list or array of x values.
+        :param x_unit:
+            The unit of x values.
+        :param b_value:
+            The value of the broadening parameter.
+        :param b_unit:
+            The unit of the broadening parameter.
+
+        :return:
+            A dictionary containing the spectrum.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'LinearResponseEigenSolver.get_ecd_spectrum: ' +
+            'x_data should be au, ev or nm')
+
+        assert_msg_critical(
+            b_unit.lower() in ['au', 'ev'],
+            'LinearResponseEigenSolver.get_ecd_spectrum: ' +
+            'broadening parameter should be au or ev')
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        exc_ene_au = rsp_results['eigenvalues']
+        rot_str_au = rsp_results[
+            'rotatory_strengths'] / rotatory_strength_in_cgs()
+
+        spectrum = {}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'Molar circular dichroism '
+        spectrum['y_label'] += '[L mol$^{-1}$ cm$^{-1}$]'
+
+        if x_unit.lower() == 'au':
+            x_data_au = list(x_data)
+        elif x_unit.lower() == 'ev':
+            x_data_au = [x / au2ev for x in x_data]
+        elif x_unit.lower() == 'nm':
+            x_data_au = [auxnm / x for x in x_data]
+
+        if b_unit.lower() == 'au':
+            b_au = b_value
+        elif b_unit.lower() == 'ev':
+            b_au = b_value / au2ev
+
+        y_data = []
+
+        delta_eps_factor = extinction_coefficient_from_beta() / 3.0
+
+        for x_au in x_data_au:
+            y = 0.0
+            for e, r in zip(exc_ene_au, rot_str_au):
+                b_factor = b_au / ((e - x_au)**2 + b_au**2)
+                y += delta_eps_factor * b_factor * e * r
+            y_data.append(y)
+
+        spectrum['x_data'] = list(x_data)
+        spectrum['y_data'] = y_data
+
+        return spectrum

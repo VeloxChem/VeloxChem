@@ -1080,12 +1080,10 @@ class TpaTransitionDriver(NonlinearSolver):
         au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
 
         tpa_ene_au = []
-        tpa_ene_ev = []
         tpa_str = []
 
         for w, s in rsp_results['tpa_strengths']['linear'].items():
             tpa_ene_au.append(-w)
-            tpa_ene_ev.append(-w * au2ev)
             tpa_str.append(s)
 
         spectrum = {}
