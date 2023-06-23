@@ -1,14 +1,14 @@
-#include "OverlapDriver.hpp"
+#include "KineticEnergyDriver.hpp"
 
 #include "GtoFunc.hpp"
 #include "MatrixFunc.hpp"
 #include "OpenMPFunc.hpp"
-#include "OverlapFunc.hpp"
+#include "KineticEnergyFunc.hpp"
 
 auto
-COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule) const -> CMatrix
+CKineticEnergyDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule) const -> CMatrix
 {
-    auto ovl_matrix = matfunc::makeMatrix(basis, mat_t::symm);
+    auto kin_matrix = matfunc::makeMatrix(basis, mat_t::symm);
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -20,7 +20,7 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
 
     auto ptr_work_groups = work_groups.data();
 
-    auto ptr_ovl_matrix = &ovl_matrix;
+    auto ptr_kin_matrix = &kin_matrix;
 
     // execute OMP tasks with static scheduling
 
@@ -28,7 +28,7 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
 
     const auto ntasks = work_groups.size();
 
-#pragma omp parallel num_threads(ntasks) shared(ntasks, ptr_gto_blocks, ptr_work_groups, ptr_ovl_matrix)
+#pragma omp parallel num_threads(ntasks) shared(ntasks, ptr_gto_blocks, ptr_work_groups, ptr_kin_matrix)
     {
 #pragma omp single nowait
         {
@@ -38,7 +38,7 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
                 {
                     for (const auto& task : ptr_work_groups[i])
                     {
-                        const auto mat_type = ptr_ovl_matrix->getType();
+                        const auto mat_type = ptr_kin_matrix->getType();
 
                         if (task[0] == task[1])
                         {
@@ -46,9 +46,9 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
 
                             const auto angmom = gto_block.getAngularMomentum();
 
-                            auto ptr_submatrix = ptr_ovl_matrix->getSubMatrix({angmom, angmom});
+                            auto ptr_submatrix = ptr_kin_matrix->getSubMatrix({angmom, angmom});
 
-                            ovlfunc::compute(ptr_submatrix, gto_block, angmom, task[2], task[3]);
+                            kinfunc::compute(ptr_submatrix, gto_block, angmom, task[2], task[3]);
                         }
                         else
                         {
@@ -60,11 +60,11 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
 
                             const auto ket_angmom = ket_gto_block.getAngularMomentum();
 
-                            auto ptr_submatrix = ptr_ovl_matrix->getSubMatrix({bra_angmom, ket_angmom});
+                            auto ptr_submatrix = ptr_kin_matrix->getSubMatrix({bra_angmom, ket_angmom});
 
-                            const auto ang_order = ptr_ovl_matrix->isAngularOrder({bra_angmom, ket_angmom});
+                            const auto ang_order = ptr_kin_matrix->isAngularOrder({bra_angmom, ket_angmom});
 
-                            ovlfunc::compute(
+                            kinfunc::compute(
                                 ptr_submatrix, bra_gto_block, ket_gto_block, bra_angmom, ket_angmom, ang_order, task[2], task[3], mat_type);
                         }
                     }
@@ -73,5 +73,5 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
         }
     }
 
-    return ovl_matrix;
+    return kin_matrix;
 }

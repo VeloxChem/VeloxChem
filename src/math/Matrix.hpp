@@ -91,7 +91,7 @@ class CMatrix
     /**
      Get vector of angular pairs from map  of submatrices.
 
-     @return the map of submatrices.
+     @return the vector of angular pairs.
      */
     auto getAngularPairs() const -> std::vector<T2Pair>;
 
@@ -114,7 +114,7 @@ class CMatrix
      Get constant pointer to specific submatrix.
 
      @param angpair the angular pair of submatrix.
-     @return the pointer to requested submatrix.
+     @return the constant pointer to requested submatrix.
      */
     auto getSubMatrix(const T2Pair& angpair) const -> const CSubMatrix*;
 
