@@ -1,0 +1,320 @@
+#ifndef KineticEnergyRecPF_hpp
+#define KineticEnergyRecPF_hpp
+
+#include <cstdint>
+
+#include "GtoBlock.hpp"
+#include "MatrixType.hpp"
+#include "SimdTypes.hpp"
+#include "SubMatrix.hpp"
+
+namespace kinrec {  // kinrec namespace
+
+/**
+ Evaluates <P|T|F>  integrals for given pair of GTOs blocks.
+
+ @param matrix the pointer to matrix for storage of integrals.
+ @param bra_gto_block the GTOs block on bra side.
+ @param ket_gto_block the GTOs block on ket side.
+ @param ang_order the flag for matching angular order between matrix and pair of GTOs blocks.
+*/
+auto compKineticEnergyPF(CSubMatrix*      matrix,
+                         const CGtoBlock& bra_gto_block,
+                         const CGtoBlock& ket_gto_block,
+                         const bool       ang_order,
+                         const int64_t    bra_first,
+                         const int64_t    bra_last) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_XXX>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_XXX(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_XXY>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_XXY(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_XXZ>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_XXZ(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_XYY>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_XYY(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_XYZ>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_XYZ(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_XZZ>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_XZZ(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_YYY>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_YYY(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_YYZ>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_YYZ(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_YZZ>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_YZZ(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+/**
+ Evaluates block of primitive <P|T|F_ZZZ>  integrals.
+
+ @param buffer_x the partial integrals buffer.
+ @param buffer_y the partial integrals buffer.
+ @param buffer_z the partial integrals buffer.
+ @param bra_exp the primitive exponent on bra side.
+ @param bra_norm the primitive normalization factor on bra side.
+ @param bra_coord the 3d coordinate of basis function on bra side.
+ @param ket_exps the array of primitive exponents on ket side.
+ @param ket_norms the array of primitive normalization factors on ket side.
+ @param ket_coords_x the array of Cartesian X coordinates on ket side.
+ @param ket_coords_y the array of Cartesian Y coordinates on ket side.
+ @param ket_coords_z the array of Cartesian Z coordinates on ket side.
+ @param ket_dim the end size of ket arrays.
+*/
+auto compPrimitiveKineticEnergyPF_T_ZZZ(TDoubleArray&       buffer_x,
+                                        TDoubleArray&       buffer_y,
+                                        TDoubleArray&       buffer_z,
+                                        const double        bra_exp,
+                                        const double        bra_norm,
+                                        const TPoint3D&     bra_coord,
+                                        const TDoubleArray& ket_exps,
+                                        const TDoubleArray& ket_norms,
+                                        const TDoubleArray& ket_coords_x,
+                                        const TDoubleArray& ket_coords_y,
+                                        const TDoubleArray& ket_coords_z,
+                                        const int64_t       ket_dim) -> void;
+
+}  // namespace kinrec
+
+#endif /* KineticEnergyRecPF_hpp */
