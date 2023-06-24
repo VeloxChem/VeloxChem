@@ -208,8 +208,11 @@ class OptimizationDriver:
 
         # filename is used by geomeTRIC to create .log and other files
 
-        filename = Path(self.filename).name
-        filename = str(temp_path / f'{filename}_{self.rank}')
+        if self.rank == mpi_master() and self.keep_files:
+            filename = self.filename
+        else:
+            filename = Path(self.filename).name
+            filename = str(temp_path / f'{filename}_{self.rank}')
 
         if self.constraints:
             constr_file = Path(filename + '.constr.txt')
@@ -240,40 +243,6 @@ class OptimizationDriver:
             except geometric.errors.HessianExit:
                 hessian_exit = True
 
-        # save output files
-
-        if self.rank == mpi_master() and self.keep_files:
-            src_files = [
-                Path(filename + '_optim.xyz'),
-                Path(filename + '.log'),
-                Path(filename + '.vdata_first'),
-                Path(filename + '.vdata_last'),
-                Path(filename + '.tmp', 'hessian', 'hessian.txt'),
-                Path(filename + '.tmp', 'hessian', 'coords.xyz'),
-            ]
-
-            dest_files = [
-                Path(self.filename + '_optim.xyz'),
-                Path(self.filename + '.log'),
-                Path(self.filename + '.vdata_first'),
-                Path(self.filename + '.vdata_last'),
-                Path(self.filename + '.tmp', 'hessian', 'hessian.txt'),
-                Path(self.filename + '.tmp', 'hessian', 'coords.xyz'),
-            ]
-
-            if constr_filename is not None:
-                src_files.append(Path(constr_filename))
-                dest_files.append(Path(self.filename + '.constr.txt'))
-
-            for src_f, dest_f in zip(src_files, dest_files):
-                if src_f.is_file():
-                    self.copy_file(src_f, dest_f)
-                    valstr = f'Saving file: {str(dest_f)}'
-                    self.ostream.print_info(valstr)
-
-            self.ostream.print_blank()
-            self.ostream.flush()
-
         # post-process and print results while temp_dir is still available
 
         if hessian_exit:
@@ -287,6 +256,8 @@ class OptimizationDriver:
 
             if self.rank == mpi_master():
                 final_mol = Molecule(labels, coords.reshape(-1, 3), units='au')
+                final_mol.set_charge(molecule.get_charge())
+                final_mol.set_multiplicity(molecule.get_multiplicity())
             else:
                 final_mol = Molecule()
             final_mol.broadcast(self.rank, self.comm)
@@ -363,22 +334,6 @@ class OptimizationDriver:
 
         if extfile.is_file():
             extfile.unlink()
-
-    @staticmethod
-    def copy_file(src, dest):
-        """
-        Copies file (from src to dest).
-
-        :param src:
-            The source of copy.
-        :param dest:
-            The destination of copy.
-        """
-
-        if (not dest.is_file()) or (not src.samefile(dest)):
-            if not dest.parent.is_dir():
-                dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(src.read_text())
 
     @staticmethod
     def get_ic_rmsd(opt_mol, ref_mol):
