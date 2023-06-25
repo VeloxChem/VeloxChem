@@ -13,6 +13,9 @@ using TDoubleArray = std::array<double, simd_width>;
 
 using TFloatArray = std::array<double, simd_width>;
 
+template <size_t N>
+using TDoubleArray2D = std::array<TDoubleArray, N>;
+
 namespace simd {  // simd namespace
 
 /**
