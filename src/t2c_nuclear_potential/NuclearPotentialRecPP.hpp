@@ -14,10 +14,16 @@ namespace npotrec { // npotrec namespace
  Evaluates <P|A|P>  integrals for given GTOs block.
 
  @param matrix the pointer to matrix for storage of integrals.
+ @param charge the charge of external point.
+ @param point the coordinates of external point.
  @param gto_block the GTOs block.
+ @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
+ @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
 */
 auto
 compNuclearPotentialPP(      CSubMatrix* matrix,
+                       const double charge,
+                       const TPoint3D& point,
                        const CGtoBlock&  gto_block,
                        const int64_t     bra_first,
                        const int64_t     bra_last) -> void;
@@ -26,12 +32,18 @@ compNuclearPotentialPP(      CSubMatrix* matrix,
  Evaluates <P|A|P>  integrals for given pair of GTOs blocks.
 
  @param matrix the pointer to matrix for storage of integrals.
+ @param charge the charge of external point.
+ @param point the coordinates of external point.
  @param bra_gto_block the GTOs block on bra side.
  @param ket_gto_block the GTOs block on ket side.
+ @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
+ @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
  @param mat_type the matrix type.
 */
 auto
 compNuclearPotentialPP(      CSubMatrix* matrix,
+                       const double charge,
+                       const TPoint3D& point,
                        const CGtoBlock&  bra_gto_block,
                        const CGtoBlock&  ket_gto_block,
                        const int64_t     bra_first,
@@ -44,6 +56,8 @@ compNuclearPotentialPP(      CSubMatrix* matrix,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
+ @param charge the charge of external point.
+ @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
  @param bra_coord the 3d coordinate of basis function on bra side.
@@ -58,6 +72,8 @@ auto
 compPrimitiveNuclearPotentialPP_X_T(      TDoubleArray& buffer_x,
                                           TDoubleArray& buffer_y,
                                           TDoubleArray& buffer_z,
+                       const double charge,
+                       const TPoint3D& point,
                                     const double        bra_exp,
                                     const double        bra_norm,
                                     const TPoint3D&     bra_coord,
@@ -74,6 +90,8 @@ compPrimitiveNuclearPotentialPP_X_T(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
+ @param charge the charge of external point.
+ @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
  @param bra_coord the 3d coordinate of basis function on bra side.
@@ -88,6 +106,8 @@ auto
 compPrimitiveNuclearPotentialPP_Y_T(      TDoubleArray& buffer_x,
                                           TDoubleArray& buffer_y,
                                           TDoubleArray& buffer_z,
+                       const double charge,
+                       const TPoint3D& point,
                                     const double        bra_exp,
                                     const double        bra_norm,
                                     const TPoint3D&     bra_coord,
@@ -104,6 +124,8 @@ compPrimitiveNuclearPotentialPP_Y_T(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
+ @param charge the charge of external point.
+ @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
  @param bra_coord the 3d coordinate of basis function on bra side.
@@ -118,6 +140,8 @@ auto
 compPrimitiveNuclearPotentialPP_Z_T(      TDoubleArray& buffer_x,
                                           TDoubleArray& buffer_y,
                                           TDoubleArray& buffer_z,
+                       const double charge,
+                       const TPoint3D& point,
                                     const double        bra_exp,
                                     const double        bra_norm,
                                     const TPoint3D&     bra_coord,

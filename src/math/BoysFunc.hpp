@@ -45,7 +45,8 @@ class CBoysFunc
      @param arguments the array of Boys function arguments.
      @param nelements the number of important elements.
      */
-    void compute(std::array<TDoubleArray, N>& values, const TDoubleArray& arguments, const int64_t nelements) const;
+    template<int64_t M>
+    void compute(std::array<TDoubleArray, M>& values, const TDoubleArray& arguments, const int64_t nelements) const;
 };
 
 template <int64_t N>
@@ -24734,8 +24735,9 @@ CBoysFunc<N>::CBoysFunc()
 }
 
 template <int64_t N>
+template <int64_t M>
 void
-CBoysFunc<N>::compute(TDoubleArray2D<N+1>& values, const TDoubleArray& arguments, const int64_t nelements) const
+CBoysFunc<N>::compute(TDoubleArray2D<M>& values, const TDoubleArray& arguments, const int64_t nelements) const
 {
     const double fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
@@ -24746,11 +24748,11 @@ CBoysFunc<N>::compute(TDoubleArray2D<N+1>& values, const TDoubleArray& arguments
 
     for (int64_t i = 0; i < nelements; i++)
     {
-        int64_t pnt = (arguments(i) > 1.0e5) ? 1000000 : static_cast<int64_t>(10.0 * arguments(i) + 0.5);
+        int64_t pnt = (arguments[i] > 1.0e5) ? 1000000 : static_cast<int64_t>(10.0 * arguments[i] + 0.5);
 
         if (pnt < 121)
         {
-            const double fa = arguments(i);
+            const double fa = arguments[i];
 
             const double w = fa - 0.1 * pnt;
 
@@ -24758,9 +24760,9 @@ CBoysFunc<N>::compute(TDoubleArray2D<N+1>& values, const TDoubleArray& arguments
 
             const double w4 = w2 * w2;
 
-            values(N, i) = _table[pnt][0] + _table[pnt][1] * w + _table[pnt][2] * w2 + _table[pnt][3] * w2 * w
+            values[N][i] = _table[pnt][0] + _table[pnt][1] * w + _table[pnt][2] * w2 + _table[pnt][3] * w2 * w
 
-                           + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
+                         + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
 
             const double f2a = fa + fa;
 
@@ -24768,16 +24770,16 @@ CBoysFunc<N>::compute(TDoubleArray2D<N+1>& values, const TDoubleArray& arguments
 
             for (int64_t j = 0; j < N; j++)
             {
-                values(N - j - 1, i) = ft[N - j - 1] * (f2a * values(N - j, i) + fx);
+                values[N - j - 1][i] = ft[N - j - 1] * (f2a * values[N - j][i] + fx);
             }
         }
         else
         {
-            const double fia = 1.0 / arguments(i);
+            const double fia = 1.0 / arguments[i];
 
             double pf = 0.5 * fia;
 
-            values(0, i) = fpi * std::sqrt(fia);
+            values[0][i] = fpi * std::sqrt(fia);
 
             if (pnt < 921)
             {
@@ -24785,17 +24787,17 @@ CBoysFunc<N>::compute(TDoubleArray2D<N+1>& values, const TDoubleArray& arguments
 
                 const double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                                 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                               + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
-                const double fx = std::exp(-arguments(i));
+                const double fx = std::exp(-arguments[i]);
 
-                values(0, i) -= f * fx;
+                values[0][i] -= f * fx;
 
                 const double rterm = pf * fx;
 
                 for (int64_t j = 1; j <= N; j++)
                 {
-                    values(j, i) = pf * values(j - 1, i) - rterm;
+                    values[j][i] = pf * values[j - 1][i] - rterm;
 
                     pf += fia;
                 }
@@ -24804,7 +24806,7 @@ CBoysFunc<N>::compute(TDoubleArray2D<N+1>& values, const TDoubleArray& arguments
             {
                 for (int64_t j = 1; j <= N; j++)
                 {
-                    values(j, i) = pf * values(j - 1, i);
+                    values[j][i] = pf * values[j - 1][i];
 
                     pf += fia;
                 }

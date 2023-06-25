@@ -14,10 +14,16 @@ namespace npotrec { // npotrec namespace
  Evaluates <S|A|S>  integrals for given GTOs block.
 
  @param matrix the pointer to matrix for storage of integrals.
+ @param charge the charge of external point.
+ @param point the coordinates of external point.
  @param gto_block the GTOs block.
+ @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
+ @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
 */
 auto
 compNuclearPotentialSS(      CSubMatrix* matrix,
+                       const double charge,
+                       const TPoint3D& point,
                        const CGtoBlock&  gto_block,
                        const int64_t     bra_first,
                        const int64_t     bra_last) -> void;
@@ -26,12 +32,18 @@ compNuclearPotentialSS(      CSubMatrix* matrix,
  Evaluates <S|A|S>  integrals for given pair of GTOs blocks.
 
  @param matrix the pointer to matrix for storage of integrals.
+ @param charge the charge of external point.
+ @param point the coordinates of external point.
  @param bra_gto_block the GTOs block on bra side.
  @param ket_gto_block the GTOs block on ket side.
+ @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
+ @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
  @param mat_type the matrix type.
 */
 auto
 compNuclearPotentialSS(      CSubMatrix* matrix,
+                       const double charge,
+                       const TPoint3D& point,
                        const CGtoBlock&  bra_gto_block,
                        const CGtoBlock&  ket_gto_block,
                        const int64_t     bra_first,
@@ -42,6 +54,8 @@ compNuclearPotentialSS(      CSubMatrix* matrix,
  Evaluates block of primitive <S|A|S> integrals.
 
  @param buffer the integrals buffer.
+ @param charge the charge of external point.
+ @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
  @param bra_coord the 3d coordinate of basis function on bra side.
@@ -54,6 +68,8 @@ compNuclearPotentialSS(      CSubMatrix* matrix,
 */
 auto
 compPrimitiveNuclearPotentialSS(      TDoubleArray& buffer,
+                       const double charge,
+                       const TPoint3D& point,
                                 const double        bra_exp,
                                 const double        bra_norm,
                                 const TPoint3D&     bra_coord,
