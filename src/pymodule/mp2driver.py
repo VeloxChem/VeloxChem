@@ -39,6 +39,7 @@ from .mointsdriver import MOIntegralsDriver
 from .subcommunicators import SubCommunicators
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
+from .sanitychecks import molecule_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -185,6 +186,16 @@ class Mp2Driver:
         :param scf_type:
             The SCF type (restricted, unrestricted, restricted_openshell).
         """
+
+        molecule_sanity_check(molecule)
+
+        if scf_type == 'restricted':
+            nalpha = molecule.number_of_alpha_electrons()
+            nbeta = molecule.number_of_beta_electrons()
+            assert_msg_critical(
+                nalpha == nbeta,
+                'Mp2Driver: inconsistent numbers of alpha and beta electrons ' +
+                'for restricted case')
 
         moints_drv = MOIntegralsDriver(self.comm, self.ostream)
 
