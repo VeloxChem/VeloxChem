@@ -1772,11 +1772,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -1787,8 +1787,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -1810,7 +1808,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -1973,11 +1971,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -1988,8 +1986,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -2011,7 +2007,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -2170,11 +2166,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -2185,8 +2181,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -2208,7 +2202,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXX_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -2367,11 +2361,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -2382,8 +2376,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -2405,7 +2397,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -2580,11 +2572,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -2595,8 +2587,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -2618,7 +2608,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -2793,11 +2783,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -2808,8 +2798,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -2831,7 +2819,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXY_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -3012,11 +3000,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -3027,8 +3015,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -3050,7 +3036,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -3225,11 +3211,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -3240,8 +3226,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -3263,7 +3247,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -3444,11 +3428,11 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -3459,8 +3443,6 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -3482,7 +3464,7 @@ compPrimitiveNuclearPotentialGeom010FP_XXZ_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -3657,11 +3639,11 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -3672,8 +3654,6 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -3695,7 +3675,7 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -3870,11 +3850,11 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -3885,8 +3865,6 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -3908,7 +3886,7 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -4083,11 +4061,11 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -4098,8 +4076,6 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -4121,7 +4097,7 @@ compPrimitiveNuclearPotentialGeom010FP_XYY_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -4302,11 +4278,11 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -4317,8 +4293,6 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -4340,7 +4314,7 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -4523,11 +4497,11 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -4538,8 +4512,6 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -4561,7 +4533,7 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -4744,11 +4716,11 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -4759,8 +4731,6 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -4782,7 +4752,7 @@ compPrimitiveNuclearPotentialGeom010FP_XYZ_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -4965,11 +4935,11 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -4980,8 +4950,6 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -5003,7 +4971,7 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -5178,11 +5146,11 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -5193,8 +5161,6 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -5216,7 +5182,7 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -5397,11 +5363,11 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -5412,8 +5378,6 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -5435,7 +5399,7 @@ compPrimitiveNuclearPotentialGeom010FP_XZZ_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -5610,11 +5574,11 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -5625,8 +5589,6 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -5648,7 +5610,7 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -5807,11 +5769,11 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -5822,8 +5784,6 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -5845,7 +5805,7 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -6008,11 +5968,11 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -6023,8 +5983,6 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -6046,7 +6004,7 @@ compPrimitiveNuclearPotentialGeom010FP_YYY_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -6205,11 +6163,11 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -6220,8 +6178,6 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -6243,7 +6199,7 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -6424,11 +6380,11 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -6439,8 +6395,6 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -6462,7 +6416,7 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -6637,11 +6591,11 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -6652,8 +6606,6 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -6675,7 +6627,7 @@ compPrimitiveNuclearPotentialGeom010FP_YYZ_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -6850,11 +6802,11 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -6865,8 +6817,6 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -6888,7 +6838,7 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -7069,11 +7019,11 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -7084,8 +7034,6 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -7107,7 +7055,7 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -7282,11 +7230,11 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -7297,8 +7245,6 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -7320,7 +7266,7 @@ compPrimitiveNuclearPotentialGeom010FP_YZZ_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -7495,11 +7441,11 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_X(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -7510,8 +7456,6 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_X(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -7533,7 +7477,7 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_X(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -7692,11 +7636,11 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_Y(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -7707,8 +7651,6 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_Y(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -7730,7 +7672,7 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_Y(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\
@@ -7889,11 +7831,11 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_Z(      TDoubleArray& buffer_x,
 
     // set up Boys function variables
 
-    const CBoysFunc<5> bf_table;
+    const CBoysFunc<4> bf_table;
 
     alignas(64) TDoubleArray bf_args;
 
-    TDoubleArray2D<6> bf_values;
+    TDoubleArray2D<5> bf_values;
 
     auto b0_vals = bf_values[0].data();
 
@@ -7904,8 +7846,6 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_Z(      TDoubleArray& buffer_x,
     auto b3_vals = bf_values[3].data();
 
     auto b4_vals = bf_values[4].data();
-
-    auto b5_vals = bf_values[5].data();
 
     auto targs = bf_args.data();
 
@@ -7927,7 +7867,7 @@ compPrimitiveNuclearPotentialGeom010FP_ZZZ_Z(      TDoubleArray& buffer_x,
         targs[i] = fxi_0 * (rpc_x * rpc_x + rpc_y * rpc_y + rpc_z * rpc_z);
     }
 
-    bf_table.compute<6>(bf_values, bf_args, ket_dim);
+    bf_table.compute<5>(bf_values, bf_args, ket_dim);
 
     #pragma omp simd aligned(fints_x,\
                              fints_y,\

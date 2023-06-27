@@ -16,7 +16,7 @@ namespace geom_npotrec { // geom_npotrec namespace
  @param matrix_xthe pointer to matrix for storage of Cartesian integral component X.
  @param matrix_ythe pointer to matrix for storage of Cartesian integral component Y.
  @param matrix_zthe pointer to matrix for storage of Cartesian integral component Z.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_gto_block the GTOs block on bra side.
  @param ket_gto_block the GTOs block on ket side.
@@ -42,7 +42,7 @@ compNuclearPotentialGeom010PF(      CSubMatrix* matrix_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -76,7 +76,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_XXX(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -110,7 +110,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_XXY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -144,7 +144,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_XXZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -178,7 +178,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_XYY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -212,7 +212,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_XYZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -246,7 +246,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_XZZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -280,7 +280,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_YYY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -314,7 +314,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_YYZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -348,7 +348,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_YZZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -382,7 +382,7 @@ compPrimitiveNuclearPotentialGeom010PF_X_ZZZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -416,7 +416,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_XXX(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -450,7 +450,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_XXY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -484,7 +484,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_XXZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -518,7 +518,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_XYY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -552,7 +552,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_XYZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -586,7 +586,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_XZZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -620,7 +620,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_YYY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -654,7 +654,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_YYZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -688,7 +688,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_YZZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -722,7 +722,7 @@ compPrimitiveNuclearPotentialGeom010PF_Y_ZZZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -756,7 +756,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_XXX(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -790,7 +790,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_XXY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -824,7 +824,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_XXZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -858,7 +858,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_XYY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -892,7 +892,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_XYZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -926,7 +926,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_XZZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -960,7 +960,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_YYY(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -994,7 +994,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_YYZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
@@ -1028,7 +1028,7 @@ compPrimitiveNuclearPotentialGeom010PF_Z_YZZ(      TDoubleArray& buffer_x,
  @param buffer_x the partial integrals buffer.
  @param buffer_y the partial integrals buffer.
  @param buffer_z the partial integrals buffer.
- @param dipole the charge of external point.
+ @param dipole the dipole of external point.
  @param point the coordinates of external point.
  @param bra_exp the primitive exponent on bra side.
  @param bra_norm the primitive normalization factor on bra side.
