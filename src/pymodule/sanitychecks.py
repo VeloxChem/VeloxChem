@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .veloxchemlib import mpi_master
+from .veloxchemlib import molorb
 from .veloxchemlib import parse_xc_func
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
@@ -149,3 +150,61 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
         err_msg_scan += 'SCAN family of functional is not supported'
         assert_msg_critical('scan' not in obj.xcfun.get_func_label().lower(),
                             err_msg_scan)
+
+
+def mp2_sanity_check(molecule, basis, mol_orbs, scf_type):
+    """
+    Checks MP2 input and returns SCF type.
+
+    :param molecule:
+        The molecule object.
+    :param basis:
+        The AO basis set object.
+    :param mol_orbs:
+        The molecular orbitals object.
+    :param scf_type:
+        The SCF type.
+
+    :return:
+        The updated SCF type.
+    """
+
+    # check molecule
+
+    molecule_sanity_check(molecule)
+
+    # check number of AOs
+
+    assert_msg_critical(
+        basis.get_dimension_of_basis(molecule) == mol_orbs.number_of_aos(),
+        'MP2: Inconsistent number of AOs in basis set and molecular orbitals')
+
+    # check ROMP2
+
+    assert_msg_critical(scf_type != 'restricted_openshell',
+                        'Restricted open-shell MP2 not implemented')
+
+    # process default value of scf_type
+
+    if scf_type is None:
+        if mol_orbs.get_orbitals_type() == molorb.unrest:
+            scf_type = 'unrestricted'
+        else:
+            scf_type = 'restricted'
+
+    # sanity check for restricted and unrestricted cases
+
+    if scf_type == 'restricted':
+        assert_msg_critical(
+            molecule.get_multiplicity() == 1,
+            'MP2: Invalid spin multiplicity for restricted case')
+        assert_msg_critical(
+            mol_orbs.get_orbitals_type() == molorb.rest,
+            'MP2: Invalid type of mol_orbs for restricted case')
+
+    elif scf_type == 'unrestricted':
+        assert_msg_critical(
+            mol_orbs.get_orbitals_type() == molorb.unrest,
+            'MP2: Invalid type of mol_orbs for unrestricted case')
+
+    return scf_type

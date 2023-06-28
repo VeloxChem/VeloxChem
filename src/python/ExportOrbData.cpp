@@ -46,9 +46,9 @@
 #include "MolecularOrbitals.hpp"
 #include "MolecularOrbitalsType.hpp"
 #include "Molecule.hpp"
+#include "PackedGtoPairContainer.hpp"
 #include "SADGuessDriver.hpp"
 #include "StringFormat.hpp"
-#include "PackedGtoPairContainer.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -377,8 +377,7 @@ export_orbdata(py::module& m)
              "nAlphaElectrons"_a,
              "nBetaElectrons"_a)
         .def("get_pair_density",
-             py::overload_cast<const std::vector<int32_t>&, const std::vector<int32_t>&>(&CMolecularOrbitals::getRestrictedPairDensity,
-                                                                                                     py::const_),
+             py::overload_cast<const std::vector<int32_t>&, const std::vector<int32_t>&>(&CMolecularOrbitals::getRestrictedPairDensity, py::const_),
              "Computes set of restricted pair C_i C_j^T density matrices in AO basis.",
              "iMolecularOrbitals"_a,
              "ecularOrbitals"_a)
@@ -394,7 +393,9 @@ export_orbdata(py::module& m)
              "aoBasis"_a,
              "minBasis"_a)
         .def("number_aos", &CMolecularOrbitals::getNumberOfRows, "Gets number of rows in specific molecular orbital matrix.")
+        .def("number_of_aos", &CMolecularOrbitals::getNumberOfRows, "Gets number of rows in specific molecular orbital matrix.")
         .def("number_mos", &CMolecularOrbitals::getNumberOfColumns, "Gets number of columns in specific molecular orbital matrix.")
+        .def("number_of_mos", &CMolecularOrbitals::getNumberOfColumns, "Gets number of columns in specific molecular orbital matrix.")
         .def("alpha_orbitals",
              py::overload_cast<const int32_t, const int32_t>(&CMolecularOrbitals::alphaOrbitals, py::const_),
              "Gets alpha orbitals within specific range.",
@@ -426,8 +427,11 @@ export_orbdata(py::module& m)
     PyClass<CSADGuessDriver>(m, "SADGuessDriver")
         .def(py::init(&vlx_general::create<CSADGuessDriver>), "comm"_a = py::none())
         .def("compute", &CSADGuessDriver::compute, "Computes SAD initial guess.", "molecule"_a, "basis_1"_a, "basis_2"_a, "densityType"_a)
-        .def("set_number_of_unpaired_electrons_on_atoms", &CSADGuessDriver::setNumberOfUnpairedElectronsOnAtoms, "Sets number of unpaired electrons on atoms for SAD initial guess.", "num_unpaired_electrons"_a);
-    
+        .def("set_number_of_unpaired_electrons_on_atoms",
+             &CSADGuessDriver::setNumberOfUnpairedElectronsOnAtoms,
+             "Sets number of unpaired electrons on atoms for SAD initial guess.",
+             "num_unpaired_electrons"_a);
+
     // CPackedGtoPairContainer class
 
     PyClass<CPackedGtoPairContainer<double, mem::Host>>(m, "PackedGtoPairContainer")

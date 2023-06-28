@@ -30,8 +30,7 @@ import sys
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat
-from .veloxchemlib import fockmat
+from .veloxchemlib import denmat, fockmat
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .outputstream import OutputStream
@@ -39,7 +38,7 @@ from .mointsdriver import MOIntegralsDriver
 from .subcommunicators import SubCommunicators
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
-from .sanitychecks import molecule_sanity_check
+from .sanitychecks import mp2_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -148,13 +147,13 @@ class Mp2Driver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-    def compute(self, molecule, ao_basis, mol_orbs, scf_type='restricted'):
+    def compute(self, molecule, basis, mol_orbs, scf_type=None):
         """
         Performs MP2 calculation.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
@@ -163,23 +162,18 @@ class Mp2Driver:
         """
 
         if self.conventional:
-            return self.compute_conventional(molecule, ao_basis, mol_orbs,
+            return self.compute_conventional(molecule, basis, mol_orbs,
                                              scf_type)
         else:
-            return self.compute_distributed(molecule, ao_basis, mol_orbs,
-                                            scf_type)
+            return self.compute_distributed(molecule, basis, mol_orbs, scf_type)
 
-    def compute_conventional(self,
-                             molecule,
-                             ao_basis,
-                             mol_orbs,
-                             scf_type='restricted'):
+    def compute_conventional(self, molecule, basis, mol_orbs, scf_type=None):
         """
         Performs conventional MP2 calculation.
 
         :param molecule:
             The molecule.
-        :param ao_basis:
+        :param basis:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
@@ -187,15 +181,9 @@ class Mp2Driver:
             The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
-        molecule_sanity_check(molecule)
+        mol_orbs.broadcast(self.rank, self.comm)
 
-        if scf_type == 'restricted':
-            nalpha = molecule.number_of_alpha_electrons()
-            nbeta = molecule.number_of_beta_electrons()
-            assert_msg_critical(
-                nalpha == nbeta,
-                'Mp2Driver: inconsistent numbers of alpha and beta electrons ' +
-                'for restricted case')
+        scf_type = mp2_sanity_check(molecule, basis, mol_orbs, scf_type)
 
         moints_drv = MOIntegralsDriver(self.comm, self.ostream)
 
@@ -212,7 +200,7 @@ class Mp2Driver:
                 e_vv = evir.reshape(-1, 1) + evir
 
                 phys_oovv = moints_drv.compute_in_memory(
-                    molecule, ao_basis, mol_orbs, 'phys_oovv')
+                    molecule, basis, mol_orbs, 'phys_oovv')
                 for i in range(phys_oovv.shape[0]):
                     for j in range(phys_oovv.shape[1]):
                         ab = phys_oovv[i, j, :, :]
@@ -242,11 +230,11 @@ class Mp2Driver:
                 e_vv_ab = evir_a.reshape(-1, 1) + evir_b
 
                 phys_oovv_aaaa = moints_drv.compute_in_memory(
-                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'aaaa')
+                    molecule, basis, mol_orbs, 'phys_oovv', 'aaaa')
                 phys_oovv_bbbb = moints_drv.compute_in_memory(
-                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'bbbb')
+                    molecule, basis, mol_orbs, 'phys_oovv', 'bbbb')
                 phys_oovv_abab = moints_drv.compute_in_memory(
-                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'abab')
+                    molecule, basis, mol_orbs, 'phys_oovv', 'abab')
 
                 for i in range(phys_oovv_aaaa.shape[0]):
                     for j in range(phys_oovv_aaaa.shape[1]):
@@ -279,7 +267,7 @@ class Mp2Driver:
         else:
             return None
 
-    def compute_distributed(self, molecule, basis, mol_orbs, scf_type):
+    def compute_distributed(self, molecule, basis, mol_orbs, scf_type=None):
         """
         Performs MP2 calculation via distributed Fock builds.
 
@@ -293,8 +281,9 @@ class Mp2Driver:
             The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
-        assert_msg_critical(scf_type != 'restricted_openshell',
-                            'Restricted open-shell MP2 not implemented')
+        mol_orbs.broadcast(self.rank, self.comm)
+
+        scf_type = mp2_sanity_check(molecule, basis, mol_orbs, scf_type)
 
         # subcommunicators
 
