@@ -674,7 +674,7 @@ class ScfDriver:
             if self.scf_type == 'restricted':
                 assert_msg_critical(alpha_list == beta_list, err_excitations)
 
-            n_mo = orbitals.number_mos()
+            n_mo = orbitals.number_of_mos()
             mo_a = orbitals.alpha_to_numpy()
             mo_b = orbitals.beta_to_numpy()
 

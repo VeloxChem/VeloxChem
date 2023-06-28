@@ -114,11 +114,11 @@ class TestOrbData:
         assert orb_rest.get_orbitals_type() == molorb.rest
         assert orb_unrest.get_orbitals_type() == molorb.unrest
 
-        assert orb_rest.number_mos() == 2
-        assert orb_unrest.number_mos() == 2
+        assert orb_rest.number_of_mos() == 2
+        assert orb_unrest.number_of_mos() == 2
 
-        assert orb_rest.number_aos() == 3
-        assert orb_unrest.number_aos() == 3
+        assert orb_rest.number_of_aos() == 3
+        assert orb_unrest.number_of_aos() == 3
 
         # hdf5 read/write tests
 
@@ -219,5 +219,5 @@ class TestOrbData:
         if is_mpi_master():
             sdal = ao_matrix_to_dalton(DenseMatrix(smat), task.ao_basis,
                                        task.molecule).to_numpy()
-            assert np.max(
-                np.abs(sdal - smat[bf_indices, :][:, bf_indices])) < 1.0e-12
+            diff = np.max(np.abs(sdal - smat[bf_indices, :][:, bf_indices]))
+            assert diff < 1.0e-12

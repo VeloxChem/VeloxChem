@@ -58,7 +58,7 @@ def _MolecularOrbitals_print_orbitals(self,
     if ostream is None:
         ostream = OutputStream(sys.stdout)
 
-    norb = self.number_mos()
+    norb = self.number_of_mos()
 
     ao_map = ao_basis.get_ao_basis_map(molecule)
 

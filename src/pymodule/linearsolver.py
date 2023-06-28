@@ -1959,7 +1959,7 @@ class LinearSolver:
             nocc = self.num_core_orbitals
         else:
             nocc = molecule.number_of_alpha_electrons()
-        nvir = nto_mo.number_mos() - nocc
+        nvir = nto_mo.number_of_mos() - nocc
         lam_diag = nto_mo.occa_to_numpy()[nocc:nocc + min(nocc, nvir)]
 
         for i_nto in range(lam_diag.size):
