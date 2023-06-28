@@ -449,6 +449,38 @@ def _Molecule_is_linear(self):
         return False
 
 
+def _Molecule_get_aufbau_alpha_occupation(self, n_mo):
+    """
+    Gets occupation numbers for alpha spin based on the aufbau principle.
+
+    :param n_mo:
+        The number of molecular orbitals.
+
+    :return:
+        The occupation numbers for alpha spin.
+    """
+
+    nalpha = self.number_of_alpha_electrons()
+
+    return [1.0 if i < nalpha else 0.0 for i in range(n_mo)]
+
+
+def _Molecule_get_aufbau_beta_occupation(self, n_mo):
+    """
+    Gets occupation numbers for beta spin based on the aufbau principle.
+
+    :param n_mo:
+        The number of molecular orbitals.
+
+    :return:
+        The occupation numbers for beta spin.
+    """
+
+    nbeta = self.number_of_beta_electrons()
+
+    return [1.0 if i < nbeta else 0.0 for i in range(n_mo)]
+
+
 def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
     """
     Creates an occupation vector based on the aufbau principle.
@@ -468,14 +500,17 @@ def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
 
     if flag == 'restricted':
         occ = [
-            2.0 if x < nbeta else 1.0 if x < nalpha else 0.0
+            2.0 if x < nbeta else (1.0 if x < nalpha else 0.0)
             for x in range(norb)
         ]
         return occ
-    else:
+
+    elif flag == 'unrestricted':
         occa = [1.0 if x < nalpha else 0.0 for x in range(norb)]
         occb = [1.0 if x < nbeta else 0.0 for x in range(norb)]
         return occa, occb
+
+    return None
 
 
 def _Molecule_deepcopy(self, memo):
@@ -512,6 +547,8 @@ Molecule.get_xyz_string = _Molecule_get_xyz_string
 Molecule.write_xyz_file = _Molecule_write_xyz_file
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
+Molecule.get_aufbau_alpha_occupation = _Molecule_get_aufbau_alpha_occupation
+Molecule.get_aufbau_beta_occupation = _Molecule_get_aufbau_beta_occupation
 Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
 Molecule.__deepcopy__ = _Molecule_deepcopy
 

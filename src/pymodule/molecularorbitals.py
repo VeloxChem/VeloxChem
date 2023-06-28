@@ -62,10 +62,9 @@ def _MolecularOrbitals_print_orbitals(self,
 
     ao_map = ao_basis.get_ao_basis_map(molecule)
 
-    if self.get_orbitals_type() == molorb.rest:
+    if self.get_orbitals_type() in [molorb.rest, molorb.restopen]:
 
         ostream.print_blank()
-
         ostream.print_header("Spin Restricted Orbitals")
         ostream.print_header("------------------------")
 
@@ -78,7 +77,7 @@ def _MolecularOrbitals_print_orbitals(self,
 
         rvecs = self.alpha_to_numpy()
         reigs = self.ea_to_numpy()
-        rnocc = self.occa_to_numpy()
+        rnocc = self.occa_to_numpy() + self.occb_to_numpy()
 
         for i in range(nstart, nend):
             _MolecularOrbitals_print_coefficients(reigs[i], rnocc[i], i,
@@ -90,7 +89,6 @@ def _MolecularOrbitals_print_orbitals(self,
     elif self.get_orbitals_type() == molorb.unrest:
 
         ostream.print_blank()
-
         ostream.print_header("Spin Unrestricted Alpha Orbitals")
         ostream.print_header("--------------------------------")
 
@@ -111,7 +109,6 @@ def _MolecularOrbitals_print_orbitals(self,
                                                   ostream)
 
         ostream.print_blank()
-
         ostream.print_header("Spin Unrestricted Beta Orbitals")
         ostream.print_header("-------------------------------")
 
@@ -135,7 +132,7 @@ def _MolecularOrbitals_print_orbitals(self,
 
     else:
 
-        errmsg = "MolecularOrbitals.get_density:"
+        errmsg = "MolecularOrbitals.print_orbitals:"
         errmsg += " Invalid molecular orbitals type"
         assert_msg_critical(False, errmsg)
 
@@ -197,7 +194,7 @@ def _MolecularOrbitals_print_coefficients(eigval, focc, iorb, coeffs, ao_map,
         ostream.print_header(valstr.ljust(92))
 
 
-def _MolecularOrbitals_get_density(self, molecule, scf_type):
+def _MolecularOrbitals_get_density(self, molecule, scf_type=None):
     """
     Gets AO density matrix from molecular orbitals.
 
@@ -211,28 +208,55 @@ def _MolecularOrbitals_get_density(self, molecule, scf_type):
         The AO density matrix.
     """
 
-    # MGD: TODO: need to implement one based on the occupations
-    nalpha = molecule.number_of_alpha_electrons()
-    nbeta = molecule.number_of_beta_electrons()
+    if self.get_orbitals_type() == molorb.rest and (scf_type is None or
+                                                    scf_type == 'restricted'):
 
-    if (self.get_orbitals_type() == molorb.rest and scf_type == 'restricted'):
-        return self.get_ao_density(nalpha + nbeta)
+        mo = self.alpha_to_numpy()
 
-    elif (self.get_orbitals_type() == molorb.unrest and
-          scf_type == 'unrestricted'):
-        return self.get_ao_density(nalpha, nbeta)
+        occ = self.occa_to_numpy()
 
-    elif (self.get_orbitals_type() == molorb.rest and
-          scf_type == 'restricted_openshell'):
-        mo_coef = self.alpha_to_numpy()
-        mo_occ_alpha = mo_coef[:, :nalpha]
-        mo_occ_beta = mo_coef[:, :nbeta]
-        dalpha = np.matmul(mo_occ_alpha, mo_occ_alpha.T)
-        dbeta = np.matmul(mo_occ_beta, mo_occ_beta.T)
-        return AODensityMatrix([dalpha, dbeta], denmat.unrest)
+        occ_mo = occ * mo
+
+        dens = np.matmul(occ_mo, occ_mo.T)
+
+        return AODensityMatrix([dens], denmat.rest)
+
+    elif self.get_orbitals_type() == molorb.unrest and (
+            scf_type is None or scf_type == 'unrestricted'):
+
+        mo_a = self.alpha_to_numpy()
+        mo_b = self.beta_to_numpy()
+
+        occ_a = self.occa_to_numpy()
+        occ_b = self.occb_to_numpy()
+
+        occ_mo_a = occ_a * mo_a
+        occ_mo_b = occ_b * mo_b
+
+        dens_a = np.matmul(occ_mo_a, occ_mo_a.T)
+        dens_b = np.matmul(occ_mo_b, occ_mo_b.T)
+
+        return AODensityMatrix([dens_a, dens_b], denmat.unrest)
+
+    elif self.get_orbitals_type() == molorb.restopen and (
+            scf_type is None or scf_type == 'restricted_openshell'):
+
+        mo = self.alpha_to_numpy()
+
+        occ_a = self.occa_to_numpy()
+        occ_b = self.occb_to_numpy()
+
+        occ_mo_a = occ_a * mo
+        occ_mo_b = occ_b * mo
+
+        dens_a = np.matmul(occ_mo_a, occ_mo_a.T)
+        dens_b = np.matmul(occ_mo_b, occ_mo_b.T)
+
+        return AODensityMatrix([dens_a, dens_b], denmat.unrest)
 
     else:
-        errmsg = "MolecularOrbitals.get_density:"
+
+        errmsg = "MolecularOrbitals.get_density: "
         errmsg += " Invalid molecular orbitals type"
         assert_msg_critical(False, errmsg)
 
@@ -259,9 +283,11 @@ def _MolecularOrbitals_write_hdf5(self,
     hf.create_dataset('alpha_occupations', data=self.occa_to_numpy())
 
     if self.get_orbitals_type() == molorb.unrest:
-
         hf.create_dataset('beta_orbitals', data=self.beta_to_numpy())
         hf.create_dataset('beta_energies', data=self.eb_to_numpy())
+        hf.create_dataset('beta_occupations', data=self.occb_to_numpy())
+
+    elif self.get_orbitals_type() == molorb.restopen:
         hf.create_dataset('beta_occupations', data=self.occb_to_numpy())
 
     if nuclear_charges is not None:
@@ -304,6 +330,9 @@ def _MolecularOrbitals_read_hdf5(fname):
             'MolecularOrbitals.read_hdf5: beta orbitals/energies/occupations not found'
         )
 
+    elif 'beta_occupations' in hf:
+        orbs_type = molorb.restopen
+
     orbs = []
     enes = []
     occs = []
@@ -315,6 +344,9 @@ def _MolecularOrbitals_read_hdf5(fname):
     if orbs_type == molorb.unrest:
         orbs.append(np.array(hf.get('beta_orbitals')))
         enes.append(np.array(hf.get('beta_energies')))
+        occs.append(np.array(hf.get('beta_occupations')))
+
+    elif orbs_type == molorb.restopen:
         occs.append(np.array(hf.get('beta_occupations')))
 
     hf.close()
@@ -355,13 +387,17 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set, scf_type):
         h5_basis_set = hf.get('basis_set')[0].decode('utf-8')
         match_basis_set = (h5_basis_set.upper() == basis_set.upper())
 
-    h5_restricted = ('beta_orbitals' not in hf and 'beta_energies' not in hf)
-    restricted = (scf_type in ['restricted', 'restricted_openshell'])
-    match_restricted = (h5_restricted == restricted)
+    if 'beta_orbitals' in hf or 'beta_energies' in hf:
+        h5_scf_type = 'unrestricted'
+    elif 'beta_occupations' in hf:
+        h5_scf_type = 'restricted_openshell'
+    else:
+        h5_scf_type = 'restricted'
+    match_scf_type = (h5_scf_type == scf_type)
 
     hf.close()
 
-    return (match_nuclear_charges and match_basis_set and match_restricted)
+    return (match_nuclear_charges and match_basis_set and match_scf_type)
 
 
 def _MolecularOrbitals_deepcopy(self, memo):

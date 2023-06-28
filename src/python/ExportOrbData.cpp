@@ -102,24 +102,45 @@ CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>>& arrays,
 static std::shared_ptr<CMolecularOrbitals>
 CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_orbs,
                                    const std::vector<py::array_t<double>>& eig_vals,
-                                   const std::vector<py::array_t<double>>& occupations,
+                                   const std::vector<py::array_t<double>>& occ_nums,
                                    const molorb                            orbs_type)
 {
-    py::ssize_t nmo = -1;
+    std::string errsize("MolecularOrbitals: Invalid input for ");
+
+    if (orbs_type == molorb::rest)
+    {
+        errors::assertMsgCritical(mol_orbs.size() == 1, errsize + std::string("restricted case"));
+        errors::assertMsgCritical(eig_vals.size() == 1, errsize + std::string("restricted case"));
+        errors::assertMsgCritical(occ_nums.size() == 1, errsize + std::string("restricted case"));
+    }
+    else if (orbs_type == molorb::unrest)
+    {
+        errors::assertMsgCritical(mol_orbs.size() == 2, errsize + std::string("unrestricted case"));
+        errors::assertMsgCritical(eig_vals.size() == 2, errsize + std::string("unrestricted case"));
+        errors::assertMsgCritical(occ_nums.size() == 2, errsize + std::string("unrestricted case"));
+    }
+    else if (orbs_type == molorb::restopen)
+    {
+        errors::assertMsgCritical(mol_orbs.size() == 1, errsize + std::string("restricted open-shell case"));
+        errors::assertMsgCritical(eig_vals.size() == 1, errsize + std::string("restricted open-shell case"));
+        errors::assertMsgCritical(occ_nums.size() == 2, errsize + std::string("restricted open-shell case"));
+    }
+    else
+    {
+        errors::assertMsgCritical(false, std::string("MolecularOrbitals: Invalid molecular orbitals type"));
+    }
+
+    auto ref_nmo = mol_orbs[0].shape(1);
 
     std::string errnmo("MolecularOrbitals: Inconsistent number of MOs");
-
     std::string erreig("MolecularOrbitals: Expecting 1D numpy arrays for eigenvalues");
-
     std::string errocc("MolecularOrbitals: Expecting 1D numpy arrays for occupations");
 
     std::vector<CDenseMatrix> cmos;
 
     for (size_t i = 0; i < mol_orbs.size(); i++)
     {
-        if (nmo == -1) nmo = mol_orbs[i].shape(1);
-
-        errors::assertMsgCritical(nmo == mol_orbs[i].shape(1), errnmo);
+        errors::assertMsgCritical(ref_nmo == mol_orbs[i].shape(1), errnmo);
 
         auto mp = vlx_math::CDenseMatrix_from_numpy(mol_orbs[i]);
 
@@ -130,11 +151,9 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 
     for (size_t i = 0; i < eig_vals.size(); i++)
     {
-        if (nmo == -1) nmo = eig_vals[i].size();
+        errors::assertMsgCritical(ref_nmo == eig_vals[i].size(), errnmo);
 
-        errors::assertMsgCritical(nmo == eig_vals[i].size(), errnmo);
-
-        const py::array_t<double>& arr = eig_vals[i];
+        const auto& arr = eig_vals[i];
 
         errors::assertMsgCritical(arr.ndim() == 1, erreig);
 
@@ -150,13 +169,11 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
 
     std::vector<CMemBlock<double>> coccs;
 
-    for (size_t i = 0; i < occupations.size(); i++)
+    for (size_t i = 0; i < occ_nums.size(); i++)
     {
-        if (nmo == -1) nmo = occupations[i].size();
+        errors::assertMsgCritical(ref_nmo == occ_nums[i].size(), errnmo);
 
-        errors::assertMsgCritical(nmo == occupations[i].size(), errnmo);
-
-        const py::array_t<double>& arr = occupations[i];
+        const auto& arr = occ_nums[i];
 
         errors::assertMsgCritical(arr.ndim() == 1, errocc);
 
@@ -189,7 +206,8 @@ export_orbdata(py::module& m)
     // clang-format off
     py::enum_<molorb>(m, "molorb")
         .value("rest", molorb::rest)
-        .value("unrest", molorb::unrest);
+        .value("unrest", molorb::unrest)
+        .value("restopen", molorb::restopen);
     // clang-format on
 
     // CBasisFunction class
@@ -367,15 +385,6 @@ export_orbdata(py::module& m)
             },
             "Converts beta orbital energies in MolecularOrbitals to numpy array.")
         .def("get_orbitals_type", &CMolecularOrbitals::getOrbitalsType, "Gets type of molecular orbital matrix.")
-        .def("get_ao_density",
-             py::overload_cast<const int32_t>(&CMolecularOrbitals::getAODensity, py::const_),
-             "Computes spin restricted electron density matrix in AO basis for specific number of electrons.",
-             "nElectrons"_a)
-        .def("get_ao_density",
-             py::overload_cast<const int32_t, const int32_t>(&CMolecularOrbitals::getAODensity, py::const_),
-             "Computes spin unrestricted electron density matrix in AO basis for specific number of alpha and beta electrons.",
-             "nAlphaElectrons"_a,
-             "nBetaElectrons"_a)
         .def("get_pair_density",
              py::overload_cast<const std::vector<int32_t>&, const std::vector<int32_t>&>(&CMolecularOrbitals::getRestrictedPairDensity, py::const_),
              "Computes set of restricted pair C_i C_j^T density matrices in AO basis.",

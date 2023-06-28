@@ -251,25 +251,6 @@ class CMolecularOrbitals
     std::string getString() const;
 
     /**
-     Computes spin restricted electron density matrix in AO basis for specific
-     number of electrons.
-
-     @param nElectrons the total number of electrons.
-     @return the AO density matrix.
-     */
-    CAODensityMatrix getAODensity(const int32_t nElectrons) const;
-
-    /**
-     Computes spin unrestricted electron density matrix in AO basis for specific
-     number of alpha and beta electrons.
-
-     @param nAlphaElectrons the number of alpha electrons.
-     @param nBetaElectrons the number of beta electrons.
-     @return the AO density matrix.
-     */
-    CAODensityMatrix getAODensity(const int32_t nAlphaElectrons, const int32_t nBetaElectrons) const;
-
-    /**
      Computes restricted pair C_i C_j^T density matrix in AO basis.
 
      @param iMolecularOrbital the index of i-th molecular orbital C_i.

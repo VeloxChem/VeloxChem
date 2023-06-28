@@ -270,8 +270,8 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
 
-            occa, occb = molecule.get_aufbau_occupation(eigs_a.size,
-                                                        'unrestricted')
+            occa = molecule.get_aufbau_alpha_occupation(eigs_a.size)
+            occb = molecule.get_aufbau_beta_occupation(eigs_b.size)
 
             return MolecularOrbitals([orb_coefs_a, orb_coefs_b],
                                      [eigs_a, eigs_b], [occa, occb],
