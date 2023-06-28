@@ -30,9 +30,10 @@ import sys
 
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
 from .veloxchemlib import mpi_master
-from .veloxchemlib import denmat, fockmat
+from .veloxchemlib import denmat, fockmat, molorb
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
+from .molecularorbitals import MolecularOrbitals
 from .outputstream import OutputStream
 from .mointsdriver import MOIntegralsDriver
 from .subcommunicators import SubCommunicators
@@ -147,7 +148,7 @@ class Mp2Driver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-    def compute(self, molecule, basis, mol_orbs, scf_type=None):
+    def compute(self, molecule, basis, scf_inp, scf_type=None):
         """
         Performs MP2 calculation.
 
@@ -155,11 +156,69 @@ class Mp2Driver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param mol_orbs:
-            The molecular orbitals.
+        :param scf_inp:
+            The input from SCF. In practice scf_inp could be scf_results, which
+            is a dictionary returned by SCF driver, or mol_orbs, which is a
+            molecular orbitals object from SCF driver.
         :param scf_type:
             The SCF type (restricted, unrestricted, restricted_openshell).
         """
+
+        if self.rank == mpi_master():
+
+            # use case: mp2_drv.compute(molecule, basis, scf_results)
+
+            if isinstance(scf_inp, dict):
+                scf_results = scf_inp
+
+                if scf_type is not None:
+                    assert_msg_critical(scf_type == scf_results['scf_type'],
+                                        'Mp2Driver: Inconsistent SCF type')
+
+                scf_type = scf_results['scf_type']
+
+                mo_a = scf_results['C_alpha']
+                ene_a = scf_results['E_alpha']
+                occ_a = molecule.get_aufbau_alpha_occupation(ene_a.shape[0])
+
+                if scf_type == 'restricted':
+                    mol_orbs = MolecularOrbitals([mo_a], [ene_a], [occ_a],
+                                                 molorb.rest)
+
+                elif scf_type == 'unrestricted':
+                    mo_b = scf_results['C_beta']
+                    ene_b = scf_results['E_beta']
+                    occ_b = molecule.get_aufbau_beta_occupation(ene_b.shape[0])
+                    mol_orbs = MolecularOrbitals([mo_a, mo_b], [ene_a, ene_b],
+                                                 [occ_a, occ_b], molorb.unrest)
+
+                elif scf_type == 'restricted_openshell':
+                    occ_b = molecule.get_aufbau_beta_occupation(ene_a.shape[0])
+                    mol_orbs = MolecularOrbitals([mo_a], [ene_a],
+                                                 [occ_a, occ_b],
+                                                 molorb.restopen)
+
+                else:
+                    assert_msg_critical(False,
+                                        'Mp2Driver.compute: Invalid SCF type')
+
+            # use case: mp2_drv.compute(molecule, basis, mol_orbs, scf_type)
+
+            elif isinstance(scf_inp, MolecularOrbitals):
+                mol_orbs = scf_inp
+
+            # invalid use case
+
+            else:
+                assert_msg_critical(False, 'Mp2Driver.compute: Invalid input')
+
+        else:
+            scf_type = None
+            mol_orbs = MolecularOrbitals()
+
+        scf_type = self.comm.bcast(scf_type, root=mpi_master())
+
+        # run MP2
 
         if self.conventional:
             return self.compute_conventional(molecule, basis, mol_orbs,
@@ -181,9 +240,17 @@ class Mp2Driver:
             The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
+        # synchronize mol_orbs
+
+        if self.rank != mpi_master():
+            mol_orbs = MolecularOrbitals()
         mol_orbs.broadcast(self.rank, self.comm)
 
+        # sanity check for MP2
+
         scf_type = mp2_sanity_check(molecule, basis, mol_orbs, scf_type)
+
+        # compute MP2 in memory
 
         moints_drv = MOIntegralsDriver(self.comm, self.ostream)
 
@@ -281,7 +348,13 @@ class Mp2Driver:
             The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
+        # synchronize mol_orbs
+
+        if self.rank != mpi_master():
+            mol_orbs = MolecularOrbitals()
         mol_orbs.broadcast(self.rank, self.comm)
+
+        # sanity check for MP2
 
         scf_type = mp2_sanity_check(molecule, basis, mol_orbs, scf_type)
 

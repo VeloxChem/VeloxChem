@@ -32,19 +32,21 @@ class TestMOIntegralsDriver:
         task = MpiTask([inpfile, None])
 
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
         mol_orbs = scf_drv.mol_orbs
 
         # mp2
         e_ref = -0.28529088
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
-        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
+        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
         if is_mpi_master(task.mpi_comm):
             assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-8
 
         mp2_drv.update_settings({'conventional': 'yes'})
-        mp2_result_2 = mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
+        mp2_result_2 = mp2_drv.compute(task.molecule, task.ao_basis,
+                                       scf_results)
         if is_mpi_master(task.mpi_comm):
             assert abs(e_ref - mp2_result_2['mp2_energy']) < 1.0e-8
 
@@ -98,20 +100,20 @@ class TestMOIntegralsDriver:
         task.molecule.check_multiplicity()
 
         scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         # mp2
         e_ref = -0.26775296
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
-        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis,
-                                     scf_drv.mol_orbs, scf_drv.scf_type)
+        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, scf_results)
         if is_mpi_master(task.mpi_comm):
             assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-7
 
         mp2_drv.conventional = True
         mp2_result_2 = mp2_drv.compute(task.molecule, task.ao_basis,
-                                       scf_drv.mol_orbs, scf_drv.scf_type)
+                                       scf_results)
         if is_mpi_master(task.mpi_comm):
             assert abs(e_ref - mp2_result_2['mp2_energy']) < 1.0e-7
 
