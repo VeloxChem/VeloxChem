@@ -21,8 +21,6 @@ dependencies:
   - mdanalysis
   - openmm
   - scipy
-  - gtest
-  - gmock
   - rdkit
   - cppe
   - xtb
