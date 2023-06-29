@@ -1,0 +1,33 @@
+target_sources(vlxobjs
+  PRIVATE
+    NuclearPotentialGeom010RecSP.cpp
+    NuclearPotentialGeom010RecPD.cpp
+    NuclearPotentialGeom010RecFF.cpp
+    NuclearPotentialGeom010RecGF.cpp
+    NuclearPotentialGeom010RecDS.cpp
+    NuclearPotentialGeom010RecSF.cpp
+    NuclearPotentialGeom010RecPG.cpp
+    NuclearPotentialGeom010RecSD.cpp
+    NuclearPotentialGeom010RecDP.cpp
+    NuclearPotentialGeom010RecFG.cpp
+    NuclearPotentialGeom010RecSG.cpp
+    NuclearPotentialGeom010RecPS.cpp
+    NuclearPotentialGeom010RecGP.cpp
+    NuclearPotentialGeom010RecPF.cpp
+    NuclearPotentialGeom010RecGS.cpp
+    NuclearPotentialGeom010RecFP.cpp
+    NuclearPotentialGeom010RecGG.cpp
+    NuclearPotentialGeom010RecDD.cpp
+    NuclearPotentialGeom010RecFD.cpp
+    NuclearPotentialGeom010RecGD.cpp
+    NuclearPotentialGeom010RecDG.cpp
+    NuclearPotentialGeom010RecDF.cpp
+    NuclearPotentialGeom010RecPP.cpp
+    NuclearPotentialGeom010RecSS.cpp
+    NuclearPotentialGeom010RecFS.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

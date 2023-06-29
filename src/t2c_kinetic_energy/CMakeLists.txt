@@ -1,0 +1,35 @@
+target_sources(vlxobjs
+  PRIVATE
+    KineticEnergyRecDD.cpp
+    KineticEnergyRecPP.cpp
+    KineticEnergyRecDG.cpp
+    KineticEnergyRecDS.cpp
+    KineticEnergyRecGG.cpp
+    KineticEnergyRecGD.cpp
+    KineticEnergyDriver.cpp
+    KineticEnergyRecPG.cpp
+    KineticEnergyRecDF.cpp
+    KineticEnergyRecFG.cpp
+    KineticEnergyRecSD.cpp
+    KineticEnergyRecSP.cpp
+    KineticEnergyRecFF.cpp
+    KineticEnergyRecFP.cpp
+    KineticEnergyRecDP.cpp
+    KineticEnergyRecFS.cpp
+    KineticEnergyRecPS.cpp
+    KineticEnergyRecGS.cpp
+    KineticEnergyFunc.cpp
+    KineticEnergyRecSF.cpp
+    KineticEnergyRecSS.cpp
+    KineticEnergyRecGF.cpp
+    KineticEnergyRecSG.cpp
+    KineticEnergyRecFD.cpp
+    KineticEnergyRecGP.cpp
+    KineticEnergyRecPD.cpp
+    KineticEnergyRecPF.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )
