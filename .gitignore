@@ -8,3 +8,4 @@ VeloxChem.xcodeproj/
 __pycache__
 .coverage
 .vs
+veloxchem.egg-info
