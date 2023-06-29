@@ -8,3 +8,5 @@ VeloxChem.xcodeproj/
 __pycache__
 .coverage
 .vs
+*.optrpt
+*.opt.yaml
