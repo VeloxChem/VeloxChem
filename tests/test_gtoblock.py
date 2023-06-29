@@ -17,7 +17,7 @@ class TestGtoBlock:
 
         mol = Molecule.read_str(h2ostr, 'au')
 
-        bas = MolecularBasis.read(mol, 'DEF2-SVP', 'basis')
+        bas = MolecularBasis.read(mol, 'DEF2-SVP', 'basis', ostream=None)
 
         return (mol, bas)
 

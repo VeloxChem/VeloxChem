@@ -292,7 +292,12 @@ class TestMatrix:
                 (1, 1)  : self.get_mat_pp()
             }, mat_t.symm)
 
-        Tester.compare_matrices(mat_a, mat_b)
+        # TODO: fix "'Matrix' object has no attribute 'get_submatrices'"
+        # Tester.compare_matrices(mat_a, mat_b)
+        assert mat_a.get_type() == mat_b.get_type()
+        for key in [(0, 0), (0, 1), (1, 1)]:
+            Tester.compare_submatrices(mat_a.get_submatrix(key),
+                                       mat_b.get_submatrix(key))
 
     def test_mpi_reduce(self):
 
@@ -339,4 +344,10 @@ class TestMatrix:
                         (0, 1) : self.get_mat_sp_f(),
                         (1, 1) : self.get_mat_pp_f()
                     }, mat_t.symm)
-            Tester.compare_matrices(mat_a, mat_b)
+
+            # TODO: fix "'Matrix' object has no attribute 'get_submatrices'"
+            # Tester.compare_matrices(mat_a, mat_b)
+            assert mat_a.get_type() == mat_b.get_type()
+            for key in [(0, 0), (0, 1), (1, 1)]:
+                Tester.compare_submatrices(mat_a.get_submatrix(key),
+                                           mat_b.get_submatrix(key))

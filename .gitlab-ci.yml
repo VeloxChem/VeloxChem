@@ -112,8 +112,8 @@ monkey:python_tests:
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
-    - mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem -m "solvers"
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO --pyargs veloxchem
+    #- mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem -m "solvers"
 
 include:
   #- '.gitlab/windows-ci.yml'

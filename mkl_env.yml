@@ -19,6 +19,7 @@ dependencies:
   - python>=3.8
   - psutil
   - pytest
+  - pytest-cov
   - mdanalysis
   - openmm
   - scipy
