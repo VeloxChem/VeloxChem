@@ -1,0 +1,33 @@
+target_sources(vlxobjs
+  PRIVATE
+    NuclearPotentialRecSP.cpp
+    NuclearPotentialRecFG.cpp
+    NuclearPotentialRecDF.cpp
+    NuclearPotentialRecFP.cpp
+    NuclearPotentialRecGS.cpp
+    NuclearPotentialRecPD.cpp
+    NuclearPotentialRecFS.cpp
+    NuclearPotentialRecDG.cpp
+    NuclearPotentialRecGP.cpp
+    NuclearPotentialRecFF.cpp
+    NuclearPotentialRecPG.cpp
+    NuclearPotentialRecFD.cpp
+    NuclearPotentialRecGG.cpp
+    NuclearPotentialRecSF.cpp
+    NuclearPotentialRecGD.cpp
+    NuclearPotentialRecDD.cpp
+    NuclearPotentialRecGF.cpp
+    NuclearPotentialRecSS.cpp
+    NuclearPotentialRecSD.cpp
+    NuclearPotentialRecPP.cpp
+    NuclearPotentialRecDS.cpp
+    NuclearPotentialRecPF.cpp
+    NuclearPotentialRecPS.cpp
+    NuclearPotentialRecSG.cpp
+    NuclearPotentialRecDP.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

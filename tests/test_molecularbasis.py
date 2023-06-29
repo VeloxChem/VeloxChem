@@ -162,7 +162,7 @@ class TestMolecularBasis:
 
         h2o = self.get_h2o()
 
-        a_basis = MolecularBasis.read(h2o, 'DEF2-SVP', 'basis')
+        a_basis = MolecularBasis.read(h2o, 'DEF2-SVP', 'basis', ostream=None)
         b_basis = self.get_h2o_svp()
         Tester.compare_molecular_basis(a_basis, b_basis)
 
@@ -172,7 +172,8 @@ class TestMolecularBasis:
 
         bdict = {'3': 'DEF2-SVPD'}
 
-        a_basis = MolecularBasis.read_dict(h2o, 'DEF2-SVP', bdict, 'basis')
+        a_basis = MolecularBasis.read_dict(h2o, 'DEF2-SVP', bdict, 'basis',
+                                           ostream=None)
         b_basis = self.get_h2o_mixed()
         Tester.compare_molecular_basis(a_basis, b_basis)
 

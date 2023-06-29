@@ -1,0 +1,33 @@
+name: vlxenv
+channels:
+  - conda-forge
+dependencies:
+  - cmake
+  - ninja
+  - scikit-build
+  - cxx-compiler
+  - mpich
+  - openblas=*=*openmp*
+  - mpi4py
+  - numpy
+  - h5py
+  - pip
+  - setuptools
+  - wheel
+  - pybind11-global
+  - python>=3.8
+  - psutil
+  - pytest
+  - pytest-cov
+  - mdanalysis
+  - openmm
+  - scipy
+  - rdkit
+  - cppe
+  - xtb
+  - geometric
+  - libxc
+  - clang-format
+  - yapf
+  - toml
+  - flake8

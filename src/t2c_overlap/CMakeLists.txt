@@ -1,0 +1,35 @@
+target_sources(vlxobjs
+  PRIVATE
+    OverlapRecPP.cpp
+    OverlapRecGF.cpp
+    OverlapRecGD.cpp
+    OverlapRecSP.cpp
+    OverlapRecFF.cpp
+    OverlapRecDD.cpp
+    OverlapRecDP.cpp
+    OverlapRecDG.cpp
+    OverlapRecSS.cpp
+    OverlapRecPS.cpp
+    OverlapRecPF.cpp
+    OverlapRecSF.cpp
+    OverlapRecGG.cpp
+    OverlapRecFS.cpp
+    OverlapRecSG.cpp
+    OverlapRecGS.cpp
+    OverlapRecFD.cpp
+    OverlapRecDF.cpp
+    OverlapRecPD.cpp
+    OverlapRecDS.cpp
+    OverlapDriver.cpp
+    OverlapRecGP.cpp
+    OverlapRecFG.cpp
+    OverlapRecFP.cpp
+    OverlapFunc.cpp
+    OverlapRecPG.cpp
+    OverlapRecSD.cpp
+  )
+
+target_include_directories(vlxobjs
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}>
+  )

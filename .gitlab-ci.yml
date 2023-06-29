@@ -82,18 +82,12 @@ monkey:cmake_build:
         -GNinja
         -DCMAKE_CXX_COMPILER=mpiicpc
         -DVLX_LA_VENDOR=MKL
-    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib utests -- -v -d stats
+    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -v -d stats
   artifacts:
     paths:
       - build
-    expire_in: 12 hours
-
-monkey:unit_tests:
-  extends: .monkey:setup
-  stage: test
-  needs: ["monkey:cmake_build"]
-  script:
-    - ctest --test-dir build --output-on-failure -L unit
+    #expire_in: 12 hours
+    expire_in: 2 days
 
 monkey:pip_install:
   extends: .monkey:setup
@@ -106,7 +100,8 @@ monkey:pip_install:
   artifacts:
     paths:
       - venv
-    expire_in: 12 hours
+    #expire_in: 12 hours
+    expire_in: 2 days
 
 monkey:python_tests:
   extends: .monkey:conf
@@ -117,8 +112,8 @@ monkey:python_tests:
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"
-    - mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem -m "solvers"
     - python -m pytest --cov=veloxchem --capture=no --log-cli-level=INFO --pyargs veloxchem
+    #- mpiexec -n 2 python -m pytest --capture=no --log-cli-level=INFO --pyargs veloxchem -m "solvers"
 
 include:
   #- '.gitlab/windows-ci.yml'

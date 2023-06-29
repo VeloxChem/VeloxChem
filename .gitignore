@@ -10,3 +10,4 @@ __pycache__
 .vs
 *.optrpt
 *.opt.yaml
+veloxchem.egg-info
