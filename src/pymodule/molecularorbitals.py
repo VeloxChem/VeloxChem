@@ -41,7 +41,8 @@ def _MolecularOrbitals_print_orbitals(self,
                                       molecule,
                                       ao_basis,
                                       all_orbs=False,
-                                      ostream=None):
+                                      ostream=None,
+                                      print_occa_only=False):
     """
     Prints molecular orbitals to output stream.
 
@@ -53,6 +54,8 @@ def _MolecularOrbitals_print_orbitals(self,
         The flag to print all orbitals.
     :param ostream:
         The output stream.
+    :param print_occa_only:
+        The flag for only printing occa (only meant to be used in multipsi).
     """
 
     if ostream is None:
@@ -77,7 +80,10 @@ def _MolecularOrbitals_print_orbitals(self,
 
         rvecs = self.alpha_to_numpy()
         reigs = self.ea_to_numpy()
-        rnocc = self.occa_to_numpy() + self.occb_to_numpy()
+        if print_occa_only:
+            rnocc = self.occa_to_numpy()
+        else:
+            rnocc = self.occa_to_numpy() + self.occb_to_numpy()
 
         for i in range(nstart, nend):
             _MolecularOrbitals_print_coefficients(reigs[i], rnocc[i], i,

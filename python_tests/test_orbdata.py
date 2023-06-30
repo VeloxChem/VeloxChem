@@ -87,38 +87,52 @@ class TestOrbData:
         orb_unrest = MolecularOrbitals([data_a, data_b], [ener_a, ener_b],
                                        [occ_a, occ_b], molorb.unrest)
 
+        orb_restopen = MolecularOrbitals([data_a], [ener_a], [occ_a, occ_b],
+                                         molorb.restopen)
+
         orb_a1 = orb_rest.alpha_to_numpy()
         orb_a2 = orb_unrest.alpha_to_numpy()
         orb_b2 = orb_unrest.beta_to_numpy()
+        orb_a3 = orb_restopen.alpha_to_numpy()
 
         assert (data_a == orb_a1).all()
         assert (data_a == orb_a2).all()
         assert (data_b == orb_b2).all()
+        assert (data_a == orb_a3).all()
 
         ene_a1 = orb_rest.ea_to_numpy()
         ene_a2 = orb_unrest.ea_to_numpy()
         ene_b2 = orb_unrest.eb_to_numpy()
+        ene_a3 = orb_restopen.ea_to_numpy()
 
         assert (ener_a == ene_a1).all()
         assert (ener_a == ene_a2).all()
         assert (ener_b == ene_b2).all()
+        assert (ener_a == ene_a3).all()
 
         occ_a1 = orb_rest.occa_to_numpy()
         occ_a2 = orb_unrest.occa_to_numpy()
         occ_b2 = orb_unrest.occb_to_numpy()
+        occ_a3 = orb_restopen.occa_to_numpy()
+        occ_b3 = orb_restopen.occb_to_numpy()
 
         assert (occ_a == occ_a1).all()
         assert (occ_a == occ_a2).all()
         assert (occ_b == occ_b2).all()
+        assert (occ_a == occ_a3).all()
+        assert (occ_b == occ_b3).all()
 
         assert orb_rest.get_orbitals_type() == molorb.rest
         assert orb_unrest.get_orbitals_type() == molorb.unrest
+        assert orb_restopen.get_orbitals_type() == molorb.restopen
 
         assert orb_rest.number_of_mos() == 2
         assert orb_unrest.number_of_mos() == 2
+        assert orb_restopen.number_of_mos() == 2
 
         assert orb_rest.number_of_aos() == 3
         assert orb_unrest.number_of_aos() == 3
+        assert orb_restopen.number_of_aos() == 3
 
         # hdf5 read/write tests
 
@@ -126,20 +140,25 @@ class TestOrbData:
 
             here = Path(__file__).parent
             h5file = str(here / 'inputs' / 'dummy.h5')
-
             nuc_chg = np.array([1, 8, 1], dtype='int32')
+
             orb_rest.write_hdf5(h5file, nuc_chg, 'sto-3g')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             assert orb_rest == dummy
             assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'sto-3g',
                                                 'restricted')
 
-            nuc_chg = np.array([1, 1, 8], dtype='int32')
             orb_unrest.write_hdf5(h5file, nuc_chg, 'cc-pvdz')
             dummy = MolecularOrbitals.read_hdf5(h5file)
             assert orb_unrest == dummy
             assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'cc-pvdz',
                                                 'unrestricted')
+
+            orb_restopen.write_hdf5(h5file, nuc_chg, 'def2-svpd')
+            dummy = MolecularOrbitals.read_hdf5(h5file)
+            assert orb_restopen == dummy
+            assert MolecularOrbitals.match_hdf5(h5file, nuc_chg, 'def2-svpd',
+                                                'restricted_openshell')
 
             h5file = Path(h5file)
             if h5file.is_file():
@@ -191,6 +210,15 @@ class TestOrbData:
         assert (den_ref_a == den_a).all()
         assert (den_ref_b == den_b).all()
 
+    def test_restopen_density(self):
+
+        mol = Molecule(['H', 'H'], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+
+        arr_a = np.array([[.9, .2, .3], [.3, .8, .6], [.1, .5, .7]])
+        ene_a = np.array([.7, .8, .9])
+        occ_a = np.array([1., 1., 0.])
+        occ_b = np.array([1., 0., 0.])
+
         orb_restopen = MolecularOrbitals([arr_a], [ene_a], [occ_a, occ_b],
                                          molorb.restopen)
         den_restopen = orb_restopen.get_density(mol, 'restricted_openshell')
@@ -200,7 +228,7 @@ class TestOrbData:
         arr_occ_a = arr_a[:, :2]
         den_ref_a = np.dot(arr_occ_a, arr_occ_a.T)
 
-        arr_occ_b = arr_a[:, :1]  # note: arr_a for restricted open-shell
+        arr_occ_b = arr_a[:, :1]
         den_ref_b = np.dot(arr_occ_b, arr_occ_b.T)
 
         assert (den_ref_a == den_a).all()
