@@ -39,7 +39,7 @@ from .mointsdriver import MOIntegralsDriver
 from .subcommunicators import SubCommunicators
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
-from .sanitychecks import mp2_sanity_check
+from .sanitychecks import molecule_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -148,7 +148,7 @@ class Mp2Driver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-    def compute(self, molecule, basis, scf_inp, scf_type=None):
+    def compute(self, molecule, basis, scf_inp):
         """
         Performs MP2 calculation.
 
@@ -160,8 +160,6 @@ class Mp2Driver:
             The input from SCF. In practice scf_inp could be scf_results, which
             is a dictionary returned by SCF driver, or mol_orbs, which is a
             molecular orbitals object from SCF driver.
-        :param scf_type:
-            The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
         if self.rank == mpi_master():
@@ -170,10 +168,6 @@ class Mp2Driver:
 
             if isinstance(scf_inp, dict):
                 scf_results = scf_inp
-
-                if scf_type is not None:
-                    assert_msg_critical(scf_type == scf_results['scf_type'],
-                                        'Mp2Driver: Inconsistent SCF type')
 
                 scf_type = scf_results['scf_type']
 
@@ -202,7 +196,7 @@ class Mp2Driver:
                     assert_msg_critical(False,
                                         'Mp2Driver.compute: Invalid SCF type')
 
-            # use case: mp2_drv.compute(molecule, basis, mol_orbs, scf_type)
+            # use case: mp2_drv.compute(molecule, basis, mol_orbs)
 
             elif isinstance(scf_inp, MolecularOrbitals):
                 mol_orbs = scf_inp
@@ -213,20 +207,16 @@ class Mp2Driver:
                 assert_msg_critical(False, 'Mp2Driver.compute: Invalid input')
 
         else:
-            scf_type = None
             mol_orbs = MolecularOrbitals()
-
-        scf_type = self.comm.bcast(scf_type, root=mpi_master())
 
         # run MP2
 
         if self.conventional:
-            return self.compute_conventional(molecule, basis, mol_orbs,
-                                             scf_type)
+            return self.compute_conventional(molecule, basis, mol_orbs)
         else:
-            return self.compute_distributed(molecule, basis, mol_orbs, scf_type)
+            return self.compute_distributed(molecule, basis, mol_orbs)
 
-    def compute_conventional(self, molecule, basis, mol_orbs, scf_type=None):
+    def compute_conventional(self, molecule, basis, mol_orbs):
         """
         Performs conventional MP2 calculation.
 
@@ -236,8 +226,6 @@ class Mp2Driver:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
-        :param scf_type:
-            The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
         # synchronize mol_orbs
@@ -246,9 +234,18 @@ class Mp2Driver:
             mol_orbs = MolecularOrbitals()
         mol_orbs.broadcast(self.rank, self.comm)
 
-        # sanity check for MP2
+        # sanity check
 
-        scf_type = mp2_sanity_check(molecule, basis, mol_orbs, scf_type)
+        molecule_sanity_check(molecule)
+
+        assert_msg_critical(
+            basis.get_dimension_of_basis(molecule) == mol_orbs.number_of_aos(),
+            'Mp2Driver.compute: Inconsistent number of AOs in basis set ' +
+            'and molecular orbitals')
+
+        assert_msg_critical(
+            mol_orbs.get_orbitals_type() != molorb.restopen,
+            'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
 
         # compute MP2 in memory
 
@@ -258,7 +255,9 @@ class Mp2Driver:
 
             self.e_mp2 = 0.0
 
-            if scf_type == 'restricted':
+            # restricted
+
+            if mol_orbs.get_orbitals_type() == molorb.rest:
 
                 orb_ene = mol_orbs.ea_to_numpy()
                 nocc = molecule.number_of_alpha_electrons()
@@ -278,7 +277,9 @@ class Mp2Driver:
                 self.ostream.print_header(mp2_str.ljust(92))
                 self.ostream.print_blank()
 
-            elif scf_type == 'unrestricted':
+            # unrestricted
+
+            elif mol_orbs.get_orbitals_type() == molorb.unrest:
 
                 orb_ene_a = mol_orbs.ea_to_numpy()
                 orb_ene_b = mol_orbs.eb_to_numpy()
@@ -325,16 +326,11 @@ class Mp2Driver:
                 self.ostream.print_header(mp2_str.ljust(92))
                 self.ostream.print_blank()
 
-            elif scf_type == 'restricted_openshell':
-
-                assert_msg_critical(
-                    False, 'Restricted open-shell MP2 not implemented')
-
             return {'mp2_energy': self.e_mp2}
         else:
             return None
 
-    def compute_distributed(self, molecule, basis, mol_orbs, scf_type=None):
+    def compute_distributed(self, molecule, basis, mol_orbs):
         """
         Performs MP2 calculation via distributed Fock builds.
 
@@ -344,8 +340,6 @@ class Mp2Driver:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
-        :param scf_type:
-            The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
         # synchronize mol_orbs
@@ -354,9 +348,18 @@ class Mp2Driver:
             mol_orbs = MolecularOrbitals()
         mol_orbs.broadcast(self.rank, self.comm)
 
-        # sanity check for MP2
+        # sanity check
 
-        scf_type = mp2_sanity_check(molecule, basis, mol_orbs, scf_type)
+        molecule_sanity_check(molecule)
+
+        assert_msg_critical(
+            basis.get_dimension_of_basis(molecule) == mol_orbs.number_of_aos(),
+            'Mp2Driver.compute: Inconsistent number of AOs in basis set ' +
+            'and molecular orbitals')
+
+        assert_msg_critical(
+            mol_orbs.get_orbitals_type() != molorb.restopen,
+            'Mp2Driver.compute: Restricted open-shell MP2 not implemented')
 
         # subcommunicators
 
@@ -410,14 +413,18 @@ class Mp2Driver:
             evv_bb = evir_b.reshape(-1, 1) + evir_b
             evv_ab = evir_a.reshape(-1, 1) + evir_b
 
-            if scf_type == 'restricted':
+            # restricted
+
+            if mol_orbs.get_orbitals_type() == molorb.rest:
 
                 mo_ints_ids = [((i, j), 'aa')
                                for i in range(nocc_a)
                                for j in range(i + 1, nocc_a)]
                 mo_ints_ids += [((i, i), 'aa') for i in range(nocc_a)]
 
-            elif scf_type == 'unrestricted':
+            # unrestricted
+
+            elif mol_orbs.get_orbitals_type() == molorb.unrest:
 
                 mo_ints_ids = [((i, j), 'aa')
                                for i in range(nocc_a)
@@ -514,7 +521,9 @@ class Mp2Driver:
 
             if local_master:
 
-                if scf_type == 'restricted':
+                # restricted
+
+                if mol_orbs.get_orbitals_type() == molorb.rest:
 
                     for ind, ((i, j), spin) in enumerate(batch_ids):
                         f_aa = fock.alpha_to_numpy(ind)
@@ -524,7 +533,9 @@ class Mp2Driver:
                         if i != j:
                             e_mp2 += np.sum(vv.T * (2.0 * vv.T - vv) / de)
 
-                elif scf_type == 'unrestricted':
+                # unrestricted
+
+                elif mol_orbs.get_orbitals_type() == molorb.unrest:
 
                     for ind, ((i, j), spin) in enumerate(batch_ids):
                         if spin == 'aa':
