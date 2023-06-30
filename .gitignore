@@ -11,3 +11,4 @@ __pycache__
 *.optrpt
 *.opt.yaml
 veloxchem.egg-info
+_skbuild
