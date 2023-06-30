@@ -597,6 +597,11 @@ class C6Driver(LinearSolver):
         profiler.check_memory_usage('End of C6 solver')
         profiler.print_memory_usage(self.ostream)
 
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
+
         # calculate response functions
         a_grad = self.get_complex_prop_grad(self.a_operator, self.a_components,
                                             molecule, basis, scf_tensors)

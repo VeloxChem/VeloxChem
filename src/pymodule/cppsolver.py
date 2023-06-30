@@ -750,6 +750,14 @@ class ComplexResponse(LinearSolver):
         profiler.check_memory_usage('End of CPP solver')
         profiler.print_memory_usage(self.ostream)
 
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
+
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
+
         # calculate response functions
         if not self.nonlinear:
             a_grad = self.get_complex_prop_grad(self.a_operator,
