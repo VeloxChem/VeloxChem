@@ -103,6 +103,7 @@ export_math(py::module& m) -> void
                 }
             },
             "Sets values of submatrix using numpy array.")
+        .def("zero", &CSubMatrix::zero, "Sets values of submatrix to zero.")
         .def(
             "to_numpy",
             [](const CSubMatrix& self) -> py::array_t<double> {
@@ -115,7 +116,7 @@ export_math(py::module& m) -> void
                 return py::array_t<double>(std::vector<py::ssize_t>({nrows, ncols}), std::vector<py::ssize_t>({ncols * tdim, tdim}), self.getData());
             },
             "Converts submatrix to numpy array.")
-        .def("get_dimensions", &CSubMatrix::getDimensions, "Gets dimensions ofsubmatrix.")
+        .def("get_dimensions", &CSubMatrix::getDimensions, "Gets dimensions of submatrix.")
         .def("offset_of_rows", &CSubMatrix::getOffsetOfRows, "Gets offset of rows in submatrix.")
         .def("offset_of_columns", &CSubMatrix::getOffsetOfColumns, "Gets offset of columns in submatrix.")
         .def("number_of_rows", &CSubMatrix::getNumberOfRows, "Gets number of rows in submatrix.")
@@ -130,6 +131,7 @@ export_math(py::module& m) -> void
         .def("add", py::overload_cast<const CSubMatrix&, const T2Pair&>(&CMatrix::add), "Adds submatrix to matrix.")
         .def("add", py::overload_cast<const T4Index&, const T2Pair&>(&CMatrix::add), "Adds submatrix to matrix.")
         .def("set_type", &CMatrix::setType, "Sets matrix type.")
+        .def("zero", &CMatrix::zero, "Sets values of matrix to zero.")
         .def("get_type", &CMatrix::getType, "Gets matrix type.")
         .def("get_angular_pairs", &CMatrix::getAngularPairs, "Gets vector of angular pairs for stored submatrices.")
         .def(

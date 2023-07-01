@@ -148,14 +148,14 @@ class Tester:
     def compare_matrices(lhs, rhs):
 
         # check list of submatrices
-        submats_a = lhs.get_submatrices()
-        submats_b = rhs.get_submatrices()
-        assert len(submats_a) == len(submats_b)
-        for ma, mb in zip(submats_a.items(), submats_b.items()):
-            assert ma[0] == mb[0]
-            Tester.compare_submatrices(ma[1], mb[1])
+        keys_a = lhs.get_angular_pairs()
+        keys_b = rhs.get_angular_pairs()
+        assert len(keys_a) == len(keys_b)
+        for key_a, key_b in zip(keys_a, keys_b):
+            assert key_a == key_b
+            ma = lhs.get_submatrix(key_a)
+            mb = rhs.get_submatrix(key_b)
+            Tester.compare_submatrices(ma, mb)
 
         # check matrix type
-        mt_a = lhs.get_type()
-        mt_b = rhs.get_type()
-        assert mt_a == mt_b
+        assert lhs.get_type() == rhs.get_type()

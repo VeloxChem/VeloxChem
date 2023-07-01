@@ -64,6 +64,15 @@ CMatrix::setType(const mat_t mat_type) -> void
 }
 
 auto
+CMatrix::zero() -> void
+{
+    for (auto& mvalue : _sub_matrices)
+    {
+        mvalue.second->zero();
+    }
+}
+
+auto
 CMatrix::getAngularPairs() const -> std::vector<T2Pair>
 {
     if (!_sub_matrices.empty())

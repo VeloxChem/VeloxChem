@@ -1,4 +1,5 @@
 from veloxchem.veloxchemlib import SubMatrix
+from veloxchem.veloxchemlib import Matrix
 from veloxchem.veloxchemlib import make_matrix
 from veloxchem.veloxchemlib import mat_t
 from veloxchem.veloxchemlib import MolecularBasis
@@ -24,82 +25,52 @@ class TestMatrixFunc:
 
         bas_svp = self.get_data()
 
-        mat = make_matrix(bas_svp, mat_t.antisymm)
-        # TODO: fix tests
-        # Tester.compare_submatrices(mat.get_submatrix((0, 0)),
-        #                            SubMatrix([0, 0, 7, 7]))
-        # Tester.compare_submatrices(mat.get_submatrix((0, 1)),
-        #                            SubMatrix([0, 7, 7, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((0, 2)),
-        #                            SubMatrix([0, 19, 7, 5]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 1)),
-        #                            SubMatrix([7, 7, 12, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 2)),
-        #                            SubMatrix([7, 19, 12, 5]))
-        # Tester.compare_submatrices(mat.get_submatrix((2, 2)),
-        #                            SubMatrix([19, 19, 5, 5]))
-        assert mat_t.antisymm == mat.get_type()
-
-        mat = make_matrix(bas_svp, mat_t.symm)
-        # TODO: fix tests
-        # Tester.compare_submatrices(mat.get_submatrix((0, 0)),
-        #                            SubMatrix([0, 0, 7, 7]))
-        # Tester.compare_submatrices(mat.get_submatrix((0, 1)),
-        #                            SubMatrix([0, 7, 7, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((0, 2)),
-        #                            SubMatrix([0, 19, 7, 5]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 1)),
-        #                            SubMatrix([7, 7, 12, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 2)),
-        #                            SubMatrix([7, 19, 12, 5]))
-        # Tester.compare_submatrices(mat.get_submatrix((2, 2)),
-        #                            SubMatrix([19, 19, 5, 5]))
-        assert mat_t.symm == mat.get_type()
-
+        mat_a = make_matrix(bas_svp, mat_t.antisymm)
+        mat_a.zero()
+        
+        mat_b = Matrix()
+        mat_b.set_type(mat_t.antisymm)
+        mat_b.add(SubMatrix([0, 0, 7, 7]), (0, 0))
+        mat_b.add(SubMatrix([0, 7, 7, 12]), (0, 1))
+        mat_b.add(SubMatrix([0, 19, 7, 5]), (0, 2))
+        mat_b.add(SubMatrix([7, 7, 12, 12]), (1, 1))
+        mat_b.add(SubMatrix([7, 19, 12, 5]), (1, 2))
+        mat_b.add(SubMatrix([19, 19, 5, 5]), (2, 2))
+        mat_b.zero()
+        
+        Tester.compare_matrices(mat_a, mat_b)
+        
+        mat_a = make_matrix(bas_svp, mat_t.symm)
+        mat_a.zero()
+        
+        mat_b.set_type(mat_t.symm)
+        
+        Tester.compare_matrices(mat_a, mat_b)
+      
     def test_make_matrix_gen(self):
 
         bas_svp = self.get_data()
 
-        mat = make_matrix(bas_svp, mat_t.gen)
-        # TODO: fix tests
-        # Tester.compare_submatrices(mat.get_submatrix((0, 0)),
-        #                            SubMatrix([0, 0, 7, 7]))
-        # Tester.compare_submatrices(mat.get_submatrix((0, 1)),
-        #                            SubMatrix([0, 7, 7, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((0, 2)),
-        #                            SubMatrix([0, 19, 7, 5]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 0)),
-        #                            SubMatrix([7, 0, 12, 7]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 1)),
-        #                            SubMatrix([7, 7, 12, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 2)),
-        #                            SubMatrix([7, 19, 12, 5]))
-        # Tester.compare_submatrices(mat.get_submatrix((2, 0)),
-        #                            SubMatrix([19, 0, 5, 7]))
-        # Tester.compare_submatrices(mat.get_submatrix((2, 1)),
-        #                            SubMatrix([19, 7, 5, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((2, 2)),
-        #                            SubMatrix([19, 19, 5, 5]))
-        assert mat_t.gen == mat.get_type()
-
-        mat = make_matrix(bas_svp, bas_svp)
-        # TODO: fix tests
-        # Tester.compare_submatrices(mat.get_submatrix((0, 0)),
-        #                            SubMatrix([0, 0, 7, 7]))
-        # Tester.compare_submatrices(mat.get_submatrix((0, 1)),
-        #                            SubMatrix([0, 7, 7, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((0, 2)),
-        #                            SubMatrix([0, 19, 7, 5]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 0)),
-        #                            SubMatrix([7, 0, 12, 7]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 1)),
-        #                            SubMatrix([7, 7, 12, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((1, 2)),
-        #                            SubMatrix([7, 19, 12, 5]))
-        # Tester.compare_submatrices(mat.get_submatrix((2, 0)),
-        #                            SubMatrix([19, 0, 5, 7]))
-        # Tester.compare_submatrices(mat.get_submatrix((2, 1)),
-        #                            SubMatrix([19, 7, 5, 12]))
-        # Tester.compare_submatrices(mat.get_submatrix((2, 2)),
-        #                            SubMatrix([19, 19, 5, 5]))
-        assert mat_t.gen == mat.get_type()
+        mat_a = make_matrix(bas_svp, mat_t.gen)
+        mat_a.zero()
+        
+        mat_b = Matrix()
+        mat_b.set_type(mat_t.gen)
+        mat_b.add(SubMatrix([0, 0, 7, 7]), (0, 0))
+        mat_b.add(SubMatrix([0, 7, 7, 12]), (0, 1))
+        mat_b.add(SubMatrix([0, 19, 7, 5]), (0, 2))
+        mat_b.add(SubMatrix([7, 0, 12, 7]), (1, 0))
+        mat_b.add(SubMatrix([7, 7, 12, 12]), (1, 1))
+        mat_b.add(SubMatrix([7, 19, 12, 5]), (1, 2))
+        mat_b.add(SubMatrix([19, 0, 5, 7]), (2, 0))
+        mat_b.add(SubMatrix([19, 7, 5, 12]), (2, 1))
+        mat_b.add(SubMatrix([19, 19, 5, 5]), (2, 2))
+        mat_b.zero()
+        
+        Tester.compare_matrices(mat_a, mat_b)
+        
+        mat_a = make_matrix(bas_svp, bas_svp)
+        mat_a.zero()
+        
+        Tester.compare_matrices(mat_a, mat_b)
+        

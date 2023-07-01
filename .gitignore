@@ -12,3 +12,4 @@ __pycache__
 *.opt.yaml
 veloxchem.egg-info
 _skbuild
+vlx.sh

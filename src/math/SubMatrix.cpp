@@ -79,6 +79,19 @@ CSubMatrix::setValues(const std::vector<double>& values) -> void
 }
 
 auto
+CSubMatrix::zero() -> void
+{
+    if (const auto nelements = _dimensions[2] * _dimensions[3]; nelements > 0)
+    {
+        #pragma omp simd
+        for (int64_t i = 0; i < nelements; i++)
+        {
+            _values[i] = 0.0;
+        }
+    }
+}
+
+auto
 CSubMatrix::getDimensions() const -> T4Index
 {
     return _dimensions;

@@ -87,6 +87,11 @@ class CMatrix
      @param mat_type the matrix type.
      */
     auto setType(const mat_t mat_type) -> void;
+    
+    /**
+     Set matrix values to zero.
+     */
+    auto zero() -> void;
 
     /**
      Get vector of angular pairs from map  of submatrices.

@@ -118,6 +118,11 @@ class CSubMatrix
     auto setValues(const std::vector<double>& values) -> void;
 
     /**
+     Set values of submatrix to zero.
+     */
+    auto zero() -> void;
+    
+    /**
      Gets dimensions of submatrix.
 
      @return The dimensions of submatrix.

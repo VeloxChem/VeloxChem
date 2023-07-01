@@ -121,6 +121,18 @@ class TestSubMatrix:
         mat_b = SubMatrix(self.get_values(), [1, 5, 3, 6])
 
         Tester.compare_submatrices(mat_a, mat_b)
+        
+    def test_zero(self):
+
+        mat_a = SubMatrix(self.get_values(), [1, 5, 3, 6])
+        
+        mat_b = SubMatrix([1, 5, 3, 6])
+
+        mat_b.set_values(np.zeros((3,6)))
+        
+        mat_a.zero()
+
+        Tester.compare_submatrices(mat_a, mat_b)
 
     def test_to_numpy(self):
 

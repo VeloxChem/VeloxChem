@@ -155,6 +155,32 @@ class TestMatrix:
         mat.set_type(mat_t.antisymm)
 
         assert mat.get_type() == mat_t.antisymm
+        
+    def test_zero(self):
+        
+        smat_ss = self.get_mat_ss()
+        smat_sp = self.get_mat_sp()
+        smat_pp = self.get_mat_pp()
+
+        mat_a = Matrix()
+        mat_a.set_type(mat_t.symm)
+        mat_a.add(smat_ss, (0, 0))
+        mat_a.add(smat_sp, (0, 1))
+        mat_a.add(smat_pp, (1, 1))
+
+        smat_ss.zero()
+        smat_sp.zero()
+        smat_pp.zero()
+
+        mat_b = Matrix()
+        mat_b.set_type(mat_t.symm)
+        mat_b.add(smat_ss, (0, 0))
+        mat_b.add(smat_sp, (0, 1))
+        mat_b.add(smat_pp, (1, 1))
+        
+        mat_a.zero()
+        
+        Tester.compare_matrices(mat_a, mat_b)
 
     def test_get_angular_pairs(self):
 
