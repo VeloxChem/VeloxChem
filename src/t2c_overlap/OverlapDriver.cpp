@@ -9,6 +9,8 @@ auto
 COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule) const -> CMatrix
 {
     auto ovl_matrix = matfunc::makeMatrix(basis, mat_t::symm);
+    
+    ovl_matrix.zero(); 
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 

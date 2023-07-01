@@ -30,7 +30,7 @@ distribute(CSubMatrix*                 matrix,
     {
         const auto ket_idx = ncgtos * ket_comp + indexes[i + 1];
 
-        data[ij_off + ket_idx] = buffer[i - ket_first];
+        data[ij_off + ket_idx] += buffer[i - ket_first];
     }
 }
 
@@ -63,7 +63,7 @@ distribute(CSubMatrix*                 matrix,
     {
         const auto ket_idx = ncgtos * ket_comp + indexes[i + 1];
 
-        data[ij_off + ket_idx] = factor * buffer[i - ket_first];
+        data[ij_off + ket_idx] += factor * buffer[i - ket_first];
     }
 }
 
@@ -103,16 +103,16 @@ distribute(CSubMatrix*                 matrix,
 
         const auto fval = buffer[i - ket_first];
 
-        data[ij_off + ket_idx] = fval;
+        data[ij_off + ket_idx] += fval;
 
         if (mat_type == mat_t::symm)
         {
-            data[ji_off + ket_idx * ket_dim] = fval;
+            data[ji_off + ket_idx * ket_dim] += fval;
         }
 
         if (mat_type == mat_t::antisymm)
         {
-            data[ji_off + ket_idx * ket_dim] = -fval;
+            data[ji_off + ket_idx * ket_dim] += -fval;
         }
     }
 }
@@ -154,16 +154,16 @@ distribute(CSubMatrix*                 matrix,
 
         const auto fval = factor * buffer[i - ket_first];
 
-        data[ij_off + ket_idx] = fval;
+        data[ij_off + ket_idx] += fval;
 
         if (mat_type == mat_t::symm)
         {
-            data[ji_off + ket_idx * ket_dim] = fval;
+            data[ji_off + ket_idx * ket_dim] += fval;
         }
 
         if (mat_type == mat_t::antisymm)
         {
-            data[ji_off + ket_idx * ket_dim] = -fval;
+            data[ji_off + ket_idx * ket_dim] += -fval;
         }
     }
 }
@@ -204,11 +204,11 @@ distribute(CSubMatrix*                 matrix,
 
         if (ang_order)
         {
-            data[ij_off + ket_idx] = buffer[i - ket_first];
+            data[ij_off + ket_idx] += buffer[i - ket_first];
         }
         else
         {
-            data[ji_off + ket_idx * ket_dim] = buffer[i - ket_first];
+            data[ji_off + ket_idx * ket_dim] += buffer[i - ket_first];
         }
     }
 }
@@ -250,11 +250,11 @@ distribute(CSubMatrix*                 matrix,
 
         if (ang_order)
         {
-            data[ij_off + ket_idx] = factor * buffer[i - ket_first];
+            data[ij_off + ket_idx] += factor * buffer[i - ket_first];
         }
         else
         {
-            data[ji_off + ket_idx * ket_dim] = factor * buffer[i - ket_first];
+            data[ji_off + ket_idx * ket_dim] += factor * buffer[i - ket_first];
         }
     }
 }
