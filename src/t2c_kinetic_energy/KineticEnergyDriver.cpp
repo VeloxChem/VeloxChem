@@ -9,6 +9,8 @@ auto
 CKineticEnergyDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule) const -> CMatrix
 {
     auto kin_matrix = matfunc::makeMatrix(basis, mat_t::symm);
+    
+    kin_matrix.zero(); 
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
