@@ -48,7 +48,6 @@ target_link_libraries(vlxobjs
     Libxc::xc
   )
 
-#add_subdirectory(t2c_nuclear_potential_geom_020)
 add_subdirectory(t2c_nuclear_potential_geom_010)
 add_subdirectory(pymodule)
 add_subdirectory(t2cfunc)
@@ -60,3 +59,4 @@ add_subdirectory(t2c_nuclear_potential)
 add_subdirectory(t2c_kinetic_energy)
 add_subdirectory(orbdata)
 add_subdirectory(t2c_overlap)
+add_subdirectory(t2c_dipole)
