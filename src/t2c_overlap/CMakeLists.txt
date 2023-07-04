@@ -1,30 +1,21 @@
 target_sources(vlxobjs
   PRIVATE
     OverlapDriver.cpp
-    OverlapFunc.cpp
+    OverlapFunc.cpp  
     OverlapRecDD.cpp
     OverlapRecDF.cpp
-    OverlapRecDG.cpp
     OverlapRecDP.cpp
     OverlapRecDS.cpp
     OverlapRecFD.cpp
     OverlapRecFF.cpp
-    OverlapRecFG.cpp
     OverlapRecFP.cpp
     OverlapRecFS.cpp
-    OverlapRecGD.cpp
-    OverlapRecGF.cpp
-    OverlapRecGG.cpp
-    OverlapRecGP.cpp
-    OverlapRecGS.cpp
     OverlapRecPD.cpp
     OverlapRecPF.cpp
-    OverlapRecPG.cpp
     OverlapRecPP.cpp
     OverlapRecPS.cpp
     OverlapRecSD.cpp
     OverlapRecSF.cpp
-    OverlapRecSG.cpp
     OverlapRecSP.cpp
     OverlapRecSS.cpp
     PrimitiveOverlapDD_XX_T.cpp
@@ -43,21 +34,6 @@ target_sources(vlxobjs
     PrimitiveOverlapDF_T_YYZ.cpp
     PrimitiveOverlapDF_T_YZZ.cpp
     PrimitiveOverlapDF_T_ZZZ.cpp
-    PrimitiveOverlapDG_T_XXXX.cpp
-    PrimitiveOverlapDG_T_XXXY.cpp
-    PrimitiveOverlapDG_T_XXXZ.cpp
-    PrimitiveOverlapDG_T_XXYY.cpp
-    PrimitiveOverlapDG_T_XXYZ.cpp
-    PrimitiveOverlapDG_T_XXZZ.cpp
-    PrimitiveOverlapDG_T_XYYY.cpp
-    PrimitiveOverlapDG_T_XYYZ.cpp
-    PrimitiveOverlapDG_T_XYZZ.cpp
-    PrimitiveOverlapDG_T_XZZZ.cpp
-    PrimitiveOverlapDG_T_YYYY.cpp
-    PrimitiveOverlapDG_T_YYYZ.cpp
-    PrimitiveOverlapDG_T_YYZZ.cpp
-    PrimitiveOverlapDG_T_YZZZ.cpp
-    PrimitiveOverlapDG_T_ZZZZ.cpp
     PrimitiveOverlapDP_XX_T.cpp
     PrimitiveOverlapDP_XY_T.cpp
     PrimitiveOverlapDP_XZ_T.cpp
@@ -85,21 +61,6 @@ target_sources(vlxobjs
     PrimitiveOverlapFF_YYZ_T.cpp
     PrimitiveOverlapFF_YZZ_T.cpp
     PrimitiveOverlapFF_ZZZ_T.cpp
-    PrimitiveOverlapFG_T_XXXX.cpp
-    PrimitiveOverlapFG_T_XXXY.cpp
-    PrimitiveOverlapFG_T_XXXZ.cpp
-    PrimitiveOverlapFG_T_XXYY.cpp
-    PrimitiveOverlapFG_T_XXYZ.cpp
-    PrimitiveOverlapFG_T_XXZZ.cpp
-    PrimitiveOverlapFG_T_XYYY.cpp
-    PrimitiveOverlapFG_T_XYYZ.cpp
-    PrimitiveOverlapFG_T_XYZZ.cpp
-    PrimitiveOverlapFG_T_XZZZ.cpp
-    PrimitiveOverlapFG_T_YYYY.cpp
-    PrimitiveOverlapFG_T_YYYZ.cpp
-    PrimitiveOverlapFG_T_YYZZ.cpp
-    PrimitiveOverlapFG_T_YZZZ.cpp
-    PrimitiveOverlapFG_T_ZZZZ.cpp
     PrimitiveOverlapFP_XXX_T.cpp
     PrimitiveOverlapFP_XXY_T.cpp
     PrimitiveOverlapFP_XXZ_T.cpp
@@ -111,67 +72,6 @@ target_sources(vlxobjs
     PrimitiveOverlapFP_YZZ_T.cpp
     PrimitiveOverlapFP_ZZZ_T.cpp
     PrimitiveOverlapFS.cpp
-    PrimitiveOverlapGD_XXXX_T.cpp
-    PrimitiveOverlapGD_XXXY_T.cpp
-    PrimitiveOverlapGD_XXXZ_T.cpp
-    PrimitiveOverlapGD_XXYY_T.cpp
-    PrimitiveOverlapGD_XXYZ_T.cpp
-    PrimitiveOverlapGD_XXZZ_T.cpp
-    PrimitiveOverlapGD_XYYY_T.cpp
-    PrimitiveOverlapGD_XYYZ_T.cpp
-    PrimitiveOverlapGD_XYZZ_T.cpp
-    PrimitiveOverlapGD_XZZZ_T.cpp
-    PrimitiveOverlapGD_YYYY_T.cpp
-    PrimitiveOverlapGD_YYYZ_T.cpp
-    PrimitiveOverlapGD_YYZZ_T.cpp
-    PrimitiveOverlapGD_YZZZ_T.cpp
-    PrimitiveOverlapGD_ZZZZ_T.cpp
-    PrimitiveOverlapGF_XXXX_T.cpp
-    PrimitiveOverlapGF_XXXY_T.cpp
-    PrimitiveOverlapGF_XXXZ_T.cpp
-    PrimitiveOverlapGF_XXYY_T.cpp
-    PrimitiveOverlapGF_XXYZ_T.cpp
-    PrimitiveOverlapGF_XXZZ_T.cpp
-    PrimitiveOverlapGF_XYYY_T.cpp
-    PrimitiveOverlapGF_XYYZ_T.cpp
-    PrimitiveOverlapGF_XYZZ_T.cpp
-    PrimitiveOverlapGF_XZZZ_T.cpp
-    PrimitiveOverlapGF_YYYY_T.cpp
-    PrimitiveOverlapGF_YYYZ_T.cpp
-    PrimitiveOverlapGF_YYZZ_T.cpp
-    PrimitiveOverlapGF_YZZZ_T.cpp
-    PrimitiveOverlapGF_ZZZZ_T.cpp
-    PrimitiveOverlapGG_XXXX_T.cpp
-    PrimitiveOverlapGG_XXXY_T.cpp
-    PrimitiveOverlapGG_XXXZ_T.cpp
-    PrimitiveOverlapGG_XXYY_T.cpp
-    PrimitiveOverlapGG_XXYZ_T.cpp
-    PrimitiveOverlapGG_XXZZ_T.cpp
-    PrimitiveOverlapGG_XYYY_T.cpp
-    PrimitiveOverlapGG_XYYZ_T.cpp
-    PrimitiveOverlapGG_XYZZ_T.cpp
-    PrimitiveOverlapGG_XZZZ_T.cpp
-    PrimitiveOverlapGG_YYYY_T.cpp
-    PrimitiveOverlapGG_YYYZ_T.cpp
-    PrimitiveOverlapGG_YYZZ_T.cpp
-    PrimitiveOverlapGG_YZZZ_T.cpp
-    PrimitiveOverlapGG_ZZZZ_T.cpp
-    PrimitiveOverlapGP_XXXX_T.cpp
-    PrimitiveOverlapGP_XXXY_T.cpp
-    PrimitiveOverlapGP_XXXZ_T.cpp
-    PrimitiveOverlapGP_XXYY_T.cpp
-    PrimitiveOverlapGP_XXYZ_T.cpp
-    PrimitiveOverlapGP_XXZZ_T.cpp
-    PrimitiveOverlapGP_XYYY_T.cpp
-    PrimitiveOverlapGP_XYYZ_T.cpp
-    PrimitiveOverlapGP_XYZZ_T.cpp
-    PrimitiveOverlapGP_XZZZ_T.cpp
-    PrimitiveOverlapGP_YYYY_T.cpp
-    PrimitiveOverlapGP_YYYZ_T.cpp
-    PrimitiveOverlapGP_YYZZ_T.cpp
-    PrimitiveOverlapGP_YZZZ_T.cpp
-    PrimitiveOverlapGP_ZZZZ_T.cpp
-    PrimitiveOverlapGS.cpp
     PrimitiveOverlapPD_T_XX.cpp
     PrimitiveOverlapPD_T_XY.cpp
     PrimitiveOverlapPD_T_XZ.cpp
@@ -188,28 +88,12 @@ target_sources(vlxobjs
     PrimitiveOverlapPF_T_YYZ.cpp
     PrimitiveOverlapPF_T_YZZ.cpp
     PrimitiveOverlapPF_T_ZZZ.cpp
-    PrimitiveOverlapPG_T_XXXX.cpp
-    PrimitiveOverlapPG_T_XXXY.cpp
-    PrimitiveOverlapPG_T_XXXZ.cpp
-    PrimitiveOverlapPG_T_XXYY.cpp
-    PrimitiveOverlapPG_T_XXYZ.cpp
-    PrimitiveOverlapPG_T_XXZZ.cpp
-    PrimitiveOverlapPG_T_XYYY.cpp
-    PrimitiveOverlapPG_T_XYYZ.cpp
-    PrimitiveOverlapPG_T_XYZZ.cpp
-    PrimitiveOverlapPG_T_XZZZ.cpp
-    PrimitiveOverlapPG_T_YYYY.cpp
-    PrimitiveOverlapPG_T_YYYZ.cpp
-    PrimitiveOverlapPG_T_YYZZ.cpp
-    PrimitiveOverlapPG_T_YZZZ.cpp
-    PrimitiveOverlapPG_T_ZZZZ.cpp
     PrimitiveOverlapPP_X_T.cpp
     PrimitiveOverlapPP_Y_T.cpp
     PrimitiveOverlapPP_Z_T.cpp
     PrimitiveOverlapPS.cpp
     PrimitiveOverlapSD.cpp
     PrimitiveOverlapSF.cpp
-    PrimitiveOverlapSG.cpp
     PrimitiveOverlapSP.cpp
     PrimitiveOverlapSS.cpp
 )

@@ -2,27 +2,18 @@
 
 #include "DipoleRecDD.hpp"
 #include "DipoleRecDF.hpp"
-#include "DipoleRecDG.hpp"
 #include "DipoleRecDP.hpp"
 #include "DipoleRecDS.hpp"
 #include "DipoleRecFD.hpp"
 #include "DipoleRecFF.hpp"
-#include "DipoleRecFG.hpp"
 #include "DipoleRecFP.hpp"
 #include "DipoleRecFS.hpp"
-#include "DipoleRecGD.hpp"
-#include "DipoleRecGF.hpp"
-#include "DipoleRecGG.hpp"
-#include "DipoleRecGP.hpp"
-#include "DipoleRecGS.hpp"
 #include "DipoleRecPD.hpp"
 #include "DipoleRecPF.hpp"
-#include "DipoleRecPG.hpp"
 #include "DipoleRecPP.hpp"
 #include "DipoleRecPS.hpp"
 #include "DipoleRecSD.hpp"
 #include "DipoleRecSF.hpp"
-#include "DipoleRecSG.hpp"
 #include "DipoleRecSP.hpp"
 #include "DipoleRecSS.hpp"
 
@@ -40,35 +31,28 @@ compute(CSubMatrix*      matrix_x,
 {
     if (angmom == 0)
     {
-        mpol::compDipoleSS(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
+        diprec::compDipoleSS(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
 
         return;
     }
 
     if (angmom == 1)
     {
-        mpol::compDipolePP(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
+        diprec::compDipolePP(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
 
         return;
     }
 
     if (angmom == 2)
     {
-        mpol::compDipoleDD(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
+        diprec::compDipoleDD(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
 
         return;
     }
 
     if (angmom == 3)
     {
-        mpol::compDipoleFF(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
-
-        return;
-    }
-
-    if (angmom == 4)
-    {
-        mpol::compDipoleGG(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
+        diprec::compDipoleFF(matrix_x, matrix_y, matrix_z, point, gto_block, bra_first, bra_last);
 
         return;
     }
@@ -90,175 +74,112 @@ compute(CSubMatrix*      matrix_x,
 {
     if ((bra_angmom == 0) && (ket_angmom == 0))
     {
-        mpol::compDipoleSS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        diprec::compDipoleSS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 1))
     {
-        mpol::compDipoleSP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleSP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 0))
     {
-        mpol::compDipolePS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipolePS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 2))
     {
-        mpol::compDipoleSD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleSD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 0))
     {
-        mpol::compDipoleDS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleDS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 3))
     {
-        mpol::compDipoleSF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleSF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 0))
     {
-        mpol::compDipoleFS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 0) && (ket_angmom == 4))
-    {
-        mpol::compDipoleSG(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 0))
-    {
-        mpol::compDipoleGS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleFS(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 1))
     {
-        mpol::compDipolePP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        diprec::compDipolePP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 2))
     {
-        mpol::compDipolePD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipolePD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 1))
     {
-        mpol::compDipoleDP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleDP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 3))
     {
-        mpol::compDipolePF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipolePF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 1))
     {
-        mpol::compDipoleFP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 1) && (ket_angmom == 4))
-    {
-        mpol::compDipolePG(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 1))
-    {
-        mpol::compDipoleGP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleFP(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 2))
     {
-        mpol::compDipoleDD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        diprec::compDipoleDD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 3))
     {
-        mpol::compDipoleDF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleDF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 2))
     {
-        mpol::compDipoleFD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 2) && (ket_angmom == 4))
-    {
-        mpol::compDipoleDG(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 2))
-    {
-        mpol::compDipoleGD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        diprec::compDipoleFD(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 3))
     {
-        mpol::compDipoleFF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
-
-        return;
-    }
-
-    if ((bra_angmom == 3) && (ket_angmom == 4))
-    {
-        mpol::compDipoleFG(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 3))
-    {
-        mpol::compDipoleGF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 4))
-    {
-        mpol::compDipoleGG(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        diprec::compDipoleFF(matrix_x, matrix_y, matrix_z, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }

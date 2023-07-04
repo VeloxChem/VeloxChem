@@ -4,27 +4,18 @@ target_sources(vlxobjs
     KineticEnergyFunc.cpp
     KineticEnergyRecDD.cpp
     KineticEnergyRecDF.cpp
-    KineticEnergyRecDG.cpp
     KineticEnergyRecDP.cpp
     KineticEnergyRecDS.cpp
     KineticEnergyRecFD.cpp
     KineticEnergyRecFF.cpp
-    KineticEnergyRecFG.cpp
     KineticEnergyRecFP.cpp
     KineticEnergyRecFS.cpp
-    KineticEnergyRecGD.cpp
-    KineticEnergyRecGF.cpp
-    KineticEnergyRecGG.cpp
-    KineticEnergyRecGP.cpp
-    KineticEnergyRecGS.cpp
     KineticEnergyRecPD.cpp
     KineticEnergyRecPF.cpp
-    KineticEnergyRecPG.cpp
     KineticEnergyRecPP.cpp
     KineticEnergyRecPS.cpp
     KineticEnergyRecSD.cpp
     KineticEnergyRecSF.cpp
-    KineticEnergyRecSG.cpp
     KineticEnergyRecSP.cpp
     KineticEnergyRecSS.cpp
     PrimitiveKineticEnergyDD_XX_T.cpp
@@ -43,21 +34,6 @@ target_sources(vlxobjs
     PrimitiveKineticEnergyDF_T_YYZ.cpp
     PrimitiveKineticEnergyDF_T_YZZ.cpp
     PrimitiveKineticEnergyDF_T_ZZZ.cpp
-    PrimitiveKineticEnergyDG_T_XXXX.cpp
-    PrimitiveKineticEnergyDG_T_XXXY.cpp
-    PrimitiveKineticEnergyDG_T_XXXZ.cpp
-    PrimitiveKineticEnergyDG_T_XXYY.cpp
-    PrimitiveKineticEnergyDG_T_XXYZ.cpp
-    PrimitiveKineticEnergyDG_T_XXZZ.cpp
-    PrimitiveKineticEnergyDG_T_XYYY.cpp
-    PrimitiveKineticEnergyDG_T_XYYZ.cpp
-    PrimitiveKineticEnergyDG_T_XYZZ.cpp
-    PrimitiveKineticEnergyDG_T_XZZZ.cpp
-    PrimitiveKineticEnergyDG_T_YYYY.cpp
-    PrimitiveKineticEnergyDG_T_YYYZ.cpp
-    PrimitiveKineticEnergyDG_T_YYZZ.cpp
-    PrimitiveKineticEnergyDG_T_YZZZ.cpp
-    PrimitiveKineticEnergyDG_T_ZZZZ.cpp
     PrimitiveKineticEnergyDP_XX_T.cpp
     PrimitiveKineticEnergyDP_XY_T.cpp
     PrimitiveKineticEnergyDP_XZ_T.cpp
@@ -85,21 +61,6 @@ target_sources(vlxobjs
     PrimitiveKineticEnergyFF_YYZ_T.cpp
     PrimitiveKineticEnergyFF_YZZ_T.cpp
     PrimitiveKineticEnergyFF_ZZZ_T.cpp
-    PrimitiveKineticEnergyFG_T_XXXX.cpp
-    PrimitiveKineticEnergyFG_T_XXXY.cpp
-    PrimitiveKineticEnergyFG_T_XXXZ.cpp
-    PrimitiveKineticEnergyFG_T_XXYY.cpp
-    PrimitiveKineticEnergyFG_T_XXYZ.cpp
-    PrimitiveKineticEnergyFG_T_XXZZ.cpp
-    PrimitiveKineticEnergyFG_T_XYYY.cpp
-    PrimitiveKineticEnergyFG_T_XYYZ.cpp
-    PrimitiveKineticEnergyFG_T_XYZZ.cpp
-    PrimitiveKineticEnergyFG_T_XZZZ.cpp
-    PrimitiveKineticEnergyFG_T_YYYY.cpp
-    PrimitiveKineticEnergyFG_T_YYYZ.cpp
-    PrimitiveKineticEnergyFG_T_YYZZ.cpp
-    PrimitiveKineticEnergyFG_T_YZZZ.cpp
-    PrimitiveKineticEnergyFG_T_ZZZZ.cpp
     PrimitiveKineticEnergyFP_XXX_T.cpp
     PrimitiveKineticEnergyFP_XXY_T.cpp
     PrimitiveKineticEnergyFP_XXZ_T.cpp
@@ -111,67 +72,6 @@ target_sources(vlxobjs
     PrimitiveKineticEnergyFP_YZZ_T.cpp
     PrimitiveKineticEnergyFP_ZZZ_T.cpp
     PrimitiveKineticEnergyFS.cpp
-    PrimitiveKineticEnergyGD_XXXX_T.cpp
-    PrimitiveKineticEnergyGD_XXXY_T.cpp
-    PrimitiveKineticEnergyGD_XXXZ_T.cpp
-    PrimitiveKineticEnergyGD_XXYY_T.cpp
-    PrimitiveKineticEnergyGD_XXYZ_T.cpp
-    PrimitiveKineticEnergyGD_XXZZ_T.cpp
-    PrimitiveKineticEnergyGD_XYYY_T.cpp
-    PrimitiveKineticEnergyGD_XYYZ_T.cpp
-    PrimitiveKineticEnergyGD_XYZZ_T.cpp
-    PrimitiveKineticEnergyGD_XZZZ_T.cpp
-    PrimitiveKineticEnergyGD_YYYY_T.cpp
-    PrimitiveKineticEnergyGD_YYYZ_T.cpp
-    PrimitiveKineticEnergyGD_YYZZ_T.cpp
-    PrimitiveKineticEnergyGD_YZZZ_T.cpp
-    PrimitiveKineticEnergyGD_ZZZZ_T.cpp
-    PrimitiveKineticEnergyGF_XXXX_T.cpp
-    PrimitiveKineticEnergyGF_XXXY_T.cpp
-    PrimitiveKineticEnergyGF_XXXZ_T.cpp
-    PrimitiveKineticEnergyGF_XXYY_T.cpp
-    PrimitiveKineticEnergyGF_XXYZ_T.cpp
-    PrimitiveKineticEnergyGF_XXZZ_T.cpp
-    PrimitiveKineticEnergyGF_XYYY_T.cpp
-    PrimitiveKineticEnergyGF_XYYZ_T.cpp
-    PrimitiveKineticEnergyGF_XYZZ_T.cpp
-    PrimitiveKineticEnergyGF_XZZZ_T.cpp
-    PrimitiveKineticEnergyGF_YYYY_T.cpp
-    PrimitiveKineticEnergyGF_YYYZ_T.cpp
-    PrimitiveKineticEnergyGF_YYZZ_T.cpp
-    PrimitiveKineticEnergyGF_YZZZ_T.cpp
-    PrimitiveKineticEnergyGF_ZZZZ_T.cpp
-    PrimitiveKineticEnergyGG_XXXX_T.cpp
-    PrimitiveKineticEnergyGG_XXXY_T.cpp
-    PrimitiveKineticEnergyGG_XXXZ_T.cpp
-    PrimitiveKineticEnergyGG_XXYY_T.cpp
-    PrimitiveKineticEnergyGG_XXYZ_T.cpp
-    PrimitiveKineticEnergyGG_XXZZ_T.cpp
-    PrimitiveKineticEnergyGG_XYYY_T.cpp
-    PrimitiveKineticEnergyGG_XYYZ_T.cpp
-    PrimitiveKineticEnergyGG_XYZZ_T.cpp
-    PrimitiveKineticEnergyGG_XZZZ_T.cpp
-    PrimitiveKineticEnergyGG_YYYY_T.cpp
-    PrimitiveKineticEnergyGG_YYYZ_T.cpp
-    PrimitiveKineticEnergyGG_YYZZ_T.cpp
-    PrimitiveKineticEnergyGG_YZZZ_T.cpp
-    PrimitiveKineticEnergyGG_ZZZZ_T.cpp
-    PrimitiveKineticEnergyGP_XXXX_T.cpp
-    PrimitiveKineticEnergyGP_XXXY_T.cpp
-    PrimitiveKineticEnergyGP_XXXZ_T.cpp
-    PrimitiveKineticEnergyGP_XXYY_T.cpp
-    PrimitiveKineticEnergyGP_XXYZ_T.cpp
-    PrimitiveKineticEnergyGP_XXZZ_T.cpp
-    PrimitiveKineticEnergyGP_XYYY_T.cpp
-    PrimitiveKineticEnergyGP_XYYZ_T.cpp
-    PrimitiveKineticEnergyGP_XYZZ_T.cpp
-    PrimitiveKineticEnergyGP_XZZZ_T.cpp
-    PrimitiveKineticEnergyGP_YYYY_T.cpp
-    PrimitiveKineticEnergyGP_YYYZ_T.cpp
-    PrimitiveKineticEnergyGP_YYZZ_T.cpp
-    PrimitiveKineticEnergyGP_YZZZ_T.cpp
-    PrimitiveKineticEnergyGP_ZZZZ_T.cpp
-    PrimitiveKineticEnergyGS.cpp
     PrimitiveKineticEnergyPD_T_XX.cpp
     PrimitiveKineticEnergyPD_T_XY.cpp
     PrimitiveKineticEnergyPD_T_XZ.cpp
@@ -188,28 +88,12 @@ target_sources(vlxobjs
     PrimitiveKineticEnergyPF_T_YYZ.cpp
     PrimitiveKineticEnergyPF_T_YZZ.cpp
     PrimitiveKineticEnergyPF_T_ZZZ.cpp
-    PrimitiveKineticEnergyPG_T_XXXX.cpp
-    PrimitiveKineticEnergyPG_T_XXXY.cpp
-    PrimitiveKineticEnergyPG_T_XXXZ.cpp
-    PrimitiveKineticEnergyPG_T_XXYY.cpp
-    PrimitiveKineticEnergyPG_T_XXYZ.cpp
-    PrimitiveKineticEnergyPG_T_XXZZ.cpp
-    PrimitiveKineticEnergyPG_T_XYYY.cpp
-    PrimitiveKineticEnergyPG_T_XYYZ.cpp
-    PrimitiveKineticEnergyPG_T_XYZZ.cpp
-    PrimitiveKineticEnergyPG_T_XZZZ.cpp
-    PrimitiveKineticEnergyPG_T_YYYY.cpp
-    PrimitiveKineticEnergyPG_T_YYYZ.cpp
-    PrimitiveKineticEnergyPG_T_YYZZ.cpp
-    PrimitiveKineticEnergyPG_T_YZZZ.cpp
-    PrimitiveKineticEnergyPG_T_ZZZZ.cpp
     PrimitiveKineticEnergyPP_X_T.cpp
     PrimitiveKineticEnergyPP_Y_T.cpp
     PrimitiveKineticEnergyPP_Z_T.cpp
     PrimitiveKineticEnergyPS.cpp
     PrimitiveKineticEnergySD.cpp
     PrimitiveKineticEnergySF.cpp
-    PrimitiveKineticEnergySG.cpp
     PrimitiveKineticEnergySP.cpp
     PrimitiveKineticEnergySS.cpp
 )
