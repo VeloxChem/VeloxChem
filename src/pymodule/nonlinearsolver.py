@@ -37,7 +37,8 @@ from .linearsolver import LinearSolver
 from .distributedarray import DistributedArray
 from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_input, print_keywords, get_datetime_string
+from .inputparser import (parse_input, print_keywords, print_attributes,
+                          get_random_string_parallel)
 from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level
 from .batchsize import get_batch_size
@@ -132,7 +133,8 @@ class NonlinearSolver:
         self.program_end_time = None
 
         # filename
-        self._filename = f'veloxchem_rsp_{get_datetime_string()}'
+        self._filename = 'veloxchem_rsp_' + get_random_string_parallel(
+            self.comm)
 
         # input keywords
         self._input_keywords = {
@@ -154,8 +156,6 @@ class NonlinearSolver:
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
-                'potfile': ('str', 'potential file for polarizable embedding'),
-                'electric_field': ('seq_fixed', 'static electric field'),
             },
         }
 
@@ -213,6 +213,13 @@ class NonlinearSolver:
         """
 
         print_keywords(self._input_keywords, self.ostream)
+
+    def print_attributes(self):
+        """
+        Prints attributes in nonlinear solver.
+        """
+
+        print_attributes(self._input_keywords, self.ostream)
 
     def update_settings(self, rsp_dict, method_dict=None):
         """

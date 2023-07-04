@@ -46,7 +46,7 @@ from .visualizationdriver import VisualizationDriver
 from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_datetime_string)
+                          get_random_string_parallel)
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
 from .dftutils import get_default_grid_level
@@ -166,7 +166,8 @@ class LinearSolver:
         self.program_end_time = None
 
         # filename
-        self._filename = f'veloxchem_rsp_{get_datetime_string()}'
+        self._filename = 'veloxchem_rsp_' + get_random_string_parallel(
+            self.comm)
 
         # distributed arrays
         self._dist_bger = None

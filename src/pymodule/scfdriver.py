@@ -50,7 +50,7 @@ from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .denguess import DensityGuess
 from .inputparser import (parse_input, print_keywords, print_attributes,
-                          get_datetime_string)
+                          get_random_string_parallel)
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
 from .dftutils import get_default_grid_level
@@ -234,7 +234,8 @@ class ScfDriver:
         self.program_end_time = None
 
         # filename
-        self._filename = f'veloxchem_scf_{get_datetime_string()}'
+        self._filename = 'veloxchem_scf_' + get_random_string_parallel(
+            self.comm)
 
         # input keywords
         self._input_keywords = {
