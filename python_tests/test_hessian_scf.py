@@ -23,10 +23,10 @@ class TestScfHessianDriver:
 
         hessian_settings = {'do_raman': 'yes'}
         method_settings = {}
-        scf_hessian_drv = ScfHessianDriver(scf_drv)
-        scf_hessian_drv.ostream.mute()
+        scf_hessian_drv = ScfHessianDriver()
         scf_hessian_drv.update_settings(method_settings, hessian_settings)
-        scf_hessian_drv.compute(task.molecule, task.ao_basis)
+        scf_hessian_drv.ostream.mute()
+        scf_hessian_drv.compute(task.molecule, task.ao_basis, scf_drv)
 
         if is_mpi_master(task.mpi_comm):
             scf_hessian_drv.vibrational_analysis(task.molecule)

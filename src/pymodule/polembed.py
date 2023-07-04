@@ -31,14 +31,14 @@ from mpi4py import MPI
 try:
     import cppe
 except ImportError:
-    raise ImportError('Unable to import cppe. Please install cppe via ' +
-                      '\'python3 -m pip install cppe\'')
+    raise ImportError(
+        'Unable to import cppe. Please install cppe via pip or conda.')
 
 from .errorhandler import assert_msg_critical
 from .inputparser import InputParser
 from .subcommunicators import SubCommunicators
 from .veloxchemlib import (ElectricFieldIntegralsDriver,
-                           NuclearPotentialIntegralsDriver, bohr_in_angstroms,
+                           NuclearPotentialIntegralsDriver, bohr_in_angstrom,
                            mpi_master)
 
 
@@ -381,7 +381,7 @@ class PolEmbed:
             if len(units) >= 3 and units == 'angstrom'[:len(units)]:
                 prefac = 1.0
             elif units in ['au', 'bohr']:
-                prefac = bohr_in_angstroms()
+                prefac = bohr_in_angstrom()
             else:
                 assert_msg_critical(False, 'potential file: invalid units')
         else:

@@ -1,14 +1,13 @@
 from pathlib import Path
-import tempfile
+import numpy as np
 import pytest
 
-import numpy as np
-
 from veloxchem.veloxchemlib import ChemicalElement, DispersionModel
-from veloxchem.veloxchemlib import bohr_in_angstroms, is_mpi_master
+from veloxchem.veloxchemlib import bohr_in_angstrom, is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.mpitask import MpiTask
 from veloxchem.optimizationdriver import OptimizationDriver
+from veloxchem.inputparser import get_random_string_serial
 
 
 @pytest.mark.filterwarnings(
@@ -49,7 +48,7 @@ class TestMolData:
         xyzstr = self.nh3_xyzstr()
 
         mol_1 = Molecule(labels, coords, 'au')
-        mol_2 = Molecule.read_str(xyzstr, 'au')
+        mol_2 = Molecule.read_molecule_string(xyzstr, 'au')
 
         array = np.array(coords)
         arrayT = np.zeros((array.shape[1], array.shape[0]))
@@ -60,7 +59,7 @@ class TestMolData:
         mol_3 = Molecule(labels, array, 'au')
         mol_4 = Molecule(labels, arrayT.T, 'au')
 
-        array_ang = array * bohr_in_angstroms()
+        array_ang = array * bohr_in_angstrom()
 
         mol_5 = Molecule(labels, array_ang)
         mol_6 = Molecule(labels, array_ang, 'angstrom')
@@ -116,9 +115,29 @@ class TestMolData:
     def test_center_of_mass(self):
 
         mol = self.nh3_molecule()
-        mol_com = mol.center_of_mass()
+        mol_com = mol.center_of_mass_in_bohr()
         ref_com = np.array([-3.831697, 3.070437, -0.031436])
         assert np.max(np.abs(ref_com - mol_com)) < 1.0e-6
+
+    def test_is_linear(self):
+
+        mol = self.nh3_molecule()
+        assert (not mol.is_linear())
+
+        mol_str = """
+            H  0.0  0.0  0.0
+            H  0.0  0.0  1.5
+        """
+        mol = Molecule.read_molecule_string(mol_str, units='au')
+        assert mol.is_linear()
+
+        mol_str = """
+            C  0.0  0.0  0.0
+            O  0.0  0.0  2.2
+            O  0.0  0.0 -2.2
+        """
+        mol = Molecule.read_molecule_string(mol_str, units='au')
+        assert mol.is_linear()
 
     def test_setters_and_getters(self):
 
@@ -150,18 +169,18 @@ class TestMolData:
 
         # fake molecule made of H,Li,C,N,O,S,Cu,Zn,Br,Ag,Au,Hg
 
-        mol = Molecule.read_str("""H    0.0   0.0   0.0
-                                   Li   0.0   0.0   1.0
-                                   C    0.0   0.0   2.0
-                                   N    0.0   0.0   3.0
-                                   O    0.0   0.0   4.0
-                                   S    0.0   0.0   5.0
-                                   Cu   0.0   0.0   6.0
-                                   Zn   0.0   0.0   7.0
-                                   Br   0.0   0.0   8.0
-                                   Ag   0.0   0.0   9.0
-                                   Au   0.0   0.0  10.0
-                                   Hg   0.0   0.0  11.0""")
+        mol = Molecule.read_molecule_string("""H    0.0   0.0   0.0
+                                               Li   0.0   0.0   1.0
+                                               C    0.0   0.0   2.0
+                                               N    0.0   0.0   3.0
+                                               O    0.0   0.0   4.0
+                                               S    0.0   0.0   5.0
+                                               Cu   0.0   0.0   6.0
+                                               Zn   0.0   0.0   7.0
+                                               Br   0.0   0.0   8.0
+                                               Ag   0.0   0.0   9.0
+                                               Au   0.0   0.0  10.0
+                                               Hg   0.0   0.0  11.0""")
 
         atom_radii = mol.vdw_radii_to_numpy()
 
@@ -170,7 +189,7 @@ class TestMolData:
             1.55
         ])
 
-        ref_radii /= bohr_in_angstroms()
+        ref_radii /= bohr_in_angstrom()
 
         assert (atom_radii == ref_radii).all()
 
@@ -291,8 +310,9 @@ class TestMolData:
             H          -2.669421889714        2.207640216349        0.385962694800
         """
 
-        init_mol = Molecule.read_str(init_xyz_str, units='angstrom')
-        final_mol = Molecule.read_str(final_xyz_str, units='angstrom')
+        init_mol = Molecule.read_molecule_string(init_xyz_str, units='angstrom')
+        final_mol = Molecule.read_molecule_string(final_xyz_str,
+                                                  units='angstrom')
 
         ic_rmsd = OptimizationDriver.get_ic_rmsd(final_mol, init_mol)
         ref_ic_rmsd = {
@@ -319,26 +339,38 @@ class TestMolData:
 
     def test_write_xyz(self):
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            if not is_mpi_master():
-                return
-
-            fname = str(Path(temp_dir, 'mol.xyz'))
+        if is_mpi_master():
+            here = Path(__file__).parent
+            random_string = get_random_string_serial()
+            fpath = here / 'inputs' / f'vlx_molecule_{random_string}.xyz'
+            fname = str(fpath)
 
             mol = self.nh3_molecule()
             mol.write_xyz(fname)
 
             ref_labels = mol.get_labels()
-            ref_coords = mol.get_coordinates()
+            ref_coords_au = mol.get_coordinates_in_bohr()
+            ref_coords_ang = mol.get_coordinates_in_angstrom()
 
-            mol_2 = Molecule.read_xyz(fname)
+            mol_2 = Molecule.read_xyz_file(fname)
             assert ref_labels == mol_2.get_labels()
             assert np.max(
-                np.abs(ref_coords - mol_2.get_coordinates())) < 1.0e-10
+                np.abs(ref_coords_au -
+                       mol_2.get_coordinates_in_bohr())) < 1.0e-10
+            assert np.max(
+                np.abs(ref_coords_ang -
+                       mol_2.get_coordinates_in_angstrom())) < 1.0e-10
 
             with open(fname, 'r') as f_xyz:
                 lines = f_xyz.readlines()
-                mol_3 = Molecule.from_xyz_string(''.join(lines))
+                mol_3 = Molecule.read_xyz_string(''.join(lines))
                 assert ref_labels == mol_3.get_labels()
                 assert np.max(
-                    np.abs(ref_coords - mol_3.get_coordinates())) < 1.0e-10
+                    np.abs(ref_coords_au -
+                           mol_3.get_coordinates_in_bohr())) < 1.0e-10
+                assert np.max(
+                    np.abs(ref_coords_ang -
+                           mol_3.get_coordinates_in_angstrom())) < 1.0e-10
+
+            if fpath.is_file():
+                fpath.unlink()

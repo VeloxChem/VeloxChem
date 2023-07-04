@@ -23,12 +23,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from pathlib import PurePath
 from datetime import datetime
+from random import getrandbits
 import numpy as np
 import sys
 import re
 
+from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 
 
@@ -74,13 +77,34 @@ class InputParser:
         errmsg = f'InputParser: bad syntax in file {self.inpname}. '
         errmsg += 'You may check for incorrect, incomplete or empty groups.'
 
+        self.input_dict = {}
+        input_groups = {}
         group = None
 
-        input_groups = {}
-
         with open(str(self.inpname), 'r') as f_inp:
+            input_lines = f_inp.readlines()
 
-            for line in f_inp:
+            # process the lines before the first group marked by "@"
+            # and save as "keyline" in dictionary
+
+            keyline = ''
+            line_of_first_group = 0
+
+            for line in input_lines:
+                line = line.strip()
+                line = re.sub(r'!.*', '', line)
+                line = re.sub(r'#.*', '', line)
+                if line.startswith('@'):
+                    break
+
+                keyline += ' '.join(line.split()) + ' '
+                line_of_first_group += 1
+
+            self.input_dict['keyline'] = keyline.strip()
+
+            # process the remaining part of the input file
+
+            for line in input_lines[line_of_first_group:]:
 
                 # remove comment and extra space
                 line = line.strip()
@@ -102,6 +126,11 @@ class InputParser:
                 if line[0] == '@' and line.lower() != '@end':
                     assert_msg_critical(group is None, errmsg)
                     group = '_'.join(line[1:].strip().lower().split())
+                    # make sure that groups are not named "keyline"
+                    assert_msg_critical(
+                        group != 'keyline',
+                        'Input: "keyline" is reserved and should not be used as input'
+                    )
                     input_groups[group] = []
 
                 # end of group
@@ -116,8 +145,6 @@ class InputParser:
                 # outside group
                 else:
                     assert_msg_critical(self.is_basis_set, errmsg)
-
-        self.input_dict = {}
 
         for group in input_groups:
             self.input_dict[group] = {}
@@ -157,7 +184,9 @@ class InputParser:
 
         # check empty group
         for group in self.input_dict:
-            assert_msg_critical(len(self.input_dict[group]), errmsg)
+            # note that "keyline" is a string and it may be empty
+            if group != 'keyline':
+                assert_msg_critical(len(self.input_dict[group]), errmsg)
 
         # save filename
         if self.outname not in [None, sys.stdout]:
@@ -409,16 +438,16 @@ def print_keywords(input_keywords, ostream):
     Prints input keywords to output stream.
     """
 
-    width = 80
+    width = 90
     for group in input_keywords:
         group_print = group.replace('_', ' ')
         ostream.print_header('=' * width)
         ostream.print_header(f'  @{group_print}'.ljust(width))
         ostream.print_header('-' * width)
         for key, val in input_keywords[group].items():
-            text = f'  {key}'.ljust(20)
+            text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 35)
+            text += f'  {val[1]}'.ljust(width - 45)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -429,13 +458,13 @@ def print_attributes(input_keywords, ostream):
     Prints attributes to output stream.
     """
 
-    width = 80
+    width = 90
     ostream.print_header('=' * width)
     for group in input_keywords:
         for key, val in input_keywords[group].items():
-            text = f'  {key}'.ljust(20)
+            text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 35)
+            text += f'  {val[1]}'.ljust(width - 45)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -481,3 +510,37 @@ def get_datetime_string():
 
     return datetime.now().isoformat(sep='T',
                                     timespec='seconds').replace(':', '.')
+
+
+def get_random_string_serial():
+    """
+    Gets a random string.
+
+    :return:
+        The random string.
+    """
+
+    return '{:>08s}'.format(hex(getrandbits(32))[2:])
+
+
+def get_random_string_parallel(comm=None):
+    """
+    Gets a random string.
+
+    :param comm:
+        The MPI communicator.
+
+    :return:
+        The random string.
+    """
+
+    if comm is None:
+        comm = MPI.COMM_WORLD
+
+    if comm.Get_rank() == mpi_master():
+        random_string = get_random_string_serial()
+    else:
+        random_string = None
+    random_string = comm.bcast(random_string, root=mpi_master())
+
+    return random_string

@@ -30,7 +30,7 @@ import tempfile
 import sys
 import re
 
-from .veloxchemlib import mpi_master, bohr_in_angstroms, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
@@ -251,62 +251,69 @@ class ForceFieldGenerator:
 
         self.ffversion = 0
 
-        with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        except TypeError:
+            temp_dir = tempfile.TemporaryDirectory()
 
-            self._workdir = Path(temp_dir)
+        self._workdir = Path(temp_dir.name)
 
-            if self.original_top_file is None:
-                original_itp_file = self._workdir / (
-                    mol_name + f'_{self.ffversion:02d}.itp')
-                original_top_file = original_itp_file.with_suffix('.top')
+        if self.original_top_file is None:
+            original_itp_file = self._workdir / (mol_name +
+                                                 f'_{self.ffversion:02d}.itp')
+            original_top_file = original_itp_file.with_suffix('.top')
 
-                if self.rank == mpi_master():
-                    self.write_original_itp(original_itp_file,
-                                            list(self.atom_types),
-                                            self.partial_charges)
-                    self.write_top(original_top_file, original_itp_file)
-                self.comm.barrier()
+            if self.rank == mpi_master():
+                self.write_original_itp(original_itp_file,
+                                        list(self.atom_types),
+                                        self.partial_charges)
+                self.write_top(original_top_file, original_itp_file)
+            self.comm.barrier()
 
-            else:
-                original_top_file = Path(self.original_top_file)
+        else:
+            original_top_file = Path(self.original_top_file)
 
-            self.ostream.print_info(
-                f'Original topology file: {original_top_file.name}')
+        self.ostream.print_info(
+            f'Original topology file: {original_top_file.name}')
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        # validate original force field
+
+        for i, dih in enumerate(self.target_dihedrals):
+            self.validate_force_field(original_top_file, i)
+
+        # fit dihedral potentials
+
+        n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
+        target_top_file = original_top_file
+        for i_round in range(n_rounds):
+            for i, dih in enumerate(self.target_dihedrals):
+                target_top_file = self.dihedral_correction(target_top_file, i)
+
+        # validate final force field
+
+        for i, dih in enumerate(self.target_dihedrals):
+            self.validate_force_field(target_top_file, i)
+
+        # save output files
+
+        if self.rank == mpi_master() and self.keep_files:
+            out_dir = Path(self.molecule_name + '_files')
+            for ffver in range(self.ffversion + 1):
+                for ftype in ['itp', 'top']:
+                    fname = mol_name + f'_{ffver:02d}.{ftype}'
+                    self.copy_file(self._workdir / fname, out_dir / fname)
+                    valstr = f'Saving file: {str(out_dir / fname)}'
+                    self.ostream.print_info(valstr)
+
             self.ostream.print_blank()
             self.ostream.flush()
 
-            # validate original force field
-
-            for i, dih in enumerate(self.target_dihedrals):
-                self.validate_force_field(original_top_file, i)
-
-            # fit dihedral potentials
-
-            n_rounds = self.n_rounds if len(self.scan_dih_angles) > 1 else 1
-            target_top_file = original_top_file
-            for i_round in range(n_rounds):
-                for i, dih in enumerate(self.target_dihedrals):
-                    target_top_file = self.dihedral_correction(
-                        target_top_file, i)
-
-            # validate final force field
-
-            for i, dih in enumerate(self.target_dihedrals):
-                self.validate_force_field(target_top_file, i)
-
-            # save output files
-
-            if self.rank == mpi_master() and self.keep_files:
-                out_dir = Path(self.molecule_name + '_files')
-                for ffver in range(self.ffversion + 1):
-                    for ftype in ['itp', 'top']:
-                        fname = mol_name + f'_{ffver:02d}.{ftype}'
-                        self.copy_file(self._workdir / fname, out_dir / fname)
-                        valstr = f'Saving file: {str(out_dir / fname)}'
-                        self.ostream.print_info(valstr)
-
-                self.ostream.print_blank()
-                self.ostream.flush()
+        try:
+            temp_dir.cleanup()
+        except (NotADirectoryError, PermissionError):
+            pass
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
@@ -355,8 +362,9 @@ class ForceFieldGenerator:
                     'ForceFieldGenerator.read_qm_scan_xyz_files: ' +
                     'inconsistent number of atoms')
 
-                xyz_str = ''.join(xyz_lines[i_start + 2:i_end])
-                geometries.append(Molecule.read_str(xyz_str, units='angstrom'))
+                mol_str = ''.join(xyz_lines[i_start + 2:i_end])
+                geometries.append(
+                    Molecule.read_molecule_string(mol_str, units='angstrom'))
 
             self.scan_geometries.append(geometries)
 
@@ -471,7 +479,7 @@ class ForceFieldGenerator:
 
         # molecular information
 
-        coords = self.molecule.get_coordinates()
+        coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
         connected = self.get_connectivity()
 
@@ -604,7 +612,7 @@ class ForceFieldGenerator:
 
             for i, j in bond_indices:
                 r_eq = np.linalg.norm(coords[i] - coords[j])
-                r_eq *= bohr_in_angstroms() * 0.1
+                r_eq *= bohr_in_angstrom() * 0.1
 
                 at_1 = atom_types[i]
                 at_2 = atom_types[j]
@@ -918,7 +926,7 @@ class ForceFieldGenerator:
             from scipy.optimize import curve_fit
         except ImportError:
             raise ImportError('Unable to import scipy. Please install scipy ' +
-                              'via \'python3 -m pip install scipy\'')
+                              'via pip or conda.')
 
         # Ryckaert-Bellemans function
 
@@ -1148,7 +1156,7 @@ class ForceFieldGenerator:
         openmm_drv = OpenMMDriver(self.comm)
         openmm_drv.add_topology(top_file, self.gromacs_include_path)
 
-        grad_drv = OpenMMGradientDriver(openmm_drv, self.comm)
+        grad_drv = OpenMMGradientDriver(self.comm)
         grad_drv.ostream.mute()
 
         opt_drv = OptimizationDriver(grad_drv)
@@ -1157,7 +1165,7 @@ class ForceFieldGenerator:
             'filename': str(Path(top_file).parent / Path(top_file).stem),
             'keep_files': self.keep_files,
         })
-        final_mol = opt_drv.compute(molecule)
+        final_mol = opt_drv.compute(molecule, openmm_drv)
 
         openmm_drv.compute(final_mol)
 
@@ -1268,12 +1276,12 @@ class ForceFieldGenerator:
             A 2d array containing the connectivity information of the molecule.
         """
 
-        coords = self.molecule.get_coordinates()
+        coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
         covalent_radii = self.molecule.covalent_radii_to_numpy()
 
         connectivity = np.full((n_atoms, n_atoms), False, dtype='bool')
-        tolerance = 0.4 / bohr_in_angstroms()
+        tolerance = 0.4 / bohr_in_angstrom()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
                 r_ij = np.linalg.norm(coords[i] - coords[j])

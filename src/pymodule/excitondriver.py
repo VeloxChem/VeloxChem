@@ -30,16 +30,15 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import KineticEnergyIntegralsDriver
-from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import LinearMomentumIntegralsDriver
-from .veloxchemlib import AngularMomentumIntegralsDriver
-from .veloxchemlib import ElectronRepulsionIntegralsDriver
-from .veloxchemlib import GridDriver
-from .veloxchemlib import XCIntegrator
+from .veloxchemlib import (KineticEnergyIntegralsDriver,
+                           NuclearPotentialIntegralsDriver,
+                           ElectricDipoleIntegralsDriver,
+                           LinearMomentumIntegralsDriver,
+                           AngularMomentumIntegralsDriver,
+                           ElectronRepulsionIntegralsDriver)
+from .veloxchemlib import GridDriver, XCIntegrator
 from .veloxchemlib import denmat, fockmat, mpi_master
-from .veloxchemlib import (hartree_in_ev, bohr_in_angstroms,
+from .veloxchemlib import (hartree_in_ev, bohr_in_angstrom,
                            rotatory_strength_in_cgs)
 from .veloxchemlib import get_dimer_ao_indices, parse_xc_func
 from .outputstream import OutputStream
@@ -51,6 +50,7 @@ from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords, get_datetime_string
 from .qqscheme import get_qq_scheme
+from .dftutils import get_default_grid_level
 from .checkpoint import read_rsp_hdf5
 from .checkpoint import write_rsp_hdf5
 
@@ -131,7 +131,7 @@ class ExcitonModelDriver:
 
         # dft settings
         self.dft = False
-        self.grid_level = 4
+        self.grid_level = None
         self.xcfun_label = 'Undefined'
 
         # scf settings
@@ -277,8 +277,8 @@ class ExcitonModelDriver:
         natoms_1 = mol_1.number_of_atoms()
         natoms_2 = mol_2.number_of_atoms()
 
-        coords_1 = mol_1.get_coordinates()
-        coords_2 = mol_2.get_coordinates()
+        coords_1 = mol_1.get_coordinates_in_bohr()
+        coords_2 = mol_2.get_coordinates_in_bohr()
 
         min_dist_2 = None
         for atom_ind_1 in range(natoms_1):
@@ -333,8 +333,8 @@ class ExcitonModelDriver:
             for ind_B in range(ind_A + 1, nfragments):
                 mol_B = monomer_molecules[ind_B]
                 min_dist_AB = self.get_minimal_distance(mol_A, mol_B)
-                if (self.dimer_cutoff_radius is None or min_dist_AB <
-                        self.dimer_cutoff_radius / bohr_in_angstroms()):
+                if (self.dimer_cutoff_radius is None or min_dist_AB
+                        < self.dimer_cutoff_radius / bohr_in_angstrom()):
                     dimer_pairs.append((ind_A, ind_B))
 
         npairs = len(dimer_pairs)
@@ -351,7 +351,7 @@ class ExcitonModelDriver:
         self.elec_trans_dipoles = np.zeros((total_num_states, 3))
         self.velo_trans_dipoles = np.zeros((total_num_states, 3))
         self.magn_trans_dipoles = np.zeros((total_num_states, 3))
-        self.center_of_mass = molecule.center_of_mass()
+        self.center_of_mass = molecule.center_of_mass_in_bohr()
 
         self.state_info = [{
             'type': '',
@@ -366,14 +366,12 @@ class ExcitonModelDriver:
 
         if self.dft:
             dft_func_label = self.xcfun_label
-            method_dict = {
-                'dft': 'yes',
-                'grid_level': self.grid_level,
-                'xcfun': dft_func_label,
-            }
+            method_dict = {'xcfun': dft_func_label}
+            if self.grid_level is not None:
+                method_dict.update({'grid_level': self.grid_level})
         else:
             dft_func_label = 'HF'
-            method_dict = {'dft': 'no'}
+            method_dict = {}
 
         rsp_vector_labels = [
             'dimer_indices',
@@ -399,17 +397,17 @@ class ExcitonModelDriver:
 
             one_elec_ints = self.get_one_elec_integrals(monomer, basis)
 
-            scf_tensors = self.monomer_scf(method_dict, ind, monomer, basis)
+            scf_results = self.monomer_scf(method_dict, ind, monomer, basis)
             tda_results = self.monomer_tda(method_dict, ind, monomer, basis,
-                                           scf_tensors)
+                                           scf_results)
 
             if self.rank == mpi_master():
-                self.monomers[ind]['mo'] = scf_tensors['C_alpha'].copy()
+                self.monomers[ind]['mo'] = scf_results['C_alpha'].copy()
                 self.monomers[ind]['exc_energies'] = tda_results['exc_energies']
                 self.monomers[ind]['exc_vectors'] = tda_results['exc_vectors']
 
                 trans_dipoles = self.get_LE_trans_dipoles(
-                    monomer, basis, one_elec_ints, scf_tensors, tda_results)
+                    monomer, basis, one_elec_ints, scf_results, tda_results)
 
                 for s in range(self.nstates):
                     # LE excitation energy
@@ -760,6 +758,7 @@ class ExcitonModelDriver:
                                                 self.magn_trans_dipoles)
 
             for s in range(adia_velo_trans_dipoles.shape[0]):
+                adia_elec_trans_dipoles *= -1.0
                 adia_velo_trans_dipoles[s, :] /= eigvals[s]
 
             valstr = 'Adiabatic excited states:'
@@ -861,19 +860,30 @@ class ExcitonModelDriver:
         if self.rank == mpi_master():
             dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
                            dipole_mats.z_to_numpy())
-            linmom_ints = (linmom_mats.x_to_numpy(), linmom_mats.y_to_numpy(),
-                           linmom_mats.z_to_numpy())
-            angmom_ints = (angmom_mats.x_to_numpy(), angmom_mats.y_to_numpy(),
-                           angmom_mats.z_to_numpy())
+
+            linmom_ints = (-1.0 * linmom_mats.x_to_numpy(),
+                           -1.0 * linmom_mats.y_to_numpy(),
+                           -1.0 * linmom_mats.z_to_numpy())
+
+            angmom_ints = (-1.0 * angmom_mats.x_to_numpy(),
+                           -1.0 * angmom_mats.y_to_numpy(),
+                           -1.0 * angmom_mats.z_to_numpy())
+
+            magdip_ints = (0.5 * angmom_mats.x_to_numpy(),
+                           0.5 * angmom_mats.y_to_numpy(),
+                           0.5 * angmom_mats.z_to_numpy())
+
         else:
             dipole_ints = None
             linmom_ints = None
             angmom_ints = None
+            magdip_ints = None
 
         return {
             'electric_dipole': dipole_ints,
             'linear_momentum': linmom_ints,
             'angular_momentum': angmom_ints,
+            'magnetic_dipole': magdip_ints,
         }
 
     def monomer_scf(self, method_dict, ind, monomer, basis, min_basis=None):
@@ -892,7 +902,7 @@ class ExcitonModelDriver:
             The minimal AO basis set.
 
         :return:
-            The SCF tensors.
+            The dictionary containing SCF results.
         """
 
         # molecule and basis info
@@ -922,15 +932,15 @@ class ExcitonModelDriver:
                 'restart': 'yes' if self.restart else 'no',
                 'checkpoint_file': str(monomer_scf_h5),
             }, method_dict)
-        scf_drv.compute(monomer, basis, min_basis)
+        scf_results = scf_drv.compute(monomer, basis, min_basis)
 
         # update ERI screening threshold
         if self.eri_thresh > scf_drv.eri_thresh and scf_drv.eri_thresh > 0:
             self.eri_thresh = scf_drv.eri_thresh
 
-        return scf_drv.scf_tensors
+        return scf_results
 
-    def monomer_tda(self, method_dict, ind, monomer, basis, scf_tensors):
+    def monomer_tda(self, method_dict, ind, monomer, basis, scf_results):
         """
         Runs monomer TDDFT-TDA calculation.
 
@@ -942,11 +952,11 @@ class ExcitonModelDriver:
             The monomer molecule.
         :param basis:
             The AO basis.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
+        :param scf_results:
+            The dictionary containing SCF results.
 
         :return:
-            The dictionary that contains TDA properties.
+            The dictionary containing TDA properties.
         """
 
         # checkpoint file for TDA
@@ -968,13 +978,10 @@ class ExcitonModelDriver:
                 'checkpoint_file': str(monomer_rsp_h5),
             }, method_dict)
         abs_spec.init_driver(self.comm, self.ostream)
-        abs_spec.compute(monomer, basis, scf_tensors)
+        abs_spec.compute(monomer, basis, scf_results)
 
         # TDA results
         if self.rank == mpi_master():
-            abs_spec.print_property(self.ostream)
-            self.ostream.flush()
-
             tda_results = {
                 'exc_energies': abs_spec.get_property('eigenvalues').copy(),
                 'exc_vectors': abs_spec.get_property('eigenvectors').copy(),
@@ -984,7 +991,7 @@ class ExcitonModelDriver:
 
         return tda_results
 
-    def get_LE_trans_dipoles(self, monomer, basis, one_elec_ints, scf_tensors,
+    def get_LE_trans_dipoles(self, monomer, basis, one_elec_ints, scf_results,
                              tda_results):
         """
         Gets transition dipole for LE states.
@@ -995,8 +1002,8 @@ class ExcitonModelDriver:
             The AO basis.
         :param one_elec_ints:
             The dictionary of one-electron integrals.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
+        :param scf_results:
+            The dictionary containing SCF results.
         :param tda_results:
             The dictionary of eigenvalues and eigenvectors from TDDFT-TDA.
 
@@ -1007,9 +1014,9 @@ class ExcitonModelDriver:
 
         dipole_ints = one_elec_ints['electric_dipole']
         linmom_ints = one_elec_ints['linear_momentum']
-        angmom_ints = one_elec_ints['angular_momentum']
+        magdip_ints = one_elec_ints['magnetic_dipole']
 
-        mo = scf_tensors['C_alpha']
+        mo = scf_results['C_alpha']
         nocc = monomer.number_of_alpha_electrons()
         nvir = mo.shape[1] - nocc
         mo_occ = mo[:, :nocc].copy()
@@ -1026,14 +1033,11 @@ class ExcitonModelDriver:
             tdens = sqrt_2 * np.matmul(
                 mo_occ, np.matmul(vec.reshape(nocc, nvir), mo_vir.T))
             elec_trans_dipoles.append(
-                np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+                np.array([np.sum(tdens * dipole_ints[d]) for d in range(3)]))
             velo_trans_dipoles.append(
-                np.array([
-                    np.sum(-1.0 * tdens * linmom_ints[d].T) for d in range(3)
-                ]))
+                np.array([np.sum(tdens * linmom_ints[d]) for d in range(3)]))
             magn_trans_dipoles.append(
-                np.array(
-                    [np.sum(0.5 * tdens * angmom_ints[d].T) for d in range(3)]))
+                np.array([np.sum(tdens * magdip_ints[d]) for d in range(3)]))
 
         return {
             'electric': elec_trans_dipoles,
@@ -1131,8 +1135,11 @@ class ExcitonModelDriver:
 
         # dft grid
         if self.dft:
+            xcfun = parse_xc_func(self.xcfun_label.upper())
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             dimer_molgrid = grid_drv.generate(dimer)
@@ -1193,7 +1200,7 @@ class ExcitonModelDriver:
             dimer_energy += np.sum(dens * (hcore + fock))
             if self.dft:
                 dimer_energy += vxc_mat.get_energy()
-                fock += vxc_mat.get_matrix().to_numpy()
+                fock += vxc_mat.alpha_to_numpy()
             # compute Fock in MO basis
             fock_mo = np.matmul(mo.T, np.matmul(fock, mo))
         else:
@@ -1524,7 +1531,7 @@ class ExcitonModelDriver:
 
         dipole_ints = one_elec_ints['electric_dipole']
         linmom_ints = one_elec_ints['linear_momentum']
-        angmom_ints = one_elec_ints['angular_momentum']
+        magdip_ints = one_elec_ints['magnetic_dipole']
 
         nocc = dimer.number_of_alpha_electrons()
         mo_occ = mo[:, :nocc].copy()
@@ -1539,14 +1546,11 @@ class ExcitonModelDriver:
         for cvec in ct_exc_vectors:
             tdens = sqrt_2 * np.matmul(mo_occ, np.matmul(cvec['vec'], mo_vir.T))
             elec_trans_dipoles.append(
-                np.array([np.sum(tdens * dipole_ints[d].T) for d in range(3)]))
+                np.array([np.sum(tdens * dipole_ints[d]) for d in range(3)]))
             velo_trans_dipoles.append(
-                np.array([
-                    np.sum(-1.0 * tdens * linmom_ints[d].T) for d in range(3)
-                ]))
+                np.array([np.sum(tdens * linmom_ints[d]) for d in range(3)]))
             magn_trans_dipoles.append(
-                np.array(
-                    [np.sum(0.5 * tdens * angmom_ints[d].T) for d in range(3)]))
+                np.array([np.sum(tdens * magdip_ints[d]) for d in range(3)]))
 
         return {
             'electric': elec_trans_dipoles,

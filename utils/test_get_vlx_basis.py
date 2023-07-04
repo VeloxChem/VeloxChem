@@ -27,10 +27,10 @@ def test_get_vlx_basis(capsys):
             if key.startswith('atombasis_'):
                 elements.append(key.replace('atombasis_', '').capitalize())
 
-        xyzstr = ''
+        mol_str = ''
         for i, elem in enumerate(elements):
-            xyzstr += f'{elem}  {0.0}  {0.0}  {i:.1f}\n'
-        mol = Molecule.read_str(xyzstr)
+            mol_str += f'{elem}  {0.0}  {0.0}  {i:.1f}\n'
+        mol = Molecule.read_molecule_string(mol_str)
 
         vlx_basis = MolecularBasis.read(mol, x.name, x.parent)
 

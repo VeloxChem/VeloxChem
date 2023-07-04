@@ -1,8 +1,7 @@
 from pathlib import Path
 import numpy as np
-import tempfile
 
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
 from veloxchem.mpitask import MpiTask
 from veloxchem.cubicgrid import CubicGrid
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -15,7 +14,7 @@ class TestNTO:
     def run_nto(self, inpfile, xcfun_label, ref_eig_vals, ref_nto_lambdas,
                 ref_nto_cube_vals, ref_dens_cube_vals, flag):
 
-        task = MpiTask([inpfile, None])
+        task = MpiTask([str(inpfile), None])
         task.input_dict['scf']['checkpoint_file'] = None
 
         if xcfun_label is not None:
@@ -26,55 +25,48 @@ class TestNTO:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         # run TDA/RPA
 
-        with tempfile.TemporaryDirectory() as temp_dir:
+        rsp_dict = {
+            'filename': str(inpfile.parent / inpfile.stem),
+            'nstates': ref_eig_vals.shape[0],
+            'nto': 'yes',
+            'detach_attach': 'yes',
+            'cube_origin': '-0.1, -0.1, -0.1',
+            'cube_stepsize': '0.3, 0.3, 0.2',
+            'cube_points': '2, 2, 3',
+        }
 
-            filename = str(Path(temp_dir, Path(inpfile).stem))
+        if flag == 'tda':
+            rsp_drv = TdaEigenSolver(task.mpi_comm, task.ostream)
+        elif flag == 'rpa':
+            rsp_drv = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
+        rsp_drv.update_settings(rsp_dict, task.input_dict['method_settings'])
+        rsp_results = rsp_drv.compute(task.molecule, task.ao_basis, scf_results)
 
-            rsp_dict = {
-                'filename': filename,
-                'nstates': ref_eig_vals.shape[0],
-                'nto': 'yes',
-                'detach_attach': 'yes',
-                'cube_origin': '-0.1, -0.1, -0.1',
-                'cube_stepsize': '0.3, 0.3, 0.2',
-                'cube_points': '2, 2, 3',
-            }
+        if is_mpi_master(task.mpi_comm):
+            eig_vals = rsp_results['eigenvalues']
 
-            if flag == 'tda':
-                rsp_drv = TdaEigenSolver(task.mpi_comm, task.ostream)
-            elif flag == 'rpa':
-                rsp_drv = LinearResponseEigenSolver(task.mpi_comm, task.ostream)
-            rsp_drv.update_settings(rsp_dict,
-                                    task.input_dict['method_settings'])
-            rsp_results = rsp_drv.compute(task.molecule, task.ao_basis,
-                                          scf_drv.scf_tensors)
+            nto_lambdas = []
+            nto_cube_vals = []
+            dens_cube_vals = []
 
-            if is_mpi_master(task.mpi_comm):
-                eig_vals = rsp_results['eigenvalues']
+            for s in range(ref_eig_vals.shape[0]):
+                lam_diag = rsp_results['nto_lambdas'][s]
+                nto_lambdas.append(lam_diag[0])
 
-                nto_lambdas = []
-                nto_cube_vals = []
-                dens_cube_vals = []
+                nto_cube_fnames = rsp_results['nto_cubes'][s]
+                for fname in nto_cube_fnames[:2]:
+                    read_grid = CubicGrid.read_cube(fname)
+                    nto_cube_vals.append(read_grid.values_to_numpy().flatten())
 
-                for s in range(ref_eig_vals.shape[0]):
-                    lam_diag = rsp_results['nto_lambdas'][s]
-                    nto_lambdas.append(lam_diag[0])
-
-                    nto_cube_fnames = rsp_results['nto_cubes'][s]
-                    for fname in nto_cube_fnames[:2]:
-                        read_grid = CubicGrid.read_cube(fname)
-                        nto_cube_vals.append(
-                            read_grid.values_to_numpy().flatten())
-
-                    dens_cube_fnames = rsp_results['density_cubes'][s]
-                    for fname in dens_cube_fnames:
-                        read_grid = CubicGrid.read_cube(fname)
-                        dens_cube_vals.append(
-                            read_grid.values_to_numpy().flatten())
+                dens_cube_fnames = rsp_results['density_cubes'][s]
+                for fname in dens_cube_fnames:
+                    read_grid = CubicGrid.read_cube(fname)
+                    dens_cube_vals.append(read_grid.values_to_numpy().flatten())
 
         # compare with reference
 
@@ -98,10 +90,38 @@ class TestNTO:
             assert np.max(np.abs(nto_cube_vals - ref_nto_cube_vals)) < 1.0e-4
             assert np.max(np.abs(dens_cube_vals - ref_dens_cube_vals)) < 1.0e-4
 
+            # clean up
+
+            scf_h5 = inpfile.with_suffix('.scf.h5')
+            if scf_h5.is_file():
+                scf_h5.unlink()
+
+            scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
+            if scf_final_h5.is_file():
+                scf_final_h5.unlink()
+
+            rsp_h5 = inpfile.with_suffix('.rsp.h5')
+            if rsp_h5.is_file():
+                rsp_h5.unlink()
+
+            rsp_solutions_h5 = rsp_h5.with_suffix('.solutions.h5')
+            if rsp_solutions_h5.is_file():
+                rsp_solutions_h5.unlink()
+
+            for s in range(ref_eig_vals.shape[0]):
+                nto_cube_fnames = rsp_results['nto_cubes'][s]
+                dens_cube_fnames = rsp_results['density_cubes'][s]
+                for fname in (nto_cube_fnames + dens_cube_fnames):
+                    fpath = Path(fname)
+                    if fpath.is_file():
+                        fpath.unlink()
+
+        mpi_barrier()
+
     def test_nto_tda(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'c2h4.inp')
+        inpfile = here / 'inputs' / 'c2h4.inp'
 
         xcfun_label = None
         nstates = 5
@@ -215,7 +235,7 @@ class TestNTO:
     def test_nto_rpa(self):
 
         here = Path(__file__).parent
-        inpfile = str(here / 'inputs' / 'c2h4.inp')
+        inpfile = here / 'inputs' / 'c2h4.inp'
 
         xcfun_label = 'b3lyp'
         nstates = 5

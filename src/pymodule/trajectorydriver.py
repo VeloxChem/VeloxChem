@@ -31,7 +31,7 @@ import sys
 from pathlib import Path
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import hartree_in_inverse_nm
 from .molecule import Molecule
@@ -150,7 +150,7 @@ class TrajectoryDriver:
             if 'angstrom' in units:
                 length_factor = 1.0
             elif 'bohr' in units:
-                length_factor = bohr_in_angstroms()
+                length_factor = bohr_in_angstrom()
             elif 'nm' in units:
                 length_factor = 10.0
 
@@ -214,9 +214,8 @@ class TrajectoryDriver:
             import MDAnalysis as mda
             from MDAnalysis.topology.guessers import guess_atom_element
         except ImportError:
-            raise ImportError(
-                'Unable to import MDAnalysis. Please install ' +
-                'MDAnalysis via \'python3 -m pip install MDAnalysis\'')
+            raise ImportError('Unable to import MDAnalysis. Please install ' +
+                              'MDAnalysis via pip or conda.')
 
         self.print_header()
 
@@ -387,7 +386,7 @@ class TrajectoryDriver:
             # run SCF
             scf_drv = ScfRestrictedDriver(local_comm, ostream)
             scf_drv.update_settings({}, self.method_dict)
-            scf_drv.compute(qm_mol, qm_basis)
+            scf_results = scf_drv.compute(qm_mol, qm_basis)
 
             if local_rank == mpi_master():
                 scf_energy = scf_drv.get_scf_energy()
@@ -395,11 +394,9 @@ class TrajectoryDriver:
             # run response for spectrum
             abs_spec = Absorption({'nstates': self.nstates}, self.method_dict)
             abs_spec.init_driver(local_comm, ostream)
-            abs_spec.compute(qm_mol, qm_basis, scf_drv.scf_tensors)
+            abs_spec.compute(qm_mol, qm_basis, scf_results)
 
             if local_rank == mpi_master():
-                abs_spec.print_property(ostream)
-
                 excitation_energies = abs_spec.get_property('eigenvalues')
                 oscillator_strengths = abs_spec.get_property(
                     'oscillator_strengths')
@@ -637,9 +634,8 @@ class TrajectoryDriver:
         try:
             from matplotlib import pyplot as plt
         except ImportError:
-            raise ImportError(
-                'Unable to import matplotlib. Please install ' +
-                'matplotlib via \'python3 -m pip install matplotlib\'')
+            raise ImportError('Unable to import matplotlib. Please install ' +
+                              'matplotlib via pip or conda.')
 
         # calculate the average spectrum
         y_averaged = np.sum(y, axis=0) / y.shape[0]

@@ -36,18 +36,16 @@ class XtbHessianDriver(HessianDriver):
     """
     Implements XTB Hessian driver.
 
-    :param xtb_drv:
-        The XTB driver.
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
 
     Instance variables
-        - xtb_drv: The XTB driver.
+        - flag: The driver flag.
     """
 
-    def __init__(self, xtb_drv, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes XTB Hessian driver.
         """
@@ -55,7 +53,6 @@ class XtbHessianDriver(HessianDriver):
         super().__init__(comm, ostream)
 
         self.flag = 'XTB Hessian Driver'
-        self.xtb_drv = xtb_drv
 
     def update_settings(self, method_dict, freq_dict=None):
         """
@@ -72,21 +69,23 @@ class XtbHessianDriver(HessianDriver):
         if freq_dict is None:
             freq_dict = {}
 
-        # The electronic energy
-        self.elec_energy = self.xtb_drv.get_energy()
-
-    def compute(self, molecule):
+    def compute(self, molecule, xtb_drv):
         """
         Computes the numerical nuclear Hessian.
 
         :param molecule:
             The molecule.
+        :param xtb_drv:
+            The xTB driver.
         """
+
         self.print_header()
 
         start_time = tm.time()
 
-        self.compute_numerical(molecule)
+        self.elec_energy = xtb_drv.get_energy()
+
+        self.compute_numerical(molecule, xtb_drv)
 
         # print Hessian
         if self.do_print_hessian:
@@ -101,12 +100,14 @@ class XtbHessianDriver(HessianDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_numerical(self, molecule):
+    def compute_numerical(self, molecule, xtb_drv):
         """
         Performs calculation of numerical Hessian.
 
         :param molecule:
             The molecule.
+        :param xtb_drv:
+            The xTB driver.
         """
 
         self.ostream.mute()
@@ -118,7 +119,11 @@ class XtbHessianDriver(HessianDriver):
         natm = molecule.number_of_atoms()
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
+
+        # charge and spin multiplicity
+        charge = molecule.get_charge()
+        multiplicity = molecule.get_multiplicity()
 
         if self.rank == mpi_master():
             # Hessian
@@ -133,25 +138,31 @@ class XtbHessianDriver(HessianDriver):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
                     # create a new XTB driver object;
                     # without this the energy is always zero...;
-                    xtb_drv = XtbDriver(self.comm)
-                    xtb_drv.mute()
-                    xtb_drv.compute(new_mol, self.ostream)
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv.mute()
+                    new_xtb_drv.compute(new_mol, self.ostream)
 
-                    grad_plus = xtb_drv.get_gradient()
+                    grad_plus = new_xtb_drv.get_gradient()
 
-                    mu_plus = xtb_drv.get_dipole()
+                    mu_plus = new_xtb_drv.get_dipole()
 
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    xtb_drv = XtbDriver(self.comm)
-                    xtb_drv.mute()
-                    xtb_drv.compute(new_mol, self.ostream)
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv.mute()
+                    new_xtb_drv.compute(new_mol, self.ostream)
 
-                    grad_minus = xtb_drv.get_gradient()
+                    grad_minus = new_xtb_drv.get_gradient()
 
-                    mu_minus = xtb_drv.get_dipole()
+                    mu_minus = new_xtb_drv.get_dipole()
 
                     coords[i, d] += self.delta_h
 
@@ -171,43 +182,55 @@ class XtbHessianDriver(HessianDriver):
                 for d in range(3):
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    xtb_drv = XtbDriver(self.comm)
-                    xtb_drv.mute()
-                    xtb_drv.compute(new_mol, self.ostream)
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv.mute()
+                    new_xtb_drv.compute(new_mol, self.ostream)
 
-                    grad_plus1 = xtb_drv.get_gradient()
+                    grad_plus1 = new_xtb_drv.get_gradient()
 
-                    mu_plus1 = xtb_drv.get_dipole()
+                    mu_plus1 = new_xtb_drv.get_dipole()
 
                     coords[i, d] += self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    xtb_drv = XtbDriver(self.comm)
-                    xtb_drv.mute()
-                    xtb_drv.compute(new_mol, self.ostream)
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv.mute()
+                    new_xtb_drv.compute(new_mol, self.ostream)
 
-                    grad_plus2 = xtb_drv.get_gradient()
+                    grad_plus2 = new_xtb_drv.get_gradient()
 
-                    mu_plus2 = xtb_drv.get_dipole()
+                    mu_plus2 = new_xtb_drv.get_dipole()
 
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    xtb_drv = XtbDriver(self.comm)
-                    xtb_drv.mute()
-                    xtb_drv.compute(new_mol, self.ostream)
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv.mute()
+                    new_xtb_drv.compute(new_mol, self.ostream)
 
-                    grad_minus1 = xtb_drv.get_gradient()
+                    grad_minus1 = new_xtb_drv.get_gradient()
 
-                    mu_minus1 = xtb_drv.get_dipole()
+                    mu_minus1 = new_xtb_drv.get_dipole()
 
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
-                    xtb_drv = XtbDriver(self.comm)
-                    xtb_drv.mute()
-                    xtb_drv.compute(new_mol, self.ostream)
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
+                    new_xtb_drv = XtbDriver(self.comm)
+                    new_xtb_drv.set_method(xtb_drv.get_method())
+                    new_xtb_drv.mute()
+                    new_xtb_drv.compute(new_mol, self.ostream)
 
-                    grad_minus2 = xtb_drv.get_gradient()
+                    grad_minus2 = new_xtb_drv.get_gradient()
 
-                    mu_minus2 = xtb_drv.get_dipole()
+                    mu_minus2 = new_xtb_drv.get_dipole()
 
                     coords[i, d] += 2.0 * self.delta_h
 

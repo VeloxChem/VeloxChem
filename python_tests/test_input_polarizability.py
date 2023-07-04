@@ -1,11 +1,11 @@
 from pathlib import Path
 from unittest.mock import patch
+from random import choice
 import numpy as np
-import tempfile
-import random
 import sys
 
 from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
+from veloxchem.inputparser import get_random_string_parallel
 from veloxchem.main import main
 
 
@@ -18,6 +18,30 @@ class TestInputPolarizability:
                 for line in lines.splitlines():
                     if line:
                         f_inp.write(f'{line}\n')
+        mpi_barrier()
+
+    def remove_input_and_h5_files(self, input_file):
+
+        if is_mpi_master():
+            if input_file.is_file():
+                input_file.unlink()
+
+            scf_h5 = input_file.with_suffix('.scf.h5')
+            if scf_h5.is_file():
+                scf_h5.unlink()
+
+            scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
+            if scf_final_h5.is_file():
+                scf_final_h5.unlink()
+
+            rsp_h5 = input_file.with_suffix('.rsp.h5')
+            if rsp_h5.is_file():
+                rsp_h5.unlink()
+
+            rsp_solutions_h5 = rsp_h5.with_suffix('.solutions.h5')
+            if rsp_solutions_h5.is_file():
+                rsp_solutions_h5.unlink()
+
         mpi_barrier()
 
     def get_input_lines(self, xcfun):
@@ -54,7 +78,7 @@ class TestInputPolarizability:
         """
 
         input_lines = input_lines.replace('==batch_size==',
-                                          str(random.choice([1, 10, 100])))
+                                          str(choice([1, 10, 100])))
 
         if xcfun is not None:
             input_lines = input_lines.replace(
@@ -64,49 +88,52 @@ class TestInputPolarizability:
 
     def run_input_polarizability(self, capsys, xcfun, ref_data):
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_file = Path(temp_dir, 'vlx_polarizability')
+        here = Path(__file__).parent
+        random_string = get_random_string_parallel()
+        input_file = here / 'inputs' / f'vlx_polarizability_{random_string}.inp'
 
-            input_lines = self.get_input_lines(xcfun)
-            self.create_input_file(input_lines, input_file)
+        input_lines = self.get_input_lines(xcfun)
+        self.create_input_file(input_lines, input_file)
 
-            with patch.object(sys, 'argv', ['vlx', str(input_file)]):
-                main()
-                captured = capsys.readouterr()
+        with patch.object(sys, 'argv', ['vlx', str(input_file)]):
+            main()
+            captured = capsys.readouterr()
 
-                if is_mpi_master():
-                    polarizability = []
-                    polar_flag = False
+            if is_mpi_master():
+                polarizability = []
+                polar_flag = False
 
-                    for line in captured.out.splitlines():
-                        if 'Wave Function Model' in line:
-                            wf_model = line.split(':')[1].strip()
+                for line in captured.out.splitlines():
+                    if 'Wave Function Model' in line:
+                        wf_model = line.split(':')[1].strip()
 
-                        if 'converged in' in line and 'SCF' not in line:
-                            n_rsp_iterations = int(
-                                line.split('converged in')[1].split()[0])
+                    if 'converged in' in line and 'SCF' not in line:
+                        n_rsp_iterations = int(
+                            line.split('converged in')[1].split()[0])
 
-                        if line.split() == ['X', 'Y', 'Z']:
-                            polar_flag = True
+                    if line.split() == ['X', 'Y', 'Z']:
+                        polar_flag = True
 
-                        if polar_flag:
-                            content = line.split()
-                            if len(content) != 4:
-                                continue
-                            if content[0] in ['X', 'Y', 'Z']:
-                                polarizability.append(float(content[1]))
-                                polarizability.append(float(content[2]))
-                                polarizability.append(float(content[3]))
-                            if content[0] == 'Z':
-                                polar_flag = False
+                    if polar_flag:
+                        content = line.split()
+                        if len(content) != 4:
+                            continue
+                        if content[0] in ['X', 'Y', 'Z']:
+                            polarizability.append(float(content[1]))
+                            polarizability.append(float(content[2]))
+                            polarizability.append(float(content[3]))
+                        if content[0] == 'Z':
+                            polar_flag = False
 
-                    polarizability = np.array(polarizability)
+                polarizability = np.array(polarizability)
 
-                    assert wf_model == ref_data['wf_model']
-                    assert n_rsp_iterations == ref_data['n_rsp_iterations']
-                    assert np.max(
-                        np.abs(polarizability -
-                               ref_data['polarizability'])) < 1.0e-4
+                assert wf_model == ref_data['wf_model']
+                assert n_rsp_iterations == ref_data['n_rsp_iterations']
+                assert np.max(
+                    np.abs(polarizability -
+                           ref_data['polarizability'])) < 1.0e-4
+
+            self.remove_input_and_h5_files(input_file)
 
     def test_input_rhf_lr_polarizability(self, capsys):
 

@@ -15,9 +15,10 @@ class TestSHG:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
-        return scf_drv.scf_tensors
+        return scf_results
 
     def run_shg(self, inpfile, xcfun_label, shg_type, ref_result):
 
@@ -30,12 +31,12 @@ class TestSHG:
         if shg_type is not None:
             task.input_dict['response']['shg_type'] = shg_type
 
-        scf_tensors = self.run_scf(task)
+        scf_results = self.run_scf(task)
 
         shg_prop = SHG(task.input_dict['response'],
                        task.input_dict['method_settings'])
         shg_prop.init_driver(task.mpi_comm, task.ostream)
-        shg_prop.compute(task.molecule, task.ao_basis, scf_tensors)
+        shg_prop.compute(task.molecule, task.ao_basis, scf_results)
         shg_result = shg_prop.rsp_property
 
         if task.mpi_rank == mpi_master():

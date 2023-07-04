@@ -30,12 +30,13 @@ import numpy as np
 import sys
 
 from .veloxchemlib import GridDriver, XCMolecularHessian
-from .veloxchemlib import (mpi_master, bohr_in_angstroms, avogadro_constant,
+from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
+from .dftutils import get_default_grid_level
 
 with redirect_stderr(StringIO()) as fg_err:
     import geometric
@@ -131,20 +132,8 @@ class HessianDriver:
         self.temperature = 298.15
         self.pressure = 1.0
 
-        # TODO: chek if these are needed!
-        # Timing and profiling
-        self.timing = False
-        self.profiling = False
-        self.memory_profiling = False
-        self.memory_tracing = False
-
-        # TODO: DFT with underscore or not?
-        #self._dft = False
-
-        self.checkpoint_file = None
-
-        self._dft = False
-        self.grid_level = 4
+        self.dft = False
+        self.grid_level = None
         self.xcfun = None
 
     def update_settings(self, method_dict, freq_dict=None):
@@ -173,15 +162,15 @@ class HessianDriver:
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self._dft = (key in ['yes', 'y'])
+            self.dft = (key in ['yes', 'y'])
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
-                self._dft = True
+                self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Gradient driver: Undefined XC functional')
+                                'Hessian driver: Undefined XC functional')
 
         if self.do_four_point:
             self.numerical = True
@@ -201,20 +190,10 @@ class HessianDriver:
         if 'xcfun' in method_dict:
             if method_dict['xcfun'] is not None:
                 #self.numerical = True
-                self._dft = True
+                self.dft = True
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self._dft = True if key in ['yes', 'y'] else False
-            #if key in ['yes', 'y']:
-                #self.numerical = True
-
-        # TODO: remove commented out code
-        #if self._dft:
-        #    self.ostream.print_blank()
-        #    warn_msg = '*** Warning: Analytical Hessian is '
-        #    warn_msg += 'not yet fully implemented for DFT methods.'
-        #    self.ostream.print_header(warn_msg.ljust(56))
-        #    self.ostream.flush()
+            self.dft = True if key in ['yes', 'y'] else False
 
         # print vibrational analysis (frequencies and normal modes)
         if 'print_vib_analysis' in freq_dict:
@@ -285,17 +264,15 @@ class HessianDriver:
             The response driver (for excited state vibrational analysis).
         """
 
-        geometric_repo = 'https://github.com/leeping/geomeTRIC.git'
         err_msg = ('The installed geometric package does not support\n' +
                    '  vibrational analysis. Please install the latest\n' +
-                   '  geometric via\n' +
-                   f'  python3 -m pip install git+{geometric_repo}\n')
+                   '  geometric via pip or conda.\n')
         assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-        coords = molecule.get_coordinates().reshape(natm * 3)
+        coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
         self.frequencies, self.normal_modes, gibbs_energy = (
             geometric.normal_modes.frequency_analysis(
@@ -309,12 +286,13 @@ class HessianDriver:
                 normalized=False))
 
         # Diagonalizes Hessian and calculates the reduced masses
-        self.reduced_masses = 1.0 / (np.einsum('ki->i', self.normal_modes.T**2))
+        # einsum 'ki->i'
+        self.reduced_masses = 1.0 / np.sum(self.normal_modes.T**2, axis=0)
 
         # Constants and conversion factors
         c = speed_of_light_in_vacuum_in_SI()
         alpha = fine_structure_constant()
-        bohr_in_km = bohr_in_angstroms() * 1e-13
+        bohr_in_km = bohr_in_angstrom() * 1e-13
         cm_to_m = 1e-2  # centimeters in meters
         N_to_mdyne = 1e+8  # Newton in milli dyne
         m_to_A = 1e+10  # meters in Angstroms
@@ -348,10 +326,13 @@ class HessianDriver:
         # Calculate Raman intensities, if applicable
 
         if self.polarizability_gradient is not None:
-            raman_transmom = np.einsum('xyi,ik->xyk',
-                                       self.polarizability_gradient,
-                                       self.normal_modes.T,
-                                       optimize=True)
+            # einsum 'xyi,ik->xyk'
+            size_x = self.polarizability_gradient.shape[0]
+            size_y = self.polarizability_gradient.shape[1]
+            size_k = self.normal_modes.shape[0]
+            raman_transmom = np.matmul(
+                self.polarizability_gradient.reshape(size_x * size_y, -1),
+                self.normal_modes.T).reshape(size_x, size_y, size_k)
             # Calculate rotational invariants
             alpha_bar = np.zeros((number_of_modes))
             gamma_bar_sq = np.zeros((number_of_modes))
@@ -381,101 +362,75 @@ class HessianDriver:
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
-        valstr = 'Harmonic frequencies (in cm**-1), force constants '
-        valstr += '(in mdyne/A), reduced masses (in amu),'
-        self.ostream.print_header(valstr)
-        if self.ir_intensities is not None:
-            valstr = ' IR intensities (in km/mol),'
-            if self.raman_intensities is not None:
-                valstr += ' Raman scattering activities (in A**4/amu),'
-            self.ostream.print_header(valstr)
+        width = 52
 
-            if (self.raman_intensities is not None and
-                    self.print_depolarization_ratio):
-                valstr = ' parallel and perpendicular Raman '
-                valstr += 'scattering activities,'
-                valstr += ' depolarization ratios,'
-                self.ostream.print_header(valstr)
-        valstr = 'and Cartesian normal mode displacements.'
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-
-        for k in range(0, number_of_modes, 3):
-
-            end = k + 3
-            if k + 3 > number_of_modes:
-
-                end = number_of_modes
+        for k in range(number_of_modes):
 
             # Print indices and frequencies:
-            index_string = '{:17s}'.format('  Index: ')
-            freq_string = '{:17s}'.format('  Frequency: ')
-            mass_string = '{:17s}'.format('  Reduced mass: ')
-            force_cnst_string = '{:17s}'.format('  Force constant:')
-            if self.ir_intensities is not None:
-                ir_intens_string = '{:17s}'.format('  IR intensity:')
-                if self.raman_intensities is not None:
-                    raman_intens_string = '{:17s}'.format('  Raman activ.:')
-                    if self.print_depolarization_ratio:
-                        raman_parallel_str = '{:17s}'.format(
-                            '  Parallel Raman:')
-                        raman_perpendicular_str = '{:17s}'.format(
-                            '  Perp. Raman:')
-                        depolarization_str = '{:17s}'.format('  Depol. ratio:')
+            index_string = '{:22s}{:d}'.format('Vibrational Mode', k + 1)
+            self.ostream.print_header(index_string.ljust(width))
+            self.ostream.print_header('-' * width)
 
-            normal_mode_string = '{:17s}'.format('  Normal mode: ')
-            for i in range(k, end):
-                index_string += '{:^31d}'.format(i + 1)
-                freq_string += '{:^31.2f}'.format(self.frequencies[i])
-                mass_string += '{:^31.4f}'.format(self.reduced_masses[i])
-                force_cnst_string += '{:^31.4f}'.format(self.force_constants[i])
-                if self.ir_intensities is not None:
-                    ir_intens_string += '{:^31.4f}'.format(
-                        self.ir_intensities[i])
-                    if self.raman_intensities is not None:
-                        raman_intens_string += '{:^31.4f}'.format(
-                            self.raman_intensities[i])
-                        if self.print_depolarization_ratio:
-                            raman_parallel_str += '{:^31.4f}'.format(int_pol[i])
-                            raman_perpendicular_str += '{:^31.4f}'.format(
-                                int_depol[i])
-                            depolarization_str += '{:^31.4f}'.format(
-                                depol_ratio[i])
+            freq_string = '{:22s}{:20.2f}  {:8s}'.format(
+                'Harmonic frequency:', self.frequencies[k], 'cm**-1')
+            self.ostream.print_header(freq_string.ljust(width))
 
-                normal_mode_string += '{:^30s}{:>1s}'.format(
-                    'X         Y         Z', '|')
-            self.ostream.print_line(index_string)
-            self.ostream.print_line(freq_string)
-            self.ostream.print_line(force_cnst_string)
-            self.ostream.print_line(mass_string)
+            mass_string = '{:22s}{:20.4f}  {:8s}'.format(
+                'Reduced mass:', self.reduced_masses[k], 'amu')
+            self.ostream.print_header(mass_string.ljust(width))
+
+            force_cnst_string = '{:22s}{:20.4f}  {:8s}'.format(
+                'Force constant:', self.force_constants[k], 'mdyne/A')
+            self.ostream.print_header(force_cnst_string.ljust(width))
+
             if self.ir_intensities is not None:
-                self.ostream.print_line(ir_intens_string)
+                ir_intens_string = '{:22s}{:20.4f}  {:8s}'.format(
+                    'IR intensity:', self.ir_intensities[k], 'km/mol')
+                self.ostream.print_header(ir_intens_string.ljust(width))
+
                 if self.raman_intensities is not None:
-                    self.ostream.print_line(raman_intens_string)
+                    raman_intens_string = '{:22s}{:20.4f}  {:8s}'.format(
+                        'Raman activity:', self.raman_intensities[k],
+                        'A**4/amu')
+                    self.ostream.print_header(raman_intens_string.ljust(width))
+
                     if self.print_depolarization_ratio:
-                        self.ostream.print_line(raman_parallel_str)
-                        self.ostream.print_line(raman_perpendicular_str)
-                        self.ostream.print_line(depolarization_str)
-            self.ostream.print_line(normal_mode_string)
+                        raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
+                            'Parallel Raman:', int_pol[k], 'A**4/amu')
+                        self.ostream.print_header(
+                            raman_parallel_str.ljust(width))
+
+                        raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
+                            'Perpendicular Raman:', int_depol[k], 'A**4/amu')
+                        self.ostream.print_header(
+                            raman_perpendicular_str.ljust(width))
+
+                        depolarization_str = '{:22s}{:20.4f}'.format(
+                            'Depolarization ratio:', depol_ratio[k])
+                        self.ostream.print_header(
+                            depolarization_str.ljust(width))
+
+            normal_mode_string = '{:22s}'.format('Normal mode:')
+            self.ostream.print_header(normal_mode_string.ljust(width))
+
+            normal_mode_string = '{:16s}{:>12s}{:>12s}{:>12s}'.format(
+                '', 'X', 'Y', 'Z')
+            self.ostream.print_header(normal_mode_string.ljust(width))
 
             # Print normal modes:
             for atom_index in range(natoms):
-                valstr = '{:17s}'.format('  ' + str(atom_index + 1) + ' ' +
-                                         atom_symbol[atom_index])
-
-                for j in range(k, end):
-                    valstr += '{:^10.4f}'.format(
-                        self.normal_modes[j][3 * atom_index])  # X
-                    valstr += '{:^10.4f}'.format(
-                        self.normal_modes[j][3 * atom_index + 1])  # Y
-                    valstr += '{:^10.4f}{:>1s}'.format(
-                        self.normal_modes[j][3 * atom_index + 2], '|')  # Z
-                self.ostream.print_line(valstr)
+                valstr = '{:<8d}'.format(atom_index + 1)
+                valstr += '{:<8s}'.format(atom_symbol[atom_index])
+                valstr += '{:12.4f}'.format(
+                    self.normal_modes[k][atom_index * 3 + 0])
+                valstr += '{:12.4f}'.format(
+                    self.normal_modes[k][atom_index * 3 + 1])
+                valstr += '{:12.4f}'.format(
+                    self.normal_modes[k][atom_index * 3 + 2])
+                self.ostream.print_header(valstr.ljust(width))
 
             self.ostream.print_blank()
-
-        self.ostream.print_blank()
+            self.ostream.print_blank()
 
         self.ostream.flush()
 
@@ -491,6 +446,7 @@ class HessianDriver:
         :return:
             The nuclear contribution to the Hessian.
         """
+
         # number of atoms
         natm = molecule.number_of_atoms()
 
@@ -498,7 +454,7 @@ class HessianDriver:
         nuc_contrib = np.zeros((natm, natm, 3, 3))
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
         nuclear_charges = molecule.elem_ids_to_numpy()
@@ -551,7 +507,9 @@ class HessianDriver:
         xc_mol_hess = XCMolecularHessian(self.comm)
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         exc_hessian = xc_mol_hess.integrate_vxc_hessian(molecule, basis,
@@ -588,7 +546,9 @@ class HessianDriver:
         xc_mol_hess = XCMolecularHessian(self.comm)
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         vxc_grad_atom = xc_mol_hess.integrate_vxc_fock_gradient(

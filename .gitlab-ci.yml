@@ -86,7 +86,8 @@ monkey:cmake_build:
   artifacts:
     paths:
       - build
-    expire_in: 12 hours
+    #expire_in: 12 hours
+    expire_in: 2 days
 
 monkey:unit_tests:
   extends: .monkey:setup
@@ -106,7 +107,8 @@ monkey:pip_install:
   artifacts:
     paths:
       - venv
-    expire_in: 12 hours
+    #expire_in: 12 hours
+    expire_in: 2 days
 
 monkey:python_tests:
   extends: .monkey:conf

@@ -17,7 +17,7 @@ class TestCoreExcitation:
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
         """
-        molecule = Molecule.read_str(water_xyz, units='au')
+        molecule = Molecule.read_molecule_string(water_xyz, units='au')
         basis = MolecularBasis.read(molecule, 'def2-svpd', ostream=None)
         xcfun_label = 'b3lyp'
 

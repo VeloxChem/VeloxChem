@@ -32,6 +32,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import parse_xc_func
 from .outputstream import OutputStream
 from .molecule import Molecule
+from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
 
 
@@ -39,8 +40,6 @@ class GradientDriver:
     """
     Implements gradient driver.
 
-    :param energy_drv:
-        The energy driver.
     :param comm:
         The MPI communicator.
     :param ostream:
@@ -57,25 +56,19 @@ class GradientDriver:
         - xcfun: The XC functional.
     """
 
-    def __init__(self, energy_drv, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
 
         if comm is None:
-            if hasattr(energy_drv, 'comm'):
-                comm = energy_drv.comm
-            else:
-                comm = MPI.COMM_WORLD
+            comm = MPI.COMM_WORLD
 
         if ostream is None:
-            if hasattr(energy_drv, 'ostream'):
-                ostream = energy_drv.ostream
+            if comm.Get_rank() == mpi_master():
+                ostream = OutputStream(sys.stdout)
             else:
-                if comm.Get_rank() == mpi_master():
-                    ostream = OutputStream(sys.stdout)
-                else:
-                    ostream = OutputStream(None)
+                ostream = OutputStream(None)
 
         self.comm = comm
         self.rank = self.comm.Get_rank()
@@ -89,8 +82,8 @@ class GradientDriver:
         self.numerical = False
         self.do_four_point = False
 
-        self._dft = False
-        self.grid_level = 4
+        self.dft = False
+        self.grid_level = None
         self.xcfun = None
 
         self.checkpoint_file = None
@@ -119,12 +112,12 @@ class GradientDriver:
 
         if 'dft' in method_dict:
             key = method_dict['dft'].lower()
-            self._dft = (key in ['yes', 'y'])
+            self.dft = (key in ['yes', 'y'])
         if 'grid_level' in method_dict:
             self.grid_level = int(method_dict['grid_level'])
         if 'xcfun' in method_dict:
             if 'dft' not in method_dict:
-                self._dft = True
+                self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
                                 'Gradient driver: Undefined XC functional')
@@ -158,7 +151,11 @@ class GradientDriver:
         labels = molecule.get_labels()
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
+
+        # charge and spin multiplicity
+        charge = molecule.get_charge()
+        multiplicity = molecule.get_multiplicity()
 
         # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
@@ -167,19 +164,27 @@ class GradientDriver:
             for d in range(3):
                 coords[i, d] += self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
+                new_mol.set_charge(charge)
+                new_mol.set_multiplicity(multiplicity)
                 e_plus = self.compute_energy(new_mol, *args)
 
                 coords[i, d] -= 2.0 * self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
+                new_mol.set_charge(charge)
+                new_mol.set_multiplicity(multiplicity)
                 e_minus = self.compute_energy(new_mol, *args)
 
                 if self.do_four_point:
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
                     e_minus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] += 4.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
                     e_plus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] -= 2.0 * self.delta_h
@@ -230,7 +235,9 @@ class GradientDriver:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
@@ -263,7 +270,9 @@ class GradientDriver:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
@@ -299,7 +308,9 @@ class GradientDriver:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xc_molgrad_drv = XCMolecularGradient(self.comm)
@@ -333,7 +344,9 @@ class GradientDriver:
         """
 
         grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
+        grid_level = (get_default_grid_level(self.xcfun)
+                      if self.grid_level is None else self.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         xcgrad_drv = XCMolecularGradient(self.comm)
@@ -371,7 +384,7 @@ class GradientDriver:
         nuc_contrib = np.zeros((natm, 3))
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
         nuclear_charges = molecule.elem_ids_to_numpy()
@@ -502,7 +515,7 @@ class GradientDriver:
             self.ostream.print_header(cur_str2.ljust(str_width))
             self.ostream.print_header(cur_str3.ljust(str_width))
 
-        if self._dft:
+        if self.dft:
             cur_str = 'DFT Functional              : '
             cur_str += self.xcfun.get_func_label()
             self.ostream.print_header(cur_str.ljust(str_width))

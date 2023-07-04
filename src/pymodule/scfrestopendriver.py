@@ -29,8 +29,8 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import (molorb, fockmat)
-from .veloxchemlib import (XCFunctional, MolecularGrid)
+from .veloxchemlib import molorb, fockmat
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .molecularorbitals import MolecularOrbitals
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -146,7 +146,7 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         return diff_den
 
-    def _store_diis_data(self, fock_mat, den_mat, e_grad):
+    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
         """
         Stores spin restricted open shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
@@ -155,38 +155,35 @@ class ScfRestrictedOpenDriver(ScfDriver):
             The Fock/Kohn-Sham matrix.
         :param den_mat:
             The density matrix.
+        :param ovl_mat:
+            The overlap matrix (used in ROSCF).
         :param e_grad:
             The electronic gradient.
         """
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and e_grad < self.diis_thresh:
 
-            if e_grad < self.diis_thresh:
+            if len(self._fock_matrices_alpha) == self.max_err_vecs:
+                self._fock_matrices_alpha.popleft()
+                self._fock_matrices_beta.popleft()
+                self._fock_matrices_proj.popleft()
 
-                if len(self._fock_matrices) == self.max_err_vecs:
+                self._density_matrices_alpha.popleft()
+                self._density_matrices_beta.popleft()
 
-                    self._fock_matrices.popleft()
-                    self._den_matrices.popleft()
+            self._fock_matrices_alpha.append(fock_mat.alpha_to_numpy(0))
+            self._fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
+            self._fock_matrices_proj.append(
+                self.get_projected_fock(
+                    fock_mat.alpha_to_numpy(0),
+                    fock_mat.beta_to_numpy(0),
+                    den_mat.alpha_to_numpy(0),
+                    den_mat.beta_to_numpy(0),
+                    ovl_mat.to_numpy(),
+                ))
 
-                    self._fock_matrices_beta.popleft()
-                    self._den_matrices_beta.popleft()
-
-                    self._fock_matrices_proj.popleft()
-
-                self._fock_matrices.append(fock_mat.alpha_to_numpy(0))
-                self._den_matrices.append(den_mat.alpha_to_numpy(0))
-
-                self._fock_matrices_beta.append(fock_mat.beta_to_numpy(0))
-                self._den_matrices_beta.append(den_mat.beta_to_numpy(0))
-
-                self._fock_matrices_proj.append(
-                    self.get_projected_fock(
-                        fock_mat.alpha_to_numpy(0),
-                        fock_mat.beta_to_numpy(0),
-                        den_mat.alpha_to_numpy(0),
-                        den_mat.beta_to_numpy(0),
-                        self.scf_tensors['S'],
-                    ))
+            self._density_matrices_alpha.append(den_mat.alpha_to_numpy(0))
+            self._density_matrices_beta.append(den_mat.beta_to_numpy(0))
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
@@ -207,17 +204,17 @@ class ScfRestrictedOpenDriver(ScfDriver):
 
         if self.rank == mpi_master():
 
-            if len(self._fock_matrices) == 1:
+            if len(self._fock_matrices_alpha) == 1:
                 return self._fock_matrices_proj[0]
 
-            if len(self._fock_matrices) > 1:
+            if len(self._fock_matrices_alpha) > 1:
 
                 acc_diis = CTwoDiis()
 
                 acc_diis.compute_error_vectors_restricted_openshell(
-                    self._fock_matrices, self._fock_matrices_beta,
-                    self._den_matrices, self._den_matrices_beta, ovl_mat,
-                    oao_mat)
+                    self._fock_matrices_alpha, self._fock_matrices_beta,
+                    self._density_matrices_alpha, self._density_matrices_beta,
+                    ovl_mat, oao_mat)
 
                 weights = acc_diis.compute_weights()
 

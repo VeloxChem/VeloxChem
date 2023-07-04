@@ -67,7 +67,7 @@ class TestXCMolHess:
         basis_set_label = 'def2-svp'
         xcfun_label = 'slater'
 
-        molecule = Molecule.read_str(molecule_string, units=units)
+        molecule = Molecule.read_molecule_string(molecule_string, units=units)
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         here = Path(__file__).parent
@@ -95,7 +95,7 @@ class TestXCMolHess:
         basis_set_label = 'def2-svp'
         xcfun_label = 'blyp'
 
-        molecule = Molecule.read_str(molecule_string, units=units)
+        molecule = Molecule.read_molecule_string(molecule_string, units=units)
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         here = Path(__file__).parent

@@ -767,7 +767,19 @@ generatePairDensityForLDA(double*               rho,
                 }
             }
         }
+
+        // To prevent numerical issues, enforce that -0.5*rho^2 < pi < 0.5*rho^2
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            auto bound = 0.5 * rho[2 * g + 0] * rho[2 * g + 0];
+
+            rho[2 * g + 1] = std::min(rho[2 * g + 1], bound);
+
+            rho[2 * g + 1] = std::max(rho[2 * g + 1], -bound);
+        }
     }
+
 
     timer.stop("Density grid rho");
 }
@@ -914,6 +926,17 @@ generatePairDensityForGGA(double*               rho,
                     }
                 }
             }
+        }
+
+        // To prevent numerical issues, enforce that -0.5*rho^2 < pi < 0.5*rho^2
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        {
+            auto bound = 0.5 * rho[2 * g + 0] * rho[2 * g + 0];
+
+            rho[2 * g + 1] = std::min(rho[2 * g + 1], bound);
+
+            rho[2 * g + 1] = std::max(rho[2 * g + 1], -bound);
         }
 
         if (sigma != nullptr)

@@ -1,6 +1,5 @@
 from pathlib import Path
 import numpy as np
-import tempfile
 
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.cubicgrid import CubicGrid
@@ -8,6 +7,7 @@ from veloxchem.visualizationdriver import VisualizationDriver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecule import Molecule
+from veloxchem.inputparser import get_random_string_parallel
 
 
 class TestVisualization:
@@ -35,7 +35,9 @@ class TestVisualization:
                         'alpha')
 
         points = [[0.3 + 1.0 * ix, 0.6 + 1.0 * iy, 0.9 + 1.0 * iz]
-                  for ix in range(2) for iy in range(3) for iz in range(3)]
+                  for ix in range(2)
+                  for iy in range(3)
+                  for iz in range(3)]
         mo_val = vis_drv.get_mo(points, task.molecule, task.ao_basis, mol_orbs,
                                 homo, 'alpha')
 
@@ -120,7 +122,7 @@ class TestVisualization:
             H   0.0   1.4   1.1
             H   0.0  -1.4   1.1
         """
-        mol = Molecule.read_str(mol_str, units='bohr')
+        mol = Molecule.read_molecule_string(mol_str, units='bohr')
         num_points = [2, 3, 5]
 
         vis_drv = VisualizationDriver()
@@ -142,31 +144,36 @@ class TestVisualization:
         mol_orbs.broadcast(task.mpi_rank, task.mpi_comm)
         density.broadcast(task.mpi_rank, task.mpi_comm)
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            dens_cube_fname = str(Path(temp_dir, 'density.cube'))
-            homo_cube_fname = str(Path(temp_dir, 'homo.cube'))
+        here = Path(__file__).parent
+        random_string = get_random_string_parallel()
+        dens_cube_fpath = here / 'inputs' / f'vlx_dens_{random_string}.cube'
+        homo_cube_fpath = here / 'inputs' / f'vlx_homo_{random_string}.cube'
 
-            cube_dict = {
-                'grid': '2, 3, 5',
-                'cubes': 'density(alpha), mo(homo)',
-                'files': f'{dens_cube_fname}, {homo_cube_fname}',
-            }
+        dens_cube_fname = str(dens_cube_fpath)
+        homo_cube_fname = str(homo_cube_fpath)
 
-            vis_drv = VisualizationDriver()
-            vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
-                              density)
+        cube_dict = {
+            'grid': '2, 3, 5',
+            'cubes': 'density(alpha), mo(homo)',
+            'files': f'{dens_cube_fname}, {homo_cube_fname}',
+        }
 
-            cubic_grid = vis_drv.gen_cubic_grid(task.molecule, [2, 3, 5])
+        vis_drv = VisualizationDriver()
+        vis_drv.gen_cubes(cube_dict, task.molecule, task.ao_basis, mol_orbs,
+                          density)
 
-            vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, density,
-                            0, 'alpha')
-            if is_mpi_master(task.mpi_comm):
-                read_grid = CubicGrid.read_cube(dens_cube_fname)
-                assert read_grid.compare(cubic_grid) < 1e-6
+        cubic_grid = vis_drv.gen_cubic_grid(task.molecule, [2, 3, 5])
 
-            vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mol_orbs,
-                            task.molecule.number_of_alpha_electrons() - 1,
-                            'alpha')
-            if is_mpi_master(task.mpi_comm):
-                read_grid = CubicGrid.read_cube(homo_cube_fname)
-                assert read_grid.compare(cubic_grid) < 1e-6
+        vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, density, 0,
+                        'alpha')
+        if is_mpi_master(task.mpi_comm):
+            read_grid = CubicGrid.read_cube(dens_cube_fname)
+            assert read_grid.compare(cubic_grid) < 1e-6
+            dens_cube_fpath.unlink()
+
+        vis_drv.compute(cubic_grid, task.molecule, task.ao_basis, mol_orbs,
+                        task.molecule.number_of_alpha_electrons() - 1, 'alpha')
+        if is_mpi_master(task.mpi_comm):
+            read_grid = CubicGrid.read_cube(homo_cube_fname)
+            assert read_grid.compare(cubic_grid) < 1e-6
+            homo_cube_fpath.unlink()

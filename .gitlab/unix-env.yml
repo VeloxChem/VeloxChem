@@ -15,6 +15,6 @@ dependencies:
   - psutil
   - pybind11
   - pytest
-  - python>=3.7
+  - python>=3.8
   - requests
   - xtb

@@ -52,6 +52,8 @@ def get_pyscf_integral_type(int_type):
             "kinetic_energy"                                : "int1e_kin",
             "nuclear_attraction"                            : "int1e_nuc",
             "electric_dipole"                               : "int1e_r",
+            "electric_quadrupole"                           : "int1e_rr",
+            "electric_octupole"                             : "int1e_rrr",
             "electron_repulsion"                            : "int2e",
             "electron_repulsion_erf"                        : "int2e", #_coulerf
             "overlap_derivative"                            : "int1e_ipovlp",
@@ -326,9 +328,10 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
     pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
 
     # Transform integral to veloxchem format
-    if pyscf_int_type in ["int1e_r"]:
-        vlx_int = np.zeros_like(pyscf_int) 
-        for x in range(3):
+    if pyscf_int_type in ["int1e_r", "int1e_rr", "int1e_rrr"]:
+        vlx_int = np.zeros_like(pyscf_int)
+        dof = vlx_int.shape[0]
+        for x in range(dof):
             vlx_int[x] = ao_matrix_to_veloxchem(
                                  DenseMatrix(pyscf_int[x]),
                                  basis, molecule).to_numpy()
@@ -366,14 +369,14 @@ def import_1e_integral(molecule, basis, int_type, atom1=1, shell1=None,
         raise ValueError("Atom or shell(s) not found.", atom2, shell2)
     
 
-    if pyscf_int_type in ["int1e_r"]:
-        vlx_int_block = np.zeros((3, len(rows), len(columns)))
+    if pyscf_int_type in ["int1e_r", "int1e_rr", "int1e_rrr"]:
+        vlx_int_block = np.zeros((dof, len(rows), len(columns)))
     else:
         vlx_int_block = np.zeros((len(rows), len(columns)))
     
     for i in range(len(rows)):
         for j in range(len(columns)):
-            if pyscf_int_type in ["int1e_r"]:
+            if pyscf_int_type in ["int1e_r", "int1e_rr", "int1e_rrr"]:
                 vlx_int_block[:,i,j] = vlx_int[:, rows[i], columns[j]] 
             else:
                 vlx_int_block[i,j] = vlx_int[rows[i], columns[j]]

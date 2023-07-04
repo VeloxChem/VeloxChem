@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from veloxchem.mpitask import MpiTask
 from veloxchem.optimizationdriver import OptimizationDriver
-from veloxchem.veloxchemlib import bohr_in_angstroms, is_mpi_master
+from veloxchem.veloxchemlib import bohr_in_angstrom, is_mpi_master
 from veloxchem.xtbdriver import XtbDriver
 from veloxchem.xtbgradientdriver import XtbGradientDriver
 
@@ -26,17 +26,17 @@ class TestOptimizeXTB:
         xtb_drv.set_method(xtb_method.lower())
         xtb_drv.compute(task.molecule, task.ostream)
 
-        grad_drv = XtbGradientDriver(xtb_drv, task.mpi_comm, task.ostream)
+        grad_drv = XtbGradientDriver(task.mpi_comm, task.ostream)
         opt_drv = OptimizationDriver(grad_drv)
         opt_drv.update_settings({
             'coordsys': 'tric',
             'filename': task.input_dict['filename'],
             'keep_files': 'no',
         })
-        opt_mol = opt_drv.compute(task.molecule)
+        opt_mol = opt_drv.compute(task.molecule, xtb_drv)
 
         if is_mpi_master(task.mpi_comm):
-            opt_coords = opt_mol.get_coordinates()
+            opt_coords = opt_mol.get_coordinates_in_bohr()
             assert np.max(np.abs(opt_coords - ref_coords)) < 1.0e-6
 
             inpfile = Path(inpfile)
@@ -59,6 +59,6 @@ class TestOptimizeXTB:
             [-1.950824053259, 2.616502833048, 0.030950778306],
             [-2.483737817114, 1.273354861268, 0.795720974820],
             [-2.523925592999, 1.354865673454, -0.836657036245],
-        ]) / bohr_in_angstroms()
+        ]) / bohr_in_angstrom()
 
         self.run_opt(inpfile, xtb_method, ref_coords)

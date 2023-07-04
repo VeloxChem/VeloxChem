@@ -171,7 +171,7 @@ class TestOneInts:
 
         # one molecule, one basis set
 
-        mol_1 = Molecule.read_xyz(h2ofile)
+        mol_1 = Molecule.read_xyz_file(h2ofile)
         bas_1 = MolecularBasis.read(mol_1, 'def2-svp', ostream=None)
 
         S11 = ovldrv.compute(mol_1, bas_1)
@@ -199,7 +199,7 @@ class TestOneInts:
 
         # one molecule, two basis sets
 
-        mol_1 = Molecule.read_xyz(h2ofile)
+        mol_1 = Molecule.read_xyz_file(h2ofile)
         bas_1 = MolecularBasis.read(mol_1, 'def2-svp', ostream=None)
         bas_2 = MolecularBasis.read(mol_1, 'cc-pvdz', ostream=None)
 
@@ -225,8 +225,8 @@ class TestOneInts:
 
         # two molecules, one basis set
 
-        mol_1 = Molecule.read_xyz(h2ofile)
-        mol_2 = Molecule.read_xyz(nh3file)
+        mol_1 = Molecule.read_xyz_file(h2ofile)
+        mol_2 = Molecule.read_xyz_file(nh3file)
         mol = Molecule(mol_1, mol_2)
         bas = MolecularBasis.read(mol, 'def2-svp', ostream=None)
 
@@ -252,8 +252,8 @@ class TestOneInts:
 
         # two molecules, two basis sets
 
-        mol_1 = Molecule.read_xyz(h2ofile)
-        mol_2 = Molecule.read_xyz(nh3file)
+        mol_1 = Molecule.read_xyz_file(h2ofile)
+        mol_2 = Molecule.read_xyz_file(nh3file)
         mol = Molecule(mol_1, mol_2)
         bas_1 = MolecularBasis.read(mol_1, 'def2-svp', ostream=None)
         bas_2 = MolecularBasis.read(mol_2, 'cc-pvdz', ostream=None)

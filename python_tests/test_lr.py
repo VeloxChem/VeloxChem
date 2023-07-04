@@ -1,7 +1,6 @@
 from pathlib import Path
+from random import choice
 import numpy as np
-import tempfile
-import random
 import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -9,6 +8,7 @@ from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.lrsolver import LinearResponseSolver
+from veloxchem.inputparser import get_random_string_serial
 
 from .addons import using_cppe
 
@@ -21,9 +21,10 @@ class TestLR:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
-        return scf_drv.scf_tensors
+        return scf_results
 
     def run_lr(self, inpfile, potfile, xcfun_label, raw_data):
 
@@ -36,7 +37,7 @@ class TestLR:
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
-        scf_tensors = self.run_scf(task)
+        scf_results = self.run_scf(task)
 
         ref_freqs = [0.0, 0.05, 0.1]
         ref_freqs_str = [str(x) for x in ref_freqs]
@@ -46,15 +47,17 @@ class TestLR:
         lr_drv.update_settings(
             {
                 'frequencies': ','.join(ref_freqs_str),
-                'batch_size': random.choice([1, 10, 100])
+                'batch_size': choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+        lr_results = lr_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         if is_mpi_master(task.mpi_comm):
             self.check_printout(lr_drv, lr_results)
             prop = np.array([
-                -lr_results['response_functions'][(a, b, w)] for w in ref_freqs
-                for a in 'xyz' for b in 'xyz'
+                -lr_results['response_functions'][(a, b, w)]
+                for w in ref_freqs
+                for a in 'xyz'
+                for b in 'xyz'
             ])
             assert np.max(np.abs(prop - ref_prop)) < 1.0e-4
 
@@ -68,26 +71,30 @@ class TestLR:
         lr_vals = [v[1] for v in sorted(lr_vals)]
         lr_vals = np.array(lr_vals)
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fname = str(Path(temp_dir, 'lr.out'))
+        here = Path(__file__).parent
+        random_string = get_random_string_serial()
+        fpath = here / 'inputs' / f'vlx_printout_lr_{random_string}.out'
 
-            ostream = OutputStream(fname)
-            lr_drv._print_results(lr_results, ostream)
-            ostream.close()
+        ostream = OutputStream(fpath)
+        lr_drv._print_results(rsp_func, ostream)
+        ostream.close()
 
-            with open(fname, 'r') as f_out:
-                lines = f_out.readlines()
+        with fpath.open('r') as f_out:
+            lines = f_out.readlines()
 
-            print_vals = []
-            for line in lines:
-                content = line.split()
-                if len(content) == 4 and content[0] in ['X', 'Y', 'Z']:
-                    print_vals.append(float(content[1]))
-                    print_vals.append(float(content[2]))
-                    print_vals.append(float(content[3]))
-            print_vals = np.array(print_vals)
+        print_vals = []
+        for line in lines:
+            content = line.split()
+            if len(content) == 4 and content[0] in ['X', 'Y', 'Z']:
+                print_vals.append(float(content[1]))
+                print_vals.append(float(content[2]))
+                print_vals.append(float(content[3]))
+        print_vals = np.array(print_vals)
 
-            assert np.max(np.abs(lr_vals - print_vals)) < 1e-6
+        assert np.max(np.abs(lr_vals - print_vals)) < 1e-6
+
+        if fpath.is_file():
+            fpath.unlink()
 
     def test_lr_hf(self):
 

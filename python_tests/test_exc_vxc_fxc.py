@@ -28,18 +28,18 @@ class TestExcVxc:
         grid_level = 1
         tol = 1.0e-10
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
         gs_density = scf_drv.density
 
         if scf_drv.rank == 0:
-            mo = scf_drv.scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             nvir = mo.shape[1] - nocc
             mo_occ = mo[:, :nocc]
@@ -98,7 +98,7 @@ class TestExcVxc:
             Gmat = gto * gw * vrho_a
 
             Vxcmat = np.matmul(gto, Gmat.T)
-            assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
+            assert np.max(np.abs(Vxcmat - vxc.alpha_to_numpy())) < tol
 
             fxc = xc_drv.compute_fxc_for_lda(xcfun_label, rho)
             v2rho2_a_a = fxc['v2rho2'][:, 0]
@@ -130,18 +130,18 @@ class TestExcVxc:
         grid_level = 1
         tol = 1.0e-10
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
         gs_density = scf_drv.density
 
         if scf_drv.rank == 0:
-            mo = scf_drv.scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             nvir = mo.shape[1] - nocc
             mo_occ = mo[:, :nocc]
@@ -229,7 +229,7 @@ class TestExcVxc:
 
             Vxcmat_gga = np.matmul(gto, Gmat_gga.T)
             Vxcmat = np.matmul(gto, Gmat.T) + Vxcmat_gga + Vxcmat_gga.T
-            assert np.max(np.abs(Vxcmat - vxc.get_matrix().to_numpy())) < tol
+            assert np.max(np.abs(Vxcmat - vxc.alpha_to_numpy())) < tol
 
             fxc = xc_drv.compute_fxc_for_gga(xcfun_label, rho, sigma)
             v2rho2_a_a = fxc['v2rho2'][:, 0]

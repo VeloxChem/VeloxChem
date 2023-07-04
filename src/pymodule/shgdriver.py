@@ -30,7 +30,7 @@ import time
 import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master, hartree_in_wavenumbers
+from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
@@ -38,6 +38,8 @@ from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
 from .firstorderprop import FirstOrderProperties
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_distributed_focks
 from .checkpoint import read_distributed_focks
@@ -92,7 +94,7 @@ class ShgDriver(NonlinearSolver):
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
-        self.damping = 1000.0 / hartree_in_wavenumbers()
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         self.a_operator = 'dipole'
         self.b_operator = 'dipole'
@@ -148,11 +150,14 @@ class ShgDriver(NonlinearSolver):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
-        # double check SCF information
-        self._check_scf_results(scf_tensors)
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check_nonlinrsp()
+        dft_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': self.timing,
@@ -224,8 +229,10 @@ class ShgDriver(NonlinearSolver):
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('xyz', a_grad) for w in wa}
-            B = {(op, w): v for op, v in zip('xyz', b_grad)
-                 for w in self.frequencies}
+            B = {
+                (op, w): v for op, v in zip('xyz', b_grad)
+                for w in self.frequencies
+            }
 
             AB.update(A)
             AB.update(B)
@@ -261,14 +268,14 @@ class ShgDriver(NonlinearSolver):
 
         self._is_converged = N_drv.is_converged
 
-        kX = N_results['kappas']
+        Nx = N_results['solutions']
         Focks = N_results['focks']
 
         profiler.check_memory_usage('CPP')
 
         # Compute the isotropic parallel beta vector
 
-        beta = self.compute_quad_components(Focks, freqpairs, X, d_a_mo, kX,
+        beta = self.compute_quad_components(Focks, freqpairs, X, d_a_mo, Nx,
                                             self.comp, scf_tensors, molecule,
                                             ao_basis, profiler)
 
@@ -360,7 +367,7 @@ class ShgDriver(NonlinearSolver):
         else:
             return None
 
-    def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
+    def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, Nx, track,
                                 scf_tensors, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to compute the isotropic quadratic
@@ -372,8 +379,9 @@ class ShgDriver(NonlinearSolver):
             A dictonary of matricies containing all the dipole integrals
         :param d_a_mo:
             The SCF density in MO basis
-        :param kX:
-            A dictonary containing all the response matricies
+        :param Nx:
+            A dictonary containing all the response vectors in distributed
+            form.
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
@@ -403,12 +411,8 @@ class ShgDriver(NonlinearSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
 
         # computing all compounded first-order densities
-        if self.rank == mpi_master():
-            first_order_dens, second_order_dens = self.get_densities(
-                freqpairs, kX, mo, nocc)
-        else:
-            first_order_dens = None
-            second_order_dens = None
+        first_order_dens, second_order_dens = self.get_densities(
+            freqpairs, Nx, mo, nocc, norb)
 
         profiler.check_memory_usage('Densities')
 
@@ -419,26 +423,35 @@ class ShgDriver(NonlinearSolver):
 
         profiler.check_memory_usage('Focks')
 
-        e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc, norb)
+        e3_dict = self.get_e3(freqpairs, Nx, fock_dict, Focks, nocc, norb)
 
         profiler.check_memory_usage('E[3]')
 
         beta = {}
 
-        if self.rank == mpi_master():
+        for (wb, wc) in freqpairs:
 
-            for (wb, wc) in freqpairs:
+            Na = {
+                'x': ComplexResponse.get_full_solution_vector(Nx[('x',
+                                                                  (wb + wc))]),
+                'y': ComplexResponse.get_full_solution_vector(Nx[('y',
+                                                                  (wb + wc))]),
+                'z': ComplexResponse.get_full_solution_vector(Nx[('z',
+                                                                  (wb + wc))]),
+            }
 
-                Na = {
-                    'x': self.complex_lrmat2vec(kX[('x', wb + wc)], nocc, norb),
-                    'y': self.complex_lrmat2vec(kX[('y', wb + wc)], nocc, norb),
-                    'z': self.complex_lrmat2vec(kX[('z', wb + wc)], nocc, norb),
-                }
+            Nb = {
+                'x': ComplexResponse.get_full_solution_vector(Nx[('x', wb)]),
+                'y': ComplexResponse.get_full_solution_vector(Nx[('y', wb)]),
+                'z': ComplexResponse.get_full_solution_vector(Nx[('z', wb)]),
+            }
 
-                Nb = {
-                    'x': self.complex_lrmat2vec(kX[('x', wb)], nocc, norb),
-                    'y': self.complex_lrmat2vec(kX[('y', wb)], nocc, norb),
-                    'z': self.complex_lrmat2vec(kX[('z', wb)], nocc, norb),
+            if self.rank == mpi_master():
+
+                kX = {
+                    ('x', wb): self.complex_lrvec2mat(Nb['x'], nocc, norb),
+                    ('y', wb): self.complex_lrvec2mat(Nb['y'], nocc, norb),
+                    ('z', wb): self.complex_lrvec2mat(Nb['z'], nocc, norb),
                 }
 
                 NaE3NbNc = {'x': 0.0, 'y': 0.0, 'z': 0.0}
@@ -492,18 +505,21 @@ class ShgDriver(NonlinearSolver):
 
         return beta
 
-    def get_densities(self, freqpairs, kX, mo, nocc):
+    def get_densities(self, freqpairs, Nx, mo, nocc, norb):
         """
         Computes the densities needed for the perturbed Fock matrices.
 
         :param freqpairs:
             A list of the frequency pairs
-        :param kX:
-            A dictonary with all the first-order response matrices
+        :param Nx:
+            A dictonary with all the first-order response vectors in
+            distributed form
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
             Number of occupied orbitals
+        :param norb:
+            Number of orbitals
 
         :return:
             first_order_dens:
@@ -512,82 +528,116 @@ class ShgDriver(NonlinearSolver):
              A list of first-order two-time tranformed compounded densities
         """
 
-        first_order_dens = []
-        second_order_dens = []
+        distributed_density_1 = None
+        distributed_density_2 = None
 
         for (wb, wc) in freqpairs:
 
-            k_x = kX[('x', wb)]
-            k_y = kX[('y', wb)]
-            k_z = kX[('z', wb)]
+            nx = ComplexResponse.get_full_solution_vector(Nx[('x', wb)])
+            ny = ComplexResponse.get_full_solution_vector(Nx[('y', wb)])
+            nz = ComplexResponse.get_full_solution_vector(Nx[('z', wb)])
 
-            # create the first order single indexed densiteies #
+            if self.rank == mpi_master():
 
-            D_x = self.commut_mo_density(k_x, nocc)
-            D_y = self.commut_mo_density(k_y, nocc)
-            D_z = self.commut_mo_density(k_z, nocc)
+                k_x = self.complex_lrvec2mat(nx, nocc, norb)
+                k_y = self.complex_lrvec2mat(ny, nocc, norb)
+                k_z = self.complex_lrvec2mat(nz, nocc, norb)
 
-            # create the first order two indexed densities #
+                # create the first order single indexed densiteies #
 
-            D_sig_x = 4 * self.commut(k_x, D_x)
-            D_sig_x += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
-                            self.commut(k_z, D_z))
+                D_x = self.commut_mo_density(k_x, nocc)
+                D_y = self.commut_mo_density(k_y, nocc)
+                D_z = self.commut_mo_density(k_z, nocc)
 
-            D_sig_y = 4 * self.commut(k_y, D_y)
-            D_sig_y += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
-                            self.commut(k_z, D_z))
+                # create the first order two indexed densities #
 
-            D_sig_z = 4 * self.commut(k_z, D_z)
-            D_sig_z += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
-                            self.commut(k_z, D_z))
+                D_sig_x = 4 * self.commut(k_x, D_x)
+                D_sig_x += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
+                                self.commut(k_z, D_z))
 
-            D_lam_xy = self.commut(k_x, D_y) + self.commut(k_y, D_x)
-            D_lam_xz = self.commut(k_x, D_z) + self.commut(k_z, D_x)
-            D_lam_yz = self.commut(k_y, D_z) + self.commut(k_z, D_y)
+                D_sig_y = 4 * self.commut(k_y, D_y)
+                D_sig_y += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
+                                self.commut(k_z, D_z))
 
-            # density transformation from MO to AO basis
+                D_sig_z = 4 * self.commut(k_z, D_z)
+                D_sig_z += 2 * (self.commut(k_x, D_x) + self.commut(k_y, D_y) +
+                                self.commut(k_z, D_z))
 
-            D_x = np.linalg.multi_dot([mo, D_x, mo.T])
-            D_y = np.linalg.multi_dot([mo, D_y, mo.T])
-            D_z = np.linalg.multi_dot([mo, D_z, mo.T])
+                D_lam_xy = self.commut(k_x, D_y) + self.commut(k_y, D_x)
+                D_lam_xz = self.commut(k_x, D_z) + self.commut(k_z, D_x)
+                D_lam_yz = self.commut(k_y, D_z) + self.commut(k_z, D_y)
 
-            D_sig_x = np.linalg.multi_dot([mo, D_sig_x, mo.T])
-            D_sig_y = np.linalg.multi_dot([mo, D_sig_y, mo.T])
-            D_sig_z = np.linalg.multi_dot([mo, D_sig_z, mo.T])
+                # density transformation from MO to AO basis
 
-            D_lam_xy = np.linalg.multi_dot([mo, D_lam_xy, mo.T])
-            D_lam_xz = np.linalg.multi_dot([mo, D_lam_xz, mo.T])
-            D_lam_yz = np.linalg.multi_dot([mo, D_lam_yz, mo.T])
+                D_x = np.linalg.multi_dot([mo, D_x, mo.T])
+                D_y = np.linalg.multi_dot([mo, D_y, mo.T])
+                D_z = np.linalg.multi_dot([mo, D_z, mo.T])
 
-            first_order_dens.append(D_x.real)
-            first_order_dens.append(D_x.imag)
-            first_order_dens.append(D_y.real)
-            first_order_dens.append(D_y.imag)
-            first_order_dens.append(D_z.real)
-            first_order_dens.append(D_z.imag)
+                D_sig_x = np.linalg.multi_dot([mo, D_sig_x, mo.T])
+                D_sig_y = np.linalg.multi_dot([mo, D_sig_y, mo.T])
+                D_sig_z = np.linalg.multi_dot([mo, D_sig_z, mo.T])
 
-            if self.shg_type == 'reduced':
-                second_order_dens.append(D_sig_x.real)
-                second_order_dens.append(D_sig_y.real)
-                second_order_dens.append(D_sig_z.real)
-                second_order_dens.append(D_lam_xy.real)
-                second_order_dens.append(D_lam_xz.real)
-                second_order_dens.append(D_lam_yz.real)
-            elif self.shg_type == 'full':
-                second_order_dens.append(D_sig_x.real)
-                second_order_dens.append(D_sig_x.imag)
-                second_order_dens.append(D_sig_y.real)
-                second_order_dens.append(D_sig_y.imag)
-                second_order_dens.append(D_sig_z.real)
-                second_order_dens.append(D_sig_z.imag)
-                second_order_dens.append(D_lam_xy.real)
-                second_order_dens.append(D_lam_xy.imag)
-                second_order_dens.append(D_lam_xz.real)
-                second_order_dens.append(D_lam_xz.imag)
-                second_order_dens.append(D_lam_yz.real)
-                second_order_dens.append(D_lam_yz.imag)
+                D_lam_xy = np.linalg.multi_dot([mo, D_lam_xy, mo.T])
+                D_lam_xz = np.linalg.multi_dot([mo, D_lam_xz, mo.T])
+                D_lam_yz = np.linalg.multi_dot([mo, D_lam_yz, mo.T])
 
-        return first_order_dens, second_order_dens
+                dist_den_1_freq = np.hstack((
+                    D_x.real.reshape(-1, 1),
+                    D_x.imag.reshape(-1, 1),
+                    D_y.real.reshape(-1, 1),
+                    D_y.imag.reshape(-1, 1),
+                    D_z.real.reshape(-1, 1),
+                    D_z.imag.reshape(-1, 1),
+                ))
+
+                if self.shg_type == 'reduced':
+                    dist_den_2_freq = np.hstack((
+                        D_sig_x.real.reshape(-1, 1),
+                        D_sig_y.real.reshape(-1, 1),
+                        D_sig_z.real.reshape(-1, 1),
+                        D_lam_xy.real.reshape(-1, 1),
+                        D_lam_xz.real.reshape(-1, 1),
+                        D_lam_yz.real.reshape(-1, 1),
+                    ))
+
+                elif self.shg_type == 'full':
+                    dist_den_2_freq = np.hstack((
+                        D_sig_x.real.reshape(-1, 1),
+                        D_sig_x.imag.reshape(-1, 1),
+                        D_sig_y.real.reshape(-1, 1),
+                        D_sig_y.imag.reshape(-1, 1),
+                        D_sig_z.real.reshape(-1, 1),
+                        D_sig_z.imag.reshape(-1, 1),
+                        D_lam_xy.real.reshape(-1, 1),
+                        D_lam_xy.imag.reshape(-1, 1),
+                        D_lam_xz.real.reshape(-1, 1),
+                        D_lam_xz.imag.reshape(-1, 1),
+                        D_lam_yz.real.reshape(-1, 1),
+                        D_lam_yz.imag.reshape(-1, 1),
+                    ))
+
+            else:
+                dist_den_1_freq = None
+                dist_den_2_freq = None
+
+            dist_den_1_freq = DistributedArray(dist_den_1_freq, self.comm)
+            dist_den_2_freq = DistributedArray(dist_den_2_freq, self.comm)
+
+            if distributed_density_1 is None:
+                distributed_density_1 = DistributedArray(dist_den_1_freq.data,
+                                                         self.comm,
+                                                         distribute=False)
+            else:
+                distributed_density_1.append(dist_den_1_freq, axis=1)
+
+            if distributed_density_2 is None:
+                distributed_density_2 = DistributedArray(dist_den_2_freq.data,
+                                                         self.comm,
+                                                         distribute=False)
+            else:
+                distributed_density_2.append(dist_den_2_freq, axis=1)
+
+        return distributed_density_1, distributed_density_2
 
     def get_fock_dict(self,
                       wi,
@@ -624,73 +674,73 @@ class ShgDriver(NonlinearSolver):
         if self.rank == mpi_master():
             self._print_fock_header()
 
-        ww = [wb for (wb, wc) in wi]
+        # generate key-frequency pairs
 
-        keys = [
-            'F_sig_x',
-            'F_sig_y',
-            'F_sig_z',
-            'F_lam_xy',
-            'F_lam_xz',
-            'F_lam_yz',
-        ]
+        key_freq_pairs = []
+
+        for (wb, wc) in wi:
+            for key in [
+                    'F_sig_x', 'F_sig_y', 'F_sig_z', 'F_lam_xy', 'F_lam_xz',
+                    'F_lam_yz'
+            ]:
+                key_freq_pairs.append((key, wb))
+
+        # examine checkpoint for distributed Focks
 
         if self.checkpoint_file is not None:
-            fock_file = str(
-                Path(self.checkpoint_file).with_suffix('.shg_fock.h5'))
+            if self.shg_type == 'reduced':
+                fock_suffix = '.shg_fock_red.h5'
+            elif self.shg_type == 'full':
+                fock_suffix = '.shg_fock_full.h5'
+            fock_file = str(Path(self.checkpoint_file).with_suffix(fock_suffix))
         else:
             fock_file = None
 
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = check_distributed_focks(fock_file, keys, ww)
+                self.restart = check_distributed_focks(fock_file,
+                                                       key_freq_pairs)
             self.restart = self.comm.bcast(self.restart, mpi_master())
 
+        # read or compute distributed Focks
+
         if self.restart:
-            focks = read_distributed_focks(fock_file, keys, ww, self.comm,
-                                           self.ostream)
-            focks['F0'] = F0
-            return focks
+            dist_focks = read_distributed_focks(fock_file, self.comm,
+                                                self.ostream)
+        else:
+            time_start_fock = time.time()
 
-        time_start_fock = time.time()
+            if self.shg_type == 'reduced':
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
+                                                 dft_dict, first_order_dens,
+                                                 second_order_dens, None,
+                                                 'shg_red', profiler)
+            elif self.shg_type == 'full':
+                dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                                 'real_and_imag', dft_dict,
+                                                 first_order_dens,
+                                                 second_order_dens, None, 'shg',
+                                                 profiler)
 
-        if self.shg_type == 'reduced':
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis, 'real',
-                                             dft_dict, first_order_dens,
-                                             second_order_dens, None, 'shg_red',
-                                             profiler)
-        elif self.shg_type == 'full':
-            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                             'real_and_imag', dft_dict,
-                                             first_order_dens,
-                                             second_order_dens, None, 'shg',
-                                             profiler)
+            self._print_fock_time(time.time() - time_start_fock)
 
-        time_end_fock = time.time()
+            write_distributed_focks(fock_file, dist_focks, key_freq_pairs,
+                                    self.comm, self.ostream)
 
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
+        # assign distributed Focks to key-frequency pairs
 
         focks = {'F0': F0}
-        for key in keys:
-            focks[key] = {}
 
-        fock_index = 0
-
-        for (wb, wc) in wi:
-            for key in keys:
-                focks[key][wb] = DistributedArray(dist_focks.data[:,
-                                                                  fock_index],
-                                                  self.comm,
-                                                  distribute=False)
-                fock_index += 1
-
-        write_distributed_focks(fock_file, focks, keys, ww, self.comm,
-                                self.ostream)
+        for fock_index, (key, wb) in enumerate(key_freq_pairs):
+            if key not in focks:
+                focks[key] = {}
+            focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index],
+                                              self.comm,
+                                              distribute=False)
 
         return focks
 
-    def get_e3(self, wi, kX, fo, fo2, nocc, norb):
+    def get_e3(self, wi, Nx, fo, fo2, nocc, norb):
         """
         Contracts E[3]
 
@@ -730,6 +780,10 @@ class ShgDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
+            nx = ComplexResponse.get_full_solution_vector(Nx[('x', wb)])
+            ny = ComplexResponse.get_full_solution_vector(Nx[('y', wb)])
+            nz = ComplexResponse.get_full_solution_vector(Nx[('z', wb)])
+
             if self.rank != mpi_master():
                 continue
 
@@ -746,9 +800,9 @@ class ShgDriver(NonlinearSolver):
 
             # Response
 
-            k_x = kX[('x', wb)].T
-            k_y = kX[('y', wb)].T
-            k_z = kX[('z', wb)].T
+            k_x = (self.complex_lrvec2mat(nx, nocc, norb)).T
+            k_y = (self.complex_lrvec2mat(ny, nocc, norb)).T
+            k_z = (self.complex_lrvec2mat(nz, nocc, norb)).T
 
             # Make all Xi terms
 

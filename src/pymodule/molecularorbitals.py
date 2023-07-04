@@ -254,41 +254,21 @@ def _MolecularOrbitals_write_hdf5(self,
 
     hf = h5py.File(fname, 'w')
 
-    hf.create_dataset('alpha_orbitals',
-                      data=self.alpha_to_numpy(),
-                      compression='gzip')
-
-    hf.create_dataset('alpha_energies',
-                      data=self.ea_to_numpy(),
-                      compression='gzip')
-
-    hf.create_dataset('alpha_occupations',
-                      data=self.occa_to_numpy(),
-                      compression='gzip')
+    hf.create_dataset('alpha_orbitals', data=self.alpha_to_numpy())
+    hf.create_dataset('alpha_energies', data=self.ea_to_numpy())
+    hf.create_dataset('alpha_occupations', data=self.occa_to_numpy())
 
     if self.get_orbitals_type() == molorb.unrest:
 
-        hf.create_dataset('beta_orbitals',
-                          data=self.beta_to_numpy(),
-                          compression='gzip')
-
-        hf.create_dataset('beta_energies',
-                          data=self.eb_to_numpy(),
-                          compression='gzip')
-
-        hf.create_dataset('beta_occupations',
-                          data=self.occb_to_numpy(),
-                          compression='gzip')
+        hf.create_dataset('beta_orbitals', data=self.beta_to_numpy())
+        hf.create_dataset('beta_energies', data=self.eb_to_numpy())
+        hf.create_dataset('beta_occupations', data=self.occb_to_numpy())
 
     if nuclear_charges is not None:
-        hf.create_dataset('nuclear_charges',
-                          data=nuclear_charges,
-                          compression='gzip')
+        hf.create_dataset('nuclear_charges', data=nuclear_charges)
 
     if basis_set is not None:
-        hf.create_dataset('basis_set',
-                          data=np.string_([basis_set]),
-                          compression='gzip')
+        hf.create_dataset('basis_set', data=np.string_([basis_set]))
 
     hf.close()
 

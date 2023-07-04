@@ -29,8 +29,8 @@ import numpy as np
 import sys
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import (molorb, fockmat)
-from .veloxchemlib import (XCFunctional, MolecularGrid)
+from .veloxchemlib import molorb, fockmat
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .molecularorbitals import MolecularOrbitals
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -133,7 +133,7 @@ class ScfRestrictedDriver(ScfDriver):
 
         return diff_den
 
-    def _store_diis_data(self, fock_mat, den_mat, e_grad):
+    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
         """
         Stores spin restricted closed shell Fock/Kohn-Sham and density matrices
         for current iteration. Overloaded base class method.
@@ -142,21 +142,20 @@ class ScfRestrictedDriver(ScfDriver):
             The Fock/Kohn-Sham matrix.
         :param den_mat:
             The density matrix.
+        :param ovl_mat:
+            The overlap matrix (used in ROSCF).
         :param e_grad:
             The electronic gradient.
         """
 
-        if self.rank == mpi_master():
+        if self.rank == mpi_master() and e_grad < self.diis_thresh:
 
-            if e_grad < self.diis_thresh:
+            if len(self._fock_matrices_alpha) == self.max_err_vecs:
+                self._fock_matrices_alpha.popleft()
+                self._density_matrices_alpha.popleft()
 
-                if len(self._fock_matrices) == self.max_err_vecs:
-
-                    self._fock_matrices.popleft()
-                    self._den_matrices.popleft()
-
-                self._fock_matrices.append(fock_mat.alpha_to_numpy(0))
-                self._den_matrices.append(den_mat.alpha_to_numpy(0))
+            self._fock_matrices_alpha.append(fock_mat.alpha_to_numpy(0))
+            self._density_matrices_alpha.append(den_mat.alpha_to_numpy(0))
 
     def _get_effective_fock(self, fock_mat, ovl_mat, oao_mat):
         """
@@ -177,13 +176,14 @@ class ScfRestrictedDriver(ScfDriver):
 
         if self.rank == mpi_master():
 
-            if len(self._fock_matrices) == 1:
-                return np.copy(self._fock_matrices[0])
+            if len(self._fock_matrices_alpha) == 1:
+                return np.copy(self._fock_matrices_alpha[0])
 
-            if len(self._fock_matrices) > 1:
+            if len(self._fock_matrices_alpha) > 1:
                 acc_diis = CTwoDiis()
                 acc_diis.compute_error_vectors_restricted(
-                    self._fock_matrices, self._den_matrices, ovl_mat, oao_mat)
+                    self._fock_matrices_alpha, self._density_matrices_alpha,
+                    ovl_mat, oao_mat)
                 weights = acc_diis.compute_weights()
 
                 return self._get_scaled_fock(weights)
@@ -204,9 +204,9 @@ class ScfRestrictedDriver(ScfDriver):
             The scaled Fock/Kohn-Sham matrix.
         """
 
-        effmat = np.zeros(self._fock_matrices[0].shape)
+        effmat = np.zeros(self._fock_matrices_alpha[0].shape)
 
-        for w, fmat in zip(weights, self._fock_matrices):
+        for w, fmat in zip(weights, self._fock_matrices_alpha):
             effmat = effmat + w * fmat
 
         return effmat

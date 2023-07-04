@@ -39,6 +39,7 @@ from .mointsdriver import MOIntegralsDriver
 from .subcommunicators import SubCommunicators
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
+from .sanitychecks import molecule_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
 
@@ -147,7 +148,7 @@ class Mp2Driver:
             if self.rank == mpi_master():
                 assert_msg_critical(False, errmsg)
 
-    def compute(self, molecule, ao_basis, mol_orbs):
+    def compute(self, molecule, ao_basis, mol_orbs, scf_type='restricted'):
         """
         Performs MP2 calculation.
 
@@ -157,14 +158,22 @@ class Mp2Driver:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
+        :param scf_type:
+            The SCF type (restricted, unrestricted, restricted_openshell).
         """
 
         if self.conventional:
-            return self.compute_conventional(molecule, ao_basis, mol_orbs)
+            return self.compute_conventional(molecule, ao_basis, mol_orbs,
+                                             scf_type)
         else:
-            return self.compute_distributed(molecule, ao_basis, mol_orbs)
+            return self.compute_distributed(molecule, ao_basis, mol_orbs,
+                                            scf_type)
 
-    def compute_conventional(self, molecule, ao_basis, mol_orbs):
+    def compute_conventional(self,
+                             molecule,
+                             ao_basis,
+                             mol_orbs,
+                             scf_type='restricted'):
         """
         Performs conventional MP2 calculation.
 
@@ -174,36 +183,103 @@ class Mp2Driver:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
+        :param scf_type:
+            The SCF type (restricted, unrestricted, restricted_openshell).
         """
+
+        molecule_sanity_check(molecule)
+
+        if scf_type == 'restricted':
+            nalpha = molecule.number_of_alpha_electrons()
+            nbeta = molecule.number_of_beta_electrons()
+            assert_msg_critical(
+                nalpha == nbeta,
+                'Mp2Driver: inconsistent numbers of alpha and beta electrons ' +
+                'for restricted case')
 
         moints_drv = MOIntegralsDriver(self.comm, self.ostream)
 
         if self.rank == mpi_master():
 
-            orb_ene = mol_orbs.ea_to_numpy()
-            nocc = molecule.number_of_alpha_electrons()
-            eocc = orb_ene[:nocc]
-            evir = orb_ene[nocc:]
-            e_vv = evir.reshape(-1, 1) + evir
-
             self.e_mp2 = 0.0
-            phys_oovv = moints_drv.compute_in_memory(molecule, ao_basis,
-                                                     mol_orbs, 'phys_oovv')
-            for i in range(phys_oovv.shape[0]):
-                for j in range(phys_oovv.shape[1]):
-                    ab = phys_oovv[i, j, :, :]
-                    denom = e_vv - eocc[i] - eocc[j]
-                    self.e_mp2 -= np.sum(ab * (2.0 * ab - ab.T) / denom)
 
-            mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
-            self.ostream.print_header(mp2_str.ljust(92))
-            self.ostream.print_blank()
+            if scf_type == 'restricted':
+
+                orb_ene = mol_orbs.ea_to_numpy()
+                nocc = molecule.number_of_alpha_electrons()
+                eocc = orb_ene[:nocc]
+                evir = orb_ene[nocc:]
+                e_vv = evir.reshape(-1, 1) + evir
+
+                phys_oovv = moints_drv.compute_in_memory(
+                    molecule, ao_basis, mol_orbs, 'phys_oovv')
+                for i in range(phys_oovv.shape[0]):
+                    for j in range(phys_oovv.shape[1]):
+                        ab = phys_oovv[i, j, :, :]
+                        denom = e_vv - eocc[i] - eocc[j]
+                        self.e_mp2 -= np.sum(ab * (2.0 * ab - ab.T) / denom)
+
+                mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
+                self.ostream.print_header(mp2_str.ljust(92))
+                self.ostream.print_blank()
+
+            elif scf_type == 'unrestricted':
+
+                orb_ene_a = mol_orbs.ea_to_numpy()
+                orb_ene_b = mol_orbs.eb_to_numpy()
+
+                nocc_a = molecule.number_of_alpha_electrons()
+                nocc_b = molecule.number_of_beta_electrons()
+
+                eocc_a = orb_ene_a[:nocc_a]
+                evir_a = orb_ene_a[nocc_a:]
+
+                eocc_b = orb_ene_b[:nocc_b]
+                evir_b = orb_ene_b[nocc_b:]
+
+                e_vv_aa = evir_a.reshape(-1, 1) + evir_a
+                e_vv_bb = evir_b.reshape(-1, 1) + evir_b
+                e_vv_ab = evir_a.reshape(-1, 1) + evir_b
+
+                phys_oovv_aaaa = moints_drv.compute_in_memory(
+                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'aaaa')
+                phys_oovv_bbbb = moints_drv.compute_in_memory(
+                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'bbbb')
+                phys_oovv_abab = moints_drv.compute_in_memory(
+                    molecule, ao_basis, mol_orbs, 'phys_oovv', 'abab')
+
+                for i in range(phys_oovv_aaaa.shape[0]):
+                    for j in range(phys_oovv_aaaa.shape[1]):
+                        vv = phys_oovv_aaaa[i, j, :, :]
+                        denom = e_vv_aa - eocc_a[i] - eocc_a[j]
+                        self.e_mp2 -= 0.5 * np.sum(vv * (vv - vv.T) / denom)
+
+                for i in range(phys_oovv_bbbb.shape[0]):
+                    for j in range(phys_oovv_bbbb.shape[1]):
+                        vv = phys_oovv_bbbb[i, j, :, :]
+                        denom = e_vv_bb - eocc_b[i] - eocc_b[j]
+                        self.e_mp2 -= 0.5 * np.sum(vv * (vv - vv.T) / denom)
+
+                for i in range(phys_oovv_abab.shape[0]):
+                    for j in range(phys_oovv_abab.shape[1]):
+                        vv = phys_oovv_abab[i, j, :, :]
+                        denom = e_vv_ab - eocc_a[i] - eocc_b[j]
+                        self.e_mp2 -= np.sum(vv * vv / denom)
+
+                mp2_str = '*** MP2 correlation energy: %20.12f a.u.' % self.e_mp2
+                self.ostream.print_header(mp2_str.ljust(92))
+                self.ostream.print_blank()
+
+            elif scf_type == 'restricted_openshell':
+
+                assert_msg_critical(
+                    False, 'Restricted open-shell MP2 not implemented')
 
             return {'mp2_energy': self.e_mp2}
         else:
             return None
 
-    def compute_distributed(self, molecule, basis, mol_orbs):
+    def compute_distributed(self, molecule, basis, mol_orbs, scf_type):
         """
         Performs MP2 calculation via distributed Fock builds.
 
@@ -213,7 +289,12 @@ class Mp2Driver:
             The AO basis set.
         :param mol_orbs:
             The molecular orbitals.
+        :param scf_type:
+            The SCF type (restricted, unrestricted, restricted_openshell).
         """
+
+        assert_msg_critical(scf_type != 'restricted_openshell',
+                            'Restricted open-shell MP2 not implemented')
 
         # subcommunicators
 
@@ -242,20 +323,54 @@ class Mp2Driver:
 
         if local_master:
             e_mp2 = 0.0
+
             mol_orbs.broadcast(cross_comm.Get_rank(), cross_comm)
-            nocc = molecule.number_of_alpha_electrons()
 
-            mo = mol_orbs.alpha_to_numpy()
-            mo_occ = mo[:, :nocc].copy()
-            mo_vir = mo[:, nocc:].copy()
+            nocc_a = molecule.number_of_alpha_electrons()
+            nocc_b = molecule.number_of_beta_electrons()
 
-            orb_ene = mol_orbs.ea_to_numpy()
-            evir = orb_ene[nocc:]
-            eab = evir.reshape(-1, 1) + evir
+            mo_a = mol_orbs.alpha_to_numpy()
+            mo_b = mol_orbs.beta_to_numpy()
 
-            mo_ints_ids = [
-                (i, j) for i in range(nocc) for j in range(i + 1, nocc)
-            ] + [(i, i) for i in range(nocc)]
+            mo_occ_a = mo_a[:, :nocc_a].copy()
+            mo_vir_a = mo_a[:, nocc_a:].copy()
+
+            mo_occ_b = mo_b[:, :nocc_b].copy()
+            mo_vir_b = mo_b[:, nocc_b:].copy()
+
+            orb_ene_a = mol_orbs.ea_to_numpy()
+            orb_ene_b = mol_orbs.eb_to_numpy()
+
+            evir_a = orb_ene_a[nocc_a:]
+            evir_b = orb_ene_b[nocc_b:]
+
+            evv_aa = evir_a.reshape(-1, 1) + evir_a
+            evv_bb = evir_b.reshape(-1, 1) + evir_b
+            evv_ab = evir_a.reshape(-1, 1) + evir_b
+
+            if scf_type == 'restricted':
+
+                mo_ints_ids = [((i, j), 'aa')
+                               for i in range(nocc_a)
+                               for j in range(i + 1, nocc_a)]
+                mo_ints_ids += [((i, i), 'aa') for i in range(nocc_a)]
+
+            elif scf_type == 'unrestricted':
+
+                mo_ints_ids = [((i, j), 'aa')
+                               for i in range(nocc_a)
+                               for j in range(i + 1, nocc_a)]
+                mo_ints_ids += [((i, i), 'aa') for i in range(nocc_a)]
+
+                mo_ints_ids += [((i, j), 'bb')
+                                for i in range(nocc_b)
+                                for j in range(i + 1, nocc_b)]
+                mo_ints_ids += [((i, i), 'bb') for i in range(nocc_b)]
+
+                mo_ints_ids += [
+                    ((i, j), 'ab') for i in range(nocc_a) for j in range(nocc_b)
+                ]
+
             self.print_header(len(mo_ints_ids))
             valstr = 'Monitoring calculation on master node.'
             self.ostream.print_header(valstr.ljust(80))
@@ -295,11 +410,33 @@ class Mp2Driver:
                 batch_ids = mo_ints_ids[batch_start:batch_end]
 
                 dks = []
-                for i, j in batch_ids:
-                    mo_ij = np.zeros((nocc, nocc))
-                    mo_ij[i, j] = 1.0
-                    dks.append(np.linalg.multi_dot([mo_occ, mo_ij, mo_occ.T]))
+
+                for (i, j), spin in batch_ids:
+
+                    if spin == 'aa':
+                        mo_ij_aa = np.zeros((nocc_a, nocc_a))
+                        mo_ij_aa[i, j] = 1.0
+                        dks.append(
+                            np.linalg.multi_dot(
+                                [mo_occ_a, mo_ij_aa, mo_occ_a.T]))
+
+                    elif spin == 'bb':
+                        mo_ij_bb = np.zeros((nocc_b, nocc_b))
+                        mo_ij_bb[i, j] = 1.0
+                        dks.append(
+                            np.linalg.multi_dot(
+                                [mo_occ_b, mo_ij_bb, mo_occ_b.T]))
+
+                    elif spin == 'ab':
+                        mo_ij_ab = np.zeros((nocc_a, nocc_b))
+                        mo_ij_ab[i, j] = 1.0
+                        dks.append(
+                            np.linalg.multi_dot(
+                                [mo_occ_a, mo_ij_ab, mo_occ_b.T]))
+
+                # Note: use restricted AODensityMatrix and Fock build
                 dens = AODensityMatrix(dks, denmat.rest)
+
             else:
                 dens = AODensityMatrix()
 
@@ -314,17 +451,46 @@ class Mp2Driver:
                             local_comm)
 
             if local_master:
-                for ind, (i, j) in enumerate(batch_ids):
-                    f_ao = fock.alpha_to_numpy(ind)
-                    f_vv = np.linalg.multi_dot([mo_vir.T, f_ao, mo_vir])
-                    de = orb_ene[i] + orb_ene[j] - eab
 
-                    ab = f_vv
-                    e_mp2 += np.sum(ab * (2.0 * ab - ab.T) / de)
+                if scf_type == 'restricted':
 
-                    if i != j:
-                        ba = f_vv.T
-                        e_mp2 += np.sum(ba * (2.0 * ba - ba.T) / de)
+                    for ind, ((i, j), spin) in enumerate(batch_ids):
+                        f_aa = fock.alpha_to_numpy(ind)
+                        vv = np.linalg.multi_dot([mo_vir_a.T, f_aa, mo_vir_a])
+                        de = orb_ene_a[i] + orb_ene_a[j] - evv_aa
+                        e_mp2 += np.sum(vv * (2.0 * vv - vv.T) / de)
+                        if i != j:
+                            e_mp2 += np.sum(vv.T * (2.0 * vv.T - vv) / de)
+
+                elif scf_type == 'unrestricted':
+
+                    for ind, ((i, j), spin) in enumerate(batch_ids):
+                        if spin == 'aa':
+                            f_aa = fock.alpha_to_numpy(ind)
+                            vv = np.linalg.multi_dot(
+                                [mo_vir_a.T, f_aa, mo_vir_a])
+                            de = orb_ene_a[i] + orb_ene_a[j] - evv_aa
+                            e_mp2 += 0.5 * np.sum(vv * (vv - vv.T) / de)
+                            if i != j:
+                                e_mp2 += 0.5 * np.sum(vv.T * (vv.T - vv) / de)
+
+                        elif spin == 'bb':
+                            # Note: use alpha_to_numpy due to restricted Fock
+                            f_bb = fock.alpha_to_numpy(ind)
+                            vv = np.linalg.multi_dot(
+                                [mo_vir_b.T, f_bb, mo_vir_b])
+                            de = orb_ene_b[i] + orb_ene_b[j] - evv_bb
+                            e_mp2 += 0.5 * np.sum(vv * (vv - vv.T) / de)
+                            if i != j:
+                                e_mp2 += 0.5 * np.sum(vv.T * (vv.T - vv) / de)
+
+                        elif spin == 'ab':
+                            # Note: use alpha_to_numpy due to restricted Fock
+                            f_ab = fock.alpha_to_numpy(ind)
+                            vv = np.linalg.multi_dot(
+                                [mo_vir_a.T, f_ab, mo_vir_b])
+                            de = orb_ene_a[i] + orb_ene_b[j] - evv_ab
+                            e_mp2 += np.sum(vv * vv / de)
 
             if global_master:
                 valstr = '{:d} / {:d}'.format(batch_end - mo_ints_start,

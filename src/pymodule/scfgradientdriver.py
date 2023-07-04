@@ -32,6 +32,7 @@ from .veloxchemlib import (XCFunctional, MolecularGrid)
 from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
+from .errorhandler import assert_msg_critical
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -43,44 +44,29 @@ class ScfGradientDriver(GradientDriver):
     """
     Implements SCF gradient driver.
 
-    :param scf_drv:
-        The SCF driver.
     :param comm:
         The MPI communicator.
     :param ostream:
         The output stream.
 
     Instance variables
-        - scf_drv: The SCF driver.
+        - flag: The driver flag.
         - delta_h: The displacement for finite difference.
     """
 
-    def __init__(self, scf_drv, comm=None, ostream=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes gradient driver.
         """
 
-        super().__init__(scf_drv, comm, ostream)
+        super().__init__(comm, ostream)
 
         self.flag = 'SCF Gradient Driver'
-        self.scf_drv = scf_drv
+
+        self.numerical = True
         self.delta_h = 0.001
 
-        self.gradient = None
-
-    def update_settings(self, grad_dict, method_dict):
-        """
-        Updates settings in ScfGradientDriver.
-
-        :param grad_dict:
-            The input dictionary of gradient settings group.
-        :param method_dict:
-            The input dicitonary of method settings group.
-        """
-
-        super().update_settings(grad_dict, method_dict)
-
-    def compute(self, molecule, ao_basis, min_basis=None):
+    def compute(self, molecule, ao_basis, scf_drv):
         """
         Computes the analytical or numerical nuclear gradient.
 
@@ -88,8 +74,8 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param scf_drv:
+            The SCF driver.
         """
 
         if self.rank == mpi_master():
@@ -98,13 +84,12 @@ class ScfGradientDriver(GradientDriver):
         start_time = tm.time()
 
         # compute gradient
-
         if self.numerical:
-            self.scf_drv.ostream.mute()
-            self.compute_numerical(molecule, ao_basis, min_basis)
-            self.scf_drv.ostream.unmute()
+            scf_drv.ostream.mute()
+            self.compute_numerical(molecule, ao_basis, scf_drv)
+            scf_drv.ostream.unmute()
         else:
-            self.compute_analytical(molecule, ao_basis)
+            self.compute_analytical(molecule, ao_basis, scf_drv)
 
         # print gradient
 
@@ -118,7 +103,7 @@ class ScfGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_analytical(self, molecule, ao_basis):
+    def compute_analytical(self, molecule, ao_basis, scf_drv):
         """
         Computes the analytical nuclear gradient.
         So far only for restricted Hartree-Fock with PySCF integral derivatives...
@@ -127,6 +112,8 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
+		:param scf_drv:
+			The SCF driver.
         """
 
         natm = molecule.number_of_atoms()
@@ -136,12 +123,12 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             nocc = molecule.number_of_alpha_electrons()
 
-            mo = self.scf_drv.scf_tensors['C_alpha']
+            mo = scf_drv.scf_tensors['C_alpha']
             mo_occ = mo[:, :nocc].copy()
 
-            one_pdm_ao = self.scf_drv.scf_tensors['D_alpha']
+            one_pdm_ao = scf_drv.scf_tensors['D_alpha']
 
-            eo_diag = np.diag(self.scf_drv.scf_tensors['E_alpha'][:nocc])
+            eo_diag = np.diag(scf_drv.scf_tensors['E_alpha'][:nocc])
             epsilon_dm_ao = -np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
             for i in range(natm):
@@ -153,7 +140,7 @@ class ScfGradientDriver(GradientDriver):
                     2.0 * np.einsum('mn,xmn->x', one_pdm_ao, d_hcore) +
                     2.0 * np.einsum('mn,xmn->x', epsilon_dm_ao, d_ovlp))
 
-                if self._dft:
+                if self.dft:
                     if self.xcfun.is_hybrid():
                         frac_K = self.xcfun.get_frac_exact_exchange()
                     else:
@@ -167,9 +154,9 @@ class ScfGradientDriver(GradientDriver):
                     'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
 
         # Add the xc contribution
-        if self._dft:
-            density = self.scf_drv.density
-            xcfun_label = self.scf_drv.xcfun.get_func_label()
+        if self.dft:
+            density = scf_drv.density
+            xcfun_label = scf_drv.xcfun.get_func_label()
 
             vxc_contrib = self.grad_vxc_contrib(molecule, ao_basis, density,
                                                 density, xcfun_label)
@@ -181,7 +168,7 @@ class ScfGradientDriver(GradientDriver):
         if self.rank == mpi_master():
             self.gradient += self.grad_nuc_contrib(molecule)
 
-    def compute_energy(self, molecule, ao_basis, min_basis=None):
+    def compute_energy(self, molecule, ao_basis, scf_drv):
         """
         Computes the energy at current geometry.
 
@@ -189,15 +176,23 @@ class ScfGradientDriver(GradientDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param scf_drv:
+            The SCF driver.
 
         :return:
             The energy.
         """
 
-        self.scf_drv.compute(molecule, ao_basis, min_basis)
-        return self.scf_drv.get_scf_energy()
+        scf_drv.ostream.mute()
+
+        scf_drv.restart = False
+        scf_drv.compute(molecule, ao_basis)
+        assert_msg_critical(scf_drv.is_converged,
+                            'ScfGradientDriver: SCF did not converge')
+
+        scf_drv.ostream.unmute()
+
+        return scf_drv.get_scf_energy()
 
     def __deepcopy__(self, memo):
         """
@@ -210,8 +205,7 @@ class ScfGradientDriver(GradientDriver):
             A deepcopy of self.
         """
 
-        new_grad_drv = ScfGradientDriver(deepcopy(self.scf_drv), self.comm,
-                                         self.ostream)
+        new_grad_drv = ScfGradientDriver(self.comm, self.ostream)
 
         for key, val in vars(self).items():
             if isinstance(val, (MPI.Intracomm, OutputStream)):

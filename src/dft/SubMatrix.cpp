@@ -64,10 +64,7 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
 }
 
 CDenseMatrix
-getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
-                            const std::vector<int32_t>& aoIndices,
-                            const int32_t               aoCount,
-                            const int32_t               nAOs)
+getSubMatrixByColumnSlicing(const CDenseMatrix& denseMatrix, const std::vector<int32_t>& aoIndices, const int32_t aoCount, const int32_t nAOs)
 {
     auto nrows = denseMatrix.getNumberOfRows();
 
@@ -96,9 +93,7 @@ getSubMatrixByColumnSlicing(const CDenseMatrix&         denseMatrix,
 }
 
 CAODensityMatrix
-getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
-                    const std::vector<int32_t>& aoIndices,
-                    const int32_t               aoCount)
+getSubDensityMatrix(const CAODensityMatrix& densityMatrix, const std::vector<int32_t>& aoIndices, const int32_t aoCount)
 {
     auto naos = densityMatrix.getNumberOfRows(0);
 
@@ -130,6 +125,28 @@ getSubDensityMatrix(const CAODensityMatrix&     densityMatrix,
     }
 
     return CAODensityMatrix(submatrices, denmat::rest);
+}
+
+void
+distributeSubmatrixTo4DTensor(CDense4DTensor& fullTensor, const CDenseMatrix& subMatrix, const std::vector<int32_t>& aoIndices, const int32_t aoCount)
+{
+    auto w_full = fullTensor.values();
+
+    auto w_small = subMatrix.values();
+
+    auto nAct3 = subMatrix.getNumberOfColumns();
+
+    for (int32_t i = 0; i < aoCount; i++)
+    {
+        auto irow = nAct3 * i;
+
+        auto irow_full = nAct3 * aoIndices[i];
+
+        for (int32_t jkl = 0; jkl < nAct3; jkl++)
+        {
+            w_full[irow_full + jkl] += w_small[irow + jkl];
+        }
+    }
 }
 
 void
@@ -210,7 +227,7 @@ distributeSubMatrixToFock(CAOFockMatrix&              aoFockMatrix,
         {
             auto row_orig = aoIndices[row];
 
-            auto fock_row_orig = aoFockMatrix.getFock(fockIndex, "ALPHA") + row_orig * nAOs;
+            auto fock_row_orig = aoFockMatrix.getFock(fockIndex, std::string("ALPHA")) + row_orig * nAOs;
 
             auto submat_row = subMatrix.row(row);
 

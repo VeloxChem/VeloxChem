@@ -28,12 +28,17 @@ import numpy as np
 import time
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master, hartree_in_wavenumbers
+from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_ev,
+                           hartree_in_inverse_nm, hartree_in_wavenumber,
+                           fine_structure_constant,
+                           speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 
 
@@ -67,7 +72,7 @@ class TpaDriver(NonlinearSolver):
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
-        self.damping = 1000.0 / hartree_in_wavenumbers()
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         # input keywords
         self._input_keywords['response'].update({
@@ -103,9 +108,9 @@ class TpaDriver(NonlinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
-              A dictonary containing the isotropic T[4], T[3], X[3], A[3],
-              X[2], A[2] contractions and the isotropic cubic response
-              functions for TPA
+            A dictonary containing the isotropic T[4], T[3], X[3], A[3], X[2],
+            A[2] contractions and the isotropic cubic response functions for
+            TPA.
         """
 
         if self.norm_thresh is None:
@@ -113,11 +118,14 @@ class TpaDriver(NonlinearSolver):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
-        # double check SCF information
-        self._check_scf_results(scf_tensors)
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check_nonlinrsp()
+        dft_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': self.timing,
@@ -174,8 +182,10 @@ class TpaDriver(NonlinearSolver):
         # Storing the dipole integral matrices used for the X[3],X[2],A[3] and
         # A[2] contractions in MO basis
         if self.rank == mpi_master():
-            v_grad = {(op, w): v for op, v in zip(component, b_grad)
-                      for w in self.frequencies}
+            v_grad = {
+                (op, w): v for op, v in zip(component, b_grad)
+                for w in self.frequencies
+            }
             X = {
                 'x': 2 * self.ao2mo(mo, dipole_mats.x_to_numpy()),
                 'y': 2 * self.ao2mo(mo, dipole_mats.y_to_numpy()),
@@ -210,18 +220,14 @@ class TpaDriver(NonlinearSolver):
 
         self._is_converged = Nb_drv.is_converged
 
-        kX = {}
-        Focks = {}
-
-        kX['Nb'] = Nb_results['kappas']
-        Focks['Fb'] = Nb_results['focks']
-        Focks['Fd'] = {}
+        Nx = Nb_results['solutions']
+        Focks = {'Fb': Nb_results['focks']}
 
         # The first-order response vectors with negative frequency are
         # obtained from the first-order response vectors with positive
         # frequency by using flip_zy, see article.
 
-        for (op, w) in kX['Nb']:
+        for (op, w) in Focks['Fb']:
 
             # The first-order Fock matrices with positive and negative
             # frequencies are each other complex conjugates
@@ -233,15 +239,7 @@ class TpaDriver(NonlinearSolver):
             else:
                 Fd_op_w = None
 
-            Focks['Fd'][(op, w)] = DistributedArray(Fd_op_w, self.comm)
-
-        # For cubic-response with all operators being the dipole μ Nb=Na=Nd
-        # Likewise, Fb=Fd
-
-        Focks['Fb'].update(Focks['Fd'])
-
-        kX['Na'] = kX['Nb']
-        kX['Nd'] = kX['Nb']
+            Focks['Fb'][(op, w)] = DistributedArray(Fd_op_w, self.comm)
 
         profiler.check_memory_usage('1st CPP')
 
@@ -250,7 +248,7 @@ class TpaDriver(NonlinearSolver):
         # but which are used for the cubic response function
 
         tpa_dict = self.compute_tpa_components(Focks, self.frequencies, X,
-                                               d_a_mo, kX, self.comp,
+                                               d_a_mo, Nx, self.comp,
                                                scf_tensors, molecule, ao_basis,
                                                profiler, dft_dict)
 
@@ -264,7 +262,7 @@ class TpaDriver(NonlinearSolver):
 
         return tpa_dict
 
-    def compute_tpa_components(self, Focks, w, X, d_a_mo, kX, track,
+    def compute_tpa_components(self, Focks, w, X, d_a_mo, Nx, track,
                                scf_tensors, molecule, ao_basis, profiler,
                                dft_dict):
         """
@@ -276,8 +274,8 @@ class TpaDriver(NonlinearSolver):
             A dictonary of matricies containing all the dipole integrals
         :param d_a_mo:
             The SCF density in MO basis
-        :param kX:
-            A dictonary containing all the response matricies
+        :param Nx:
+            A dictonary containing all the response vectors in distributed form
         :param track:
             A list that contains all the information about which γ components
             and at what freqs they are to be computed
@@ -309,13 +307,8 @@ class TpaDriver(NonlinearSolver):
         nocc = molecule.number_of_alpha_electrons()
 
         # computing all compounded first-order densities
-        if self.rank == mpi_master():
-            density_list1, density_list2, density_list3 = self.get_densities(
-                w, kX, mo, nocc)
-        else:
-            density_list1 = None
-            density_list2 = None
-            density_list3 = None
+        density_list1, density_list2, density_list3 = self.get_densities(
+            w, Nx, mo, nocc, norb)
 
         profiler.check_memory_usage('1st densities')
 
@@ -336,13 +329,13 @@ class TpaDriver(NonlinearSolver):
         profiler.check_memory_usage('1st Focks')
 
         fock_dict.update(Focks)
-        e4_dict = self.get_e4(w, kX, fock_dict, nocc, norb)
+        e4_dict = self.get_e4(w, Nx, fock_dict, nocc, norb)
 
         profiler.check_memory_usage('E[4]')
 
         # computing all the compounded second-order response vectors and
         # extracting some of the second-order Fock matrices from the subspace
-        (kXY_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict, kX, nocc,
+        (Nxy_dict, Focks_xy) = self.get_Nxy(w, d_a_mo, X, fock_dict, Nx, nocc,
                                             norb, molecule, ao_basis,
                                             scf_tensors)
 
@@ -350,12 +343,8 @@ class TpaDriver(NonlinearSolver):
 
         # computing all second-order compounded densities based on the
         # second-order response vectors
-        if self.rank == mpi_master():
-            density_list_two1, density_list_two2 = self.get_densities_II(
-                w, kX, kXY_dict, mo, nocc)
-        else:
-            density_list_two1 = None
-            density_list_two2 = None
+        density_list_two1, density_list_two2 = self.get_densities_II(
+            w, Nx, Nxy_dict, mo, nocc, norb)
 
         profiler.check_memory_usage('2nd densities')
 
@@ -383,14 +372,14 @@ class TpaDriver(NonlinearSolver):
 
         # computing the compounded E[3] contractions for the isotropic
         # cubic response function
-        e3_dict = self.get_e3(w, kX, kXY_dict, fock_dict, fock_dict_two, nocc,
+        e3_dict = self.get_e3(w, Nx, Nxy_dict, fock_dict, fock_dict_two, nocc,
                               norb)
 
         profiler.check_memory_usage('E[3]')
 
         # computing the X[3],A[3],X[2],A[2] contractions for the isotropic
         # cubic response function
-        other_dict = self.get_other_terms(w, track, X, kX, kXY_dict, d_a_mo,
+        other_dict = self.get_other_terms(w, track, X, Nx, Nxy_dict, d_a_mo,
                                           nocc, norb)
 
         profiler.check_memory_usage('X[3],A[3],X[2],A[2]')
@@ -398,15 +387,14 @@ class TpaDriver(NonlinearSolver):
         # Combining all the terms to evaluate the iso-tropic cubic response
         # function. For TPA Full and reduced, see article
 
-        t4_dict = self.get_t4(self.frequencies, e4_dict, kX, self.comp, d_a_mo,
+        t4_dict = self.get_t4(self.frequencies, e4_dict, Nx, self.comp, d_a_mo,
                               nocc, norb)
-        if self.rank == mpi_master():
-            t3_dict = self.get_t3(self.frequencies, e3_dict, kX, self.comp,
-                                  nocc, norb)
+        t3_dict = self.get_t3(self.frequencies, e3_dict, Nx, self.comp, nocc,
+                              norb)
 
         profiler.check_memory_usage('T[4],T[3]')
 
-        result = {}
+        ret_dict = {}
 
         if self.rank == mpi_master():
             gamma = {}
@@ -419,23 +407,22 @@ class TpaDriver(NonlinearSolver):
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-            self.print_results(self.frequencies, gamma, self.comp, t4_dict,
-                               t3_dict, other_dict)
+            ret_dict.update(other_dict)
 
-            result.update(other_dict)
-
-            result.update({
+            ret_dict.update({
                 't4_dict': t4_dict,
                 't3_dict': t3_dict,
                 'gamma': gamma,
-                'w': self.frequencies
+                'frequencies': list(self.frequencies),
             })
+
+            self._print_results(ret_dict)
 
         profiler.check_memory_usage('End of TPA')
 
-        return result
+        return ret_dict
 
-    def get_densities(self, wi, kX, mo, nocc):
+    def get_densities(self, wi, Nx, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded Fock
         matrices F^{σ},F^{λ+τ},F^{σλτ} used for the isotropic cubic response
@@ -443,12 +430,14 @@ class TpaDriver(NonlinearSolver):
 
         :param wi:
             A list of the frequencies
-        :param kX:
-            A dictonary with all the first-order response matrices
+        :param Nx:
+            A dictonary with all the first-order response vectors in distributed form
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
-            Number of alpha electrons
+            Number of occupied orbitals
+        :param norb:
+            Number of orbitals
 
         :return:
             A list of tranformed compounded densities
@@ -539,7 +528,7 @@ class TpaDriver(NonlinearSolver):
 
         return None
 
-    def get_densities_II(self, wi, kX, kXY, mo, nocc):
+    def get_densities_II(self, wi, Nx, Nxy, mo, nocc, norb):
         """
         Computes the compounded densities needed for the compounded
         second-order Fock matrices used for the isotropic cubic response
@@ -547,14 +536,17 @@ class TpaDriver(NonlinearSolver):
 
         :param wi:
             A list of the frequencies
-        :param kX:
-            A dictonary with all the first-order response matrices
-        :param kXY:
-            A dict of the two index response matrices
+        :param Nx:
+            A dictonary with all the first-order response vectors in
+            distributed form
+        :param Nxy:
+            A dict of the two index response vectors in distributed form
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
-            Number of alpha electrons
+            Number of occupied orbitals
+        :param nocc:
+            Number of orbitals
 
         :return:
             A list of tranformed compounded densities
@@ -585,16 +577,16 @@ class TpaDriver(NonlinearSolver):
 
         return None
 
-    def get_e3(self, wi, kX, kXY, fo, fo2, nocc, norb):
+    def get_e3(self, wi, Nx, Nxy, fo, fo2, nocc, norb):
         """
         Contracts E[3]
 
         :param wi:
             A list of freqs
-        :param kX:
-            A dict of the single index response matricies
-        :param kXY:
-            A dict of the two index response matrices
+        :param Nx:
+            A dict of the single index response vectors in distributed form
+        :param Nxy:
+            A dict of the two index response vectors in distributed form
         :param fo:
             A dictonary of transformed Fock matricies from fock_dict
         :param fo2:
@@ -611,7 +603,7 @@ class TpaDriver(NonlinearSolver):
 
         return None
 
-    def get_other_terms(self, wi, track, X, kX, kXY, da, nocc, norb):
+    def get_other_terms(self, wi, track, X, Nx, Nxy, da, nocc, norb):
         """
         Computes the terms involving X[3],A[3],X[2],A[2] in the isotropic cubic
         response function
@@ -623,10 +615,11 @@ class TpaDriver(NonlinearSolver):
             to be computed and which freqs
         :param X:
             A dictonray with all the property integral matricies
-        :param kX:
-            A dictonary with all the respone matricies
-        :param kXY:
-            A dictonary containing all the two-index response matricies
+        :param Nx:
+            A dictonary with all the respone vectors in distributed form
+        :param Nxy:
+            A dictonary containing all the two-index response vectors in
+            distributed form
         :param da:
             The SCF density matrix in MO basis
         :param nocc:
@@ -640,7 +633,7 @@ class TpaDriver(NonlinearSolver):
 
         return None
 
-    def get_t4(self, wi, e4_dict, kX, track, da, nocc, norb):
+    def get_t4(self, wi, e4_dict, Nx, track, da, nocc, norb):
         """
         Computes the contraction of the E[4] tensor with that of the S[4] and
         R[4] tensors to return the contraction of T[4] as a dictonary of
@@ -650,8 +643,8 @@ class TpaDriver(NonlinearSolver):
             A list of all the freqs
         :param e4_dict:
             A dictonary of all the E[4] contraction
-        :param kX:
-            A dictonray containng all the response matricies
+        :param Nx:
+            A dictonray containng all the response vectors in distributed form
         :param track:
             A list containg information about all the γ components that are to
             be computed
@@ -668,7 +661,7 @@ class TpaDriver(NonlinearSolver):
 
         return None
 
-    def get_t3(self, freqs, e3_dict, kX, track, nocc, norb):
+    def get_t3(self, freqs, e3_dict, Nx, track, nocc, norb):
         """
         Computes the T[3] contraction, for HF S[3] = 0, R[3] = 0 such that
         the T[3] contraction for the isotropic cubic response function in terms
@@ -683,8 +676,8 @@ class TpaDriver(NonlinearSolver):
             List of frequencies of the pertubations
         :param e3_dict:
             A dictonary that contains the contractions of E[3]
-        :param kX:
-            A dictonray containng all the response matricies
+        :param Nx:
+            A dictonray containng all the response vectors in distributed form
         :param track:
             A list containing information about what tensor components that are
             being computed
@@ -702,19 +695,17 @@ class TpaDriver(NonlinearSolver):
         for i in range(len(freqs)):
             w = float(track[i * (len(track) // len(freqs))].split(",")[1])
 
-            ka_x = kX['Na'][('x', w)]
-            ka_y = kX['Na'][('y', w)]
-            ka_z = kX['Na'][('z', w)]
+            na_x = ComplexResponse.get_full_solution_vector(Nx[('x', w)])
+            na_y = ComplexResponse.get_full_solution_vector(Nx[('y', w)])
+            na_z = ComplexResponse.get_full_solution_vector(Nx[('z', w)])
 
-            na_x = self.complex_lrmat2vec(ka_x, nocc, norb)
-            na_y = self.complex_lrmat2vec(ka_y, nocc, norb)
-            na_z = self.complex_lrmat2vec(ka_z, nocc, norb)
+            if self.rank == mpi_master():
 
-            t3term = (np.dot(na_x, e3_dict['f_iso_x'][w]) +
-                      np.dot(na_y, e3_dict['f_iso_y'][w]) +
-                      np.dot(na_z, e3_dict['f_iso_z'][w]))
+                t3val = (np.dot(na_x, e3_dict['f_iso_x'][w]) +
+                         np.dot(na_y, e3_dict['f_iso_y'][w]) +
+                         np.dot(na_z, e3_dict['f_iso_z'][w]))
 
-            t3_term[(w, -w, w)] = 1. / 15 * t3term
+                t3_term[(w, -w, w)] = 1. / 15 * t3val
 
         return t3_term
 
@@ -758,59 +749,60 @@ class TpaDriver(NonlinearSolver):
         nx_a2_nyz = 0.0
 
         w = inp_dict['freq']
-        ka_na = inp_dict['Na_ka']
         A = inp_dict['A']
 
-        Na = self.complex_lrmat2vec(ka_na, nocc, norb)
+        Na = ComplexResponse.get_full_solution_vector(inp_dict['Na'])
 
         if inp_dict['flag'] == 'CD':
-            kcd = inp_dict['kcd']
-            kb = inp_dict['kb']
-            B = inp_dict['B']
-
-            Ncd = self.complex_lrmat2vec(kcd, nocc, norb)
-            Nb = self.complex_lrmat2vec(kb, nocc, norb)
-
-            na_x2_nyz += np.dot(Na.T, self._x2_contract(kcd, B, da, nocc, norb))
-            nx_a2_nyz += np.dot(self._a2_contract(kb, A, da, nocc, norb), Ncd)
-            nx_a2_nyz += np.dot(self._a2_contract(kcd, A, da, nocc, norb), Nb)
+            Ncd = ComplexResponse.get_full_solution_vector(inp_dict['Ncd'])
+            Nb = ComplexResponse.get_full_solution_vector(inp_dict['Nb'])
 
         elif inp_dict['flag'] == 'BD':
-            kbd = inp_dict['kbd']
-            kc = -inp_dict['kc_kb'].T.conj()  # gets kc from kb
-            C = inp_dict['C']
+            Nbd = ComplexResponse.get_full_solution_vector(inp_dict['Nbd'])
+            Nc = ComplexResponse.get_full_solution_vector(inp_dict['Nc'])
 
-            Nbd = self.complex_lrmat2vec(kbd, nocc, norb)
-            Nc = self.complex_lrmat2vec(kc, nocc, norb)
+        if self.rank == mpi_master():
 
-            na_x2_nyz += np.dot(Na.T, self._x2_contract(kbd, C, da, nocc, norb))
-            nx_a2_nyz += np.dot(self._a2_contract(kc, A, da, nocc, norb), Nbd)
-            nx_a2_nyz += np.dot(self._a2_contract(kbd, A, da, nocc, norb), Nc)
+            if inp_dict['flag'] == 'CD':
+                kcd = self.complex_lrvec2mat(Ncd, nocc, norb)
+                kb = self.complex_lrvec2mat(Nb, nocc, norb)
+                B = inp_dict['B']
 
-        return {
-            'key': (w, -w, w),
-            'x2': -(1. / 15) * na_x2_nyz,
-            'a2': -(1. / 15) * nx_a2_nyz,
-        }
+                na_x2_nyz += np.dot(Na.T,
+                                    self._x2_contract(kcd, B, da, nocc, norb))
+                nx_a2_nyz += np.dot(self._a2_contract(kb, A, da, nocc, norb),
+                                    Ncd)
+                nx_a2_nyz += np.dot(self._a2_contract(kcd, A, da, nocc, norb),
+                                    Nb)
 
-    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
+            elif inp_dict['flag'] == 'BD':
+                Nc = self.flip_yz(Nc)
+                kbd = self.complex_lrvec2mat(Nbd, nocc, norb)
+                kc = self.complex_lrvec2mat(Nc, nocc, norb)
+                C = inp_dict['C']
+
+                na_x2_nyz += np.dot(Na.T,
+                                    self._x2_contract(kbd, C, da, nocc, norb))
+                nx_a2_nyz += np.dot(self._a2_contract(kc, A, da, nocc, norb),
+                                    Nbd)
+                nx_a2_nyz += np.dot(self._a2_contract(kbd, A, da, nocc, norb),
+                                    Nc)
+
+            return {
+                'key': (w, -w, w),
+                'x2': -(1. / 15) * na_x2_nyz,
+                'a2': -(1. / 15) * nx_a2_nyz,
+            }
+
+        else:
+            return {}
+
+    def _print_results(self, rsp_results):
         """
         Prints the results from the TPA calculation.
 
-        :param freqs:
-            List of frequencies
-        :param gamma:
-            A dictonary containing the isotropic cubic response functions for
-            TPA
-        :param comp:
-            List of gamma tensors components
-        :param t4_dict:
-            A dictonary containing the isotropic T[4] contractions
-        :param t3_dict:
-            A dictonary containing the isotropic T[3] contractions
-        :param tpa_dict:
-            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
-            contractions
+        :param rsp_results:
+            A dictonary containing the results of response calculation.
         """
 
         return None
@@ -882,3 +874,108 @@ class TpaDriver(NonlinearSolver):
         w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
+
+    @staticmethod
+    def get_spectrum(rsp_results, x_unit):
+        """
+        Gets two-photon absorption spectrum.
+
+        :param rsp_results:
+            A dictonary containing the results of response calculation.
+        :param x_unit:
+            The unit of x-axis.
+
+        :return:
+            A dictionary containing photon energies and TPA cross-sections.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'TpaDriver.get_spectrum: x_unit should be au, ev or nm')
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        # conversion factor for TPA cross-sections in GM
+        # * a0 in cm
+        # * c in cm/s
+        # * broadening parameter not included in au2gm
+        alpha = fine_structure_constant()
+        a0_in_cm = bohr_in_angstroms() * 1.0e-8
+        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
+        au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
+
+        gamma = rsp_results['gamma']
+
+        spectrum = {'x_data': [], 'y_data': []}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'TPA cross-section [GM]'
+
+        freqs = rsp_results['frequencies']
+
+        for w in freqs:
+            if w == 0.0:
+                continue
+
+            if x_unit.lower() == 'au':
+                spectrum['x_data'].append(w)
+            elif x_unit.lower() == 'ev':
+                spectrum['x_data'].append(au2ev * w)
+            elif x_unit.lower() == 'nm':
+                spectrum['x_data'].append(auxnm / w)
+
+            cross_section_in_GM = gamma[(w, -w, w)].imag * w**2 * au2gm
+
+            spectrum['y_data'].append(cross_section_in_GM)
+
+        return spectrum
+
+    def _print_spectrum(self, spectrum, width):
+        """
+        Prints two-photon absorption spectrum.
+
+        :param spectrum:
+            The spectrum.
+        :param width:
+            The width of the output.
+        """
+
+        self.ostream.print_blank()
+
+        title = 'Two-Photon Absorption Spectrum'
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('=' * len(title)).ljust(width))
+        self.ostream.print_blank()
+
+        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
+            text = '*** No two-photon absorption spectrum at zero frequency.'
+            self.ostream.print_header(text.ljust(width))
+            self.ostream.print_blank()
+            return
+
+        assert_msg_critical(
+            '[a.u.]' in spectrum['x_label'],
+            'TpaDriver._print_spectrum: In valid unit in x_label')
+        assert_msg_critical(
+            '[GM]' in spectrum['y_label'],
+            'TpaDriver._print_spectrum: In valid unit in y_label')
+
+        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'TPA cross-section[GM]')
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('-' * len(title)).ljust(width))
+
+        for w, cross_section in zip(spectrum['x_data'], spectrum['y_data']):
+            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
+                w, w * hartree_in_ev(), cross_section)
+            self.ostream.print_header(output.ljust(width))
+
+        self.ostream.print_blank()

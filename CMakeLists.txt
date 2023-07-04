@@ -55,17 +55,12 @@ include(${PROJECT_SOURCE_DIR}/cmake/custom/alignment.cmake)
 include(${PROJECT_SOURCE_DIR}/cmake/custom/math.cmake)
 
 # find external dependencies
-# Python 3.7+
-find_package(Python 3.7 REQUIRED COMPONENTS Interpreter Development NumPy)
+# Python 3.8+
+find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development NumPy)
 # pybind11
 find_package(pybind11 2.6 CONFIG REQUIRED)
 # Libxc
-find_package(Libxc 6.0.0 QUIET)
-if(TARGET Libxc::xc)
-  find_package(Libxc 6.0.0 CONFIG REQUIRED COMPONENTS C)
-else()
-  find_package(Libxc 5.2.3 CONFIG REQUIRED COMPONENTS C)
-endif()
+find_package(Libxc 6.0.0 CONFIG REQUIRED COMPONENTS C)
 get_property(_loc TARGET Libxc::xc PROPERTY LOCATION)
 message(STATUS "Found Libxc: ${_loc} (found version \"${Libxc_VERSION}\")") 
 

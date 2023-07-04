@@ -55,7 +55,7 @@ CSADGuessDriver::~CSADGuessDriver()
 std::vector<double>
 CSADGuessDriver::_getOcc1s(const double nocc) const
 {
-    double occ = std::min(std::max(0.0, nocc), 1.0);
+    const double occ = std::max(0.0, nocc);
 
     //                           1s
     return std::vector<double>({occ});
@@ -64,7 +64,7 @@ CSADGuessDriver::_getOcc1s(const double nocc) const
 std::vector<double>
 CSADGuessDriver::_getOcc2s(const double nocc) const
 {
-    double occ = std::min(std::max(0.0, nocc), 1.0);
+    const double occ = std::max(0.0, nocc);
 
     //                           1s   2s
     return std::vector<double>({1.0, occ});
@@ -73,7 +73,7 @@ CSADGuessDriver::_getOcc2s(const double nocc) const
 std::vector<double>
 CSADGuessDriver::_getOcc2s2p(const double nocc) const
 {
-    double occ = std::min(std::max(0.0, nocc), 1.0);
+    const double occ = std::max(0.0, nocc);
 
     //                           1s   2s   2p-1 2p0  2p+1
     return std::vector<double>({1.0, occ, occ, occ, occ});
@@ -82,7 +82,7 @@ CSADGuessDriver::_getOcc2s2p(const double nocc) const
 std::vector<double>
 CSADGuessDriver::_getOcc3s(const double nocc) const
 {
-    double occ = std::min(std::max(0.0, nocc), 1.0);
+    const double occ = std::max(0.0, nocc);
 
     //                           1s   2s   3s   2p-1 2p0  2p+1
     return std::vector<double>({1.0, 1.0, occ, 1.0, 1.0, 1.0});
@@ -91,7 +91,7 @@ CSADGuessDriver::_getOcc3s(const double nocc) const
 std::vector<double>
 CSADGuessDriver::_getOcc3s3p(const double nocc) const
 {
-    double occ = std::min(std::max(0.0, nocc), 1.0);
+    const double occ = std::max(0.0, nocc);
 
     //                           1s   2s   3s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
     return std::vector<double>({1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
@@ -100,7 +100,7 @@ CSADGuessDriver::_getOcc3s3p(const double nocc) const
 std::vector<double>
 CSADGuessDriver::_getOcc4s(const double nocc) const
 {
-    double occ = std::min(std::max(0.0, nocc), 1.0);
+    const double occ = std::max(0.0, nocc);
 
     //                           1s   2s   3s   4s   2p-1 3p-1 2p0  3p0  2p+1 3p+1
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
@@ -109,7 +109,7 @@ CSADGuessDriver::_getOcc4s(const double nocc) const
 std::vector<double>
 CSADGuessDriver::_getOcc3d(const double nocc) const
 {
-    double occ = std::min(std::max(0.0, nocc), 1.0);
+    const double occ = std::max(0.0, nocc);
 
     //                           1s   2s   3s   4s  2p-1 3p-1 2p0  3p0  2p+1 3p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ});
@@ -118,71 +118,89 @@ CSADGuessDriver::_getOcc3d(const double nocc) const
 std::vector<double>
 CSADGuessDriver::_getOcc4s4p(const double nocc) const
 {
-    double occ = std::min(std::max(0.0, nocc), 1.0);
+    const double occ = std::max(0.0, nocc);
 
     //                           1s   2s   3s   4s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc5s(double occ) const
+CSADGuessDriver::_getOcc5s(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 3d-1 3d0  3d+1 3d+2
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc4d(double occ) const
+CSADGuessDriver::_getOcc4d(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  2p-1 3p-1 4p-1 2p0  3p0  4p0  2p+1 3p+1 4p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc5s5p(double occ) const
+CSADGuessDriver::_getOcc5s5p(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc6s(double occ) const
+CSADGuessDriver::_getOcc6s(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc4f(double occ) const
+CSADGuessDriver::_getOcc4f(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 3d-1 4d-1 3d0  4d0  3d+1 4d+1 3d+2 4d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, occ, occ, occ, occ, occ, occ});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc5d(double occ) const
+CSADGuessDriver::_getOcc5d(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  6s   2p-1 3p-1 4p-1 5p-1 2p0  3p0  4p0  5p0  2p+1 3p+1 4p+1 5p+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc6s6p(double occ) const
+CSADGuessDriver::_getOcc6s6p(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  6s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0  3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc7s(double occ) const
+CSADGuessDriver::_getOcc7s(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  6s   7s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0  3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 4f-2 4f-1 4f0  4f+1 4f+2 4f+3
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0});
 }
 
 std::vector<double>
-CSADGuessDriver::_getOcc5f(double occ) const
+CSADGuessDriver::_getOcc5f(const double nocc) const
 {
+    const double occ = std::max(0.0, nocc);
+
     //                           1s   2s   3s   4s   5s  6s   7s   2p-1 3p-1 4p-1 5p-1 6s-1 2p0  3p0  4p0  5p0  6s0  2p+1 3p+1 4p+1 5p+1 6s+1 3d-2 4d-2 5d-2 3d-1 4d-1 5d-1 3d0  4d0  5d0  3d+1 4d+1 5d+1 3d+2 4d+2 5d+2 4f-3 5f-3 4f-2 5f-2 4f-1 5f-1 4f0  5f0  4f+1 5f+1 4f+2 5f+2 4f+3 5f+3
     return std::vector<double>({1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ, 1.0, occ});
 }
@@ -527,25 +545,53 @@ CSADGuessDriver::getOccupationNumbersForElement(const int32_t elem_id, const dou
 }
 
 std::vector<std::vector<double>>
-CSADGuessDriver::getOccupationNumbersForMolecule(const CMolecule& molecule,
-                                                 const double     nelec) const
+CSADGuessDriver::getAlphaBetaOccupationNumbersForMolecule(const CMolecule& molecule,
+                                                          const double     netCharge,
+                                                          const double     numberOfUnpairedElectrons) const
 {
-    std::vector<std::vector<double>> occnumbers;
+    std::vector<std::vector<double>> occ_numbers;
 
     auto natoms = molecule.getNumberOfAtoms();
 
-    auto partialcharges = parchg::getPartialCharges(molecule, -nelec * 2.0);
+    auto partialcharges = parchg::getPartialCharges(molecule, netCharge);
 
     auto idselem = molecule.getIdsElemental();
 
+    int32_t sum_id_elems = 0, sum_unpaired_electrons_on_atoms = 0;
+
+    bool use_hint_for_unpaired_electrons = (static_cast<int32_t>(_numberOfUnpairedElectronsOnAtoms.size()) == natoms);
+
     for (int32_t i = 0; i < natoms; i++)
     {
-        auto occ = getOccupationNumbersForElement(idselem[i], -partialcharges[i] / 2.0);
+        sum_id_elems += idselem[i];
 
-        occnumbers.push_back(occ);
+        if (use_hint_for_unpaired_electrons)
+        {
+            sum_unpaired_electrons_on_atoms += _numberOfUnpairedElectronsOnAtoms[i];
+        }
     }
 
-    return occnumbers;
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        auto weight = static_cast<double>(idselem[i]) / sum_id_elems;
+
+        auto alpha_elec = 0.5 * (numberOfUnpairedElectrons - sum_unpaired_electrons_on_atoms) * weight;
+        auto beta_elec = -0.5 * (numberOfUnpairedElectrons - sum_unpaired_electrons_on_atoms) * weight;
+
+        if (use_hint_for_unpaired_electrons)
+        {
+            alpha_elec += 0.5 * _numberOfUnpairedElectronsOnAtoms[i];
+            beta_elec -= 0.5 * _numberOfUnpairedElectronsOnAtoms[i];
+        }
+
+        auto alpha_occ = getOccupationNumbersForElement(idselem[i], -partialcharges[i] * 0.5 + alpha_elec);
+        auto beta_occ = getOccupationNumbersForElement(idselem[i], -partialcharges[i] * 0.5 + beta_elec);
+
+        occ_numbers.push_back(alpha_occ);
+        occ_numbers.push_back(beta_occ);
+    }
+
+    return occ_numbers;
 }
 
 std::vector<std::vector<int32_t>>
@@ -582,6 +628,17 @@ CSADGuessDriver::getAOIndicesOfAtoms(const CMolecule&       molecule,
     }
 
     return aoinds_atoms;
+}
+
+void
+CSADGuessDriver::setNumberOfUnpairedElectronsOnAtoms(const std::vector<double>& numUnpairedElectrons)
+{
+    _numberOfUnpairedElectronsOnAtoms.clear();
+
+    for (int32_t i = 0; i < static_cast<int32_t>(numUnpairedElectrons.size()); i++)
+    {
+        _numberOfUnpairedElectronsOnAtoms.push_back(numUnpairedElectrons[i]);
+    }
 }
 
 CAODensityMatrix
@@ -661,15 +718,17 @@ CSADGuessDriver::_compSADGuess(const CMolecule&       molecule,
 
     double mult_1 = static_cast<double>(molecule.getMultiplicity() - 1);
 
-    double alpha_elec = 0.5 * (-charge + mult_1);
-
-    double beta_elec = 0.5 * (-charge - mult_1);
-
     // occupation numbers
 
-    auto alpha_occ = getOccupationNumbersForMolecule(molecule, alpha_elec);
+    auto alpha_beta_occ = getAlphaBetaOccupationNumbersForMolecule(molecule, charge, mult_1);
 
-    auto beta_occ = getOccupationNumbersForMolecule(molecule, beta_elec);
+    std::vector<std::vector<double>> alpha_occ, beta_occ;
+
+    for (int32_t i = 0; i < natoms; i++)
+    {
+        alpha_occ.push_back(alpha_beta_occ[i * 2 + 0]);
+        beta_occ.push_back(alpha_beta_occ[i * 2 + 1]);
+    }
 
     // C_SAD matrix
 

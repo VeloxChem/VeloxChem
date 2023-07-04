@@ -1,14 +1,14 @@
-import random
-import tempfile
 from pathlib import Path
-
+from random import choice
 import numpy as np
 import pytest
+
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
 from veloxchem.cppsolver import ComplexResponse
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.inputparser import get_random_string_serial
 
 from .addons import using_cppe
 
@@ -52,7 +52,7 @@ class TestCppAbs:
         cpp_drv.update_settings(
             {
                 'frequencies': ','.join(ref_freqs_str),
-                'batch_size': random.choice([1, 10, 100]),
+                'batch_size': choice([1, 10, 100]),
             },
             task.input_dict['method_settings'],
         )
@@ -71,39 +71,44 @@ class TestCppAbs:
             assert np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4
             assert np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4
 
-            spectrum = cpp_drv.get_spectrum(cpp_results)
-            for i, (w, sigma) in enumerate(spectrum):
+            spectrum = cpp_drv.get_spectrum(cpp_results, 'au')
+            for i, (w, sigma) in enumerate(
+                    zip(spectrum['x_data'], spectrum['y_data'])):
                 ref_w, ref_sigma = ref_spectrum[i]
                 assert abs(w - ref_w) < 1.0e-6
                 assert abs(sigma - ref_sigma) < 1.0e-7
 
     def check_printout(self, cpp_drv, cpp_results):
 
+        here = Path(__file__).parent
+        random_string = get_random_string_serial()
+        fpath = here / 'inputs' / f'vlx_printout_cpp_abs_{random_string}.out'
+
+        ostream = OutputStream(fpath)
+        cpp_drv._print_results(cpp_results, ostream)
+        ostream.close()
+
+        with fpath.open('r') as f_out:
+            lines = f_out.readlines()
+
         rsp_func = cpp_results['response_functions']
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fname = str(Path(temp_dir, 'cpp.out'))
+        for key, val in rsp_func.items():
+            key_found = False
+            for line in lines:
+                if f'{key[0]}  ;  {key[1]}' in line:
+                    content = line.split('>>')[1].split()
+                    print_freq = float(content[0])
+                    if abs(key[2] - print_freq) < 1e-4:
+                        key_found = True
+                        print_real = float(content[1])
+                        print_imag = float(content[2].replace('j', ''))
+                        assert abs(val.real - print_real) < 1.0e-6
+                        assert abs(val.imag - print_imag) < 1.0e-6
+            assert key_found
 
-            ostream = OutputStream(fname)
-            cpp_drv._print_results(cpp_results, ostream)
-            ostream.close()
-
-            with open(fname, 'r') as f_out:
-                lines = f_out.readlines()
-
-            for key, val in rsp_func.items():
-                key_found = False
-                for line in lines:
-                    if f'{key[0]}  ;  {key[1]}' in line:
-                        content = line.split('>>')[1].split()
-                        print_freq = float(content[0])
-                        if abs(key[2] - print_freq) < 1e-4:
-                            key_found = True
-                            print_real = float(content[1])
-                            print_imag = float(content[2].replace('j', ''))
-                            assert abs(val.real - print_real) < 1.0e-6
-                            assert abs(val.imag - print_imag) < 1.0e-6
-                assert key_found
+        if fpath.is_file():
+            fpath.unlink()
 
     def test_cpp_hf(self):
 

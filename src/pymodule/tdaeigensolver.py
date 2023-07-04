@@ -25,6 +25,7 @@
 
 from mpi4py import MPI
 from pathlib import Path
+from copy import deepcopy
 import numpy as np
 import time as tm
 import math
@@ -33,6 +34,7 @@ import sys
 from .veloxchemlib import (ElectricDipoleIntegralsDriver,
                            LinearMomentumIntegralsDriver,
                            AngularMomentumIntegralsDriver)
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
 from .veloxchemlib import denmat, fockmat
 from .aodensitymatrix import AODensityMatrix
@@ -44,6 +46,8 @@ from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
                          write_rsp_solution)
@@ -138,15 +142,18 @@ class TdaEigenSolver(LinearSolver):
 
         if self.cube_origin is not None:
             assert_msg_critical(
-                len(self.cube_origin) == 3, 'cube origin: Need 3 numbers')
+                len(self.cube_origin) == 3,
+                'TdaEigenSolver: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
-                len(self.cube_stepsize) == 3, 'cube stepsize: Need 3 numbers')
+                len(self.cube_stepsize) == 3,
+                'TdaEigenSolver: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
-                len(self.cube_points) == 3, 'cube points: Need 3 integers')
+                len(self.cube_points) == 3,
+                'TdaEigenSolver: cube points needs 3 integers')
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -164,11 +171,14 @@ class TdaEigenSolver(LinearSolver):
             dipole moments, oscillator strengths and rotatory strengths.
         """
 
-        # double check SCF information
-        self._check_scf_results(scf_tensors)
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check()
+        dft_sanity_check(self, 'compute')
 
         # check pe setup
         self._pe_sanity_check()
@@ -674,15 +684,21 @@ class TdaEigenSolver(LinearSolver):
         integrals = {}
 
         if self.rank == mpi_master():
-            integrals['electric dipole'] = (dipole_mats.x_to_numpy(),
+            integrals['electric_dipole'] = (dipole_mats.x_to_numpy(),
                                             dipole_mats.y_to_numpy(),
                                             dipole_mats.z_to_numpy())
-            integrals['linear momentum'] = (linmom_mats.x_to_numpy(),
-                                            linmom_mats.y_to_numpy(),
-                                            linmom_mats.z_to_numpy())
-            integrals['angular momentum'] = (angmom_mats.x_to_numpy(),
-                                             angmom_mats.y_to_numpy(),
-                                             angmom_mats.z_to_numpy())
+
+            integrals['linear_momentum'] = (-1.0 * linmom_mats.x_to_numpy(),
+                                            -1.0 * linmom_mats.y_to_numpy(),
+                                            -1.0 * linmom_mats.z_to_numpy())
+
+            integrals['angular_momentum'] = (-1.0 * angmom_mats.x_to_numpy(),
+                                             -1.0 * angmom_mats.y_to_numpy(),
+                                             -1.0 * angmom_mats.z_to_numpy())
+
+            integrals['magnetic_dipole'] = (0.5 * angmom_mats.x_to_numpy(),
+                                            0.5 * angmom_mats.y_to_numpy(),
+                                            0.5 * angmom_mats.z_to_numpy())
 
         return integrals
 
@@ -719,17 +735,17 @@ class TdaEigenSolver(LinearSolver):
                 [mo_occ, exc_vec, mo_vir.T])
 
             transition_dipoles['electric'][s, :] = np.array([
-                np.vdot(trans_dens, integrals['electric dipole'][d].T)
+                np.vdot(trans_dens, integrals['electric_dipole'][d])
                 for d in range(3)
-            ])
+            ]) * (-1.0)
 
             transition_dipoles['velocity'][s, :] = np.array([
-                np.vdot(trans_dens, -1.0 * integrals['linear momentum'][d].T) /
-                eigvals[s] for d in range(3)
-            ])
+                np.vdot(trans_dens, integrals['linear_momentum'][d])
+                for d in range(3)
+            ]) / eigvals[s]
 
             transition_dipoles['magnetic'][s, :] = np.array([
-                np.vdot(trans_dens, 0.5 * integrals['angular momentum'][d].T)
+                np.vdot(trans_dens, integrals['magnetic_dipole'][d])
                 for d in range(3)
             ])
 
@@ -824,3 +840,28 @@ class TdaEigenSolver(LinearSolver):
         self._print_absorption('One-Photon Absorption', results)
         self._print_ecd('Electronic Circular Dichroism', results)
         self._print_excitation_details('Character of excitations:', results)
+
+    def __deepcopy__(self, memo):
+        """
+        Implements deepcopy.
+
+        :param memo:
+            The memo dictionary for deepcopy.
+
+        :return:
+            A deepcopy of self.
+        """
+
+        new_rsp_drv = TdaEigenSolver(self.comm, self.ostream)
+
+        for key, val in vars(self).items():
+            if isinstance(val, (MPI.Intracomm, OutputStream)):
+                pass
+            elif isinstance(val, XCFunctional):
+                new_rsp_drv.key = XCFunctional(val)
+            elif isinstance(val, MolecularGrid):
+                new_rsp_drv.key = MolecularGrid(val)
+            else:
+                new_rsp_drv.key = deepcopy(val)
+
+        return new_rsp_drv

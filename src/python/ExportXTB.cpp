@@ -60,6 +60,7 @@ export_xtb(py::module& m)
         .def("mute", &CXtbDriver::mute, "Mutes output.")
         .def("unmute", &CXtbDriver::unmute, "Unmutes output.")
         .def("get_output", &CXtbDriver::getOutput, "Gets XTB output as a vector of strings.")
+        .def("get_method", &CXtbDriver::getMethod, "Gets XTB method.")
         .def("get_output_filename", &CXtbDriver::getOutputFilename, "Gets XTB output filename.")
         .def("get_energy", &CXtbDriver::getEnergy, "Gets energy of molecular system.")
         .def(

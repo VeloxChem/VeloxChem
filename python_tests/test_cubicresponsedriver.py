@@ -22,7 +22,8 @@ class TestCrf:
 
         scf_settings = {'conv_thresh': 1.0e-8}
 
-        molecule = Molecule.read_str(molecule_string, units='ang')
+        molecule = Molecule.read_molecule_string(molecule_string,
+                                                 units='angstrom')
         molecule.set_charge(0)
         molecule.set_multiplicity(1)
 
@@ -31,13 +32,13 @@ class TestCrf:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.update_settings(scf_settings)
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
-        return scf_drv.scf_tensors, molecule, basis
+        return scf_results, molecule, basis
 
     def run_crf(self, ref_result):
 
-        scf_tensors, molecule, ao_basis = self.run_scf()
+        scf_results, molecule, ao_basis = self.run_scf()
 
         wb = -0.1
         wc = 0.3
@@ -58,7 +59,7 @@ class TestCrf:
         crf_prop = CubicResponseDriver()
         crf_prop.ostream.mute()
         crf_prop.update_settings(rsp_settings)
-        crf_result = crf_prop.compute(molecule, ao_basis, scf_tensors)
+        crf_result = crf_prop.compute(molecule, ao_basis, scf_results)
 
         if is_mpi_master():
             for key in ref_result:

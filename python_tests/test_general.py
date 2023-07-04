@@ -1,6 +1,6 @@
 from veloxchem.veloxchemlib import mpi_master
 from veloxchem.veloxchemlib import mpi_initialized
-from veloxchem.veloxchemlib import bohr_in_angstroms
+from veloxchem.veloxchemlib import bohr_in_angstrom
 from veloxchem.veloxchemlib import hartree_in_ev
 from veloxchem.veloxchemlib import to_angular_momentum
 from veloxchem.errorhandler import assert_msg_critical
@@ -22,7 +22,7 @@ class TestGeneral:
 
     def test_constants(self):
 
-        assert abs(bohr_in_angstroms() - 0.529177) < 1.0e-6
+        assert abs(bohr_in_angstrom() - 0.529177) < 1.0e-6
         assert abs(hartree_in_ev() - 27.2114) < 1.0e-4
 
     def test_angular_momentum(self):

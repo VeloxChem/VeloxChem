@@ -30,16 +30,19 @@ import time as tm
 import math
 import sys
 
-from .veloxchemlib import (mpi_master, hartree_in_wavenumbers, hartree_in_ev,
-                           fine_structure_constant,
+from .veloxchemlib import (mpi_master, hartree_in_wavenumber, hartree_in_ev,
+                           hartree_in_inverse_nm, fine_structure_constant,
                            extinction_coefficient_from_beta)
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
-from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
+from .checkpoint import (check_rsp_hdf5, create_hdf5,
+                         write_rsp_solution_with_multiple_keys)
 
 
 class ComplexResponse(LinearSolver):
@@ -81,10 +84,10 @@ class ComplexResponse(LinearSolver):
         self.b_operator = 'electric dipole'
         self.b_components = 'xyz'
 
-        self.cpp_flag = 'absorption'
+        self.cpp_flag = None
 
         self.frequencies = (0,)
-        self.damping = 1000.0 / hartree_in_wavenumbers()
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         self._input_keywords['response'].update({
             'a_operator': ('str_lower', 'A operator'),
@@ -302,11 +305,14 @@ class ComplexResponse(LinearSolver):
         self._dist_fock_ger = None
         self._dist_fock_ung = None
 
-        # double check SCF information
-        self._check_scf_results(scf_tensors)
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check()
+        dft_sanity_check(self, 'compute')
 
         # check pe setup
         self._pe_sanity_check()
@@ -365,8 +371,10 @@ class ComplexResponse(LinearSolver):
                                                 self.b_components, molecule,
                                                 basis, scf_tensors)
             if self.rank == mpi_master():
-                v_grad = {(op, w): v for op, v in zip(self.b_components, b_grad)
-                          for w in self.frequencies}
+                v_grad = {
+                    (op, w): v for op, v in zip(self.b_components, b_grad)
+                    for w in self.frequencies
+                }
 
         # operators, frequencies and preconditioners
         if self.rank == mpi_master():
@@ -633,7 +641,7 @@ class ComplexResponse(LinearSolver):
 
                     x = DistributedArray(x_data, self.comm, distribute=False)
 
-                    x_full = self._get_full_solution_vector(x)
+                    x_full = self.get_full_solution_vector(x)
                     if self.rank == mpi_master():
                         xv = np.dot(x_full, v_grad[(op, w)])
                         xvs.append((op, w, xv))
@@ -752,7 +760,6 @@ class ComplexResponse(LinearSolver):
                 if self.rank == mpi_master():
                     va = {op: v for op, v in zip(self.a_components, a_grad)}
                     rsp_funcs = {}
-                    full_solutions = {}
 
                     # create h5 file for response solutions
                     if (self.save_solutions and
@@ -765,19 +772,21 @@ class ComplexResponse(LinearSolver):
                                     pe_dict['potfile_text'])
 
                 for bop, w in solutions:
-                    x = self._get_full_solution_vector(solutions[(bop, w)])
+                    x = self.get_full_solution_vector(solutions[(bop, w)])
 
                     if self.rank == mpi_master():
                         for aop in self.a_components:
                             rsp_funcs[(aop, bop, w)] = -np.dot(va[aop], x)
-                            full_solutions[(bop, w)] = x
 
-                            # write to h5 file for response solutions
-                            if (self.save_solutions and
-                                    self.checkpoint_file is not None):
-                                write_rsp_solution(
-                                    final_h5_fname,
-                                    '{:s}_{:s}_{:.8f}'.format(aop, bop, w), x)
+                        # write to h5 file for response solutions
+                        if (self.save_solutions and
+                                self.checkpoint_file is not None):
+                            solution_keys = [
+                                '{:s}_{:s}_{:.8f}'.format(aop, bop, w)
+                                for aop in self.a_components
+                            ]
+                            write_rsp_solution_with_multiple_keys(
+                                final_h5_fname, solution_keys, x)
 
                 if self.rank == mpi_master():
                     # print information about h5 file for response solutions
@@ -789,29 +798,25 @@ class ComplexResponse(LinearSolver):
                         self.ostream.print_blank()
 
                     ret_dict = {
+                        'frequencies': list(self.frequencies),
                         'response_functions': rsp_funcs,
-                        'solutions': full_solutions
+                        'solutions': solutions,
                     }
 
-                    self._print_results(ret_dict, self.ostream)
+                    self._print_results(ret_dict)
 
                     return ret_dict
+                else:
+                    return {'solutions': solutions}
 
         else:
             if self.is_converged:
-                kappas = {}
-
-                for op, w in solutions:
-                    x = self._get_full_solution_vector(solutions[(op, w)])
-                    x = self.comm.bcast(x, root=mpi_master())
-                    kappas[(op, w)] = (self.lrvec2mat(x.real, nocc, norb) +
-                                       1j * self.lrvec2mat(x.imag, nocc, norb))
-
-                return {'focks': focks, 'kappas': kappas}
+                return {'focks': focks, 'solutions': solutions}
 
         return None
 
-    def _get_full_solution_vector(self, solution):
+    @staticmethod
+    def get_full_solution_vector(solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -827,7 +832,7 @@ class ComplexResponse(LinearSolver):
         x_imagung = solution.get_full_vector(2)
         x_imagger = solution.get_full_vector(3)
 
-        if self.rank == mpi_master():
+        if solution.rank == mpi_master():
             x_real = np.hstack((x_realger, x_realger)) + np.hstack(
                 (x_realung, -x_realung))
             x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
@@ -874,74 +879,132 @@ class ComplexResponse(LinearSolver):
 
         self.ostream.flush()
 
-    def get_spectrum(self, results):
+    def get_spectrum(self, rsp_results, x_unit):
         """
         Gets spectrum.
 
-        :param results:
+        :param rsp_results:
             The dictionary containing response results.
+        :param x_unit:
+            The unit of x-axis.
 
         :return:
-            A list containing the energies and spectrum.
+            A dictionary containing the spectrum.
         """
 
         if self.cpp_flag == 'absorption':
-            return self._get_absorption_spectrum(results)
+            return self._get_absorption_spectrum(rsp_results, x_unit)
 
         elif self.cpp_flag == 'ecd':
-            return self._get_ecd_spectrum(results)
+            return self._get_ecd_spectrum(rsp_results, x_unit)
 
         return None
 
-    def _get_absorption_spectrum(self, results):
+    def _get_absorption_spectrum(self, rsp_results, x_unit):
         """
         Gets absorption spectrum.
 
-        :param results:
+        :param rsp_results:
             The dictionary containing response results.
+        :param x_unit:
+            The unit of x-axis.
 
         :return:
-            A list containing the energies and cross-sections in a.u.
+            A dictionary containing the absorption spectrum.
         """
 
-        spectrum = []
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'ComplexResponse.get_spectrum: x_unit should be au, ev or nm')
 
-        for w in self.frequencies:
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        spectrum = {'x_data': [], 'y_data': []}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'Absorption cross-section [a.u.]'
+
+        freqs = rsp_results['frequencies']
+        rsp_funcs = rsp_results['response_functions']
+
+        for w in freqs:
             if w == 0.0:
                 continue
 
-            axx = -results['response_functions'][('x', 'x', w)].imag
-            ayy = -results['response_functions'][('y', 'y', w)].imag
-            azz = -results['response_functions'][('z', 'z', w)].imag
+            if x_unit.lower() == 'au':
+                spectrum['x_data'].append(w)
+            elif x_unit.lower() == 'ev':
+                spectrum['x_data'].append(au2ev * w)
+            elif x_unit.lower() == 'nm':
+                spectrum['x_data'].append(auxnm / w)
+
+            axx = -rsp_funcs[('x', 'x', w)].imag
+            ayy = -rsp_funcs[('y', 'y', w)].imag
+            azz = -rsp_funcs[('z', 'z', w)].imag
 
             alpha_bar = (axx + ayy + azz) / 3.0
             sigma = 4.0 * math.pi * w * alpha_bar * fine_structure_constant()
 
-            spectrum.append((w, sigma))
+            spectrum['y_data'].append(sigma)
 
         return spectrum
 
-    def _get_ecd_spectrum(self, results):
+    def _get_ecd_spectrum(self, rsp_results, x_unit):
         """
         Gets circular dichroism spectrum.
 
-        :param results:
+        :param rsp_results:
             The dictionary containing response results.
+        :param x_unit:
+            The unit of x-axis.
 
         :return:
-            A list containing the energies and extinction coefficient (Delta
-            epsilon).
+            A dictionary containing the circular dichroism spectrum.
         """
 
-        spectrum = []
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'ComplexResponse.get_spectrum: x_unit should be au, ev or nm')
 
-        for w in self.frequencies:
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        spectrum = {'x_data': [], 'y_data': []}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'Molar circular dichroism '
+        spectrum['y_label'] += '[L mol$^{-1}$ cm$^{-1}$]'
+
+        freqs = rsp_results['frequencies']
+        rsp_funcs = rsp_results['response_functions']
+
+        for w in freqs:
             if w == 0.0:
                 continue
 
-            Gxx = -results['response_functions'][('x', 'x', w)].imag
-            Gyy = -results['response_functions'][('y', 'y', w)].imag
-            Gzz = -results['response_functions'][('z', 'z', w)].imag
+            if x_unit.lower() == 'au':
+                spectrum['x_data'].append(w)
+            elif x_unit.lower() == 'ev':
+                spectrum['x_data'].append(au2ev * w)
+            elif x_unit.lower() == 'nm':
+                spectrum['x_data'].append(auxnm / w)
+
+            Gxx = -rsp_funcs[('x', 'x', w)].imag
+            Gyy = -rsp_funcs[('y', 'y', w)].imag
+            Gzz = -rsp_funcs[('z', 'z', w)].imag
 
             Gxx /= w
             Gyy /= w
@@ -950,65 +1013,106 @@ class ComplexResponse(LinearSolver):
             beta = -(Gxx + Gyy + Gzz) / (3.0 * w)
             Delta_epsilon = beta * w**2 * extinction_coefficient_from_beta()
 
-            spectrum.append((w, Delta_epsilon))
+            spectrum['y_data'].append(Delta_epsilon)
 
         return spectrum
 
-    def _print_results(self, results, ostream):
+    def _print_results(self, rsp_results, ostream=None):
         """
         Prints response resutls to output stream.
 
-        :param results:
+        :param rsp_results:
             The dictionary containing response results.
         :param ostream:
             The output stream.
         """
+
+        self._print_response_functions(rsp_results, ostream)
 
         if self.cpp_flag == 'absorption':
-            self._print_absorption_results(results, ostream)
+            self._print_absorption_results(rsp_results, ostream)
 
         elif self.cpp_flag == 'ecd':
-            self._print_ecd_results(results, ostream)
+            self._print_ecd_results(rsp_results, ostream)
 
-    def _print_absorption_results(self, results, ostream):
+    def _print_response_functions(self, rsp_results, ostream=None):
         """
-        Prints absorption results to output stream.
+        Prints response functions to output stream.
 
-        :param results:
+        :param rsp_results:
             The dictionary containing response results.
         :param ostream:
             The output stream.
         """
 
+        if ostream is None:
+            ostream = self.ostream
+
         width = 92
+
+        freqs = rsp_results['frequencies']
+        rsp_funcs = rsp_results['response_functions']
 
         title = 'Response Functions at Given Frequencies'
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        for w in self.frequencies:
+        operator_to_name = {
+            'dipole': 'Dipole',
+            'electric dipole': 'Dipole',
+            'electric_dipole': 'Dipole',
+            'linear_momentum': 'LinMom',
+            'linear momentum': 'LinMom',
+            'angular_momentum': 'AngMom',
+            'angular momentum': 'AngMom',
+            'magnetic dipole': 'MagDip',
+            'magnetic_dipole': 'MagDip',
+        }
+        a_name = operator_to_name[self.a_operator]
+        b_name = operator_to_name[self.b_operator]
+
+        for w in freqs:
             title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'Dipole', 'Dipole', 'Frequency', 'Real', 'Imaginary')
+                a_name, b_name, 'Frequency', 'Real', 'Imaginary')
             ostream.print_header(title.ljust(width))
             ostream.print_header(('-' * len(title)).ljust(width))
 
             for a in self.a_components:
                 for b in self.b_components:
-                    prop = results['response_functions'][(a, b, w)]
+                    rsp_func_val = rsp_funcs[(a, b, w)]
                     ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
                         a.lower(), b.lower(), w)
                     output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
+                        ops_label, rsp_func_val.real, rsp_func_val.imag)
                     ostream.print_header(output.ljust(width))
             ostream.print_blank()
+
+    def _print_absorption_results(self, rsp_results, ostream=None):
+        """
+        Prints absorption results to output stream.
+
+        :param rsp_results:
+            The dictionary containing response results.
+        :param ostream:
+            The output stream.
+        """
+
+        if ostream is None:
+            ostream = self.ostream
+
+        width = 92
+
+        spectrum = self.get_spectrum(rsp_results, 'au')
 
         title = 'Linear Absorption Cross-Section'
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
+        freqs = rsp_results['frequencies']
+
+        if len(freqs) == 1 and freqs[0] == 0.0:
             text = '*** No linear absorption spectrum at zero frequency.'
             ostream.print_header(text.ljust(width))
             ostream.print_blank()
@@ -1020,60 +1124,53 @@ class ComplexResponse(LinearSolver):
         ostream.print_header(title.ljust(width))
         ostream.print_blank()
 
+        assert_msg_critical(
+            '[a.u.]' in spectrum['x_label'],
+            'ComplexResponse._print_absorption_results: In valid unit in x_label'
+        )
+        assert_msg_critical(
+            '[a.u.]' in spectrum['y_label'],
+            'ComplexResponse._print_absorption_results: In valid unit in y_label'
+        )
+
         title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
                                                'Frequency[eV]',
                                                'sigma(w)[a.u.]')
         ostream.print_header(title.ljust(width))
         ostream.print_header(('-' * len(title)).ljust(width))
 
-        spectrum = self.get_spectrum(results)
-
-        for w, sigma in spectrum:
+        for w, sigma in zip(spectrum['x_data'], spectrum['y_data']):
             output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
                 w, w * hartree_in_ev(), sigma)
             ostream.print_header(output.ljust(width))
 
         ostream.print_blank()
 
-    def _print_ecd_results(self, results, ostream):
+    def _print_ecd_results(self, rsp_results, ostream=None):
         """
         Prints ECD results to output stream.
 
-        :param results:
+        :param rsp_results:
             The dictionary containing response results.
         :param ostream:
             The output stream.
         """
 
+        if ostream is None:
+            ostream = self.ostream
+
         width = 92
 
-        title = 'Response Functions at Given Frequencies'
-        ostream.print_header(title.ljust(width))
-        ostream.print_header(('=' * len(title)).ljust(width))
-        ostream.print_blank()
-
-        for w in self.frequencies:
-            title = '{:<7s} {:<7s} {:>10s} {:>15s} {:>16s}'.format(
-                'MagDip', 'LinMom', 'Frequency', 'Real', 'Imaginary')
-            ostream.print_header(title.ljust(width))
-            ostream.print_header(('-' * len(title)).ljust(width))
-
-            for a in self.a_components:
-                for b in self.b_components:
-                    prop = results['response_functions'][(a, b, w)]
-                    ops_label = '<<{:>3s}  ;  {:<3s}>> {:10.4f}'.format(
-                        a.lower(), b.lower(), w)
-                    output = '{:<15s} {:15.8f} {:15.8f}j'.format(
-                        ops_label, prop.real, prop.imag)
-                    ostream.print_header(output.ljust(width))
-            ostream.print_blank()
+        spectrum = self.get_spectrum(rsp_results, 'au')
 
         title = 'Circular Dichroism Spectrum'
         ostream.print_header(title.ljust(width))
         ostream.print_header(('=' * len(title)).ljust(width))
         ostream.print_blank()
 
-        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
+        freqs = rsp_results['frequencies']
+
+        if len(freqs) == 1 and freqs[0] == 0.0:
             text = '*** No circular dichroism spectrum at zero frequency.'
             ostream.print_header(text.ljust(width))
             ostream.print_blank()
@@ -1085,15 +1182,20 @@ class ComplexResponse(LinearSolver):
         ostream.print_header(title.ljust(width))
         ostream.print_blank()
 
+        assert_msg_critical(
+            '[a.u.]' in spectrum['x_label'],
+            'ComplexResponse._print_ecd_results: In valid unit in x_label')
+        assert_msg_critical(
+            r'[L mol$^{-1}$ cm$^{-1}$]' in spectrum['y_label'],
+            'ComplexResponse._print_ecd_results: In valid unit in y_label')
+
         title = '{:<20s}{:<20s}{:>28s}'.format('Frequency[a.u.]',
                                                'Frequency[eV]',
                                                'Delta_epsilon[L mol^-1 cm^-1]')
         ostream.print_header(title.ljust(width))
         ostream.print_header(('-' * len(title)).ljust(width))
 
-        spectrum = self.get_spectrum(results)
-
-        for w, Delta_epsilon in spectrum:
+        for w, Delta_epsilon in zip(spectrum['x_data'], spectrum['y_data']):
             output = '{:<20.4f}{:<20.5f}{:>18.8f}'.format(
                 w, w * hartree_in_ev(), Delta_epsilon)
             ostream.print_header(output.ljust(width))

@@ -29,9 +29,9 @@ class TestXtbHessianDriver:
         xtb_drv.set_method(xtb_method.lower())
         xtb_drv.compute(task.molecule, task.ostream)
 
-        xtb_hessian_drv = XtbHessianDriver(xtb_drv)
-        xtb_hessian_drv.ostream.mute()
-        xtb_hessian_drv.compute(task.molecule)
+        xtb_hessian_drv = XtbHessianDriver()
+        xtb_hessian_drv.ostream.state = False
+        xtb_hessian_drv.compute(task.molecule, xtb_drv)
 
         if is_mpi_master(task.mpi_comm):
             xtb_hessian_drv.vibrational_analysis(task.molecule)

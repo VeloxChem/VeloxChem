@@ -26,9 +26,9 @@
 from .rspproperty import ResponseProperty
 
 
-class TPA(ResponseProperty):
+class TpaTransition(ResponseProperty):
     """
-    Implements the two-photon absorption property.
+    Implements the TPA transition property.
 
     :param rsp_dict:
         The dictionary of response input.
@@ -38,7 +38,7 @@ class TPA(ResponseProperty):
 
     def __init__(self, rsp_dict=None, method_dict=None):
         """
-        Initializes the TPA property.
+        Initializes the TPA transition property.
         """
 
         if rsp_dict is None:
@@ -51,12 +51,12 @@ class TPA(ResponseProperty):
         else:
             method_dict = dict(method_dict)
 
-        rsp_dict['property'] = 'tpa'
-        rsp_dict['order'] = 'cubic'
-        rsp_dict['residue'] = 'none'
+        rsp_dict['property'] = 'tpa transition'
+        rsp_dict['order'] = 'quadratic'
+        rsp_dict['residue'] = 'single'
         rsp_dict['complex'] = 'yes'
 
-        if 'frequencies' not in rsp_dict:
-            rsp_dict['frequencies'] = '0'
+        if 'nstates' not in rsp_dict:
+            rsp_dict['nstates'] = '3'
 
         super().__init__(rsp_dict, method_dict)

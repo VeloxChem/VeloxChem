@@ -51,19 +51,19 @@ def _AODensityMatrix_write_hdf5(self, fname):
 
             name = f'{matrix_count}_rest.alpha_{density_id}'
             array = self.alpha_to_numpy(density_id)
-            hf.create_dataset(name, data=array, compression='gzip')
+            hf.create_dataset(name, data=array)
             matrix_count += 1
 
         elif density_type == denmat.unrest:
 
             name = f'{matrix_count}_unrest.alpha_{density_id}'
             array = self.alpha_to_numpy(density_id)
-            hf.create_dataset(name, data=array, compression='gzip')
+            hf.create_dataset(name, data=array)
             matrix_count += 1
 
             name = f'{matrix_count}_unrest.beta_{density_id}'
             array = self.beta_to_numpy(density_id)
-            hf.create_dataset(name, data=array, compression='gzip')
+            hf.create_dataset(name, data=array)
             matrix_count += 1
 
     hf.close()

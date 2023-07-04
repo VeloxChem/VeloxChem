@@ -246,9 +246,17 @@ export_orbdata(py::module& m)
             "py_comm"_a)
         .def("get_valence_basis", &CMolecularBasis::reduceToValenceBasis, "Reduces molecular basis to valence molecular basis.")
         .def("add_atom_basis", &CMolecularBasis::addAtomBasis, "Adds atom basis object to molecular basis.", "atomBasis"_a)
+        .def("get_dimension_of_basis",
+             &CMolecularBasis::getDimensionsOfBasis,
+             "Determines size of contracted AO basis for selected molecule.",
+             "molecule"_a)
         .def("get_dimensions_of_basis",
              &CMolecularBasis::getDimensionsOfBasis,
              "Determines size of contracted AO basis for selected molecule.",
+             "molecule"_a)
+        .def("get_dimension_of_primitive_basis",
+             &CMolecularBasis::getDimensionsOfPrimitiveBasis,
+             "Determines size of primitive AO basis for selected molecule.",
              "molecule"_a)
         .def("get_dimensions_of_primitive_basis",
              &CMolecularBasis::getDimensionsOfPrimitiveBasis,
@@ -417,7 +425,8 @@ export_orbdata(py::module& m)
 
     PyClass<CSADGuessDriver>(m, "SADGuessDriver")
         .def(py::init(&vlx_general::create<CSADGuessDriver>), "comm"_a = py::none())
-        .def("compute", &CSADGuessDriver::compute, "Computes SAD initial guess.", "molecule"_a, "basis_1"_a, "basis_2"_a, "densityType"_a);
+        .def("compute", &CSADGuessDriver::compute, "Computes SAD initial guess.", "molecule"_a, "basis_1"_a, "basis_2"_a, "densityType"_a)
+        .def("set_number_of_unpaired_electrons_on_atoms", &CSADGuessDriver::setNumberOfUnpairedElectronsOnAtoms, "Sets number of unpaired electrons on atoms for SAD initial guess.", "num_unpaired_electrons"_a);
     
     // CPackedGtoPairContainer class
 

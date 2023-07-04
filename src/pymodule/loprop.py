@@ -31,7 +31,7 @@ from collections import Counter
 from .lrsolver import LinearResponseSolver
 from .outputstream import OutputStream
 from .veloxchemlib import (ElectricDipoleIntegralsDriver, mpi_master,
-                           bohr_in_angstroms, to_angular_momentum,
+                           bohr_in_angstrom, to_angular_momentum,
                            get_basis_function_indices_for_atom)
 from .errorhandler import assert_msg_critical
 
@@ -182,12 +182,15 @@ class LoPropDriver:
         lrs_drv = LinearResponseSolver(self.comm, self.ostream)
         lrs_out = lrs_drv.compute(molecule, basis, scf_tensors)
 
-        if self.rank == mpi_master():
+        # obtain response vectors
+        Nx = LinearResponseSolver.get_full_solution_vector(
+            lrs_out['solutions'][('x', 0)])
+        Ny = LinearResponseSolver.get_full_solution_vector(
+            lrs_out['solutions'][('y', 0)])
+        Nz = LinearResponseSolver.get_full_solution_vector(
+            lrs_out['solutions'][('z', 0)])
 
-            # obtain response vectors
-            Nx = lrs_out['solutions'][('x', 0)]
-            Ny = lrs_out['solutions'][('y', 0)]
-            Nz = lrs_out['solutions'][('z', 0)]
+        if self.rank == mpi_master():
 
             # This is a workaround for the sqrt(2) factor in the solution vectors
             inv_sqrt_2 = 1.0 / np.sqrt(2.0)
@@ -253,7 +256,7 @@ class LoPropDriver:
                 it += ao_per_atom[a]
 
             # coord_matrix, the rab matrix in equation above
-            molecule_coord = molecule.get_coordinates()
+            molecule_coord = molecule.get_coordinates_in_bohr()
             coord_matrix = np.zeros((natoms, natoms, 3))
             for i in range(natoms):
                 # a==b: rab=ra
@@ -398,7 +401,7 @@ class LoPropDriver:
         RBS = np.array([
             0, 0.25, 0.25, 1.45, 1.05, 0.85, 0.7, 0.65, 0.6, 0.5, 0.43, 1.8,
             1.5, 1.25, 1.1, 1.0, 1.0, 1.0, 1.0
-        ]) / bohr_in_angstroms()
+        ]) / bohr_in_angstrom()
 
         assert_msg_critical(za <= 18 and zb <= 18,
                             'LoPropDriver: we currently support up to Ar')

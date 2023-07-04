@@ -30,13 +30,15 @@ import time
 import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master, hartree_in_wavenumbers
+from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -82,7 +84,7 @@ class QuadraticResponseDriver(NonlinearSolver):
         self.b_frequencies = (0,)
         self.c_frequencies = (0,)
         self.comp = None
-        self.damping = 1000.0 / hartree_in_wavenumbers()
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         self.a_components = 'z'
         self.b_components = 'z'
@@ -133,11 +135,14 @@ class QuadraticResponseDriver(NonlinearSolver):
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-6
 
-        # double check SCF information
-        self._check_scf_results(scf_tensors)
+        # check molecule
+        molecule_sanity_check(molecule)
+
+        # check SCF results
+        scf_results_sanity_check(self, scf_tensors)
 
         # check dft setup
-        self._dft_sanity_check_nonlinrsp()
+        dft_sanity_check(self, 'compute', 'nonlinear')
 
         profiler = Profiler({
             'timing': False,
@@ -214,10 +219,14 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         if self.rank == mpi_master():
             A = {(op, w): v for op, v in zip('A', a_grad) for w in wa}
-            B = {(op, w): v for op, v in zip('B', b_grad)
-                 for w in self.b_frequencies}
-            C = {(op, w): v for op, v in zip('C', c_grad)
-                 for w in self.c_frequencies}
+            B = {
+                (op, w): v for op, v in zip('B', b_grad)
+                for w in self.b_frequencies
+            }
+            C = {
+                (op, w): v for op, v in zip('C', c_grad)
+                for w in self.c_frequencies
+            }
 
             ABC.update(A)
             ABC.update(B)
@@ -253,13 +262,13 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         self._is_converged = N_drv.is_converged
 
-        kX = N_results['kappas']
+        Nx = N_results['solutions']
         Focks = N_results['focks']
 
         profiler.check_memory_usage('CPP')
 
         quad_dict = self.compute_quad_components(Focks, freqpairs, X, d_a_mo,
-                                                 kX, self.comp, scf_tensors,
+                                                 Nx, self.comp, scf_tensors,
                                                  molecule, ao_basis, profiler)
 
         valstr = '*** Time spent in quadratic response calculation: '
@@ -272,7 +281,7 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         return quad_dict
 
-    def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, kX, track,
+    def compute_quad_components(self, Focks, freqpairs, X, d_a_mo, Nx, track,
                                 scf_tensors, molecule, ao_basis, profiler):
         """
         Computes all the relevent terms to compute a general quadratic response function
@@ -283,8 +292,8 @@ class QuadraticResponseDriver(NonlinearSolver):
             A dictonary of matricies containing all the property integrals
         :param d_a_mo:
             The SCF density in MO basis
-        :param kX:
-            A dictonary containing all the response matricies
+        :param Nx:
+            A dictonary containing all the response vectors in distributed form
         :param scf_tensors:
             The dictionary of tensors from converged SCF wavefunction.
         :param molecule:
@@ -314,12 +323,8 @@ class QuadraticResponseDriver(NonlinearSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
 
         # computing all compounded first-order densities
-        if self.rank == mpi_master():
-            first_order_dens, second_order_dens = self.get_densities(
-                freqpairs, kX, mo, nocc)
-        else:
-            first_order_dens = None
-            second_order_dens = None
+        first_order_dens, second_order_dens = self.get_densities(
+            freqpairs, Nx, mo, nocc, norb)
 
         profiler.check_memory_usage('Densities')
 
@@ -330,33 +335,32 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         profiler.check_memory_usage('Focks')
 
-        e3_dict = self.get_e3(freqpairs, kX, fock_dict, Focks, nocc, norb)
+        e3_dict = self.get_e3(freqpairs, Nx, fock_dict, Focks, nocc, norb)
 
         profiler.check_memory_usage('E[3]')
 
         result = {}
 
-        if self.rank == mpi_master():
+        for (wb, wc) in freqpairs:
 
-            op_a = X[self.a_components]
-            op_b = X[self.b_components]
-            op_c = X[self.c_components]
+            Na = ComplexResponse.get_full_solution_vector(Nx[('A', (wb + wc))])
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
 
-            for (wb, wc) in freqpairs:
+            if self.rank == mpi_master():
 
-                Na = self.complex_lrmat2vec(kX[('A', wb + wc)], nocc, norb)
-                Nb = self.complex_lrmat2vec(kX[('B', wb)], nocc, norb)
-                Nc = self.complex_lrmat2vec(kX[('C', wc)], nocc, norb)
+                op_a = X[self.a_components]
+                op_b = X[self.b_components]
+                op_c = X[self.c_components]
 
-                C2Nb = self._x2_contract(kX[('B', wb)], op_c, d_a_mo, nocc,
-                                         norb)
-                B2Nc = self._x2_contract(kX[('C', wc)], op_b, d_a_mo, nocc,
-                                         norb)
+                kb = self.complex_lrvec2mat(Nb, nocc, norb)
+                kc = self.complex_lrvec2mat(Nc, nocc, norb)
 
-                A2Nc = self._a2_contract(kX[('C', wc)], op_a, d_a_mo, nocc,
-                                         norb)
-                A2Nb = self._a2_contract(kX[('B', wb)], op_a, d_a_mo, nocc,
-                                         norb)
+                C2Nb = self._x2_contract(kb, op_c, d_a_mo, nocc, norb)
+                B2Nc = self._x2_contract(kc, op_b, d_a_mo, nocc, norb)
+
+                A2Nc = self._a2_contract(kc, op_a, d_a_mo, nocc, norb)
+                A2Nb = self._a2_contract(kb, op_a, d_a_mo, nocc, norb)
 
                 NaE3NbNc = np.dot(Na.T, e3_dict[wb])
                 NaC2Nb = np.dot(Na.T, C2Nb)
@@ -370,23 +374,23 @@ class QuadraticResponseDriver(NonlinearSolver):
                 beta = val_E3 + val_A2 + val_X2
 
                 self.ostream.print_blank()
-                w_str = 'Quadratic response function at given frequencies: '
-                w_str += '<< {};{},{} >>'.format(self.a_components,
-                                                 self.b_components,
-                                                 self.c_components)
+                w_str = 'Quadratic response function: '
+                w_str += '<< {};{},{} >>  ({},{})'.format(
+                    self.a_components, self.b_components, self.c_components,
+                    str(wb), str(wc))
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
 
-                title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
-                    'Component', 'Frequency', 'Real', 'Imaginary')
+                title = '{:<9s} {:>20s} {:>21s}'.format('Component', 'Real',
+                                                        'Imaginary')
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component('X2', wb, val_X2, width)
-                self._print_component('A2', wb, val_A2, width)
-                self._print_component('E3', wb, val_E3, width)
-                self._print_component('beta', wb, beta, width)
+                self._print_component('X2', val_X2, width)
+                self._print_component('A2', val_A2, width)
+                self._print_component('E3', val_E3, width)
+                self._print_component('beta', beta, width)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
@@ -396,57 +400,90 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         return result
 
-    def get_densities(self, freqpairs, kX, mo, nocc):
+    def get_densities(self, freqpairs, Nx, mo, nocc, norb):
         """
         Computes the densities needed for the perturbed Fock matrices.
 
         :param freqpairs:
             A list of the frequencies
-        :param kX:
-            A dictonary with all the first-order response matrices
+        :param Nx:
+            A dictonary with all the first-order response vectors in
+            distributed form
         :param mo:
             A matrix containing the MO coefficents
         :param nocc:
             Number of occupied orbitals
+        :param norb:
+            Number of orbitals
 
         :return:
-            first_order_dens:
-             A list of first-order one-time tranformed compounded densities
-            second_order_dens:
-             A list of first-order two-time tranformed compounded densities
+            first_order_dens (first-order one-time tranformed compounded
+            densities) and second_order_dens (first-order two-time tranformed
+            compounded densities)
         """
 
-        first_order_dens = []
-        second_order_dens = []
+        distributed_density_1 = None
+        distributed_density_2 = None
 
         for (wb, wc) in freqpairs:
 
-            kb = kX[('B', wb)]
-            kc = kX[('C', wc)]
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
 
-            # create the first order single indexed densiteies #
+            if self.rank == mpi_master():
 
-            Db = self.commut_mo_density(kb, nocc)
-            Dc = self.commut_mo_density(kc, nocc)
+                kb = self.complex_lrvec2mat(Nb, nocc, norb)
+                kc = self.complex_lrvec2mat(Nc, nocc, norb)
 
-            # create the first order two indexed densities #
+                # create the first order single indexed densiteies #
 
-            Dbc = self.commut(kb, Dc) + self.commut(kc, Db)
+                Db = self.commut_mo_density(kb, nocc)
+                Dc = self.commut_mo_density(kc, nocc)
 
-            # density transformation from MO to AO basis
+                # create the first order two indexed densities #
 
-            Db = np.linalg.multi_dot([mo, Db, mo.T])
-            Dc = np.linalg.multi_dot([mo, Dc, mo.T])
-            Dbc = np.linalg.multi_dot([mo, Dbc, mo.T])
+                Dbc = self.commut(kb, Dc) + self.commut(kc, Db)
 
-            first_order_dens.append(Db.real)
-            first_order_dens.append(Db.imag)
-            first_order_dens.append(Dc.real)
-            first_order_dens.append(Dc.imag)
-            second_order_dens.append(Dbc.real)
-            second_order_dens.append(Dbc.imag)
+                # density transformation from MO to AO basis
 
-        return first_order_dens, second_order_dens
+                Db = np.linalg.multi_dot([mo, Db, mo.T])
+                Dc = np.linalg.multi_dot([mo, Dc, mo.T])
+                Dbc = np.linalg.multi_dot([mo, Dbc, mo.T])
+
+                dist_den_1_freq = np.hstack((
+                    Db.real.reshape(-1, 1),
+                    Db.imag.reshape(-1, 1),
+                    Dc.real.reshape(-1, 1),
+                    Dc.imag.reshape(-1, 1),
+                ))
+
+                dist_den_2_freq = np.hstack((
+                    Dbc.real.reshape(-1, 1),
+                    Dbc.imag.reshape(-1, 1),
+                ))
+
+            else:
+                dist_den_1_freq = None
+                dist_den_2_freq = None
+
+            dist_den_1_freq = DistributedArray(dist_den_1_freq, self.comm)
+            dist_den_2_freq = DistributedArray(dist_den_2_freq, self.comm)
+
+            if distributed_density_1 is None:
+                distributed_density_1 = DistributedArray(dist_den_1_freq.data,
+                                                         self.comm,
+                                                         distribute=False)
+            else:
+                distributed_density_1.append(dist_den_1_freq, axis=1)
+
+            if distributed_density_2 is None:
+                distributed_density_2 = DistributedArray(dist_den_2_freq.data,
+                                                         self.comm,
+                                                         distribute=False)
+            else:
+                distributed_density_2.append(dist_den_2_freq, axis=1)
+
+        return distributed_density_1, distributed_density_2
 
     def get_fock_dict(self,
                       wi,
@@ -480,7 +517,15 @@ class QuadraticResponseDriver(NonlinearSolver):
         if self.rank == mpi_master():
             self._print_fock_header()
 
-        keys = ['FbcFcb']
+        # generate key-frequency pairs
+
+        key_freq_pairs = []
+
+        for (wb, wc) in wi:
+            for key in ['FbcFcb']:
+                key_freq_pairs.append((key, wb))
+
+        # examine checkpoint file for distributed Focks
 
         if self.checkpoint_file is not None:
             fock_file = str(
@@ -488,60 +533,54 @@ class QuadraticResponseDriver(NonlinearSolver):
         else:
             fock_file = None
 
-        fock_freqs = [wb for (wb, wc) in wi]
-
         if self.restart:
             if self.rank == mpi_master():
-                self.restart = check_distributed_focks(fock_file, keys,
-                                                       fock_freqs)
+                self.restart = check_distributed_focks(fock_file,
+                                                       key_freq_pairs)
             self.restart = self.comm.bcast(self.restart, mpi_master())
 
+        # read or compute distributed Focks
+
         if self.restart:
-            focks = read_distributed_focks(fock_file, keys, fock_freqs,
-                                           self.comm, self.ostream)
-            focks['F0'] = F0
-            return focks
+            dist_focks = read_distributed_focks(fock_file, self.comm,
+                                                self.ostream)
+        else:
+            time_start_fock = time.time()
 
-        time_start_fock = time.time()
-        dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
-                                         'real_and_imag', dft_dict,
-                                         first_order_dens, second_order_dens,
-                                         None, 'qrf')
-        time_end_fock = time.time()
+            dist_focks = self._comp_nlr_fock(mo, molecule, ao_basis,
+                                             'real_and_imag', dft_dict,
+                                             first_order_dens,
+                                             second_order_dens, None, 'qrf')
 
-        total_time_fock = time_end_fock - time_start_fock
-        self._print_fock_time(total_time_fock)
+            self._print_fock_time(time.time() - time_start_fock)
+
+            write_distributed_focks(fock_file, dist_focks, key_freq_pairs,
+                                    self.comm, self.ostream)
 
         focks = {'F0': F0}
-        for key in keys:
-            focks[key] = {}
 
-        fock_index = 0
-        for wb in fock_freqs:
-            for key in keys:
-                focks[key][wb] = DistributedArray(dist_focks.data[:,
-                                                                  fock_index],
-                                                  self.comm,
-                                                  distribute=False)
-                fock_index += 1
-
-        write_distributed_focks(fock_file, focks, keys, fock_freqs, self.comm,
-                                self.ostream)
+        for fock_index, (key, wb) in enumerate(key_freq_pairs):
+            if key not in focks:
+                focks[key] = {}
+            focks[key][wb] = DistributedArray(dist_focks.data[:, fock_index],
+                                              self.comm,
+                                              distribute=False)
 
         return focks
 
-    def get_e3(self, wi, kX, fo, fo2, nocc, norb):
+    def get_e3(self, wi, Nx, fo, fo2, nocc, norb):
         """
         Contracts E[3]
 
         :param wi:
             A list of freqs
-        :param kX:
-            A dict of the single index response matricies
+        :param Nx:
+            A dict of the single index response vectors in distributed form
         :param fo:
             A dictonary of transformed Fock matricies from fock_dict
         :param fo2:
-            A dictonarty of transfromed Fock matricies from subspace of response solver
+            A dictonarty of transfromed Fock matricies from subspace of
+            response solver
         :param nocc:
             The number of occupied orbitals
         :param norb:
@@ -564,6 +603,9 @@ class QuadraticResponseDriver(NonlinearSolver):
 
             vec_pack = self._collect_vectors_in_columns(vec_pack)
 
+            Nb = ComplexResponse.get_full_solution_vector(Nx[('B', wb)])
+            Nc = ComplexResponse.get_full_solution_vector(Nx[('C', wc)])
+
             if self.rank != mpi_master():
                 continue
 
@@ -578,8 +620,8 @@ class QuadraticResponseDriver(NonlinearSolver):
 
             # Response
 
-            kb = kX[('B', wb)].T
-            kc = kX[('C', wc)].T
+            kb = (self.complex_lrvec2mat(Nb, nocc, norb)).T
+            kc = (self.complex_lrvec2mat(Nc, nocc, norb)).T
 
             xi = self._xi(kb, kc, fb, fc, F0_a)
 
@@ -590,7 +632,7 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         return e3vec
 
-    def _print_component(self, label, freq, value, width):
+    def _print_component(self, label, value, width):
         """
         Prints QRF component.
 
@@ -604,6 +646,6 @@ class QuadraticResponseDriver(NonlinearSolver):
             The width for the output
         """
 
-        w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
-            label, freq, value.real, value.imag)
+        w_str = '{:<9s} {:20.8f} {:20.8f}j'.format(label, value.real,
+                                                   value.imag)
         self.ostream.print_header(w_str.ljust(width))

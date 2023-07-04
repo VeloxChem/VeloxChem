@@ -78,7 +78,7 @@ class OutputStream:
             errio = f'OutputStream: invalid argument {stream}'
             assert_msg_critical(self.state, errio)
 
-        self._state_backup = self.state
+        self._state_backup = None
 
     def __del__(self):
         """
@@ -104,8 +104,10 @@ class OutputStream:
         Mutes the output stream.
         """
 
-        self._state_backup = self.state
-        self.state = False
+        # only mute from an unmuted state (i.e. when _state_backup is None)
+        if self._state_backup is None:
+            self._state_backup = self.state
+            self.state = False
 
     def unmute(self):
         """
@@ -113,7 +115,10 @@ class OutputStream:
         state of the output stream.
         """
 
-        self.state = self._state_backup
+        # only unmute from an muted state (i.e. when _state_backup is not None)
+        if self._state_backup is not None:
+            self.state = self._state_backup
+            self._state_backup = None
 
     def get_state(self):
         """
@@ -192,6 +197,25 @@ class OutputStream:
         return '* Info * ' + line + ' ' * right
 
     @staticmethod
+    def warning(line, width):
+        """
+        Gets the warning string.
+
+        :param line:
+            The line of text.
+        :param width:
+            Width of the output.
+
+        :return:
+            The warning string.
+        """
+
+        length = len(line)
+        left = 12
+        right = width - length - left
+        return '* Warning * ' + line + ' ' * right
+
+    @staticmethod
     def tsep(width):
         """
         Gets the separator string.
@@ -261,6 +285,20 @@ class OutputStream:
         if not self.state:
             return
         self.buffer_lines.append(self.info(line, self.width))
+
+    def print_warning(self, line):
+        """
+        Prints a warning line to stream.
+
+        :param line:
+            The line of text.
+        """
+
+        if not self.state:
+            return
+        self.buffer_lines.append('*' * 11 + ' ' * (self.width - 11))
+        self.buffer_lines.append(self.warning(line, self.width))
+        self.buffer_lines.append('*' * 11 + ' ' * (self.width - 11))
 
     def print_separator(self):
         """

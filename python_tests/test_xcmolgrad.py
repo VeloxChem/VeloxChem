@@ -5,6 +5,7 @@ from veloxchem.veloxchemlib import GridDriver, XCMolecularGradient
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.dftutils import get_default_grid_level
 
 
 class TestXCMolGrad:
@@ -14,7 +15,6 @@ class TestXCMolGrad:
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
 
-        scf_drv.dft = True
         scf_drv.xcfun = xcfun
         scf_drv.conv_thresh = 1.0e-8
 
@@ -22,7 +22,9 @@ class TestXCMolGrad:
         density = scf_drv.density
 
         grid_drv = GridDriver(scf_drv.comm)
-        grid_drv.set_level(scf_drv.grid_level)
+        grid_level = (get_default_grid_level(scf_drv.xcfun)
+                      if scf_drv.grid_level is None else scf_drv.grid_level)
+        grid_drv.set_level(grid_level)
         mol_grid = grid_drv.generate(molecule)
 
         grad_drv = XCMolecularGradient(scf_drv.comm)
@@ -41,7 +43,7 @@ class TestXCMolGrad:
             H  0.0000000000  -0.7695699584   0.5948147012
         """
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         xcfun = 'slater'
 
@@ -61,7 +63,7 @@ class TestXCMolGrad:
             H  0.0000000000  -0.7695699584   0.5948147012
         """
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
         xcfun = 'blyp'
 

@@ -28,9 +28,8 @@ import numpy as np
 import sys
 
 from .veloxchemlib import Molecule
-from .veloxchemlib import (mpi_master, bohr_in_angstroms,
-                           hartree_in_wavenumbers, hartree_in_ev,
-                           amu_in_electron_masses,
+from .veloxchemlib import (mpi_master, bohr_in_angstrom, hartree_in_wavenumber,
+                           hartree_in_ev, amu_in_electron_mass,
                            boltzmann_in_hartreeperkelvin)
 from .outputstream import OutputStream
 from .scfrestdriver import ScfRestrictedDriver
@@ -38,6 +37,7 @@ from .firstorderprop import FirstOrderProperties
 from .rspabsorption import Absorption
 from .errorhandler import assert_msg_critical
 from .inputparser import parse_input, print_keywords
+from .dftutils import get_default_grid_level
 
 
 class NumerovDriver:
@@ -208,7 +208,7 @@ class NumerovDriver:
             from scipy import interpolate
         except ImportError:
             raise ImportError('Unable to import scipy. Please install scipy ' +
-                              'via \'python3 -m pip install scipy\'')
+                              'via pip or conda.')
 
         if not self.pec_data:
             # carry out PEC scan
@@ -374,7 +374,7 @@ class NumerovDriver:
             'NumerovDriver.generate_pec: Only applicable to diatomic molecules')
 
         # get data for PEC scan
-        mol_coords = molecule.get_coordinates()
+        mol_coords = molecule.get_coordinates_in_bohr()
         self.eq_bond_len = np.linalg.norm(mol_coords[0] - mol_coords[1])
         bond_lengths = self.pec_displacements + self.eq_bond_len
 
@@ -398,11 +398,12 @@ class NumerovDriver:
         self.print_PEC_header(scf_drv)
 
         for n, x in enumerate(bond_lengths):
-            geometry = Molecule.read_str('{}  0 0 0\n{}  {} 0 0'.format(
-                atom1, atom2, x * bohr_in_angstroms()))
+            geometry = Molecule.read_molecule_string(
+                '{}  0 0 0\n{}  {} 0 0'.format(atom1, atom2,
+                                               x * bohr_in_angstrom()))
 
-            scf_drv.compute(geometry, ao_basis, min_basis)
-            scf_prop.compute_scf_prop(geometry, ao_basis, scf_drv.scf_tensors)
+            scf_results = scf_drv.compute(geometry, ao_basis, min_basis)
+            scf_prop.compute_scf_prop(geometry, ao_basis, scf_results)
 
             # save energies and dipole moments
             pec_energies['i'].append(scf_drv.scf_energy)
@@ -436,7 +437,7 @@ class NumerovDriver:
                         }, self.method_dict)
 
                     rsp_prop.init_driver(self.comm, OutputStream(None))
-                    rsp_prop.compute(geometry, ao_basis, scf_drv.scf_tensors)
+                    rsp_prop.compute(geometry, ao_basis, scf_results)
 
                     total_energy = (rsp_prop.rsp_property['eigenvalues'][-1] +
                                     scf_drv.scf_energy)
@@ -649,7 +650,7 @@ class NumerovDriver:
                        np.sum([tm**2 for tm in trans_moms]))
 
         # (forbidden) Q branch
-        exc_energies['Q'] = vib_exc_energy * hartree_in_wavenumbers()
+        exc_energies['Q'] = vib_exc_energy * hartree_in_wavenumber()
         osc_str['Q'] = vib_osc_str
 
         # rotational resolution
@@ -664,7 +665,7 @@ class NumerovDriver:
         for j in range(0, self.n_rot_states):
             exc_energies['R'] = np.append(exc_energies['R'],
                                           (vib_exc_energy + 2.0 * B *
-                                           (j + 1)) * hartree_in_wavenumbers())
+                                           (j + 1)) * hartree_in_wavenumber())
 
             R_j = (2 * j + 1) * np.exp((-B * j * (j + 1)) / (kB * self.temp))
             osc_str['R'] = np.append(osc_str['R'], R_j)
@@ -679,7 +680,7 @@ class NumerovDriver:
         for j in range(1, self.n_rot_states):
             exc_energies['P'] = np.append(exc_energies['P'],
                                           (vib_exc_energy - 2.0 * B * j) *
-                                          hartree_in_wavenumbers())
+                                          hartree_in_wavenumber())
 
             P_j = (2 * j + 1) * np.exp((-B * j * (j + 1)) / (kB * self.temp))
             osc_str['P'] = np.append(osc_str['P'], P_j)
@@ -741,7 +742,7 @@ class NumerovDriver:
                 [tm**2 for tm in abs_vib_trans_moms])
 
             exc_energies[a] = np.append(exc_energies[a],
-                                        abs_energy * hartree_in_wavenumbers())
+                                        abs_energy * hartree_in_wavenumber())
             osc_str[a] = np.append(osc_str[a], abs_f)
 
             # emission spectrum
@@ -753,7 +754,7 @@ class NumerovDriver:
                 [tm**2 for tm in em_vib_trans_moms])
 
             exc_energies[e] = np.append(exc_energies[e],
-                                        em_energy * hartree_in_wavenumbers())
+                                        em_energy * hartree_in_wavenumber())
             osc_str[e] = np.append(osc_str[e], em_f)
 
         return (exc_energies, osc_str)
@@ -791,8 +792,8 @@ class NumerovDriver:
             key: value for key, value in zip(['i', 'f'], [*pec_energies])
         }
         self.eq_bond_len = (bond_lengths[np.argmin(self.pec_energies['i'])] /
-                            bohr_in_angstroms())
-        self.pec_displacements = (np.array(bond_lengths) / bohr_in_angstroms() -
+                            bohr_in_angstrom())
+        self.pec_displacements = (np.array(bond_lengths) / bohr_in_angstrom() -
                                   self.eq_bond_len)
         self.pec_data = True
 
@@ -817,7 +818,7 @@ class NumerovDriver:
             The reduced mass in amu.
         """
 
-        self.reduced_mass = reduced_mass * amu_in_electron_masses()
+        self.reduced_mass = reduced_mass * amu_in_electron_mass()
 
     def print_PEC_header(self, scf_drv):
         """
@@ -850,8 +851,9 @@ class NumerovDriver:
             cur_str = 'DFT Functional                : '
             cur_str += scf_drv.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level          : ' + str(
-                scf_drv.grid_level)
+            grid_level = (get_default_grid_level(scf_drv.xcfun)
+                          if scf_drv.grid_level is None else scf_drv.grid_level)
+            cur_str = 'Molecular Grid Level          : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         # print excited state info
@@ -914,8 +916,8 @@ class NumerovDriver:
             cur_str += '{:>16s}'.format('rel. ES energy')
         self.ostream.print_header(cur_str.ljust(width))
         for bl, gs_e, es_e in zip(bond_lengths, gs_energies, es_energies):
-            cur_str = 'Bond distance: {:10.4f} angs '.format(
-                bl * bohr_in_angstroms())
+            cur_str = 'Bond distance: {:10.4f} angs '.format(bl *
+                                                             bohr_in_angstrom())
             cur_str += '{:12.5f} eV '.format(gs_e * hartree_in_ev())
             if es_e:
                 cur_str += '{:12.5f} eV'.format(es_e * hartree_in_ev())

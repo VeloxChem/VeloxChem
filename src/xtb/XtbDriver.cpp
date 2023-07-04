@@ -85,13 +85,13 @@ CXtbDriver::setElectronicTemp(const double electronicTemp)
 }
 
 void 
-CXtbDriver::setMethod(const std::string method)
+CXtbDriver::setMethod(const std::string& method)
 {
     _xtbMethod = method; 
 }
 
 void 
-CXtbDriver::setOutputFilename(const std::string filename)
+CXtbDriver::setOutputFilename(const std::string& filename)
 {
     _outputFilename = filename; 
 }
@@ -205,6 +205,12 @@ CXtbDriver::getOutput() const
     }
 
     return output_strings;
+}
+
+std::string
+CXtbDriver::getMethod() const
+{
+    return _xtbMethod;
 }
 
 std::string

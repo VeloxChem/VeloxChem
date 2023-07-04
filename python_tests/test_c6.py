@@ -1,14 +1,14 @@
-import random
-import tempfile
 from pathlib import Path
-
+from random import choice
 import numpy as np
 import pytest
+
+from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.mpitask import MpiTask
 from veloxchem.outputstream import OutputStream
 from veloxchem.c6driver import C6Driver
 from veloxchem.scfrestdriver import ScfRestrictedDriver
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.inputparser import get_random_string_serial
 
 
 @pytest.mark.solvers
@@ -19,9 +19,10 @@ class TestC6:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
-        return scf_drv.scf_tensors
+        return scf_results
 
     def run_c6(self, inpfile, xcfun_label, data_lines, ref_c6_value):
 
@@ -34,15 +35,15 @@ class TestC6:
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
-        scf_tensors = self.run_scf(task)
+        scf_results = self.run_scf(task)
 
         c6_drv = C6Driver(task.mpi_comm, task.ostream)
         c6_drv.update_settings(
             {
                 'n_points': ref_n_points,
-                'batch_size': random.choice([1, 10, 100])
+                'batch_size': choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        c6_results = c6_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+        c6_results = c6_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         assert c6_drv.is_converged
 
@@ -96,31 +97,36 @@ class TestC6:
 
     def check_printout(self, c6_drv, c6_results):
 
+        c6_val = c6_results['c6']
         rsp_func = c6_results['response_functions']
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            fname = str(Path(temp_dir, 'c6.out'))
+        here = Path(__file__).parent
+        random_string = get_random_string_serial()
+        fpath = here / 'inputs' / f'vlx_printout_c6_{random_string}.out'
 
-            ostream = OutputStream(fname)
-            c6_drv._print_results(c6_results, ostream)
-            ostream.close()
+        ostream = OutputStream(fpath)
+        c6_drv._print_results(c6_val, rsp_func, ostream)
+        ostream.close()
 
-            with open(fname, 'r') as f_out:
-                lines = f_out.readlines()
+        with fpath.open('r') as f_out:
+            lines = f_out.readlines()
 
-            for key, val in rsp_func.items():
-                key_found = False
-                for line in lines:
-                    if f'{key[0]}  ;  {key[1]}' in line:
-                        content = line.split('>>')[1].split()
-                        print_freq = float(content[0])
-                        if abs(key[2] - print_freq) < 1e-4:
-                            key_found = True
-                            print_real = float(content[1])
-                            print_imag = float(content[2].replace('j', ''))
-                            assert abs(val.real - print_real) < 1.0e-6
-                            assert abs(val.imag - print_imag) < 1.0e-6
-                assert key_found
+        for key, val in rsp_func.items():
+            key_found = False
+            for line in lines:
+                if f'{key[0]}  ;  {key[1]}' in line:
+                    content = line.split('>>')[1].split()
+                    print_freq = float(content[0])
+                    if abs(key[2] - print_freq) < 1e-4:
+                        key_found = True
+                        print_real = float(content[1])
+                        print_imag = float(content[2].replace('j', ''))
+                        assert abs(val.real - print_real) < 1.0e-6
+                        assert abs(val.imag - print_imag) < 1.0e-6
+            assert key_found
+
+        if fpath.is_file():
+            fpath.unlink()
 
     def test_c6_hf(self):
 

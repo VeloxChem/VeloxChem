@@ -39,7 +39,7 @@ TEST_F(CGridDriverTest, DefaultConstructor)
 {
     CGridDriver gdrv(MPI_COMM_WORLD);
 
-    gdrv.setLevel(6);
+    gdrv.setLevel(8);
 
     auto mlih = vlxmol::getMoleculeLiH();
 

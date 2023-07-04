@@ -8,7 +8,7 @@ except ImportError:
     pass
 
 from veloxchem.numerovdriver import NumerovDriver
-from veloxchem.veloxchemlib import bohr_in_angstroms
+from veloxchem.veloxchemlib import bohr_in_angstrom
 
 
 class TestNumerov:
@@ -18,7 +18,7 @@ class TestNumerov:
         # data for HCl (B3LYP/6-31+G)
 
         # bond_lengths
-        bond_lengths = np.arange(-0.7, 2.01, 0.1) * bohr_in_angstroms() + 1.274
+        bond_lengths = np.arange(-0.7, 2.01, 0.1) * bohr_in_angstrom() + 1.274
 
         # ground state energies from unrestricted SCF
         gs_energies = [

@@ -34,11 +34,6 @@ class Polarizability(ResponseProperty):
         The dictionary of response input.
     :param method_dict:
         The dictionary of method settings.
-
-    Instance variables
-        - rsp_dict: The dictionary of response input.
-        - method_dict: The dictionary of method settings.
-        - rsp_property: The dictionary of response property.
     """
 
     def __init__(self, rsp_dict=None, method_dict=None):
@@ -75,26 +70,3 @@ class Polarizability(ResponseProperty):
             rsp_dict['frequencies'] = '0'
 
         super().__init__(rsp_dict, method_dict)
-
-    def get_property(self, key):
-        """
-        Gets response functions or solutions.
-
-        :param key:
-            The keyword 'response_functions' or 'solutions'.
-
-        :return:
-            The response functions or solutions.
-        """
-
-        return self._rsp_property[key]
-
-    def print_property(self, ostream):
-        """
-        Prints polarizability to output stream.
-
-        :param ostream:
-            The output stream.
-        """
-
-        pass

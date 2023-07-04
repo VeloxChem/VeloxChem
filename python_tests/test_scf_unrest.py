@@ -26,11 +26,11 @@ class TestScfUnrestricted:
         scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-        scf_prop.compute_scf_prop(task.molecule, task.ao_basis,
-                                  scf_drv.scf_tensors)
+        scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_results)
 
         if is_mpi_master(task.mpi_comm):
             if xcfun_label is not None:
@@ -100,10 +100,8 @@ class TestScfUnrestricted:
 
         xcfun_label = 'm06'
         electric_field = None
-        ref_e_scf = -76.0876405275
-        ref_dip = np.array([0.000000, 0.000000, -0.213026])
-        # note: reference energy with finer grid is -76.087540220585
-        # note: reference dipole moment with finer grid is -0.213126
+        ref_e_scf = -76.0875402206
+        ref_dip = np.array([0.000000, 0.000000, -0.213126])
 
         self.run_scf(inpfile, potfile, xcfun_label, electric_field, ref_e_scf,
                      ref_dip)

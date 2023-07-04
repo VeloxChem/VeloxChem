@@ -16,7 +16,7 @@ dependencies:
   - setuptools
   - wheel
   - pybind11-global
-  - python>=3.7
+  - python>=3.8
   - psutil
   - pytest
   - mdanalysis
@@ -24,7 +24,12 @@ dependencies:
   - scipy
   - gtest
   - gmock
+  - rdkit
   - cppe
   - xtb
   - geometric
   - libxc
+  - clang-format
+  - yapf
+  - toml
+  - flake8

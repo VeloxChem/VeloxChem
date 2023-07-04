@@ -19,18 +19,19 @@ class TestQrf:
         """
         basis_set_label = '6-31G'
 
-        molecule = Molecule.read_str(molecule_string, units='ang')
+        molecule = Molecule.read_molecule_string(molecule_string,
+                                                 units='angstrom')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
-        return molecule, basis, scf_drv.scf_tensors
+        return molecule, basis, scf_results
 
     def run_qrf(self, ref_result):
 
-        molecule, basis, scf_tensors = self.run_scf()
+        molecule, basis, scf_results = self.run_scf()
 
         qrf_drv = QuadraticResponseDriver()
         qrf_drv.ostream.mute()
@@ -45,7 +46,7 @@ class TestQrf:
             'c_components': 'x'
         }
         qrf_drv.update_settings(rsp_settings)
-        qrf_result_xxx = qrf_drv.compute(molecule, basis, scf_tensors)
+        qrf_result_xxx = qrf_drv.compute(molecule, basis, scf_results)
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,
@@ -57,7 +58,7 @@ class TestQrf:
             'c_components': 'x'
         }
         qrf_drv.update_settings(rsp_settings)
-        qrf_result_zzx = qrf_drv.compute(molecule, basis, scf_tensors)
+        qrf_result_zzx = qrf_drv.compute(molecule, basis, scf_results)
 
         rsp_settings = {
             'conv_thresh': 1.0e-4,
@@ -69,7 +70,7 @@ class TestQrf:
             'c_components': 'x'
         }
         qrf_drv.update_settings(rsp_settings)
-        qrf_result_yyx = qrf_drv.compute(molecule, basis, scf_tensors)
+        qrf_result_yyx = qrf_drv.compute(molecule, basis, scf_results)
 
         if is_mpi_master():
             thresh = 1.0e-4

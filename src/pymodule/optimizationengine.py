@@ -31,7 +31,7 @@ import numpy as np
 import time as tm
 
 from .veloxchemlib import mpi_master
-from .veloxchemlib import (XCFunctional, MolecularGrid)
+from .veloxchemlib import XCFunctional, MolecularGrid
 from .outputstream import OutputStream
 from .molecule import Molecule
 
@@ -65,7 +65,7 @@ class OptimizationEngine(geometric.engine.Engine):
         g_molecule = geometric.molecule.Molecule()
         g_molecule.elem = molecule.get_labels()
         g_molecule.xyzs = [
-            molecule.get_coordinates() * geometric.nifty.bohr2ang
+            molecule.get_coordinates_in_bohr() * geometric.nifty.bohr2ang
         ]
 
         super().__init__(g_molecule)
@@ -109,13 +109,16 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.ostream.print_info('Computing energy and gradient...')
         self.grad_drv.ostream.flush()
 
-        self.grad_drv.ostream.mute()
+        # manually mute the output stream
+        ostream_state_orig = self.grad_drv.ostream.state
+        self.grad_drv.ostream.state = False
 
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
-        self.grad_drv.ostream.unmute()
+        # manually unmute the output stream
+        self.grad_drv.ostream.state = ostream_state_orig
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())

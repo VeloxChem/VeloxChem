@@ -28,7 +28,9 @@ import numpy as np
 
 from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
+
+from .errorhandler import assert_msg_critical
 
 
 @staticmethod
@@ -80,9 +82,9 @@ def _Molecule_draw_2d_svg(smiles_str, width=300, height=300):
         from IPython.display import SVG
         from IPython.display import display
 
-        mol_no_hydrogen = Molecule._smiles_to_xyz(smiles_str,
-                                                  optimize=True,
-                                                  no_hydrogen=True)
+        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
+                                                 optimize=True,
+                                                 no_hydrogen=True)
 
         drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
         drawer.DrawMolecule(mol_no_hydrogen)
@@ -106,18 +108,18 @@ def _Molecule_read_smiles(smiles_str):
         The molecule.
     """
 
-    xyz = Molecule._smiles_to_xyz(smiles_str, optimize=True)
+    xyz = Molecule.smiles_to_xyz(smiles_str, optimize=True)
 
-    return Molecule.from_xyz_string(xyz)
+    return Molecule.read_xyz_string(xyz)
 
 
 @staticmethod
-def _Molecule_read_str(xyzstr, units='angstrom'):
+def _Molecule_read_molecule_string(mol_str, units='angstrom'):
     """
-    Reads molecule from xyz string.
+    Reads molecule from a string containing Cartesian coordinates.
 
-    :param xyzstr:
-        The xyz string.
+    :param mol_str:
+        The string containing Cartesian coordinates.
     :param units:
         The unit of coordinates.
 
@@ -128,7 +130,7 @@ def _Molecule_read_str(xyzstr, units='angstrom'):
     labels = []
     coords = []
 
-    for line in xyzstr.strip().splitlines():
+    for line in mol_str.strip().splitlines():
         if line:
             content = line.split()
             labels.append(content[0])
@@ -138,7 +140,7 @@ def _Molecule_read_str(xyzstr, units='angstrom'):
 
 
 @staticmethod
-def _Molecule_read_xyz(xyzfile):
+def _Molecule_read_xyz_file(xyzfile):
     """
     Reads molecule from file in XYZ format.
 
@@ -150,13 +152,13 @@ def _Molecule_read_xyz(xyzfile):
     """
 
     with Path(xyzfile).open('r') as fh:
-        xyzstr = '\n'.join(fh.readlines()[2:])
+        xyzstr = fh.read()
 
-    return Molecule.read_str(xyzstr, units='angstrom')
+    return Molecule.read_xyz_string(xyzstr)
 
 
 @staticmethod
-def _Molecule_from_xyz_string(xyz):
+def _Molecule_read_xyz_string(xyz):
     """
     Generate molecule from string in XYZ format.
 
@@ -167,9 +169,19 @@ def _Molecule_from_xyz_string(xyz):
         The molecule.
     """
 
-    xyzstr = '\n'.join(xyz.strip().splitlines()[2:])
+    lines = xyz.strip().splitlines()
 
-    return Molecule.read_str(xyzstr, 'angstrom')
+    try:
+        natoms = int(lines[0].strip())
+    except (ValueError, TypeError):
+        assert_msg_critical(False,
+                            'Molecule: Invalid number of atoms in XYZ input')
+
+    assert_msg_critical(natoms == len(lines[2:]),
+                        'Molecule: Inconsistent number of atoms in XYZ input')
+
+    mol_str = '\n'.join(lines[2:])
+    return Molecule.read_molecule_string(mol_str, 'angstrom')
 
 
 @staticmethod
@@ -184,11 +196,21 @@ def _Molecule_from_dict(mol_dict):
         The molecule.
     """
 
-    xyzstr = '\n'.join(mol_dict['xyz'])
+    assert_msg_critical(('xyz' in mol_dict) ^ ('xyzfile' in mol_dict),
+                        'Molecule: Expecting either "xyz" or "xyzfile" input')
 
-    units = 'angstrom'
-    if 'units' in mol_dict:
-        units = mol_dict['units'].lower()
+    if 'xyz' in mol_dict:
+        mol_str = '\n'.join(mol_dict['xyz'])
+        units = 'angstrom'
+        if 'units' in mol_dict:
+            units = mol_dict['units'].lower()
+        mol = Molecule.read_molecule_string(mol_str, units)
+
+    elif 'xyzfile' in mol_dict:
+        assert_msg_critical(
+            'units' not in mol_dict,
+            'Molecule: Cannot have both "units" and "xyzfile" input')
+        mol = Molecule.read_xyz_file(mol_dict['xyzfile'])
 
     charge = 0.0
     if 'charge' in mol_dict:
@@ -198,7 +220,6 @@ def _Molecule_from_dict(mol_dict):
     if 'multiplicity' in mol_dict:
         multiplicity = int(mol_dict['multiplicity'])
 
-    mol = Molecule.read_str(xyzstr, units)
     mol.set_charge(charge)
     mol.set_multiplicity(multiplicity)
     mol.check_multiplicity()
@@ -209,10 +230,21 @@ def _Molecule_from_dict(mol_dict):
 
 def _Molecule_center_of_mass(self):
     """
-    Computes center of mass of a molecule.
+    Computes center of mass of a molecule in Bohr (for backward compatibility).
 
     :return:
-        The center of mass.
+        The center of mass in Bohr.
+    """
+
+    return self.center_of_mass_in_bohr()
+
+
+def _Molecule_center_of_mass_in_bohr(self):
+    """
+    Computes center of mass of a molecule in Bohr.
+
+    :return:
+        The center of mass in Bohr.
     """
 
     masses = self.masses_to_numpy()
@@ -225,6 +257,17 @@ def _Molecule_center_of_mass(self):
     z_center = np.sum(z_coords * masses) / np.sum(masses)
 
     return x_center, y_center, z_center
+
+
+def _Molecule_center_of_mass_in_angstrom(self):
+    """
+    Computes center of mass of a molecule in Angstrom.
+
+    :return:
+        The center of mass in Angstrom.
+    """
+
+    return self.center_of_mass_in_bohr() * bohr_in_angstrom()
 
 
 def _Molecule_more_info(self):
@@ -276,10 +319,21 @@ def _Molecule_get_labels(self):
 
 def _Molecule_get_coordinates(self):
     """
-    Returns atom coordinates in atomic units.
+    Returns atom coordinates in Bohr (for backward compatibility).
 
     :return:
-        A numpy array of atom coordinates (nx3) in atomic units.
+        A numpy array of atom coordinates (nx3) in Bohr.
+    """
+
+    return self.get_coordinates_in_bohr()
+
+
+def _Molecule_get_coordinates_in_bohr(self):
+    """
+    Returns atom coordinates in Bohr.
+
+    :return:
+        A numpy array of atom coordinates (nx3) in Bohr.
     """
 
     return np.array([
@@ -287,6 +341,17 @@ def _Molecule_get_coordinates(self):
         self.y_to_numpy(),
         self.z_to_numpy(),
     ]).T.copy()
+
+
+def _Molecule_get_coordinates_in_angstrom(self):
+    """
+    Returns atom coordinates in Angstrom.
+
+    :return:
+        A numpy array of atom coordinates (nx3) in Angstrom.
+    """
+
+    return self.get_coordinates_in_bohr() * bohr_in_angstrom()
 
 
 def _Molecule_get_xyz_string(self):
@@ -298,21 +363,19 @@ def _Molecule_get_xyz_string(self):
     """
 
     labels = self.get_labels()
-    coords = self.get_coordinates()
+    coords_in_angstrom = self.get_coordinates_in_angstrom()
 
     natoms = len(labels)
     xyz = f'{natoms}\n\n'
 
     for a in range(natoms):
-        xa = coords[a][0] * bohr_in_angstroms()
-        ya = coords[a][1] * bohr_in_angstroms()
-        za = coords[a][2] * bohr_in_angstroms()
-        xyz += f'{labels[a]} {xa:.6f} {ya:.6f} {za:.6f}\n'
+        xa, ya, za = coords_in_angstrom[a]
+        xyz += f'{labels[a]:<6s} {xa:22.12f} {ya:22.12f} {za:22.12f}\n'
 
     return xyz
 
 
-def _Molecule_write_xyz(self, xyz_filename):
+def _Molecule_write_xyz_file(self, xyz_filename):
     """
     Writes molecular geometry to xyz file.
 
@@ -320,21 +383,8 @@ def _Molecule_write_xyz(self, xyz_filename):
         The name of the xyz file.
     """
 
-    elem_ids = self.elem_ids_to_numpy()
-
-    xs = self.x_to_numpy() * bohr_in_angstroms()
-    ys = self.y_to_numpy() * bohr_in_angstroms()
-    zs = self.z_to_numpy() * bohr_in_angstroms()
-
     with open(str(xyz_filename), 'w') as fh:
-
-        fh.write(f"{self.number_of_atoms():d}\n\n")
-
-        for elem_id, x, y, z in zip(elem_ids, xs, ys, zs):
-            elem = ChemicalElement()
-            elem.set_atom_type(elem_id)
-            fh.write(
-                f'{elem.get_name():<6s} {x:22.12f} {y:22.12f} {z:22.12f}\n')
+        fh.write(self.get_xyz_string())
 
 def _Molecule_moments_of_inertia(self):
     """
@@ -392,15 +442,15 @@ def _Molecule_is_linear(self):
 
 def _Molecule_moments_of_inertia(self):
     """
-    Calculates the moment of inertia tensor and principle axes
+    Calculates the moment of inertia tensor and principle axes.
 
     :return:
         The principle moments of inertia.
     """
 
     masses = self.masses_to_numpy()
-    coordinates = self.get_coordinates()
-    center_of_mass = np.array(self.center_of_mass())
+    coordinates = self.get_coordinates_in_bohr()
+    center_of_mass = np.array(self.center_of_mass_in_bohr())
     natm = self.number_of_atoms()
 
     # Coordinates in the center-of-mass frame
@@ -430,6 +480,9 @@ def _Molecule_is_linear(self):
         True if linear, False otherwise.
     """
 
+    assert_msg_critical(self.number_of_atoms() >= 2,
+                        'Molecule.is_linear: Need at least two atoms')
+
     # Get principle moments of inertia
     Ivals = self.moments_of_inertia()
 
@@ -439,13 +492,14 @@ def _Molecule_is_linear(self):
         if abs(Ivals[i]) > 1.0e-10:
             Rotational_DoF += 1
 
+    assert_msg_critical(
+        Rotational_DoF in [2, 3],
+        'Molecule.is_linear: Unexpected rotational degrees of freedom')
+
     if Rotational_DoF == 2:
         return True
     elif Rotational_DoF == 3:
         return False
-    # TODO: Raise an error if rotational DoFs are not 2 or 3
-    else:
-        pass
 
 
 def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
@@ -492,19 +546,30 @@ def _Molecule_deepcopy(self, memo):
 
 
 Molecule._smiles_to_xyz = _Molecule_smiles_to_xyz
+Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.draw_2d_svg = _Molecule_draw_2d_svg
 Molecule.read_smiles = _Molecule_read_smiles
-Molecule.read_str = _Molecule_read_str
-Molecule.read_xyz = _Molecule_read_xyz
-Molecule.from_xyz_string = _Molecule_from_xyz_string
+Molecule.read_molecule_string = _Molecule_read_molecule_string
+Molecule.read_xyz_file = _Molecule_read_xyz_file
+Molecule.read_xyz_string = _Molecule_read_xyz_string
 Molecule.from_dict = _Molecule_from_dict
 Molecule.center_of_mass = _Molecule_center_of_mass
+Molecule.center_of_mass_in_bohr = _Molecule_center_of_mass_in_bohr
+Molecule.center_of_mass_in_angstrom = _Molecule_center_of_mass_in_angstrom
 Molecule.more_info = _Molecule_more_info
 Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates
+Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
+Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
 Molecule.get_xyz_string = _Molecule_get_xyz_string
-Molecule.write_xyz = _Molecule_write_xyz
+Molecule.write_xyz_file = _Molecule_write_xyz_file
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
 Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
 Molecule.__deepcopy__ = _Molecule_deepcopy
+
+# aliases for backward compatibility
+Molecule.read_xyz = _Molecule_read_xyz_file
+Molecule.from_xyz_string = _Molecule_read_xyz_string
+Molecule.write_xyz = _Molecule_write_xyz_file
+Molecule.read_str = _Molecule_read_molecule_string

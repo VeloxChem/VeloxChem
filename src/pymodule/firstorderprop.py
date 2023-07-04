@@ -99,7 +99,7 @@ class FirstOrderProperties:
         """
 
         if molecule.get_charge() != 0:
-            coords = molecule.get_coordinates()
+            coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.elem_ids_to_numpy()
             origin = np.sum(coords.T * nuclear_charges,
                             axis=1) / np.sum(nuclear_charges)
@@ -131,7 +131,7 @@ class FirstOrderProperties:
                   [np.sum(dipole_ints[d] * total_density) for d in range(3)])
 
             # nuclear contribution
-            coords = molecule.get_coordinates()
+            coords = molecule.get_coordinates_in_bohr()
             nuclear_charges = molecule.elem_ids_to_numpy()
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)

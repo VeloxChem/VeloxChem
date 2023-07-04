@@ -67,7 +67,7 @@ class CVisualizationDriver
      @param angl the angular momentum of the shell.
      @return a vector of vector, e.g. {{1,0,0}, {0,1,0}, {0,0,1}} for p-shell.
      */
-    std::vector<std::vector<int32_t>> _buildCartesianAngularMomentum(int angl) const;
+    std::vector<std::vector<int32_t>> _buildCartesianAngularMomentum(int32_t angl) const;
 
     /**
      Computes atomic orbitals at a given grid point.

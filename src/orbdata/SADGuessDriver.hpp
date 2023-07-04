@@ -61,6 +61,11 @@ class CSADGuessDriver
     MPI_Comm _locComm;
 
     /**
+     The number of user-specified unpaired electrons on atoms.
+     */
+    std::vector<double> _numberOfUnpairedElectronsOnAtoms;
+
+    /**
      Gets occupation numbers for 1s elements.
 
      @param nocc number of 1s orbitals.
@@ -130,7 +135,7 @@ class CSADGuessDriver
      @param occ number of 5s orbital.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc5s(double occ) const;
+    std::vector<double> _getOcc5s(const double nocc) const;
 
     /**
      Gets occupation numbers for 4d elements.
@@ -138,7 +143,7 @@ class CSADGuessDriver
      @param occ number of 4d orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc4d(double occ) const;
+    std::vector<double> _getOcc4d(const double nocc) const;
 
     /**
      Gets occupation numbers for 5p elements.
@@ -146,7 +151,7 @@ class CSADGuessDriver
      @param occ number of 5s5p orbitals.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc5s5p(double occ) const;
+    std::vector<double> _getOcc5s5p(const double nocc) const;
 
     /**
      Gets occupation numbers for 6s elements.
@@ -154,7 +159,7 @@ class CSADGuessDriver
      @param occ number of 6s orbital.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc6s(double occ) const;
+    std::vector<double> _getOcc6s(const double nocc) const;
 
     /**
      Gets occupation numbers for 4f elements.
@@ -162,7 +167,7 @@ class CSADGuessDriver
      @param occ number of 4f orbital.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc4f(double occ) const;
+    std::vector<double> _getOcc4f(const double nocc) const;
 
     /**
      Gets occupation numbers for 5d elements.
@@ -170,7 +175,7 @@ class CSADGuessDriver
      @param occ number of 5d orbital.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc5d(double occ) const;
+    std::vector<double> _getOcc5d(const double nocc) const;
 
     /**
      Gets occupation numbers for 6p elements.
@@ -178,7 +183,7 @@ class CSADGuessDriver
      @param occ number of 6p orbital.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc6s6p(double occ) const;
+    std::vector<double> _getOcc6s6p(const double nocc) const;
 
     /**
      Gets occupation numbers for 7s elements.
@@ -186,7 +191,7 @@ class CSADGuessDriver
      @param occ number of 7s orbital.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc7s(double occ) const;
+    std::vector<double> _getOcc7s(const double nocc) const;
 
     /**
      Gets occupation numbers for 5f elements.
@@ -194,7 +199,7 @@ class CSADGuessDriver
      @param occ number of 5f orbital.
      @return vector of occupation numbers.
      */
-    std::vector<double> _getOcc5f(double occ) const;
+    std::vector<double> _getOcc5f(const double nocc) const;
 
     /**
      Computes SAD initial guess.
@@ -226,6 +231,13 @@ class CSADGuessDriver
      Destroys a SAD guess driver object.
      */
     ~CSADGuessDriver();
+
+    /**
+     Sets number of unpaired electrons on atoms.
+
+     @param numUnpairedElectrons the number of unpaired electrons on atoms.
+     */
+    void setNumberOfUnpairedElectronsOnAtoms(const std::vector<double>& numUnpairedElectrons);
 
     /**
      Computes SAD initial guess.
@@ -265,11 +277,13 @@ class CSADGuessDriver
      Computes occupation numbers for a given molecule.
 
      @param molecule the molecule.
-     @param nelec the number of excessive alpha or beta electrons.
-     @return a vector of vector containing the occupation numbers for each atom in the molecule.
+     @param netCharge the net charge of the molecule.
+     @param numberOfUnpairedElectrons the number of unpaired electrons (i.e. excessive alpha electrons).
+     @return a vector of vector containing alpha and beta occupation numbers for each atom in the molecule.
      */
-    std::vector<std::vector<double>> getOccupationNumbersForMolecule(const CMolecule& molecule,
-                                                                     const double     nelec) const;
+    std::vector<std::vector<double>> getAlphaBetaOccupationNumbersForMolecule(const CMolecule& molecule,
+                                                                              const double     netCharge,
+                                                                              const double     numberOfUnpairedElectrons) const;
 };
 
 #endif /* SADGuessDriver_hpp */

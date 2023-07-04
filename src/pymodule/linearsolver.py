@@ -37,18 +37,19 @@ from .veloxchemlib import DenseMatrix
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import mpi_master, rotatory_strength_in_cgs, hartree_in_ev
 from .veloxchemlib import denmat, fockmat, molorb
-from .veloxchemlib import parse_xc_func
 from .aodensitymatrix import AODensityMatrix
 from .aofockmatrix import AOFockMatrix
 from .distributedarray import DistributedArray
 from .subcommunicators import SubCommunicators
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
+from .sanitychecks import dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_datetime_string)
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
+from .dftutils import get_default_grid_level
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
@@ -116,7 +117,7 @@ class LinearSolver:
 
         # dft
         self.xcfun = None
-        self.grid_level = 4
+        self.grid_level = None
         self._dft = False
 
         # polarizable embedding
@@ -190,7 +191,7 @@ class LinearSolver:
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
-                'save_solutions': ('str', 'save solutions to file'),
+                'save_solutions': ('bool', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),
@@ -282,8 +283,7 @@ class LinearSolver:
             method_dict = {}
 
         rsp_keywords = {
-            key: val[0]
-            for key, val in self._input_keywords['response'].items()
+            key: val[0] for key, val in self._input_keywords['response'].items()
         }
 
         parse_input(self, rsp_keywords, rsp_dict)
@@ -302,7 +302,7 @@ class LinearSolver:
 
         parse_input(self, method_keywords, method_dict)
 
-        self._dft_sanity_check()
+        dft_sanity_check(self, 'update_settings')
 
         self._pe_sanity_check(method_dict)
 
@@ -318,71 +318,6 @@ class LinearSolver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
-
-    def _check_scf_results(self, scf_results):
-        """
-        Checks SCF results for ERI, DFT and PE information.
-
-        :param scf_results:
-            A dictionary containing SCF results.
-        """
-
-        updated_scf_info = {}
-
-        if self.rank == mpi_master():
-            if scf_results.get('eri_thresh', None) is not None:
-                updated_scf_info['eri_thresh'] = scf_results['eri_thresh']
-
-            if scf_results.get('qq_type', None) is not None:
-                updated_scf_info['qq_type'] = scf_results['qq_type']
-
-            if scf_results.get('restart', None) is not None:
-                # do not restart if scf is not restarted from checkpoint
-                if not scf_results['restart']:
-                    updated_scf_info['restart'] = scf_results['restart']
-
-            if scf_results.get('xcfun', None) is not None:
-                # do not overwrite xcfun if it is already specified
-                if self.xcfun is None:
-                    updated_scf_info['xcfun'] = scf_results['xcfun']
-
-            if scf_results.get('potfile', None) is not None:
-                # do not overwrite potfile if it is already specified
-                if self.potfile is None:
-                    updated_scf_info['potfile'] = scf_results['potfile']
-
-        updated_scf_info = self.comm.bcast(updated_scf_info, root=mpi_master())
-
-        for key, val in updated_scf_info.items():
-            setattr(self, key, val)
-
-    def _dft_sanity_check(self):
-        """
-        Checks DFT settings and updates relevant attributes.
-        """
-
-        # Hartree-Fock: xcfun is None or 'hf'
-        if (self.xcfun is None or
-            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
-            self._dft = False
-
-        # DFT: xcfun is functional object or string (other than 'hf')
-        else:
-            if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'LinearSolver: Undefined XC functional')
-            self._dft = True
-
-        # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
-            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
-            warn_msg += ' Using default value. ***'
-            self.ostream.print_blank()
-            self.ostream.print_header(warn_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.grid_level = 4
 
     def _pe_sanity_check(self, method_dict=None):
         """
@@ -466,7 +401,9 @@ class LinearSolver:
 
         if self._dft:
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
@@ -1131,6 +1068,8 @@ class LinearSolver:
         if self.checkpoint_file is None:
             return
 
+        t0 = tm.time()
+
         if self.rank == mpi_master():
             success = write_rsp_hdf5(self.checkpoint_file, [], [], molecule,
                                      basis, dft_dict, pe_dict, self.ostream)
@@ -1152,6 +1091,11 @@ class LinearSolver:
 
             for dist_array, label in zip(dist_arrays, labels):
                 dist_array.append_to_hdf5_file(self.checkpoint_file, label)
+
+            checkpoint_text = 'Time spent in writing checkpoint file: '
+            checkpoint_text += f'{(tm.time() - t0):.2f} sec'
+            self.ostream.print_info(checkpoint_text)
+            self.ostream.print_blank()
 
     def _graceful_exit(self, molecule, basis, dft_dict, pe_dict, labels):
         """
@@ -1263,8 +1207,9 @@ class LinearSolver:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level            : ' + str(
-                self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()
@@ -1521,7 +1466,7 @@ class LinearSolver:
                 mo_core_exc = mo[:, core_exc_orb_inds]
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
-                        np.linalg.multi_dot([mo_core_exc.T, P.T, mo_core_exc]),
+                        np.linalg.multi_dot([mo_core_exc.T, P, mo_core_exc]),
                         nocc, self.num_core_orbitals) for P in integral_comps
                 ]
                 gradients = tuple(
@@ -1530,7 +1475,7 @@ class LinearSolver:
             else:
                 matrices = [
                     factor * (-1.0) * self.commut_mo_density(
-                        np.linalg.multi_dot([mo.T, P.T, mo]), nocc)
+                        np.linalg.multi_dot([mo.T, P, mo]), nocc)
                     for P in integral_comps
                 ]
                 gradients = tuple(
@@ -1628,8 +1573,8 @@ class LinearSolver:
 
             factor = np.sqrt(2.0)
             matrices = [
-                factor * (-1.0) * self.commut_mo_density(
-                    np.linalg.multi_dot([mo.T, P.conj().T, mo]), nocc)
+                factor * (-1.0) *
+                self.commut_mo_density(np.linalg.multi_dot([mo.T, P, mo]), nocc)
                 for P in integral_comps
             ]
 

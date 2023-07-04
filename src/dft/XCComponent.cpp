@@ -163,3 +163,27 @@ CXCComponent::getFunctionalPointer() const
 {
     return &_func;
 }
+
+bool
+CXCComponent::isLDA() const
+{
+    auto family = _func.info->family;
+
+    return ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA));
+}
+
+bool
+CXCComponent::isGGA() const
+{
+    auto family = _func.info->family;
+
+    return ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA));
+}
+
+bool
+CXCComponent::isMetaGGA() const
+{
+    auto family = _func.info->family;
+
+    return ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA));
+}

@@ -1,5 +1,4 @@
 from pathlib import Path
-import tempfile
 import hashlib
 
 from veloxchem.veloxchemlib import is_mpi_master
@@ -47,16 +46,20 @@ class TestBasis:
 
         if is_mpi_master():
 
-            molecule = Molecule.read_str(mol_text, units='angstrom')
+            molecule = Molecule.read_molecule_string(mol_text, units='angstrom')
 
-            with tempfile.TemporaryDirectory() as temp_dir:
-                fname = Path(temp_dir, basis_name)
-                with open(str(fname), 'w') as f_basis:
-                    f_basis.write(basis_text)
-                basis = MolecularBasis.read(molecule,
-                                            basis_name,
-                                            temp_dir,
-                                            ostream=None)
+            here = Path(__file__).parent
+            basis_file = here / 'inputs' / basis_name
+            with basis_file.open('w') as f_basis:
+                f_basis.write(basis_text)
+
+            basis = MolecularBasis.read(molecule,
+                                        basis_name,
+                                        str(basis_file.parent),
+                                        ostream=None)
+
+            if basis_file.is_file():
+                basis_file.unlink()
 
             ref_basis = MolecularBasis()
 

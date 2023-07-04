@@ -1,6 +1,5 @@
 from pathlib import Path
 from unittest.mock import patch
-import tempfile
 import sys
 
 from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
@@ -13,6 +12,7 @@ from veloxchem.rspcdspec import CircularDichroismSpectrum
 from veloxchem.rsplinabscross import LinearAbsorptionCrossSection
 from veloxchem.rsppolarizability import Polarizability
 from veloxchem.rsptpa import TPA
+from veloxchem.inputparser import get_random_string_parallel
 from veloxchem.main import select_scf_driver, select_rsp_property, main
 
 
@@ -29,32 +29,41 @@ class TestMain:
 
     def run_main_function(self, capsys, input_lines, input_fname, output):
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            input_file = Path(temp_dir, input_fname)
-            self.create_input_file(input_lines, input_file)
-            with patch.object(sys, 'argv', ['vlx', str(input_file)]):
-                main()
-                captured = capsys.readouterr()
-                if is_mpi_master():
-                    for line in output:
-                        assert line in captured.out
-                self.remove_h5_files(input_file)
+        here = Path(__file__).parent
+        random_string = get_random_string_parallel()
+        input_file = here / 'inputs' / f'{input_fname}_{random_string}.inp'
 
-    def remove_h5_files(self, input_file):
+        self.create_input_file(input_lines, input_file)
+        with patch.object(sys, 'argv', ['vlx', str(input_file)]):
+            main()
+            captured = capsys.readouterr()
+            if is_mpi_master():
+                for line in output:
+                    assert line in captured.out
+            self.remove_input_and_h5_files(input_file)
+
+    def remove_input_and_h5_files(self, input_file):
 
         if is_mpi_master():
+            if input_file.is_file():
+                input_file.unlink()
+
             scf_h5 = input_file.with_suffix('.scf.h5')
             if scf_h5.is_file():
                 scf_h5.unlink()
+
             scf_final_h5 = scf_h5.with_suffix('.tensors.h5')
             if scf_final_h5.is_file():
                 scf_final_h5.unlink()
+
             rsp_h5 = input_file.with_suffix('.rsp.h5')
             if rsp_h5.is_file():
                 rsp_h5.unlink()
+
             rsp_solutions_h5 = rsp_h5.with_suffix('.solutions.h5')
             if rsp_solutions_h5.is_file():
                 rsp_solutions_h5.unlink()
+
         mpi_barrier()
 
     def test_select_scf_driver(self):
@@ -204,7 +213,7 @@ class TestMain:
 
         scf_input_lines = (scf_job_input + method_input + molecule_input)
 
-        self.run_main_function(capsys, scf_input_lines, 'vlx_scf_test.inp',
+        self.run_main_function(capsys, scf_input_lines, 'vlx_scf_test',
                                scf_output)
 
         # rpa test
@@ -212,7 +221,7 @@ class TestMain:
         rpa_input_lines = (rsp_job_input + method_input + rpa_input +
                            molecule_input)
 
-        self.run_main_function(capsys, rpa_input_lines, 'vlx_rpa_test.inp',
+        self.run_main_function(capsys, rpa_input_lines, 'vlx_rpa_test',
                                scf_output + rpa_output)
 
         # cpp test
@@ -220,5 +229,5 @@ class TestMain:
         cpp_input_lines = (rsp_job_input + method_input + cpp_input +
                            molecule_input)
 
-        self.run_main_function(capsys, cpp_input_lines, 'vlx_cpp_test.inp',
+        self.run_main_function(capsys, cpp_input_lines, 'vlx_cpp_test',
                                scf_output + cpp_output)

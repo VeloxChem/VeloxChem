@@ -40,7 +40,6 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import mpi_master
-from .veloxchemlib import parse_xc_func
 from .veloxchemlib import molorb, xcfun
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -54,6 +53,8 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_datetime_string)
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
+from .dftutils import get_default_grid_level
+from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_tensors
 
@@ -155,12 +156,12 @@ class ScfDriver:
         self._num_iter = 0
 
         # DIIS data
-        self._fock_matrices = deque()
+        self._fock_matrices_alpha = deque()
         self._fock_matrices_beta = deque()
         self._fock_matrices_proj = deque()
 
-        self._den_matrices = deque()
-        self._den_matrices_beta = deque()
+        self._density_matrices_alpha = deque()
+        self._density_matrices_beta = deque()
 
         # density matrix and molecular orbitals
         self._density = AODensityMatrix()
@@ -192,9 +193,12 @@ class ScfDriver:
         self.dispersion = False
         self._d4_energy = 0.0
 
+        # for open-shell system: unpaired electrons for initial guess
+        self.guess_unpaired_electrons = ''
+
         # dft
         self.xcfun = None
-        self.grid_level = 4
+        self.grid_level = None
         self._dft = False
         self._mol_grid = None
 
@@ -248,11 +252,13 @@ class ScfDriver:
                 'memory_profiling': ('bool', 'print memory usage'),
                 'memory_tracing': ('bool', 'trace memory allocation'),
                 'print_level': ('int', 'verbosity of output (1-3)'),
+                'guess_unpaired_electrons':
+                    ('str', 'unpaired electrons for initila guess'),
             },
             'method_settings': {
                 'dispersion': ('bool', 'use D4 dispersion correction'),
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
-                'grid_level': ('int', 'accuracy level of DFT grid (1-6)'),
+                'grid_level': ('int', 'accuracy level of DFT grid (1-8)'),
                 'potfile': ('str', 'potential file for polarizable embedding'),
                 'electric_field': ('seq_fixed', 'static electric field'),
                 'use_split_comm': ('bool', 'use split communicators'),
@@ -410,7 +416,7 @@ class ScfDriver:
 
         parse_input(self, method_keywords, method_dict)
 
-        self._dft_sanity_check()
+        dft_sanity_check(self, 'update_settings')
 
         self._pe_sanity_check(method_dict)
 
@@ -426,34 +432,6 @@ class ScfDriver:
             # checkpoint file does not contain information about the electric
             # field
             self.restart = False
-
-    def _dft_sanity_check(self):
-        """
-        Checks DFT settings and updates relevant attributes.
-        """
-
-        # Hartree-Fock: xcfun is None or 'hf'
-        if (self.xcfun is None or
-            (isinstance(self.xcfun, str) and self.xcfun.lower() == 'hf')):
-            self._dft = False
-
-        # DFT: xcfun is functional object or string (other than 'hf')
-        else:
-            if isinstance(self.xcfun, str):
-                self.xcfun = parse_xc_func(self.xcfun.upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'LinearSolver: Undefined XC functional')
-            self._dft = True
-
-        # check grid level
-        if self._dft and (self.grid_level < 1 or self.grid_level > 7):
-            warn_msg = f'*** Warning: Invalid DFT grid level {self.grid_level}.'
-            warn_msg += ' Using default value. ***'
-            self.ostream.print_blank()
-            self.ostream.print_header(warn_msg)
-            self.ostream.print_blank()
-            self.ostream.flush()
-            self.grid_level = 4
 
     def _pe_sanity_check(self, method_dict=None):
         """
@@ -511,8 +489,11 @@ class ScfDriver:
                 min_basis = MolecularBasis()
             min_basis.broadcast(self.rank, self.comm)
 
+        # check molecule
+        molecule_sanity_check(molecule)
+
         # check dft setup
-        self._dft_sanity_check()
+        dft_sanity_check(self, 'compute')
 
         # check pe setup
         self._pe_sanity_check()
@@ -538,6 +519,9 @@ class ScfDriver:
                 self._molecular_orbitals = MolecularOrbitals(self._ref_mol_orbs)
         else:
             self._den_guess = DensityGuess('SAD')
+            if self.guess_unpaired_electrons:
+                self._den_guess.set_unpaired_electrons(
+                    self.guess_unpaired_electrons)
 
         # nuclear repulsion energy
         self._nuc_energy = molecule.nuclear_repulsion_energy()
@@ -566,7 +550,9 @@ class ScfDriver:
         # generate integration grid
         if self._dft:
             grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            grid_drv.set_level(grid_level)
 
             grid_t0 = tm.time()
             self._mol_grid = grid_drv.generate(molecule)
@@ -623,13 +609,12 @@ class ScfDriver:
 
             self._comp_diis(molecule, ao_basis, val_basis, profiler)
 
-        self._fock_matrices.clear()
-        self._den_matrices.clear()
-
+        self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
-        self._den_matrices_beta.clear()
-
         self._fock_matrices_proj.clear()
+
+        self._density_matrices_alpha.clear()
+        self._density_matrices_beta.clear()
 
         profiler.end(self.ostream, scf_flag=True)
 
@@ -734,7 +719,7 @@ class ScfDriver:
                 C_alpha = None
                 C_beta = None
 
-            n_ao = basis.get_dimensions_of_basis(molecule)
+            n_ao = basis.get_dimension_of_basis(molecule)
             err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
             err_array = 'ScfDriver.set_start_orbitals: invalid array'
 
@@ -817,13 +802,12 @@ class ScfDriver:
 
         diis_start_time = tm.time()
 
-        self._fock_matrices.clear()
-        self._den_matrices.clear()
-
+        self._fock_matrices_alpha.clear()
         self._fock_matrices_beta.clear()
-        self._den_matrices_beta.clear()
-
         self._fock_matrices_proj.clear()
+
+        self._density_matrices_alpha.clear()
+        self._density_matrices_beta.clear()
 
         ovl_mat, kin_mat, npot_mat, dipole_mats = self._comp_one_ints(
             molecule, ao_basis)
@@ -838,8 +822,6 @@ class ScfDriver:
             t0 = tm.time()
 
             oao_mat = ovl_mat.get_ortho_matrix(self.ovl_thresh)
-            self._scf_tensors = {'S': ovl_mat.to_numpy()}
-
             self.ostream.print_info('Orthogonalization matrix computed in' +
                                     ' {:.2f} sec.'.format(tm.time() - t0))
             self.ostream.print_blank()
@@ -955,7 +937,7 @@ class ScfDriver:
                     fock_mat.add_matrix(DenseMatrix(efpot), 0, 'beta')
 
                 self._ef_nuc_energy = 0.0
-                coords = molecule.get_coordinates()
+                coords = molecule.get_coordinates_in_bohr()
                 elem_ids = molecule.elem_ids_to_numpy()
                 for i in range(molecule.number_of_atoms()):
                     self._ef_nuc_energy -= np.dot(
@@ -1005,7 +987,7 @@ class ScfDriver:
 
             profiler.start_timer('FockDiag')
 
-            self._store_diis_data(fock_mat, den_mat, e_grad)
+            self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
@@ -1037,7 +1019,8 @@ class ScfDriver:
             self.write_checkpoint(molecule.elem_ids_to_numpy(),
                                   ao_basis.get_label())
 
-        if self.rank == mpi_master() and not self._first_step:
+        if (self.rank == mpi_master() and (not self._first_step) and
+                self.is_converged):
             S = ovl_mat.to_numpy()
 
             C_alpha = self.molecular_orbitals.alpha_to_numpy()
@@ -1090,13 +1073,14 @@ class ScfDriver:
             if self._dft:
                 # dft info
                 self._scf_tensors['xcfun'] = self.xcfun.get_func_label()
+                if self.grid_level is not None:
+                    self._scf_tensors['grid_level'] = self.grid_level
 
             if self._pe:
                 # pe info
                 self._scf_tensors['potfile'] = self.potfile
 
-            if self.is_converged:
-                self._write_final_hdf5(molecule, ao_basis)
+            self._write_final_hdf5(molecule, ao_basis)
 
         else:
             self._scf_tensors = None
@@ -1190,7 +1174,7 @@ class ScfDriver:
 
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
-                coords = molecule.get_coordinates()
+                coords = molecule.get_coordinates_in_bohr()
                 nuclear_charges = molecule.elem_ids_to_numpy()
                 self._dipole_origin = np.sum(coords.T * nuclear_charges,
                                              axis=1) / np.sum(nuclear_charges)
@@ -1653,9 +1637,9 @@ class ScfDriver:
             fock_mat.add_hcore(kin_mat, npot_mat, 0)
 
             if self._dft and not self._first_step:
-                fock_mat.add_matrix(vxc_mat.get_matrix(), 0)
+                fock_mat.add_matrix(vxc_mat.get_alpha_matrix(), 0, 'alpha')
                 if self.scf_type in ['unrestricted', 'restricted_openshell']:
-                    fock_mat.add_matrix(vxc_mat.get_matrix(True), 0, 'beta')
+                    fock_mat.add_matrix(vxc_mat.get_beta_matrix(), 0, 'beta')
 
             if self._pe and not self._first_step:
                 fock_mat.add_matrix(DenseMatrix(pe_mat), 0)
@@ -1694,7 +1678,7 @@ class ScfDriver:
 
         return 0.0
 
-    def _store_diis_data(self, fock_mat, den_mat):
+    def _store_diis_data(self, fock_mat, den_mat, ovl_mat, e_grad):
         """
         Stores Fock/Kohn-Sham and density matrices for current iteration.
 
@@ -1702,6 +1686,8 @@ class ScfDriver:
             The Fock/Kohn-Sham matrix.
         :param den_mat:
             The density matrix.
+        :param ovl_mat:
+            The overlap matrix (used in ROSCF).
         :param e_grad:
             The electronic gradient.
         """
@@ -1974,8 +1960,9 @@ class ScfDriver:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))
-            cur_str = 'Molecular Grid Level            : ' + str(
-                self.grid_level)
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if self.electric_field is not None:

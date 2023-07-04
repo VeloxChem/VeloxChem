@@ -28,22 +28,17 @@ from .rspproperty import ResponseProperty
 
 class SHG(ResponseProperty):
     """
-    Implements the quadratic SHG abs property.
+    Implements the second-harmonic generation property.
 
     :param rsp_dict:
         The dictionary of response input.
     :param method_dict:
         The dictionary of method settings.
-
-    Instance variables
-        - rsp_dict: The dictionary of response input.
-        - method_dict: The dictionary of method settings.
-        - rsp_property: The dictionary of response property.
     """
 
     def __init__(self, rsp_dict=None, method_dict=None):
         """
-        Initializes the polarizability property.
+        Initializes the SHG property.
         """
 
         if rsp_dict is None:
@@ -60,9 +55,11 @@ class SHG(ResponseProperty):
         rsp_dict['order'] = 'quadratic'
         rsp_dict['residue'] = 'none'
         rsp_dict['complex'] = 'yes'
+
         rsp_dict['a_operator'] = 'dipole'
         rsp_dict['b_operator'] = 'dipole'
         rsp_dict['c_operator'] = 'dipole'
+
         rsp_dict['a_components'] = 'xyz'
         rsp_dict['b_components'] = 'xyz'
 
@@ -70,16 +67,3 @@ class SHG(ResponseProperty):
             rsp_dict['frequencies'] = '0'
 
         super().__init__(rsp_dict, method_dict)
-
-    def get_property(self, key):
-        """
-        Gets response functions or solutions.
-
-        :param key:
-            The keyword.
-
-        :return:
-            The response functions or solutions.
-        """
-
-        return self._rsp_property[key]
