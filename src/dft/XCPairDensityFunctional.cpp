@@ -27,6 +27,8 @@
 
 #include "ErrorHandler.hpp"
 #include "MemAlloc.hpp"
+#include "PairDensityBecke88.hpp"
+#include "PairDensityLYP.hpp"
 #include "PairDensityPBE_C.hpp"
 #include "PairDensityPBE_X.hpp"
 #include "PairDensitySlater.hpp"
@@ -60,6 +62,10 @@ CXCPairDensityFunctional::CXCPairDensityFunctional(const std::string&           
         _familyOfFunctional = std::string("PLDA");
     }
     else if (fstr::upcase(nameOfFunctional) == "TPBE")
+    {
+        _familyOfFunctional = std::string("PGGA");
+    }
+    else if (fstr::upcase(nameOfFunctional) == "TBLYP")
     {
         _familyOfFunctional = std::string("PGGA");
     }
@@ -284,6 +290,10 @@ CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int32_t np, const double* rho
         if (fstr::upcase(funcname) == "TPBE_X") pdftpbe_x::compute_exc_vxc(np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
         if (fstr::upcase(funcname) == "TPBE_C") pdftpbe_c::compute_exc_vxc(np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
+
+        if (fstr::upcase(funcname) == "TB88") pdftb88::compute_exc_vxc(np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
+
+        if (fstr::upcase(funcname) == "TLYP") pdftlyp::compute_exc_vxc(np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
 
         const auto c = std::get<1>(comp);
 

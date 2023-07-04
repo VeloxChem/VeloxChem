@@ -150,7 +150,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 std::vector<std::string>
 getAvailablePairDensityFunctionals()
 {
-    return std::vector<std::string>({"TSLATER", "TLDA", "TPBE"});
+    return std::vector<std::string>({"TSLATER", "TLDA", "TPBE", "TBLYP"});
 }
 
 CXCPairDensityFunctional
@@ -168,6 +168,7 @@ getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (fstr::upcase(xcLabel) == "TPBE") return CXCPairDensityFunctional("TPBE", {"TPBE_X", "TPBE_C"}, {1.0, 1.0});
 
+        if (fstr::upcase(xcLabel) == "TBLYP") return CXCPairDensityFunctional("TBLYP", {"TSLATER", "TB88", "TLYP"}, {1.0, 1.0, 1.0});
         // FIX ME: add other functionals here...
     }
 
