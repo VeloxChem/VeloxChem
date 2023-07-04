@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <map>
 #include <vector>
+#include <string>
 
 #include "Matrix.hpp"
 
@@ -19,6 +20,14 @@ class CMatrices
      The vector of matrices.
      */
     std::map<int64_t, CMatrix*> _matrices;
+    
+    /**
+     Converts string label to integer key of matrix.
+
+     @param label the label of key.
+     @return the integer key of matrix.
+     */
+    auto _to_key(const std::string& label) const -> int64_t;
 
    public:
     /**
@@ -60,6 +69,20 @@ class CMatrices
      @param key the key of matrix.
      */
     auto add(const CMatrix& matrix, const int64_t key) -> void;
+    
+    /**
+     Adds matrix to matrices.
+
+     @param matrix the matrix to be added.
+     @param label the label of key.
+     */
+    auto add(const CMatrix& matrix, const std::string& label) -> void;
+    
+    /**
+     Sets all matrices to zero.
+
+     */
+    auto zero() -> void;
 
     /**
      Get vector of keys from map  of matrices.
@@ -83,6 +106,22 @@ class CMatrices
      @return the constant pointer to requested matrix.
      */
     auto getMatrix(const int64_t key) const -> const CMatrix*;
+    
+    /**
+     Get pointer to specific matrix.
+
+     @param label the label of key.
+     @return the pointer to requested matrix.
+     */
+    auto getMatrix(const std::string& label) -> CMatrix*;
+
+    /**
+     Get constant pointer to specific matrix.
+
+     @param label the label of key.
+     @return the constant pointer to requested matrix.
+     */
+    auto getMatrix(const std::string& label) const -> const CMatrix*;
 };
 
 #endif /* Matrices_hpp */

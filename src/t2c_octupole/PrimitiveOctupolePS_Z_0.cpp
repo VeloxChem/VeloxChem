@@ -121,12 +121,6 @@ compPrimitiveOctupolePS_Z_0(TDoubleArray&       buffer_xxx,
 
         const auto fss = bra_norm * ket_fn[i] * std::pow(fe_0 * fpi, 1.50) * std::exp(-fz_0);
 
-        const auto faa_x = rpc_x * fss;
-
-        const auto faa_y = rpc_y * fss;
-
-        const auto faa_z = rpc_z * fss;
-
         const auto faa_xx = fss * (rpc_x * rpc_x + 0.5 * fe_0);
 
         const auto faa_xy = fss * rpc_x * rpc_y;

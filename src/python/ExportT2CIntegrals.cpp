@@ -1,9 +1,12 @@
 #include "ExportT2CIntegrals.hpp"
 
 #include <pybind11/operators.h>
+#include <pybind11/stl.h>
 
 #include "OverlapDriver.hpp"
 #include "KineticEnergyDriver.hpp"
+#include "DipoleDriver.hpp"
+#include "Point.hpp"
 
 namespace vlx_t2cintegrals {  // vlx_t2cintegrals namespace
 
@@ -33,6 +36,17 @@ export_t2cintegrals(py::module& m)
                 return std::make_shared<CMatrix>(kin_drv.compute(basis, molecule));
             },
             "Computes kinetic energy matrix for given molecule and basis.");
+    
+    // CDipoleDriver class
+
+    PyClass<CDipoleDriver>(m, "DipoleDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const CDipoleDriver& dip_drv, const CMolecularBasis& basis, const CMolecule& molecule, const TPoint3D& point) -> std::shared_ptr<CMatrices> {
+                return std::make_shared<CMatrices>(dip_drv.compute(basis, molecule, point));
+            },
+            "Computes dipole matrix for given molecule, basis and origin.");
 
     // ...
 }

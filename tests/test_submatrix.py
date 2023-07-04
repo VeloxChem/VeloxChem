@@ -121,15 +121,15 @@ class TestSubMatrix:
         mat_b = SubMatrix(self.get_values(), [1, 5, 3, 6])
 
         Tester.compare_submatrices(mat_a, mat_b)
-        
+
     def test_zero(self):
 
         mat_a = SubMatrix(self.get_values(), [1, 5, 3, 6])
-        
+
         mat_b = SubMatrix([1, 5, 3, 6])
 
-        mat_b.set_values(np.zeros((3,6)))
-        
+        mat_b.set_values(np.zeros((3, 6)))
+
         mat_a.zero()
 
         Tester.compare_submatrices(mat_a, mat_b)
@@ -199,8 +199,8 @@ class TestSubMatrix:
             mat_a = SubMatrix(self.get_values(), [1, 5, 3, 6])
         elif rank == 1:
             mat_a = SubMatrix([
-                1.2, 2.2, 3.2, 4.2, 5.2, 6.2, 1.4, 2.4, 3.4, 4.4, 5.4, 6.4,
-                1.5, 2.5, 3.5, 4.5, 5.5, 6.5
+                1.2, 2.2, 3.2, 4.2, 5.2, 6.2, 1.4, 2.4, 3.4, 4.4, 5.4, 6.4, 1.5,
+                2.5, 3.5, 4.5, 5.5, 6.5
             ], [1, 5, 3, 6])
         else:
             mat_a = SubMatrix([1, 5, 3, 6])

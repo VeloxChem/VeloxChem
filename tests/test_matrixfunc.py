@@ -27,7 +27,7 @@ class TestMatrixFunc:
 
         mat_a = make_matrix(bas_svp, mat_t.antisymm)
         mat_a.zero()
-        
+
         mat_b = Matrix()
         mat_b.set_type(mat_t.antisymm)
         mat_b.add(SubMatrix([0, 0, 7, 7]), (0, 0))
@@ -37,23 +37,23 @@ class TestMatrixFunc:
         mat_b.add(SubMatrix([7, 19, 12, 5]), (1, 2))
         mat_b.add(SubMatrix([19, 19, 5, 5]), (2, 2))
         mat_b.zero()
-        
+
         Tester.compare_matrices(mat_a, mat_b)
-        
+
         mat_a = make_matrix(bas_svp, mat_t.symm)
         mat_a.zero()
-        
+
         mat_b.set_type(mat_t.symm)
-        
+
         Tester.compare_matrices(mat_a, mat_b)
-      
+
     def test_make_matrix_gen(self):
 
         bas_svp = self.get_data()
 
         mat_a = make_matrix(bas_svp, mat_t.gen)
         mat_a.zero()
-        
+
         mat_b = Matrix()
         mat_b.set_type(mat_t.gen)
         mat_b.add(SubMatrix([0, 0, 7, 7]), (0, 0))
@@ -66,11 +66,10 @@ class TestMatrixFunc:
         mat_b.add(SubMatrix([19, 7, 5, 12]), (2, 1))
         mat_b.add(SubMatrix([19, 19, 5, 5]), (2, 2))
         mat_b.zero()
-        
+
         Tester.compare_matrices(mat_a, mat_b)
-        
+
         mat_a = make_matrix(bas_svp, bas_svp)
         mat_a.zero()
-        
+
         Tester.compare_matrices(mat_a, mat_b)
-        
