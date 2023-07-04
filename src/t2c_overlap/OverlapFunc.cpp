@@ -2,27 +2,18 @@
 
 #include "OverlapRecDD.hpp"
 #include "OverlapRecDF.hpp"
-#include "OverlapRecDG.hpp"
 #include "OverlapRecDP.hpp"
 #include "OverlapRecDS.hpp"
 #include "OverlapRecFD.hpp"
 #include "OverlapRecFF.hpp"
-#include "OverlapRecFG.hpp"
 #include "OverlapRecFP.hpp"
 #include "OverlapRecFS.hpp"
-#include "OverlapRecGD.hpp"
-#include "OverlapRecGF.hpp"
-#include "OverlapRecGG.hpp"
-#include "OverlapRecGP.hpp"
-#include "OverlapRecGS.hpp"
 #include "OverlapRecPD.hpp"
 #include "OverlapRecPF.hpp"
-#include "OverlapRecPG.hpp"
 #include "OverlapRecPP.hpp"
 #include "OverlapRecPS.hpp"
 #include "OverlapRecSD.hpp"
 #include "OverlapRecSF.hpp"
-#include "OverlapRecSG.hpp"
 #include "OverlapRecSP.hpp"
 #include "OverlapRecSS.hpp"
 
@@ -55,13 +46,6 @@ compute(CSubMatrix* matrix, const CGtoBlock& gto_block, const int64_t angmom, co
     if (angmom == 3)
     {
         ovlrec::compOverlapFF(matrix, gto_block, bra_first, bra_last);
-
-        return;
-    }
-
-    if (angmom == 4)
-    {
-        ovlrec::compOverlapGG(matrix, gto_block, bra_first, bra_last);
 
         return;
     }
@@ -127,20 +111,6 @@ compute(CSubMatrix*      matrix,
         return;
     }
 
-    if ((bra_angmom == 0) && (ket_angmom == 4))
-    {
-        ovlrec::compOverlapSG(matrix, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 0))
-    {
-        ovlrec::compOverlapGS(matrix, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
     if ((bra_angmom == 1) && (ket_angmom == 1))
     {
         ovlrec::compOverlapPP(matrix, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
@@ -176,20 +146,6 @@ compute(CSubMatrix*      matrix,
         return;
     }
 
-    if ((bra_angmom == 1) && (ket_angmom == 4))
-    {
-        ovlrec::compOverlapPG(matrix, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 1))
-    {
-        ovlrec::compOverlapGP(matrix, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
     if ((bra_angmom == 2) && (ket_angmom == 2))
     {
         ovlrec::compOverlapDD(matrix, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
@@ -211,44 +167,9 @@ compute(CSubMatrix*      matrix,
         return;
     }
 
-    if ((bra_angmom == 2) && (ket_angmom == 4))
-    {
-        ovlrec::compOverlapDG(matrix, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 2))
-    {
-        ovlrec::compOverlapGD(matrix, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
     if ((bra_angmom == 3) && (ket_angmom == 3))
     {
         ovlrec::compOverlapFF(matrix, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
-
-        return;
-    }
-
-    if ((bra_angmom == 3) && (ket_angmom == 4))
-    {
-        ovlrec::compOverlapFG(matrix, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 3))
-    {
-        ovlrec::compOverlapGF(matrix, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
-
-        return;
-    }
-
-    if ((bra_angmom == 4) && (ket_angmom == 4))
-    {
-        ovlrec::compOverlapGG(matrix, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }

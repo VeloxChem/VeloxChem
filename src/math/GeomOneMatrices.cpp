@@ -6,7 +6,6 @@ CGeomOneMatrices::CGeomOneMatrices()
 
     : _matrices(std::map<TGeomPair, CMatrix*>())
 {
-    
 }
 
 CGeomOneMatrices::CGeomOneMatrices(const std::map<TGeomPair, CMatrix>& matrices)
@@ -24,7 +23,7 @@ CGeomOneMatrices::CGeomOneMatrices(const CMatrix& matrix, const std::vector<int6
     : _matrices(std::map<TGeomPair, CMatrix*>())
 {
     const auto axis = std::string("xyz");
-    
+
     for (const auto atom : atoms)
     {
         for (size_t i = 0; i < 3; i++)

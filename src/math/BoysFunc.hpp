@@ -45,7 +45,7 @@ class CBoysFunc
      @param arguments the array of Boys function arguments.
      @param nelements the number of important elements.
      */
-    template<int64_t M>
+    template <int64_t M>
     void compute(std::array<TDoubleArray, M>& values, const TDoubleArray& arguments, const int64_t nelements) const;
 };
 
@@ -24762,7 +24762,7 @@ CBoysFunc<N>::compute(TDoubleArray2D<M>& values, const TDoubleArray& arguments, 
 
             values[N][i] = _table[pnt][0] + _table[pnt][1] * w + _table[pnt][2] * w2 + _table[pnt][3] * w2 * w
 
-                         + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
+                           + _table[pnt][4] * w4 + _table[pnt][5] * w4 * w + _table[pnt][6] * w4 * w2;
 
             const double f2a = fa + fa;
 
@@ -24787,7 +24787,7 @@ CBoysFunc<N>::compute(TDoubleArray2D<M>& values, const TDoubleArray& arguments, 
 
                 const double f = 0.4999489092 * fia - 0.2473631686 * fia2
 
-                               + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+                                 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
                 const double fx = std::exp(-arguments[i]);
 

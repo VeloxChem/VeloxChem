@@ -1,9 +1,9 @@
 #ifndef GeomKeys_hpp
 #define GeomKeys_hpp
 
+#include <array>
 #include <cstdint>
 #include <utility>
-#include <array>
 
 using TGeomPair = std::pair<int64_t, char>;
 

@@ -155,7 +155,7 @@ export_math(py::module& m) -> void
             "get_full_matrix",
             [](const CMatrix& self) -> std::shared_ptr<CSubMatrix> { return std::make_shared<CSubMatrix>(self.getFullMatrix()); },
             "Creates full matrix representation of matrix.");
-    
+
     // CMatrices class
 
     PyClass<CMatrices>(m, "Matrices")
@@ -168,32 +168,32 @@ export_math(py::module& m) -> void
         .def("zero", &CMatrices::zero, "Sets values of matrices to zero.")
         .def("get_keys", &CMatrices::getKeys, "Gets keys of each matrix in matrices.")
         .def(
-             "get_matrix",
-             [](const CMatrices& self, const int64_t key) -> std::shared_ptr<CMatrix> {
-                 if (auto mat = self.getMatrix(key); mat != nullptr)
-                 {
-                     return std::make_shared<CMatrix>(*mat);
-                 }
-                 else
-                 {
-                     return std::make_shared<CMatrix>();
-                 }
-             },
-             "Gets specific matrix from matrices.")
+            "get_matrix",
+            [](const CMatrices& self, const int64_t key) -> std::shared_ptr<CMatrix> {
+                if (auto mat = self.getMatrix(key); mat != nullptr)
+                {
+                    return std::make_shared<CMatrix>(*mat);
+                }
+                else
+                {
+                    return std::make_shared<CMatrix>();
+                }
+            },
+            "Gets specific matrix from matrices.")
         .def(
-             "get_matrix",
-             [](const CMatrices& self, const std::string& label) -> std::shared_ptr<CMatrix> {
-                 if (auto mat = self.getMatrix(label); mat != nullptr)
-                 {
-                     return std::make_shared<CMatrix>(*mat);
-                 }
-                 else
-                 {
-                     return std::make_shared<CMatrix>();
-                 }
-             },
-             "Gets specific matrix from matrices.");
-    
+            "get_matrix",
+            [](const CMatrices& self, const std::string& label) -> std::shared_ptr<CMatrix> {
+                if (auto mat = self.getMatrix(label); mat != nullptr)
+                {
+                    return std::make_shared<CMatrix>(*mat);
+                }
+                else
+                {
+                    return std::make_shared<CMatrix>();
+                }
+            },
+            "Gets specific matrix from matrices.");
+
     // ...
 }
 

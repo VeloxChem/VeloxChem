@@ -6,7 +6,6 @@ CGeomTwoMatrices::CGeomTwoMatrices()
 
     : _matrices(std::map<T2GeomKey, CMatrix*>())
 {
-    
 }
 
 CGeomTwoMatrices::CGeomTwoMatrices(const std::map<T2GeomKey, CMatrix>& matrices)
@@ -24,17 +23,17 @@ CGeomTwoMatrices::CGeomTwoMatrices(const CMatrix& matrix, const std::vector<int6
     : _matrices(std::map<T2GeomKey, CMatrix*>())
 {
     const auto axis = std::string("xyz");
-    
+
     for (const auto atom : atoms)
     {
         for (size_t i = 0; i < 3; i++)
         {
             const auto ipair = T2Pair({atom, axis[i]});
-            
+
             for (size_t j = i; j < 3; j++)
             {
                 const auto jpair = T2Pair({atom, axis[j]});
-                
+
                 _matrices.insert({{ipair, jpair}, new CMatrix(matrix)});
             }
         }

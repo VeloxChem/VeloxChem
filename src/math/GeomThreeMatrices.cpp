@@ -6,7 +6,6 @@ CGeomThreeMatrices::CGeomThreeMatrices()
 
     : _matrices(std::map<T3GeomKey, CMatrix*>())
 {
-    
 }
 
 CGeomThreeMatrices::CGeomThreeMatrices(const std::map<T3GeomKey, CMatrix>& matrices)
@@ -24,21 +23,21 @@ CGeomThreeMatrices::CGeomThreeMatrices(const CMatrix& matrix, const std::vector<
     : _matrices(std::map<T3GeomKey, CMatrix*>())
 {
     const auto axis = std::string("xyz");
-    
+
     for (const auto atom : atoms)
     {
         for (size_t i = 0; i < 3; i++)
         {
             const auto ipair = T2Pair({atom, axis[i]});
-            
+
             for (size_t j = i; j < 3; j++)
             {
                 const auto jpair = T2Pair({atom, axis[j]});
-                
+
                 for (size_t k = j; k < 3; k++)
                 {
                     const auto kpair = T2Pair({atom, axis[k]});
-                 
+
                     _matrices.insert({{ipair, jpair, kpair}, new CMatrix(matrix)});
                 }
             }

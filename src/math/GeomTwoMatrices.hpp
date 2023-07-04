@@ -5,8 +5,8 @@
 #include <map>
 #include <vector>
 
-#include "Matrix.hpp"
 #include "GeomKeys.hpp"
+#include "Matrix.hpp"
 
 /**
  Class CGeomTwoMatrices stores dictionary of matrices associated with second order geometrical derivatives and provides set of methods
@@ -33,7 +33,7 @@ class CGeomTwoMatrices
      @param matrices the map of matrices.
      */
     CGeomTwoMatrices(const std::map<T2GeomKey, CMatrix>& matrices);
-    
+
     /**
      Creates a matrices.
 
@@ -41,7 +41,7 @@ class CGeomTwoMatrices
      @param atoms the vector of atoms.
      */
     CGeomTwoMatrices(const CMatrix& matrix, const std::vector<int64_t>& atoms);
-    
+
     /**
      Creates a matrices.
 

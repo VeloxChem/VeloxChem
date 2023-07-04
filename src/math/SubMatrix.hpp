@@ -121,7 +121,7 @@ class CSubMatrix
      Set values of submatrix to zero.
      */
     auto zero() -> void;
-    
+
     /**
      Gets dimensions of submatrix.
 

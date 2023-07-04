@@ -34,9 +34,9 @@ compute(CSubMatrix*      matrix_x,
         CSubMatrix*      matrix_z,
         const TPoint3D&  point,
         const CGtoBlock& gto_block,
-        const int64_t angmom,
-        const int64_t bra_first,
-        const int64_t bra_last) -> void
+        const int64_t    angmom,
+        const int64_t    bra_first,
+        const int64_t    bra_last) -> void
 {
     if (angmom == 0)
     {
@@ -73,7 +73,6 @@ compute(CSubMatrix*      matrix_x,
         return;
     }
 }
-
 
 auto
 compute(CSubMatrix*      matrix_x,

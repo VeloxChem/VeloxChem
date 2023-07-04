@@ -6,7 +6,6 @@ CGeomFourMatrices::CGeomFourMatrices()
 
     : _matrices(std::map<T4GeomKey, CMatrix*>())
 {
-    
 }
 
 CGeomFourMatrices::CGeomFourMatrices(const std::map<T4GeomKey, CMatrix>& matrices)
@@ -24,25 +23,25 @@ CGeomFourMatrices::CGeomFourMatrices(const CMatrix& matrix, const std::vector<in
     : _matrices(std::map<T4GeomKey, CMatrix*>())
 {
     const auto axis = std::string("xyz");
-    
+
     for (const auto atom : atoms)
     {
         for (size_t i = 0; i < 3; i++)
         {
             const auto ipair = T2Pair({atom, axis[i]});
-            
+
             for (size_t j = i; j < 3; j++)
             {
                 const auto jpair = T2Pair({atom, axis[j]});
-                
+
                 for (size_t k = j; k < 3; k++)
                 {
                     const auto kpair = T2Pair({atom, axis[k]});
-                    
+
                     for (size_t l = k; l < 3; l++)
                     {
                         const auto lpair = T2Pair({atom, axis[l]});
-                        
+
                         _matrices.insert({{ipair, jpair, kpair, lpair}, new CMatrix(matrix)});
                     }
                 }

@@ -5,8 +5,8 @@
 #include <map>
 #include <vector>
 
-#include "Matrix.hpp"
 #include "GeomKeys.hpp"
+#include "Matrix.hpp"
 
 /**
  Class CGeomThreeMatrices stores dictionary of matrices associated with third order geometrical derivatives and provides set of methods
@@ -33,7 +33,7 @@ class CGeomThreeMatrices
      @param matrices the map of matrices.
      */
     CGeomThreeMatrices(const std::map<T3GeomKey, CMatrix>& matrices);
-    
+
     /**
      Creates a matrices.
 
@@ -41,7 +41,7 @@ class CGeomThreeMatrices
      @param atoms the vector of atoms.
      */
     CGeomThreeMatrices(const CMatrix& matrix, const std::vector<int64_t>& atoms);
-    
+
     /**
      Creates a matrices.
 

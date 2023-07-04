@@ -5,8 +5,8 @@
 #include <map>
 #include <vector>
 
-#include "Matrix.hpp"
 #include "GeomKeys.hpp"
+#include "Matrix.hpp"
 
 /**
  Class CGeomFourMatrices stores dictionary of matrices associated with fourth order geometrical derivatives and provides set of methods
@@ -33,7 +33,7 @@ class CGeomFourMatrices
      @param matrices the map of matrices.
      */
     CGeomFourMatrices(const std::map<T4GeomKey, CMatrix>& matrices);
-    
+
     /**
      Creates a matrices.
 
@@ -41,7 +41,7 @@ class CGeomFourMatrices
      @param atoms the vector of atoms.
      */
     CGeomFourMatrices(const CMatrix& matrix, const std::vector<int64_t>& atoms);
-    
+
     /**
      Creates a matrices.
 

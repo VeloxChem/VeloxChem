@@ -5,8 +5,8 @@
 #include <map>
 #include <vector>
 
-#include "Matrix.hpp"
 #include "GeomKeys.hpp"
+#include "Matrix.hpp"
 
 /**
  Class CGeomOneMatrices stores dictionary of matrices associated with first order geometrical derivatives and provides set of methods
@@ -33,7 +33,7 @@ class CGeomOneMatrices
      @param matrices the map of matrices.
      */
     CGeomOneMatrices(const std::map<TGeomPair, CMatrix>& matrices);
-    
+
     /**
      Creates a matrices.
 
@@ -41,7 +41,7 @@ class CGeomOneMatrices
      @param atoms the vector of atoms.
      */
     CGeomOneMatrices(const CMatrix& matrix, const std::vector<int64_t>& atoms);
-    
+
     /**
      Creates a matrices.
 

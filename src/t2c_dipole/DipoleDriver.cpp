@@ -1,25 +1,23 @@
 #include "DipoleDriver.hpp"
 
-#include "Matrix.hpp"
-#include "MatrixType.hpp"
-#include "GtoFunc.hpp"
-#include "MatrixFunc.hpp"
-#include "OpenMPFunc.hpp"
 #include "DipoleFunc.hpp"
+#include "GtoFunc.hpp"
+#include "Matrix.hpp"
+#include "MatrixFunc.hpp"
+#include "MatrixType.hpp"
+#include "OpenMPFunc.hpp"
 
 auto
-CDipoleDriver::compute(const CMolecularBasis& basis,
-                       const CMolecule& molecule,
-                       const TPoint3D& point) const -> CMatrices
+CDipoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule, const TPoint3D& point) const -> CMatrices
 {
     CMatrices dip_matrix;
-    
+
     dip_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "x");
-    
+
     dip_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "y");
-    
+
     dip_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "z");
-    
+
     dip_matrix.zero();
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
@@ -57,17 +55,17 @@ CDipoleDriver::compute(const CMolecularBasis& basis,
                             const auto gto_block = ptr_gto_blocks[task[0]];
 
                             const auto angmom = gto_block.getAngularMomentum();
-                            
+
                             auto ptr_matrix_x = ptr_dip_matrix->getMatrix("X");
-                            
+
                             auto ptr_matrix_y = ptr_dip_matrix->getMatrix("Y");
-                            
+
                             auto ptr_matrix_z = ptr_dip_matrix->getMatrix("Z");
-                        
+
                             auto ptr_submatrix_x = ptr_matrix_x->getSubMatrix({angmom, angmom});
-                            
+
                             auto ptr_submatrix_y = ptr_matrix_y->getSubMatrix({angmom, angmom});
-                            
+
                             auto ptr_submatrix_z = ptr_matrix_z->getSubMatrix({angmom, angmom});
 
                             dipfunc::compute(ptr_submatrix_x, ptr_submatrix_y, ptr_submatrix_z, point, gto_block, angmom, task[2], task[3]);
@@ -83,21 +81,31 @@ CDipoleDriver::compute(const CMolecularBasis& basis,
                             const auto ket_angmom = ket_gto_block.getAngularMomentum();
 
                             auto ptr_matrix_x = ptr_dip_matrix->getMatrix("X");
-                            
+
                             auto ptr_matrix_y = ptr_dip_matrix->getMatrix("Y");
-                            
+
                             auto ptr_matrix_z = ptr_dip_matrix->getMatrix("Z");
-                        
+
                             auto ptr_submatrix_x = ptr_matrix_x->getSubMatrix({bra_angmom, ket_angmom});
-                            
+
                             auto ptr_submatrix_y = ptr_matrix_y->getSubMatrix({bra_angmom, ket_angmom});
-                            
+
                             auto ptr_submatrix_z = ptr_matrix_z->getSubMatrix({bra_angmom, ket_angmom});
 
                             const auto ang_order = ptr_matrix_x->isAngularOrder({bra_angmom, ket_angmom});
 
-                            dipfunc::compute(
-                                             ptr_submatrix_x, ptr_submatrix_y, ptr_submatrix_z, point, bra_gto_block, ket_gto_block, bra_angmom, ket_angmom, ang_order, task[2], task[3], mat_type);
+                            dipfunc::compute(ptr_submatrix_x,
+                                             ptr_submatrix_y,
+                                             ptr_submatrix_z,
+                                             point,
+                                             bra_gto_block,
+                                             ket_gto_block,
+                                             bra_angmom,
+                                             ket_angmom,
+                                             ang_order,
+                                             task[2],
+                                             task[3],
+                                             mat_type);
                         }
                     }
                 }
