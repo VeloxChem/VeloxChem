@@ -127,6 +127,18 @@ compPrimitiveOctupoleGF_XXZZ_XXX(TDoubleArray&       buffer_xxx,
 
         const auto faa_z = rpc_z * fss;
 
+        const auto faa_xx = fss * (rpc_x * rpc_x + 0.5 * fe_0);
+
+        const auto faa_xy = fss * rpc_x * rpc_y;
+
+        const auto faa_xz = fss * rpc_x * rpc_z;
+
+        const auto faa_yy = fss * (rpc_y * rpc_y + 0.5 * fe_0);
+
+        const auto faa_yz = fss * rpc_x * rpc_z;
+
+        const auto faa_zz = fss * (rpc_z * rpc_z + 0.5 * fe_0);
+
         const auto faa_xxx = fss * (rpc_x * rpc_x * rpc_x + 1.5 * fe_0 * rpc_x);
 
         const auto faa_xxy = fss * (rpc_x * rpc_x * rpc_y + 0.5 * fe_0 * rpc_y);
