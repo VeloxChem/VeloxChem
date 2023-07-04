@@ -30,6 +30,8 @@ from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
 from .veloxchemlib import bohr_in_angstrom
 
+from .outputstream import OutputStream
+from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical
 
 
@@ -196,8 +198,11 @@ def _Molecule_from_dict(mol_dict):
         The molecule.
     """
 
-    assert_msg_critical(('xyz' in mol_dict) ^ ('xyzfile' in mol_dict),
+    assert_msg_critical('xyz' in mol_dict or 'xyzfile' in mol_dict,
                         'Molecule: Expecting either "xyz" or "xyzfile" input')
+
+    assert_msg_critical(not ('xyz' in mol_dict and 'xyzfile' in mol_dict),
+                        'Molecule: Cannot have both "xyz" and "xyzfile" input')
 
     if 'xyz' in mol_dict:
         mol_str = '\n'.join(mol_dict['xyz'])
@@ -513,6 +518,35 @@ def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
     return None
 
 
+@staticmethod
+def _Molecule_get_input_keywords():
+    """
+    Returns input keywords for Molecule.
+    """
+
+    return {
+        'molecule': {
+            'charge': ('int', 'net charge'),
+            'multiplicity': ('int', 'spin multiplicity'),
+            'units': ('str_lower', 'unit of coordinates, default is Angstrom'),
+            'xyz': ('list', 'atom and Cartesian coordinates'),
+            'xyzfile': ('str', 'XYZ file name (conflicts with units/xyz)'),
+        },
+    }
+
+
+@staticmethod
+def _Molecule_print_keywords():
+    """
+    Prints keywords for Molecule.
+    """
+
+    input_keywords = Molecule._get_input_keywords()
+    ostream = OutputStream()
+
+    print_keywords(input_keywords, ostream)
+
+
 def _Molecule_deepcopy(self, memo):
     """
     Implements deepcopy.
@@ -527,7 +561,8 @@ def _Molecule_deepcopy(self, memo):
     return Molecule(self)
 
 
-Molecule._smiles_to_xyz = _Molecule_smiles_to_xyz
+Molecule._get_input_keywords = _Molecule_get_input_keywords
+
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.draw_2d_svg = _Molecule_draw_2d_svg
 Molecule.read_smiles = _Molecule_read_smiles
@@ -550,6 +585,7 @@ Molecule.is_linear = _Molecule_is_linear
 Molecule.get_aufbau_alpha_occupation = _Molecule_get_aufbau_alpha_occupation
 Molecule.get_aufbau_beta_occupation = _Molecule_get_aufbau_beta_occupation
 Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
+Molecule.print_keywords = _Molecule_print_keywords
 Molecule.__deepcopy__ = _Molecule_deepcopy
 
 # aliases for backward compatibility
