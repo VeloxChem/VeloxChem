@@ -24,23 +24,23 @@ class TestDipoleDriver:
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')
-        bas = MolecularBasis.read(mol, 'def2-qzvpp', basis_path, ostream=None)
+        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path, ostream=None)
 
         return mol, bas
 
     def test_dipole_of2_qzvpp(self):
 
-        mol_h2o, bas_qzvpp = self.get_data()
+        mol_h2o, bas_tzvpp = self.get_data()
 
         dip_drv = DipoleDriver()
-        dip_mats = dip_drv.compute(bas_qzvpp, mol_h2o, [0.0, 0.0, 0.0])
+        dip_mats = dip_drv.compute(bas_tzvpp, mol_h2o, [0.0, 0.0, 0.0])
 
         dipx_mat = dip_mats.get_matrix('x')
         dipy_mat = dip_mats.get_matrix('y')
         dipz_mat = dip_mats.get_matrix('z')
 
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'of2.qzvpp.electric.dipole.npy')
+        npyfile = str(here / 'data' / 'of2.tzvpp.electric.dipole.npy')
         ref_mats = np.load(npyfile)
 
         # (s|r|s) integrals

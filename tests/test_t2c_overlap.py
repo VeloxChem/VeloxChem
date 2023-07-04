@@ -22,19 +22,19 @@ class TestOverlapDriver:
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')
-        bas = MolecularBasis.read(mol, 'def2-qzvpp', basis_path, ostream=None)
+        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path, ostream=None)
 
         return mol, bas
 
     def test_overlap_of2_qzvpp(self):
 
-        mol_h2o, bas_qzvpp = self.get_data()
+        mol_h2o, bas_tzvpp = self.get_data()
 
         ovl_drv = OverlapDriver()
-        ovl_mat = ovl_drv.compute(bas_qzvpp, mol_h2o)
+        ovl_mat = ovl_drv.compute(bas_tzvpp, mol_h2o)
 
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'of2.qzvpp.overlap.npy')
+        npyfile = str(here / 'data' / 'of2.tzvpp.overlap.npy')
         ref_mat = np.load(npyfile)
 
         # (s|s) integrals

@@ -22,19 +22,19 @@ class TestKineticEnergyDriver:
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')
-        bas = MolecularBasis.read(mol, 'def2-qzvpp', basis_path, ostream=None)
+        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path, ostream=None)
 
         return mol, bas
 
     def test_kinetic_energy_of2_qzvpp(self):
 
-        mol_h2o, bas_qzvpp = self.get_data()
+        mol_h2o, bas_tzvpp = self.get_data()
 
         kin_drv = KineticEnergyDriver()
-        kin_mat = kin_drv.compute(bas_qzvpp, mol_h2o)
+        kin_mat = kin_drv.compute(bas_tzvpp, mol_h2o)
 
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'of2.qzvpp.kinetic.energy.npy')
+        npyfile = str(here / 'data' / 'of2.tzvpp.kinetic.energy.npy')
         ref_mat = np.load(npyfile)
 
         # (s|T|s) integrals
