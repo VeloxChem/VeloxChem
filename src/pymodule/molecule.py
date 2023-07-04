@@ -467,7 +467,7 @@ def _Molecule_get_aufbau_alpha_occupation(self, n_mo):
 
     nalpha = self.number_of_alpha_electrons()
 
-    return [1.0 if i < nalpha else 0.0 for i in range(n_mo)]
+    return np.hstack((np.ones(nalpha), np.zeros(n_mo - nalpha)))
 
 
 def _Molecule_get_aufbau_beta_occupation(self, n_mo):
@@ -483,37 +483,30 @@ def _Molecule_get_aufbau_beta_occupation(self, n_mo):
 
     nbeta = self.number_of_beta_electrons()
 
-    return [1.0 if i < nbeta else 0.0 for i in range(n_mo)]
+    return np.hstack((np.ones(nbeta), np.zeros(n_mo - nbeta)))
 
 
-def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
+def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted'):
     """
-    Creates an occupation vector based on the aufbau principle.
+    Gets occupation vector(s) based on the aufbau principle.
 
-    :param norb:
-        The number of molecular orbitals
+    :param n_mo:
+        The number of molecular orbitals.
     :param flag:
         The flag (restricted or unrestricted).
 
     :return:
-        flag=='restricted': single vector assuming doubly occupied orbitals.
-        flag=='unrestricted': two vectors assuming singly occupied spin-orbitals.
+        The occupation vector(s).
     """
 
-    nalpha = self.number_of_alpha_electrons()
-    nbeta = self.number_of_beta_electrons()
+    occ_a = self.get_aufbau_alpha_occupation(n_mo)
+    occ_b = self.get_aufbau_beta_occupation(n_mo)
 
     if flag == 'restricted':
-        occ = [
-            2.0 if x < nbeta else (1.0 if x < nalpha else 0.0)
-            for x in range(norb)
-        ]
-        return occ
+        return 0.5 * (occ_a + occ_b)
 
     elif flag == 'unrestricted':
-        occa = [1.0 if x < nalpha else 0.0 for x in range(norb)]
-        occb = [1.0 if x < nbeta else 0.0 for x in range(norb)]
-        return occa, occb
+        return occ_a, occ_b
 
     return None
 

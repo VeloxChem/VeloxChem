@@ -710,44 +710,51 @@ class ScfDriver:
         # create MolecularOrbitals object from numpy array
 
         if self.rank == mpi_master():
+            assert_msg_critical(
+                isinstance(array, (np.ndarray, tuple, list)),
+                'ScfDriver.set_start_orbitals: invalid input for alpha ' +
+                'orbitals')
+
             if isinstance(array, np.ndarray):
-                C_alpha = array
-                C_beta = None
+                C_alpha, C_beta = array, None
+
             elif isinstance(array, (tuple, list)):
-                C_alpha = array[0]
-                C_beta = array[1] if len(array) > 1 else None
-            else:
-                C_alpha = None
-                C_beta = None
+                if len(array) == 1:
+                    C_alpha, C_beta = array[0], None
+                elif len(array) == 2:
+                    C_alpha, C_beta = array[0], array[1]
+                else:
+                    assert_msg_critical(
+                        False,
+                        'ScfDriver.set_start_orbitals: expecting one or two ' +
+                        'input orbitals')
+
+            err_array = 'ScfDriver.set_start_orbitals: expecting numpy array'
+            assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
 
             n_ao = basis.get_dimension_of_basis(molecule)
+            n_mo = C_alpha.shape[1]
+            E_alpha = np.zeros(n_mo)
+
+            err_mo = 'ScfDriver.set_start_orbitals: inconsistent number of MOs'
             err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
-            err_array = 'ScfDriver.set_start_orbitals: invalid array'
+            assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
 
             if C_beta is None:
-                assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
-                assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
+                occ_alpha = molecule.get_aufbau_occupation(n_mo, 'restricted')
 
-                E_alpha = np.zeros(C_alpha.shape[1])
-                occ_alpha = molecule.get_aufbau_occupation(n_ao, 'restricted')
-
-                # TODO: use molorb.restopen for restricted open-shell
                 self._molecular_orbitals = MolecularOrbitals([C_alpha],
                                                              [E_alpha],
                                                              [occ_alpha],
                                                              molorb.rest)
             else:
-                assert_msg_critical(
-                    isinstance(C_alpha, np.ndarray) and
-                    isinstance(C_beta, np.ndarray), err_array)
-                assert_msg_critical(
-                    n_ao == C_alpha.shape[0] and n_ao == C_beta.shape[0],
-                    err_ao)
+                assert_msg_critical(isinstance(C_beta, np.ndarray), err_array)
+                assert_msg_critical(n_ao == C_beta.shape[0], err_ao)
+                assert_msg_critical(n_mo == C_beta.shape[1], err_mo)
 
-                E_alpha = np.zeros(C_alpha.shape[1])
-                E_beta = np.zeros(C_beta.shape[1])
+                E_beta = np.zeros(n_mo)
                 occ_alpha, occ_beta = molecule.get_aufbau_occupation(
-                    n_ao, 'unrestricted')
+                    n_mo, 'unrestricted')
 
                 self._molecular_orbitals = MolecularOrbitals(
                     [C_alpha, C_beta], [E_alpha, E_beta], [occ_alpha, occ_beta],
