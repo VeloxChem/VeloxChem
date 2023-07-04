@@ -277,58 +277,6 @@ class CXCIntegrator
      @param xcFunctional the exchange-correlation functional.
      @param quadMode a string that specifies which densities should be combined.
      */
-    void _integrateLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
-                                 const CMolecule&        molecule,
-                                 const CMolecularBasis&  basis,
-                                 const CAODensityMatrix& rwDensityMatrix,
-                                 const CAODensityMatrix& rw2DensityMatrix,
-                                 const CAODensityMatrix& rw3DensityMatrix,
-                                 const CAODensityMatrix& gsDensityMatrix,
-                                 const CMolecularGrid&   molecularGrid,
-                                 const CXCFunctional&    xcFunctional,
-                                 const std::string&      quadMode) const;
-
-    /**
-     Integrates fourth-order GGA exchange-correlation functional contribution
-     to AO Fock matrix.
-
-     @param aoFockMatrix the AO Fock matrix.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param rwDensityMatrix the perturbed one-time transformed densities.
-     @param rw2DensityMatrix the two-time transformed densities.
-     @param rw3DensityMatrix the three-time transformed densities.
-     @param gsDensityMatrix the ground state density matrix.
-     @param molecularGrid the molecular grid.
-     @param xcFunctional the exchange-correlation functional.
-     @param cubeMode a string that specifies which densities should be combined.
-     */
-    void _integrateLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
-                                 const CMolecule&        molecule,
-                                 const CMolecularBasis&  basis,
-                                 const CAODensityMatrix& rwDensityMatrix,
-                                 const CAODensityMatrix& rw2DensityMatrix,
-                                 const CAODensityMatrix& rw3DensityMatrix,
-                                 const CAODensityMatrix& gsDensityMatrix,
-                                 const CMolecularGrid&   molecularGrid,
-                                 const CXCFunctional&    xcFunctional,
-                                 const std::string&      cubeMode) const;
-
-    /**
-     Integrates fourth-order LDA exchnage-correlation functional contribution
-     to AO Fock matrix.
-
-     @param aoFockMatrix the AO Fock matrix.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param rwDensityMatrix the perturbed one-time transformed densities.
-     @param rw2DensityMatrix the two-time transformed densities.
-     @param rw3DensityMatrix the three-time transformed densities.
-     @param gsDensityMatrix the ground state density matrix.
-     @param molecularGrid the molecular grid.
-     @param xcFunctional the exchange-correlation functional.
-     @param quadMode a string that specifies which densities should be combined.
-     */
     void _integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
                                     const CMolecule&        molecule,
                                     const CMolecularBasis&  basis,
@@ -605,6 +553,7 @@ class CXCIntegrator
     /**
      Integrates LDA contribution to (second-order) Fxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -613,16 +562,18 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForLDA(const int32_t       npoints,
-                                                const double*       weights,
-                                                const CDenseMatrix& gtoValues,
-                                                const double*       rhow,
-                                                const double*       v2rho2,
-                                                CMultiTimer&        timer) const;
+    CDenseMatrix _integratePartialFxcFockForLDA(const CXCFunctional& xcFunctional,
+                                                const int32_t        npoints,
+                                                const double*        weights,
+                                                const CDenseMatrix&  gtoValues,
+                                                const double*        rhow,
+                                                const double*        v2rho2,
+                                                CMultiTimer&         timer) const;
 
     /**
      Integrates GGA contribution to (second-order) Fxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -639,24 +590,26 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForGGA(const int32_t       npoints,
-                                                const double*       weights,
-                                                const CDenseMatrix& gtoValues,
-                                                const CDenseMatrix& gtoValuesX,
-                                                const CDenseMatrix& gtoValuesY,
-                                                const CDenseMatrix& gtoValuesZ,
-                                                const double*       rhow,
-                                                const double*       rhograd,
-                                                const double*       rhowgrad,
-                                                const double*       vsigma,
-                                                const double*       v2rho2,
-                                                const double*       v2rhosigma,
-                                                const double*       v2sigma2,
-                                                CMultiTimer&        timer) const;
+    CDenseMatrix _integratePartialFxcFockForGGA(const CXCFunctional& xcFunctional,
+                                                const int32_t        npoints,
+                                                const double*        weights,
+                                                const CDenseMatrix&  gtoValues,
+                                                const CDenseMatrix&  gtoValuesX,
+                                                const CDenseMatrix&  gtoValuesY,
+                                                const CDenseMatrix&  gtoValuesZ,
+                                                const double*        rhow,
+                                                const double*        rhograd,
+                                                const double*        rhowgrad,
+                                                const double*        vsigma,
+                                                const double*        v2rho2,
+                                                const double*        v2rhosigma,
+                                                const double*        v2sigma2,
+                                                CMultiTimer&         timer) const;
 
     /**
      Integrates meta-GGA contribution to (second-order) Fxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -686,36 +639,38 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialFxcFockForMGGA(const int32_t       npoints,
-                                                 const double*       local_weights,
-                                                 const CDenseMatrix& gtoValues,
-                                                 const CDenseMatrix& gtoValuesX,
-                                                 const CDenseMatrix& gtoValuesY,
-                                                 const CDenseMatrix& gtoValuesZ,
-                                                 const double*       rhow,
-                                                 const double*       rhograd,
-                                                 const double*       rhowgrad,
-                                                 const double*       tauw,
-                                                 const double*       laplw,
-                                                 const double*       vrho,
-                                                 const double*       vsigma,
-                                                 const double*       vlapl,
-                                                 const double*       vtau,
-                                                 const double*       v2rho2,
-                                                 const double*       v2lapl2,
-                                                 const double*       v2tau2,
-                                                 const double*       v2rholapl,
-                                                 const double*       v2rhotau,
-                                                 const double*       v2lapltau,
-                                                 const double*       v2rhosigma,
-                                                 const double*       v2sigmalapl,
-                                                 const double*       v2sigmatau,
-                                                 const double*       v2sigma2,
-                                                 CMultiTimer&        timer) const;
+    CDenseMatrix _integratePartialFxcFockForMGGA(const CXCFunctional& xcFunctional,
+                                                 const int32_t        npoints,
+                                                 const double*        local_weights,
+                                                 const CDenseMatrix&  gtoValues,
+                                                 const CDenseMatrix&  gtoValuesX,
+                                                 const CDenseMatrix&  gtoValuesY,
+                                                 const CDenseMatrix&  gtoValuesZ,
+                                                 const double*        rhow,
+                                                 const double*        rhograd,
+                                                 const double*        rhowgrad,
+                                                 const double*        tauw,
+                                                 const double*        laplw,
+                                                 const double*        vrho,
+                                                 const double*        vsigma,
+                                                 const double*        vlapl,
+                                                 const double*        vtau,
+                                                 const double*        v2rho2,
+                                                 const double*        v2lapl2,
+                                                 const double*        v2tau2,
+                                                 const double*        v2rholapl,
+                                                 const double*        v2rhotau,
+                                                 const double*        v2lapltau,
+                                                 const double*        v2rhosigma,
+                                                 const double*        v2sigmalapl,
+                                                 const double*        v2sigmatau,
+                                                 const double*        v2sigma2,
+                                                 CMultiTimer&         timer) const;
 
     /**
      Integrates LDA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -727,7 +682,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForLDA(const int32_t           npoints,
+    CDenseMatrix _integratePartialKxcFockForLDA(const CXCFunctional&    xcFunctional,
+                                                const int32_t           npoints,
                                                 const double*           weights,
                                                 const CDenseMatrix&     gtoValues,
                                                 const double*           v2rho2,
@@ -740,6 +696,7 @@ class CXCIntegrator
     /**
      Integrates GGA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -761,7 +718,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForGGA(const int32_t           npoints,
+    CDenseMatrix _integratePartialKxcFockForGGA(const CXCFunctional&    xcFunctional,
+                                                const int32_t           npoints,
                                                 const double*           weights,
                                                 const CDenseMatrix&     gtoValues,
                                                 const CDenseMatrix&     gtoValuesX,
@@ -784,6 +742,7 @@ class CXCIntegrator
     /**
      Integrates meta-GGA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -828,7 +787,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForMGGA(const int32_t           npoints,
+    CDenseMatrix _integratePartialKxcFockForMGGA(const CXCFunctional&    xcFunctional,
+                                                 const int32_t           npoints,
                                                  const double*           weights,
                                                  const CDenseMatrix&     gtoValues,
                                                  const CDenseMatrix&     gtoValuesX,
@@ -874,6 +834,7 @@ class CXCIntegrator
     /**
      Integrates LDA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -885,7 +846,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForLDA2(const int32_t            npoints,
+    CDenseMatrix _integratePartialKxcFockForLDA2(const CXCFunctional&     xcFunctional,
+                                                 const int32_t            npoints,
                                                  const double*            weights,
                                                  const CDenseMatrix&      gtoValues,
                                                  const double*            v2rho2,
@@ -898,6 +860,7 @@ class CXCIntegrator
     /**
      Integrates GGA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -919,7 +882,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForGGA2(const int32_t            npoints,
+    CDenseMatrix _integratePartialKxcFockForGGA2(const CXCFunctional&     xcFunctional,
+                                                 const int32_t            npoints,
                                                  const double*            weights,
                                                  const CDenseMatrix&      gtoValues,
                                                  const CDenseMatrix&      gtoValuesX,
@@ -942,6 +906,7 @@ class CXCIntegrator
     /**
      Integrates meta-GGA contribution to (third-order) Kxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -986,7 +951,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialKxcFockForMGGA2(const int32_t            npoints,
+    CDenseMatrix _integratePartialKxcFockForMGGA2(const CXCFunctional&     xcFunctional,
+                                                  const int32_t            npoints,
                                                   const double*            weights,
                                                   const CDenseMatrix&      gtoValues,
                                                   const CDenseMatrix&      gtoValuesX,
@@ -1030,8 +996,9 @@ class CXCIntegrator
                                                   CMultiTimer&             timer) const;
 
     /**
-     Integrates LDA contribution to (fourth-order) Kxc matrix.
+     Integrates LDA contribution to (fourth-order) Lxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -1044,7 +1011,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialLxcFockForLDA(const int32_t            npoints,
+    CDenseMatrix _integratePartialLxcFockForLDA(const CXCFunctional&     xcFunctional,
+                                                const int32_t            npoints,
                                                 const double*            weights,
                                                 const CDenseMatrix&      gtoValues,
                                                 const double*            v2rho2,
@@ -1058,6 +1026,7 @@ class CXCIntegrator
     /**
      Integrates GGA contribution to (fourth-order) Lxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -1084,7 +1053,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialLxcFockForGGA(const int32_t            npoints,
+    CDenseMatrix _integratePartialLxcFockForGGA(const CXCFunctional&     xcFunctional,
+                                                const int32_t            npoints,
                                                 const double*            weights,
                                                 const CDenseMatrix&      gtoValues,
                                                 const CDenseMatrix&      gtoValuesX,
@@ -1112,6 +1082,7 @@ class CXCIntegrator
     /**
      Integrates meta-GGA contribution to (fourth-order) Lxc matrix.
 
+     @param xcFunctional the exchange-correlation functional.
      @param npoints the number of grid points.
      @param weights the weights of grid points.
      @param gtoValues the GTO values on grid points.
@@ -1191,7 +1162,8 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    CDenseMatrix _integratePartialLxcFockForMGGA(const int32_t            npoints,
+    CDenseMatrix _integratePartialLxcFockForMGGA(const CXCFunctional&     xcFunctional,
+                                                 const int32_t            npoints,
                                                  const double*            weights,
                                                  const CDenseMatrix&      gtoValues,
                                                  const CDenseMatrix&      gtoValuesX,
@@ -1337,32 +1309,6 @@ class CXCIntegrator
                           const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel,
                           const std::string&      quadMode) const;
-
-    /**
-     Integrates fourth-order exchnage-correlation functional contribution to AO
-     Fock matrix in quadratic response.
-
-     @param aoFockMatrix the AO Fock matrix.
-     @param molecule the molecule.
-     @param basis the molecular basis.
-     @param rwDensityMatrix the one-time transformed densities.
-     @param rw2DensityMatrix the two-time transformed densities.
-     @param rw3DensityMatrix the three-time transformed densities.
-     @param gsDensityMatrix the ground state density matrix.
-     @param molecularGrid the molecular grid.
-     @param xcFuncLabel the label of exchange-correlation functional.
-     @param quadMode a string that specifies which densities should be combined.
-     */
-    void integrateLxcFock(CAOFockMatrix&          aoFockMatrix,
-                          const CMolecule&        molecule,
-                          const CMolecularBasis&  basis,
-                          const CAODensityMatrix& rwDensityMatrix,
-                          const CAODensityMatrix& rw2DensityMatrix,
-                          const CAODensityMatrix& rw3DensityMatrix,
-                          const CAODensityMatrix& gsDensityMatrix,
-                          const CMolecularGrid&   molecularGrid,
-                          const std::string&      xcFuncLabel,
-                          const std::string&      cubeMode) const;
 
     /**
      Integrates fourth-order exchnage-correlation functional contribution to AO

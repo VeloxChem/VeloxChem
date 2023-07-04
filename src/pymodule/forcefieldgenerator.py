@@ -30,7 +30,7 @@ import tempfile
 import sys
 import re
 
-from .veloxchemlib import mpi_master, bohr_in_angstroms, hartree_in_kcalpermol
+from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
@@ -362,8 +362,9 @@ class ForceFieldGenerator:
                     'ForceFieldGenerator.read_qm_scan_xyz_files: ' +
                     'inconsistent number of atoms')
 
-                xyz_str = ''.join(xyz_lines[i_start + 2:i_end])
-                geometries.append(Molecule.read_str(xyz_str, units='angstrom'))
+                mol_str = ''.join(xyz_lines[i_start + 2:i_end])
+                geometries.append(
+                    Molecule.read_molecule_string(mol_str, units='angstrom'))
 
             self.scan_geometries.append(geometries)
 
@@ -478,7 +479,7 @@ class ForceFieldGenerator:
 
         # molecular information
 
-        coords = self.molecule.get_coordinates()
+        coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
         connected = self.get_connectivity()
 
@@ -611,7 +612,7 @@ class ForceFieldGenerator:
 
             for i, j in bond_indices:
                 r_eq = np.linalg.norm(coords[i] - coords[j])
-                r_eq *= bohr_in_angstroms() * 0.1
+                r_eq *= bohr_in_angstrom() * 0.1
 
                 at_1 = atom_types[i]
                 at_2 = atom_types[j]
@@ -925,7 +926,7 @@ class ForceFieldGenerator:
             from scipy.optimize import curve_fit
         except ImportError:
             raise ImportError('Unable to import scipy. Please install scipy ' +
-                              'via \'python3 -m pip install scipy\'')
+                              'via pip or conda.')
 
         # Ryckaert-Bellemans function
 
@@ -1275,12 +1276,12 @@ class ForceFieldGenerator:
             A 2d array containing the connectivity information of the molecule.
         """
 
-        coords = self.molecule.get_coordinates()
+        coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
         covalent_radii = self.molecule.covalent_radii_to_numpy()
 
         connectivity = np.full((n_atoms, n_atoms), False, dtype='bool')
-        tolerance = 0.4 / bohr_in_angstroms()
+        tolerance = 0.4 / bohr_in_angstrom()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
                 r_ij = np.linalg.norm(coords[i] - coords[j])

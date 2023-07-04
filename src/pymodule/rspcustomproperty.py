@@ -24,27 +24,21 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 from .rspproperty import ResponseProperty
-from .inputparser import parse_seq_range
 
 
 class CustomProperty(ResponseProperty):
     """
-    Implements a custom, user-defined  property.
+    Implements a custom, user-defined property.
 
     :param rsp_dict:
         The dictionary of response input.
     :param method_dict:
         The dictionary of method settings.
-
-    Instance variables
-        - rsp_dict: The dictionary of response input.
-        - method_dict: The dictionary of method settings.
-        - rsp_property: The dictionary of response property.
     """
 
     def __init__(self, rsp_dict=None, method_dict=None):
         """
-        Initializes a custom, user-defined  property.
+        Initializes a custom, user-defined property.
         """
 
         if rsp_dict is None:

@@ -1,4 +1,6 @@
-from veloxchem.veloxchemlib import is_mpi_master
+import pytest
+
+from veloxchem.veloxchemlib import is_single_node, is_mpi_master
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -8,7 +10,7 @@ from veloxchem.tpafulldriver import TpaFullDriver
 
 class TestTpaFromCrf:
 
-    def test_tpa_from_crf(self):
+    def run_tpa_from_crf(self, xcfun_label):
 
         molecule_string = """
             O   0.0   0.0   0.0
@@ -17,16 +19,16 @@ class TestTpaFromCrf:
         """
         basis_set_label = 'def2-svp'
 
-        molecule = Molecule.read_str(molecule_string, units='au')
+        molecule = Molecule.read_molecule_string(molecule_string, units='au')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_settings = {}
-        method_settings = {'xcfun': 'pbe0', 'grid_level': 1}
+        method_settings = {'xcfun': xcfun_label, 'grid_level': 1}
 
         scfdrv = ScfRestrictedDriver()
         scfdrv.ostream.mute()
         scfdrv.update_settings(scf_settings, method_settings)
-        scfdrv.compute(molecule, basis)
+        scf_results = scfdrv.compute(molecule, basis)
 
         w1 = 0.05
         w2 = -w1
@@ -61,7 +63,7 @@ class TestTpaFromCrf:
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)
-                crf_results = crf.compute(molecule, basis, scfdrv.scf_tensors)
+                crf_results = crf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
                     ref_tpa_results['gamma'] += crf_results[('gamma', w1, w2,
                                                              w3)]
@@ -85,7 +87,7 @@ class TestTpaFromCrf:
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)
-                crf_results = crf.compute(molecule, basis, scfdrv.scf_tensors)
+                crf_results = crf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
                     ref_tpa_results['gamma'] += crf_results[('gamma', w1, w2,
                                                              w3)]
@@ -109,7 +111,7 @@ class TestTpaFromCrf:
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)
-                crf_results = crf.compute(molecule, basis, scfdrv.scf_tensors)
+                crf_results = crf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
                     ref_tpa_results['gamma'] += crf_results[('gamma', w1, w2,
                                                              w3)]
@@ -128,7 +130,7 @@ class TestTpaFromCrf:
         tpa = TpaFullDriver()
         tpa.ostream.mute()
         tpa.update_settings(rsp_settings, method_settings)
-        tpa_results = tpa.compute(molecule, basis, scfdrv.scf_tensors)
+        tpa_results = tpa.compute(molecule, basis, scf_results)
 
         if is_mpi_master():
             for key in ref_tpa_results:
@@ -151,3 +153,18 @@ class TestTpaFromCrf:
                 calc_val = tpa_results[key_aliases[key]][(w1, w2, w3)]
                 assert abs(abs(calc_val.real / ref_val.real) - 1.0) < tol
                 assert abs(abs(calc_val.imag / ref_val.imag) - 1.0) < tol
+
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
+    def test_tpa_from_crf_lda(self):
+
+        self.run_tpa_from_crf('slda')
+
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
+    def test_tpa_from_crf_gga(self):
+
+        self.run_tpa_from_crf('pbe0')
+
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
+    def test_tpa_from_crf_mgga(self):
+
+        self.run_tpa_from_crf('tpssh')

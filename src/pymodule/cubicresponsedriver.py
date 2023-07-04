@@ -30,14 +30,15 @@ import time
 import sys
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master, hartree_in_wavenumbers
+from .veloxchemlib import mpi_master, hartree_in_wavenumber
 from .profiler import Profiler
 from .outputstream import OutputStream
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
-from .sanitychecks import scf_results_sanity_check, dft_sanity_check
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_distributed_focks, read_distributed_focks,
                          write_distributed_focks)
@@ -81,7 +82,7 @@ class CubicResponseDriver(NonlinearSolver):
         self.c_frequencies = (0,)
         self.d_frequencies = (0,)
         self.comp = None
-        self.damping = 1000.0 / hartree_in_wavenumbers()
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         self.a_components = 'z'
         self.b_components = 'z'
@@ -134,6 +135,9 @@ class CubicResponseDriver(NonlinearSolver):
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-6
+
+        # check molecule
+        molecule_sanity_check(molecule)
 
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)

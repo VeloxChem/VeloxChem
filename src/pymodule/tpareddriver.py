@@ -951,30 +951,20 @@ class TpaReducedDriver(TpaDriver):
 
         return None
 
-    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, other_dict):
+    def _print_results(self, rsp_results):
         """
         Prints the results from the reduced TPA calculation.
 
-        :param freqs:
-            List of frequencies
-        :param gamma:
-            A dictonary containing the reduced isotropic cubic response
-            functions for TPA
-        :param comp:
-            List of gamma tensors components
-        :param t4_dict:
-            A dictonary containing the isotropic T[4] contractions (None for
-            one-photon off-resonance TPA calculations)
-        :param t3_dict:
-            A dictonary containing the isotropic T[3] contractions for
-            one-photon off-resonance TPA calculations
-        :param other_dict:
-            A dictonary containing the isotropic X[2] and A[2] contractions for
-            one-photo off-resonance TPA calculations
+        :param rsp_results:
+            A dictonary containing the results of response calculation.
         """
 
-        NaX2Nyz = other_dict['NaX2Nyz']
-        NxA2Nyz = other_dict['NxA2Nyz']
+        gamma = rsp_results['gamma']
+
+        t3_dict = rsp_results['t3_dict']
+
+        NaX2Nyz = rsp_results['NaX2Nyz']
+        NxA2Nyz = rsp_results['NxA2Nyz']
 
         self.ostream.print_blank()
 
@@ -992,6 +982,8 @@ class TpaReducedDriver(TpaDriver):
         w_str = '    intended for use in one-photon off-resonance regions.    '
         self.ostream.print_header(w_str)
         self.ostream.print_blank()
+
+        freqs = rsp_results['frequencies']
 
         for w in freqs:
             title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
@@ -1014,5 +1006,8 @@ class TpaReducedDriver(TpaDriver):
         title += 'J. Chem. Phys. 154, 024111 (2021)'
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()
+
+        spectrum = self.get_spectrum(rsp_results, x_unit='au')
+        self._print_spectrum(spectrum, width)
 
         self.ostream.print_blank()

@@ -20,19 +20,19 @@ class TestQrf:
         basis_set_label = 'cc-pVDZ'
         xcfun_label = 'B3LYP'
 
-        molecule = Molecule.read_str(molecule_string, units='au')
+        molecule = Molecule.read_molecule_string(molecule_string, units='au')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.ostream.mute()
         scf_drv.update_settings({}, {'xcfun': xcfun_label})
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
 
-        return molecule, basis, xcfun_label, scf_drv.scf_tensors
+        return molecule, basis, xcfun_label, scf_results
 
     def run_qrf(self, ref_result):
 
-        molecule, basis, xcfun_label, scf_tensors = self.run_scf()
+        molecule, basis, xcfun_label, scf_results = self.run_scf()
         method_settings = {'xcfun': xcfun_label}
 
         qrf_drv = QuadraticResponseDriver()
@@ -48,7 +48,7 @@ class TestQrf:
             'c_components': 'z'
         }
         qrf_drv.update_settings(rsp_settings, method_settings)
-        qrf_result_xxz = qrf_drv.compute(molecule, basis, scf_tensors)
+        qrf_result_xxz = qrf_drv.compute(molecule, basis, scf_results)
 
         rsp_settings = {
             'conv_thresh': 1.0e-6,
@@ -60,7 +60,7 @@ class TestQrf:
             'c_components': 'y'
         }
         qrf_drv.update_settings(rsp_settings, method_settings)
-        qrf_result_yzy = qrf_drv.compute(molecule, basis, scf_tensors)
+        qrf_result_yzy = qrf_drv.compute(molecule, basis, scf_results)
 
         rsp_settings = {
             'conv_thresh': 1.0e-6,
@@ -72,7 +72,7 @@ class TestQrf:
             'c_components': 'z'
         }
         qrf_drv.update_settings(rsp_settings, method_settings)
-        qrf_result_zzz = qrf_drv.compute(molecule, basis, scf_tensors)
+        qrf_result_zzz = qrf_drv.compute(molecule, basis, scf_results)
 
         if is_mpi_master():
             thresh = 1.0e-4

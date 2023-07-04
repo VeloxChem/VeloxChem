@@ -28,7 +28,7 @@ import math
 
 from .veloxchemlib import VisualizationDriver, CubicGrid
 from .veloxchemlib import molorb
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 
 
 class OrbitalViewer:
@@ -93,16 +93,15 @@ class OrbitalViewer:
 
     def help_string_k3d(self):
 
-        return ('Unable to import k3d. Please install k3d via\n' +
-                '  python3 -m pip install k3d\n' +
+        return ('Unable to import k3d. Please install k3d via pip or conda,\n' +
+                '  and then run\n' +
                 '  jupyter nbextension install --py --sys-prefix k3d\n' +
                 '  jupyter nbextension enable --py --sys-prefix k3d\n')
 
     def help_string_widgets_and_display(self):
 
         return ('Unable to import ipywidgets or IPython.display.\n' +
-                'Please install jupyter notebook via\n' +
-                '  python3 -m pip install jupyter')
+                'Please install jupyter notebook via pip or conda.')
 
     def initialize(self, molecule, basis):
         """
@@ -119,7 +118,7 @@ class OrbitalViewer:
 
         # Define box size
         self.atomnr = molecule.elem_ids_to_numpy()
-        self.coords = molecule.get_coordinates()
+        self.coords = molecule.get_coordinates_in_bohr()
         xmin = self.coords[:, 0].min() - self.grid_margins
         xmax = self.coords[:, 0].max() + self.grid_margins
         ymin = self.coords[:, 1].min() - self.grid_margins
@@ -411,7 +410,7 @@ class OrbitalViewer:
 
         natoms = molecule.number_of_atoms()
         atomnr = molecule.elem_ids_to_numpy() - 1
-        coords = molecule.get_coordinates().astype('float32')
+        coords = molecule.get_coordinates_in_bohr().astype('float32')
 
         # Create a list of colors and radii
         colors = []
@@ -439,7 +438,7 @@ class OrbitalViewer:
         for i in range(natoms):
             color_i = colors[i]
             for j in range(i + 1, natoms):
-                bond = (radii[i] + radii[j]) / bohr_in_angstroms()
+                bond = (radii[i] + radii[j]) / bohr_in_angstrom()
                 if np.linalg.norm(coords[i, :] - coords[j, :]) > 1.25 * bond:
                     continue
                 color_j = colors[j]

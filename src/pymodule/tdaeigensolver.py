@@ -46,7 +46,8 @@ from .blockdavidson import BlockDavidsonSolver
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
-from .sanitychecks import scf_results_sanity_check, dft_sanity_check
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (read_rsp_hdf5, write_rsp_hdf5, create_hdf5,
                          write_rsp_solution)
@@ -141,15 +142,18 @@ class TdaEigenSolver(LinearSolver):
 
         if self.cube_origin is not None:
             assert_msg_critical(
-                len(self.cube_origin) == 3, 'cube origin: Need 3 numbers')
+                len(self.cube_origin) == 3,
+                'TdaEigenSolver: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
-                len(self.cube_stepsize) == 3, 'cube stepsize: Need 3 numbers')
+                len(self.cube_stepsize) == 3,
+                'TdaEigenSolver: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
-                len(self.cube_points) == 3, 'cube points: Need 3 integers')
+                len(self.cube_points) == 3,
+                'TdaEigenSolver: cube points needs 3 integers')
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -166,6 +170,9 @@ class TdaEigenSolver(LinearSolver):
             A dictionary containing eigenvalues, eigenvectors, transition
             dipole moments, oscillator strengths and rotatory strengths.
         """
+
+        # check molecule
+        molecule_sanity_check(molecule)
 
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)

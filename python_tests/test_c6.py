@@ -19,9 +19,10 @@ class TestC6:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
-        return scf_drv.scf_tensors
+        return scf_results
 
     def run_c6(self, inpfile, xcfun_label, data_lines, ref_c6_value):
 
@@ -34,7 +35,7 @@ class TestC6:
         if xcfun_label is not None:
             task.input_dict['method_settings']['xcfun'] = xcfun_label
 
-        scf_tensors = self.run_scf(task)
+        scf_results = self.run_scf(task)
 
         c6_drv = C6Driver(task.mpi_comm, task.ostream)
         c6_drv.update_settings(
@@ -42,7 +43,7 @@ class TestC6:
                 'n_points': ref_n_points,
                 'batch_size': choice([1, 10, 100])
             }, task.input_dict['method_settings'])
-        c6_results = c6_drv.compute(task.molecule, task.ao_basis, scf_tensors)
+        c6_results = c6_drv.compute(task.molecule, task.ao_basis, scf_results)
 
         assert c6_drv.is_converged
 

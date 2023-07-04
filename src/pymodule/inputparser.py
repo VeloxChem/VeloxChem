@@ -438,16 +438,16 @@ def print_keywords(input_keywords, ostream):
     Prints input keywords to output stream.
     """
 
-    width = 80
+    width = 90
     for group in input_keywords:
         group_print = group.replace('_', ' ')
         ostream.print_header('=' * width)
         ostream.print_header(f'  @{group_print}'.ljust(width))
         ostream.print_header('-' * width)
         for key, val in input_keywords[group].items():
-            text = f'  {key}'.ljust(20)
+            text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 35)
+            text += f'  {val[1]}'.ljust(width - 45)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -458,13 +458,13 @@ def print_attributes(input_keywords, ostream):
     Prints attributes to output stream.
     """
 
-    width = 80
+    width = 90
     ostream.print_header('=' * width)
     for group in input_keywords:
         for key, val in input_keywords[group].items():
-            text = f'  {key}'.ljust(20)
+            text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 35)
+            text += f'  {val[1]}'.ljust(width - 45)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()

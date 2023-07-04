@@ -1864,30 +1864,23 @@ class TpaFullDriver(TpaDriver):
         else:
             return None
 
-    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
+    def _print_results(self, rsp_results):
         """
         Prints the results from the TPA calculation.
 
-        :param freqs:
-            List of frequencies
-        :param gamma:
-            A dictonary containing the isotropic cubic response functions for
-            TPA
-        :param comp:
-            List of gamma tensors components
-        :param t4_dict:
-            A dictonary containing the isotropic T[4] contractions
-        :param t3_dict:
-            A dictonary containing the isotropic T[3] contractions
-        :param tpa_dict:
-            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
-            contractions
+        :param rsp_results:
+            A dictonary containing the results of response calculation.
         """
 
-        NaX3NyNz = tpa_dict['NaX3NyNz']
-        NaA3NxNy = tpa_dict['NaA3NxNy']
-        NaX2Nyz = tpa_dict['NaX2Nyz']
-        NxA2Nyz = tpa_dict['NxA2Nyz']
+        gamma = rsp_results['gamma']
+
+        t4_dict = rsp_results['t4_dict']
+        t3_dict = rsp_results['t3_dict']
+
+        NaX3NyNz = rsp_results['NaX3NyNz']
+        NaA3NxNy = rsp_results['NaA3NxNy']
+        NaX2Nyz = rsp_results['NaX2Nyz']
+        NxA2Nyz = rsp_results['NxA2Nyz']
 
         self.ostream.print_blank()
 
@@ -1897,6 +1890,8 @@ class TpaFullDriver(TpaDriver):
         self.ostream.print_header(w_str)
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
+
+        freqs = rsp_results['frequencies']
 
         for w in freqs:
             title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
@@ -1922,5 +1917,8 @@ class TpaFullDriver(TpaDriver):
         title += 'J. Chem. Phys. 154, 024111 (2021)'
         self.ostream.print_header(title.ljust(width))
         self.ostream.print_blank()
+
+        spectrum = self.get_spectrum(rsp_results, x_unit='au')
+        self._print_spectrum(spectrum, width)
 
         self.ostream.print_blank()

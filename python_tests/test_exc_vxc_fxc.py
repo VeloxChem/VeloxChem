@@ -28,18 +28,18 @@ class TestExcVxc:
         grid_level = 1
         tol = 1.0e-10
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
         gs_density = scf_drv.density
 
         if scf_drv.rank == 0:
-            mo = scf_drv.scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             nvir = mo.shape[1] - nocc
             mo_occ = mo[:, :nocc]
@@ -130,18 +130,18 @@ class TestExcVxc:
         grid_level = 1
         tol = 1.0e-10
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()
         scf_drv.xcfun = xcfun_label
         scf_drv.grid_level = grid_level
         scf_drv.ostream.mute()
-        scf_drv.compute(molecule, basis)
+        scf_results = scf_drv.compute(molecule, basis)
         gs_density = scf_drv.density
 
         if scf_drv.rank == 0:
-            mo = scf_drv.scf_tensors['C_alpha']
+            mo = scf_results['C_alpha']
             nocc = molecule.number_of_alpha_electrons()
             nvir = mo.shape[1] - nocc
             mo_occ = mo[:, :nocc]

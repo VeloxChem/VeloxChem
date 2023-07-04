@@ -36,11 +36,11 @@ class TestScfRestricted:
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         scf_prop = FirstOrderProperties(task.mpi_comm, task.ostream)
-        scf_prop.compute_scf_prop(task.molecule, task.ao_basis,
-                                  scf_drv.scf_tensors)
+        scf_prop.compute_scf_prop(task.molecule, task.ao_basis, scf_results)
 
         if is_mpi_master(task.mpi_comm):
             if xcfun_label is not None:
@@ -170,7 +170,7 @@ class TestScfRestricted:
 
         mol = task.molecule
         bas = task.ao_basis
-        nao = bas.get_dimensions_of_basis(mol)
+        nao = bas.get_dimension_of_basis(mol)
 
         dmat = np.diag(np.ones(nao))
         dens = AODensityMatrix([dmat], denmat.rest)

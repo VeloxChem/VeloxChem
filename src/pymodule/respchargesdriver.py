@@ -29,7 +29,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import NuclearPotentialIntegralsDriver
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import boltzmann_in_evperkelvin
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import mpi_master
@@ -232,11 +232,12 @@ class RespChargesDriver:
                     int(xyz_lines[i_start].split()[0]) == n_atoms,
                     'RespChargesDriver.compute: inconsistent number of atoms')
 
-                xyz_str = ''.join(xyz_lines[i_start + 2:i_end])
+                mol_str = ''.join(xyz_lines[i_start + 2:i_end])
 
                 if self.rank == mpi_master():
                     # create molecule
-                    mol = Molecule.read_str(xyz_str, units='angstrom')
+                    mol = Molecule.read_molecule_string(mol_str,
+                                                        units='angstrom')
                     mol.set_charge(self.net_charge)
                     mol.set_multiplicity(self.multiplicity)
                     # create basis set
@@ -329,7 +330,7 @@ class RespChargesDriver:
                     'checkpoint_file': self.filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
-                scf_drv.compute(mol, bas)
+                scf_results = scf_drv.compute(mol, bas)
 
             else:
                 filename = str(
@@ -346,12 +347,12 @@ class RespChargesDriver:
                     'checkpoint_file': filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
-                scf_drv.compute(mol, bas)
+                scf_results = scf_drv.compute(mol, bas)
                 ostream.close()
 
             grid_m = self.get_grid_points(mol)
             esp_m = self.get_electrostatic_potential(grid_m, mol, bas,
-                                                     scf_drv.scf_tensors)
+                                                     scf_results)
             scf_energy_m = scf_drv.get_scf_energy()
 
             if self.rank == mpi_master():
@@ -714,7 +715,7 @@ class RespChargesDriver:
             a_m = np.zeros(a.shape)
             b_m = np.zeros(b.shape)
 
-            coords = molecules[m].get_coordinates()
+            coords = molecules[m].get_coordinates_in_bohr()
 
             for i in range(n_atoms):
                 if constr[i] != -1:
@@ -758,7 +759,7 @@ class RespChargesDriver:
         """
 
         n_atoms = molecule.number_of_atoms()
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
         labels = molecule.get_labels()
         covalent_radii = molecule.covalent_radii_to_numpy()
 
@@ -766,7 +767,7 @@ class RespChargesDriver:
 
         # connect atoms with distances close to sum of covalent radii with
         # tolerance of 0.4 Angstrom
-        tolerance = 0.4 / bohr_in_angstroms()
+        tolerance = 0.4 / bohr_in_angstrom()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
                 r_ij = np.linalg.norm(coords[i] - coords[j])
@@ -836,7 +837,7 @@ class RespChargesDriver:
         """
 
         grid = []
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         for layer in range(self.number_layers):
 
@@ -847,7 +848,7 @@ class RespChargesDriver:
             for atom in range(molecule.number_of_atoms()):
                 # number of points fitting on the equator
                 n_eq = int(2.0 * np.pi * r[atom] * np.sqrt(self.density) *
-                           bohr_in_angstroms())
+                           bohr_in_angstrom())
 
                 # number of latitudes
                 n_i = n_eq // 2
@@ -881,7 +882,7 @@ class RespChargesDriver:
 
         return np.array(grid)
 
-    def get_electrostatic_potential(self, grid, molecule, basis, scf_tensors):
+    def get_electrostatic_potential(self, grid, molecule, basis, scf_results):
         """
         Gets the QM ESP on the grid points.
 
@@ -891,15 +892,15 @@ class RespChargesDriver:
             The molecule.
         :param basis:
             The AO basis set.
-        :param scf_tensors:
-            The tensors from the converged SCF calculation.
+        :param scf_results:
+            The dictionary containing SCF results.
 
         :return:
             The ESP at each grid point listed in an array.
         """
 
         if self.rank == mpi_master():
-            D = scf_tensors['D_alpha'] + scf_tensors['D_beta']
+            D = scf_results['D_alpha'] + scf_results['D_beta']
         else:
             D = None
         D = self.comm.bcast(D, root=mpi_master())
@@ -908,7 +909,7 @@ class RespChargesDriver:
 
         # classical electrostatic potential
 
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
         elem_ids = molecule.elem_ids_to_numpy()
 
         if self.rank == mpi_master():
@@ -972,7 +973,7 @@ class RespChargesDriver:
         rrms = 0.0
 
         for m in range(len(molecules)):
-            coords = molecules[m].get_coordinates()
+            coords = molecules[m].get_coordinates_in_bohr()
             chi_square = 0.0
             norm = 0.0
             for i in range(esp[m].size):
@@ -1027,7 +1028,7 @@ class RespChargesDriver:
             else:
                 pdb_fname = f'{filename}.pdb'
             with open(pdb_fname, 'w') as f_pdb:
-                coords = mol.get_coordinates() * bohr_in_angstroms()
+                coords = mol.get_coordinates_in_angstrom()
                 for j in range(mol.number_of_atoms()):
                     cur_str = '{:6s}{:5d} {:^4s} {:3s}  {:4d}    '.format(
                         'ATOM', j + 1,

@@ -50,10 +50,10 @@ from .veloxchemlib import mpi_initialized
 from .veloxchemlib import ao_matrix_to_veloxchem
 from .veloxchemlib import ao_matrix_to_dalton
 from .veloxchemlib import get_basis_function_indices_for_atom
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom, bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import hartree_in_kcalpermol
-from .veloxchemlib import hartree_in_wavenumbers
+from .veloxchemlib import hartree_in_wavenumber, hartree_in_wavenumbers
 from .veloxchemlib import dipole_in_debye
 from .veloxchemlib import rotatory_strength_in_cgs
 from .veloxchemlib import extinction_coefficient_from_beta
@@ -100,6 +100,7 @@ from .c6driver import C6Driver
 from .quadraticresponsedriver import QuadraticResponseDriver
 from .cubicresponsedriver import CubicResponseDriver
 from .shgdriver import ShgDriver
+from .tpatransitiondriver import TpaTransitionDriver
 from .tpafulldriver import TpaFullDriver
 from .tpareddriver import TpaReducedDriver
 from .respchargesdriver import RespChargesDriver

@@ -35,7 +35,8 @@ from .profiler import Profiler
 from .distributedarray import DistributedArray
 from .signalhandler import SignalHandler
 from .linearsolver import LinearSolver
-from .sanitychecks import scf_results_sanity_check, dft_sanity_check
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import (check_rsp_hdf5, create_hdf5,
                          write_rsp_solution_with_multiple_keys)
@@ -130,6 +131,9 @@ class LinearResponseSolver(LinearSolver):
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        # check molecule
+        molecule_sanity_check(molecule)
 
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
@@ -665,23 +669,26 @@ class LinearResponseSolver(LinearSolver):
 
         width = 92
 
-        for w in self.frequencies:
-            w_str = 'Polarizability (w={:.4f})'.format(w)
-            ostream.print_header(w_str.ljust(width))
-            ostream.print_header(('-' * len(w_str)).ljust(width))
+        dipole_ops = ['dipole', 'electric dipole', 'electric_dipole']
 
-            valstr = '{:<5s}'.format('')
-            for b in self.b_components:
-                valstr += '{:>15s}'.format(b.upper())
-            ostream.print_header(valstr.ljust(width))
+        if self.a_operator in dipole_ops and self.b_operator in dipole_ops:
 
-            for a in self.a_components:
-                valstr = '{:<5s}'.format(a.upper())
+            for w in self.frequencies:
+                w_str = 'Polarizability (w={:.4f})'.format(w)
+                ostream.print_header(w_str.ljust(width))
+                ostream.print_header(('-' * len(w_str)).ljust(width))
+
+                valstr = '{:<5s}'.format('')
                 for b in self.b_components:
-                    prop = -rsp_funcs[(a, b, w)]
-                    valstr += '{:15.8f}'.format(prop)
+                    valstr += '{:>15s}'.format(b.upper())
                 ostream.print_header(valstr.ljust(width))
 
-            ostream.print_blank()
+                for a in self.a_components:
+                    valstr = '{:<5s}'.format(a.upper())
+                    for b in self.b_components:
+                        prop = -rsp_funcs[(a, b, w)]
+                        valstr += '{:15.8f}'.format(prop)
+                    ostream.print_header(valstr.ljust(width))
+                ostream.print_blank()
 
         ostream.flush()

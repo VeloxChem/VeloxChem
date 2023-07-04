@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from veloxchem.veloxchemlib import is_mpi_master
-from veloxchem.veloxchemlib import bohr_in_angstroms
+from veloxchem.veloxchemlib import bohr_in_angstrom
 from veloxchem.mpitask import MpiTask
 from veloxchem.molecularbasis import MolecularBasis
 from veloxchem.scfrestdriver import ScfRestrictedDriver
@@ -44,7 +44,7 @@ class TestOptimizeSCF:
         opt_mol = opt_drv.compute(task.molecule, task.ao_basis, scf_drv)
 
         if is_mpi_master(task.mpi_comm):
-            opt_coords = opt_mol.get_coordinates()
+            opt_coords = opt_mol.get_coordinates_in_bohr()
             assert np.max(np.abs(opt_coords - ref_coords)) < 1.0e-6
 
             inpfile = Path(inpfile)
@@ -67,6 +67,6 @@ class TestOptimizeSCF:
             [-1.965745778628, 2.619171893222, 0.031449914839],
             [-2.496768727202, 1.280798298868, 0.793505674044],
             [-2.536814090843, 1.362016810479, -0.833073376431],
-        ]) / bohr_in_angstroms()
+        ]) / bohr_in_angstrom()
 
         self.run_opt(inpfile, basis_label, ref_coords)

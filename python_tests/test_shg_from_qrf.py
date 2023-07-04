@@ -20,7 +20,7 @@ class TestShgFromQrf:
         """
         basis_set_label = 'def2-svp'
 
-        molecule = Molecule.read_str(molecule_string, units='au')
+        molecule = Molecule.read_molecule_string(molecule_string, units='au')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         scf_settings = {}
@@ -29,10 +29,10 @@ class TestShgFromQrf:
         scfdrv = ScfRestrictedDriver()
         scfdrv.ostream.mute()
         scfdrv.update_settings(scf_settings, method_settings)
-        scfdrv.compute(molecule, basis)
+        scf_results = scfdrv.compute(molecule, basis)
 
         scf_prop = FirstOrderProperties()
-        scf_prop.compute_scf_prop(molecule, basis, scfdrv.scf_tensors)
+        scf_prop.compute_scf_prop(molecule, basis, scf_results)
 
         w1 = 0.05
         w2 = w1
@@ -57,7 +57,7 @@ class TestShgFromQrf:
                     'damping': damping,
                 })
                 qrf.update_settings(rsp_settings, method_settings)
-                qrf_results = qrf.compute(molecule, basis, scfdrv.scf_tensors)
+                qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
                     ref_shg_results[ind] += qrf_results[(w1, w2)]
 
@@ -71,7 +71,7 @@ class TestShgFromQrf:
                     'damping': damping,
                 })
                 qrf.update_settings(rsp_settings, method_settings)
-                qrf_results = qrf.compute(molecule, basis, scfdrv.scf_tensors)
+                qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
                     ref_shg_results[ind] += qrf_results[(w1, w2)]
 
@@ -85,7 +85,7 @@ class TestShgFromQrf:
                     'damping': damping,
                 })
                 qrf.update_settings(rsp_settings, method_settings)
-                qrf_results = qrf.compute(molecule, basis, scfdrv.scf_tensors)
+                qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
                     ref_shg_results[ind] += qrf_results[(w1, w2)]
 
@@ -97,7 +97,7 @@ class TestShgFromQrf:
         shg = ShgDriver()
         shg.ostream.mute()
         shg.update_settings(rsp_settings, method_settings)
-        shg_results = shg.compute(molecule, basis, scfdrv.scf_tensors)
+        shg_results = shg.compute(molecule, basis, scf_results)
 
         if is_mpi_master():
             for ind in range(len(ref_shg_results)):

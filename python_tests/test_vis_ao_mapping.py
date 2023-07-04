@@ -44,7 +44,7 @@ class TestVisAOMapping:
             H     0.000000    0.504284    0.758602
             H     0.000000   -0.504284    0.758602
         """
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, 'def2-svp', ostream=None)
 
         ref_atom_to_ao = [

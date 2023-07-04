@@ -37,10 +37,11 @@ class TestROHFOrbitalEnergies:
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
 
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         if task.mpi_rank == mpi_master():
             scf_energy = scf_drv.scf_energy
-            mo_energies = scf_drv.scf_tensors['E_alpha']
+            mo_energies = scf_results['E_alpha']
             assert abs(ref_scf_energy - scf_energy) < 1.0e-8
             assert np.max(np.abs(ref_mo_energies - mo_energies)) < 1.0e-4

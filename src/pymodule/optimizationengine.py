@@ -65,7 +65,7 @@ class OptimizationEngine(geometric.engine.Engine):
         g_molecule = geometric.molecule.Molecule()
         g_molecule.elem = molecule.get_labels()
         g_molecule.xyzs = [
-            molecule.get_coordinates() * geometric.nifty.bohr2ang
+            molecule.get_coordinates_in_bohr() * geometric.nifty.bohr2ang
         ]
 
         super().__init__(g_molecule)

@@ -28,13 +28,17 @@ import numpy as np
 import time
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
-from .veloxchemlib import mpi_master, hartree_in_wavenumbers
+from .veloxchemlib import (mpi_master, bohr_in_angstroms, hartree_in_ev,
+                           hartree_in_inverse_nm, hartree_in_wavenumber,
+                           fine_structure_constant,
+                           speed_of_light_in_vacuum_in_SI)
 from .profiler import Profiler
 from .cppsolver import ComplexResponse
 from .linearsolver import LinearSolver
 from .nonlinearsolver import NonlinearSolver
 from .distributedarray import DistributedArray
-from .sanitychecks import scf_results_sanity_check, dft_sanity_check
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 
 
@@ -68,7 +72,7 @@ class TpaDriver(NonlinearSolver):
         # cpp settings
         self.frequencies = (0,)
         self.comp = None
-        self.damping = 1000.0 / hartree_in_wavenumbers()
+        self.damping = 1000.0 / hartree_in_wavenumber()
 
         # input keywords
         self._input_keywords['response'].update({
@@ -104,15 +108,18 @@ class TpaDriver(NonlinearSolver):
             The dictionary of tensors from converged SCF wavefunction.
 
         :return:
-              A dictonary containing the isotropic T[4], T[3], X[3], A[3],
-              X[2], A[2] contractions and the isotropic cubic response
-              functions for TPA
+            A dictonary containing the isotropic T[4], T[3], X[3], A[3], X[2],
+            A[2] contractions and the isotropic cubic response functions for
+            TPA.
         """
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
         if self.lindep_thresh is None:
             self.lindep_thresh = self.conv_thresh * 1.0e-6
+
+        # check molecule
+        molecule_sanity_check(molecule)
 
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
@@ -387,7 +394,7 @@ class TpaDriver(NonlinearSolver):
 
         profiler.check_memory_usage('T[4],T[3]')
 
-        result = {}
+        ret_dict = {}
 
         if self.rank == mpi_master():
             gamma = {}
@@ -400,21 +407,20 @@ class TpaDriver(NonlinearSolver):
                     sum_val += val[(w, -w, w)]
                 gamma[(w, -w, w)] = sum_val
 
-            self.print_results(self.frequencies, gamma, self.comp, t4_dict,
-                               t3_dict, other_dict)
+            ret_dict.update(other_dict)
 
-            result.update(other_dict)
-
-            result.update({
+            ret_dict.update({
                 't4_dict': t4_dict,
                 't3_dict': t3_dict,
                 'gamma': gamma,
-                'w': self.frequencies
+                'frequencies': list(self.frequencies),
             })
+
+            self._print_results(ret_dict)
 
         profiler.check_memory_usage('End of TPA')
 
-        return result
+        return ret_dict
 
     def get_densities(self, wi, Nx, mo, nocc, norb):
         """
@@ -791,24 +797,12 @@ class TpaDriver(NonlinearSolver):
         else:
             return {}
 
-    def print_results(self, freqs, gamma, comp, t4_dict, t3_dict, tpa_dict):
+    def _print_results(self, rsp_results):
         """
         Prints the results from the TPA calculation.
 
-        :param freqs:
-            List of frequencies
-        :param gamma:
-            A dictonary containing the isotropic cubic response functions for
-            TPA
-        :param comp:
-            List of gamma tensors components
-        :param t4_dict:
-            A dictonary containing the isotropic T[4] contractions
-        :param t3_dict:
-            A dictonary containing the isotropic T[3] contractions
-        :param tpa_dict:
-            A dictonary containing the isotropic X[3], A[3], X[2], A[2]
-            contractions
+        :param rsp_results:
+            A dictonary containing the results of response calculation.
         """
 
         return None
@@ -880,3 +874,108 @@ class TpaDriver(NonlinearSolver):
         w_str = '{:<9s} {:12.4f} {:20.8f} {:20.8f}j'.format(
             label, freq, value.real, value.imag)
         self.ostream.print_header(w_str.ljust(width))
+
+    @staticmethod
+    def get_spectrum(rsp_results, x_unit):
+        """
+        Gets two-photon absorption spectrum.
+
+        :param rsp_results:
+            A dictonary containing the results of response calculation.
+        :param x_unit:
+            The unit of x-axis.
+
+        :return:
+            A dictionary containing photon energies and TPA cross-sections.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'TpaDriver.get_spectrum: x_unit should be au, ev or nm')
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        # conversion factor for TPA cross-sections in GM
+        # * a0 in cm
+        # * c in cm/s
+        # * broadening parameter not included in au2gm
+        alpha = fine_structure_constant()
+        a0_in_cm = bohr_in_angstroms() * 1.0e-8
+        c_in_cm_per_s = speed_of_light_in_vacuum_in_SI() * 100.0
+        au2gm = (8.0 * np.pi**2 * alpha * a0_in_cm**5) / c_in_cm_per_s * 1.0e+50
+
+        gamma = rsp_results['gamma']
+
+        spectrum = {'x_data': [], 'y_data': []}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'TPA cross-section [GM]'
+
+        freqs = rsp_results['frequencies']
+
+        for w in freqs:
+            if w == 0.0:
+                continue
+
+            if x_unit.lower() == 'au':
+                spectrum['x_data'].append(w)
+            elif x_unit.lower() == 'ev':
+                spectrum['x_data'].append(au2ev * w)
+            elif x_unit.lower() == 'nm':
+                spectrum['x_data'].append(auxnm / w)
+
+            cross_section_in_GM = gamma[(w, -w, w)].imag * w**2 * au2gm
+
+            spectrum['y_data'].append(cross_section_in_GM)
+
+        return spectrum
+
+    def _print_spectrum(self, spectrum, width):
+        """
+        Prints two-photon absorption spectrum.
+
+        :param spectrum:
+            The spectrum.
+        :param width:
+            The width of the output.
+        """
+
+        self.ostream.print_blank()
+
+        title = 'Two-Photon Absorption Spectrum'
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('=' * len(title)).ljust(width))
+        self.ostream.print_blank()
+
+        if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:
+            text = '*** No two-photon absorption spectrum at zero frequency.'
+            self.ostream.print_header(text.ljust(width))
+            self.ostream.print_blank()
+            return
+
+        assert_msg_critical(
+            '[a.u.]' in spectrum['x_label'],
+            'TpaDriver._print_spectrum: In valid unit in x_label')
+        assert_msg_critical(
+            '[GM]' in spectrum['y_label'],
+            'TpaDriver._print_spectrum: In valid unit in y_label')
+
+        title = '{:<20s}{:<20s}{:>15s}'.format('Frequency[a.u.]',
+                                               'Frequency[eV]',
+                                               'TPA cross-section[GM]')
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('-' * len(title)).ljust(width))
+
+        for w, cross_section in zip(spectrum['x_data'], spectrum['y_data']):
+            output = '{:<20.4f}{:<20.5f}{:>13.8f}'.format(
+                w, w * hartree_in_ev(), cross_section)
+            self.ostream.print_header(output.ljust(width))
+
+        self.ostream.print_blank()

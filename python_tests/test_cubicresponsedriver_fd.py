@@ -22,7 +22,7 @@ class TestCrfFD:
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
         """
-        molecule = Molecule.read_str(molecule_string, units='au')
+        molecule = Molecule.read_molecule_string(molecule_string, units='au')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         a, b, c, d = components
@@ -168,10 +168,12 @@ class TestCrfFD:
             gamma_0_fd = (beta_plus.real - beta_minus.real) / (2.0 * delta_ef)
             assert abs(gamma_0 - gamma_0_fd) / abs(gamma_0_fd) < 1.0e-5
 
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
     def test_lda_crf_fd(self):
 
         self.run_crf_fd('slda', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
 
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
     def test_gga_crf_fd(self):
 
         self.run_crf_fd('pbe0', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])
@@ -179,5 +181,4 @@ class TestCrfFD:
     @pytest.mark.skipif(is_single_node(), reason="multi-node only")
     def test_mgga_crf_fd(self):
 
-        # Note: this test is expensive and we skip it on single-node runs
         self.run_crf_fd('tpssh', 'def2-svp', 'zyyz', [0.11, -0.3, 0.05])

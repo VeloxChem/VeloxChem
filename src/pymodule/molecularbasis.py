@@ -167,8 +167,10 @@ def _MolecularBasis_read(mol,
     for elem_id in elem_comp:
 
         elem = ChemicalElement()
-        err = elem.set_atom_type(elem_id)
-        assert_msg_critical(err, 'ChemicalElement.set_atom_type')
+        success = elem.set_atom_type(elem_id)
+        assert_msg_critical(
+            success,
+            'MolecularBasis.read: ChemicalElement.set_atom_type failed')
 
         basis_key = 'atombasis_{}'.format(elem.get_name().lower())
         basis_list = [entry for entry in basis_dict[basis_key]]

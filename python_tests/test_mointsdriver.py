@@ -4,6 +4,7 @@ import numpy as np
 from veloxchem.veloxchemlib import is_mpi_master
 from veloxchem.veloxchemlib import moints
 from veloxchem.scfrestdriver import ScfRestrictedDriver
+from veloxchem.scfunrestdriver import ScfUnrestrictedDriver
 from veloxchem.mointsdriver import MOIntegralsDriver
 from veloxchem.mp2driver import Mp2Driver
 from veloxchem.mpitask import MpiTask
@@ -35,19 +36,17 @@ class TestMOIntegralsDriver:
         mol_orbs = scf_drv.mol_orbs
 
         # mp2
+        e_ref = -0.28529088
+
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_result = mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
-
         if is_mpi_master(task.mpi_comm):
-            e_ref = -0.28529088
-            e_mp2 = mp2_result['mp2_energy']
-            assert abs(e_ref - e_mp2) < 1.0e-8
+            assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-8
 
         mp2_drv.update_settings({'conventional': 'yes'})
-        mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
-
+        mp2_result_2 = mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
         if is_mpi_master(task.mpi_comm):
-            assert abs(e_ref - mp2_drv.e_mp2) < 1.0e-8
+            assert abs(e_ref - mp2_result_2['mp2_energy']) < 1.0e-8
 
         # extra test: collect moints batches to master node
         moints_drv = MOIntegralsDriver(task.mpi_comm, task.ostream)
@@ -87,6 +86,34 @@ class TestMOIntegralsDriver:
             assert abs(e_ref - in_mem_e_mp2) < 1.0e-8
 
         task.finish()
+
+    def test_h2se_ump2(self):
+
+        # scf
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'h2se.inp')
+
+        task = MpiTask([inpfile, None])
+        task.molecule.set_multiplicity(3)
+        task.molecule.check_multiplicity()
+
+        scf_drv = ScfUnrestrictedDriver(task.mpi_comm, task.ostream)
+        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+
+        # mp2
+        e_ref = -0.26775296
+
+        mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
+        mp2_result = mp2_drv.compute(task.molecule, task.ao_basis,
+                                     scf_drv.mol_orbs, scf_drv.scf_type)
+        if is_mpi_master(task.mpi_comm):
+            assert abs(e_ref - mp2_result['mp2_energy']) < 1.0e-7
+
+        mp2_drv.conventional = True
+        mp2_result_2 = mp2_drv.compute(task.molecule, task.ao_basis,
+                                       scf_drv.mol_orbs, scf_drv.scf_type)
+        if is_mpi_master(task.mpi_comm):
+            assert abs(e_ref - mp2_result_2['mp2_energy']) < 1.0e-7
 
     def test_mp2_update_settings(self):
 

@@ -149,7 +149,11 @@ class GradientDriver:
         labels = molecule.get_labels()
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
+
+        # charge and spin multiplicity
+        charge = molecule.get_charge()
+        multiplicity = molecule.get_multiplicity()
 
         # numerical gradient
         self.gradient = np.zeros((molecule.number_of_atoms(), 3))
@@ -158,19 +162,27 @@ class GradientDriver:
             for d in range(3):
                 coords[i, d] += self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
+                new_mol.set_charge(charge)
+                new_mol.set_multiplicity(multiplicity)
                 e_plus = self.compute_energy(new_mol, *args)
 
                 coords[i, d] -= 2.0 * self.delta_h
                 new_mol = Molecule(labels, coords, units='au')
+                new_mol.set_charge(charge)
+                new_mol.set_multiplicity(multiplicity)
                 e_minus = self.compute_energy(new_mol, *args)
 
                 if self.do_four_point:
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
                     e_minus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] += 4.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
+                    new_mol.set_charge(charge)
+                    new_mol.set_multiplicity(multiplicity)
                     e_plus2 = self.compute_energy(new_mol, *args)
 
                     coords[i, d] -= 2.0 * self.delta_h
@@ -370,7 +382,7 @@ class GradientDriver:
         nuc_contrib = np.zeros((natm, 3))
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
         nuclear_charges = molecule.elem_ids_to_numpy()

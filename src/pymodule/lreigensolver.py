@@ -30,9 +30,11 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import mpi_master, rotatory_strength_in_cgs
-from .veloxchemlib import denmat
 from .veloxchemlib import XCFunctional, MolecularGrid
+from .veloxchemlib import denmat
+from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
+                           hartree_in_inverse_nm, fine_structure_constant,
+                           extinction_coefficient_from_beta)
 from .aodensitymatrix import AODensityMatrix
 from .outputstream import OutputStream
 from .profiler import Profiler
@@ -42,7 +44,8 @@ from .linearsolver import LinearSolver
 from .molecularorbitals import MolecularOrbitals
 from .visualizationdriver import VisualizationDriver
 from .cubicgrid import CubicGrid
-from .sanitychecks import scf_results_sanity_check, dft_sanity_check
+from .sanitychecks import (molecule_sanity_check, scf_results_sanity_check,
+                           dft_sanity_check)
 from .errorhandler import assert_msg_critical
 from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 
@@ -127,15 +130,18 @@ class LinearResponseEigenSolver(LinearSolver):
 
         if self.cube_origin is not None:
             assert_msg_critical(
-                len(self.cube_origin) == 3, 'cube origin: Need 3 numbers')
+                len(self.cube_origin) == 3,
+                'LinearResponseEigenSolver: cube origin needs 3 numbers')
 
         if self.cube_stepsize is not None:
             assert_msg_critical(
-                len(self.cube_stepsize) == 3, 'cube stepsize: Need 3 numbers')
+                len(self.cube_stepsize) == 3,
+                'LinearResponseEigenSolver: cube stepsize needs 3 numbers')
 
         if self.cube_points is not None:
             assert_msg_critical(
-                len(self.cube_points) == 3, 'cube points: Need 3 integers')
+                len(self.cube_points) == 3,
+                'LinearResponseEigenSolver: cube points needs 3 integers')
 
     def compute(self, molecule, basis, scf_tensors):
         """
@@ -162,6 +168,12 @@ class LinearResponseEigenSolver(LinearSolver):
         self._dist_bung = None
         self._dist_e2bger = None
         self._dist_e2bung = None
+
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
+
+        # check molecule
+        molecule_sanity_check(molecule)
 
         # check SCF results
         scf_results_sanity_check(self, scf_tensors)
@@ -221,12 +233,22 @@ class LinearResponseEigenSolver(LinearSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
 
-        rsp_vector_labels = [
-            'LR_eigen_bger_half_size',
-            'LR_eigen_bung_half_size',
-            'LR_eigen_e2bger_half_size',
-            'LR_eigen_e2bung_half_size',
-        ]
+        if self.nonlinear:
+            rsp_vector_labels = [
+                'LR_eigen_bger_half_size',
+                'LR_eigen_bung_half_size',
+                'LR_eigen_e2bger_half_size',
+                'LR_eigen_e2bung_half_size',
+                'LR_eigen_fock_ger',
+                'LR_eigen_fock_ung',
+            ]
+        else:
+            rsp_vector_labels = [
+                'LR_eigen_bger_half_size',
+                'LR_eigen_bung_half_size',
+                'LR_eigen_e2bger_half_size',
+                'LR_eigen_e2bung_half_size',
+            ]
 
         # read initial guess from restart file
         if self.restart:
@@ -251,6 +273,7 @@ class LinearResponseEigenSolver(LinearSolver):
         profiler.check_memory_usage('Initial guess')
 
         exc_energies = {}
+        exc_focks = {}
         exc_solutions = {}
         exc_residuals = {}
         relative_residual_norm = {}
@@ -329,6 +352,18 @@ class LinearResponseEigenSolver(LinearSolver):
 
                 e2x_ger = self._dist_e2bger.matmul_AB_no_gather(c_ger[:, k])
                 e2x_ung = self._dist_e2bung.matmul_AB_no_gather(c_ung[:, k])
+
+                if self.nonlinear:
+                    fock_realger = self._dist_fock_ger.matmul_AB_no_gather(
+                        c_ger[:, k])
+                    fock_realung = self._dist_fock_ung.matmul_AB_no_gather(
+                        c_ung[:, k])
+
+                    fock_full_data = (fock_realger.data + fock_realung.data)
+
+                    exc_focks[k] = DistributedArray(fock_full_data,
+                                                    self.comm,
+                                                    distribute=False)
 
                 s2x_ger = x_ger.data
                 s2x_ung = x_ung.data
@@ -574,44 +609,71 @@ class LinearResponseEigenSolver(LinearSolver):
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-            if self.rank == mpi_master():
+            if not self.nonlinear:
+
+                if self.rank == mpi_master():
+                    osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
+                                               axis=1) * eigvals
+                    rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
+                                     axis=1) * rotatory_strength_in_cgs()
+
+                    ret_dict = {
+                        'eigenvalues': eigvals,
+                        'eigenvectors_distributed': exc_solutions,
+                        'electric_transition_dipoles': elec_trans_dipoles,
+                        'velocity_transition_dipoles': velo_trans_dipoles,
+                        'magnetic_transition_dipoles': magn_trans_dipoles,
+                        'oscillator_strengths': osc,
+                        'rotatory_strengths': rot_vel,
+                        'excitation_details': excitation_details,
+                    }
+
+                    if self.nto:
+                        ret_dict['nto_lambdas'] = nto_lambdas
+                        ret_dict['nto_cubes'] = nto_cube_files
+
+                    if self.detach_attach:
+                        ret_dict['density_cubes'] = dens_cube_files
+
+                    if (self.save_solutions and
+                            self.checkpoint_file is not None):
+                        checkpoint_text = 'Response solution vectors written to file: '
+                        checkpoint_text += final_h5_fname
+                        self.ostream.print_info(checkpoint_text)
+                        self.ostream.print_blank()
+
+                    self._print_results(ret_dict)
+
+                    return ret_dict
+                else:
+                    return {
+                        'eigenvalues': eigvals,
+                        'eigenvectors_distributed': exc_solutions,
+                    }
+
+            else:
+                if self.rank != mpi_master():
+                    elec_trans_dipoles = None
+                    excitation_details = None
+
+                elec_trans_dipoles = self.comm.bcast(elec_trans_dipoles,
+                                                     root=mpi_master())
+                excitation_details = self.comm.bcast(excitation_details,
+                                                     root=mpi_master())
+
                 osc = (2.0 / 3.0) * np.sum(elec_trans_dipoles**2,
                                            axis=1) * eigvals
-                rot_vel = np.sum(velo_trans_dipoles * magn_trans_dipoles,
-                                 axis=1) * rotatory_strength_in_cgs()
 
                 ret_dict = {
                     'eigenvalues': eigvals,
                     'eigenvectors_distributed': exc_solutions,
-                    'electric_transition_dipoles': elec_trans_dipoles,
-                    'velocity_transition_dipoles': velo_trans_dipoles,
-                    'magnetic_transition_dipoles': magn_trans_dipoles,
+                    'focks': exc_focks,
                     'oscillator_strengths': osc,
-                    'rotatory_strengths': rot_vel,
                     'excitation_details': excitation_details,
+                    'electric_transition_dipoles': elec_trans_dipoles,
                 }
-
-                if self.nto:
-                    ret_dict['nto_lambdas'] = nto_lambdas
-                    ret_dict['nto_cubes'] = nto_cube_files
-
-                if self.detach_attach:
-                    ret_dict['density_cubes'] = dens_cube_files
-
-                if (self.save_solutions and self.checkpoint_file is not None):
-                    checkpoint_text = 'Response solution vectors written to file: '
-                    checkpoint_text += final_h5_fname
-                    self.ostream.print_info(checkpoint_text)
-                    self.ostream.print_blank()
-
-                self._print_results(ret_dict)
 
                 return ret_dict
-            else:
-                return {
-                    'eigenvalues': eigvals,
-                    'eigenvectors_distributed': exc_solutions,
-                }
 
         return None
 
@@ -981,3 +1043,155 @@ class LinearResponseEigenSolver(LinearSolver):
                 new_rsp_drv.key = deepcopy(val)
 
         return new_rsp_drv
+
+    @staticmethod
+    def get_absorption_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
+        """
+        Gets absorption spectrum.
+
+        :param rsp_results:
+            A dictonary containing the result of response calculation.
+        :param x_data:
+            The list or array of x values.
+        :param x_unit:
+            The unit of x values.
+        :param b_value:
+            The value of the broadening parameter.
+        :param b_unit:
+            The unit of the broadening parameter.
+
+        :return:
+            A dictionary containing the spectrum.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'LinearResponseEigenSolver.get_absorption_spectrum: ' +
+            'x_data should be au, ev or nm')
+
+        assert_msg_critical(
+            b_unit.lower() in ['au', 'ev'],
+            'LinearResponseEigenSolver.get_absorption_spectrum: ' +
+            'broadening parameter should be au or ev')
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        exc_ene_au = rsp_results['eigenvalues']
+        osc_str = rsp_results['oscillator_strengths']
+
+        spectrum = {}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'Absorption cross-section [a.u.]'
+
+        if x_unit.lower() == 'au':
+            x_data_au = list(x_data)
+        elif x_unit.lower() == 'ev':
+            x_data_au = [x / au2ev for x in x_data]
+        elif x_unit.lower() == 'nm':
+            x_data_au = [auxnm / x for x in x_data]
+
+        if b_unit.lower() == 'au':
+            b_au = b_value
+        elif b_unit.lower() == 'ev':
+            b_au = b_value / au2ev
+
+        y_data = []
+
+        sigma_factor = 2.0 * np.pi * fine_structure_constant()
+
+        for x_au in x_data_au:
+            y = 0.0
+            for e, f in zip(exc_ene_au, osc_str):
+                b_factor = b_au / ((e - x_au)**2 + b_au**2)
+                y += sigma_factor * b_factor * f
+            y_data.append(y)
+
+        spectrum['x_data'] = list(x_data)
+        spectrum['y_data'] = y_data
+
+        return spectrum
+
+    @staticmethod
+    def get_ecd_spectrum(rsp_results, x_data, x_unit, b_value, b_unit):
+        """
+        Gets ECD spectrum.
+
+        :param rsp_results:
+            A dictonary containing the result of response calculation.
+        :param x_data:
+            The list or array of x values.
+        :param x_unit:
+            The unit of x values.
+        :param b_value:
+            The value of the broadening parameter.
+        :param b_unit:
+            The unit of the broadening parameter.
+
+        :return:
+            A dictionary containing the spectrum.
+        """
+
+        assert_msg_critical(
+            x_unit.lower() in ['au', 'ev', 'nm'],
+            'LinearResponseEigenSolver.get_ecd_spectrum: ' +
+            'x_data should be au, ev or nm')
+
+        assert_msg_critical(
+            b_unit.lower() in ['au', 'ev'],
+            'LinearResponseEigenSolver.get_ecd_spectrum: ' +
+            'broadening parameter should be au or ev')
+
+        au2ev = hartree_in_ev()
+        auxnm = 1.0 / hartree_in_inverse_nm()
+
+        exc_ene_au = rsp_results['eigenvalues']
+        rot_str_au = rsp_results[
+            'rotatory_strengths'] / rotatory_strength_in_cgs()
+
+        spectrum = {}
+
+        if x_unit.lower() == 'au':
+            spectrum['x_label'] = 'Photon energy [a.u.]'
+        elif x_unit.lower() == 'ev':
+            spectrum['x_label'] = 'Photon energy [eV]'
+        elif x_unit.lower() == 'nm':
+            spectrum['x_label'] = 'Wavelength [nm]'
+
+        spectrum['y_label'] = 'Molar circular dichroism '
+        spectrum['y_label'] += '[L mol$^{-1}$ cm$^{-1}$]'
+
+        if x_unit.lower() == 'au':
+            x_data_au = list(x_data)
+        elif x_unit.lower() == 'ev':
+            x_data_au = [x / au2ev for x in x_data]
+        elif x_unit.lower() == 'nm':
+            x_data_au = [auxnm / x for x in x_data]
+
+        if b_unit.lower() == 'au':
+            b_au = b_value
+        elif b_unit.lower() == 'ev':
+            b_au = b_value / au2ev
+
+        y_data = []
+
+        delta_eps_factor = extinction_coefficient_from_beta() / 3.0
+
+        for x_au in x_data_au:
+            y = 0.0
+            for e, r in zip(exc_ene_au, rot_str_au):
+                b_factor = b_au / ((e - x_au)**2 + b_au**2)
+                y += delta_eps_factor * b_factor * e * r
+            y_data.append(y)
+
+        spectrum['x_data'] = list(x_data)
+        spectrum['y_data'] = y_data
+
+        return spectrum

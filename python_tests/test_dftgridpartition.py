@@ -14,7 +14,7 @@ class TestDftGridPartition:
     def run_dft_grid_partition(self, mol_str, basis_label, xcfun_label,
                                grid_level, tol, ref_h5file):
 
-        molecule = Molecule.read_str(mol_str, units='angstrom')
+        molecule = Molecule.read_molecule_string(mol_str, units='angstrom')
         basis = MolecularBasis.read(molecule, basis_label, ostream=None)
 
         scf_drv = ScfRestrictedDriver()

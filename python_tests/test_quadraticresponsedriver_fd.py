@@ -1,6 +1,7 @@
 from mpi4py import MPI
+import pytest
 
-from veloxchem.veloxchemlib import is_mpi_master
+from veloxchem.veloxchemlib import is_single_node, is_mpi_master
 from veloxchem.outputstream import OutputStream
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
@@ -21,7 +22,7 @@ class TestQrfFD:
         H   0.0   1.4   1.1
         H   0.0  -1.4   1.1
         """
-        molecule = Molecule.read_str(molecule_string, units='au')
+        molecule = Molecule.read_molecule_string(molecule_string, units='au')
         basis = MolecularBasis.read(molecule, basis_set_label, ostream=None)
 
         a, b, c = components
@@ -155,14 +156,17 @@ class TestQrfFD:
             beta_0_fd = (alpha_plus.real - alpha_minus.real) / (2.0 * delta_ef)
             assert abs(beta_0 - beta_0_fd) / abs(beta_0_fd) < 1.0e-5
 
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
     def test_lda_qrf_fd(self):
 
         self.run_qrf_fd('slda', 'def2-svp', 'yyz', [0.3, -0.11])
 
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
     def test_gga_qrf_fd(self):
 
         self.run_qrf_fd('bp86', 'def2-svp', 'yyz', [0.3, -0.11])
 
+    @pytest.mark.skipif(is_single_node(), reason="multi-node only")
     def test_mgga_qrf_fd(self):
 
         self.run_qrf_fd('tpssh', 'def2-svp', 'yyz', [0.3, -0.11])

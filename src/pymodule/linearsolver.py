@@ -191,7 +191,7 @@ class LinearSolver:
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
                 'restart': ('bool', 'restart from checkpoint file'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
-                'save_solutions': ('str', 'save solutions to file'),
+                'save_solutions': ('bool', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
                 'memory_profiling': ('bool', 'print memory usage'),

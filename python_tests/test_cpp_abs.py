@@ -71,26 +71,27 @@ class TestCppAbs:
             assert np.max(np.abs(prop.real - ref_prop_real)) < 1.0e-4
             assert np.max(np.abs(prop.imag - ref_prop_imag)) < 1.0e-4
 
-            spectrum = cpp_drv.get_spectrum(cpp_results['response_functions'])
-            for i, (w, sigma) in enumerate(spectrum):
+            spectrum = cpp_drv.get_spectrum(cpp_results, 'au')
+            for i, (w, sigma) in enumerate(
+                    zip(spectrum['x_data'], spectrum['y_data'])):
                 ref_w, ref_sigma = ref_spectrum[i]
                 assert abs(w - ref_w) < 1.0e-6
                 assert abs(sigma - ref_sigma) < 1.0e-7
 
     def check_printout(self, cpp_drv, cpp_results):
 
-        rsp_func = cpp_results['response_functions']
-
         here = Path(__file__).parent
         random_string = get_random_string_serial()
         fpath = here / 'inputs' / f'vlx_printout_cpp_abs_{random_string}.out'
 
         ostream = OutputStream(fpath)
-        cpp_drv._print_results(rsp_func, ostream)
+        cpp_drv._print_results(cpp_results, ostream)
         ostream.close()
 
         with fpath.open('r') as f_out:
             lines = f_out.readlines()
+
+        rsp_func = cpp_results['response_functions']
 
         for key, val in rsp_func.items():
             key_found = False

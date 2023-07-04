@@ -28,7 +28,7 @@ import numpy as np
 import time as tm
 import sys
 
-from .veloxchemlib import bohr_in_angstroms
+from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import mpi_master
 from .veloxchemlib import CommonNeighbors
 from .outputstream import OutputStream
@@ -108,13 +108,13 @@ class CnaAnalysisDriver:
         if self.cna_bond is None:
             self.cna_bond = 3.0
         else:
-            self.cna_bond /= bohr_in_angstroms()
+            self.cna_bond /= bohr_in_angstrom()
             
         # update CNA bond environment cut-off radius
         if self.cna_rcut is None:
             self.cna_rcut = 4.5
         else:
-            self.cna_rcut /= bohr_in_angstroms()
+            self.cna_rcut /= bohr_in_angstrom()
             
     def compute(self):
         """
@@ -187,7 +187,7 @@ class CnaAnalysisDriver:
             The list of molecule files.
         """
         
-        molecules = [Molecule.read_xyz(finp) for finp in mol_files]
+        molecules = [Molecule.read_xyz_file(finp) for finp in mol_files]
         cnas = []
         for mol in molecules:
             mcna = CommonNeighbors(mol, self.cna_bond)
@@ -218,7 +218,7 @@ class CnaAnalysisDriver:
             The list of molecule files.
         """
         
-        molecules = [Molecule.read_xyz(finp) for finp in mol_files]
+        molecules = [Molecule.read_xyz_file(finp) for finp in mol_files]
         for mol in molecules:
             cdata = self.get_coord_numbers(mol)
             # print('@Coordination Data: ', cdata[0], ' ', cdata[1], ' ', cdata[2])

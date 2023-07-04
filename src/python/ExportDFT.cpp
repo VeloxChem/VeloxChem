@@ -221,6 +221,7 @@ export_dft(py::module& m)
         .def("get_func_type", &CXCFunctional::getFunctionalType, "Gets type of XC functional.")
         .def("get_func_label", &CXCFunctional::getFunctionalLabel, "Gets name of XC functional.")
         .def("get_frac_exact_exchange", &CXCFunctional::getFractionOfExactExchange, "Gets fraction of exact Hartree-Fock exchange in XC functional.")
+        .def("get_dimension_of_derivatives", &CXCFunctional::getDimensionOfDerivatives, "Gets dimension of derivatives.")
         .def(
             "compute_exc_vxc_for_lda",
             [](const CXCFunctional& self, const py::array_t<double>& rho) -> py::list {
@@ -229,8 +230,10 @@ export_dft(py::module& m)
                 auto rho_size = static_cast<int32_t>(rho.size());
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
-                CDenseMatrix exc(npoints, 1);
-                CDenseMatrix vrho(npoints, 2);
+                auto         ldafunc = self.getFunctionalPointerToLdaComponent();
+                const auto   dim     = &(ldafunc->dim);
+                CDenseMatrix exc(npoints, dim->zk);
+                CDenseMatrix vrho(npoints, dim->vrho);
                 self.compute_exc_vxc_for_lda(npoints, rho.data(), exc.values(), vrho.values());
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
@@ -251,9 +254,11 @@ export_dft(py::module& m)
                 auto npoints    = rho_size / 2;
                 errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
                                           std::string("compute_exc_vxc_for_gga: Inconsistent array size"));
-                CDenseMatrix exc(npoints, 1);
-                CDenseMatrix vrho(npoints, 2);
-                CDenseMatrix vsigma(npoints, 3);
+                auto         ggafunc = self.getFunctionalPointerToGgaComponent();
+                const auto   dim     = &(ggafunc->dim);
+                CDenseMatrix exc(npoints, dim->zk);
+                CDenseMatrix vrho(npoints, dim->vrho);
+                CDenseMatrix vsigma(npoints, dim->vsigma);
                 self.compute_exc_vxc_for_gga(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
                 py::list ret;
                 ret.append(vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfElements()));
@@ -404,19 +409,6 @@ export_dft(py::module& m)
              "molecularGrid"_a,
              "xcFuncLabel"_a,
              "quadMode"_a)
-        .def("integrate_lxc_fock",
-             &CXCIntegrator::integrateLxcFock,
-             "Integrates 4rd-order exchange-correlation contribution to Fock matrix.",
-             "aoFockMatrix"_a,
-             "molecule"_a,
-             "basis"_a,
-             "rwDensityMatrix"_a,
-             "rw2DensityMatrix"_a,
-             "rw3DensityMatrix"_a,
-             "gsDensityMatrix"_a,
-             "molecularGrid"_a,
-             "xcFuncLabel"_a,
-             "cubeMode"_a)
         .def("integrate_kxclxc_fock",
              &CXCIntegrator::integrateKxcLxcFock,
              "Integrates 4rd-order exchange-correlation contribution to Fock matrix.",
@@ -491,9 +483,11 @@ export_dft(py::module& m)
                 auto rho_size = static_cast<int32_t>(rho.size());
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_exc_vxc_for_lda: Inconsistent array size"));
-                CDenseMatrix exc(npoints, 1);
-                CDenseMatrix vrho(npoints, 2);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func    = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         ldafunc = func.getFunctionalPointerToLdaComponent();
+                const auto   dim     = &(ldafunc->dim);
+                CDenseMatrix exc(npoints, dim->zk);
+                CDenseMatrix vrho(npoints, dim->vrho);
                 func.compute_exc_vxc_for_lda(npoints, rho.data(), exc.values(), vrho.values());
                 py::dict ret;
                 ret["exc"]  = vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfRows(), exc.getNumberOfColumns());
@@ -511,8 +505,10 @@ export_dft(py::module& m)
                 auto rho_size = static_cast<int32_t>(rho.size());
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_fxc_for_lda: Inconsistent array size"));
-                CDenseMatrix v2rho2(npoints, 3);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func    = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         ldafunc = func.getFunctionalPointerToLdaComponent();
+                const auto   dim     = &(ldafunc->dim);
+                CDenseMatrix v2rho2(npoints, dim->v2rho2);
                 func.compute_fxc_for_lda(npoints, rho.data(), v2rho2.values());
                 py::dict ret;
                 ret["v2rho2"] = vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfRows(), v2rho2.getNumberOfColumns());
@@ -529,8 +525,10 @@ export_dft(py::module& m)
                 auto rho_size = static_cast<int32_t>(rho.size());
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_kxc_for_lda: Inconsistent array size"));
-                CDenseMatrix v3rho3(npoints, 4);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func    = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         ldafunc = func.getFunctionalPointerToLdaComponent();
+                const auto   dim     = &(ldafunc->dim);
+                CDenseMatrix v3rho3(npoints, dim->v3rho3);
                 func.compute_kxc_for_lda(npoints, rho.data(), v3rho3.values());
                 py::dict ret;
                 ret["v3rho3"] = vlx_general::pointer_to_numpy(v3rho3.values(), v3rho3.getNumberOfRows(), v3rho3.getNumberOfColumns());
@@ -547,8 +545,10 @@ export_dft(py::module& m)
                 auto rho_size = static_cast<int32_t>(rho.size());
                 auto npoints  = rho_size / 2;
                 errors::assertMsgCritical(rho_size == npoints * 2, std::string("compute_lxc_for_lda: Inconsistent array size"));
-                CDenseMatrix v4rho4(npoints, 5);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func    = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         ldafunc = func.getFunctionalPointerToLdaComponent();
+                const auto   dim     = &(ldafunc->dim);
+                CDenseMatrix v4rho4(npoints, dim->v4rho4);
                 func.compute_lxc_for_lda(npoints, rho.data(), v4rho4.values());
                 py::dict ret;
                 ret["v4rho4"] = vlx_general::pointer_to_numpy(v4rho4.values(), v4rho4.getNumberOfRows(), v4rho4.getNumberOfColumns());
@@ -569,10 +569,12 @@ export_dft(py::module& m)
                 auto npoints    = rho_size / 2;
                 errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
                                           std::string("compute_exc_vxc_for_gga: Inconsistent array size"));
-                CDenseMatrix exc(npoints, 1);
-                CDenseMatrix vrho(npoints, 2);
-                CDenseMatrix vsigma(npoints, 3);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func    = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         ggafunc = func.getFunctionalPointerToGgaComponent();
+                const auto   dim     = &(ggafunc->dim);
+                CDenseMatrix exc(npoints, dim->zk);
+                CDenseMatrix vrho(npoints, dim->vrho);
+                CDenseMatrix vsigma(npoints, dim->vsigma);
                 func.compute_exc_vxc_for_gga(npoints, rho.data(), sigma.data(), exc.values(), vrho.values(), vsigma.values());
                 py::dict ret;
                 ret["exc"]    = vlx_general::pointer_to_numpy(exc.values(), exc.getNumberOfRows(), exc.getNumberOfColumns());
@@ -595,10 +597,12 @@ export_dft(py::module& m)
                 auto npoints    = rho_size / 2;
                 errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
                                           std::string("compute_fxc_for_gga: Inconsistent array size"));
-                CDenseMatrix v2rho2(npoints, 3);
-                CDenseMatrix v2rhosigma(npoints, 6);
-                CDenseMatrix v2sigma2(npoints, 6);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func    = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         ggafunc = func.getFunctionalPointerToGgaComponent();
+                const auto   dim     = &(ggafunc->dim);
+                CDenseMatrix v2rho2(npoints, dim->v2rho2);
+                CDenseMatrix v2rhosigma(npoints, dim->v2rhosigma);
+                CDenseMatrix v2sigma2(npoints, dim->v2sigma2);
                 func.compute_fxc_for_gga(npoints, rho.data(), sigma.data(), v2rho2.values(), v2rhosigma.values(), v2sigma2.values());
                 py::dict ret;
                 ret["v2rho2"]     = vlx_general::pointer_to_numpy(v2rho2.values(), v2rho2.getNumberOfRows(), v2rho2.getNumberOfColumns());
@@ -621,11 +625,13 @@ export_dft(py::module& m)
                 auto npoints    = rho_size / 2;
                 errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
                                           std::string("compute_kxc_for_gga: Inconsistent array size"));
-                CDenseMatrix v3rho3(npoints, 4);
-                CDenseMatrix v3rho2sigma(npoints, 9);
-                CDenseMatrix v3rhosigma2(npoints, 12);
-                CDenseMatrix v3sigma3(npoints, 10);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func    = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         ggafunc = func.getFunctionalPointerToGgaComponent();
+                const auto   dim     = &(ggafunc->dim);
+                CDenseMatrix v3rho3(npoints, dim->v3rho3);
+                CDenseMatrix v3rho2sigma(npoints, dim->v3rho2sigma);
+                CDenseMatrix v3rhosigma2(npoints, dim->v3rhosigma2);
+                CDenseMatrix v3sigma3(npoints, dim->v3sigma3);
                 func.compute_kxc_for_gga(
                     npoints, rho.data(), sigma.data(), v3rho3.values(), v3rho2sigma.values(), v3rhosigma2.values(), v3sigma3.values());
                 py::dict ret;
@@ -652,12 +658,14 @@ export_dft(py::module& m)
                 auto npoints    = rho_size / 2;
                 errors::assertMsgCritical((rho_size == npoints * 2) && (sigma_size == npoints * 3),
                                           std::string("compute_lxc_for_gga: Inconsistent array size"));
-                CDenseMatrix v4rho4(npoints, 5);
-                CDenseMatrix v4rho3sigma(npoints, 12);
-                CDenseMatrix v4rho2sigma2(npoints, 18);
-                CDenseMatrix v4rhosigma3(npoints, 20);
-                CDenseMatrix v4sigma4(npoints, 15);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func    = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         ggafunc = func.getFunctionalPointerToGgaComponent();
+                const auto   dim     = &(ggafunc->dim);
+                CDenseMatrix v4rho4(npoints, dim->v4rho4);
+                CDenseMatrix v4rho3sigma(npoints, dim->v4rho3sigma);
+                CDenseMatrix v4rho2sigma2(npoints, dim->v4rho2sigma2);
+                CDenseMatrix v4rhosigma3(npoints, dim->v4rhosigma3);
+                CDenseMatrix v4sigma4(npoints, dim->v4sigma4);
                 func.compute_lxc_for_gga(npoints,
                                          rho.data(),
                                          sigma.data(),
@@ -703,12 +711,14 @@ export_dft(py::module& m)
                 errors::assertMsgCritical(
                     (rho_size == npoints * 2) && (sigma_size == npoints * 3) && (lapl_size == npoints * 2) && (tau_size == npoints * 2),
                     std::string("compute_exc_vxc_for_mgga: Inconsistent array size"));
-                CDenseMatrix exc(npoints, 1);
-                CDenseMatrix vrho(npoints, 2);
-                CDenseMatrix vsigma(npoints, 3);
-                CDenseMatrix vlapl(npoints, 2);
-                CDenseMatrix vtau(npoints, 2);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func     = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         mggafunc = func.getFunctionalPointerToMetaGgaComponent();
+                const auto   dim      = &(mggafunc->dim);
+                CDenseMatrix exc(npoints, dim->zk);
+                CDenseMatrix vrho(npoints, dim->vrho);
+                CDenseMatrix vsigma(npoints, dim->vsigma);
+                CDenseMatrix vlapl(npoints, dim->vlapl);
+                CDenseMatrix vtau(npoints, dim->vtau);
                 func.compute_exc_vxc_for_mgga(npoints,
                                               rho.data(),
                                               sigma.data(),
@@ -755,17 +765,19 @@ export_dft(py::module& m)
                 errors::assertMsgCritical(
                     (rho_size == npoints * 2) && (sigma_size == npoints * 3) && (lapl_size == npoints * 2) && (tau_size == npoints * 2),
                     std::string("compute_fxc_for_mgga: Inconsistent array size"));
-                CDenseMatrix v2rho2(npoints, 3);
-                CDenseMatrix v2rhosigma(npoints, 6);
-                CDenseMatrix v2rholapl(npoints, 4);
-                CDenseMatrix v2rhotau(npoints, 4);
-                CDenseMatrix v2sigma2(npoints, 6);
-                CDenseMatrix v2sigmalapl(npoints, 6);
-                CDenseMatrix v2sigmatau(npoints, 6);
-                CDenseMatrix v2lapl2(npoints, 3);
-                CDenseMatrix v2lapltau(npoints, 4);
-                CDenseMatrix v2tau2(npoints, 3);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func     = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         mggafunc = func.getFunctionalPointerToMetaGgaComponent();
+                const auto   dim      = &(mggafunc->dim);
+                CDenseMatrix v2rho2(npoints, dim->v2rho2);
+                CDenseMatrix v2rhosigma(npoints, dim->v2rhosigma);
+                CDenseMatrix v2rholapl(npoints, dim->v2rholapl);
+                CDenseMatrix v2rhotau(npoints, dim->v2rhotau);
+                CDenseMatrix v2sigma2(npoints, dim->v2sigma2);
+                CDenseMatrix v2sigmalapl(npoints, dim->v2sigmalapl);
+                CDenseMatrix v2sigmatau(npoints, dim->v2sigmatau);
+                CDenseMatrix v2lapl2(npoints, dim->v2lapl2);
+                CDenseMatrix v2lapltau(npoints, dim->v2lapltau);
+                CDenseMatrix v2tau2(npoints, dim->v2tau2);
                 func.compute_fxc_for_mgga(npoints,
                                           rho.data(),
                                           sigma.data(),
@@ -823,27 +835,29 @@ export_dft(py::module& m)
                 errors::assertMsgCritical(
                     (rho_size == npoints * 2) && (sigma_size == npoints * 3) && (lapl_size == npoints * 2) && (tau_size == npoints * 2),
                     std::string("compute_kxc_for_mgga: Inconsistent array size"));
-                CDenseMatrix v3rho3(npoints, 4);
-                CDenseMatrix v3rho2sigma(npoints, 9);
-                CDenseMatrix v3rho2lapl(npoints, 6);
-                CDenseMatrix v3rho2tau(npoints, 6);
-                CDenseMatrix v3rhosigma2(npoints, 12);
-                CDenseMatrix v3rhosigmalapl(npoints, 12);
-                CDenseMatrix v3rhosigmatau(npoints, 12);
-                CDenseMatrix v3rholapl2(npoints, 6);
-                CDenseMatrix v3rholapltau(npoints, 8);
-                CDenseMatrix v3rhotau2(npoints, 6);
-                CDenseMatrix v3sigma3(npoints, 10);
-                CDenseMatrix v3sigma2lapl(npoints, 12);
-                CDenseMatrix v3sigma2tau(npoints, 12);
-                CDenseMatrix v3sigmalapl2(npoints, 9);
-                CDenseMatrix v3sigmalapltau(npoints, 12);
-                CDenseMatrix v3sigmatau2(npoints, 9);
-                CDenseMatrix v3lapl3(npoints, 4);
-                CDenseMatrix v3lapl2tau(npoints, 6);
-                CDenseMatrix v3lapltau2(npoints, 6);
-                CDenseMatrix v3tau3(npoints, 4);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func     = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         mggafunc = func.getFunctionalPointerToMetaGgaComponent();
+                const auto   dim      = &(mggafunc->dim);
+                CDenseMatrix v3rho3(npoints, dim->v3rho3);
+                CDenseMatrix v3rho2sigma(npoints, dim->v3rho2sigma);
+                CDenseMatrix v3rho2lapl(npoints, dim->v3rho2lapl);
+                CDenseMatrix v3rho2tau(npoints, dim->v3rho2tau);
+                CDenseMatrix v3rhosigma2(npoints, dim->v3rhosigma2);
+                CDenseMatrix v3rhosigmalapl(npoints, dim->v3rhosigmalapl);
+                CDenseMatrix v3rhosigmatau(npoints, dim->v3rhosigmatau);
+                CDenseMatrix v3rholapl2(npoints, dim->v3rholapl2);
+                CDenseMatrix v3rholapltau(npoints, dim->v3rholapltau);
+                CDenseMatrix v3rhotau2(npoints, dim->v3rhotau2);
+                CDenseMatrix v3sigma3(npoints, dim->v3sigma3);
+                CDenseMatrix v3sigma2lapl(npoints, dim->v3sigma2lapl);
+                CDenseMatrix v3sigma2tau(npoints, dim->v3sigma2tau);
+                CDenseMatrix v3sigmalapl2(npoints, dim->v3sigmalapl2);
+                CDenseMatrix v3sigmalapltau(npoints, dim->v3sigmalapltau);
+                CDenseMatrix v3sigmatau2(npoints, dim->v3sigmatau2);
+                CDenseMatrix v3lapl3(npoints, dim->v3lapl3);
+                CDenseMatrix v3lapl2tau(npoints, dim->v3lapl2tau);
+                CDenseMatrix v3lapltau2(npoints, dim->v3lapltau2);
+                CDenseMatrix v3tau3(npoints, dim->v3tau3);
                 func.compute_kxc_for_mgga(npoints,
                                           rho.data(),
                                           sigma.data(),
@@ -930,46 +944,44 @@ export_dft(py::module& m)
                 errors::assertMsgCritical(
                     (rho_size == npoints * 2) && (sigma_size == npoints * 3) && (lapl_size == npoints * 2) && (tau_size == npoints * 2),
                     std::string("compute_lxc_for_mgga: Inconsistent array size"));
-                CDenseMatrix v4rho4(npoints, 5);
-                CDenseMatrix v4rho3sigma(npoints, 12);
-                CDenseMatrix v4rho3lapl(npoints, 8);
-                CDenseMatrix v4rho3tau(npoints, 8);
-                CDenseMatrix v4rho2sigma2(npoints, 18);
-                CDenseMatrix v4rho2sigmalapl(npoints, 18);
-                CDenseMatrix v4rho2sigmatau(npoints, 18);
-                CDenseMatrix v4rho2lapl2(npoints, 9);
-                CDenseMatrix v4rho2lapltau(npoints, 12);
-                CDenseMatrix v4rho2tau2(npoints, 9);
-                CDenseMatrix v4rhosigma3(npoints, 20);
-                // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24);
-                CDenseMatrix v4rhosigma2lapl(npoints, 36);
-                // v4rhosigma2tau: inconsistent size in libxc (36 vs 24);
-                CDenseMatrix v4rhosigma2tau(npoints, 36);
-                CDenseMatrix v4rhosigmalapl2(npoints, 18);
-                CDenseMatrix v4rhosigmalapltau(npoints, 24);
-                // v4rhosigmatau2: inconsistent size in libxc (36 vs 18);
-                CDenseMatrix v4rhosigmatau2(npoints, 36);
-                CDenseMatrix v4rholapl3(npoints, 8);
-                CDenseMatrix v4rholapl2tau(npoints, 12);
-                CDenseMatrix v4rholapltau2(npoints, 12);
-                CDenseMatrix v4rhotau3(npoints, 8);
-                CDenseMatrix v4sigma4(npoints, 15);
-                CDenseMatrix v4sigma3lapl(npoints, 20);
-                // v4sigma3tau: inconsistent size in libxc (30 vs 20);
-                CDenseMatrix v4sigma3tau(npoints, 30);
-                CDenseMatrix v4sigma2lapl2(npoints, 18);
-                CDenseMatrix v4sigma2lapltau(npoints, 24);
-                CDenseMatrix v4sigma2tau2(npoints, 18);
-                CDenseMatrix v4sigmalapl3(npoints, 12);
-                CDenseMatrix v4sigmalapl2tau(npoints, 18);
-                CDenseMatrix v4sigmalapltau2(npoints, 18);
-                CDenseMatrix v4sigmatau3(npoints, 12);
-                CDenseMatrix v4lapl4(npoints, 5);
-                CDenseMatrix v4lapl3tau(npoints, 8);
-                CDenseMatrix v4lapl2tau2(npoints, 9);
-                CDenseMatrix v4lapltau3(npoints, 8);
-                CDenseMatrix v4tau4(npoints, 5);
-                auto         func = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         func     = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+                auto         mggafunc = func.getFunctionalPointerToMetaGgaComponent();
+                const auto   dim      = &(mggafunc->dim);
+                CDenseMatrix v4rho4(npoints, dim->v4rho4);
+                CDenseMatrix v4rho3sigma(npoints, dim->v4rho3sigma);
+                CDenseMatrix v4rho3lapl(npoints, dim->v4rho3lapl);
+                CDenseMatrix v4rho3tau(npoints, dim->v4rho3tau);
+                CDenseMatrix v4rho2sigma2(npoints, dim->v4rho2sigma2);
+                CDenseMatrix v4rho2sigmalapl(npoints, dim->v4rho2sigmalapl);
+                CDenseMatrix v4rho2sigmatau(npoints, dim->v4rho2sigmatau);
+                CDenseMatrix v4rho2lapl2(npoints, dim->v4rho2lapl2);
+                CDenseMatrix v4rho2lapltau(npoints, dim->v4rho2lapltau);
+                CDenseMatrix v4rho2tau2(npoints, dim->v4rho2tau2);
+                CDenseMatrix v4rhosigma3(npoints, dim->v4rhosigma3);
+                CDenseMatrix v4rhosigma2lapl(npoints, dim->v4rhosigma2lapl);
+                CDenseMatrix v4rhosigma2tau(npoints, dim->v4rhosigma2tau);
+                CDenseMatrix v4rhosigmalapl2(npoints, dim->v4rhosigmalapl2);
+                CDenseMatrix v4rhosigmalapltau(npoints, dim->v4rhosigmalapltau);
+                CDenseMatrix v4rhosigmatau2(npoints, dim->v4rhosigmatau2);
+                CDenseMatrix v4rholapl3(npoints, dim->v4rholapl3);
+                CDenseMatrix v4rholapl2tau(npoints, dim->v4rholapl2tau);
+                CDenseMatrix v4rholapltau2(npoints, dim->v4rholapltau2);
+                CDenseMatrix v4rhotau3(npoints, dim->v4rhotau3);
+                CDenseMatrix v4sigma4(npoints, dim->v4sigma4);
+                CDenseMatrix v4sigma3lapl(npoints, dim->v4sigma3lapl);
+                CDenseMatrix v4sigma3tau(npoints, dim->v4sigma3tau);
+                CDenseMatrix v4sigma2lapl2(npoints, dim->v4sigma2lapl2);
+                CDenseMatrix v4sigma2lapltau(npoints, dim->v4sigma2lapltau);
+                CDenseMatrix v4sigma2tau2(npoints, dim->v4sigma2tau2);
+                CDenseMatrix v4sigmalapl3(npoints, dim->v4sigmalapl3);
+                CDenseMatrix v4sigmalapl2tau(npoints, dim->v4sigmalapl2tau);
+                CDenseMatrix v4sigmalapltau2(npoints, dim->v4sigmalapltau2);
+                CDenseMatrix v4sigmatau3(npoints, dim->v4sigmatau3);
+                CDenseMatrix v4lapl4(npoints, dim->v4lapl4);
+                CDenseMatrix v4lapl3tau(npoints, dim->v4lapl3tau);
+                CDenseMatrix v4lapl2tau2(npoints, dim->v4lapl2tau2);
+                CDenseMatrix v4lapltau3(npoints, dim->v4lapltau3);
+                CDenseMatrix v4tau4(npoints, dim->v4tau4);
                 func.compute_lxc_for_mgga(npoints,
                                           rho.data(),
                                           sigma.data(),

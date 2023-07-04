@@ -38,7 +38,7 @@ from .veloxchemlib import (KineticEnergyIntegralsDriver,
                            ElectronRepulsionIntegralsDriver)
 from .veloxchemlib import GridDriver, XCIntegrator
 from .veloxchemlib import denmat, fockmat, mpi_master
-from .veloxchemlib import (hartree_in_ev, bohr_in_angstroms,
+from .veloxchemlib import (hartree_in_ev, bohr_in_angstrom,
                            rotatory_strength_in_cgs)
 from .veloxchemlib import get_dimer_ao_indices, parse_xc_func
 from .outputstream import OutputStream
@@ -277,8 +277,8 @@ class ExcitonModelDriver:
         natoms_1 = mol_1.number_of_atoms()
         natoms_2 = mol_2.number_of_atoms()
 
-        coords_1 = mol_1.get_coordinates()
-        coords_2 = mol_2.get_coordinates()
+        coords_1 = mol_1.get_coordinates_in_bohr()
+        coords_2 = mol_2.get_coordinates_in_bohr()
 
         min_dist_2 = None
         for atom_ind_1 in range(natoms_1):
@@ -334,7 +334,7 @@ class ExcitonModelDriver:
                 mol_B = monomer_molecules[ind_B]
                 min_dist_AB = self.get_minimal_distance(mol_A, mol_B)
                 if (self.dimer_cutoff_radius is None or min_dist_AB
-                        < self.dimer_cutoff_radius / bohr_in_angstroms()):
+                        < self.dimer_cutoff_radius / bohr_in_angstrom()):
                     dimer_pairs.append((ind_A, ind_B))
 
         npairs = len(dimer_pairs)
@@ -351,7 +351,7 @@ class ExcitonModelDriver:
         self.elec_trans_dipoles = np.zeros((total_num_states, 3))
         self.velo_trans_dipoles = np.zeros((total_num_states, 3))
         self.magn_trans_dipoles = np.zeros((total_num_states, 3))
-        self.center_of_mass = molecule.center_of_mass()
+        self.center_of_mass = molecule.center_of_mass_in_bohr()
 
         self.state_info = [{
             'type': '',

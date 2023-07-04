@@ -30,7 +30,7 @@ import numpy as np
 import sys
 
 from .veloxchemlib import GridDriver, XCMolecularHessian
-from .veloxchemlib import (mpi_master, bohr_in_angstroms, avogadro_constant,
+from .veloxchemlib import (mpi_master, bohr_in_angstrom, avogadro_constant,
                            fine_structure_constant, electron_mass_in_amu,
                            amu_in_kg, speed_of_light_in_vacuum_in_SI)
 from .veloxchemlib import parse_xc_func
@@ -163,7 +163,7 @@ class HessianDriver:
                 self.dft = True
             self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
             assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Gradient driver: Undefined XC functional')
+                                'Hessian driver: Undefined XC functional')
 
         if self.do_four_point:
             self.numerical = True
@@ -215,17 +215,15 @@ class HessianDriver:
             The response driver (for excited state vibrational analysis).
         """
 
-        geometric_repo = 'https://github.com/leeping/geomeTRIC.git'
         err_msg = ('The installed geometric package does not support\n' +
                    '  vibrational analysis. Please install the latest\n' +
-                   '  geometric via\n' +
-                   f'  python3 -m pip install git+{geometric_repo}\n')
+                   '  geometric via pip or conda.\n')
         assert_msg_critical(hasattr(geometric, 'normal_modes'), err_msg)
 
         # number of atoms, elements, and coordinates
         natm = molecule.number_of_atoms()
         elem = molecule.get_labels()
-        coords = molecule.get_coordinates().reshape(natm * 3)
+        coords = molecule.get_coordinates_in_bohr().reshape(natm * 3)
 
         self.frequencies, self.normal_modes, gibbs_energy = (
             geometric.normal_modes.frequency_analysis(
@@ -245,7 +243,7 @@ class HessianDriver:
         # Constants and conversion factors
         c = speed_of_light_in_vacuum_in_SI()
         alpha = fine_structure_constant()
-        bohr_in_km = bohr_in_angstroms() * 1e-13
+        bohr_in_km = bohr_in_angstrom() * 1e-13
         cm_to_m = 1e-2  # centimeters in meters
         N_to_mdyne = 1e+8  # Newton in milli dyne
         m_to_A = 1e+10  # meters in Angstroms
@@ -404,7 +402,7 @@ class HessianDriver:
         nuc_contrib = np.zeros((natm, natm, 3, 3))
 
         # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
+        coords = molecule.get_coordinates_in_bohr()
 
         # atomic charges
         nuclear_charges = molecule.elem_ids_to_numpy()

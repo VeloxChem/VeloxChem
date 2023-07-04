@@ -25,6 +25,8 @@
 
 #include "XCFunctional.hpp"
 
+#include <omp.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -104,13 +106,10 @@ CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
 
         // check functional family
 
-        // which family does this x-c mixture belong to?
-        auto family = funcptr->info->family;
-
         // LDA, GGA, metaGGA
-        isMGGA = (isMGGA || (family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA));
-        isGGA  = ((!isMGGA) && (isGGA || (family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA)));
-        isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || (family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA)));
+        isMGGA = (isMGGA || xccomp.isMetaGGA());
+        isGGA  = ((!isMGGA) && (isGGA || xccomp.isGGA()));
+        isLDA  = ((!isMGGA) && (!isGGA) && (isLDA || xccomp.isLDA()));
 
         // check functional hybrid type
         // TODO use xc_hyb_type when it is available
@@ -195,15 +194,7 @@ CXCFunctional::_allocateStagingBuffer()
 {
     if (_stagingBuffer == nullptr)
     {
-        // TODO write function to compute this number based on functional
-        // family and order of derivatives available
-        int32_t n_xc_outputs = 0;
-
-        if (_familyOfFunctional == std::string("LDA")) n_xc_outputs = 15;
-
-        if (_familyOfFunctional == std::string("GGA")) n_xc_outputs = 126;
-
-        if (_familyOfFunctional == std::string("MGGA")) n_xc_outputs = 767;
+        auto n_xc_outputs = getDimensionOfDerivatives();
 
         _stagingBuffer = mem::malloc<double>(n_xc_outputs * _ldStaging);
     }
@@ -218,6 +209,231 @@ CXCFunctional::_freeStagingBuffer()
 
         _stagingBuffer = nullptr;
     }
+}
+
+std::unordered_map<std::string, std::array<int32_t, 2>>
+CXCFunctional::_getIndicesAndCountsOfDerivatives() const
+{
+    std::unordered_map<std::string, std::array<int32_t, 2>> indices_and_counts;
+
+    if (_familyOfFunctional == std::string("LDA"))
+    {
+        auto       ldafunc = getFunctionalPointerToLdaComponent();
+        const auto dim     = &(ldafunc->dim);
+
+        int32_t n_xc_outputs = 0;
+
+        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        n_xc_outputs += dim->zk;
+
+        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        n_xc_outputs += dim->vrho;
+
+        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        n_xc_outputs += dim->v2rho2;
+
+        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        n_xc_outputs += dim->v3rho3;
+
+        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        n_xc_outputs += dim->v4rho4;
+    }
+    else if (_familyOfFunctional == std::string("GGA"))
+    {
+        auto       ggafunc = getFunctionalPointerToGgaComponent();
+        const auto dim     = &(ggafunc->dim);
+
+        int32_t n_xc_outputs = 0;
+
+        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        n_xc_outputs += dim->zk;
+
+        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        n_xc_outputs += dim->vrho;
+        indices_and_counts["vsigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->vsigma});
+        n_xc_outputs += dim->vsigma;
+
+        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        n_xc_outputs += dim->v2rho2;
+        indices_and_counts["v2rhosigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhosigma});
+        n_xc_outputs += dim->v2rhosigma;
+        indices_and_counts["v2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigma2});
+        n_xc_outputs += dim->v2sigma2;
+
+        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        n_xc_outputs += dim->v3rho3;
+        indices_and_counts["v3rho2sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2sigma});
+        n_xc_outputs += dim->v3rho2sigma;
+        indices_and_counts["v3rhosigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigma2});
+        n_xc_outputs += dim->v3rhosigma2;
+        indices_and_counts["v3sigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma3});
+        n_xc_outputs += dim->v3sigma3;
+
+        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        n_xc_outputs += dim->v4rho4;
+        indices_and_counts["v4rho3sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3sigma});
+        n_xc_outputs += dim->v4rho3sigma;
+        indices_and_counts["v4rho2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigma2});
+        n_xc_outputs += dim->v4rho2sigma2;
+        indices_and_counts["v4rhosigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma3});
+        n_xc_outputs += dim->v4rhosigma3;
+        indices_and_counts["v4sigma4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma4});
+        n_xc_outputs += dim->v4sigma4;
+    }
+    else if (_familyOfFunctional == std::string("MGGA"))
+    {
+        auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+        const auto dim      = &(mggafunc->dim);
+
+        int32_t n_xc_outputs = 0;
+
+        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        n_xc_outputs += dim->zk;
+
+        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        n_xc_outputs += dim->vrho;
+        indices_and_counts["vsigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->vsigma});
+        n_xc_outputs += dim->vsigma;
+        indices_and_counts["vlapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->vlapl});
+        n_xc_outputs += dim->vlapl;
+        indices_and_counts["vtau"] = std::array<int32_t, 2>({n_xc_outputs, dim->vtau});
+        n_xc_outputs += dim->vtau;
+
+        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        n_xc_outputs += dim->v2rho2;
+        indices_and_counts["v2rhosigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhosigma});
+        n_xc_outputs += dim->v2rhosigma;
+        indices_and_counts["v2rholapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rholapl});
+        n_xc_outputs += dim->v2rholapl;
+        indices_and_counts["v2rhotau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhotau});
+        n_xc_outputs += dim->v2rhotau;
+        indices_and_counts["v2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigma2});
+        n_xc_outputs += dim->v2sigma2;
+        indices_and_counts["v2sigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigmalapl});
+        n_xc_outputs += dim->v2sigmalapl;
+        indices_and_counts["v2sigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigmatau});
+        n_xc_outputs += dim->v2sigmatau;
+        indices_and_counts["v2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2lapl2});
+        n_xc_outputs += dim->v2lapl2;
+        indices_and_counts["v2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2lapltau});
+        n_xc_outputs += dim->v2lapltau;
+        indices_and_counts["v2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2tau2});
+        n_xc_outputs += dim->v2tau2;
+
+        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        n_xc_outputs += dim->v3rho3;
+        indices_and_counts["v3rho2sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2sigma});
+        n_xc_outputs += dim->v3rho2sigma;
+        indices_and_counts["v3rho2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2lapl});
+        n_xc_outputs += dim->v3rho2lapl;
+        indices_and_counts["v3rho2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2tau});
+        n_xc_outputs += dim->v3rho2tau;
+        indices_and_counts["v3rhosigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigma2});
+        n_xc_outputs += dim->v3rhosigma2;
+        indices_and_counts["v3rhosigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigmalapl});
+        n_xc_outputs += dim->v3rhosigmalapl;
+        indices_and_counts["v3rhosigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigmatau});
+        n_xc_outputs += dim->v3rhosigmatau;
+        indices_and_counts["v3rholapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rholapl2});
+        n_xc_outputs += dim->v3rholapl2;
+        indices_and_counts["v3rholapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rholapltau});
+        n_xc_outputs += dim->v3rholapltau;
+        indices_and_counts["v3rhotau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhotau2});
+        n_xc_outputs += dim->v3rhotau2;
+        indices_and_counts["v3sigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma3});
+        n_xc_outputs += dim->v3sigma3;
+        indices_and_counts["v3sigma2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma2lapl});
+        n_xc_outputs += dim->v3sigma2lapl;
+        indices_and_counts["v3sigma2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma2tau});
+        n_xc_outputs += dim->v3sigma2tau;
+        indices_and_counts["v3sigmalapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmalapl2});
+        n_xc_outputs += dim->v3sigmalapl2;
+        indices_and_counts["v3sigmalapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmalapltau});
+        n_xc_outputs += dim->v3sigmalapltau;
+        indices_and_counts["v3sigmatau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmatau2});
+        n_xc_outputs += dim->v3sigmatau2;
+        indices_and_counts["v3lapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapl3});
+        n_xc_outputs += dim->v3lapl3;
+        indices_and_counts["v3lapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapl2tau});
+        n_xc_outputs += dim->v3lapl2tau;
+        indices_and_counts["v3lapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapltau2});
+        n_xc_outputs += dim->v3lapltau2;
+        indices_and_counts["v3tau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3tau3});
+        n_xc_outputs += dim->v3tau3;
+
+        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        n_xc_outputs += dim->v4rho4;
+        indices_and_counts["v4rho3sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3sigma});
+        n_xc_outputs += dim->v4rho3sigma;
+        indices_and_counts["v4rho3lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3lapl});
+        n_xc_outputs += dim->v4rho3lapl;
+        indices_and_counts["v4rho3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3tau});
+        n_xc_outputs += dim->v4rho3tau;
+        indices_and_counts["v4rho2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigma2});
+        n_xc_outputs += dim->v4rho2sigma2;
+        indices_and_counts["v4rho2sigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigmalapl});
+        n_xc_outputs += dim->v4rho2sigmalapl;
+        indices_and_counts["v4rho2sigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigmatau});
+        n_xc_outputs += dim->v4rho2sigmatau;
+        indices_and_counts["v4rho2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2lapl2});
+        n_xc_outputs += dim->v4rho2lapl2;
+        indices_and_counts["v4rho2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2lapltau});
+        n_xc_outputs += dim->v4rho2lapltau;
+        indices_and_counts["v4rho2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2tau2});
+        n_xc_outputs += dim->v4rho2tau2;
+        indices_and_counts["v4rhosigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma3});
+        n_xc_outputs += dim->v4rhosigma3;
+        indices_and_counts["v4rhosigma2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma2lapl});
+        n_xc_outputs += dim->v4rhosigma2lapl;
+        indices_and_counts["v4rhosigma2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma2tau});
+        n_xc_outputs += dim->v4rhosigma2tau;
+        indices_and_counts["v4rhosigmalapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmalapl2});
+        n_xc_outputs += dim->v4rhosigmalapl2;
+        indices_and_counts["v4rhosigmalapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmalapltau});
+        n_xc_outputs += dim->v4rhosigmalapltau;
+        indices_and_counts["v4rhosigmatau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmatau2});
+        n_xc_outputs += dim->v4rhosigmatau2;
+        indices_and_counts["v4rholapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapl3});
+        n_xc_outputs += dim->v4rholapl3;
+        indices_and_counts["v4rholapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapl2tau});
+        n_xc_outputs += dim->v4rholapl2tau;
+        indices_and_counts["v4rholapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapltau2});
+        n_xc_outputs += dim->v4rholapltau2;
+        indices_and_counts["v4rhotau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhotau3});
+        n_xc_outputs += dim->v4rhotau3;
+        indices_and_counts["v4sigma4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma4});
+        n_xc_outputs += dim->v4sigma4;
+        indices_and_counts["v4sigma3lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma3lapl});
+        n_xc_outputs += dim->v4sigma3lapl;
+        indices_and_counts["v4sigma3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma3tau});
+        n_xc_outputs += dim->v4sigma3tau;
+        indices_and_counts["v4sigma2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2lapl2});
+        n_xc_outputs += dim->v4sigma2lapl2;
+        indices_and_counts["v4sigma2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2lapltau});
+        n_xc_outputs += dim->v4sigma2lapltau;
+        indices_and_counts["v4sigma2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2tau2});
+        n_xc_outputs += dim->v4sigma2tau2;
+        indices_and_counts["v4sigmalapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapl3});
+        n_xc_outputs += dim->v4sigmalapl3;
+        indices_and_counts["v4sigmalapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapl2tau});
+        n_xc_outputs += dim->v4sigmalapl2tau;
+        indices_and_counts["v4sigmalapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapltau2});
+        n_xc_outputs += dim->v4sigmalapltau2;
+        indices_and_counts["v4sigmatau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmatau3});
+        n_xc_outputs += dim->v4sigmatau3;
+        indices_and_counts["v4lapl4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl4});
+        n_xc_outputs += dim->v4lapl4;
+        indices_and_counts["v4lapl3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl3tau});
+        n_xc_outputs += dim->v4lapl3tau;
+        indices_and_counts["v4lapl2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl2tau2});
+        n_xc_outputs += dim->v4lapl2tau2;
+        indices_and_counts["v4lapltau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapltau3});
+        n_xc_outputs += dim->v4lapltau3;
+        indices_and_counts["v4tau4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4tau4});
+        n_xc_outputs += dim->v4tau4;
+    }
+
+    return indices_and_counts;
 }
 
 CXCFunctional&
@@ -331,51 +547,97 @@ CXCFunctional::getFractionOfExactExchange() const
 }
 
 auto
-CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* exc, double* vrho) const -> void
+CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* zk, double* vrho) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc  = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(exc, vrho : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_zk   = nullptr;
+    double* stage_vrho = nullptr;
+
+    if (alloc)
     {
-        exc[g] = 0.0;
-
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
+        stage_zk   = mem::malloc<double>(ind_cnt["zk"][1] * np);
+        stage_vrho = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+    }
+    else
+    {
+        stage_zk   = &_stagingBuffer[ind_cnt["zk"][0] * _ldStaging];
+        stage_vrho = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            exc[g] += c * stage_exc[g];
-
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+            for (int ind = 0; ind < dim->zk; ++ind)
+            {
+                zk[dim->zk * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vrho; ++ind)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
         }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_exc_vxc(funcptr,
+                               grid_batch_size,
+                               rho + dim->rho * grid_batch_offset,
+                               stage_zk + dim->zk * grid_batch_offset,
+                               stage_vrho + dim->vrho * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
+            }
+        }
+
+        gridscreen::screenExcVxcForLDA(
+            this, grid_batch_size, rho + dim->rho * grid_batch_offset, zk + dim->zk * grid_batch_offset, vrho + dim->vrho * grid_batch_offset);
     }
 
     if (alloc)
     {
-        mem::free(stage_exc);
+        mem::free(stage_zk);
         mem::free(stage_vrho);
     }
-
-    gridscreen::screenExcVxcForLDA(np, rho, exc, vrho);
 }
 
 auto
@@ -384,40 +646,75 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_vrho = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(vrho : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_vrho = nullptr;
+
+    if (alloc)
     {
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
+        stage_vrho = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+    }
+    else
+    {
+        stage_vrho = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_vxc(funcptr, np, rho, stage_vrho);
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        #pragma omp simd aligned(vrho, stage_vrho : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+            for (int ind = 0; ind < dim->vrho; ++ind)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
         }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_vxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_vrho + dim->vrho * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
+            }
+        }
+
+        gridscreen::screenVxcForLDA(this, grid_batch_size, rho + dim->rho * grid_batch_offset, vrho + dim->vrho * grid_batch_offset);
     }
 
     if (alloc)
     {
         mem::free(stage_vrho);
     }
-
-    gridscreen::screenVxcForLDA(np, rho, vrho);
 }
 
 auto
@@ -426,42 +723,75 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_v2rho2 = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(v2rho2 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_v2rho2 = nullptr;
+
+    if (alloc)
     {
-        v2rho2[3 * g + 0] = 0.0;
-        v2rho2[3 * g + 1] = 0.0;
-        v2rho2[3 * g + 2] = 0.0;
+        stage_v2rho2 = mem::malloc<double>(ind_cnt["v2rho2"][1] * np);
+    }
+    else
+    {
+        stage_v2rho2 = &_stagingBuffer[ind_cnt["v2rho2"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        #pragma omp simd aligned(v2rho2, stage_v2rho2 : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
-            v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
-            v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+            for (int ind = 0; ind < dim->v2rho2; ++ind)
+            {
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
         }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_fxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v2rho2 + dim->v2rho2 * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v2rho2; ++ind)
+                    {
+                        v2rho2[dim->v2rho2 * g + ind] += c * stage_v2rho2[dim->v2rho2 * g + ind];
+                    }
+                }
+            }
+        }
+
+        gridscreen::screenFxcForLDA(this, grid_batch_size, rho + dim->rho * grid_batch_offset, v2rho2 + dim->v2rho2 * grid_batch_offset);
     }
 
     if (alloc)
     {
         mem::free(stage_v2rho2);
     }
-
-    gridscreen::screenFxcForLDA(np, rho, v2rho2);
 }
 
 auto
@@ -470,44 +800,75 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_v3rho3 = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[6 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(v3rho3 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_v3rho3 = nullptr;
+
+    if (alloc)
     {
-        v3rho3[4 * g + 0] = 0.0;
-        v3rho3[4 * g + 1] = 0.0;
-        v3rho3[4 * g + 2] = 0.0;
-        v3rho3[4 * g + 3] = 0.0;
+        stage_v3rho3 = mem::malloc<double>(ind_cnt["v3rho3"][1] * np);
+    }
+    else
+    {
+        stage_v3rho3 = &_stagingBuffer[ind_cnt["v3rho3"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        #pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-            v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-            v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-            v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+            for (int ind = 0; ind < dim->v3rho3; ++ind)
+            {
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
         }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_kxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v3rho3 + dim->v3rho3 * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                }
+            }
+        }
+
+        gridscreen::screenKxcForLDA(this, grid_batch_size, rho + dim->rho * grid_batch_offset, v3rho3 + dim->v3rho3 * grid_batch_offset);
     }
 
     if (alloc)
     {
         mem::free(stage_v3rho3);
     }
-
-    gridscreen::screenKxcForLDA(np, rho, v3rho3);
 }
 
 auto
@@ -516,123 +877,209 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
 
-    // should we allocate staging buffers? Or can we use the global one?
+    // set up staging buffers
+
     bool alloc = (np > _ldStaging);
 
-    auto stage_v4rho4 = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[10 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    #pragma omp simd aligned(v4rho4 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
+    double* stage_v4rho4 = nullptr;
+
+    if (alloc)
     {
-        v4rho4[5 * g + 0] = 0.0;
-        v4rho4[5 * g + 1] = 0.0;
-        v4rho4[5 * g + 2] = 0.0;
-        v4rho4[5 * g + 3] = 0.0;
-        v4rho4[5 * g + 4] = 0.0;
+        stage_v4rho4 = mem::malloc<double>(ind_cnt["v4rho4"][1] * np);
+    }
+    else
+    {
+        stage_v4rho4 = &_stagingBuffer[ind_cnt["v4rho4"][0] * _ldStaging];
     }
 
-    for (const auto& xccomp : _components)
+    // compute derivatives
+
+    auto       ldafunc = getFunctionalPointerToLdaComponent();
+    const auto dim     = &(ldafunc->dim);
+
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        auto thread_id = omp_get_thread_num();
 
-        xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
 
-        const auto c = xccomp.getScalingFactor();
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
 
-        #pragma omp simd aligned(v4rho4, stage_v4rho4 : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
-            v4rho4[5 * g + 1] += c * stage_v4rho4[5 * g + 1];
-            v4rho4[5 * g + 2] += c * stage_v4rho4[5 * g + 2];
-            v4rho4[5 * g + 3] += c * stage_v4rho4[5 * g + 3];
-            v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
+            for (int ind = 0; ind < dim->v4rho4; ++ind)
+            {
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
         }
+
+        for (const auto& xccomp : _components)
+        {
+            auto funcptr = xccomp.getFunctionalPointer();
+
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
+            {
+                xc_lda_lxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v4rho4 + dim->v4rho4 * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v4rho4; ++ind)
+                    {
+                        v4rho4[dim->v4rho4 * g + ind] += c * stage_v4rho4[dim->v4rho4 * g + ind];
+                    }
+                }
+            }
+        }
+
+        gridscreen::screenLxcForLDA(this, grid_batch_size, rho + dim->rho * grid_batch_offset, v4rho4 + dim->v4rho4 * grid_batch_offset);
     }
 
     if (alloc)
     {
         mem::free(stage_v4rho4);
     }
-
-    gridscreen::screenLxcForLDA(np, rho, v4rho4);
 }
 
 auto
-CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma) const
+CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* zk, double* vrho, double* vsigma) const
     -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
 
-    #pragma omp simd aligned(exc, vrho, vsigma : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        exc[g] = 0.0;
+    // set up staging buffers
 
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
-
-        vsigma[3 * g + 0] = 0.0;
-        vsigma[3 * g + 1] = 0.0;
-        vsigma[3 * g + 2] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_zk     = nullptr;
+    double* stage_vrho   = nullptr;
+    double* stage_vsigma = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_zk     = mem::malloc<double>(ind_cnt["zk"][1] * np);
+        stage_vrho   = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+        stage_vsigma = mem::malloc<double>(ind_cnt["vsigma"][1] * np);
+    }
+    else
+    {
+        stage_zk     = &_stagingBuffer[ind_cnt["zk"][0] * _ldStaging];
+        stage_vrho   = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
+        stage_vsigma = &_stagingBuffer[ind_cnt["vsigma"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       ggafunc = getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
-
-            #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->zk; ++ind)
             {
-                exc[g] += c * stage_exc[g];
-
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                zk[dim->zk * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vrho; ++ind)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma; ++ind)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                exc[g] += c * stage_exc[g];
+                xc_lda_exc_vxc(funcptr,
+                               grid_batch_size,
+                               rho + dim->rho * grid_batch_offset,
+                               stage_zk + dim->zk * grid_batch_offset,
+                               stage_vrho + dim->vrho * grid_batch_offset);
 
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_exc_vxc(funcptr,
+                               grid_batch_size,
+                               rho + dim->rho * grid_batch_offset,
+                               sigma + dim->sigma * grid_batch_offset,
+                               stage_zk + dim->zk * grid_batch_offset,
+                               stage_vrho + dim->vrho * grid_batch_offset,
+                               stage_vsigma + dim->vsigma * grid_batch_offset);
 
-                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vsigma; ++ind)
+                    {
+                        vsigma[dim->vsigma * g + ind] += c * stage_vsigma[dim->vsigma * g + ind];
+                    }
+                }
             }
         }
+
+        gridscreen::screenExcVxcForGGA(this,
+                                       grid_batch_size,
+                                       rho + dim->rho * grid_batch_offset,
+                                       sigma + dim->sigma * grid_batch_offset,
+                                       zk + dim->zk * grid_batch_offset,
+                                       vrho + dim->vrho * grid_batch_offset,
+                                       vsigma + dim->vsigma * grid_batch_offset);
     }
 
     if (alloc)
     {
-        mem::free(stage_exc);
+        mem::free(stage_zk);
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
     }
-
-    gridscreen::screenExcVxcForGGA(np, rho, sigma, exc, vrho, vsigma);
 }
 
 auto
@@ -641,57 +1088,102 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
 
-    #pragma omp simd aligned(vrho, vsigma : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
+    // set up staging buffers
 
-        vsigma[3 * g + 0] = 0.0;
-        vsigma[3 * g + 1] = 0.0;
-        vsigma[3 * g + 2] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_vrho   = nullptr;
+    double* stage_vsigma = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_vrho   = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+        stage_vsigma = mem::malloc<double>(ind_cnt["vsigma"][1] * np);
+    }
+    else
+    {
+        stage_vrho   = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
+        stage_vsigma = &_stagingBuffer[ind_cnt["vsigma"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       ggafunc = getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_vxc(funcptr, np, rho, stage_vrho);
-
-            #pragma omp simd aligned(vrho, stage_vrho : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->vrho; ++ind)
             {
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma; ++ind)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                xc_lda_vxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_vrho + dim->vrho * grid_batch_offset);
 
-                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_vxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_vrho + dim->vrho * grid_batch_offset,
+                           stage_vsigma + dim->vsigma * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vsigma; ++ind)
+                    {
+                        vsigma[dim->vsigma * g + ind] += c * stage_vsigma[dim->vsigma * g + ind];
+                    }
+                }
             }
         }
+
+        gridscreen::screenVxcForGGA(this,
+                                    grid_batch_size,
+                                    rho + dim->rho * grid_batch_offset,
+                                    sigma + dim->sigma * grid_batch_offset,
+                                    vrho + dim->vrho * grid_batch_offset,
+                                    vsigma + dim->vsigma * grid_batch_offset);
     }
 
     if (alloc)
@@ -699,8 +1191,6 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
     }
-
-    gridscreen::screenVxcForGGA(np, rho, sigma, vrho, vsigma);
 }
 
 auto
@@ -710,82 +1200,115 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
 
-    #pragma omp simd aligned(v2rho2, v2rhosigma, v2sigma2 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        v2rho2[3 * g + 0] = 0.0;
-        v2rho2[3 * g + 1] = 0.0;
-        v2rho2[3 * g + 2] = 0.0;
+    // set up staging buffers
 
-        v2rhosigma[6 * g + 0] = 0.0;
-        v2rhosigma[6 * g + 1] = 0.0;
-        v2rhosigma[6 * g + 2] = 0.0;
-        v2rhosigma[6 * g + 3] = 0.0;
-        v2rhosigma[6 * g + 4] = 0.0;
-        v2rhosigma[6 * g + 5] = 0.0;
-
-        v2sigma2[6 * g + 0] = 0.0;
-        v2sigma2[6 * g + 1] = 0.0;
-        v2sigma2[6 * g + 2] = 0.0;
-        v2sigma2[6 * g + 3] = 0.0;
-        v2sigma2[6 * g + 4] = 0.0;
-        v2sigma2[6 * g + 5] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_v2rho2     = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[6 * _ldStaging];
-    auto stage_v2rhosigma = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[9 * _ldStaging];
-    auto stage_v2sigma2   = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[15 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_v2rho2     = nullptr;
+    double* stage_v2rhosigma = nullptr;
+    double* stage_v2sigma2   = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_v2rho2     = mem::malloc<double>(ind_cnt["v2rho2"][1] * np);
+        stage_v2rhosigma = mem::malloc<double>(ind_cnt["v2rhosigma"][1] * np);
+        stage_v2sigma2   = mem::malloc<double>(ind_cnt["v2sigma2"][1] * np);
+    }
+    else
+    {
+        stage_v2rho2     = &_stagingBuffer[ind_cnt["v2rho2"][0] * _ldStaging];
+        stage_v2rhosigma = &_stagingBuffer[ind_cnt["v2rhosigma"][0] * _ldStaging];
+        stage_v2sigma2   = &_stagingBuffer[ind_cnt["v2sigma2"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       ggafunc = getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
-
-            #pragma omp simd aligned(v2rho2, stage_v2rho2 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->v2rho2; ++ind)
             {
-                v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
-                v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
-                v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2rhosigma; ++ind)
+            {
+                v2rhosigma[dim->v2rhosigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2sigma2; ++ind)
+            {
+                v2sigma2[dim->v2sigma2 * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(v2rho2, stage_v2rho2, v2rhosigma, stage_v2rhosigma, \
-                                     v2sigma2, stage_v2sigma2 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
-                v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
-                v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+                xc_lda_fxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v2rho2 + dim->v2rho2 * grid_batch_offset);
 
-                v2rhosigma[6 * g + 0] += c * stage_v2rhosigma[6 * g + 0];
-                v2rhosigma[6 * g + 1] += c * stage_v2rhosigma[6 * g + 1];
-                v2rhosigma[6 * g + 2] += c * stage_v2rhosigma[6 * g + 2];
-                v2rhosigma[6 * g + 3] += c * stage_v2rhosigma[6 * g + 3];
-                v2rhosigma[6 * g + 4] += c * stage_v2rhosigma[6 * g + 4];
-                v2rhosigma[6 * g + 5] += c * stage_v2rhosigma[6 * g + 5];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v2rho2; ++ind)
+                    {
+                        v2rho2[dim->v2rho2 * g + ind] += c * stage_v2rho2[dim->v2rho2 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_fxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_v2rho2 + dim->v2rho2 * grid_batch_offset,
+                           stage_v2rhosigma + dim->v2rhosigma * grid_batch_offset,
+                           stage_v2sigma2 + dim->v2sigma2 * grid_batch_offset);
 
-                v2sigma2[6 * g + 0] += c * stage_v2sigma2[6 * g + 0];
-                v2sigma2[6 * g + 1] += c * stage_v2sigma2[6 * g + 1];
-                v2sigma2[6 * g + 2] += c * stage_v2sigma2[6 * g + 2];
-                v2sigma2[6 * g + 3] += c * stage_v2sigma2[6 * g + 3];
-                v2sigma2[6 * g + 4] += c * stage_v2sigma2[6 * g + 4];
-                v2sigma2[6 * g + 5] += c * stage_v2sigma2[6 * g + 5];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v2rho2; ++ind)
+                    {
+                        v2rho2[dim->v2rho2 * g + ind] += c * stage_v2rho2[dim->v2rho2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2rhosigma; ++ind)
+                    {
+                        v2rhosigma[dim->v2rhosigma * g + ind] += c * stage_v2rhosigma[dim->v2rhosigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2sigma2; ++ind)
+                    {
+                        v2sigma2[dim->v2sigma2 * g + ind] += c * stage_v2sigma2[dim->v2sigma2 * g + ind];
+                    }
+                }
             }
         }
+
+        gridscreen::screenFxcForGGA(this,
+                                    grid_batch_size,
+                                    rho + dim->rho * grid_batch_offset,
+                                    sigma + dim->sigma * grid_batch_offset,
+                                    v2rho2 + dim->v2rho2 * grid_batch_offset,
+                                    v2rhosigma + dim->v2rhosigma * grid_batch_offset,
+                                    v2sigma2 + dim->v2sigma2 * grid_batch_offset);
     }
 
     if (alloc)
@@ -794,12 +1317,10 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
         mem::free(stage_v2rhosigma);
         mem::free(stage_v2sigma2);
     }
-
-    gridscreen::screenFxcForGGA(np, rho, sigma, v2rho2, v2rhosigma, v2sigma2);
 }
 
 auto
-CXCFunctional::compute_kxc_for_gga(int32_t       np,
+CXCFunctional::compute_kxc_for_gga(const int32_t np,
                                    const double* rho,
                                    const double* sigma,
                                    double*       v3rho3,
@@ -810,126 +1331,128 @@ CXCFunctional::compute_kxc_for_gga(int32_t       np,
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
 
-    #pragma omp simd aligned(v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        v3rho3[4 * g + 0] = 0.0;
-        v3rho3[4 * g + 1] = 0.0;
-        v3rho3[4 * g + 2] = 0.0;
-        v3rho3[4 * g + 3] = 0.0;
+    // set up staging buffers
 
-        v3rho2sigma[9 * g + 0] = 0.0;
-        v3rho2sigma[9 * g + 1] = 0.0;
-        v3rho2sigma[9 * g + 2] = 0.0;
-        v3rho2sigma[9 * g + 3] = 0.0;
-        v3rho2sigma[9 * g + 4] = 0.0;
-        v3rho2sigma[9 * g + 5] = 0.0;
-        v3rho2sigma[9 * g + 6] = 0.0;
-        v3rho2sigma[9 * g + 7] = 0.0;
-        v3rho2sigma[9 * g + 8] = 0.0;
-
-        v3rhosigma2[12 * g + 0]  = 0.0;
-        v3rhosigma2[12 * g + 1]  = 0.0;
-        v3rhosigma2[12 * g + 2]  = 0.0;
-        v3rhosigma2[12 * g + 3]  = 0.0;
-        v3rhosigma2[12 * g + 4]  = 0.0;
-        v3rhosigma2[12 * g + 5]  = 0.0;
-        v3rhosigma2[12 * g + 6]  = 0.0;
-        v3rhosigma2[12 * g + 7]  = 0.0;
-        v3rhosigma2[12 * g + 8]  = 0.0;
-        v3rhosigma2[12 * g + 9]  = 0.0;
-        v3rhosigma2[12 * g + 10] = 0.0;
-        v3rhosigma2[12 * g + 11] = 0.0;
-
-        v3sigma3[10 * g + 0] = 0.0;
-        v3sigma3[10 * g + 1] = 0.0;
-        v3sigma3[10 * g + 2] = 0.0;
-        v3sigma3[10 * g + 3] = 0.0;
-        v3sigma3[10 * g + 4] = 0.0;
-        v3sigma3[10 * g + 5] = 0.0;
-        v3sigma3[10 * g + 6] = 0.0;
-        v3sigma3[10 * g + 7] = 0.0;
-        v3sigma3[10 * g + 8] = 0.0;
-        v3sigma3[10 * g + 9] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_v3rho3      = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[21 * _ldStaging];
-    auto stage_v3rho2sigma = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[25 * _ldStaging];
-    auto stage_v3rhosigma2 = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[34 * _ldStaging];
-    auto stage_v3sigma3    = (alloc) ? mem::malloc<double>(10 * np) : &_stagingBuffer[46 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_v3rho3      = nullptr;
+    double* stage_v3rho2sigma = nullptr;
+    double* stage_v3rhosigma2 = nullptr;
+    double* stage_v3sigma3    = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_v3rho3      = mem::malloc<double>(ind_cnt["v3rho3"][1] * np);
+        stage_v3rho2sigma = mem::malloc<double>(ind_cnt["v3rho2sigma"][1] * np);
+        stage_v3rhosigma2 = mem::malloc<double>(ind_cnt["v3rhosigma2"][1] * np);
+        stage_v3sigma3    = mem::malloc<double>(ind_cnt["v3sigma3"][1] * np);
+    }
+    else
+    {
+        stage_v3rho3      = &_stagingBuffer[ind_cnt["v3rho3"][0] * _ldStaging];
+        stage_v3rho2sigma = &_stagingBuffer[ind_cnt["v3rho2sigma"][0] * _ldStaging];
+        stage_v3rhosigma2 = &_stagingBuffer[ind_cnt["v3rhosigma2"][0] * _ldStaging];
+        stage_v3sigma3    = &_stagingBuffer[ind_cnt["v3sigma3"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       ggafunc = getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
-
-            #pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->v3rho3; ++ind)
             {
-                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2sigma; ++ind)
+            {
+                v3rho2sigma[dim->v3rho2sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigma2; ++ind)
+            {
+                v3rhosigma2[dim->v3rhosigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma3; ++ind)
+            {
+                v3sigma3[dim->v3sigma3 * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, \
-                                     v3rhosigma2, stage_v3rhosigma2, v3sigma3, stage_v3sigma3 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+                xc_lda_kxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v3rho3 + dim->v3rho3 * grid_batch_offset);
 
-                v3rho2sigma[9 * g + 0] += c * stage_v3rho2sigma[9 * g + 0];
-                v3rho2sigma[9 * g + 1] += c * stage_v3rho2sigma[9 * g + 1];
-                v3rho2sigma[9 * g + 2] += c * stage_v3rho2sigma[9 * g + 2];
-                v3rho2sigma[9 * g + 3] += c * stage_v3rho2sigma[9 * g + 3];
-                v3rho2sigma[9 * g + 4] += c * stage_v3rho2sigma[9 * g + 4];
-                v3rho2sigma[9 * g + 5] += c * stage_v3rho2sigma[9 * g + 5];
-                v3rho2sigma[9 * g + 6] += c * stage_v3rho2sigma[9 * g + 6];
-                v3rho2sigma[9 * g + 7] += c * stage_v3rho2sigma[9 * g + 7];
-                v3rho2sigma[9 * g + 8] += c * stage_v3rho2sigma[9 * g + 8];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_kxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_v3rho3 + dim->v3rho3 * grid_batch_offset,
+                           stage_v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                           stage_v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                           stage_v3sigma3 + dim->v3sigma3 * grid_batch_offset);
 
-                v3rhosigma2[12 * g + 0] += c * stage_v3rhosigma2[12 * g + 0];
-                v3rhosigma2[12 * g + 1] += c * stage_v3rhosigma2[12 * g + 1];
-                v3rhosigma2[12 * g + 2] += c * stage_v3rhosigma2[12 * g + 2];
-                v3rhosigma2[12 * g + 3] += c * stage_v3rhosigma2[12 * g + 3];
-                v3rhosigma2[12 * g + 4] += c * stage_v3rhosigma2[12 * g + 4];
-                v3rhosigma2[12 * g + 5] += c * stage_v3rhosigma2[12 * g + 5];
-                v3rhosigma2[12 * g + 6] += c * stage_v3rhosigma2[12 * g + 6];
-                v3rhosigma2[12 * g + 7] += c * stage_v3rhosigma2[12 * g + 7];
-                v3rhosigma2[12 * g + 8] += c * stage_v3rhosigma2[12 * g + 8];
-                v3rhosigma2[12 * g + 9] += c * stage_v3rhosigma2[12 * g + 9];
-                v3rhosigma2[12 * g + 10] += c * stage_v3rhosigma2[12 * g + 10];
-                v3rhosigma2[12 * g + 11] += c * stage_v3rhosigma2[12 * g + 11];
-
-                v3sigma3[10 * g + 0] += c * stage_v3sigma3[10 * g + 0];
-                v3sigma3[10 * g + 1] += c * stage_v3sigma3[10 * g + 1];
-                v3sigma3[10 * g + 2] += c * stage_v3sigma3[10 * g + 2];
-                v3sigma3[10 * g + 3] += c * stage_v3sigma3[10 * g + 3];
-                v3sigma3[10 * g + 4] += c * stage_v3sigma3[10 * g + 4];
-                v3sigma3[10 * g + 5] += c * stage_v3sigma3[10 * g + 5];
-                v3sigma3[10 * g + 6] += c * stage_v3sigma3[10 * g + 6];
-                v3sigma3[10 * g + 7] += c * stage_v3sigma3[10 * g + 7];
-                v3sigma3[10 * g + 8] += c * stage_v3sigma3[10 * g + 8];
-                v3sigma3[10 * g + 9] += c * stage_v3sigma3[10 * g + 9];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2sigma; ++ind)
+                    {
+                        v3rho2sigma[dim->v3rho2sigma * g + ind] += c * stage_v3rho2sigma[dim->v3rho2sigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigma2; ++ind)
+                    {
+                        v3rhosigma2[dim->v3rhosigma2 * g + ind] += c * stage_v3rhosigma2[dim->v3rhosigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma3; ++ind)
+                    {
+                        v3sigma3[dim->v3sigma3 * g + ind] += c * stage_v3sigma3[dim->v3sigma3 * g + ind];
+                    }
+                }
             }
         }
+
+        gridscreen::screenKxcForGGA(this,
+                                    grid_batch_size,
+                                    rho + dim->rho * grid_batch_offset,
+                                    sigma + dim->sigma * grid_batch_offset,
+                                    v3rho3 + dim->v3rho3 * grid_batch_offset,
+                                    v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                                    v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                                    v3sigma3 + dim->v3sigma3 * grid_batch_offset);
     }
 
     if (alloc)
@@ -939,12 +1462,10 @@ CXCFunctional::compute_kxc_for_gga(int32_t       np,
         mem::free(stage_v3rhosigma2);
         mem::free(stage_v3sigma3);
     }
-
-    gridscreen::screenKxcForGGA(np, rho, sigma, v3rho3, v3rho2sigma, v3rhosigma2, v3sigma3);
 }
 
 auto
-CXCFunctional::compute_lxc_for_gga(int32_t       np,
+CXCFunctional::compute_lxc_for_gga(const int32_t np,
                                    const double* rho,
                                    const double* sigma,
                                    double*       v4rho4,
@@ -956,201 +1477,141 @@ CXCFunctional::compute_lxc_for_gga(int32_t       np,
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
 
-    #pragma omp simd aligned(v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        v4rho4[5 * g + 0] = 0.0;
-        v4rho4[5 * g + 1] = 0.0;
-        v4rho4[5 * g + 2] = 0.0;
-        v4rho4[5 * g + 3] = 0.0;
-        v4rho4[5 * g + 4] = 0.0;
+    // set up staging buffers
 
-        v4rho3sigma[12 * g + 0]  = 0.0;
-        v4rho3sigma[12 * g + 1]  = 0.0;
-        v4rho3sigma[12 * g + 2]  = 0.0;
-        v4rho3sigma[12 * g + 3]  = 0.0;
-        v4rho3sigma[12 * g + 4]  = 0.0;
-        v4rho3sigma[12 * g + 5]  = 0.0;
-        v4rho3sigma[12 * g + 6]  = 0.0;
-        v4rho3sigma[12 * g + 7]  = 0.0;
-        v4rho3sigma[12 * g + 8]  = 0.0;
-        v4rho3sigma[12 * g + 9]  = 0.0;
-        v4rho3sigma[12 * g + 10] = 0.0;
-        v4rho3sigma[12 * g + 11] = 0.0;
-
-        v4rho2sigma2[18 * g + 0]  = 0.0;
-        v4rho2sigma2[18 * g + 1]  = 0.0;
-        v4rho2sigma2[18 * g + 2]  = 0.0;
-        v4rho2sigma2[18 * g + 3]  = 0.0;
-        v4rho2sigma2[18 * g + 4]  = 0.0;
-        v4rho2sigma2[18 * g + 5]  = 0.0;
-        v4rho2sigma2[18 * g + 6]  = 0.0;
-        v4rho2sigma2[18 * g + 7]  = 0.0;
-        v4rho2sigma2[18 * g + 8]  = 0.0;
-        v4rho2sigma2[18 * g + 9]  = 0.0;
-        v4rho2sigma2[18 * g + 10] = 0.0;
-        v4rho2sigma2[18 * g + 11] = 0.0;
-        v4rho2sigma2[18 * g + 12] = 0.0;
-        v4rho2sigma2[18 * g + 13] = 0.0;
-        v4rho2sigma2[18 * g + 14] = 0.0;
-        v4rho2sigma2[18 * g + 15] = 0.0;
-        v4rho2sigma2[18 * g + 16] = 0.0;
-        v4rho2sigma2[18 * g + 17] = 0.0;
-
-        v4rhosigma3[20 * g + 0]  = 0.0;
-        v4rhosigma3[20 * g + 1]  = 0.0;
-        v4rhosigma3[20 * g + 2]  = 0.0;
-        v4rhosigma3[20 * g + 3]  = 0.0;
-        v4rhosigma3[20 * g + 4]  = 0.0;
-        v4rhosigma3[20 * g + 5]  = 0.0;
-        v4rhosigma3[20 * g + 6]  = 0.0;
-        v4rhosigma3[20 * g + 7]  = 0.0;
-        v4rhosigma3[20 * g + 8]  = 0.0;
-        v4rhosigma3[20 * g + 9]  = 0.0;
-        v4rhosigma3[20 * g + 10] = 0.0;
-        v4rhosigma3[20 * g + 11] = 0.0;
-        v4rhosigma3[20 * g + 12] = 0.0;
-        v4rhosigma3[20 * g + 13] = 0.0;
-        v4rhosigma3[20 * g + 14] = 0.0;
-        v4rhosigma3[20 * g + 15] = 0.0;
-        v4rhosigma3[20 * g + 16] = 0.0;
-        v4rhosigma3[20 * g + 17] = 0.0;
-        v4rhosigma3[20 * g + 18] = 0.0;
-        v4rhosigma3[20 * g + 19] = 0.0;
-
-        v4sigma4[15 * g + 0]  = 0.0;
-        v4sigma4[15 * g + 1]  = 0.0;
-        v4sigma4[15 * g + 2]  = 0.0;
-        v4sigma4[15 * g + 3]  = 0.0;
-        v4sigma4[15 * g + 4]  = 0.0;
-        v4sigma4[15 * g + 5]  = 0.0;
-        v4sigma4[15 * g + 6]  = 0.0;
-        v4sigma4[15 * g + 7]  = 0.0;
-        v4sigma4[15 * g + 8]  = 0.0;
-        v4sigma4[15 * g + 9]  = 0.0;
-        v4sigma4[15 * g + 10] = 0.0;
-        v4sigma4[15 * g + 11] = 0.0;
-        v4sigma4[15 * g + 12] = 0.0;
-        v4sigma4[15 * g + 13] = 0.0;
-        v4sigma4[15 * g + 14] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_v4rho4       = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[56 * _ldStaging];
-    auto stage_v4rho3sigma  = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[61 * _ldStaging];
-    auto stage_v4rho2sigma2 = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[73 * _ldStaging];
-    auto stage_v4rhosigma3  = (alloc) ? mem::malloc<double>(20 * np) : &_stagingBuffer[91 * _ldStaging];
-    auto stage_v4sigma4     = (alloc) ? mem::malloc<double>(15 * np) : &_stagingBuffer[111 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_v4rho4       = nullptr;
+    double* stage_v4rho3sigma  = nullptr;
+    double* stage_v4rho2sigma2 = nullptr;
+    double* stage_v4rhosigma3  = nullptr;
+    double* stage_v4sigma4     = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_v4rho4       = mem::malloc<double>(ind_cnt["v4rho4"][1] * np);
+        stage_v4rho3sigma  = mem::malloc<double>(ind_cnt["v4rho3sigma"][1] * np);
+        stage_v4rho2sigma2 = mem::malloc<double>(ind_cnt["v4rho2sigma2"][1] * np);
+        stage_v4rhosigma3  = mem::malloc<double>(ind_cnt["v4rhosigma3"][1] * np);
+        stage_v4sigma4     = mem::malloc<double>(ind_cnt["v4sigma4"][1] * np);
+    }
+    else
+    {
+        stage_v4rho4       = &_stagingBuffer[ind_cnt["v4rho4"][0] * _ldStaging];
+        stage_v4rho3sigma  = &_stagingBuffer[ind_cnt["v4rho3sigma"][0] * _ldStaging];
+        stage_v4rho2sigma2 = &_stagingBuffer[ind_cnt["v4rho2sigma2"][0] * _ldStaging];
+        stage_v4rhosigma3  = &_stagingBuffer[ind_cnt["v4rhosigma3"][0] * _ldStaging];
+        stage_v4sigma4     = &_stagingBuffer[ind_cnt["v4sigma4"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       ggafunc = getFunctionalPointerToGgaComponent();
+    const auto dim     = &(ggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
-
-            #pragma omp simd aligned(v4rho4, stage_v4rho4 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->v4rho4; ++ind)
             {
-                v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
-                v4rho4[5 * g + 1] += c * stage_v4rho4[5 * g + 1];
-                v4rho4[5 * g + 2] += c * stage_v4rho4[5 * g + 2];
-                v4rho4[5 * g + 3] += c * stage_v4rho4[5 * g + 3];
-                v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho3sigma; ++ind)
+            {
+                v4rho3sigma[dim->v4rho3sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2sigma2; ++ind)
+            {
+                v4rho2sigma2[dim->v4rho2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigma3; ++ind)
+            {
+                v4rhosigma3[dim->v4rhosigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma4; ++ind)
+            {
+                v4sigma4[dim->v4sigma4 * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_lxc(funcptr, np, rho, sigma, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(v4rho4, stage_v4rho4, v4rho3sigma, stage_v4rho3sigma, \
-                                     v4rho2sigma2, stage_v4rho2sigma2, v4rhosigma3, stage_v4rhosigma3, \
-                                     v4sigma4, stage_v4sigma4 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
-                v4rho4[5 * g + 1] += c * stage_v4rho4[5 * g + 1];
-                v4rho4[5 * g + 2] += c * stage_v4rho4[5 * g + 2];
-                v4rho4[5 * g + 3] += c * stage_v4rho4[5 * g + 3];
-                v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
+                xc_lda_lxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v4rho4 + dim->v4rho4 * grid_batch_offset);
 
-                v4rho3sigma[12 * g + 0] += c * stage_v4rho3sigma[12 * g + 0];
-                v4rho3sigma[12 * g + 1] += c * stage_v4rho3sigma[12 * g + 1];
-                v4rho3sigma[12 * g + 2] += c * stage_v4rho3sigma[12 * g + 2];
-                v4rho3sigma[12 * g + 3] += c * stage_v4rho3sigma[12 * g + 3];
-                v4rho3sigma[12 * g + 4] += c * stage_v4rho3sigma[12 * g + 4];
-                v4rho3sigma[12 * g + 5] += c * stage_v4rho3sigma[12 * g + 5];
-                v4rho3sigma[12 * g + 6] += c * stage_v4rho3sigma[12 * g + 6];
-                v4rho3sigma[12 * g + 7] += c * stage_v4rho3sigma[12 * g + 7];
-                v4rho3sigma[12 * g + 8] += c * stage_v4rho3sigma[12 * g + 8];
-                v4rho3sigma[12 * g + 9] += c * stage_v4rho3sigma[12 * g + 9];
-                v4rho3sigma[12 * g + 10] += c * stage_v4rho3sigma[12 * g + 10];
-                v4rho3sigma[12 * g + 11] += c * stage_v4rho3sigma[12 * g + 11];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v4rho4; ++ind)
+                    {
+                        v4rho4[dim->v4rho4 * g + ind] += c * stage_v4rho4[dim->v4rho4 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_lxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_v4rho4 + dim->v4rho4 * grid_batch_offset,
+                           stage_v4rho3sigma + dim->v4rho3sigma * grid_batch_offset,
+                           stage_v4rho2sigma2 + dim->v4rho2sigma2 * grid_batch_offset,
+                           stage_v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
+                           stage_v4sigma4 + dim->v4sigma4 * grid_batch_offset);
 
-                v4rho2sigma2[18 * g + 0] += c * stage_v4rho2sigma2[18 * g + 0];
-                v4rho2sigma2[18 * g + 1] += c * stage_v4rho2sigma2[18 * g + 1];
-                v4rho2sigma2[18 * g + 2] += c * stage_v4rho2sigma2[18 * g + 2];
-                v4rho2sigma2[18 * g + 3] += c * stage_v4rho2sigma2[18 * g + 3];
-                v4rho2sigma2[18 * g + 4] += c * stage_v4rho2sigma2[18 * g + 4];
-                v4rho2sigma2[18 * g + 5] += c * stage_v4rho2sigma2[18 * g + 5];
-                v4rho2sigma2[18 * g + 6] += c * stage_v4rho2sigma2[18 * g + 6];
-                v4rho2sigma2[18 * g + 7] += c * stage_v4rho2sigma2[18 * g + 7];
-                v4rho2sigma2[18 * g + 8] += c * stage_v4rho2sigma2[18 * g + 8];
-                v4rho2sigma2[18 * g + 9] += c * stage_v4rho2sigma2[18 * g + 9];
-                v4rho2sigma2[18 * g + 10] += c * stage_v4rho2sigma2[18 * g + 10];
-                v4rho2sigma2[18 * g + 11] += c * stage_v4rho2sigma2[18 * g + 11];
-                v4rho2sigma2[18 * g + 12] += c * stage_v4rho2sigma2[18 * g + 12];
-                v4rho2sigma2[18 * g + 13] += c * stage_v4rho2sigma2[18 * g + 13];
-                v4rho2sigma2[18 * g + 14] += c * stage_v4rho2sigma2[18 * g + 14];
-                v4rho2sigma2[18 * g + 15] += c * stage_v4rho2sigma2[18 * g + 15];
-                v4rho2sigma2[18 * g + 16] += c * stage_v4rho2sigma2[18 * g + 16];
-                v4rho2sigma2[18 * g + 17] += c * stage_v4rho2sigma2[18 * g + 17];
-
-                v4rhosigma3[20 * g + 0] += c * stage_v4rhosigma3[20 * g + 0];
-                v4rhosigma3[20 * g + 1] += c * stage_v4rhosigma3[20 * g + 1];
-                v4rhosigma3[20 * g + 2] += c * stage_v4rhosigma3[20 * g + 2];
-                v4rhosigma3[20 * g + 3] += c * stage_v4rhosigma3[20 * g + 3];
-                v4rhosigma3[20 * g + 4] += c * stage_v4rhosigma3[20 * g + 4];
-                v4rhosigma3[20 * g + 5] += c * stage_v4rhosigma3[20 * g + 5];
-                v4rhosigma3[20 * g + 6] += c * stage_v4rhosigma3[20 * g + 6];
-                v4rhosigma3[20 * g + 7] += c * stage_v4rhosigma3[20 * g + 7];
-                v4rhosigma3[20 * g + 8] += c * stage_v4rhosigma3[20 * g + 8];
-                v4rhosigma3[20 * g + 9] += c * stage_v4rhosigma3[20 * g + 9];
-                v4rhosigma3[20 * g + 10] += c * stage_v4rhosigma3[20 * g + 10];
-                v4rhosigma3[20 * g + 11] += c * stage_v4rhosigma3[20 * g + 11];
-                v4rhosigma3[20 * g + 12] += c * stage_v4rhosigma3[20 * g + 12];
-                v4rhosigma3[20 * g + 13] += c * stage_v4rhosigma3[20 * g + 13];
-                v4rhosigma3[20 * g + 14] += c * stage_v4rhosigma3[20 * g + 14];
-                v4rhosigma3[20 * g + 15] += c * stage_v4rhosigma3[20 * g + 15];
-                v4rhosigma3[20 * g + 16] += c * stage_v4rhosigma3[20 * g + 16];
-                v4rhosigma3[20 * g + 17] += c * stage_v4rhosigma3[20 * g + 17];
-                v4rhosigma3[20 * g + 18] += c * stage_v4rhosigma3[20 * g + 18];
-                v4rhosigma3[20 * g + 19] += c * stage_v4rhosigma3[20 * g + 19];
-
-                v4sigma4[15 * g + 0] += c * stage_v4sigma4[15 * g + 0];
-                v4sigma4[15 * g + 1] += c * stage_v4sigma4[15 * g + 1];
-                v4sigma4[15 * g + 2] += c * stage_v4sigma4[15 * g + 2];
-                v4sigma4[15 * g + 3] += c * stage_v4sigma4[15 * g + 3];
-                v4sigma4[15 * g + 4] += c * stage_v4sigma4[15 * g + 4];
-                v4sigma4[15 * g + 5] += c * stage_v4sigma4[15 * g + 5];
-                v4sigma4[15 * g + 6] += c * stage_v4sigma4[15 * g + 6];
-                v4sigma4[15 * g + 7] += c * stage_v4sigma4[15 * g + 7];
-                v4sigma4[15 * g + 8] += c * stage_v4sigma4[15 * g + 8];
-                v4sigma4[15 * g + 9] += c * stage_v4sigma4[15 * g + 9];
-                v4sigma4[15 * g + 10] += c * stage_v4sigma4[15 * g + 10];
-                v4sigma4[15 * g + 11] += c * stage_v4sigma4[15 * g + 11];
-                v4sigma4[15 * g + 12] += c * stage_v4sigma4[15 * g + 12];
-                v4sigma4[15 * g + 13] += c * stage_v4sigma4[15 * g + 13];
-                v4sigma4[15 * g + 14] += c * stage_v4sigma4[15 * g + 14];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v4rho4; ++ind)
+                    {
+                        v4rho4[dim->v4rho4 * g + ind] += c * stage_v4rho4[dim->v4rho4 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho3sigma; ++ind)
+                    {
+                        v4rho3sigma[dim->v4rho3sigma * g + ind] += c * stage_v4rho3sigma[dim->v4rho3sigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho2sigma2; ++ind)
+                    {
+                        v4rho2sigma2[dim->v4rho2sigma2 * g + ind] += c * stage_v4rho2sigma2[dim->v4rho2sigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhosigma3; ++ind)
+                    {
+                        v4rhosigma3[dim->v4rhosigma3 * g + ind] += c * stage_v4rhosigma3[dim->v4rhosigma3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigma4; ++ind)
+                    {
+                        v4sigma4[dim->v4sigma4 * g + ind] += c * stage_v4sigma4[dim->v4sigma4 * g + ind];
+                    }
+                }
             }
         }
+
+        gridscreen::screenLxcForGGA(this,
+                                    grid_batch_size,
+                                    rho + dim->rho * grid_batch_offset,
+                                    sigma + dim->sigma * grid_batch_offset,
+                                    v4rho4 + dim->v4rho4 * grid_batch_offset,
+                                    v4rho3sigma + dim->v4rho3sigma * grid_batch_offset,
+                                    v4rho2sigma2 + dim->v4rho2sigma2 * grid_batch_offset,
+                                    v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
+                                    v4sigma4 + dim->v4sigma4 * grid_batch_offset);
     }
 
     if (alloc)
@@ -1161,131 +1622,210 @@ CXCFunctional::compute_lxc_for_gga(int32_t       np,
         mem::free(stage_v4rhosigma3);
         mem::free(stage_v4sigma4);
     }
-
-    gridscreen::screenLxcForGGA(np, rho, sigma, v4rho4, v4rho3sigma, v4rho2sigma2, v4rhosigma3, v4sigma4);
 }
 
 auto
-CXCFunctional::compute_exc_vxc_for_mgga(int32_t       np,
+CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
                                         const double* rho,
                                         const double* sigma,
                                         const double* lapl,
                                         const double* tau,
-                                        double*       exc,
+                                        double*       zk,
                                         double*       vrho,
                                         double*       vsigma,
                                         double*       vlapl,
                                         double*       vtau) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
-                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
+                              std::string(__func__) + ": exchange-correlation functional does not provide evaluators for ExcVxc on grid");
 
-    #pragma omp simd aligned(exc, vrho, vsigma, vlapl, vtau : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        exc[g] = 0.0;
+    // set up staging buffers
 
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
-
-        vsigma[3 * g + 0] = 0.0;
-        vsigma[3 * g + 1] = 0.0;
-        vsigma[3 * g + 2] = 0.0;
-
-        vlapl[2 * g + 0] = 0.0;
-        vlapl[2 * g + 1] = 0.0;
-
-        vtau[2 * g + 0] = 0.0;
-        vtau[2 * g + 1] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_exc    = (alloc) ? mem::malloc<double>(1 * np) : &_stagingBuffer[0 * _ldStaging];
-    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-    auto stage_vlapl  = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[6 * _ldStaging];
-    auto stage_vtau   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[8 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_zk     = nullptr;
+    double* stage_vrho   = nullptr;
+    double* stage_vsigma = nullptr;
+    double* stage_vlapl  = nullptr;
+    double* stage_vtau   = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_zk     = mem::malloc<double>(ind_cnt["zk"][1] * np);
+        stage_vrho   = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+        stage_vsigma = mem::malloc<double>(ind_cnt["vsigma"][1] * np);
+        stage_vlapl  = mem::malloc<double>(ind_cnt["vlapl"][1] * np);
+        stage_vtau   = mem::malloc<double>(ind_cnt["vtau"][1] * np);
+    }
+    else
+    {
+        stage_zk     = &_stagingBuffer[ind_cnt["zk"][0] * _ldStaging];
+        stage_vrho   = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
+        stage_vsigma = &_stagingBuffer[ind_cnt["vsigma"][0] * _ldStaging];
+        stage_vlapl  = &_stagingBuffer[ind_cnt["vlapl"][0] * _ldStaging];
+        stage_vtau   = &_stagingBuffer[ind_cnt["vtau"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_exc_vxc(funcptr, np, rho, stage_exc, stage_vrho);
-
-            #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->zk; ++ind)
             {
-                exc[g] += c * stage_exc[g];
-
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                zk[dim->zk * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vrho; ++ind)
+            {
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma; ++ind)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vlapl; ++ind)
+            {
+                vlapl[dim->vlapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vtau; ++ind)
+            {
+                vtau[dim->vtau * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                exc[g] += c * stage_exc[g];
+                xc_lda_exc_vxc(funcptr,
+                               grid_batch_size,
+                               rho + dim->rho * grid_batch_offset,
+                               stage_zk + dim->zk * grid_batch_offset,
+                               stage_vrho + dim->vrho * grid_batch_offset);
 
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_exc_vxc(funcptr,
+                               grid_batch_size,
+                               rho + dim->rho * grid_batch_offset,
+                               sigma + dim->sigma * grid_batch_offset,
+                               stage_zk + dim->zk * grid_batch_offset,
+                               stage_vrho + dim->vrho * grid_batch_offset,
+                               stage_vsigma + dim->vsigma * grid_batch_offset);
 
-                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vsigma; ++ind)
+                    {
+                        vsigma[dim->vsigma * g + ind] += c * stage_vsigma[dim->vsigma * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isMetaGGA())
+            {
+                xc_mgga_exc_vxc(funcptr,
+                                grid_batch_size,
+                                rho + dim->rho * grid_batch_offset,
+                                sigma + dim->sigma * grid_batch_offset,
+                                lapl + dim->lapl * grid_batch_offset,
+                                tau + dim->tau * grid_batch_offset,
+                                stage_zk + dim->zk * grid_batch_offset,
+                                stage_vrho + dim->vrho * grid_batch_offset,
+                                stage_vsigma + dim->vsigma * grid_batch_offset,
+                                stage_vlapl + dim->vlapl * grid_batch_offset,
+                                stage_vtau + dim->vtau * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->zk; ++ind)
+                    {
+                        zk[dim->zk * g + ind] += c * stage_zk[dim->zk * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vsigma; ++ind)
+                    {
+                        vsigma[dim->vsigma * g + ind] += c * stage_vsigma[dim->vsigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vlapl; ++ind)
+                    {
+                        vlapl[dim->vlapl * g + ind] += c * stage_vlapl[dim->vlapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vtau; ++ind)
+                    {
+                        vtau[dim->vtau * g + ind] += c * stage_vtau[dim->vtau * g + ind];
+                    }
+                }
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
-        {
-            xc_mgga_exc_vxc(funcptr, np, rho, sigma, lapl, tau, stage_exc, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
 
-            #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma, \
-                                     vlapl, stage_vlapl, vtau, stage_vtau : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
-            {
-                exc[g] += c * stage_exc[g];
-
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
-
-                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
-
-                vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
-                vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
-
-                vtau[2 * g + 0] += c * stage_vtau[2 * g + 0];
-                vtau[2 * g + 1] += c * stage_vtau[2 * g + 1];
-            }
-        }
+        gridscreen::screenExcVxcForMGGA(this,
+                                        grid_batch_size,
+                                        rho + dim->rho * grid_batch_offset,
+                                        sigma + dim->sigma * grid_batch_offset,
+                                        lapl + dim->lapl * grid_batch_offset,
+                                        tau + dim->tau * grid_batch_offset,
+                                        zk + dim->zk * grid_batch_offset,
+                                        vrho + dim->vrho * grid_batch_offset,
+                                        vsigma + dim->vsigma * grid_batch_offset,
+                                        vlapl + dim->vlapl * grid_batch_offset,
+                                        vtau + dim->vtau * grid_batch_offset);
     }
 
     if (alloc)
     {
-        mem::free(stage_exc);
+        mem::free(stage_zk);
         mem::free(stage_vrho);
         mem::free(stage_vsigma);
         mem::free(stage_vlapl);
         mem::free(stage_vtau);
     }
-
-    gridscreen::screenExcVxcForMGGA(np, rho, sigma, lapl, tau, exc, vrho, vsigma, vlapl, vtau);
 }
 
 auto
-CXCFunctional::compute_vxc_for_mgga(int32_t       np,
+CXCFunctional::compute_vxc_for_mgga(const int32_t np,
                                     const double* rho,
                                     const double* sigma,
                                     const double* lapl,
@@ -1298,86 +1838,153 @@ CXCFunctional::compute_vxc_for_mgga(int32_t       np,
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
 
-    #pragma omp simd aligned(vrho, vsigma, vlapl, vtau : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        vrho[2 * g + 0] = 0.0;
-        vrho[2 * g + 1] = 0.0;
+    // set up staging buffers
 
-        vsigma[3 * g + 0] = 0.0;
-        vsigma[3 * g + 1] = 0.0;
-        vsigma[3 * g + 2] = 0.0;
-
-        vlapl[2 * g + 0] = 0.0;
-        vlapl[2 * g + 1] = 0.0;
-
-        vtau[2 * g + 0] = 0.0;
-        vtau[2 * g + 1] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
-    auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
-    auto stage_vlapl  = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[6 * _ldStaging];
-    auto stage_vtau   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[8 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_vrho   = nullptr;
+    double* stage_vsigma = nullptr;
+    double* stage_vlapl  = nullptr;
+    double* stage_vtau   = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_vrho   = mem::malloc<double>(ind_cnt["vrho"][1] * np);
+        stage_vsigma = mem::malloc<double>(ind_cnt["vsigma"][1] * np);
+        stage_vlapl  = mem::malloc<double>(ind_cnt["vlapl"][1] * np);
+        stage_vtau   = mem::malloc<double>(ind_cnt["vtau"][1] * np);
+    }
+    else
+    {
+        stage_vrho   = &_stagingBuffer[ind_cnt["vrho"][0] * _ldStaging];
+        stage_vsigma = &_stagingBuffer[ind_cnt["vsigma"][0] * _ldStaging];
+        stage_vlapl  = &_stagingBuffer[ind_cnt["vlapl"][0] * _ldStaging];
+        stage_vtau   = &_stagingBuffer[ind_cnt["vtau"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_vxc(funcptr, np, rho, stage_vrho);
-
-            #pragma omp simd aligned(vrho, stage_vrho : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->vrho; ++ind)
             {
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                vrho[dim->vrho * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vsigma; ++ind)
+            {
+                vsigma[dim->vsigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vlapl; ++ind)
+            {
+                vlapl[dim->vlapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->vtau; ++ind)
+            {
+                vtau[dim->vtau * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+                xc_lda_vxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_vrho + dim->vrho * grid_batch_offset);
 
-                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_vxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_vrho + dim->vrho * grid_batch_offset,
+                           stage_vsigma + dim->vsigma * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vsigma; ++ind)
+                    {
+                        vsigma[dim->vsigma * g + ind] += c * stage_vsigma[dim->vsigma * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isMetaGGA())
+            {
+                xc_mgga_vxc(funcptr,
+                            grid_batch_size,
+                            rho + dim->rho * grid_batch_offset,
+                            sigma + dim->sigma * grid_batch_offset,
+                            lapl + dim->lapl * grid_batch_offset,
+                            tau + dim->tau * grid_batch_offset,
+                            stage_vrho + dim->vrho * grid_batch_offset,
+                            stage_vsigma + dim->vsigma * grid_batch_offset,
+                            stage_vlapl + dim->vlapl * grid_batch_offset,
+                            stage_vtau + dim->vtau * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->vrho; ++ind)
+                    {
+                        vrho[dim->vrho * g + ind] += c * stage_vrho[dim->vrho * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vsigma; ++ind)
+                    {
+                        vsigma[dim->vsigma * g + ind] += c * stage_vsigma[dim->vsigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vlapl; ++ind)
+                    {
+                        vlapl[dim->vlapl * g + ind] += c * stage_vlapl[dim->vlapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->vtau; ++ind)
+                    {
+                        vtau[dim->vtau * g + ind] += c * stage_vtau[dim->vtau * g + ind];
+                    }
+                }
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
-        {
-            xc_mgga_vxc(funcptr, np, rho, sigma, lapl, tau, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
 
-            #pragma omp simd aligned(vrho, stage_vrho, vsigma, stage_vsigma, vlapl, stage_vlapl, vtau, stage_vtau : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
-            {
-                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
-
-                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
-
-                vlapl[2 * g + 0] += c * stage_vlapl[2 * g + 0];
-                vlapl[2 * g + 1] += c * stage_vlapl[2 * g + 1];
-
-                vtau[2 * g + 0] += c * stage_vtau[2 * g + 0];
-                vtau[2 * g + 1] += c * stage_vtau[2 * g + 1];
-            }
-        }
+        gridscreen::screenVxcForMGGA(this,
+                                     grid_batch_size,
+                                     rho + dim->rho * grid_batch_offset,
+                                     sigma + dim->sigma * grid_batch_offset,
+                                     lapl + dim->lapl * grid_batch_offset,
+                                     tau + dim->tau * grid_batch_offset,
+                                     vrho + dim->vrho * grid_batch_offset,
+                                     vsigma + dim->vsigma * grid_batch_offset,
+                                     vlapl + dim->vlapl * grid_batch_offset,
+                                     vtau + dim->vtau * grid_batch_offset);
     }
 
     if (alloc)
@@ -1387,12 +1994,10 @@ CXCFunctional::compute_vxc_for_mgga(int32_t       np,
         mem::free(stage_vlapl);
         mem::free(stage_vtau);
     }
-
-    gridscreen::screenVxcForMGGA(np, rho, sigma, lapl, tau, vrho, vsigma, vlapl, vtau);
 }
 
 auto
-CXCFunctional::compute_fxc_for_mgga(int32_t       np,
+CXCFunctional::compute_fxc_for_mgga(const int32_t np,
                                     const double* rho,
                                     const double* sigma,
                                     const double* lapl,
@@ -1411,210 +2016,236 @@ CXCFunctional::compute_fxc_for_mgga(int32_t       np,
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
 
-    #pragma omp simd aligned(v2rho2, v2rhosigma, v2rholapl, v2rhotau, \
-                             v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, \
-                             v2lapltau, v2tau2 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        v2rho2[3 * g + 0] = 0.0;
-        v2rho2[3 * g + 1] = 0.0;
-        v2rho2[3 * g + 2] = 0.0;
+    // set up staging buffers
 
-        v2rhosigma[6 * g + 0] = 0.0;
-        v2rhosigma[6 * g + 1] = 0.0;
-        v2rhosigma[6 * g + 2] = 0.0;
-        v2rhosigma[6 * g + 3] = 0.0;
-        v2rhosigma[6 * g + 4] = 0.0;
-        v2rhosigma[6 * g + 5] = 0.0;
-
-        v2rholapl[4 * g + 0] = 0.0;
-        v2rholapl[4 * g + 1] = 0.0;
-        v2rholapl[4 * g + 2] = 0.0;
-        v2rholapl[4 * g + 3] = 0.0;
-
-        v2rhotau[4 * g + 0] = 0.0;
-        v2rhotau[4 * g + 1] = 0.0;
-        v2rhotau[4 * g + 2] = 0.0;
-        v2rhotau[4 * g + 3] = 0.0;
-
-        v2sigma2[6 * g + 0] = 0.0;
-        v2sigma2[6 * g + 1] = 0.0;
-        v2sigma2[6 * g + 2] = 0.0;
-        v2sigma2[6 * g + 3] = 0.0;
-        v2sigma2[6 * g + 4] = 0.0;
-        v2sigma2[6 * g + 5] = 0.0;
-
-        v2sigmalapl[6 * g + 0] = 0.0;
-        v2sigmalapl[6 * g + 1] = 0.0;
-        v2sigmalapl[6 * g + 2] = 0.0;
-        v2sigmalapl[6 * g + 3] = 0.0;
-        v2sigmalapl[6 * g + 4] = 0.0;
-        v2sigmalapl[6 * g + 5] = 0.0;
-
-        v2sigmatau[6 * g + 0] = 0.0;
-        v2sigmatau[6 * g + 1] = 0.0;
-        v2sigmatau[6 * g + 2] = 0.0;
-        v2sigmatau[6 * g + 3] = 0.0;
-        v2sigmatau[6 * g + 4] = 0.0;
-        v2sigmatau[6 * g + 5] = 0.0;
-
-        v2lapl2[3 * g + 0] = 0.0;
-        v2lapl2[3 * g + 1] = 0.0;
-        v2lapl2[3 * g + 2] = 0.0;
-
-        v2lapltau[4 * g + 0] = 0.0;
-        v2lapltau[4 * g + 1] = 0.0;
-        v2lapltau[4 * g + 2] = 0.0;
-        v2lapltau[4 * g + 3] = 0.0;
-
-        v2tau2[3 * g + 0] = 0.0;
-        v2tau2[3 * g + 1] = 0.0;
-        v2tau2[3 * g + 2] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_v2rho2      = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[10 * _ldStaging];
-    auto stage_v2rhosigma  = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[13 * _ldStaging];
-    auto stage_v2rholapl   = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[19 * _ldStaging];
-    auto stage_v2rhotau    = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[23 * _ldStaging];
-    auto stage_v2sigma2    = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[27 * _ldStaging];
-    auto stage_v2sigmalapl = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[33 * _ldStaging];
-    auto stage_v2sigmatau  = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[39 * _ldStaging];
-    auto stage_v2lapl2     = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[45 * _ldStaging];
-    auto stage_v2lapltau   = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[48 * _ldStaging];
-    auto stage_v2tau2      = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[52 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_v2rho2      = nullptr;
+    double* stage_v2rhosigma  = nullptr;
+    double* stage_v2rholapl   = nullptr;
+    double* stage_v2rhotau    = nullptr;
+    double* stage_v2sigma2    = nullptr;
+    double* stage_v2sigmalapl = nullptr;
+    double* stage_v2sigmatau  = nullptr;
+    double* stage_v2lapl2     = nullptr;
+    double* stage_v2lapltau   = nullptr;
+    double* stage_v2tau2      = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_v2rho2      = mem::malloc<double>(ind_cnt["v2rho2"][1] * np);
+        stage_v2rhosigma  = mem::malloc<double>(ind_cnt["v2rhosigma"][1] * np);
+        stage_v2rholapl   = mem::malloc<double>(ind_cnt["v2rholapl"][1] * np);
+        stage_v2rhotau    = mem::malloc<double>(ind_cnt["v2rhotau"][1] * np);
+        stage_v2sigma2    = mem::malloc<double>(ind_cnt["v2sigma2"][1] * np);
+        stage_v2sigmalapl = mem::malloc<double>(ind_cnt["v2sigmalapl"][1] * np);
+        stage_v2sigmatau  = mem::malloc<double>(ind_cnt["v2sigmatau"][1] * np);
+        stage_v2lapl2     = mem::malloc<double>(ind_cnt["v2lapl2"][1] * np);
+        stage_v2lapltau   = mem::malloc<double>(ind_cnt["v2lapltau"][1] * np);
+        stage_v2tau2      = mem::malloc<double>(ind_cnt["v2tau2"][1] * np);
+    }
+    else
+    {
+        stage_v2rho2      = &_stagingBuffer[ind_cnt["v2rho2"][0] * _ldStaging];
+        stage_v2rhosigma  = &_stagingBuffer[ind_cnt["v2rhosigma"][0] * _ldStaging];
+        stage_v2rholapl   = &_stagingBuffer[ind_cnt["v2rholapl"][0] * _ldStaging];
+        stage_v2rhotau    = &_stagingBuffer[ind_cnt["v2rhotau"][0] * _ldStaging];
+        stage_v2sigma2    = &_stagingBuffer[ind_cnt["v2sigma2"][0] * _ldStaging];
+        stage_v2sigmalapl = &_stagingBuffer[ind_cnt["v2sigmalapl"][0] * _ldStaging];
+        stage_v2sigmatau  = &_stagingBuffer[ind_cnt["v2sigmatau"][0] * _ldStaging];
+        stage_v2lapl2     = &_stagingBuffer[ind_cnt["v2lapl2"][0] * _ldStaging];
+        stage_v2lapltau   = &_stagingBuffer[ind_cnt["v2lapltau"][0] * _ldStaging];
+        stage_v2tau2      = &_stagingBuffer[ind_cnt["v2tau2"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
-
-            #pragma omp simd aligned(v2rho2, stage_v2rho2 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->v2rho2; ++ind)
             {
-                v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
-                v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
-                v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+                v2rho2[dim->v2rho2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2rhosigma; ++ind)
+            {
+                v2rhosigma[dim->v2rhosigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2rholapl; ++ind)
+            {
+                v2rholapl[dim->v2rholapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2rhotau; ++ind)
+            {
+                v2rhotau[dim->v2rhotau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2sigma2; ++ind)
+            {
+                v2sigma2[dim->v2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2sigmalapl; ++ind)
+            {
+                v2sigmalapl[dim->v2sigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2sigmatau; ++ind)
+            {
+                v2sigmatau[dim->v2sigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2lapl2; ++ind)
+            {
+                v2lapl2[dim->v2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2lapltau; ++ind)
+            {
+                v2lapltau[dim->v2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v2tau2; ++ind)
+            {
+                v2tau2[dim->v2tau2 * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(v2rho2, stage_v2rho2, v2rhosigma, stage_v2rhosigma, \
-                                     v2sigma2, stage_v2sigma2 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
-                v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
-                v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
+                xc_lda_fxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v2rho2 + dim->v2rho2 * grid_batch_offset);
 
-                v2rhosigma[6 * g + 0] += c * stage_v2rhosigma[6 * g + 0];
-                v2rhosigma[6 * g + 1] += c * stage_v2rhosigma[6 * g + 1];
-                v2rhosigma[6 * g + 2] += c * stage_v2rhosigma[6 * g + 2];
-                v2rhosigma[6 * g + 3] += c * stage_v2rhosigma[6 * g + 3];
-                v2rhosigma[6 * g + 4] += c * stage_v2rhosigma[6 * g + 4];
-                v2rhosigma[6 * g + 5] += c * stage_v2rhosigma[6 * g + 5];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v2rho2; ++ind)
+                    {
+                        v2rho2[dim->v2rho2 * g + ind] += c * stage_v2rho2[dim->v2rho2 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_fxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_v2rho2 + dim->v2rho2 * grid_batch_offset,
+                           stage_v2rhosigma + dim->v2rhosigma * grid_batch_offset,
+                           stage_v2sigma2 + dim->v2sigma2 * grid_batch_offset);
 
-                v2sigma2[6 * g + 0] += c * stage_v2sigma2[6 * g + 0];
-                v2sigma2[6 * g + 1] += c * stage_v2sigma2[6 * g + 1];
-                v2sigma2[6 * g + 2] += c * stage_v2sigma2[6 * g + 2];
-                v2sigma2[6 * g + 3] += c * stage_v2sigma2[6 * g + 3];
-                v2sigma2[6 * g + 4] += c * stage_v2sigma2[6 * g + 4];
-                v2sigma2[6 * g + 5] += c * stage_v2sigma2[6 * g + 5];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v2rho2; ++ind)
+                    {
+                        v2rho2[dim->v2rho2 * g + ind] += c * stage_v2rho2[dim->v2rho2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2rhosigma; ++ind)
+                    {
+                        v2rhosigma[dim->v2rhosigma * g + ind] += c * stage_v2rhosigma[dim->v2rhosigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2sigma2; ++ind)
+                    {
+                        v2sigma2[dim->v2sigma2 * g + ind] += c * stage_v2sigma2[dim->v2sigma2 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isMetaGGA())
+            {
+                xc_mgga_fxc(funcptr,
+                            grid_batch_size,
+                            rho + dim->rho * grid_batch_offset,
+                            sigma + dim->sigma * grid_batch_offset,
+                            lapl + dim->lapl * grid_batch_offset,
+                            tau + dim->tau * grid_batch_offset,
+                            stage_v2rho2 + dim->v2rho2 * grid_batch_offset,
+                            stage_v2rhosigma + dim->v2rhosigma * grid_batch_offset,
+                            stage_v2rholapl + dim->v2rholapl * grid_batch_offset,
+                            stage_v2rhotau + dim->v2rhotau * grid_batch_offset,
+                            stage_v2sigma2 + dim->v2sigma2 * grid_batch_offset,
+                            stage_v2sigmalapl + dim->v2sigmalapl * grid_batch_offset,
+                            stage_v2sigmatau + dim->v2sigmatau * grid_batch_offset,
+                            stage_v2lapl2 + dim->v2lapl2 * grid_batch_offset,
+                            stage_v2lapltau + dim->v2lapltau * grid_batch_offset,
+                            stage_v2tau2 + dim->v2tau2 * grid_batch_offset);
+
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v2rho2; ++ind)
+                    {
+                        v2rho2[dim->v2rho2 * g + ind] += c * stage_v2rho2[dim->v2rho2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2rhosigma; ++ind)
+                    {
+                        v2rhosigma[dim->v2rhosigma * g + ind] += c * stage_v2rhosigma[dim->v2rhosigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2rholapl; ++ind)
+                    {
+                        v2rholapl[dim->v2rholapl * g + ind] += c * stage_v2rholapl[dim->v2rholapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2rhotau; ++ind)
+                    {
+                        v2rhotau[dim->v2rhotau * g + ind] += c * stage_v2rhotau[dim->v2rhotau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2sigma2; ++ind)
+                    {
+                        v2sigma2[dim->v2sigma2 * g + ind] += c * stage_v2sigma2[dim->v2sigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2sigmalapl; ++ind)
+                    {
+                        v2sigmalapl[dim->v2sigmalapl * g + ind] += c * stage_v2sigmalapl[dim->v2sigmalapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2sigmatau; ++ind)
+                    {
+                        v2sigmatau[dim->v2sigmatau * g + ind] += c * stage_v2sigmatau[dim->v2sigmatau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2lapl2; ++ind)
+                    {
+                        v2lapl2[dim->v2lapl2 * g + ind] += c * stage_v2lapl2[dim->v2lapl2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2lapltau; ++ind)
+                    {
+                        v2lapltau[dim->v2lapltau * g + ind] += c * stage_v2lapltau[dim->v2lapltau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v2tau2; ++ind)
+                    {
+                        v2tau2[dim->v2tau2 * g + ind] += c * stage_v2tau2[dim->v2tau2 * g + ind];
+                    }
+                }
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
-        {
-            xc_mgga_fxc(funcptr,
-                        np,
-                        rho,
-                        sigma,
-                        lapl,
-                        tau,
-                        stage_v2rho2,
-                        stage_v2rhosigma,
-                        stage_v2rholapl,
-                        stage_v2rhotau,
-                        stage_v2sigma2,
-                        stage_v2sigmalapl,
-                        stage_v2sigmatau,
-                        stage_v2lapl2,
-                        stage_v2lapltau,
-                        stage_v2tau2);
 
-            #pragma omp simd aligned(v2rho2, stage_v2rho2, v2rhosigma, stage_v2rhosigma, \
-                                     v2rholapl, stage_v2rholapl, v2rhotau, stage_v2rhotau, \
-                                     v2sigma2, stage_v2sigma2, v2sigmalapl, stage_v2sigmalapl, \
-                                     v2sigmatau, stage_v2sigmatau, v2lapl2, stage_v2lapl2, \
-                                     v2lapltau, stage_v2lapltau, v2tau2, stage_v2tau2 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
-            {
-                v2rho2[3 * g + 0] += c * stage_v2rho2[3 * g + 0];
-                v2rho2[3 * g + 1] += c * stage_v2rho2[3 * g + 1];
-                v2rho2[3 * g + 2] += c * stage_v2rho2[3 * g + 2];
-
-                v2rhosigma[6 * g + 0] += c * stage_v2rhosigma[6 * g + 0];
-                v2rhosigma[6 * g + 1] += c * stage_v2rhosigma[6 * g + 1];
-                v2rhosigma[6 * g + 2] += c * stage_v2rhosigma[6 * g + 2];
-                v2rhosigma[6 * g + 3] += c * stage_v2rhosigma[6 * g + 3];
-                v2rhosigma[6 * g + 4] += c * stage_v2rhosigma[6 * g + 4];
-                v2rhosigma[6 * g + 5] += c * stage_v2rhosigma[6 * g + 5];
-
-                v2rholapl[4 * g + 0] += c * stage_v2rholapl[4 * g + 0];
-                v2rholapl[4 * g + 1] += c * stage_v2rholapl[4 * g + 1];
-                v2rholapl[4 * g + 2] += c * stage_v2rholapl[4 * g + 2];
-                v2rholapl[4 * g + 3] += c * stage_v2rholapl[4 * g + 3];
-
-                v2rhotau[4 * g + 0] += c * stage_v2rhotau[4 * g + 0];
-                v2rhotau[4 * g + 1] += c * stage_v2rhotau[4 * g + 1];
-                v2rhotau[4 * g + 2] += c * stage_v2rhotau[4 * g + 2];
-                v2rhotau[4 * g + 3] += c * stage_v2rhotau[4 * g + 3];
-
-                v2sigma2[6 * g + 0] += c * stage_v2sigma2[6 * g + 0];
-                v2sigma2[6 * g + 1] += c * stage_v2sigma2[6 * g + 1];
-                v2sigma2[6 * g + 2] += c * stage_v2sigma2[6 * g + 2];
-                v2sigma2[6 * g + 3] += c * stage_v2sigma2[6 * g + 3];
-                v2sigma2[6 * g + 4] += c * stage_v2sigma2[6 * g + 4];
-                v2sigma2[6 * g + 5] += c * stage_v2sigma2[6 * g + 5];
-
-                v2sigmalapl[6 * g + 0] += c * stage_v2sigmalapl[6 * g + 0];
-                v2sigmalapl[6 * g + 1] += c * stage_v2sigmalapl[6 * g + 1];
-                v2sigmalapl[6 * g + 2] += c * stage_v2sigmalapl[6 * g + 2];
-                v2sigmalapl[6 * g + 3] += c * stage_v2sigmalapl[6 * g + 3];
-                v2sigmalapl[6 * g + 4] += c * stage_v2sigmalapl[6 * g + 4];
-                v2sigmalapl[6 * g + 5] += c * stage_v2sigmalapl[6 * g + 5];
-
-                v2sigmatau[6 * g + 0] += c * stage_v2sigmatau[6 * g + 0];
-                v2sigmatau[6 * g + 1] += c * stage_v2sigmatau[6 * g + 1];
-                v2sigmatau[6 * g + 2] += c * stage_v2sigmatau[6 * g + 2];
-                v2sigmatau[6 * g + 3] += c * stage_v2sigmatau[6 * g + 3];
-                v2sigmatau[6 * g + 4] += c * stage_v2sigmatau[6 * g + 4];
-                v2sigmatau[6 * g + 5] += c * stage_v2sigmatau[6 * g + 5];
-
-                v2lapl2[3 * g + 0] += c * stage_v2lapl2[3 * g + 0];
-                v2lapl2[3 * g + 1] += c * stage_v2lapl2[3 * g + 1];
-                v2lapl2[3 * g + 2] += c * stage_v2lapl2[3 * g + 2];
-
-                v2lapltau[4 * g + 0] += c * stage_v2lapltau[4 * g + 0];
-                v2lapltau[4 * g + 1] += c * stage_v2lapltau[4 * g + 1];
-                v2lapltau[4 * g + 2] += c * stage_v2lapltau[4 * g + 2];
-                v2lapltau[4 * g + 3] += c * stage_v2lapltau[4 * g + 3];
-
-                v2tau2[3 * g + 0] += c * stage_v2tau2[3 * g + 0];
-                v2tau2[3 * g + 1] += c * stage_v2tau2[3 * g + 1];
-                v2tau2[3 * g + 2] += c * stage_v2tau2[3 * g + 2];
-            }
-        }
+        gridscreen::screenFxcForMGGA(this,
+                                     grid_batch_size,
+                                     rho + dim->rho * grid_batch_offset,
+                                     sigma + dim->sigma * grid_batch_offset,
+                                     lapl + dim->lapl * grid_batch_offset,
+                                     tau + dim->tau * grid_batch_offset,
+                                     v2rho2 + dim->v2rho2 * grid_batch_offset,
+                                     v2rhosigma + dim->v2rhosigma * grid_batch_offset,
+                                     v2rholapl + dim->v2rholapl * grid_batch_offset,
+                                     v2rhotau + dim->v2rhotau * grid_batch_offset,
+                                     v2sigma2 + dim->v2sigma2 * grid_batch_offset,
+                                     v2sigmalapl + dim->v2sigmalapl * grid_batch_offset,
+                                     v2sigmatau + dim->v2sigmatau * grid_batch_offset,
+                                     v2lapl2 + dim->v2lapl2 * grid_batch_offset,
+                                     v2lapltau + dim->v2lapltau * grid_batch_offset,
+                                     v2tau2 + dim->v2tau2 * grid_batch_offset);
     }
 
     if (alloc)
@@ -1630,13 +2261,10 @@ CXCFunctional::compute_fxc_for_mgga(int32_t       np,
         mem::free(stage_v2lapltau);
         mem::free(stage_v2tau2);
     }
-
-    gridscreen::screenFxcForMGGA(
-        np, rho, sigma, lapl, tau, v2rho2, v2rhosigma, v2rholapl, v2rhotau, v2sigma2, v2sigmalapl, v2sigmatau, v2lapl2, v2lapltau, v2tau2);
 }
 
 auto
-CXCFunctional::compute_kxc_for_mgga(int32_t       np,
+CXCFunctional::compute_kxc_for_mgga(const int32_t np,
                                     const double* rho,
                                     const double* sigma,
                                     const double* lapl,
@@ -1665,519 +2293,371 @@ CXCFunctional::compute_kxc_for_mgga(int32_t       np,
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
 
-    #pragma omp simd aligned(v3rho3, v3rho2sigma, v3rho2lapl, v3rho2tau, \
-                             v3rhosigma2, v3rhosigmalapl, v3rhosigmatau, v3rholapl2, \
-                             v3rholapltau, v3rhotau2, v3sigma3, v3sigma2lapl, \
-                             v3sigma2tau, v3sigmalapl2, v3sigmalapltau, v3sigmatau2, \
-                             v3lapl3, v3lapl2tau, v3lapltau2, v3tau3 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        v3rho3[4 * g + 0] = 0;
-        v3rho3[4 * g + 1] = 0;
-        v3rho3[4 * g + 2] = 0;
-        v3rho3[4 * g + 3] = 0;
+    // set up staging buffers
 
-        v3rho2sigma[9 * g + 0] = 0;
-        v3rho2sigma[9 * g + 1] = 0;
-        v3rho2sigma[9 * g + 2] = 0;
-        v3rho2sigma[9 * g + 3] = 0;
-        v3rho2sigma[9 * g + 4] = 0;
-        v3rho2sigma[9 * g + 5] = 0;
-        v3rho2sigma[9 * g + 6] = 0;
-        v3rho2sigma[9 * g + 7] = 0;
-        v3rho2sigma[9 * g + 8] = 0;
-
-        v3rho2lapl[6 * g + 0] = 0;
-        v3rho2lapl[6 * g + 1] = 0;
-        v3rho2lapl[6 * g + 2] = 0;
-        v3rho2lapl[6 * g + 3] = 0;
-        v3rho2lapl[6 * g + 4] = 0;
-        v3rho2lapl[6 * g + 5] = 0;
-
-        v3rho2tau[6 * g + 0] = 0;
-        v3rho2tau[6 * g + 1] = 0;
-        v3rho2tau[6 * g + 2] = 0;
-        v3rho2tau[6 * g + 3] = 0;
-        v3rho2tau[6 * g + 4] = 0;
-        v3rho2tau[6 * g + 5] = 0;
-
-        v3rhosigma2[12 * g + 0]  = 0;
-        v3rhosigma2[12 * g + 1]  = 0;
-        v3rhosigma2[12 * g + 2]  = 0;
-        v3rhosigma2[12 * g + 3]  = 0;
-        v3rhosigma2[12 * g + 4]  = 0;
-        v3rhosigma2[12 * g + 5]  = 0;
-        v3rhosigma2[12 * g + 6]  = 0;
-        v3rhosigma2[12 * g + 7]  = 0;
-        v3rhosigma2[12 * g + 8]  = 0;
-        v3rhosigma2[12 * g + 9]  = 0;
-        v3rhosigma2[12 * g + 10] = 0;
-        v3rhosigma2[12 * g + 11] = 0;
-
-        v3rhosigmalapl[12 * g + 0]  = 0;
-        v3rhosigmalapl[12 * g + 1]  = 0;
-        v3rhosigmalapl[12 * g + 2]  = 0;
-        v3rhosigmalapl[12 * g + 3]  = 0;
-        v3rhosigmalapl[12 * g + 4]  = 0;
-        v3rhosigmalapl[12 * g + 5]  = 0;
-        v3rhosigmalapl[12 * g + 6]  = 0;
-        v3rhosigmalapl[12 * g + 7]  = 0;
-        v3rhosigmalapl[12 * g + 8]  = 0;
-        v3rhosigmalapl[12 * g + 9]  = 0;
-        v3rhosigmalapl[12 * g + 10] = 0;
-        v3rhosigmalapl[12 * g + 11] = 0;
-
-        v3rhosigmatau[12 * g + 0]  = 0;
-        v3rhosigmatau[12 * g + 1]  = 0;
-        v3rhosigmatau[12 * g + 2]  = 0;
-        v3rhosigmatau[12 * g + 3]  = 0;
-        v3rhosigmatau[12 * g + 4]  = 0;
-        v3rhosigmatau[12 * g + 5]  = 0;
-        v3rhosigmatau[12 * g + 6]  = 0;
-        v3rhosigmatau[12 * g + 7]  = 0;
-        v3rhosigmatau[12 * g + 8]  = 0;
-        v3rhosigmatau[12 * g + 9]  = 0;
-        v3rhosigmatau[12 * g + 10] = 0;
-        v3rhosigmatau[12 * g + 11] = 0;
-
-        v3rholapl2[6 * g + 0] = 0;
-        v3rholapl2[6 * g + 1] = 0;
-        v3rholapl2[6 * g + 2] = 0;
-        v3rholapl2[6 * g + 3] = 0;
-        v3rholapl2[6 * g + 4] = 0;
-        v3rholapl2[6 * g + 5] = 0;
-
-        v3rholapltau[8 * g + 0] = 0;
-        v3rholapltau[8 * g + 1] = 0;
-        v3rholapltau[8 * g + 2] = 0;
-        v3rholapltau[8 * g + 3] = 0;
-        v3rholapltau[8 * g + 4] = 0;
-        v3rholapltau[8 * g + 5] = 0;
-        v3rholapltau[8 * g + 6] = 0;
-        v3rholapltau[8 * g + 7] = 0;
-
-        v3rhotau2[6 * g + 0] = 0;
-        v3rhotau2[6 * g + 1] = 0;
-        v3rhotau2[6 * g + 2] = 0;
-        v3rhotau2[6 * g + 3] = 0;
-        v3rhotau2[6 * g + 4] = 0;
-        v3rhotau2[6 * g + 5] = 0;
-
-        v3sigma3[10 * g + 0] = 0;
-        v3sigma3[10 * g + 1] = 0;
-        v3sigma3[10 * g + 2] = 0;
-        v3sigma3[10 * g + 3] = 0;
-        v3sigma3[10 * g + 4] = 0;
-        v3sigma3[10 * g + 5] = 0;
-        v3sigma3[10 * g + 6] = 0;
-        v3sigma3[10 * g + 7] = 0;
-        v3sigma3[10 * g + 8] = 0;
-        v3sigma3[10 * g + 9] = 0;
-
-        v3sigma2lapl[12 * g + 0]  = 0;
-        v3sigma2lapl[12 * g + 1]  = 0;
-        v3sigma2lapl[12 * g + 2]  = 0;
-        v3sigma2lapl[12 * g + 3]  = 0;
-        v3sigma2lapl[12 * g + 4]  = 0;
-        v3sigma2lapl[12 * g + 5]  = 0;
-        v3sigma2lapl[12 * g + 6]  = 0;
-        v3sigma2lapl[12 * g + 7]  = 0;
-        v3sigma2lapl[12 * g + 8]  = 0;
-        v3sigma2lapl[12 * g + 9]  = 0;
-        v3sigma2lapl[12 * g + 10] = 0;
-        v3sigma2lapl[12 * g + 11] = 0;
-
-        v3sigma2tau[12 * g + 0]  = 0;
-        v3sigma2tau[12 * g + 1]  = 0;
-        v3sigma2tau[12 * g + 2]  = 0;
-        v3sigma2tau[12 * g + 3]  = 0;
-        v3sigma2tau[12 * g + 4]  = 0;
-        v3sigma2tau[12 * g + 5]  = 0;
-        v3sigma2tau[12 * g + 6]  = 0;
-        v3sigma2tau[12 * g + 7]  = 0;
-        v3sigma2tau[12 * g + 8]  = 0;
-        v3sigma2tau[12 * g + 9]  = 0;
-        v3sigma2tau[12 * g + 10] = 0;
-        v3sigma2tau[12 * g + 11] = 0;
-
-        v3sigmalapl2[9 * g + 0] = 0;
-        v3sigmalapl2[9 * g + 1] = 0;
-        v3sigmalapl2[9 * g + 2] = 0;
-        v3sigmalapl2[9 * g + 3] = 0;
-        v3sigmalapl2[9 * g + 4] = 0;
-        v3sigmalapl2[9 * g + 5] = 0;
-        v3sigmalapl2[9 * g + 6] = 0;
-        v3sigmalapl2[9 * g + 7] = 0;
-        v3sigmalapl2[9 * g + 8] = 0;
-
-        v3sigmalapltau[12 * g + 0]  = 0;
-        v3sigmalapltau[12 * g + 1]  = 0;
-        v3sigmalapltau[12 * g + 2]  = 0;
-        v3sigmalapltau[12 * g + 3]  = 0;
-        v3sigmalapltau[12 * g + 4]  = 0;
-        v3sigmalapltau[12 * g + 5]  = 0;
-        v3sigmalapltau[12 * g + 6]  = 0;
-        v3sigmalapltau[12 * g + 7]  = 0;
-        v3sigmalapltau[12 * g + 8]  = 0;
-        v3sigmalapltau[12 * g + 9]  = 0;
-        v3sigmalapltau[12 * g + 10] = 0;
-        v3sigmalapltau[12 * g + 11] = 0;
-
-        v3sigmatau2[9 * g + 0] = 0;
-        v3sigmatau2[9 * g + 1] = 0;
-        v3sigmatau2[9 * g + 2] = 0;
-        v3sigmatau2[9 * g + 3] = 0;
-        v3sigmatau2[9 * g + 4] = 0;
-        v3sigmatau2[9 * g + 5] = 0;
-        v3sigmatau2[9 * g + 6] = 0;
-        v3sigmatau2[9 * g + 7] = 0;
-        v3sigmatau2[9 * g + 8] = 0;
-
-        v3lapl3[4 * g + 0] = 0;
-        v3lapl3[4 * g + 1] = 0;
-        v3lapl3[4 * g + 2] = 0;
-        v3lapl3[4 * g + 3] = 0;
-
-        v3lapl2tau[6 * g + 0] = 0;
-        v3lapl2tau[6 * g + 1] = 0;
-        v3lapl2tau[6 * g + 2] = 0;
-        v3lapl2tau[6 * g + 3] = 0;
-        v3lapl2tau[6 * g + 4] = 0;
-        v3lapl2tau[6 * g + 5] = 0;
-
-        v3lapltau2[6 * g + 0] = 0;
-        v3lapltau2[6 * g + 1] = 0;
-        v3lapltau2[6 * g + 2] = 0;
-        v3lapltau2[6 * g + 3] = 0;
-        v3lapltau2[6 * g + 4] = 0;
-        v3lapltau2[6 * g + 5] = 0;
-
-        v3tau3[4 * g + 0] = 0;
-        v3tau3[4 * g + 1] = 0;
-        v3tau3[4 * g + 2] = 0;
-        v3tau3[4 * g + 3] = 0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_v3rho3         = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[55 * _ldStaging];
-    auto stage_v3rho2sigma    = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[59 * _ldStaging];
-    auto stage_v3rho2lapl     = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[68 * _ldStaging];
-    auto stage_v3rho2tau      = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[74 * _ldStaging];
-    auto stage_v3rhosigma2    = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[80 * _ldStaging];
-    auto stage_v3rhosigmalapl = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[92 * _ldStaging];
-    auto stage_v3rhosigmatau  = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[104 * _ldStaging];
-    auto stage_v3rholapl2     = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[116 * _ldStaging];
-    auto stage_v3rholapltau   = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[122 * _ldStaging];
-    auto stage_v3rhotau2      = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[130 * _ldStaging];
-    auto stage_v3sigma3       = (alloc) ? mem::malloc<double>(10 * np) : &_stagingBuffer[136 * _ldStaging];
-    auto stage_v3sigma2lapl   = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[146 * _ldStaging];
-    auto stage_v3sigma2tau    = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[158 * _ldStaging];
-    auto stage_v3sigmalapl2   = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[170 * _ldStaging];
-    auto stage_v3sigmalapltau = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[179 * _ldStaging];
-    auto stage_v3sigmatau2    = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[191 * _ldStaging];
-    auto stage_v3lapl3        = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[200 * _ldStaging];
-    auto stage_v3lapl2tau     = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[204 * _ldStaging];
-    auto stage_v3lapltau2     = (alloc) ? mem::malloc<double>(6 * np) : &_stagingBuffer[210 * _ldStaging];
-    auto stage_v3tau3         = (alloc) ? mem::malloc<double>(4 * np) : &_stagingBuffer[216 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_v3rho3         = nullptr;
+    double* stage_v3rho2sigma    = nullptr;
+    double* stage_v3rho2lapl     = nullptr;
+    double* stage_v3rho2tau      = nullptr;
+    double* stage_v3rhosigma2    = nullptr;
+    double* stage_v3rhosigmalapl = nullptr;
+    double* stage_v3rhosigmatau  = nullptr;
+    double* stage_v3rholapl2     = nullptr;
+    double* stage_v3rholapltau   = nullptr;
+    double* stage_v3rhotau2      = nullptr;
+    double* stage_v3sigma3       = nullptr;
+    double* stage_v3sigma2lapl   = nullptr;
+    double* stage_v3sigma2tau    = nullptr;
+    double* stage_v3sigmalapl2   = nullptr;
+    double* stage_v3sigmalapltau = nullptr;
+    double* stage_v3sigmatau2    = nullptr;
+    double* stage_v3lapl3        = nullptr;
+    double* stage_v3lapl2tau     = nullptr;
+    double* stage_v3lapltau2     = nullptr;
+    double* stage_v3tau3         = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_v3rho3         = mem::malloc<double>(ind_cnt["v3rho3"][1] * np);
+        stage_v3rho2sigma    = mem::malloc<double>(ind_cnt["v3rho2sigma"][1] * np);
+        stage_v3rho2lapl     = mem::malloc<double>(ind_cnt["v3rho2lapl"][1] * np);
+        stage_v3rho2tau      = mem::malloc<double>(ind_cnt["v3rho2tau"][1] * np);
+        stage_v3rhosigma2    = mem::malloc<double>(ind_cnt["v3rhosigma2"][1] * np);
+        stage_v3rhosigmalapl = mem::malloc<double>(ind_cnt["v3rhosigmalapl"][1] * np);
+        stage_v3rhosigmatau  = mem::malloc<double>(ind_cnt["v3rhosigmatau"][1] * np);
+        stage_v3rholapl2     = mem::malloc<double>(ind_cnt["v3rholapl2"][1] * np);
+        stage_v3rholapltau   = mem::malloc<double>(ind_cnt["v3rholapltau"][1] * np);
+        stage_v3rhotau2      = mem::malloc<double>(ind_cnt["v3rhotau2"][1] * np);
+        stage_v3sigma3       = mem::malloc<double>(ind_cnt["v3sigma3"][1] * np);
+        stage_v3sigma2lapl   = mem::malloc<double>(ind_cnt["v3sigma2lapl"][1] * np);
+        stage_v3sigma2tau    = mem::malloc<double>(ind_cnt["v3sigma2tau"][1] * np);
+        stage_v3sigmalapl2   = mem::malloc<double>(ind_cnt["v3sigmalapl2"][1] * np);
+        stage_v3sigmalapltau = mem::malloc<double>(ind_cnt["v3sigmalapltau"][1] * np);
+        stage_v3sigmatau2    = mem::malloc<double>(ind_cnt["v3sigmatau2"][1] * np);
+        stage_v3lapl3        = mem::malloc<double>(ind_cnt["v3lapl3"][1] * np);
+        stage_v3lapl2tau     = mem::malloc<double>(ind_cnt["v3lapl2tau"][1] * np);
+        stage_v3lapltau2     = mem::malloc<double>(ind_cnt["v3lapltau2"][1] * np);
+        stage_v3tau3         = mem::malloc<double>(ind_cnt["v3tau3"][1] * np);
+    }
+    else
+    {
+        stage_v3rho3         = &_stagingBuffer[ind_cnt["v3rho3"][0] * _ldStaging];
+        stage_v3rho2sigma    = &_stagingBuffer[ind_cnt["v3rho2sigma"][0] * _ldStaging];
+        stage_v3rho2lapl     = &_stagingBuffer[ind_cnt["v3rho2lapl"][0] * _ldStaging];
+        stage_v3rho2tau      = &_stagingBuffer[ind_cnt["v3rho2tau"][0] * _ldStaging];
+        stage_v3rhosigma2    = &_stagingBuffer[ind_cnt["v3rhosigma2"][0] * _ldStaging];
+        stage_v3rhosigmalapl = &_stagingBuffer[ind_cnt["v3rhosigmalapl"][0] * _ldStaging];
+        stage_v3rhosigmatau  = &_stagingBuffer[ind_cnt["v3rhosigmatau"][0] * _ldStaging];
+        stage_v3rholapl2     = &_stagingBuffer[ind_cnt["v3rholapl2"][0] * _ldStaging];
+        stage_v3rholapltau   = &_stagingBuffer[ind_cnt["v3rholapltau"][0] * _ldStaging];
+        stage_v3rhotau2      = &_stagingBuffer[ind_cnt["v3rhotau2"][0] * _ldStaging];
+        stage_v3sigma3       = &_stagingBuffer[ind_cnt["v3sigma3"][0] * _ldStaging];
+        stage_v3sigma2lapl   = &_stagingBuffer[ind_cnt["v3sigma2lapl"][0] * _ldStaging];
+        stage_v3sigma2tau    = &_stagingBuffer[ind_cnt["v3sigma2tau"][0] * _ldStaging];
+        stage_v3sigmalapl2   = &_stagingBuffer[ind_cnt["v3sigmalapl2"][0] * _ldStaging];
+        stage_v3sigmalapltau = &_stagingBuffer[ind_cnt["v3sigmalapltau"][0] * _ldStaging];
+        stage_v3sigmatau2    = &_stagingBuffer[ind_cnt["v3sigmatau2"][0] * _ldStaging];
+        stage_v3lapl3        = &_stagingBuffer[ind_cnt["v3lapl3"][0] * _ldStaging];
+        stage_v3lapl2tau     = &_stagingBuffer[ind_cnt["v3lapl2tau"][0] * _ldStaging];
+        stage_v3lapltau2     = &_stagingBuffer[ind_cnt["v3lapltau2"][0] * _ldStaging];
+        stage_v3tau3         = &_stagingBuffer[ind_cnt["v3tau3"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
-
-            #pragma omp simd aligned(v3rho3, stage_v3rho3 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->v3rho3; ++ind)
             {
-                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+                v3rho3[dim->v3rho3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2sigma; ++ind)
+            {
+                v3rho2sigma[dim->v3rho2sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2lapl; ++ind)
+            {
+                v3rho2lapl[dim->v3rho2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rho2tau; ++ind)
+            {
+                v3rho2tau[dim->v3rho2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigma2; ++ind)
+            {
+                v3rhosigma2[dim->v3rhosigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigmalapl; ++ind)
+            {
+                v3rhosigmalapl[dim->v3rhosigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhosigmatau; ++ind)
+            {
+                v3rhosigmatau[dim->v3rhosigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rholapl2; ++ind)
+            {
+                v3rholapl2[dim->v3rholapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rholapltau; ++ind)
+            {
+                v3rholapltau[dim->v3rholapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3rhotau2; ++ind)
+            {
+                v3rhotau2[dim->v3rhotau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma3; ++ind)
+            {
+                v3sigma3[dim->v3sigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma2lapl; ++ind)
+            {
+                v3sigma2lapl[dim->v3sigma2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigma2tau; ++ind)
+            {
+                v3sigma2tau[dim->v3sigma2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmalapl2; ++ind)
+            {
+                v3sigmalapl2[dim->v3sigmalapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmalapltau; ++ind)
+            {
+                v3sigmalapltau[dim->v3sigmalapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3sigmatau2; ++ind)
+            {
+                v3sigmatau2[dim->v3sigmatau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapl3; ++ind)
+            {
+                v3lapl3[dim->v3lapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapl2tau; ++ind)
+            {
+                v3lapl2tau[dim->v3lapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3lapltau2; ++ind)
+            {
+                v3lapltau2[dim->v3lapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v3tau3; ++ind)
+            {
+                v3tau3[dim->v3tau3 * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, \
-                                     v3rhosigma2, stage_v3rhosigma2, v3sigma3, stage_v3sigma3 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
+                xc_lda_kxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v3rho3 + dim->v3rho3 * grid_batch_offset);
 
-                v3rho2sigma[9 * g + 0] += c * stage_v3rho2sigma[9 * g + 0];
-                v3rho2sigma[9 * g + 1] += c * stage_v3rho2sigma[9 * g + 1];
-                v3rho2sigma[9 * g + 2] += c * stage_v3rho2sigma[9 * g + 2];
-                v3rho2sigma[9 * g + 3] += c * stage_v3rho2sigma[9 * g + 3];
-                v3rho2sigma[9 * g + 4] += c * stage_v3rho2sigma[9 * g + 4];
-                v3rho2sigma[9 * g + 5] += c * stage_v3rho2sigma[9 * g + 5];
-                v3rho2sigma[9 * g + 6] += c * stage_v3rho2sigma[9 * g + 6];
-                v3rho2sigma[9 * g + 7] += c * stage_v3rho2sigma[9 * g + 7];
-                v3rho2sigma[9 * g + 8] += c * stage_v3rho2sigma[9 * g + 8];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_kxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_v3rho3 + dim->v3rho3 * grid_batch_offset,
+                           stage_v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                           stage_v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                           stage_v3sigma3 + dim->v3sigma3 * grid_batch_offset);
 
-                v3rhosigma2[12 * g + 0] += c * stage_v3rhosigma2[12 * g + 0];
-                v3rhosigma2[12 * g + 1] += c * stage_v3rhosigma2[12 * g + 1];
-                v3rhosigma2[12 * g + 2] += c * stage_v3rhosigma2[12 * g + 2];
-                v3rhosigma2[12 * g + 3] += c * stage_v3rhosigma2[12 * g + 3];
-                v3rhosigma2[12 * g + 4] += c * stage_v3rhosigma2[12 * g + 4];
-                v3rhosigma2[12 * g + 5] += c * stage_v3rhosigma2[12 * g + 5];
-                v3rhosigma2[12 * g + 6] += c * stage_v3rhosigma2[12 * g + 6];
-                v3rhosigma2[12 * g + 7] += c * stage_v3rhosigma2[12 * g + 7];
-                v3rhosigma2[12 * g + 8] += c * stage_v3rhosigma2[12 * g + 8];
-                v3rhosigma2[12 * g + 9] += c * stage_v3rhosigma2[12 * g + 9];
-                v3rhosigma2[12 * g + 10] += c * stage_v3rhosigma2[12 * g + 10];
-                v3rhosigma2[12 * g + 11] += c * stage_v3rhosigma2[12 * g + 11];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2sigma; ++ind)
+                    {
+                        v3rho2sigma[dim->v3rho2sigma * g + ind] += c * stage_v3rho2sigma[dim->v3rho2sigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigma2; ++ind)
+                    {
+                        v3rhosigma2[dim->v3rhosigma2 * g + ind] += c * stage_v3rhosigma2[dim->v3rhosigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma3; ++ind)
+                    {
+                        v3sigma3[dim->v3sigma3 * g + ind] += c * stage_v3sigma3[dim->v3sigma3 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isMetaGGA())
+            {
+                xc_mgga_kxc(funcptr,
+                            grid_batch_size,
+                            rho + dim->rho * grid_batch_offset,
+                            sigma + dim->sigma * grid_batch_offset,
+                            lapl + dim->lapl * grid_batch_offset,
+                            tau + dim->tau * grid_batch_offset,
+                            stage_v3rho3 + dim->v3rho3 * grid_batch_offset,
+                            stage_v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                            stage_v3rho2lapl + dim->v3rho2lapl * grid_batch_offset,
+                            stage_v3rho2tau + dim->v3rho2tau * grid_batch_offset,
+                            stage_v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                            stage_v3rhosigmalapl + dim->v3rhosigmalapl * grid_batch_offset,
+                            stage_v3rhosigmatau + dim->v3rhosigmatau * grid_batch_offset,
+                            stage_v3rholapl2 + dim->v3rholapl2 * grid_batch_offset,
+                            stage_v3rholapltau + dim->v3rholapltau * grid_batch_offset,
+                            stage_v3rhotau2 + dim->v3rhotau2 * grid_batch_offset,
+                            stage_v3sigma3 + dim->v3sigma3 * grid_batch_offset,
+                            stage_v3sigma2lapl + dim->v3sigma2lapl * grid_batch_offset,
+                            stage_v3sigma2tau + dim->v3sigma2tau * grid_batch_offset,
+                            stage_v3sigmalapl2 + dim->v3sigmalapl2 * grid_batch_offset,
+                            stage_v3sigmalapltau + dim->v3sigmalapltau * grid_batch_offset,
+                            stage_v3sigmatau2 + dim->v3sigmatau2 * grid_batch_offset,
+                            stage_v3lapl3 + dim->v3lapl3 * grid_batch_offset,
+                            stage_v3lapl2tau + dim->v3lapl2tau * grid_batch_offset,
+                            stage_v3lapltau2 + dim->v3lapltau2 * grid_batch_offset,
+                            stage_v3tau3 + dim->v3tau3 * grid_batch_offset);
 
-                v3sigma3[10 * g + 0] += c * stage_v3sigma3[10 * g + 0];
-                v3sigma3[10 * g + 1] += c * stage_v3sigma3[10 * g + 1];
-                v3sigma3[10 * g + 2] += c * stage_v3sigma3[10 * g + 2];
-                v3sigma3[10 * g + 3] += c * stage_v3sigma3[10 * g + 3];
-                v3sigma3[10 * g + 4] += c * stage_v3sigma3[10 * g + 4];
-                v3sigma3[10 * g + 5] += c * stage_v3sigma3[10 * g + 5];
-                v3sigma3[10 * g + 6] += c * stage_v3sigma3[10 * g + 6];
-                v3sigma3[10 * g + 7] += c * stage_v3sigma3[10 * g + 7];
-                v3sigma3[10 * g + 8] += c * stage_v3sigma3[10 * g + 8];
-                v3sigma3[10 * g + 9] += c * stage_v3sigma3[10 * g + 9];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v3rho3; ++ind)
+                    {
+                        v3rho3[dim->v3rho3 * g + ind] += c * stage_v3rho3[dim->v3rho3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2sigma; ++ind)
+                    {
+                        v3rho2sigma[dim->v3rho2sigma * g + ind] += c * stage_v3rho2sigma[dim->v3rho2sigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2lapl; ++ind)
+                    {
+                        v3rho2lapl[dim->v3rho2lapl * g + ind] += c * stage_v3rho2lapl[dim->v3rho2lapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rho2tau; ++ind)
+                    {
+                        v3rho2tau[dim->v3rho2tau * g + ind] += c * stage_v3rho2tau[dim->v3rho2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigma2; ++ind)
+                    {
+                        v3rhosigma2[dim->v3rhosigma2 * g + ind] += c * stage_v3rhosigma2[dim->v3rhosigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigmalapl; ++ind)
+                    {
+                        v3rhosigmalapl[dim->v3rhosigmalapl * g + ind] += c * stage_v3rhosigmalapl[dim->v3rhosigmalapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhosigmatau; ++ind)
+                    {
+                        v3rhosigmatau[dim->v3rhosigmatau * g + ind] += c * stage_v3rhosigmatau[dim->v3rhosigmatau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rholapl2; ++ind)
+                    {
+                        v3rholapl2[dim->v3rholapl2 * g + ind] += c * stage_v3rholapl2[dim->v3rholapl2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rholapltau; ++ind)
+                    {
+                        v3rholapltau[dim->v3rholapltau * g + ind] += c * stage_v3rholapltau[dim->v3rholapltau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3rhotau2; ++ind)
+                    {
+                        v3rhotau2[dim->v3rhotau2 * g + ind] += c * stage_v3rhotau2[dim->v3rhotau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma3; ++ind)
+                    {
+                        v3sigma3[dim->v3sigma3 * g + ind] += c * stage_v3sigma3[dim->v3sigma3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma2lapl; ++ind)
+                    {
+                        v3sigma2lapl[dim->v3sigma2lapl * g + ind] += c * stage_v3sigma2lapl[dim->v3sigma2lapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigma2tau; ++ind)
+                    {
+                        v3sigma2tau[dim->v3sigma2tau * g + ind] += c * stage_v3sigma2tau[dim->v3sigma2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigmalapl2; ++ind)
+                    {
+                        v3sigmalapl2[dim->v3sigmalapl2 * g + ind] += c * stage_v3sigmalapl2[dim->v3sigmalapl2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigmalapltau; ++ind)
+                    {
+                        v3sigmalapltau[dim->v3sigmalapltau * g + ind] += c * stage_v3sigmalapltau[dim->v3sigmalapltau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3sigmatau2; ++ind)
+                    {
+                        v3sigmatau2[dim->v3sigmatau2 * g + ind] += c * stage_v3sigmatau2[dim->v3sigmatau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3lapl3; ++ind)
+                    {
+                        v3lapl3[dim->v3lapl3 * g + ind] += c * stage_v3lapl3[dim->v3lapl3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3lapl2tau; ++ind)
+                    {
+                        v3lapl2tau[dim->v3lapl2tau * g + ind] += c * stage_v3lapl2tau[dim->v3lapl2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3lapltau2; ++ind)
+                    {
+                        v3lapltau2[dim->v3lapltau2 * g + ind] += c * stage_v3lapltau2[dim->v3lapltau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v3tau3; ++ind)
+                    {
+                        v3tau3[dim->v3tau3 * g + ind] += c * stage_v3tau3[dim->v3tau3 * g + ind];
+                    }
+                }
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
-        {
-            xc_mgga_kxc(funcptr,
-                        np,
-                        rho,
-                        sigma,
-                        lapl,
-                        tau,
-                        stage_v3rho3,
-                        stage_v3rho2sigma,
-                        stage_v3rho2lapl,
-                        stage_v3rho2tau,
-                        stage_v3rhosigma2,
-                        stage_v3rhosigmalapl,
-                        stage_v3rhosigmatau,
-                        stage_v3rholapl2,
-                        stage_v3rholapltau,
-                        stage_v3rhotau2,
-                        stage_v3sigma3,
-                        stage_v3sigma2lapl,
-                        stage_v3sigma2tau,
-                        stage_v3sigmalapl2,
-                        stage_v3sigmalapltau,
-                        stage_v3sigmatau2,
-                        stage_v3lapl3,
-                        stage_v3lapl2tau,
-                        stage_v3lapltau2,
-                        stage_v3tau3);
 
-            #pragma omp simd aligned(v3rho3, stage_v3rho3, v3rho2sigma, stage_v3rho2sigma, \
-                                     v3rho2lapl, stage_v3rho2lapl, v3rho2tau, stage_v3rho2tau, \
-                                     v3rhosigma2, stage_v3rhosigma2, v3rhosigmalapl, stage_v3rhosigmalapl, \
-                                     v3rhosigmatau, stage_v3rhosigmatau, v3rholapl2, stage_v3rholapl2, \
-                                     v3rholapltau, stage_v3rholapltau, v3rhotau2, stage_v3rhotau2, \
-                                     v3sigma3, stage_v3sigma3, v3sigma2lapl, stage_v3sigma2lapl, \
-                                     v3sigma2tau, stage_v3sigma2tau, v3sigmalapl2, stage_v3sigmalapl2, \
-                                     v3sigmalapltau, stage_v3sigmalapltau, v3sigmatau2, stage_v3sigmatau2, \
-                                     v3lapl3, stage_v3lapl3, v3lapl2tau, stage_v3lapl2tau, \
-                                     v3lapltau2, stage_v3lapltau2, v3tau3, stage_v3tau3 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
-            {
-                v3rho3[4 * g + 0] += c * stage_v3rho3[4 * g + 0];
-                v3rho3[4 * g + 1] += c * stage_v3rho3[4 * g + 1];
-                v3rho3[4 * g + 2] += c * stage_v3rho3[4 * g + 2];
-                v3rho3[4 * g + 3] += c * stage_v3rho3[4 * g + 3];
-
-                v3rho2sigma[9 * g + 0] += c * stage_v3rho2sigma[9 * g + 0];
-                v3rho2sigma[9 * g + 1] += c * stage_v3rho2sigma[9 * g + 1];
-                v3rho2sigma[9 * g + 2] += c * stage_v3rho2sigma[9 * g + 2];
-                v3rho2sigma[9 * g + 3] += c * stage_v3rho2sigma[9 * g + 3];
-                v3rho2sigma[9 * g + 4] += c * stage_v3rho2sigma[9 * g + 4];
-                v3rho2sigma[9 * g + 5] += c * stage_v3rho2sigma[9 * g + 5];
-                v3rho2sigma[9 * g + 6] += c * stage_v3rho2sigma[9 * g + 6];
-                v3rho2sigma[9 * g + 7] += c * stage_v3rho2sigma[9 * g + 7];
-                v3rho2sigma[9 * g + 8] += c * stage_v3rho2sigma[9 * g + 8];
-
-                v3rho2lapl[6 * g + 0] += c * stage_v3rho2lapl[6 * g + 0];
-                v3rho2lapl[6 * g + 1] += c * stage_v3rho2lapl[6 * g + 1];
-                v3rho2lapl[6 * g + 2] += c * stage_v3rho2lapl[6 * g + 2];
-                v3rho2lapl[6 * g + 3] += c * stage_v3rho2lapl[6 * g + 3];
-                v3rho2lapl[6 * g + 4] += c * stage_v3rho2lapl[6 * g + 4];
-                v3rho2lapl[6 * g + 5] += c * stage_v3rho2lapl[6 * g + 5];
-
-                v3rho2tau[6 * g + 0] += c * stage_v3rho2tau[6 * g + 0];
-                v3rho2tau[6 * g + 1] += c * stage_v3rho2tau[6 * g + 1];
-                v3rho2tau[6 * g + 2] += c * stage_v3rho2tau[6 * g + 2];
-                v3rho2tau[6 * g + 3] += c * stage_v3rho2tau[6 * g + 3];
-                v3rho2tau[6 * g + 4] += c * stage_v3rho2tau[6 * g + 4];
-                v3rho2tau[6 * g + 5] += c * stage_v3rho2tau[6 * g + 5];
-
-                v3rhosigma2[12 * g + 0] += c * stage_v3rhosigma2[12 * g + 0];
-                v3rhosigma2[12 * g + 1] += c * stage_v3rhosigma2[12 * g + 1];
-                v3rhosigma2[12 * g + 2] += c * stage_v3rhosigma2[12 * g + 2];
-                v3rhosigma2[12 * g + 3] += c * stage_v3rhosigma2[12 * g + 3];
-                v3rhosigma2[12 * g + 4] += c * stage_v3rhosigma2[12 * g + 4];
-                v3rhosigma2[12 * g + 5] += c * stage_v3rhosigma2[12 * g + 5];
-                v3rhosigma2[12 * g + 6] += c * stage_v3rhosigma2[12 * g + 6];
-                v3rhosigma2[12 * g + 7] += c * stage_v3rhosigma2[12 * g + 7];
-                v3rhosigma2[12 * g + 8] += c * stage_v3rhosigma2[12 * g + 8];
-                v3rhosigma2[12 * g + 9] += c * stage_v3rhosigma2[12 * g + 9];
-                v3rhosigma2[12 * g + 10] += c * stage_v3rhosigma2[12 * g + 10];
-                v3rhosigma2[12 * g + 11] += c * stage_v3rhosigma2[12 * g + 11];
-
-                v3rhosigmalapl[12 * g + 0] += c * stage_v3rhosigmalapl[12 * g + 0];
-                v3rhosigmalapl[12 * g + 1] += c * stage_v3rhosigmalapl[12 * g + 1];
-                v3rhosigmalapl[12 * g + 2] += c * stage_v3rhosigmalapl[12 * g + 2];
-                v3rhosigmalapl[12 * g + 3] += c * stage_v3rhosigmalapl[12 * g + 3];
-                v3rhosigmalapl[12 * g + 4] += c * stage_v3rhosigmalapl[12 * g + 4];
-                v3rhosigmalapl[12 * g + 5] += c * stage_v3rhosigmalapl[12 * g + 5];
-                v3rhosigmalapl[12 * g + 6] += c * stage_v3rhosigmalapl[12 * g + 6];
-                v3rhosigmalapl[12 * g + 7] += c * stage_v3rhosigmalapl[12 * g + 7];
-                v3rhosigmalapl[12 * g + 8] += c * stage_v3rhosigmalapl[12 * g + 8];
-                v3rhosigmalapl[12 * g + 9] += c * stage_v3rhosigmalapl[12 * g + 9];
-                v3rhosigmalapl[12 * g + 10] += c * stage_v3rhosigmalapl[12 * g + 10];
-                v3rhosigmalapl[12 * g + 11] += c * stage_v3rhosigmalapl[12 * g + 11];
-
-                v3rhosigmatau[12 * g + 0] += c * stage_v3rhosigmatau[12 * g + 0];
-                v3rhosigmatau[12 * g + 1] += c * stage_v3rhosigmatau[12 * g + 1];
-                v3rhosigmatau[12 * g + 2] += c * stage_v3rhosigmatau[12 * g + 2];
-                v3rhosigmatau[12 * g + 3] += c * stage_v3rhosigmatau[12 * g + 3];
-                v3rhosigmatau[12 * g + 4] += c * stage_v3rhosigmatau[12 * g + 4];
-                v3rhosigmatau[12 * g + 5] += c * stage_v3rhosigmatau[12 * g + 5];
-                v3rhosigmatau[12 * g + 6] += c * stage_v3rhosigmatau[12 * g + 6];
-                v3rhosigmatau[12 * g + 7] += c * stage_v3rhosigmatau[12 * g + 7];
-                v3rhosigmatau[12 * g + 8] += c * stage_v3rhosigmatau[12 * g + 8];
-                v3rhosigmatau[12 * g + 9] += c * stage_v3rhosigmatau[12 * g + 9];
-                v3rhosigmatau[12 * g + 10] += c * stage_v3rhosigmatau[12 * g + 10];
-                v3rhosigmatau[12 * g + 11] += c * stage_v3rhosigmatau[12 * g + 11];
-
-                v3rholapl2[6 * g + 0] += c * stage_v3rholapl2[6 * g + 0];
-                v3rholapl2[6 * g + 1] += c * stage_v3rholapl2[6 * g + 1];
-                v3rholapl2[6 * g + 2] += c * stage_v3rholapl2[6 * g + 2];
-                v3rholapl2[6 * g + 3] += c * stage_v3rholapl2[6 * g + 3];
-                v3rholapl2[6 * g + 4] += c * stage_v3rholapl2[6 * g + 4];
-                v3rholapl2[6 * g + 5] += c * stage_v3rholapl2[6 * g + 5];
-
-                v3rholapltau[8 * g + 0] += c * stage_v3rholapltau[8 * g + 0];
-                v3rholapltau[8 * g + 1] += c * stage_v3rholapltau[8 * g + 1];
-                v3rholapltau[8 * g + 2] += c * stage_v3rholapltau[8 * g + 2];
-                v3rholapltau[8 * g + 3] += c * stage_v3rholapltau[8 * g + 3];
-                v3rholapltau[8 * g + 4] += c * stage_v3rholapltau[8 * g + 4];
-                v3rholapltau[8 * g + 5] += c * stage_v3rholapltau[8 * g + 5];
-                v3rholapltau[8 * g + 6] += c * stage_v3rholapltau[8 * g + 6];
-                v3rholapltau[8 * g + 7] += c * stage_v3rholapltau[8 * g + 7];
-
-                v3rhotau2[6 * g + 0] += c * stage_v3rhotau2[6 * g + 0];
-                v3rhotau2[6 * g + 1] += c * stage_v3rhotau2[6 * g + 1];
-                v3rhotau2[6 * g + 2] += c * stage_v3rhotau2[6 * g + 2];
-                v3rhotau2[6 * g + 3] += c * stage_v3rhotau2[6 * g + 3];
-                v3rhotau2[6 * g + 4] += c * stage_v3rhotau2[6 * g + 4];
-                v3rhotau2[6 * g + 5] += c * stage_v3rhotau2[6 * g + 5];
-
-                v3sigma3[10 * g + 0] += c * stage_v3sigma3[10 * g + 0];
-                v3sigma3[10 * g + 1] += c * stage_v3sigma3[10 * g + 1];
-                v3sigma3[10 * g + 2] += c * stage_v3sigma3[10 * g + 2];
-                v3sigma3[10 * g + 3] += c * stage_v3sigma3[10 * g + 3];
-                v3sigma3[10 * g + 4] += c * stage_v3sigma3[10 * g + 4];
-                v3sigma3[10 * g + 5] += c * stage_v3sigma3[10 * g + 5];
-                v3sigma3[10 * g + 6] += c * stage_v3sigma3[10 * g + 6];
-                v3sigma3[10 * g + 7] += c * stage_v3sigma3[10 * g + 7];
-                v3sigma3[10 * g + 8] += c * stage_v3sigma3[10 * g + 8];
-                v3sigma3[10 * g + 9] += c * stage_v3sigma3[10 * g + 9];
-
-                v3sigma2lapl[12 * g + 0] += c * stage_v3sigma2lapl[12 * g + 0];
-                v3sigma2lapl[12 * g + 1] += c * stage_v3sigma2lapl[12 * g + 1];
-                v3sigma2lapl[12 * g + 2] += c * stage_v3sigma2lapl[12 * g + 2];
-                v3sigma2lapl[12 * g + 3] += c * stage_v3sigma2lapl[12 * g + 3];
-                v3sigma2lapl[12 * g + 4] += c * stage_v3sigma2lapl[12 * g + 4];
-                v3sigma2lapl[12 * g + 5] += c * stage_v3sigma2lapl[12 * g + 5];
-                v3sigma2lapl[12 * g + 6] += c * stage_v3sigma2lapl[12 * g + 6];
-                v3sigma2lapl[12 * g + 7] += c * stage_v3sigma2lapl[12 * g + 7];
-                v3sigma2lapl[12 * g + 8] += c * stage_v3sigma2lapl[12 * g + 8];
-                v3sigma2lapl[12 * g + 9] += c * stage_v3sigma2lapl[12 * g + 9];
-                v3sigma2lapl[12 * g + 10] += c * stage_v3sigma2lapl[12 * g + 10];
-                v3sigma2lapl[12 * g + 11] += c * stage_v3sigma2lapl[12 * g + 11];
-
-                v3sigma2tau[12 * g + 0] += c * stage_v3sigma2tau[12 * g + 0];
-                v3sigma2tau[12 * g + 1] += c * stage_v3sigma2tau[12 * g + 1];
-                v3sigma2tau[12 * g + 2] += c * stage_v3sigma2tau[12 * g + 2];
-                v3sigma2tau[12 * g + 3] += c * stage_v3sigma2tau[12 * g + 3];
-                v3sigma2tau[12 * g + 4] += c * stage_v3sigma2tau[12 * g + 4];
-                v3sigma2tau[12 * g + 5] += c * stage_v3sigma2tau[12 * g + 5];
-                v3sigma2tau[12 * g + 6] += c * stage_v3sigma2tau[12 * g + 6];
-                v3sigma2tau[12 * g + 7] += c * stage_v3sigma2tau[12 * g + 7];
-                v3sigma2tau[12 * g + 8] += c * stage_v3sigma2tau[12 * g + 8];
-                v3sigma2tau[12 * g + 9] += c * stage_v3sigma2tau[12 * g + 9];
-                v3sigma2tau[12 * g + 10] += c * stage_v3sigma2tau[12 * g + 10];
-                v3sigma2tau[12 * g + 11] += c * stage_v3sigma2tau[12 * g + 11];
-
-                v3sigmalapl2[9 * g + 0] += c * stage_v3sigmalapl2[9 * g + 0];
-                v3sigmalapl2[9 * g + 1] += c * stage_v3sigmalapl2[9 * g + 1];
-                v3sigmalapl2[9 * g + 2] += c * stage_v3sigmalapl2[9 * g + 2];
-                v3sigmalapl2[9 * g + 3] += c * stage_v3sigmalapl2[9 * g + 3];
-                v3sigmalapl2[9 * g + 4] += c * stage_v3sigmalapl2[9 * g + 4];
-                v3sigmalapl2[9 * g + 5] += c * stage_v3sigmalapl2[9 * g + 5];
-                v3sigmalapl2[9 * g + 6] += c * stage_v3sigmalapl2[9 * g + 6];
-                v3sigmalapl2[9 * g + 7] += c * stage_v3sigmalapl2[9 * g + 7];
-                v3sigmalapl2[9 * g + 8] += c * stage_v3sigmalapl2[9 * g + 8];
-
-                v3sigmalapltau[12 * g + 0] += c * stage_v3sigmalapltau[12 * g + 0];
-                v3sigmalapltau[12 * g + 1] += c * stage_v3sigmalapltau[12 * g + 1];
-                v3sigmalapltau[12 * g + 2] += c * stage_v3sigmalapltau[12 * g + 2];
-                v3sigmalapltau[12 * g + 3] += c * stage_v3sigmalapltau[12 * g + 3];
-                v3sigmalapltau[12 * g + 4] += c * stage_v3sigmalapltau[12 * g + 4];
-                v3sigmalapltau[12 * g + 5] += c * stage_v3sigmalapltau[12 * g + 5];
-                v3sigmalapltau[12 * g + 6] += c * stage_v3sigmalapltau[12 * g + 6];
-                v3sigmalapltau[12 * g + 7] += c * stage_v3sigmalapltau[12 * g + 7];
-                v3sigmalapltau[12 * g + 8] += c * stage_v3sigmalapltau[12 * g + 8];
-                v3sigmalapltau[12 * g + 9] += c * stage_v3sigmalapltau[12 * g + 9];
-                v3sigmalapltau[12 * g + 10] += c * stage_v3sigmalapltau[12 * g + 10];
-                v3sigmalapltau[12 * g + 11] += c * stage_v3sigmalapltau[12 * g + 11];
-
-                v3sigmatau2[9 * g + 0] += c * stage_v3sigmatau2[9 * g + 0];
-                v3sigmatau2[9 * g + 1] += c * stage_v3sigmatau2[9 * g + 1];
-                v3sigmatau2[9 * g + 2] += c * stage_v3sigmatau2[9 * g + 2];
-                v3sigmatau2[9 * g + 3] += c * stage_v3sigmatau2[9 * g + 3];
-                v3sigmatau2[9 * g + 4] += c * stage_v3sigmatau2[9 * g + 4];
-                v3sigmatau2[9 * g + 5] += c * stage_v3sigmatau2[9 * g + 5];
-                v3sigmatau2[9 * g + 6] += c * stage_v3sigmatau2[9 * g + 6];
-                v3sigmatau2[9 * g + 7] += c * stage_v3sigmatau2[9 * g + 7];
-                v3sigmatau2[9 * g + 8] += c * stage_v3sigmatau2[9 * g + 8];
-
-                v3lapl3[4 * g + 0] += c * stage_v3lapl3[4 * g + 0];
-                v3lapl3[4 * g + 1] += c * stage_v3lapl3[4 * g + 1];
-                v3lapl3[4 * g + 2] += c * stage_v3lapl3[4 * g + 2];
-                v3lapl3[4 * g + 3] += c * stage_v3lapl3[4 * g + 3];
-
-                v3lapl2tau[6 * g + 0] += c * stage_v3lapl2tau[6 * g + 0];
-                v3lapl2tau[6 * g + 1] += c * stage_v3lapl2tau[6 * g + 1];
-                v3lapl2tau[6 * g + 2] += c * stage_v3lapl2tau[6 * g + 2];
-                v3lapl2tau[6 * g + 3] += c * stage_v3lapl2tau[6 * g + 3];
-                v3lapl2tau[6 * g + 4] += c * stage_v3lapl2tau[6 * g + 4];
-                v3lapl2tau[6 * g + 5] += c * stage_v3lapl2tau[6 * g + 5];
-
-                v3lapltau2[6 * g + 0] += c * stage_v3lapltau2[6 * g + 0];
-                v3lapltau2[6 * g + 1] += c * stage_v3lapltau2[6 * g + 1];
-                v3lapltau2[6 * g + 2] += c * stage_v3lapltau2[6 * g + 2];
-                v3lapltau2[6 * g + 3] += c * stage_v3lapltau2[6 * g + 3];
-                v3lapltau2[6 * g + 4] += c * stage_v3lapltau2[6 * g + 4];
-                v3lapltau2[6 * g + 5] += c * stage_v3lapltau2[6 * g + 5];
-
-                v3tau3[4 * g + 0] += c * stage_v3tau3[4 * g + 0];
-                v3tau3[4 * g + 1] += c * stage_v3tau3[4 * g + 1];
-                v3tau3[4 * g + 2] += c * stage_v3tau3[4 * g + 2];
-                v3tau3[4 * g + 3] += c * stage_v3tau3[4 * g + 3];
-            }
-        }
+        gridscreen::screenKxcForMGGA(this,
+                                     grid_batch_size,
+                                     rho + dim->rho * grid_batch_offset,
+                                     sigma + dim->sigma * grid_batch_offset,
+                                     lapl + dim->lapl * grid_batch_offset,
+                                     tau + dim->tau * grid_batch_offset,
+                                     v3rho3 + dim->v3rho3 * grid_batch_offset,
+                                     v3rho2sigma + dim->v3rho2sigma * grid_batch_offset,
+                                     v3rho2lapl + dim->v3rho2lapl * grid_batch_offset,
+                                     v3rho2tau + dim->v3rho2tau * grid_batch_offset,
+                                     v3rhosigma2 + dim->v3rhosigma2 * grid_batch_offset,
+                                     v3rhosigmalapl + dim->v3rhosigmalapl * grid_batch_offset,
+                                     v3rhosigmatau + dim->v3rhosigmatau * grid_batch_offset,
+                                     v3rholapl2 + dim->v3rholapl2 * grid_batch_offset,
+                                     v3rholapltau + dim->v3rholapltau * grid_batch_offset,
+                                     v3rhotau2 + dim->v3rhotau2 * grid_batch_offset,
+                                     v3sigma3 + dim->v3sigma3 * grid_batch_offset,
+                                     v3sigma2lapl + dim->v3sigma2lapl * grid_batch_offset,
+                                     v3sigma2tau + dim->v3sigma2tau * grid_batch_offset,
+                                     v3sigmalapl2 + dim->v3sigmalapl2 * grid_batch_offset,
+                                     v3sigmalapltau + dim->v3sigmalapltau * grid_batch_offset,
+                                     v3sigmatau2 + dim->v3sigmatau2 * grid_batch_offset,
+                                     v3lapl3 + dim->v3lapl3 * grid_batch_offset,
+                                     v3lapl2tau + dim->v3lapl2tau * grid_batch_offset,
+                                     v3lapltau2 + dim->v3lapltau2 * grid_batch_offset,
+                                     v3tau3 + dim->v3tau3 * grid_batch_offset);
     }
 
     if (alloc)
@@ -2203,36 +2683,10 @@ CXCFunctional::compute_kxc_for_mgga(int32_t       np,
         mem::free(stage_v3lapltau2);
         mem::free(stage_v3tau3);
     }
-
-    gridscreen::screenKxcForMGGA(np,
-                                 rho,
-                                 sigma,
-                                 lapl,
-                                 tau,
-                                 v3rho3,
-                                 v3rho2sigma,
-                                 v3rho2lapl,
-                                 v3rho2tau,
-                                 v3rhosigma2,
-                                 v3rhosigmalapl,
-                                 v3rhosigmatau,
-                                 v3rholapl2,
-                                 v3rholapltau,
-                                 v3rhotau2,
-                                 v3sigma3,
-                                 v3sigma2lapl,
-                                 v3sigma2tau,
-                                 v3sigmalapl2,
-                                 v3sigmalapltau,
-                                 v3sigmatau2,
-                                 v3lapl3,
-                                 v3lapl2tau,
-                                 v3lapltau2,
-                                 v3tau3);
 }
 
 auto
-CXCFunctional::compute_lxc_for_mgga(int32_t       np,
+CXCFunctional::compute_lxc_for_mgga(const int32_t np,
                                     const double* rho,
                                     const double* sigma,
                                     const double* lapl,
@@ -2276,1297 +2730,571 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
 
-    #pragma omp simd aligned(v4rho4, v4rho3sigma, v4rho3lapl, v4rho3tau, \
-                             v4rho2sigma2, v4rho2sigmalapl, v4rho2sigmatau, v4rho2lapl2, \
-                             v4rho2lapltau, v4rho2tau2, v4rhosigma3, v4rhosigma2lapl, \
-                             v4rhosigma2tau, v4rhosigmalapl2, v4rhosigmalapltau, v4rhosigmatau2, \
-                             v4rholapl3, v4rholapl2tau, v4rholapltau2, v4rhotau3, \
-                             v4sigma4, v4sigma3lapl, v4sigma3tau, v4sigma2lapl2, \
-                             v4sigma2lapltau, v4sigma2tau2, v4sigmalapl3, v4sigmalapl2tau, \
-                             v4sigmalapltau2, v4sigmatau3, v4lapl4, v4lapl3tau, \
-                             v4lapl2tau2, v4lapltau3, v4tau4 : VLX_ALIGN)
-    for (auto g = 0; g < np; ++g)
-    {
-        v4rho4[5 * g + 0] = 0.0;
-        v4rho4[5 * g + 1] = 0.0;
-        v4rho4[5 * g + 2] = 0.0;
-        v4rho4[5 * g + 3] = 0.0;
-        v4rho4[5 * g + 4] = 0.0;
+    // set up staging buffers
 
-        v4rho3sigma[12 * g + 0]  = 0.0;
-        v4rho3sigma[12 * g + 1]  = 0.0;
-        v4rho3sigma[12 * g + 2]  = 0.0;
-        v4rho3sigma[12 * g + 3]  = 0.0;
-        v4rho3sigma[12 * g + 4]  = 0.0;
-        v4rho3sigma[12 * g + 5]  = 0.0;
-        v4rho3sigma[12 * g + 6]  = 0.0;
-        v4rho3sigma[12 * g + 7]  = 0.0;
-        v4rho3sigma[12 * g + 8]  = 0.0;
-        v4rho3sigma[12 * g + 9]  = 0.0;
-        v4rho3sigma[12 * g + 10] = 0.0;
-        v4rho3sigma[12 * g + 11] = 0.0;
-
-        v4rho3lapl[8 * g + 0] = 0.0;
-        v4rho3lapl[8 * g + 1] = 0.0;
-        v4rho3lapl[8 * g + 2] = 0.0;
-        v4rho3lapl[8 * g + 3] = 0.0;
-        v4rho3lapl[8 * g + 4] = 0.0;
-        v4rho3lapl[8 * g + 5] = 0.0;
-        v4rho3lapl[8 * g + 6] = 0.0;
-        v4rho3lapl[8 * g + 7] = 0.0;
-
-        v4rho3tau[8 * g + 0] = 0.0;
-        v4rho3tau[8 * g + 1] = 0.0;
-        v4rho3tau[8 * g + 2] = 0.0;
-        v4rho3tau[8 * g + 3] = 0.0;
-        v4rho3tau[8 * g + 4] = 0.0;
-        v4rho3tau[8 * g + 5] = 0.0;
-        v4rho3tau[8 * g + 6] = 0.0;
-        v4rho3tau[8 * g + 7] = 0.0;
-
-        v4rho2sigma2[18 * g + 0]  = 0.0;
-        v4rho2sigma2[18 * g + 1]  = 0.0;
-        v4rho2sigma2[18 * g + 2]  = 0.0;
-        v4rho2sigma2[18 * g + 3]  = 0.0;
-        v4rho2sigma2[18 * g + 4]  = 0.0;
-        v4rho2sigma2[18 * g + 5]  = 0.0;
-        v4rho2sigma2[18 * g + 6]  = 0.0;
-        v4rho2sigma2[18 * g + 7]  = 0.0;
-        v4rho2sigma2[18 * g + 8]  = 0.0;
-        v4rho2sigma2[18 * g + 9]  = 0.0;
-        v4rho2sigma2[18 * g + 10] = 0.0;
-        v4rho2sigma2[18 * g + 11] = 0.0;
-        v4rho2sigma2[18 * g + 12] = 0.0;
-        v4rho2sigma2[18 * g + 13] = 0.0;
-        v4rho2sigma2[18 * g + 14] = 0.0;
-        v4rho2sigma2[18 * g + 15] = 0.0;
-        v4rho2sigma2[18 * g + 16] = 0.0;
-        v4rho2sigma2[18 * g + 17] = 0.0;
-
-        v4rho2sigmalapl[18 * g + 0]  = 0.0;
-        v4rho2sigmalapl[18 * g + 1]  = 0.0;
-        v4rho2sigmalapl[18 * g + 2]  = 0.0;
-        v4rho2sigmalapl[18 * g + 3]  = 0.0;
-        v4rho2sigmalapl[18 * g + 4]  = 0.0;
-        v4rho2sigmalapl[18 * g + 5]  = 0.0;
-        v4rho2sigmalapl[18 * g + 6]  = 0.0;
-        v4rho2sigmalapl[18 * g + 7]  = 0.0;
-        v4rho2sigmalapl[18 * g + 8]  = 0.0;
-        v4rho2sigmalapl[18 * g + 9]  = 0.0;
-        v4rho2sigmalapl[18 * g + 10] = 0.0;
-        v4rho2sigmalapl[18 * g + 11] = 0.0;
-        v4rho2sigmalapl[18 * g + 12] = 0.0;
-        v4rho2sigmalapl[18 * g + 13] = 0.0;
-        v4rho2sigmalapl[18 * g + 14] = 0.0;
-        v4rho2sigmalapl[18 * g + 15] = 0.0;
-        v4rho2sigmalapl[18 * g + 16] = 0.0;
-        v4rho2sigmalapl[18 * g + 17] = 0.0;
-
-        v4rho2sigmatau[18 * g + 0]  = 0.0;
-        v4rho2sigmatau[18 * g + 1]  = 0.0;
-        v4rho2sigmatau[18 * g + 2]  = 0.0;
-        v4rho2sigmatau[18 * g + 3]  = 0.0;
-        v4rho2sigmatau[18 * g + 4]  = 0.0;
-        v4rho2sigmatau[18 * g + 5]  = 0.0;
-        v4rho2sigmatau[18 * g + 6]  = 0.0;
-        v4rho2sigmatau[18 * g + 7]  = 0.0;
-        v4rho2sigmatau[18 * g + 8]  = 0.0;
-        v4rho2sigmatau[18 * g + 9]  = 0.0;
-        v4rho2sigmatau[18 * g + 10] = 0.0;
-        v4rho2sigmatau[18 * g + 11] = 0.0;
-        v4rho2sigmatau[18 * g + 12] = 0.0;
-        v4rho2sigmatau[18 * g + 13] = 0.0;
-        v4rho2sigmatau[18 * g + 14] = 0.0;
-        v4rho2sigmatau[18 * g + 15] = 0.0;
-        v4rho2sigmatau[18 * g + 16] = 0.0;
-        v4rho2sigmatau[18 * g + 17] = 0.0;
-
-        v4rho2lapl2[9 * g + 0] = 0.0;
-        v4rho2lapl2[9 * g + 1] = 0.0;
-        v4rho2lapl2[9 * g + 2] = 0.0;
-        v4rho2lapl2[9 * g + 3] = 0.0;
-        v4rho2lapl2[9 * g + 4] = 0.0;
-        v4rho2lapl2[9 * g + 5] = 0.0;
-        v4rho2lapl2[9 * g + 6] = 0.0;
-        v4rho2lapl2[9 * g + 7] = 0.0;
-        v4rho2lapl2[9 * g + 8] = 0.0;
-
-        v4rho2lapltau[12 * g + 0]  = 0.0;
-        v4rho2lapltau[12 * g + 1]  = 0.0;
-        v4rho2lapltau[12 * g + 2]  = 0.0;
-        v4rho2lapltau[12 * g + 3]  = 0.0;
-        v4rho2lapltau[12 * g + 4]  = 0.0;
-        v4rho2lapltau[12 * g + 5]  = 0.0;
-        v4rho2lapltau[12 * g + 6]  = 0.0;
-        v4rho2lapltau[12 * g + 7]  = 0.0;
-        v4rho2lapltau[12 * g + 8]  = 0.0;
-        v4rho2lapltau[12 * g + 9]  = 0.0;
-        v4rho2lapltau[12 * g + 10] = 0.0;
-        v4rho2lapltau[12 * g + 11] = 0.0;
-
-        v4rho2tau2[9 * g + 0] = 0.0;
-        v4rho2tau2[9 * g + 1] = 0.0;
-        v4rho2tau2[9 * g + 2] = 0.0;
-        v4rho2tau2[9 * g + 3] = 0.0;
-        v4rho2tau2[9 * g + 4] = 0.0;
-        v4rho2tau2[9 * g + 5] = 0.0;
-        v4rho2tau2[9 * g + 6] = 0.0;
-        v4rho2tau2[9 * g + 7] = 0.0;
-        v4rho2tau2[9 * g + 8] = 0.0;
-
-        v4rhosigma3[20 * g + 0]  = 0.0;
-        v4rhosigma3[20 * g + 1]  = 0.0;
-        v4rhosigma3[20 * g + 2]  = 0.0;
-        v4rhosigma3[20 * g + 3]  = 0.0;
-        v4rhosigma3[20 * g + 4]  = 0.0;
-        v4rhosigma3[20 * g + 5]  = 0.0;
-        v4rhosigma3[20 * g + 6]  = 0.0;
-        v4rhosigma3[20 * g + 7]  = 0.0;
-        v4rhosigma3[20 * g + 8]  = 0.0;
-        v4rhosigma3[20 * g + 9]  = 0.0;
-        v4rhosigma3[20 * g + 10] = 0.0;
-        v4rhosigma3[20 * g + 11] = 0.0;
-        v4rhosigma3[20 * g + 12] = 0.0;
-        v4rhosigma3[20 * g + 13] = 0.0;
-        v4rhosigma3[20 * g + 14] = 0.0;
-        v4rhosigma3[20 * g + 15] = 0.0;
-        v4rhosigma3[20 * g + 16] = 0.0;
-        v4rhosigma3[20 * g + 17] = 0.0;
-        v4rhosigma3[20 * g + 18] = 0.0;
-        v4rhosigma3[20 * g + 19] = 0.0;
-
-        // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24)
-        v4rhosigma2lapl[36 * g + 0]  = 0.0;
-        v4rhosigma2lapl[36 * g + 1]  = 0.0;
-        v4rhosigma2lapl[36 * g + 2]  = 0.0;
-        v4rhosigma2lapl[36 * g + 3]  = 0.0;
-        v4rhosigma2lapl[36 * g + 4]  = 0.0;
-        v4rhosigma2lapl[36 * g + 5]  = 0.0;
-        v4rhosigma2lapl[36 * g + 6]  = 0.0;
-        v4rhosigma2lapl[36 * g + 7]  = 0.0;
-        v4rhosigma2lapl[36 * g + 8]  = 0.0;
-        v4rhosigma2lapl[36 * g + 9]  = 0.0;
-        v4rhosigma2lapl[36 * g + 10] = 0.0;
-        v4rhosigma2lapl[36 * g + 11] = 0.0;
-        v4rhosigma2lapl[36 * g + 12] = 0.0;
-        v4rhosigma2lapl[36 * g + 13] = 0.0;
-        v4rhosigma2lapl[36 * g + 14] = 0.0;
-        v4rhosigma2lapl[36 * g + 15] = 0.0;
-        v4rhosigma2lapl[36 * g + 16] = 0.0;
-        v4rhosigma2lapl[36 * g + 17] = 0.0;
-        v4rhosigma2lapl[36 * g + 18] = 0.0;
-        v4rhosigma2lapl[36 * g + 19] = 0.0;
-        v4rhosigma2lapl[36 * g + 20] = 0.0;
-        v4rhosigma2lapl[36 * g + 21] = 0.0;
-        v4rhosigma2lapl[36 * g + 22] = 0.0;
-        v4rhosigma2lapl[36 * g + 23] = 0.0;
-
-        // v4rhosigma2tau: inconsistent size in libxc (36 vs 24)
-        v4rhosigma2tau[36 * g + 0]  = 0.0;
-        v4rhosigma2tau[36 * g + 1]  = 0.0;
-        v4rhosigma2tau[36 * g + 2]  = 0.0;
-        v4rhosigma2tau[36 * g + 3]  = 0.0;
-        v4rhosigma2tau[36 * g + 4]  = 0.0;
-        v4rhosigma2tau[36 * g + 5]  = 0.0;
-        v4rhosigma2tau[36 * g + 6]  = 0.0;
-        v4rhosigma2tau[36 * g + 7]  = 0.0;
-        v4rhosigma2tau[36 * g + 8]  = 0.0;
-        v4rhosigma2tau[36 * g + 9]  = 0.0;
-        v4rhosigma2tau[36 * g + 10] = 0.0;
-        v4rhosigma2tau[36 * g + 11] = 0.0;
-        v4rhosigma2tau[36 * g + 12] = 0.0;
-        v4rhosigma2tau[36 * g + 13] = 0.0;
-        v4rhosigma2tau[36 * g + 14] = 0.0;
-        v4rhosigma2tau[36 * g + 15] = 0.0;
-        v4rhosigma2tau[36 * g + 16] = 0.0;
-        v4rhosigma2tau[36 * g + 17] = 0.0;
-        v4rhosigma2tau[36 * g + 18] = 0.0;
-        v4rhosigma2tau[36 * g + 19] = 0.0;
-        v4rhosigma2tau[36 * g + 20] = 0.0;
-        v4rhosigma2tau[36 * g + 21] = 0.0;
-        v4rhosigma2tau[36 * g + 22] = 0.0;
-        v4rhosigma2tau[36 * g + 23] = 0.0;
-
-        v4rhosigmalapl2[18 * g + 0]  = 0.0;
-        v4rhosigmalapl2[18 * g + 1]  = 0.0;
-        v4rhosigmalapl2[18 * g + 2]  = 0.0;
-        v4rhosigmalapl2[18 * g + 3]  = 0.0;
-        v4rhosigmalapl2[18 * g + 4]  = 0.0;
-        v4rhosigmalapl2[18 * g + 5]  = 0.0;
-        v4rhosigmalapl2[18 * g + 6]  = 0.0;
-        v4rhosigmalapl2[18 * g + 7]  = 0.0;
-        v4rhosigmalapl2[18 * g + 8]  = 0.0;
-        v4rhosigmalapl2[18 * g + 9]  = 0.0;
-        v4rhosigmalapl2[18 * g + 10] = 0.0;
-        v4rhosigmalapl2[18 * g + 11] = 0.0;
-        v4rhosigmalapl2[18 * g + 12] = 0.0;
-        v4rhosigmalapl2[18 * g + 13] = 0.0;
-        v4rhosigmalapl2[18 * g + 14] = 0.0;
-        v4rhosigmalapl2[18 * g + 15] = 0.0;
-        v4rhosigmalapl2[18 * g + 16] = 0.0;
-        v4rhosigmalapl2[18 * g + 17] = 0.0;
-
-        v4rhosigmalapltau[24 * g + 0]  = 0.0;
-        v4rhosigmalapltau[24 * g + 1]  = 0.0;
-        v4rhosigmalapltau[24 * g + 2]  = 0.0;
-        v4rhosigmalapltau[24 * g + 3]  = 0.0;
-        v4rhosigmalapltau[24 * g + 4]  = 0.0;
-        v4rhosigmalapltau[24 * g + 5]  = 0.0;
-        v4rhosigmalapltau[24 * g + 6]  = 0.0;
-        v4rhosigmalapltau[24 * g + 7]  = 0.0;
-        v4rhosigmalapltau[24 * g + 8]  = 0.0;
-        v4rhosigmalapltau[24 * g + 9]  = 0.0;
-        v4rhosigmalapltau[24 * g + 10] = 0.0;
-        v4rhosigmalapltau[24 * g + 11] = 0.0;
-        v4rhosigmalapltau[24 * g + 12] = 0.0;
-        v4rhosigmalapltau[24 * g + 13] = 0.0;
-        v4rhosigmalapltau[24 * g + 14] = 0.0;
-        v4rhosigmalapltau[24 * g + 15] = 0.0;
-        v4rhosigmalapltau[24 * g + 16] = 0.0;
-        v4rhosigmalapltau[24 * g + 17] = 0.0;
-        v4rhosigmalapltau[24 * g + 18] = 0.0;
-        v4rhosigmalapltau[24 * g + 19] = 0.0;
-        v4rhosigmalapltau[24 * g + 20] = 0.0;
-        v4rhosigmalapltau[24 * g + 21] = 0.0;
-        v4rhosigmalapltau[24 * g + 22] = 0.0;
-        v4rhosigmalapltau[24 * g + 23] = 0.0;
-
-        // v4rhosigmatau2: inconsistent size in libxc (36 vs 18)
-        v4rhosigmatau2[36 * g + 0]  = 0.0;
-        v4rhosigmatau2[36 * g + 1]  = 0.0;
-        v4rhosigmatau2[36 * g + 2]  = 0.0;
-        v4rhosigmatau2[36 * g + 3]  = 0.0;
-        v4rhosigmatau2[36 * g + 4]  = 0.0;
-        v4rhosigmatau2[36 * g + 5]  = 0.0;
-        v4rhosigmatau2[36 * g + 6]  = 0.0;
-        v4rhosigmatau2[36 * g + 7]  = 0.0;
-        v4rhosigmatau2[36 * g + 8]  = 0.0;
-        v4rhosigmatau2[36 * g + 9]  = 0.0;
-        v4rhosigmatau2[36 * g + 10] = 0.0;
-        v4rhosigmatau2[36 * g + 11] = 0.0;
-        v4rhosigmatau2[36 * g + 12] = 0.0;
-        v4rhosigmatau2[36 * g + 13] = 0.0;
-        v4rhosigmatau2[36 * g + 14] = 0.0;
-        v4rhosigmatau2[36 * g + 15] = 0.0;
-        v4rhosigmatau2[36 * g + 16] = 0.0;
-        v4rhosigmatau2[36 * g + 17] = 0.0;
-
-        v4rholapl3[8 * g + 0] = 0.0;
-        v4rholapl3[8 * g + 1] = 0.0;
-        v4rholapl3[8 * g + 2] = 0.0;
-        v4rholapl3[8 * g + 3] = 0.0;
-        v4rholapl3[8 * g + 4] = 0.0;
-        v4rholapl3[8 * g + 5] = 0.0;
-        v4rholapl3[8 * g + 6] = 0.0;
-        v4rholapl3[8 * g + 7] = 0.0;
-
-        v4rholapl2tau[12 * g + 0]  = 0.0;
-        v4rholapl2tau[12 * g + 1]  = 0.0;
-        v4rholapl2tau[12 * g + 2]  = 0.0;
-        v4rholapl2tau[12 * g + 3]  = 0.0;
-        v4rholapl2tau[12 * g + 4]  = 0.0;
-        v4rholapl2tau[12 * g + 5]  = 0.0;
-        v4rholapl2tau[12 * g + 6]  = 0.0;
-        v4rholapl2tau[12 * g + 7]  = 0.0;
-        v4rholapl2tau[12 * g + 8]  = 0.0;
-        v4rholapl2tau[12 * g + 9]  = 0.0;
-        v4rholapl2tau[12 * g + 10] = 0.0;
-        v4rholapl2tau[12 * g + 11] = 0.0;
-
-        v4rholapltau2[12 * g + 0]  = 0.0;
-        v4rholapltau2[12 * g + 1]  = 0.0;
-        v4rholapltau2[12 * g + 2]  = 0.0;
-        v4rholapltau2[12 * g + 3]  = 0.0;
-        v4rholapltau2[12 * g + 4]  = 0.0;
-        v4rholapltau2[12 * g + 5]  = 0.0;
-        v4rholapltau2[12 * g + 6]  = 0.0;
-        v4rholapltau2[12 * g + 7]  = 0.0;
-        v4rholapltau2[12 * g + 8]  = 0.0;
-        v4rholapltau2[12 * g + 9]  = 0.0;
-        v4rholapltau2[12 * g + 10] = 0.0;
-        v4rholapltau2[12 * g + 11] = 0.0;
-
-        v4rhotau3[8 * g + 0] = 0.0;
-        v4rhotau3[8 * g + 1] = 0.0;
-        v4rhotau3[8 * g + 2] = 0.0;
-        v4rhotau3[8 * g + 3] = 0.0;
-        v4rhotau3[8 * g + 4] = 0.0;
-        v4rhotau3[8 * g + 5] = 0.0;
-        v4rhotau3[8 * g + 6] = 0.0;
-        v4rhotau3[8 * g + 7] = 0.0;
-
-        v4sigma4[15 * g + 0]  = 0.0;
-        v4sigma4[15 * g + 1]  = 0.0;
-        v4sigma4[15 * g + 2]  = 0.0;
-        v4sigma4[15 * g + 3]  = 0.0;
-        v4sigma4[15 * g + 4]  = 0.0;
-        v4sigma4[15 * g + 5]  = 0.0;
-        v4sigma4[15 * g + 6]  = 0.0;
-        v4sigma4[15 * g + 7]  = 0.0;
-        v4sigma4[15 * g + 8]  = 0.0;
-        v4sigma4[15 * g + 9]  = 0.0;
-        v4sigma4[15 * g + 10] = 0.0;
-        v4sigma4[15 * g + 11] = 0.0;
-        v4sigma4[15 * g + 12] = 0.0;
-        v4sigma4[15 * g + 13] = 0.0;
-        v4sigma4[15 * g + 14] = 0.0;
-
-        v4sigma3lapl[20 * g + 0]  = 0.0;
-        v4sigma3lapl[20 * g + 1]  = 0.0;
-        v4sigma3lapl[20 * g + 2]  = 0.0;
-        v4sigma3lapl[20 * g + 3]  = 0.0;
-        v4sigma3lapl[20 * g + 4]  = 0.0;
-        v4sigma3lapl[20 * g + 5]  = 0.0;
-        v4sigma3lapl[20 * g + 6]  = 0.0;
-        v4sigma3lapl[20 * g + 7]  = 0.0;
-        v4sigma3lapl[20 * g + 8]  = 0.0;
-        v4sigma3lapl[20 * g + 9]  = 0.0;
-        v4sigma3lapl[20 * g + 10] = 0.0;
-        v4sigma3lapl[20 * g + 11] = 0.0;
-        v4sigma3lapl[20 * g + 12] = 0.0;
-        v4sigma3lapl[20 * g + 13] = 0.0;
-        v4sigma3lapl[20 * g + 14] = 0.0;
-        v4sigma3lapl[20 * g + 15] = 0.0;
-        v4sigma3lapl[20 * g + 16] = 0.0;
-        v4sigma3lapl[20 * g + 17] = 0.0;
-        v4sigma3lapl[20 * g + 18] = 0.0;
-        v4sigma3lapl[20 * g + 19] = 0.0;
-
-        // v4sigma3tau: inconsistent size in libxc (30 vs 20)
-        v4sigma3tau[30 * g + 0]  = 0.0;
-        v4sigma3tau[30 * g + 1]  = 0.0;
-        v4sigma3tau[30 * g + 2]  = 0.0;
-        v4sigma3tau[30 * g + 3]  = 0.0;
-        v4sigma3tau[30 * g + 4]  = 0.0;
-        v4sigma3tau[30 * g + 5]  = 0.0;
-        v4sigma3tau[30 * g + 6]  = 0.0;
-        v4sigma3tau[30 * g + 7]  = 0.0;
-        v4sigma3tau[30 * g + 8]  = 0.0;
-        v4sigma3tau[30 * g + 9]  = 0.0;
-        v4sigma3tau[30 * g + 10] = 0.0;
-        v4sigma3tau[30 * g + 11] = 0.0;
-        v4sigma3tau[30 * g + 12] = 0.0;
-        v4sigma3tau[30 * g + 13] = 0.0;
-        v4sigma3tau[30 * g + 14] = 0.0;
-        v4sigma3tau[30 * g + 15] = 0.0;
-        v4sigma3tau[30 * g + 16] = 0.0;
-        v4sigma3tau[30 * g + 17] = 0.0;
-        v4sigma3tau[30 * g + 18] = 0.0;
-        v4sigma3tau[30 * g + 19] = 0.0;
-
-        v4sigma2lapl2[18 * g + 0]  = 0.0;
-        v4sigma2lapl2[18 * g + 1]  = 0.0;
-        v4sigma2lapl2[18 * g + 2]  = 0.0;
-        v4sigma2lapl2[18 * g + 3]  = 0.0;
-        v4sigma2lapl2[18 * g + 4]  = 0.0;
-        v4sigma2lapl2[18 * g + 5]  = 0.0;
-        v4sigma2lapl2[18 * g + 6]  = 0.0;
-        v4sigma2lapl2[18 * g + 7]  = 0.0;
-        v4sigma2lapl2[18 * g + 8]  = 0.0;
-        v4sigma2lapl2[18 * g + 9]  = 0.0;
-        v4sigma2lapl2[18 * g + 10] = 0.0;
-        v4sigma2lapl2[18 * g + 11] = 0.0;
-        v4sigma2lapl2[18 * g + 12] = 0.0;
-        v4sigma2lapl2[18 * g + 13] = 0.0;
-        v4sigma2lapl2[18 * g + 14] = 0.0;
-        v4sigma2lapl2[18 * g + 15] = 0.0;
-        v4sigma2lapl2[18 * g + 16] = 0.0;
-        v4sigma2lapl2[18 * g + 17] = 0.0;
-
-        v4sigma2lapltau[24 * g + 0]  = 0.0;
-        v4sigma2lapltau[24 * g + 1]  = 0.0;
-        v4sigma2lapltau[24 * g + 2]  = 0.0;
-        v4sigma2lapltau[24 * g + 3]  = 0.0;
-        v4sigma2lapltau[24 * g + 4]  = 0.0;
-        v4sigma2lapltau[24 * g + 5]  = 0.0;
-        v4sigma2lapltau[24 * g + 6]  = 0.0;
-        v4sigma2lapltau[24 * g + 7]  = 0.0;
-        v4sigma2lapltau[24 * g + 8]  = 0.0;
-        v4sigma2lapltau[24 * g + 9]  = 0.0;
-        v4sigma2lapltau[24 * g + 10] = 0.0;
-        v4sigma2lapltau[24 * g + 11] = 0.0;
-        v4sigma2lapltau[24 * g + 12] = 0.0;
-        v4sigma2lapltau[24 * g + 13] = 0.0;
-        v4sigma2lapltau[24 * g + 14] = 0.0;
-        v4sigma2lapltau[24 * g + 15] = 0.0;
-        v4sigma2lapltau[24 * g + 16] = 0.0;
-        v4sigma2lapltau[24 * g + 17] = 0.0;
-        v4sigma2lapltau[24 * g + 18] = 0.0;
-        v4sigma2lapltau[24 * g + 19] = 0.0;
-        v4sigma2lapltau[24 * g + 20] = 0.0;
-        v4sigma2lapltau[24 * g + 21] = 0.0;
-        v4sigma2lapltau[24 * g + 22] = 0.0;
-        v4sigma2lapltau[24 * g + 23] = 0.0;
-
-        v4sigma2tau2[18 * g + 0]  = 0.0;
-        v4sigma2tau2[18 * g + 1]  = 0.0;
-        v4sigma2tau2[18 * g + 2]  = 0.0;
-        v4sigma2tau2[18 * g + 3]  = 0.0;
-        v4sigma2tau2[18 * g + 4]  = 0.0;
-        v4sigma2tau2[18 * g + 5]  = 0.0;
-        v4sigma2tau2[18 * g + 6]  = 0.0;
-        v4sigma2tau2[18 * g + 7]  = 0.0;
-        v4sigma2tau2[18 * g + 8]  = 0.0;
-        v4sigma2tau2[18 * g + 9]  = 0.0;
-        v4sigma2tau2[18 * g + 10] = 0.0;
-        v4sigma2tau2[18 * g + 11] = 0.0;
-        v4sigma2tau2[18 * g + 12] = 0.0;
-        v4sigma2tau2[18 * g + 13] = 0.0;
-        v4sigma2tau2[18 * g + 14] = 0.0;
-        v4sigma2tau2[18 * g + 15] = 0.0;
-        v4sigma2tau2[18 * g + 16] = 0.0;
-        v4sigma2tau2[18 * g + 17] = 0.0;
-
-        v4sigmalapl3[12 * g + 0]  = 0.0;
-        v4sigmalapl3[12 * g + 1]  = 0.0;
-        v4sigmalapl3[12 * g + 2]  = 0.0;
-        v4sigmalapl3[12 * g + 3]  = 0.0;
-        v4sigmalapl3[12 * g + 4]  = 0.0;
-        v4sigmalapl3[12 * g + 5]  = 0.0;
-        v4sigmalapl3[12 * g + 6]  = 0.0;
-        v4sigmalapl3[12 * g + 7]  = 0.0;
-        v4sigmalapl3[12 * g + 8]  = 0.0;
-        v4sigmalapl3[12 * g + 9]  = 0.0;
-        v4sigmalapl3[12 * g + 10] = 0.0;
-        v4sigmalapl3[12 * g + 11] = 0.0;
-
-        v4sigmalapl2tau[18 * g + 0]  = 0.0;
-        v4sigmalapl2tau[18 * g + 1]  = 0.0;
-        v4sigmalapl2tau[18 * g + 2]  = 0.0;
-        v4sigmalapl2tau[18 * g + 3]  = 0.0;
-        v4sigmalapl2tau[18 * g + 4]  = 0.0;
-        v4sigmalapl2tau[18 * g + 5]  = 0.0;
-        v4sigmalapl2tau[18 * g + 6]  = 0.0;
-        v4sigmalapl2tau[18 * g + 7]  = 0.0;
-        v4sigmalapl2tau[18 * g + 8]  = 0.0;
-        v4sigmalapl2tau[18 * g + 9]  = 0.0;
-        v4sigmalapl2tau[18 * g + 10] = 0.0;
-        v4sigmalapl2tau[18 * g + 11] = 0.0;
-        v4sigmalapl2tau[18 * g + 12] = 0.0;
-        v4sigmalapl2tau[18 * g + 13] = 0.0;
-        v4sigmalapl2tau[18 * g + 14] = 0.0;
-        v4sigmalapl2tau[18 * g + 15] = 0.0;
-        v4sigmalapl2tau[18 * g + 16] = 0.0;
-        v4sigmalapl2tau[18 * g + 17] = 0.0;
-
-        v4sigmalapltau2[18 * g + 0]  = 0.0;
-        v4sigmalapltau2[18 * g + 1]  = 0.0;
-        v4sigmalapltau2[18 * g + 2]  = 0.0;
-        v4sigmalapltau2[18 * g + 3]  = 0.0;
-        v4sigmalapltau2[18 * g + 4]  = 0.0;
-        v4sigmalapltau2[18 * g + 5]  = 0.0;
-        v4sigmalapltau2[18 * g + 6]  = 0.0;
-        v4sigmalapltau2[18 * g + 7]  = 0.0;
-        v4sigmalapltau2[18 * g + 8]  = 0.0;
-        v4sigmalapltau2[18 * g + 9]  = 0.0;
-        v4sigmalapltau2[18 * g + 10] = 0.0;
-        v4sigmalapltau2[18 * g + 11] = 0.0;
-        v4sigmalapltau2[18 * g + 12] = 0.0;
-        v4sigmalapltau2[18 * g + 13] = 0.0;
-        v4sigmalapltau2[18 * g + 14] = 0.0;
-        v4sigmalapltau2[18 * g + 15] = 0.0;
-        v4sigmalapltau2[18 * g + 16] = 0.0;
-        v4sigmalapltau2[18 * g + 17] = 0.0;
-
-        v4sigmatau3[12 * g + 0]  = 0.0;
-        v4sigmatau3[12 * g + 1]  = 0.0;
-        v4sigmatau3[12 * g + 2]  = 0.0;
-        v4sigmatau3[12 * g + 3]  = 0.0;
-        v4sigmatau3[12 * g + 4]  = 0.0;
-        v4sigmatau3[12 * g + 5]  = 0.0;
-        v4sigmatau3[12 * g + 6]  = 0.0;
-        v4sigmatau3[12 * g + 7]  = 0.0;
-        v4sigmatau3[12 * g + 8]  = 0.0;
-        v4sigmatau3[12 * g + 9]  = 0.0;
-        v4sigmatau3[12 * g + 10] = 0.0;
-        v4sigmatau3[12 * g + 11] = 0.0;
-
-        v4lapl4[5 * g + 0] = 0.0;
-        v4lapl4[5 * g + 1] = 0.0;
-        v4lapl4[5 * g + 2] = 0.0;
-        v4lapl4[5 * g + 3] = 0.0;
-        v4lapl4[5 * g + 4] = 0.0;
-
-        v4lapl3tau[8 * g + 0] = 0.0;
-        v4lapl3tau[8 * g + 1] = 0.0;
-        v4lapl3tau[8 * g + 2] = 0.0;
-        v4lapl3tau[8 * g + 3] = 0.0;
-        v4lapl3tau[8 * g + 4] = 0.0;
-        v4lapl3tau[8 * g + 5] = 0.0;
-        v4lapl3tau[8 * g + 6] = 0.0;
-        v4lapl3tau[8 * g + 7] = 0.0;
-
-        v4lapl2tau2[9 * g + 0] = 0.0;
-        v4lapl2tau2[9 * g + 1] = 0.0;
-        v4lapl2tau2[9 * g + 2] = 0.0;
-        v4lapl2tau2[9 * g + 3] = 0.0;
-        v4lapl2tau2[9 * g + 4] = 0.0;
-        v4lapl2tau2[9 * g + 5] = 0.0;
-        v4lapl2tau2[9 * g + 6] = 0.0;
-        v4lapl2tau2[9 * g + 7] = 0.0;
-        v4lapl2tau2[9 * g + 8] = 0.0;
-
-        v4lapltau3[8 * g + 0] = 0.0;
-        v4lapltau3[8 * g + 1] = 0.0;
-        v4lapltau3[8 * g + 2] = 0.0;
-        v4lapltau3[8 * g + 3] = 0.0;
-        v4lapltau3[8 * g + 4] = 0.0;
-        v4lapltau3[8 * g + 5] = 0.0;
-        v4lapltau3[8 * g + 6] = 0.0;
-        v4lapltau3[8 * g + 7] = 0.0;
-
-        v4tau4[5 * g + 0] = 0.0;
-        v4tau4[5 * g + 1] = 0.0;
-        v4tau4[5 * g + 2] = 0.0;
-        v4tau4[5 * g + 3] = 0.0;
-        v4tau4[5 * g + 4] = 0.0;
-    }
-
-    // should we allocate staging buffers? Or can we use the global one?
     bool alloc = (np > _ldStaging);
 
-    auto stage_v4rho4            = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[220 * _ldStaging];
-    auto stage_v4rho3sigma       = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[225 * _ldStaging];
-    auto stage_v4rho3lapl        = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[237 * _ldStaging];
-    auto stage_v4rho3tau         = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[245 * _ldStaging];
-    auto stage_v4rho2sigma2      = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[253 * _ldStaging];
-    auto stage_v4rho2sigmalapl   = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[271 * _ldStaging];
-    auto stage_v4rho2sigmatau    = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[289 * _ldStaging];
-    auto stage_v4rho2lapl2       = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[307 * _ldStaging];
-    auto stage_v4rho2lapltau     = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[316 * _ldStaging];
-    auto stage_v4rho2tau2        = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[328 * _ldStaging];
-    auto stage_v4rhosigma3       = (alloc) ? mem::malloc<double>(20 * np) : &_stagingBuffer[337 * _ldStaging];
-    auto stage_v4rhosigma2lapl   = (alloc) ? mem::malloc<double>(36 * np) : &_stagingBuffer[357 * _ldStaging];  // inconsistent size (36 vs 24);
-    auto stage_v4rhosigma2tau    = (alloc) ? mem::malloc<double>(36 * np) : &_stagingBuffer[393 * _ldStaging];  // inconsistent size (36 vs 24);
-    auto stage_v4rhosigmalapl2   = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[429 * _ldStaging];
-    auto stage_v4rhosigmalapltau = (alloc) ? mem::malloc<double>(24 * np) : &_stagingBuffer[447 * _ldStaging];
-    auto stage_v4rhosigmatau2    = (alloc) ? mem::malloc<double>(36 * np) : &_stagingBuffer[471 * _ldStaging];  // inconsistent size (36 vs 18);
-    auto stage_v4rholapl3        = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[507 * _ldStaging];
-    auto stage_v4rholapl2tau     = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[515 * _ldStaging];
-    auto stage_v4rholapltau2     = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[527 * _ldStaging];
-    auto stage_v4rhotau3         = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[539 * _ldStaging];
-    auto stage_v4sigma4          = (alloc) ? mem::malloc<double>(15 * np) : &_stagingBuffer[547 * _ldStaging];
-    auto stage_v4sigma3lapl      = (alloc) ? mem::malloc<double>(20 * np) : &_stagingBuffer[562 * _ldStaging];
-    auto stage_v4sigma3tau       = (alloc) ? mem::malloc<double>(30 * np) : &_stagingBuffer[582 * _ldStaging];  // inconsistent size (30 vs 20);
-    auto stage_v4sigma2lapl2     = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[612 * _ldStaging];
-    auto stage_v4sigma2lapltau   = (alloc) ? mem::malloc<double>(24 * np) : &_stagingBuffer[630 * _ldStaging];
-    auto stage_v4sigma2tau2      = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[654 * _ldStaging];
-    auto stage_v4sigmalapl3      = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[672 * _ldStaging];
-    auto stage_v4sigmalapl2tau   = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[684 * _ldStaging];
-    auto stage_v4sigmalapltau2   = (alloc) ? mem::malloc<double>(18 * np) : &_stagingBuffer[702 * _ldStaging];
-    auto stage_v4sigmatau3       = (alloc) ? mem::malloc<double>(12 * np) : &_stagingBuffer[720 * _ldStaging];
-    auto stage_v4lapl4           = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[732 * _ldStaging];
-    auto stage_v4lapl3tau        = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[737 * _ldStaging];
-    auto stage_v4lapl2tau2       = (alloc) ? mem::malloc<double>(9 * np) : &_stagingBuffer[745 * _ldStaging];
-    auto stage_v4lapltau3        = (alloc) ? mem::malloc<double>(8 * np) : &_stagingBuffer[754 * _ldStaging];
-    auto stage_v4tau4            = (alloc) ? mem::malloc<double>(5 * np) : &_stagingBuffer[762 * _ldStaging];
+    auto ind_cnt = _getIndicesAndCountsOfDerivatives();
 
-    for (const auto& xccomp : _components)
+    double* stage_v4rho4            = nullptr;
+    double* stage_v4rho3sigma       = nullptr;
+    double* stage_v4rho3lapl        = nullptr;
+    double* stage_v4rho3tau         = nullptr;
+    double* stage_v4rho2sigma2      = nullptr;
+    double* stage_v4rho2sigmalapl   = nullptr;
+    double* stage_v4rho2sigmatau    = nullptr;
+    double* stage_v4rho2lapl2       = nullptr;
+    double* stage_v4rho2lapltau     = nullptr;
+    double* stage_v4rho2tau2        = nullptr;
+    double* stage_v4rhosigma3       = nullptr;
+    double* stage_v4rhosigma2lapl   = nullptr;
+    double* stage_v4rhosigma2tau    = nullptr;
+    double* stage_v4rhosigmalapl2   = nullptr;
+    double* stage_v4rhosigmalapltau = nullptr;
+    double* stage_v4rhosigmatau2    = nullptr;
+    double* stage_v4rholapl3        = nullptr;
+    double* stage_v4rholapl2tau     = nullptr;
+    double* stage_v4rholapltau2     = nullptr;
+    double* stage_v4rhotau3         = nullptr;
+    double* stage_v4sigma4          = nullptr;
+    double* stage_v4sigma3lapl      = nullptr;
+    double* stage_v4sigma3tau       = nullptr;
+    double* stage_v4sigma2lapl2     = nullptr;
+    double* stage_v4sigma2lapltau   = nullptr;
+    double* stage_v4sigma2tau2      = nullptr;
+    double* stage_v4sigmalapl3      = nullptr;
+    double* stage_v4sigmalapl2tau   = nullptr;
+    double* stage_v4sigmalapltau2   = nullptr;
+    double* stage_v4sigmatau3       = nullptr;
+    double* stage_v4lapl4           = nullptr;
+    double* stage_v4lapl3tau        = nullptr;
+    double* stage_v4lapl2tau2       = nullptr;
+    double* stage_v4lapltau3        = nullptr;
+    double* stage_v4tau4            = nullptr;
+
+    if (alloc)
     {
-        auto funcptr = xccomp.getFunctionalPointer();
+        stage_v4rho4            = mem::malloc<double>(ind_cnt["v4rho4"][1] * np);
+        stage_v4rho3sigma       = mem::malloc<double>(ind_cnt["v4rho3sigma"][1] * np);
+        stage_v4rho3lapl        = mem::malloc<double>(ind_cnt["v4rho3lapl"][1] * np);
+        stage_v4rho3tau         = mem::malloc<double>(ind_cnt["v4rho3tau"][1] * np);
+        stage_v4rho2sigma2      = mem::malloc<double>(ind_cnt["v4rho2sigma2"][1] * np);
+        stage_v4rho2sigmalapl   = mem::malloc<double>(ind_cnt["v4rho2sigmalapl"][1] * np);
+        stage_v4rho2sigmatau    = mem::malloc<double>(ind_cnt["v4rho2sigmatau"][1] * np);
+        stage_v4rho2lapl2       = mem::malloc<double>(ind_cnt["v4rho2lapl2"][1] * np);
+        stage_v4rho2lapltau     = mem::malloc<double>(ind_cnt["v4rho2lapltau"][1] * np);
+        stage_v4rho2tau2        = mem::malloc<double>(ind_cnt["v4rho2tau2"][1] * np);
+        stage_v4rhosigma3       = mem::malloc<double>(ind_cnt["v4rhosigma3"][1] * np);
+        stage_v4rhosigma2lapl   = mem::malloc<double>(ind_cnt["v4rhosigma2lapl"][1] * np);
+        stage_v4rhosigma2tau    = mem::malloc<double>(ind_cnt["v4rhosigma2tau"][1] * np);
+        stage_v4rhosigmalapl2   = mem::malloc<double>(ind_cnt["v4rhosigmalapl2"][1] * np);
+        stage_v4rhosigmalapltau = mem::malloc<double>(ind_cnt["v4rhosigmalapltau"][1] * np);
+        stage_v4rhosigmatau2    = mem::malloc<double>(ind_cnt["v4rhosigmatau2"][1] * np);
+        stage_v4rholapl3        = mem::malloc<double>(ind_cnt["v4rholapl3"][1] * np);
+        stage_v4rholapl2tau     = mem::malloc<double>(ind_cnt["v4rholapl2tau"][1] * np);
+        stage_v4rholapltau2     = mem::malloc<double>(ind_cnt["v4rholapltau2"][1] * np);
+        stage_v4rhotau3         = mem::malloc<double>(ind_cnt["v4rhotau3"][1] * np);
+        stage_v4sigma4          = mem::malloc<double>(ind_cnt["v4sigma4"][1] * np);
+        stage_v4sigma3lapl      = mem::malloc<double>(ind_cnt["v4sigma3lapl"][1] * np);
+        stage_v4sigma3tau       = mem::malloc<double>(ind_cnt["v4sigma3tau"][1] * np);
+        stage_v4sigma2lapl2     = mem::malloc<double>(ind_cnt["v4sigma2lapl2"][1] * np);
+        stage_v4sigma2lapltau   = mem::malloc<double>(ind_cnt["v4sigma2lapltau"][1] * np);
+        stage_v4sigma2tau2      = mem::malloc<double>(ind_cnt["v4sigma2tau2"][1] * np);
+        stage_v4sigmalapl3      = mem::malloc<double>(ind_cnt["v4sigmalapl3"][1] * np);
+        stage_v4sigmalapl2tau   = mem::malloc<double>(ind_cnt["v4sigmalapl2tau"][1] * np);
+        stage_v4sigmalapltau2   = mem::malloc<double>(ind_cnt["v4sigmalapltau2"][1] * np);
+        stage_v4sigmatau3       = mem::malloc<double>(ind_cnt["v4sigmatau3"][1] * np);
+        stage_v4lapl4           = mem::malloc<double>(ind_cnt["v4lapl4"][1] * np);
+        stage_v4lapl3tau        = mem::malloc<double>(ind_cnt["v4lapl3tau"][1] * np);
+        stage_v4lapl2tau2       = mem::malloc<double>(ind_cnt["v4lapl2tau2"][1] * np);
+        stage_v4lapltau3        = mem::malloc<double>(ind_cnt["v4lapltau3"][1] * np);
+        stage_v4tau4            = mem::malloc<double>(ind_cnt["v4tau4"][1] * np);
+    }
+    else
+    {
+        stage_v4rho4            = &_stagingBuffer[ind_cnt["v4rho4"][0] * _ldStaging];
+        stage_v4rho3sigma       = &_stagingBuffer[ind_cnt["v4rho3sigma"][0] * _ldStaging];
+        stage_v4rho3lapl        = &_stagingBuffer[ind_cnt["v4rho3lapl"][0] * _ldStaging];
+        stage_v4rho3tau         = &_stagingBuffer[ind_cnt["v4rho3tau"][0] * _ldStaging];
+        stage_v4rho2sigma2      = &_stagingBuffer[ind_cnt["v4rho2sigma2"][0] * _ldStaging];
+        stage_v4rho2sigmalapl   = &_stagingBuffer[ind_cnt["v4rho2sigmalapl"][0] * _ldStaging];
+        stage_v4rho2sigmatau    = &_stagingBuffer[ind_cnt["v4rho2sigmatau"][0] * _ldStaging];
+        stage_v4rho2lapl2       = &_stagingBuffer[ind_cnt["v4rho2lapl2"][0] * _ldStaging];
+        stage_v4rho2lapltau     = &_stagingBuffer[ind_cnt["v4rho2lapltau"][0] * _ldStaging];
+        stage_v4rho2tau2        = &_stagingBuffer[ind_cnt["v4rho2tau2"][0] * _ldStaging];
+        stage_v4rhosigma3       = &_stagingBuffer[ind_cnt["v4rhosigma3"][0] * _ldStaging];
+        stage_v4rhosigma2lapl   = &_stagingBuffer[ind_cnt["v4rhosigma2lapl"][0] * _ldStaging];
+        stage_v4rhosigma2tau    = &_stagingBuffer[ind_cnt["v4rhosigma2tau"][0] * _ldStaging];
+        stage_v4rhosigmalapl2   = &_stagingBuffer[ind_cnt["v4rhosigmalapl2"][0] * _ldStaging];
+        stage_v4rhosigmalapltau = &_stagingBuffer[ind_cnt["v4rhosigmalapltau"][0] * _ldStaging];
+        stage_v4rhosigmatau2    = &_stagingBuffer[ind_cnt["v4rhosigmatau2"][0] * _ldStaging];
+        stage_v4rholapl3        = &_stagingBuffer[ind_cnt["v4rholapl3"][0] * _ldStaging];
+        stage_v4rholapl2tau     = &_stagingBuffer[ind_cnt["v4rholapl2tau"][0] * _ldStaging];
+        stage_v4rholapltau2     = &_stagingBuffer[ind_cnt["v4rholapltau2"][0] * _ldStaging];
+        stage_v4rhotau3         = &_stagingBuffer[ind_cnt["v4rhotau3"][0] * _ldStaging];
+        stage_v4sigma4          = &_stagingBuffer[ind_cnt["v4sigma4"][0] * _ldStaging];
+        stage_v4sigma3lapl      = &_stagingBuffer[ind_cnt["v4sigma3lapl"][0] * _ldStaging];
+        stage_v4sigma3tau       = &_stagingBuffer[ind_cnt["v4sigma3tau"][0] * _ldStaging];
+        stage_v4sigma2lapl2     = &_stagingBuffer[ind_cnt["v4sigma2lapl2"][0] * _ldStaging];
+        stage_v4sigma2lapltau   = &_stagingBuffer[ind_cnt["v4sigma2lapltau"][0] * _ldStaging];
+        stage_v4sigma2tau2      = &_stagingBuffer[ind_cnt["v4sigma2tau2"][0] * _ldStaging];
+        stage_v4sigmalapl3      = &_stagingBuffer[ind_cnt["v4sigmalapl3"][0] * _ldStaging];
+        stage_v4sigmalapl2tau   = &_stagingBuffer[ind_cnt["v4sigmalapl2tau"][0] * _ldStaging];
+        stage_v4sigmalapltau2   = &_stagingBuffer[ind_cnt["v4sigmalapltau2"][0] * _ldStaging];
+        stage_v4sigmatau3       = &_stagingBuffer[ind_cnt["v4sigmatau3"][0] * _ldStaging];
+        stage_v4lapl4           = &_stagingBuffer[ind_cnt["v4lapl4"][0] * _ldStaging];
+        stage_v4lapl3tau        = &_stagingBuffer[ind_cnt["v4lapl3tau"][0] * _ldStaging];
+        stage_v4lapl2tau2       = &_stagingBuffer[ind_cnt["v4lapl2tau2"][0] * _ldStaging];
+        stage_v4lapltau3        = &_stagingBuffer[ind_cnt["v4lapltau3"][0] * _ldStaging];
+        stage_v4tau4            = &_stagingBuffer[ind_cnt["v4tau4"][0] * _ldStaging];
+    }
 
-        const auto c = xccomp.getScalingFactor();
+    // compute derivatives
 
-        auto family = funcptr->info->family;
+    auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
+    const auto dim      = &(mggafunc->dim);
 
-        if ((family == XC_FAMILY_LDA) || (family == XC_FAMILY_HYB_LDA))
+    auto nthreads = omp_get_max_threads();
+
+    #pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto grid_batch_size = mpi::batch_size(np, thread_id, nthreads);
+
+        auto grid_batch_offset = mpi::batch_offset(np, thread_id, nthreads);
+
+        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
         {
-            xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
-
-            #pragma omp simd aligned(v4rho4, stage_v4rho4 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            for (int ind = 0; ind < dim->v4rho4; ++ind)
             {
-                v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
-                v4rho4[5 * g + 1] += c * stage_v4rho4[5 * g + 1];
-                v4rho4[5 * g + 2] += c * stage_v4rho4[5 * g + 2];
-                v4rho4[5 * g + 3] += c * stage_v4rho4[5 * g + 3];
-                v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
+                v4rho4[dim->v4rho4 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho3sigma; ++ind)
+            {
+                v4rho3sigma[dim->v4rho3sigma * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho3lapl; ++ind)
+            {
+                v4rho3lapl[dim->v4rho3lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho3tau; ++ind)
+            {
+                v4rho3tau[dim->v4rho3tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2sigma2; ++ind)
+            {
+                v4rho2sigma2[dim->v4rho2sigma2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2sigmalapl; ++ind)
+            {
+                v4rho2sigmalapl[dim->v4rho2sigmalapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2sigmatau; ++ind)
+            {
+                v4rho2sigmatau[dim->v4rho2sigmatau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2lapl2; ++ind)
+            {
+                v4rho2lapl2[dim->v4rho2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2lapltau; ++ind)
+            {
+                v4rho2lapltau[dim->v4rho2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rho2tau2; ++ind)
+            {
+                v4rho2tau2[dim->v4rho2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigma3; ++ind)
+            {
+                v4rhosigma3[dim->v4rhosigma3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigma2lapl; ++ind)
+            {
+                v4rhosigma2lapl[dim->v4rhosigma2lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigma2tau; ++ind)
+            {
+                v4rhosigma2tau[dim->v4rhosigma2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigmalapl2; ++ind)
+            {
+                v4rhosigmalapl2[dim->v4rhosigmalapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigmalapltau; ++ind)
+            {
+                v4rhosigmalapltau[dim->v4rhosigmalapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhosigmatau2; ++ind)
+            {
+                v4rhosigmatau2[dim->v4rhosigmatau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rholapl3; ++ind)
+            {
+                v4rholapl3[dim->v4rholapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rholapl2tau; ++ind)
+            {
+                v4rholapl2tau[dim->v4rholapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rholapltau2; ++ind)
+            {
+                v4rholapltau2[dim->v4rholapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4rhotau3; ++ind)
+            {
+                v4rhotau3[dim->v4rhotau3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma4; ++ind)
+            {
+                v4sigma4[dim->v4sigma4 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma3lapl; ++ind)
+            {
+                v4sigma3lapl[dim->v4sigma3lapl * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma3tau; ++ind)
+            {
+                v4sigma3tau[dim->v4sigma3tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma2lapl2; ++ind)
+            {
+                v4sigma2lapl2[dim->v4sigma2lapl2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma2lapltau; ++ind)
+            {
+                v4sigma2lapltau[dim->v4sigma2lapltau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigma2tau2; ++ind)
+            {
+                v4sigma2tau2[dim->v4sigma2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigmalapl3; ++ind)
+            {
+                v4sigmalapl3[dim->v4sigmalapl3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigmalapl2tau; ++ind)
+            {
+                v4sigmalapl2tau[dim->v4sigmalapl2tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigmalapltau2; ++ind)
+            {
+                v4sigmalapltau2[dim->v4sigmalapltau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4sigmatau3; ++ind)
+            {
+                v4sigmatau3[dim->v4sigmatau3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4lapl4; ++ind)
+            {
+                v4lapl4[dim->v4lapl4 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4lapl3tau; ++ind)
+            {
+                v4lapl3tau[dim->v4lapl3tau * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4lapl2tau2; ++ind)
+            {
+                v4lapl2tau2[dim->v4lapl2tau2 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4lapltau3; ++ind)
+            {
+                v4lapltau3[dim->v4lapltau3 * g + ind] = 0.0;
+            }
+            for (int ind = 0; ind < dim->v4tau4; ++ind)
+            {
+                v4tau4[dim->v4tau4 * g + ind] = 0.0;
             }
         }
-        else if ((family == XC_FAMILY_GGA) || (family == XC_FAMILY_HYB_GGA))
+
+        for (const auto& xccomp : _components)
         {
-            xc_gga_lxc(funcptr, np, rho, sigma, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4);
+            auto funcptr = xccomp.getFunctionalPointer();
 
-            #pragma omp simd aligned(v4rho4, stage_v4rho4, v4rho3sigma, stage_v4rho3sigma, \
-                                     v4rho2sigma2, stage_v4rho2sigma2, v4rhosigma3, stage_v4rhosigma3, \
-                                     v4sigma4, stage_v4sigma4 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
+            const auto dim = &(funcptr->dim);
+
+            const auto c = xccomp.getScalingFactor();
+
+            if (xccomp.isLDA())
             {
-                v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
-                v4rho4[5 * g + 1] += c * stage_v4rho4[5 * g + 1];
-                v4rho4[5 * g + 2] += c * stage_v4rho4[5 * g + 2];
-                v4rho4[5 * g + 3] += c * stage_v4rho4[5 * g + 3];
-                v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
+                xc_lda_lxc(funcptr, grid_batch_size, rho + dim->rho * grid_batch_offset, stage_v4rho4 + dim->v4rho4 * grid_batch_offset);
 
-                v4rho3sigma[12 * g + 0] += c * stage_v4rho3sigma[12 * g + 0];
-                v4rho3sigma[12 * g + 1] += c * stage_v4rho3sigma[12 * g + 1];
-                v4rho3sigma[12 * g + 2] += c * stage_v4rho3sigma[12 * g + 2];
-                v4rho3sigma[12 * g + 3] += c * stage_v4rho3sigma[12 * g + 3];
-                v4rho3sigma[12 * g + 4] += c * stage_v4rho3sigma[12 * g + 4];
-                v4rho3sigma[12 * g + 5] += c * stage_v4rho3sigma[12 * g + 5];
-                v4rho3sigma[12 * g + 6] += c * stage_v4rho3sigma[12 * g + 6];
-                v4rho3sigma[12 * g + 7] += c * stage_v4rho3sigma[12 * g + 7];
-                v4rho3sigma[12 * g + 8] += c * stage_v4rho3sigma[12 * g + 8];
-                v4rho3sigma[12 * g + 9] += c * stage_v4rho3sigma[12 * g + 9];
-                v4rho3sigma[12 * g + 10] += c * stage_v4rho3sigma[12 * g + 10];
-                v4rho3sigma[12 * g + 11] += c * stage_v4rho3sigma[12 * g + 11];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v4rho4; ++ind)
+                    {
+                        v4rho4[dim->v4rho4 * g + ind] += c * stage_v4rho4[dim->v4rho4 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isGGA())
+            {
+                xc_gga_lxc(funcptr,
+                           grid_batch_size,
+                           rho + dim->rho * grid_batch_offset,
+                           sigma + dim->sigma * grid_batch_offset,
+                           stage_v4rho4 + dim->v4rho4 * grid_batch_offset,
+                           stage_v4rho3sigma + dim->v4rho3sigma * grid_batch_offset,
+                           stage_v4rho2sigma2 + dim->v4rho2sigma2 * grid_batch_offset,
+                           stage_v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
+                           stage_v4sigma4 + dim->v4sigma4 * grid_batch_offset);
 
-                v4rho2sigma2[18 * g + 0] += c * stage_v4rho2sigma2[18 * g + 0];
-                v4rho2sigma2[18 * g + 1] += c * stage_v4rho2sigma2[18 * g + 1];
-                v4rho2sigma2[18 * g + 2] += c * stage_v4rho2sigma2[18 * g + 2];
-                v4rho2sigma2[18 * g + 3] += c * stage_v4rho2sigma2[18 * g + 3];
-                v4rho2sigma2[18 * g + 4] += c * stage_v4rho2sigma2[18 * g + 4];
-                v4rho2sigma2[18 * g + 5] += c * stage_v4rho2sigma2[18 * g + 5];
-                v4rho2sigma2[18 * g + 6] += c * stage_v4rho2sigma2[18 * g + 6];
-                v4rho2sigma2[18 * g + 7] += c * stage_v4rho2sigma2[18 * g + 7];
-                v4rho2sigma2[18 * g + 8] += c * stage_v4rho2sigma2[18 * g + 8];
-                v4rho2sigma2[18 * g + 9] += c * stage_v4rho2sigma2[18 * g + 9];
-                v4rho2sigma2[18 * g + 10] += c * stage_v4rho2sigma2[18 * g + 10];
-                v4rho2sigma2[18 * g + 11] += c * stage_v4rho2sigma2[18 * g + 11];
-                v4rho2sigma2[18 * g + 12] += c * stage_v4rho2sigma2[18 * g + 12];
-                v4rho2sigma2[18 * g + 13] += c * stage_v4rho2sigma2[18 * g + 13];
-                v4rho2sigma2[18 * g + 14] += c * stage_v4rho2sigma2[18 * g + 14];
-                v4rho2sigma2[18 * g + 15] += c * stage_v4rho2sigma2[18 * g + 15];
-                v4rho2sigma2[18 * g + 16] += c * stage_v4rho2sigma2[18 * g + 16];
-                v4rho2sigma2[18 * g + 17] += c * stage_v4rho2sigma2[18 * g + 17];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v4rho4; ++ind)
+                    {
+                        v4rho4[dim->v4rho4 * g + ind] += c * stage_v4rho4[dim->v4rho4 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho3sigma; ++ind)
+                    {
+                        v4rho3sigma[dim->v4rho3sigma * g + ind] += c * stage_v4rho3sigma[dim->v4rho3sigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho2sigma2; ++ind)
+                    {
+                        v4rho2sigma2[dim->v4rho2sigma2 * g + ind] += c * stage_v4rho2sigma2[dim->v4rho2sigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhosigma3; ++ind)
+                    {
+                        v4rhosigma3[dim->v4rhosigma3 * g + ind] += c * stage_v4rhosigma3[dim->v4rhosigma3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigma4; ++ind)
+                    {
+                        v4sigma4[dim->v4sigma4 * g + ind] += c * stage_v4sigma4[dim->v4sigma4 * g + ind];
+                    }
+                }
+            }
+            else if (xccomp.isMetaGGA())
+            {
+                xc_mgga_lxc(funcptr,
+                            grid_batch_size,
+                            rho + dim->rho * grid_batch_offset,
+                            sigma + dim->sigma * grid_batch_offset,
+                            lapl + dim->lapl * grid_batch_offset,
+                            tau + dim->tau * grid_batch_offset,
+                            stage_v4rho4 + dim->v4rho4 * grid_batch_offset,
+                            stage_v4rho3sigma + dim->v4rho3sigma * grid_batch_offset,
+                            stage_v4rho3lapl + dim->v4rho3lapl * grid_batch_offset,
+                            stage_v4rho3tau + dim->v4rho3tau * grid_batch_offset,
+                            stage_v4rho2sigma2 + dim->v4rho2sigma2 * grid_batch_offset,
+                            stage_v4rho2sigmalapl + dim->v4rho2sigmalapl * grid_batch_offset,
+                            stage_v4rho2sigmatau + dim->v4rho2sigmatau * grid_batch_offset,
+                            stage_v4rho2lapl2 + dim->v4rho2lapl2 * grid_batch_offset,
+                            stage_v4rho2lapltau + dim->v4rho2lapltau * grid_batch_offset,
+                            stage_v4rho2tau2 + dim->v4rho2tau2 * grid_batch_offset,
+                            stage_v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
+                            stage_v4rhosigma2lapl + dim->v4rhosigma2lapl * grid_batch_offset,
+                            stage_v4rhosigma2tau + dim->v4rhosigma2tau * grid_batch_offset,
+                            stage_v4rhosigmalapl2 + dim->v4rhosigmalapl2 * grid_batch_offset,
+                            stage_v4rhosigmalapltau + dim->v4rhosigmalapltau * grid_batch_offset,
+                            stage_v4rhosigmatau2 + dim->v4rhosigmatau2 * grid_batch_offset,
+                            stage_v4rholapl3 + dim->v4rholapl3 * grid_batch_offset,
+                            stage_v4rholapl2tau + dim->v4rholapl2tau * grid_batch_offset,
+                            stage_v4rholapltau2 + dim->v4rholapltau2 * grid_batch_offset,
+                            stage_v4rhotau3 + dim->v4rhotau3 * grid_batch_offset,
+                            stage_v4sigma4 + dim->v4sigma4 * grid_batch_offset,
+                            stage_v4sigma3lapl + dim->v4sigma3lapl * grid_batch_offset,
+                            stage_v4sigma3tau + dim->v4sigma3tau * grid_batch_offset,
+                            stage_v4sigma2lapl2 + dim->v4sigma2lapl2 * grid_batch_offset,
+                            stage_v4sigma2lapltau + dim->v4sigma2lapltau * grid_batch_offset,
+                            stage_v4sigma2tau2 + dim->v4sigma2tau2 * grid_batch_offset,
+                            stage_v4sigmalapl3 + dim->v4sigmalapl3 * grid_batch_offset,
+                            stage_v4sigmalapl2tau + dim->v4sigmalapl2tau * grid_batch_offset,
+                            stage_v4sigmalapltau2 + dim->v4sigmalapltau2 * grid_batch_offset,
+                            stage_v4sigmatau3 + dim->v4sigmatau3 * grid_batch_offset,
+                            stage_v4lapl4 + dim->v4lapl4 * grid_batch_offset,
+                            stage_v4lapl3tau + dim->v4lapl3tau * grid_batch_offset,
+                            stage_v4lapl2tau2 + dim->v4lapl2tau2 * grid_batch_offset,
+                            stage_v4lapltau3 + dim->v4lapltau3 * grid_batch_offset,
+                            stage_v4tau4 + dim->v4tau4 * grid_batch_offset);
 
-                v4rhosigma3[20 * g + 0] += c * stage_v4rhosigma3[20 * g + 0];
-                v4rhosigma3[20 * g + 1] += c * stage_v4rhosigma3[20 * g + 1];
-                v4rhosigma3[20 * g + 2] += c * stage_v4rhosigma3[20 * g + 2];
-                v4rhosigma3[20 * g + 3] += c * stage_v4rhosigma3[20 * g + 3];
-                v4rhosigma3[20 * g + 4] += c * stage_v4rhosigma3[20 * g + 4];
-                v4rhosigma3[20 * g + 5] += c * stage_v4rhosigma3[20 * g + 5];
-                v4rhosigma3[20 * g + 6] += c * stage_v4rhosigma3[20 * g + 6];
-                v4rhosigma3[20 * g + 7] += c * stage_v4rhosigma3[20 * g + 7];
-                v4rhosigma3[20 * g + 8] += c * stage_v4rhosigma3[20 * g + 8];
-                v4rhosigma3[20 * g + 9] += c * stage_v4rhosigma3[20 * g + 9];
-                v4rhosigma3[20 * g + 10] += c * stage_v4rhosigma3[20 * g + 10];
-                v4rhosigma3[20 * g + 11] += c * stage_v4rhosigma3[20 * g + 11];
-                v4rhosigma3[20 * g + 12] += c * stage_v4rhosigma3[20 * g + 12];
-                v4rhosigma3[20 * g + 13] += c * stage_v4rhosigma3[20 * g + 13];
-                v4rhosigma3[20 * g + 14] += c * stage_v4rhosigma3[20 * g + 14];
-                v4rhosigma3[20 * g + 15] += c * stage_v4rhosigma3[20 * g + 15];
-                v4rhosigma3[20 * g + 16] += c * stage_v4rhosigma3[20 * g + 16];
-                v4rhosigma3[20 * g + 17] += c * stage_v4rhosigma3[20 * g + 17];
-                v4rhosigma3[20 * g + 18] += c * stage_v4rhosigma3[20 * g + 18];
-                v4rhosigma3[20 * g + 19] += c * stage_v4rhosigma3[20 * g + 19];
-
-                v4sigma4[15 * g + 0] += c * stage_v4sigma4[15 * g + 0];
-                v4sigma4[15 * g + 1] += c * stage_v4sigma4[15 * g + 1];
-                v4sigma4[15 * g + 2] += c * stage_v4sigma4[15 * g + 2];
-                v4sigma4[15 * g + 3] += c * stage_v4sigma4[15 * g + 3];
-                v4sigma4[15 * g + 4] += c * stage_v4sigma4[15 * g + 4];
-                v4sigma4[15 * g + 5] += c * stage_v4sigma4[15 * g + 5];
-                v4sigma4[15 * g + 6] += c * stage_v4sigma4[15 * g + 6];
-                v4sigma4[15 * g + 7] += c * stage_v4sigma4[15 * g + 7];
-                v4sigma4[15 * g + 8] += c * stage_v4sigma4[15 * g + 8];
-                v4sigma4[15 * g + 9] += c * stage_v4sigma4[15 * g + 9];
-                v4sigma4[15 * g + 10] += c * stage_v4sigma4[15 * g + 10];
-                v4sigma4[15 * g + 11] += c * stage_v4sigma4[15 * g + 11];
-                v4sigma4[15 * g + 12] += c * stage_v4sigma4[15 * g + 12];
-                v4sigma4[15 * g + 13] += c * stage_v4sigma4[15 * g + 13];
-                v4sigma4[15 * g + 14] += c * stage_v4sigma4[15 * g + 14];
+                for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; ++g)
+                {
+                    for (int ind = 0; ind < dim->v4rho4; ++ind)
+                    {
+                        v4rho4[dim->v4rho4 * g + ind] += c * stage_v4rho4[dim->v4rho4 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho3sigma; ++ind)
+                    {
+                        v4rho3sigma[dim->v4rho3sigma * g + ind] += c * stage_v4rho3sigma[dim->v4rho3sigma * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho3lapl; ++ind)
+                    {
+                        v4rho3lapl[dim->v4rho3lapl * g + ind] += c * stage_v4rho3lapl[dim->v4rho3lapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho3tau; ++ind)
+                    {
+                        v4rho3tau[dim->v4rho3tau * g + ind] += c * stage_v4rho3tau[dim->v4rho3tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho2sigma2; ++ind)
+                    {
+                        v4rho2sigma2[dim->v4rho2sigma2 * g + ind] += c * stage_v4rho2sigma2[dim->v4rho2sigma2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho2sigmalapl; ++ind)
+                    {
+                        v4rho2sigmalapl[dim->v4rho2sigmalapl * g + ind] += c * stage_v4rho2sigmalapl[dim->v4rho2sigmalapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho2sigmatau; ++ind)
+                    {
+                        v4rho2sigmatau[dim->v4rho2sigmatau * g + ind] += c * stage_v4rho2sigmatau[dim->v4rho2sigmatau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho2lapl2; ++ind)
+                    {
+                        v4rho2lapl2[dim->v4rho2lapl2 * g + ind] += c * stage_v4rho2lapl2[dim->v4rho2lapl2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho2lapltau; ++ind)
+                    {
+                        v4rho2lapltau[dim->v4rho2lapltau * g + ind] += c * stage_v4rho2lapltau[dim->v4rho2lapltau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rho2tau2; ++ind)
+                    {
+                        v4rho2tau2[dim->v4rho2tau2 * g + ind] += c * stage_v4rho2tau2[dim->v4rho2tau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhosigma3; ++ind)
+                    {
+                        v4rhosigma3[dim->v4rhosigma3 * g + ind] += c * stage_v4rhosigma3[dim->v4rhosigma3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhosigma2lapl; ++ind)
+                    {
+                        v4rhosigma2lapl[dim->v4rhosigma2lapl * g + ind] += c * stage_v4rhosigma2lapl[dim->v4rhosigma2lapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhosigma2tau; ++ind)
+                    {
+                        v4rhosigma2tau[dim->v4rhosigma2tau * g + ind] += c * stage_v4rhosigma2tau[dim->v4rhosigma2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhosigmalapl2; ++ind)
+                    {
+                        v4rhosigmalapl2[dim->v4rhosigmalapl2 * g + ind] += c * stage_v4rhosigmalapl2[dim->v4rhosigmalapl2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhosigmalapltau; ++ind)
+                    {
+                        v4rhosigmalapltau[dim->v4rhosigmalapltau * g + ind] += c * stage_v4rhosigmalapltau[dim->v4rhosigmalapltau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhosigmatau2; ++ind)
+                    {
+                        v4rhosigmatau2[dim->v4rhosigmatau2 * g + ind] += c * stage_v4rhosigmatau2[dim->v4rhosigmatau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rholapl3; ++ind)
+                    {
+                        v4rholapl3[dim->v4rholapl3 * g + ind] += c * stage_v4rholapl3[dim->v4rholapl3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rholapl2tau; ++ind)
+                    {
+                        v4rholapl2tau[dim->v4rholapl2tau * g + ind] += c * stage_v4rholapl2tau[dim->v4rholapl2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rholapltau2; ++ind)
+                    {
+                        v4rholapltau2[dim->v4rholapltau2 * g + ind] += c * stage_v4rholapltau2[dim->v4rholapltau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4rhotau3; ++ind)
+                    {
+                        v4rhotau3[dim->v4rhotau3 * g + ind] += c * stage_v4rhotau3[dim->v4rhotau3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigma4; ++ind)
+                    {
+                        v4sigma4[dim->v4sigma4 * g + ind] += c * stage_v4sigma4[dim->v4sigma4 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigma3lapl; ++ind)
+                    {
+                        v4sigma3lapl[dim->v4sigma3lapl * g + ind] += c * stage_v4sigma3lapl[dim->v4sigma3lapl * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigma3tau; ++ind)
+                    {
+                        v4sigma3tau[dim->v4sigma3tau * g + ind] += c * stage_v4sigma3tau[dim->v4sigma3tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigma2lapl2; ++ind)
+                    {
+                        v4sigma2lapl2[dim->v4sigma2lapl2 * g + ind] += c * stage_v4sigma2lapl2[dim->v4sigma2lapl2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigma2lapltau; ++ind)
+                    {
+                        v4sigma2lapltau[dim->v4sigma2lapltau * g + ind] += c * stage_v4sigma2lapltau[dim->v4sigma2lapltau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigma2tau2; ++ind)
+                    {
+                        v4sigma2tau2[dim->v4sigma2tau2 * g + ind] += c * stage_v4sigma2tau2[dim->v4sigma2tau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigmalapl3; ++ind)
+                    {
+                        v4sigmalapl3[dim->v4sigmalapl3 * g + ind] += c * stage_v4sigmalapl3[dim->v4sigmalapl3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigmalapl2tau; ++ind)
+                    {
+                        v4sigmalapl2tau[dim->v4sigmalapl2tau * g + ind] += c * stage_v4sigmalapl2tau[dim->v4sigmalapl2tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigmalapltau2; ++ind)
+                    {
+                        v4sigmalapltau2[dim->v4sigmalapltau2 * g + ind] += c * stage_v4sigmalapltau2[dim->v4sigmalapltau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4sigmatau3; ++ind)
+                    {
+                        v4sigmatau3[dim->v4sigmatau3 * g + ind] += c * stage_v4sigmatau3[dim->v4sigmatau3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4lapl4; ++ind)
+                    {
+                        v4lapl4[dim->v4lapl4 * g + ind] += c * stage_v4lapl4[dim->v4lapl4 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4lapl3tau; ++ind)
+                    {
+                        v4lapl3tau[dim->v4lapl3tau * g + ind] += c * stage_v4lapl3tau[dim->v4lapl3tau * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4lapl2tau2; ++ind)
+                    {
+                        v4lapl2tau2[dim->v4lapl2tau2 * g + ind] += c * stage_v4lapl2tau2[dim->v4lapl2tau2 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4lapltau3; ++ind)
+                    {
+                        v4lapltau3[dim->v4lapltau3 * g + ind] += c * stage_v4lapltau3[dim->v4lapltau3 * g + ind];
+                    }
+                    for (int ind = 0; ind < dim->v4tau4; ++ind)
+                    {
+                        v4tau4[dim->v4tau4 * g + ind] += c * stage_v4tau4[dim->v4tau4 * g + ind];
+                    }
+                }
             }
         }
-        else if ((family == XC_FAMILY_MGGA) || (family == XC_FAMILY_HYB_MGGA))
-        {
-            xc_mgga_lxc(funcptr,
-                        np,
-                        rho,
-                        sigma,
-                        lapl,
-                        tau,
-                        stage_v4rho4,
-                        stage_v4rho3sigma,
-                        stage_v4rho3lapl,
-                        stage_v4rho3tau,
-                        stage_v4rho2sigma2,
-                        stage_v4rho2sigmalapl,
-                        stage_v4rho2sigmatau,
-                        stage_v4rho2lapl2,
-                        stage_v4rho2lapltau,
-                        stage_v4rho2tau2,
-                        stage_v4rhosigma3,
-                        stage_v4rhosigma2lapl,
-                        stage_v4rhosigma2tau,
-                        stage_v4rhosigmalapl2,
-                        stage_v4rhosigmalapltau,
-                        stage_v4rhosigmatau2,
-                        stage_v4rholapl3,
-                        stage_v4rholapl2tau,
-                        stage_v4rholapltau2,
-                        stage_v4rhotau3,
-                        stage_v4sigma4,
-                        stage_v4sigma3lapl,
-                        stage_v4sigma3tau,
-                        stage_v4sigma2lapl2,
-                        stage_v4sigma2lapltau,
-                        stage_v4sigma2tau2,
-                        stage_v4sigmalapl3,
-                        stage_v4sigmalapl2tau,
-                        stage_v4sigmalapltau2,
-                        stage_v4sigmatau3,
-                        stage_v4lapl4,
-                        stage_v4lapl3tau,
-                        stage_v4lapl2tau2,
-                        stage_v4lapltau3,
-                        stage_v4tau4);
 
-            #pragma omp simd aligned(v4rho4, stage_v4rho4, v4rho3sigma, stage_v4rho3sigma, \
-                                     v4rho3lapl, stage_v4rho3lapl, v4rho3tau, stage_v4rho3tau, \
-                                     v4rho2sigma2, stage_v4rho2sigma2, v4rho2sigmalapl, stage_v4rho2sigmalapl, \
-                                     v4rho2sigmatau, stage_v4rho2sigmatau, v4rho2lapl2, stage_v4rho2lapl2, \
-                                     v4rho2lapltau, stage_v4rho2lapltau, v4rho2tau2, stage_v4rho2tau2, \
-                                     v4rhosigma3, stage_v4rhosigma3, v4rhosigma2lapl, stage_v4rhosigma2lapl, \
-                                     v4rhosigma2tau, stage_v4rhosigma2tau, v4rhosigmalapl2, stage_v4rhosigmalapl2, \
-                                     v4rhosigmalapltau, stage_v4rhosigmalapltau, v4rhosigmatau2, stage_v4rhosigmatau2, \
-                                     v4rholapl3, stage_v4rholapl3, v4rholapl2tau, stage_v4rholapl2tau, \
-                                     v4rholapltau2, stage_v4rholapltau2, v4rhotau3, stage_v4rhotau3, \
-                                     v4sigma4, stage_v4sigma4, v4sigma3lapl, stage_v4sigma3lapl, \
-                                     v4sigma3tau, stage_v4sigma3tau, v4sigma2lapl2, stage_v4sigma2lapl2, \
-                                     v4sigma2lapltau, stage_v4sigma2lapltau, v4sigma2tau2, stage_v4sigma2tau2, \
-                                     v4sigmalapl3, stage_v4sigmalapl3, v4sigmalapl2tau, stage_v4sigmalapl2tau, \
-                                     v4sigmalapltau2, stage_v4sigmalapltau2, v4sigmatau3, stage_v4sigmatau3, \
-                                     v4lapl4, stage_v4lapl4, v4lapl3tau, stage_v4lapl3tau, \
-                                     v4lapl2tau2, stage_v4lapl2tau2, v4lapltau3, stage_v4lapltau3, \
-                                     v4tau4, stage_v4tau4 : VLX_ALIGN)
-            for (auto g = 0; g < np; ++g)
-            {
-                v4rho4[5 * g + 0] += c * stage_v4rho4[5 * g + 0];
-                v4rho4[5 * g + 1] += c * stage_v4rho4[5 * g + 1];
-                v4rho4[5 * g + 2] += c * stage_v4rho4[5 * g + 2];
-                v4rho4[5 * g + 3] += c * stage_v4rho4[5 * g + 3];
-                v4rho4[5 * g + 4] += c * stage_v4rho4[5 * g + 4];
-
-                v4rho3sigma[12 * g + 0] += c * stage_v4rho3sigma[12 * g + 0];
-                v4rho3sigma[12 * g + 1] += c * stage_v4rho3sigma[12 * g + 1];
-                v4rho3sigma[12 * g + 2] += c * stage_v4rho3sigma[12 * g + 2];
-                v4rho3sigma[12 * g + 3] += c * stage_v4rho3sigma[12 * g + 3];
-                v4rho3sigma[12 * g + 4] += c * stage_v4rho3sigma[12 * g + 4];
-                v4rho3sigma[12 * g + 5] += c * stage_v4rho3sigma[12 * g + 5];
-                v4rho3sigma[12 * g + 6] += c * stage_v4rho3sigma[12 * g + 6];
-                v4rho3sigma[12 * g + 7] += c * stage_v4rho3sigma[12 * g + 7];
-                v4rho3sigma[12 * g + 8] += c * stage_v4rho3sigma[12 * g + 8];
-                v4rho3sigma[12 * g + 9] += c * stage_v4rho3sigma[12 * g + 9];
-                v4rho3sigma[12 * g + 10] += c * stage_v4rho3sigma[12 * g + 10];
-                v4rho3sigma[12 * g + 11] += c * stage_v4rho3sigma[12 * g + 11];
-
-                v4rho3lapl[8 * g + 0] += c * stage_v4rho3lapl[8 * g + 0];
-                v4rho3lapl[8 * g + 1] += c * stage_v4rho3lapl[8 * g + 1];
-                v4rho3lapl[8 * g + 2] += c * stage_v4rho3lapl[8 * g + 2];
-                v4rho3lapl[8 * g + 3] += c * stage_v4rho3lapl[8 * g + 3];
-                v4rho3lapl[8 * g + 4] += c * stage_v4rho3lapl[8 * g + 4];
-                v4rho3lapl[8 * g + 5] += c * stage_v4rho3lapl[8 * g + 5];
-                v4rho3lapl[8 * g + 6] += c * stage_v4rho3lapl[8 * g + 6];
-                v4rho3lapl[8 * g + 7] += c * stage_v4rho3lapl[8 * g + 7];
-
-                v4rho3tau[8 * g + 0] += c * stage_v4rho3tau[8 * g + 0];
-                v4rho3tau[8 * g + 1] += c * stage_v4rho3tau[8 * g + 1];
-                v4rho3tau[8 * g + 2] += c * stage_v4rho3tau[8 * g + 2];
-                v4rho3tau[8 * g + 3] += c * stage_v4rho3tau[8 * g + 3];
-                v4rho3tau[8 * g + 4] += c * stage_v4rho3tau[8 * g + 4];
-                v4rho3tau[8 * g + 5] += c * stage_v4rho3tau[8 * g + 5];
-                v4rho3tau[8 * g + 6] += c * stage_v4rho3tau[8 * g + 6];
-                v4rho3tau[8 * g + 7] += c * stage_v4rho3tau[8 * g + 7];
-
-                v4rho2sigma2[18 * g + 0] += c * stage_v4rho2sigma2[18 * g + 0];
-                v4rho2sigma2[18 * g + 1] += c * stage_v4rho2sigma2[18 * g + 1];
-                v4rho2sigma2[18 * g + 2] += c * stage_v4rho2sigma2[18 * g + 2];
-                v4rho2sigma2[18 * g + 3] += c * stage_v4rho2sigma2[18 * g + 3];
-                v4rho2sigma2[18 * g + 4] += c * stage_v4rho2sigma2[18 * g + 4];
-                v4rho2sigma2[18 * g + 5] += c * stage_v4rho2sigma2[18 * g + 5];
-                v4rho2sigma2[18 * g + 6] += c * stage_v4rho2sigma2[18 * g + 6];
-                v4rho2sigma2[18 * g + 7] += c * stage_v4rho2sigma2[18 * g + 7];
-                v4rho2sigma2[18 * g + 8] += c * stage_v4rho2sigma2[18 * g + 8];
-                v4rho2sigma2[18 * g + 9] += c * stage_v4rho2sigma2[18 * g + 9];
-                v4rho2sigma2[18 * g + 10] += c * stage_v4rho2sigma2[18 * g + 10];
-                v4rho2sigma2[18 * g + 11] += c * stage_v4rho2sigma2[18 * g + 11];
-                v4rho2sigma2[18 * g + 12] += c * stage_v4rho2sigma2[18 * g + 12];
-                v4rho2sigma2[18 * g + 13] += c * stage_v4rho2sigma2[18 * g + 13];
-                v4rho2sigma2[18 * g + 14] += c * stage_v4rho2sigma2[18 * g + 14];
-                v4rho2sigma2[18 * g + 15] += c * stage_v4rho2sigma2[18 * g + 15];
-                v4rho2sigma2[18 * g + 16] += c * stage_v4rho2sigma2[18 * g + 16];
-                v4rho2sigma2[18 * g + 17] += c * stage_v4rho2sigma2[18 * g + 17];
-
-                v4rho2sigmalapl[18 * g + 0] += c * stage_v4rho2sigmalapl[18 * g + 0];
-                v4rho2sigmalapl[18 * g + 1] += c * stage_v4rho2sigmalapl[18 * g + 1];
-                v4rho2sigmalapl[18 * g + 2] += c * stage_v4rho2sigmalapl[18 * g + 2];
-                v4rho2sigmalapl[18 * g + 3] += c * stage_v4rho2sigmalapl[18 * g + 3];
-                v4rho2sigmalapl[18 * g + 4] += c * stage_v4rho2sigmalapl[18 * g + 4];
-                v4rho2sigmalapl[18 * g + 5] += c * stage_v4rho2sigmalapl[18 * g + 5];
-                v4rho2sigmalapl[18 * g + 6] += c * stage_v4rho2sigmalapl[18 * g + 6];
-                v4rho2sigmalapl[18 * g + 7] += c * stage_v4rho2sigmalapl[18 * g + 7];
-                v4rho2sigmalapl[18 * g + 8] += c * stage_v4rho2sigmalapl[18 * g + 8];
-                v4rho2sigmalapl[18 * g + 9] += c * stage_v4rho2sigmalapl[18 * g + 9];
-                v4rho2sigmalapl[18 * g + 10] += c * stage_v4rho2sigmalapl[18 * g + 10];
-                v4rho2sigmalapl[18 * g + 11] += c * stage_v4rho2sigmalapl[18 * g + 11];
-                v4rho2sigmalapl[18 * g + 12] += c * stage_v4rho2sigmalapl[18 * g + 12];
-                v4rho2sigmalapl[18 * g + 13] += c * stage_v4rho2sigmalapl[18 * g + 13];
-                v4rho2sigmalapl[18 * g + 14] += c * stage_v4rho2sigmalapl[18 * g + 14];
-                v4rho2sigmalapl[18 * g + 15] += c * stage_v4rho2sigmalapl[18 * g + 15];
-                v4rho2sigmalapl[18 * g + 16] += c * stage_v4rho2sigmalapl[18 * g + 16];
-                v4rho2sigmalapl[18 * g + 17] += c * stage_v4rho2sigmalapl[18 * g + 17];
-
-                v4rho2sigmatau[18 * g + 0] += c * stage_v4rho2sigmatau[18 * g + 0];
-                v4rho2sigmatau[18 * g + 1] += c * stage_v4rho2sigmatau[18 * g + 1];
-                v4rho2sigmatau[18 * g + 2] += c * stage_v4rho2sigmatau[18 * g + 2];
-                v4rho2sigmatau[18 * g + 3] += c * stage_v4rho2sigmatau[18 * g + 3];
-                v4rho2sigmatau[18 * g + 4] += c * stage_v4rho2sigmatau[18 * g + 4];
-                v4rho2sigmatau[18 * g + 5] += c * stage_v4rho2sigmatau[18 * g + 5];
-                v4rho2sigmatau[18 * g + 6] += c * stage_v4rho2sigmatau[18 * g + 6];
-                v4rho2sigmatau[18 * g + 7] += c * stage_v4rho2sigmatau[18 * g + 7];
-                v4rho2sigmatau[18 * g + 8] += c * stage_v4rho2sigmatau[18 * g + 8];
-                v4rho2sigmatau[18 * g + 9] += c * stage_v4rho2sigmatau[18 * g + 9];
-                v4rho2sigmatau[18 * g + 10] += c * stage_v4rho2sigmatau[18 * g + 10];
-                v4rho2sigmatau[18 * g + 11] += c * stage_v4rho2sigmatau[18 * g + 11];
-                v4rho2sigmatau[18 * g + 12] += c * stage_v4rho2sigmatau[18 * g + 12];
-                v4rho2sigmatau[18 * g + 13] += c * stage_v4rho2sigmatau[18 * g + 13];
-                v4rho2sigmatau[18 * g + 14] += c * stage_v4rho2sigmatau[18 * g + 14];
-                v4rho2sigmatau[18 * g + 15] += c * stage_v4rho2sigmatau[18 * g + 15];
-                v4rho2sigmatau[18 * g + 16] += c * stage_v4rho2sigmatau[18 * g + 16];
-                v4rho2sigmatau[18 * g + 17] += c * stage_v4rho2sigmatau[18 * g + 17];
-
-                v4rho2lapl2[9 * g + 0] += c * stage_v4rho2lapl2[9 * g + 0];
-                v4rho2lapl2[9 * g + 1] += c * stage_v4rho2lapl2[9 * g + 1];
-                v4rho2lapl2[9 * g + 2] += c * stage_v4rho2lapl2[9 * g + 2];
-                v4rho2lapl2[9 * g + 3] += c * stage_v4rho2lapl2[9 * g + 3];
-                v4rho2lapl2[9 * g + 4] += c * stage_v4rho2lapl2[9 * g + 4];
-                v4rho2lapl2[9 * g + 5] += c * stage_v4rho2lapl2[9 * g + 5];
-                v4rho2lapl2[9 * g + 6] += c * stage_v4rho2lapl2[9 * g + 6];
-                v4rho2lapl2[9 * g + 7] += c * stage_v4rho2lapl2[9 * g + 7];
-                v4rho2lapl2[9 * g + 8] += c * stage_v4rho2lapl2[9 * g + 8];
-
-                v4rho2lapltau[12 * g + 0] += c * stage_v4rho2lapltau[12 * g + 0];
-                v4rho2lapltau[12 * g + 1] += c * stage_v4rho2lapltau[12 * g + 1];
-                v4rho2lapltau[12 * g + 2] += c * stage_v4rho2lapltau[12 * g + 2];
-                v4rho2lapltau[12 * g + 3] += c * stage_v4rho2lapltau[12 * g + 3];
-                v4rho2lapltau[12 * g + 4] += c * stage_v4rho2lapltau[12 * g + 4];
-                v4rho2lapltau[12 * g + 5] += c * stage_v4rho2lapltau[12 * g + 5];
-                v4rho2lapltau[12 * g + 6] += c * stage_v4rho2lapltau[12 * g + 6];
-                v4rho2lapltau[12 * g + 7] += c * stage_v4rho2lapltau[12 * g + 7];
-                v4rho2lapltau[12 * g + 8] += c * stage_v4rho2lapltau[12 * g + 8];
-                v4rho2lapltau[12 * g + 9] += c * stage_v4rho2lapltau[12 * g + 9];
-                v4rho2lapltau[12 * g + 10] += c * stage_v4rho2lapltau[12 * g + 10];
-                v4rho2lapltau[12 * g + 11] += c * stage_v4rho2lapltau[12 * g + 11];
-
-                v4rho2tau2[9 * g + 0] += c * stage_v4rho2tau2[9 * g + 0];
-                v4rho2tau2[9 * g + 1] += c * stage_v4rho2tau2[9 * g + 1];
-                v4rho2tau2[9 * g + 2] += c * stage_v4rho2tau2[9 * g + 2];
-                v4rho2tau2[9 * g + 3] += c * stage_v4rho2tau2[9 * g + 3];
-                v4rho2tau2[9 * g + 4] += c * stage_v4rho2tau2[9 * g + 4];
-                v4rho2tau2[9 * g + 5] += c * stage_v4rho2tau2[9 * g + 5];
-                v4rho2tau2[9 * g + 6] += c * stage_v4rho2tau2[9 * g + 6];
-                v4rho2tau2[9 * g + 7] += c * stage_v4rho2tau2[9 * g + 7];
-                v4rho2tau2[9 * g + 8] += c * stage_v4rho2tau2[9 * g + 8];
-
-                v4rhosigma3[20 * g + 0] += c * stage_v4rhosigma3[20 * g + 0];
-                v4rhosigma3[20 * g + 1] += c * stage_v4rhosigma3[20 * g + 1];
-                v4rhosigma3[20 * g + 2] += c * stage_v4rhosigma3[20 * g + 2];
-                v4rhosigma3[20 * g + 3] += c * stage_v4rhosigma3[20 * g + 3];
-                v4rhosigma3[20 * g + 4] += c * stage_v4rhosigma3[20 * g + 4];
-                v4rhosigma3[20 * g + 5] += c * stage_v4rhosigma3[20 * g + 5];
-                v4rhosigma3[20 * g + 6] += c * stage_v4rhosigma3[20 * g + 6];
-                v4rhosigma3[20 * g + 7] += c * stage_v4rhosigma3[20 * g + 7];
-                v4rhosigma3[20 * g + 8] += c * stage_v4rhosigma3[20 * g + 8];
-                v4rhosigma3[20 * g + 9] += c * stage_v4rhosigma3[20 * g + 9];
-                v4rhosigma3[20 * g + 10] += c * stage_v4rhosigma3[20 * g + 10];
-                v4rhosigma3[20 * g + 11] += c * stage_v4rhosigma3[20 * g + 11];
-                v4rhosigma3[20 * g + 12] += c * stage_v4rhosigma3[20 * g + 12];
-                v4rhosigma3[20 * g + 13] += c * stage_v4rhosigma3[20 * g + 13];
-                v4rhosigma3[20 * g + 14] += c * stage_v4rhosigma3[20 * g + 14];
-                v4rhosigma3[20 * g + 15] += c * stage_v4rhosigma3[20 * g + 15];
-                v4rhosigma3[20 * g + 16] += c * stage_v4rhosigma3[20 * g + 16];
-                v4rhosigma3[20 * g + 17] += c * stage_v4rhosigma3[20 * g + 17];
-                v4rhosigma3[20 * g + 18] += c * stage_v4rhosigma3[20 * g + 18];
-                v4rhosigma3[20 * g + 19] += c * stage_v4rhosigma3[20 * g + 19];
-
-                // v4rhosigma2lapl: inconsistent size in libxc (36 vs 24)
-                v4rhosigma2lapl[36 * g + 0] += c * stage_v4rhosigma2lapl[36 * g + 0];
-                v4rhosigma2lapl[36 * g + 1] += c * stage_v4rhosigma2lapl[36 * g + 1];
-                v4rhosigma2lapl[36 * g + 2] += c * stage_v4rhosigma2lapl[36 * g + 2];
-                v4rhosigma2lapl[36 * g + 3] += c * stage_v4rhosigma2lapl[36 * g + 3];
-                v4rhosigma2lapl[36 * g + 4] += c * stage_v4rhosigma2lapl[36 * g + 4];
-                v4rhosigma2lapl[36 * g + 5] += c * stage_v4rhosigma2lapl[36 * g + 5];
-                v4rhosigma2lapl[36 * g + 6] += c * stage_v4rhosigma2lapl[36 * g + 6];
-                v4rhosigma2lapl[36 * g + 7] += c * stage_v4rhosigma2lapl[36 * g + 7];
-                v4rhosigma2lapl[36 * g + 8] += c * stage_v4rhosigma2lapl[36 * g + 8];
-                v4rhosigma2lapl[36 * g + 9] += c * stage_v4rhosigma2lapl[36 * g + 9];
-                v4rhosigma2lapl[36 * g + 10] += c * stage_v4rhosigma2lapl[36 * g + 10];
-                v4rhosigma2lapl[36 * g + 11] += c * stage_v4rhosigma2lapl[36 * g + 11];
-                v4rhosigma2lapl[36 * g + 12] += c * stage_v4rhosigma2lapl[36 * g + 12];
-                v4rhosigma2lapl[36 * g + 13] += c * stage_v4rhosigma2lapl[36 * g + 13];
-                v4rhosigma2lapl[36 * g + 14] += c * stage_v4rhosigma2lapl[36 * g + 14];
-                v4rhosigma2lapl[36 * g + 15] += c * stage_v4rhosigma2lapl[36 * g + 15];
-                v4rhosigma2lapl[36 * g + 16] += c * stage_v4rhosigma2lapl[36 * g + 16];
-                v4rhosigma2lapl[36 * g + 17] += c * stage_v4rhosigma2lapl[36 * g + 17];
-                v4rhosigma2lapl[36 * g + 18] += c * stage_v4rhosigma2lapl[36 * g + 18];
-                v4rhosigma2lapl[36 * g + 19] += c * stage_v4rhosigma2lapl[36 * g + 19];
-                v4rhosigma2lapl[36 * g + 20] += c * stage_v4rhosigma2lapl[36 * g + 20];
-                v4rhosigma2lapl[36 * g + 21] += c * stage_v4rhosigma2lapl[36 * g + 21];
-                v4rhosigma2lapl[36 * g + 22] += c * stage_v4rhosigma2lapl[36 * g + 22];
-                v4rhosigma2lapl[36 * g + 23] += c * stage_v4rhosigma2lapl[36 * g + 23];
-
-                // v4rhosigma2tau: inconsistent size in libxc (36 vs 24)
-                v4rhosigma2tau[36 * g + 0] += c * stage_v4rhosigma2tau[36 * g + 0];
-                v4rhosigma2tau[36 * g + 1] += c * stage_v4rhosigma2tau[36 * g + 1];
-                v4rhosigma2tau[36 * g + 2] += c * stage_v4rhosigma2tau[36 * g + 2];
-                v4rhosigma2tau[36 * g + 3] += c * stage_v4rhosigma2tau[36 * g + 3];
-                v4rhosigma2tau[36 * g + 4] += c * stage_v4rhosigma2tau[36 * g + 4];
-                v4rhosigma2tau[36 * g + 5] += c * stage_v4rhosigma2tau[36 * g + 5];
-                v4rhosigma2tau[36 * g + 6] += c * stage_v4rhosigma2tau[36 * g + 6];
-                v4rhosigma2tau[36 * g + 7] += c * stage_v4rhosigma2tau[36 * g + 7];
-                v4rhosigma2tau[36 * g + 8] += c * stage_v4rhosigma2tau[36 * g + 8];
-                v4rhosigma2tau[36 * g + 9] += c * stage_v4rhosigma2tau[36 * g + 9];
-                v4rhosigma2tau[36 * g + 10] += c * stage_v4rhosigma2tau[36 * g + 10];
-                v4rhosigma2tau[36 * g + 11] += c * stage_v4rhosigma2tau[36 * g + 11];
-                v4rhosigma2tau[36 * g + 12] += c * stage_v4rhosigma2tau[36 * g + 12];
-                v4rhosigma2tau[36 * g + 13] += c * stage_v4rhosigma2tau[36 * g + 13];
-                v4rhosigma2tau[36 * g + 14] += c * stage_v4rhosigma2tau[36 * g + 14];
-                v4rhosigma2tau[36 * g + 15] += c * stage_v4rhosigma2tau[36 * g + 15];
-                v4rhosigma2tau[36 * g + 16] += c * stage_v4rhosigma2tau[36 * g + 16];
-                v4rhosigma2tau[36 * g + 17] += c * stage_v4rhosigma2tau[36 * g + 17];
-                v4rhosigma2tau[36 * g + 18] += c * stage_v4rhosigma2tau[36 * g + 18];
-                v4rhosigma2tau[36 * g + 19] += c * stage_v4rhosigma2tau[36 * g + 19];
-                v4rhosigma2tau[36 * g + 20] += c * stage_v4rhosigma2tau[36 * g + 20];
-                v4rhosigma2tau[36 * g + 21] += c * stage_v4rhosigma2tau[36 * g + 21];
-                v4rhosigma2tau[36 * g + 22] += c * stage_v4rhosigma2tau[36 * g + 22];
-                v4rhosigma2tau[36 * g + 23] += c * stage_v4rhosigma2tau[36 * g + 23];
-
-                v4rhosigmalapl2[18 * g + 0] += c * stage_v4rhosigmalapl2[18 * g + 0];
-                v4rhosigmalapl2[18 * g + 1] += c * stage_v4rhosigmalapl2[18 * g + 1];
-                v4rhosigmalapl2[18 * g + 2] += c * stage_v4rhosigmalapl2[18 * g + 2];
-                v4rhosigmalapl2[18 * g + 3] += c * stage_v4rhosigmalapl2[18 * g + 3];
-                v4rhosigmalapl2[18 * g + 4] += c * stage_v4rhosigmalapl2[18 * g + 4];
-                v4rhosigmalapl2[18 * g + 5] += c * stage_v4rhosigmalapl2[18 * g + 5];
-                v4rhosigmalapl2[18 * g + 6] += c * stage_v4rhosigmalapl2[18 * g + 6];
-                v4rhosigmalapl2[18 * g + 7] += c * stage_v4rhosigmalapl2[18 * g + 7];
-                v4rhosigmalapl2[18 * g + 8] += c * stage_v4rhosigmalapl2[18 * g + 8];
-                v4rhosigmalapl2[18 * g + 9] += c * stage_v4rhosigmalapl2[18 * g + 9];
-                v4rhosigmalapl2[18 * g + 10] += c * stage_v4rhosigmalapl2[18 * g + 10];
-                v4rhosigmalapl2[18 * g + 11] += c * stage_v4rhosigmalapl2[18 * g + 11];
-                v4rhosigmalapl2[18 * g + 12] += c * stage_v4rhosigmalapl2[18 * g + 12];
-                v4rhosigmalapl2[18 * g + 13] += c * stage_v4rhosigmalapl2[18 * g + 13];
-                v4rhosigmalapl2[18 * g + 14] += c * stage_v4rhosigmalapl2[18 * g + 14];
-                v4rhosigmalapl2[18 * g + 15] += c * stage_v4rhosigmalapl2[18 * g + 15];
-                v4rhosigmalapl2[18 * g + 16] += c * stage_v4rhosigmalapl2[18 * g + 16];
-                v4rhosigmalapl2[18 * g + 17] += c * stage_v4rhosigmalapl2[18 * g + 17];
-
-                v4rhosigmalapltau[24 * g + 0] += c * stage_v4rhosigmalapltau[24 * g + 0];
-                v4rhosigmalapltau[24 * g + 1] += c * stage_v4rhosigmalapltau[24 * g + 1];
-                v4rhosigmalapltau[24 * g + 2] += c * stage_v4rhosigmalapltau[24 * g + 2];
-                v4rhosigmalapltau[24 * g + 3] += c * stage_v4rhosigmalapltau[24 * g + 3];
-                v4rhosigmalapltau[24 * g + 4] += c * stage_v4rhosigmalapltau[24 * g + 4];
-                v4rhosigmalapltau[24 * g + 5] += c * stage_v4rhosigmalapltau[24 * g + 5];
-                v4rhosigmalapltau[24 * g + 6] += c * stage_v4rhosigmalapltau[24 * g + 6];
-                v4rhosigmalapltau[24 * g + 7] += c * stage_v4rhosigmalapltau[24 * g + 7];
-                v4rhosigmalapltau[24 * g + 8] += c * stage_v4rhosigmalapltau[24 * g + 8];
-                v4rhosigmalapltau[24 * g + 9] += c * stage_v4rhosigmalapltau[24 * g + 9];
-                v4rhosigmalapltau[24 * g + 10] += c * stage_v4rhosigmalapltau[24 * g + 10];
-                v4rhosigmalapltau[24 * g + 11] += c * stage_v4rhosigmalapltau[24 * g + 11];
-                v4rhosigmalapltau[24 * g + 12] += c * stage_v4rhosigmalapltau[24 * g + 12];
-                v4rhosigmalapltau[24 * g + 13] += c * stage_v4rhosigmalapltau[24 * g + 13];
-                v4rhosigmalapltau[24 * g + 14] += c * stage_v4rhosigmalapltau[24 * g + 14];
-                v4rhosigmalapltau[24 * g + 15] += c * stage_v4rhosigmalapltau[24 * g + 15];
-                v4rhosigmalapltau[24 * g + 16] += c * stage_v4rhosigmalapltau[24 * g + 16];
-                v4rhosigmalapltau[24 * g + 17] += c * stage_v4rhosigmalapltau[24 * g + 17];
-                v4rhosigmalapltau[24 * g + 18] += c * stage_v4rhosigmalapltau[24 * g + 18];
-                v4rhosigmalapltau[24 * g + 19] += c * stage_v4rhosigmalapltau[24 * g + 19];
-                v4rhosigmalapltau[24 * g + 20] += c * stage_v4rhosigmalapltau[24 * g + 20];
-                v4rhosigmalapltau[24 * g + 21] += c * stage_v4rhosigmalapltau[24 * g + 21];
-                v4rhosigmalapltau[24 * g + 22] += c * stage_v4rhosigmalapltau[24 * g + 22];
-                v4rhosigmalapltau[24 * g + 23] += c * stage_v4rhosigmalapltau[24 * g + 23];
-
-                // v4rhosigmatau2: inconsistent size in libxc (36 vs 18)
-                v4rhosigmatau2[36 * g + 0] += c * stage_v4rhosigmatau2[36 * g + 0];
-                v4rhosigmatau2[36 * g + 1] += c * stage_v4rhosigmatau2[36 * g + 1];
-                v4rhosigmatau2[36 * g + 2] += c * stage_v4rhosigmatau2[36 * g + 2];
-                v4rhosigmatau2[36 * g + 3] += c * stage_v4rhosigmatau2[36 * g + 3];
-                v4rhosigmatau2[36 * g + 4] += c * stage_v4rhosigmatau2[36 * g + 4];
-                v4rhosigmatau2[36 * g + 5] += c * stage_v4rhosigmatau2[36 * g + 5];
-                v4rhosigmatau2[36 * g + 6] += c * stage_v4rhosigmatau2[36 * g + 6];
-                v4rhosigmatau2[36 * g + 7] += c * stage_v4rhosigmatau2[36 * g + 7];
-                v4rhosigmatau2[36 * g + 8] += c * stage_v4rhosigmatau2[36 * g + 8];
-                v4rhosigmatau2[36 * g + 9] += c * stage_v4rhosigmatau2[36 * g + 9];
-                v4rhosigmatau2[36 * g + 10] += c * stage_v4rhosigmatau2[36 * g + 10];
-                v4rhosigmatau2[36 * g + 11] += c * stage_v4rhosigmatau2[36 * g + 11];
-                v4rhosigmatau2[36 * g + 12] += c * stage_v4rhosigmatau2[36 * g + 12];
-                v4rhosigmatau2[36 * g + 13] += c * stage_v4rhosigmatau2[36 * g + 13];
-                v4rhosigmatau2[36 * g + 14] += c * stage_v4rhosigmatau2[36 * g + 14];
-                v4rhosigmatau2[36 * g + 15] += c * stage_v4rhosigmatau2[36 * g + 15];
-                v4rhosigmatau2[36 * g + 16] += c * stage_v4rhosigmatau2[36 * g + 16];
-                v4rhosigmatau2[36 * g + 17] += c * stage_v4rhosigmatau2[36 * g + 17];
-
-                v4rholapl3[8 * g + 0] += c * stage_v4rholapl3[8 * g + 0];
-                v4rholapl3[8 * g + 1] += c * stage_v4rholapl3[8 * g + 1];
-                v4rholapl3[8 * g + 2] += c * stage_v4rholapl3[8 * g + 2];
-                v4rholapl3[8 * g + 3] += c * stage_v4rholapl3[8 * g + 3];
-                v4rholapl3[8 * g + 4] += c * stage_v4rholapl3[8 * g + 4];
-                v4rholapl3[8 * g + 5] += c * stage_v4rholapl3[8 * g + 5];
-                v4rholapl3[8 * g + 6] += c * stage_v4rholapl3[8 * g + 6];
-                v4rholapl3[8 * g + 7] += c * stage_v4rholapl3[8 * g + 7];
-
-                v4rholapl2tau[12 * g + 0] += c * stage_v4rholapl2tau[12 * g + 0];
-                v4rholapl2tau[12 * g + 1] += c * stage_v4rholapl2tau[12 * g + 1];
-                v4rholapl2tau[12 * g + 2] += c * stage_v4rholapl2tau[12 * g + 2];
-                v4rholapl2tau[12 * g + 3] += c * stage_v4rholapl2tau[12 * g + 3];
-                v4rholapl2tau[12 * g + 4] += c * stage_v4rholapl2tau[12 * g + 4];
-                v4rholapl2tau[12 * g + 5] += c * stage_v4rholapl2tau[12 * g + 5];
-                v4rholapl2tau[12 * g + 6] += c * stage_v4rholapl2tau[12 * g + 6];
-                v4rholapl2tau[12 * g + 7] += c * stage_v4rholapl2tau[12 * g + 7];
-                v4rholapl2tau[12 * g + 8] += c * stage_v4rholapl2tau[12 * g + 8];
-                v4rholapl2tau[12 * g + 9] += c * stage_v4rholapl2tau[12 * g + 9];
-                v4rholapl2tau[12 * g + 10] += c * stage_v4rholapl2tau[12 * g + 10];
-                v4rholapl2tau[12 * g + 11] += c * stage_v4rholapl2tau[12 * g + 11];
-
-                v4rholapltau2[12 * g + 0] += c * stage_v4rholapltau2[12 * g + 0];
-                v4rholapltau2[12 * g + 1] += c * stage_v4rholapltau2[12 * g + 1];
-                v4rholapltau2[12 * g + 2] += c * stage_v4rholapltau2[12 * g + 2];
-                v4rholapltau2[12 * g + 3] += c * stage_v4rholapltau2[12 * g + 3];
-                v4rholapltau2[12 * g + 4] += c * stage_v4rholapltau2[12 * g + 4];
-                v4rholapltau2[12 * g + 5] += c * stage_v4rholapltau2[12 * g + 5];
-                v4rholapltau2[12 * g + 6] += c * stage_v4rholapltau2[12 * g + 6];
-                v4rholapltau2[12 * g + 7] += c * stage_v4rholapltau2[12 * g + 7];
-                v4rholapltau2[12 * g + 8] += c * stage_v4rholapltau2[12 * g + 8];
-                v4rholapltau2[12 * g + 9] += c * stage_v4rholapltau2[12 * g + 9];
-                v4rholapltau2[12 * g + 10] += c * stage_v4rholapltau2[12 * g + 10];
-                v4rholapltau2[12 * g + 11] += c * stage_v4rholapltau2[12 * g + 11];
-
-                v4rhotau3[8 * g + 0] += c * stage_v4rhotau3[8 * g + 0];
-                v4rhotau3[8 * g + 1] += c * stage_v4rhotau3[8 * g + 1];
-                v4rhotau3[8 * g + 2] += c * stage_v4rhotau3[8 * g + 2];
-                v4rhotau3[8 * g + 3] += c * stage_v4rhotau3[8 * g + 3];
-                v4rhotau3[8 * g + 4] += c * stage_v4rhotau3[8 * g + 4];
-                v4rhotau3[8 * g + 5] += c * stage_v4rhotau3[8 * g + 5];
-                v4rhotau3[8 * g + 6] += c * stage_v4rhotau3[8 * g + 6];
-                v4rhotau3[8 * g + 7] += c * stage_v4rhotau3[8 * g + 7];
-
-                v4sigma4[15 * g + 0] += c * stage_v4sigma4[15 * g + 0];
-                v4sigma4[15 * g + 1] += c * stage_v4sigma4[15 * g + 1];
-                v4sigma4[15 * g + 2] += c * stage_v4sigma4[15 * g + 2];
-                v4sigma4[15 * g + 3] += c * stage_v4sigma4[15 * g + 3];
-                v4sigma4[15 * g + 4] += c * stage_v4sigma4[15 * g + 4];
-                v4sigma4[15 * g + 5] += c * stage_v4sigma4[15 * g + 5];
-                v4sigma4[15 * g + 6] += c * stage_v4sigma4[15 * g + 6];
-                v4sigma4[15 * g + 7] += c * stage_v4sigma4[15 * g + 7];
-                v4sigma4[15 * g + 8] += c * stage_v4sigma4[15 * g + 8];
-                v4sigma4[15 * g + 9] += c * stage_v4sigma4[15 * g + 9];
-                v4sigma4[15 * g + 10] += c * stage_v4sigma4[15 * g + 10];
-                v4sigma4[15 * g + 11] += c * stage_v4sigma4[15 * g + 11];
-                v4sigma4[15 * g + 12] += c * stage_v4sigma4[15 * g + 12];
-                v4sigma4[15 * g + 13] += c * stage_v4sigma4[15 * g + 13];
-                v4sigma4[15 * g + 14] += c * stage_v4sigma4[15 * g + 14];
-
-                v4sigma3lapl[20 * g + 0] += c * stage_v4sigma3lapl[20 * g + 0];
-                v4sigma3lapl[20 * g + 1] += c * stage_v4sigma3lapl[20 * g + 1];
-                v4sigma3lapl[20 * g + 2] += c * stage_v4sigma3lapl[20 * g + 2];
-                v4sigma3lapl[20 * g + 3] += c * stage_v4sigma3lapl[20 * g + 3];
-                v4sigma3lapl[20 * g + 4] += c * stage_v4sigma3lapl[20 * g + 4];
-                v4sigma3lapl[20 * g + 5] += c * stage_v4sigma3lapl[20 * g + 5];
-                v4sigma3lapl[20 * g + 6] += c * stage_v4sigma3lapl[20 * g + 6];
-                v4sigma3lapl[20 * g + 7] += c * stage_v4sigma3lapl[20 * g + 7];
-                v4sigma3lapl[20 * g + 8] += c * stage_v4sigma3lapl[20 * g + 8];
-                v4sigma3lapl[20 * g + 9] += c * stage_v4sigma3lapl[20 * g + 9];
-                v4sigma3lapl[20 * g + 10] += c * stage_v4sigma3lapl[20 * g + 10];
-                v4sigma3lapl[20 * g + 11] += c * stage_v4sigma3lapl[20 * g + 11];
-                v4sigma3lapl[20 * g + 12] += c * stage_v4sigma3lapl[20 * g + 12];
-                v4sigma3lapl[20 * g + 13] += c * stage_v4sigma3lapl[20 * g + 13];
-                v4sigma3lapl[20 * g + 14] += c * stage_v4sigma3lapl[20 * g + 14];
-                v4sigma3lapl[20 * g + 15] += c * stage_v4sigma3lapl[20 * g + 15];
-                v4sigma3lapl[20 * g + 16] += c * stage_v4sigma3lapl[20 * g + 16];
-                v4sigma3lapl[20 * g + 17] += c * stage_v4sigma3lapl[20 * g + 17];
-                v4sigma3lapl[20 * g + 18] += c * stage_v4sigma3lapl[20 * g + 18];
-                v4sigma3lapl[20 * g + 19] += c * stage_v4sigma3lapl[20 * g + 19];
-
-                // v4sigma3tau: inconsistent size in libxc (30 vs 20)
-                v4sigma3tau[30 * g + 0] += c * stage_v4sigma3tau[30 * g + 0];
-                v4sigma3tau[30 * g + 1] += c * stage_v4sigma3tau[30 * g + 1];
-                v4sigma3tau[30 * g + 2] += c * stage_v4sigma3tau[30 * g + 2];
-                v4sigma3tau[30 * g + 3] += c * stage_v4sigma3tau[30 * g + 3];
-                v4sigma3tau[30 * g + 4] += c * stage_v4sigma3tau[30 * g + 4];
-                v4sigma3tau[30 * g + 5] += c * stage_v4sigma3tau[30 * g + 5];
-                v4sigma3tau[30 * g + 6] += c * stage_v4sigma3tau[30 * g + 6];
-                v4sigma3tau[30 * g + 7] += c * stage_v4sigma3tau[30 * g + 7];
-                v4sigma3tau[30 * g + 8] += c * stage_v4sigma3tau[30 * g + 8];
-                v4sigma3tau[30 * g + 9] += c * stage_v4sigma3tau[30 * g + 9];
-                v4sigma3tau[30 * g + 10] += c * stage_v4sigma3tau[30 * g + 10];
-                v4sigma3tau[30 * g + 11] += c * stage_v4sigma3tau[30 * g + 11];
-                v4sigma3tau[30 * g + 12] += c * stage_v4sigma3tau[30 * g + 12];
-                v4sigma3tau[30 * g + 13] += c * stage_v4sigma3tau[30 * g + 13];
-                v4sigma3tau[30 * g + 14] += c * stage_v4sigma3tau[30 * g + 14];
-                v4sigma3tau[30 * g + 15] += c * stage_v4sigma3tau[30 * g + 15];
-                v4sigma3tau[30 * g + 16] += c * stage_v4sigma3tau[30 * g + 16];
-                v4sigma3tau[30 * g + 17] += c * stage_v4sigma3tau[30 * g + 17];
-                v4sigma3tau[30 * g + 18] += c * stage_v4sigma3tau[30 * g + 18];
-                v4sigma3tau[30 * g + 19] += c * stage_v4sigma3tau[30 * g + 19];
-
-                v4sigma2lapl2[18 * g + 0] += c * stage_v4sigma2lapl2[18 * g + 0];
-                v4sigma2lapl2[18 * g + 1] += c * stage_v4sigma2lapl2[18 * g + 1];
-                v4sigma2lapl2[18 * g + 2] += c * stage_v4sigma2lapl2[18 * g + 2];
-                v4sigma2lapl2[18 * g + 3] += c * stage_v4sigma2lapl2[18 * g + 3];
-                v4sigma2lapl2[18 * g + 4] += c * stage_v4sigma2lapl2[18 * g + 4];
-                v4sigma2lapl2[18 * g + 5] += c * stage_v4sigma2lapl2[18 * g + 5];
-                v4sigma2lapl2[18 * g + 6] += c * stage_v4sigma2lapl2[18 * g + 6];
-                v4sigma2lapl2[18 * g + 7] += c * stage_v4sigma2lapl2[18 * g + 7];
-                v4sigma2lapl2[18 * g + 8] += c * stage_v4sigma2lapl2[18 * g + 8];
-                v4sigma2lapl2[18 * g + 9] += c * stage_v4sigma2lapl2[18 * g + 9];
-                v4sigma2lapl2[18 * g + 10] += c * stage_v4sigma2lapl2[18 * g + 10];
-                v4sigma2lapl2[18 * g + 11] += c * stage_v4sigma2lapl2[18 * g + 11];
-                v4sigma2lapl2[18 * g + 12] += c * stage_v4sigma2lapl2[18 * g + 12];
-                v4sigma2lapl2[18 * g + 13] += c * stage_v4sigma2lapl2[18 * g + 13];
-                v4sigma2lapl2[18 * g + 14] += c * stage_v4sigma2lapl2[18 * g + 14];
-                v4sigma2lapl2[18 * g + 15] += c * stage_v4sigma2lapl2[18 * g + 15];
-                v4sigma2lapl2[18 * g + 16] += c * stage_v4sigma2lapl2[18 * g + 16];
-                v4sigma2lapl2[18 * g + 17] += c * stage_v4sigma2lapl2[18 * g + 17];
-
-                v4sigma2lapltau[24 * g + 0] += c * stage_v4sigma2lapltau[24 * g + 0];
-                v4sigma2lapltau[24 * g + 1] += c * stage_v4sigma2lapltau[24 * g + 1];
-                v4sigma2lapltau[24 * g + 2] += c * stage_v4sigma2lapltau[24 * g + 2];
-                v4sigma2lapltau[24 * g + 3] += c * stage_v4sigma2lapltau[24 * g + 3];
-                v4sigma2lapltau[24 * g + 4] += c * stage_v4sigma2lapltau[24 * g + 4];
-                v4sigma2lapltau[24 * g + 5] += c * stage_v4sigma2lapltau[24 * g + 5];
-                v4sigma2lapltau[24 * g + 6] += c * stage_v4sigma2lapltau[24 * g + 6];
-                v4sigma2lapltau[24 * g + 7] += c * stage_v4sigma2lapltau[24 * g + 7];
-                v4sigma2lapltau[24 * g + 8] += c * stage_v4sigma2lapltau[24 * g + 8];
-                v4sigma2lapltau[24 * g + 9] += c * stage_v4sigma2lapltau[24 * g + 9];
-                v4sigma2lapltau[24 * g + 10] += c * stage_v4sigma2lapltau[24 * g + 10];
-                v4sigma2lapltau[24 * g + 11] += c * stage_v4sigma2lapltau[24 * g + 11];
-                v4sigma2lapltau[24 * g + 12] += c * stage_v4sigma2lapltau[24 * g + 12];
-                v4sigma2lapltau[24 * g + 13] += c * stage_v4sigma2lapltau[24 * g + 13];
-                v4sigma2lapltau[24 * g + 14] += c * stage_v4sigma2lapltau[24 * g + 14];
-                v4sigma2lapltau[24 * g + 15] += c * stage_v4sigma2lapltau[24 * g + 15];
-                v4sigma2lapltau[24 * g + 16] += c * stage_v4sigma2lapltau[24 * g + 16];
-                v4sigma2lapltau[24 * g + 17] += c * stage_v4sigma2lapltau[24 * g + 17];
-                v4sigma2lapltau[24 * g + 18] += c * stage_v4sigma2lapltau[24 * g + 18];
-                v4sigma2lapltau[24 * g + 19] += c * stage_v4sigma2lapltau[24 * g + 19];
-                v4sigma2lapltau[24 * g + 20] += c * stage_v4sigma2lapltau[24 * g + 20];
-                v4sigma2lapltau[24 * g + 21] += c * stage_v4sigma2lapltau[24 * g + 21];
-                v4sigma2lapltau[24 * g + 22] += c * stage_v4sigma2lapltau[24 * g + 22];
-                v4sigma2lapltau[24 * g + 23] += c * stage_v4sigma2lapltau[24 * g + 23];
-
-                v4sigma2tau2[18 * g + 0] += c * stage_v4sigma2tau2[18 * g + 0];
-                v4sigma2tau2[18 * g + 1] += c * stage_v4sigma2tau2[18 * g + 1];
-                v4sigma2tau2[18 * g + 2] += c * stage_v4sigma2tau2[18 * g + 2];
-                v4sigma2tau2[18 * g + 3] += c * stage_v4sigma2tau2[18 * g + 3];
-                v4sigma2tau2[18 * g + 4] += c * stage_v4sigma2tau2[18 * g + 4];
-                v4sigma2tau2[18 * g + 5] += c * stage_v4sigma2tau2[18 * g + 5];
-                v4sigma2tau2[18 * g + 6] += c * stage_v4sigma2tau2[18 * g + 6];
-                v4sigma2tau2[18 * g + 7] += c * stage_v4sigma2tau2[18 * g + 7];
-                v4sigma2tau2[18 * g + 8] += c * stage_v4sigma2tau2[18 * g + 8];
-                v4sigma2tau2[18 * g + 9] += c * stage_v4sigma2tau2[18 * g + 9];
-                v4sigma2tau2[18 * g + 10] += c * stage_v4sigma2tau2[18 * g + 10];
-                v4sigma2tau2[18 * g + 11] += c * stage_v4sigma2tau2[18 * g + 11];
-                v4sigma2tau2[18 * g + 12] += c * stage_v4sigma2tau2[18 * g + 12];
-                v4sigma2tau2[18 * g + 13] += c * stage_v4sigma2tau2[18 * g + 13];
-                v4sigma2tau2[18 * g + 14] += c * stage_v4sigma2tau2[18 * g + 14];
-                v4sigma2tau2[18 * g + 15] += c * stage_v4sigma2tau2[18 * g + 15];
-                v4sigma2tau2[18 * g + 16] += c * stage_v4sigma2tau2[18 * g + 16];
-                v4sigma2tau2[18 * g + 17] += c * stage_v4sigma2tau2[18 * g + 17];
-
-                v4sigmalapl3[12 * g + 0] += c * stage_v4sigmalapl3[12 * g + 0];
-                v4sigmalapl3[12 * g + 1] += c * stage_v4sigmalapl3[12 * g + 1];
-                v4sigmalapl3[12 * g + 2] += c * stage_v4sigmalapl3[12 * g + 2];
-                v4sigmalapl3[12 * g + 3] += c * stage_v4sigmalapl3[12 * g + 3];
-                v4sigmalapl3[12 * g + 4] += c * stage_v4sigmalapl3[12 * g + 4];
-                v4sigmalapl3[12 * g + 5] += c * stage_v4sigmalapl3[12 * g + 5];
-                v4sigmalapl3[12 * g + 6] += c * stage_v4sigmalapl3[12 * g + 6];
-                v4sigmalapl3[12 * g + 7] += c * stage_v4sigmalapl3[12 * g + 7];
-                v4sigmalapl3[12 * g + 8] += c * stage_v4sigmalapl3[12 * g + 8];
-                v4sigmalapl3[12 * g + 9] += c * stage_v4sigmalapl3[12 * g + 9];
-                v4sigmalapl3[12 * g + 10] += c * stage_v4sigmalapl3[12 * g + 10];
-                v4sigmalapl3[12 * g + 11] += c * stage_v4sigmalapl3[12 * g + 11];
-
-                v4sigmalapl2tau[18 * g + 0] += c * stage_v4sigmalapl2tau[18 * g + 0];
-                v4sigmalapl2tau[18 * g + 1] += c * stage_v4sigmalapl2tau[18 * g + 1];
-                v4sigmalapl2tau[18 * g + 2] += c * stage_v4sigmalapl2tau[18 * g + 2];
-                v4sigmalapl2tau[18 * g + 3] += c * stage_v4sigmalapl2tau[18 * g + 3];
-                v4sigmalapl2tau[18 * g + 4] += c * stage_v4sigmalapl2tau[18 * g + 4];
-                v4sigmalapl2tau[18 * g + 5] += c * stage_v4sigmalapl2tau[18 * g + 5];
-                v4sigmalapl2tau[18 * g + 6] += c * stage_v4sigmalapl2tau[18 * g + 6];
-                v4sigmalapl2tau[18 * g + 7] += c * stage_v4sigmalapl2tau[18 * g + 7];
-                v4sigmalapl2tau[18 * g + 8] += c * stage_v4sigmalapl2tau[18 * g + 8];
-                v4sigmalapl2tau[18 * g + 9] += c * stage_v4sigmalapl2tau[18 * g + 9];
-                v4sigmalapl2tau[18 * g + 10] += c * stage_v4sigmalapl2tau[18 * g + 10];
-                v4sigmalapl2tau[18 * g + 11] += c * stage_v4sigmalapl2tau[18 * g + 11];
-                v4sigmalapl2tau[18 * g + 12] += c * stage_v4sigmalapl2tau[18 * g + 12];
-                v4sigmalapl2tau[18 * g + 13] += c * stage_v4sigmalapl2tau[18 * g + 13];
-                v4sigmalapl2tau[18 * g + 14] += c * stage_v4sigmalapl2tau[18 * g + 14];
-                v4sigmalapl2tau[18 * g + 15] += c * stage_v4sigmalapl2tau[18 * g + 15];
-                v4sigmalapl2tau[18 * g + 16] += c * stage_v4sigmalapl2tau[18 * g + 16];
-                v4sigmalapl2tau[18 * g + 17] += c * stage_v4sigmalapl2tau[18 * g + 17];
-
-                v4sigmalapltau2[18 * g + 0] += c * stage_v4sigmalapltau2[18 * g + 0];
-                v4sigmalapltau2[18 * g + 1] += c * stage_v4sigmalapltau2[18 * g + 1];
-                v4sigmalapltau2[18 * g + 2] += c * stage_v4sigmalapltau2[18 * g + 2];
-                v4sigmalapltau2[18 * g + 3] += c * stage_v4sigmalapltau2[18 * g + 3];
-                v4sigmalapltau2[18 * g + 4] += c * stage_v4sigmalapltau2[18 * g + 4];
-                v4sigmalapltau2[18 * g + 5] += c * stage_v4sigmalapltau2[18 * g + 5];
-                v4sigmalapltau2[18 * g + 6] += c * stage_v4sigmalapltau2[18 * g + 6];
-                v4sigmalapltau2[18 * g + 7] += c * stage_v4sigmalapltau2[18 * g + 7];
-                v4sigmalapltau2[18 * g + 8] += c * stage_v4sigmalapltau2[18 * g + 8];
-                v4sigmalapltau2[18 * g + 9] += c * stage_v4sigmalapltau2[18 * g + 9];
-                v4sigmalapltau2[18 * g + 10] += c * stage_v4sigmalapltau2[18 * g + 10];
-                v4sigmalapltau2[18 * g + 11] += c * stage_v4sigmalapltau2[18 * g + 11];
-                v4sigmalapltau2[18 * g + 12] += c * stage_v4sigmalapltau2[18 * g + 12];
-                v4sigmalapltau2[18 * g + 13] += c * stage_v4sigmalapltau2[18 * g + 13];
-                v4sigmalapltau2[18 * g + 14] += c * stage_v4sigmalapltau2[18 * g + 14];
-                v4sigmalapltau2[18 * g + 15] += c * stage_v4sigmalapltau2[18 * g + 15];
-                v4sigmalapltau2[18 * g + 16] += c * stage_v4sigmalapltau2[18 * g + 16];
-                v4sigmalapltau2[18 * g + 17] += c * stage_v4sigmalapltau2[18 * g + 17];
-
-                v4sigmatau3[12 * g + 0] += c * stage_v4sigmatau3[12 * g + 0];
-                v4sigmatau3[12 * g + 1] += c * stage_v4sigmatau3[12 * g + 1];
-                v4sigmatau3[12 * g + 2] += c * stage_v4sigmatau3[12 * g + 2];
-                v4sigmatau3[12 * g + 3] += c * stage_v4sigmatau3[12 * g + 3];
-                v4sigmatau3[12 * g + 4] += c * stage_v4sigmatau3[12 * g + 4];
-                v4sigmatau3[12 * g + 5] += c * stage_v4sigmatau3[12 * g + 5];
-                v4sigmatau3[12 * g + 6] += c * stage_v4sigmatau3[12 * g + 6];
-                v4sigmatau3[12 * g + 7] += c * stage_v4sigmatau3[12 * g + 7];
-                v4sigmatau3[12 * g + 8] += c * stage_v4sigmatau3[12 * g + 8];
-                v4sigmatau3[12 * g + 9] += c * stage_v4sigmatau3[12 * g + 9];
-                v4sigmatau3[12 * g + 10] += c * stage_v4sigmatau3[12 * g + 10];
-                v4sigmatau3[12 * g + 11] += c * stage_v4sigmatau3[12 * g + 11];
-
-                v4lapl4[5 * g + 0] += c * stage_v4lapl4[5 * g + 0];
-                v4lapl4[5 * g + 1] += c * stage_v4lapl4[5 * g + 1];
-                v4lapl4[5 * g + 2] += c * stage_v4lapl4[5 * g + 2];
-                v4lapl4[5 * g + 3] += c * stage_v4lapl4[5 * g + 3];
-                v4lapl4[5 * g + 4] += c * stage_v4lapl4[5 * g + 4];
-
-                v4lapl3tau[8 * g + 0] += c * stage_v4lapl3tau[8 * g + 0];
-                v4lapl3tau[8 * g + 1] += c * stage_v4lapl3tau[8 * g + 1];
-                v4lapl3tau[8 * g + 2] += c * stage_v4lapl3tau[8 * g + 2];
-                v4lapl3tau[8 * g + 3] += c * stage_v4lapl3tau[8 * g + 3];
-                v4lapl3tau[8 * g + 4] += c * stage_v4lapl3tau[8 * g + 4];
-                v4lapl3tau[8 * g + 5] += c * stage_v4lapl3tau[8 * g + 5];
-                v4lapl3tau[8 * g + 6] += c * stage_v4lapl3tau[8 * g + 6];
-                v4lapl3tau[8 * g + 7] += c * stage_v4lapl3tau[8 * g + 7];
-
-                v4lapl2tau2[9 * g + 0] += c * stage_v4lapl2tau2[9 * g + 0];
-                v4lapl2tau2[9 * g + 1] += c * stage_v4lapl2tau2[9 * g + 1];
-                v4lapl2tau2[9 * g + 2] += c * stage_v4lapl2tau2[9 * g + 2];
-                v4lapl2tau2[9 * g + 3] += c * stage_v4lapl2tau2[9 * g + 3];
-                v4lapl2tau2[9 * g + 4] += c * stage_v4lapl2tau2[9 * g + 4];
-                v4lapl2tau2[9 * g + 5] += c * stage_v4lapl2tau2[9 * g + 5];
-                v4lapl2tau2[9 * g + 6] += c * stage_v4lapl2tau2[9 * g + 6];
-                v4lapl2tau2[9 * g + 7] += c * stage_v4lapl2tau2[9 * g + 7];
-                v4lapl2tau2[9 * g + 8] += c * stage_v4lapl2tau2[9 * g + 8];
-
-                v4lapltau3[8 * g + 0] += c * stage_v4lapltau3[8 * g + 0];
-                v4lapltau3[8 * g + 1] += c * stage_v4lapltau3[8 * g + 1];
-                v4lapltau3[8 * g + 2] += c * stage_v4lapltau3[8 * g + 2];
-                v4lapltau3[8 * g + 3] += c * stage_v4lapltau3[8 * g + 3];
-                v4lapltau3[8 * g + 4] += c * stage_v4lapltau3[8 * g + 4];
-                v4lapltau3[8 * g + 5] += c * stage_v4lapltau3[8 * g + 5];
-                v4lapltau3[8 * g + 6] += c * stage_v4lapltau3[8 * g + 6];
-                v4lapltau3[8 * g + 7] += c * stage_v4lapltau3[8 * g + 7];
-
-                v4tau4[5 * g + 0] += c * stage_v4tau4[5 * g + 0];
-                v4tau4[5 * g + 1] += c * stage_v4tau4[5 * g + 1];
-                v4tau4[5 * g + 2] += c * stage_v4tau4[5 * g + 2];
-                v4tau4[5 * g + 3] += c * stage_v4tau4[5 * g + 3];
-                v4tau4[5 * g + 4] += c * stage_v4tau4[5 * g + 4];
-            }
-        }
+        gridscreen::screenLxcForMGGA(this,
+                                     grid_batch_size,
+                                     rho + dim->rho * grid_batch_offset,
+                                     sigma + dim->sigma * grid_batch_offset,
+                                     lapl + dim->lapl * grid_batch_offset,
+                                     tau + dim->tau * grid_batch_offset,
+                                     v4rho4 + dim->v4rho4 * grid_batch_offset,
+                                     v4rho3sigma + dim->v4rho3sigma * grid_batch_offset,
+                                     v4rho3lapl + dim->v4rho3lapl * grid_batch_offset,
+                                     v4rho3tau + dim->v4rho3tau * grid_batch_offset,
+                                     v4rho2sigma2 + dim->v4rho2sigma2 * grid_batch_offset,
+                                     v4rho2sigmalapl + dim->v4rho2sigmalapl * grid_batch_offset,
+                                     v4rho2sigmatau + dim->v4rho2sigmatau * grid_batch_offset,
+                                     v4rho2lapl2 + dim->v4rho2lapl2 * grid_batch_offset,
+                                     v4rho2lapltau + dim->v4rho2lapltau * grid_batch_offset,
+                                     v4rho2tau2 + dim->v4rho2tau2 * grid_batch_offset,
+                                     v4rhosigma3 + dim->v4rhosigma3 * grid_batch_offset,
+                                     v4rhosigma2lapl + dim->v4rhosigma2lapl * grid_batch_offset,
+                                     v4rhosigma2tau + dim->v4rhosigma2tau * grid_batch_offset,
+                                     v4rhosigmalapl2 + dim->v4rhosigmalapl2 * grid_batch_offset,
+                                     v4rhosigmalapltau + dim->v4rhosigmalapltau * grid_batch_offset,
+                                     v4rhosigmatau2 + dim->v4rhosigmatau2 * grid_batch_offset,
+                                     v4rholapl3 + dim->v4rholapl3 * grid_batch_offset,
+                                     v4rholapl2tau + dim->v4rholapl2tau * grid_batch_offset,
+                                     v4rholapltau2 + dim->v4rholapltau2 * grid_batch_offset,
+                                     v4rhotau3 + dim->v4rhotau3 * grid_batch_offset,
+                                     v4sigma4 + dim->v4sigma4 * grid_batch_offset,
+                                     v4sigma3lapl + dim->v4sigma3lapl * grid_batch_offset,
+                                     v4sigma3tau + dim->v4sigma3tau * grid_batch_offset,
+                                     v4sigma2lapl2 + dim->v4sigma2lapl2 * grid_batch_offset,
+                                     v4sigma2lapltau + dim->v4sigma2lapltau * grid_batch_offset,
+                                     v4sigma2tau2 + dim->v4sigma2tau2 * grid_batch_offset,
+                                     v4sigmalapl3 + dim->v4sigmalapl3 * grid_batch_offset,
+                                     v4sigmalapl2tau + dim->v4sigmalapl2tau * grid_batch_offset,
+                                     v4sigmalapltau2 + dim->v4sigmalapltau2 * grid_batch_offset,
+                                     v4sigmatau3 + dim->v4sigmatau3 * grid_batch_offset,
+                                     v4lapl4 + dim->v4lapl4 * grid_batch_offset,
+                                     v4lapl3tau + dim->v4lapl3tau * grid_batch_offset,
+                                     v4lapl2tau2 + dim->v4lapl2tau2 * grid_batch_offset,
+                                     v4lapltau3 + dim->v4lapltau3 * grid_batch_offset,
+                                     v4tau4 + dim->v4tau4 * grid_batch_offset);
     }
 
     if (alloc)
@@ -3607,45 +3335,88 @@ CXCFunctional::compute_lxc_for_mgga(int32_t       np,
         mem::free(stage_v4lapltau3);
         mem::free(stage_v4tau4);
     }
+}
 
-    gridscreen::screenLxcForMGGA(np,
-                                 rho,
-                                 sigma,
-                                 lapl,
-                                 tau,
-                                 v4rho4,
-                                 v4rho3sigma,
-                                 v4rho3lapl,
-                                 v4rho3tau,
-                                 v4rho2sigma2,
-                                 v4rho2sigmalapl,
-                                 v4rho2sigmatau,
-                                 v4rho2lapl2,
-                                 v4rho2lapltau,
-                                 v4rho2tau2,
-                                 v4rhosigma3,
-                                 v4rhosigma2lapl,
-                                 v4rhosigma2tau,
-                                 v4rhosigmalapl2,
-                                 v4rhosigmalapltau,
-                                 v4rhosigmatau2,
-                                 v4rholapl3,
-                                 v4rholapl2tau,
-                                 v4rholapltau2,
-                                 v4rhotau3,
-                                 v4sigma4,
-                                 v4sigma3lapl,
-                                 v4sigma3tau,
-                                 v4sigma2lapl2,
-                                 v4sigma2lapltau,
-                                 v4sigma2tau2,
-                                 v4sigmalapl3,
-                                 v4sigmalapl2tau,
-                                 v4sigmalapltau2,
-                                 v4sigmatau3,
-                                 v4lapl4,
-                                 v4lapl3tau,
-                                 v4lapl2tau2,
-                                 v4lapltau3,
-                                 v4tau4);
+const xc_func_type*
+CXCFunctional::getFunctionalPointerToLdaComponent() const
+{
+    for (const auto& xccomp : _components)
+    {
+        if (xccomp.isLDA())
+        {
+            return xccomp.getFunctionalPointer();
+        }
+    }
+
+    std::string errmsg("XCFunctional.getFunctionalPointerToLdaComponent: Cannot find LDA functional component");
+
+    errors::assertMsgCritical(false, errmsg);
+
+    return nullptr;
+}
+
+const xc_func_type*
+CXCFunctional::getFunctionalPointerToGgaComponent() const
+{
+    for (const auto& xccomp : _components)
+    {
+        if (xccomp.isGGA())
+        {
+            return xccomp.getFunctionalPointer();
+        }
+    }
+
+    std::string errmsg("XCFunctional.getFunctionalPointerToGgaComponent: Cannot find GGA functional component");
+
+    errors::assertMsgCritical(false, errmsg);
+
+    return nullptr;
+}
+
+const xc_func_type*
+CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
+{
+    for (const auto& xccomp : _components)
+    {
+        if (xccomp.isMetaGGA())
+        {
+            return xccomp.getFunctionalPointer();
+        }
+    }
+
+    std::string errmsg("XCFunctional.getFunctionalPointerToMetaGgaComponent: Cannot find meta-GGA functional component");
+
+    errors::assertMsgCritical(false, errmsg);
+
+    return nullptr;
+}
+
+const int32_t
+CXCFunctional::getDimensionOfDerivatives() const
+{
+    auto indices_and_counts = _getIndicesAndCountsOfDerivatives();
+
+    if (_familyOfFunctional == std::string("LDA"))
+    {
+        auto final_index = indices_and_counts["v4rho4"][0];
+        auto final_count = indices_and_counts["v4rho4"][1];
+
+        return final_index + final_count;
+    }
+    else if (_familyOfFunctional == std::string("GGA"))
+    {
+        auto final_index = indices_and_counts["v4sigma4"][0];
+        auto final_count = indices_and_counts["v4sigma4"][1];
+
+        return final_index + final_count;
+    }
+    else if (_familyOfFunctional == std::string("MGGA"))
+    {
+        auto final_index = indices_and_counts["v4tau4"][0];
+        auto final_count = indices_and_counts["v4tau4"][1];
+
+        return final_index + final_count;
+    }
+
+    return 0;
 }

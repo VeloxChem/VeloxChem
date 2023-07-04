@@ -18,7 +18,7 @@ class TestMOM:
         H       0.7595754146     0.0000000000    -0.4713344012
         """
 
-        molecule = Molecule.read_str(water_xyz)
+        molecule = Molecule.read_molecule_string(water_xyz)
         basis = MolecularBasis.read(molecule, '6-31G', ostream=None)
 
         # Ground state
@@ -59,7 +59,7 @@ class TestMOM:
         H       0.7595754146     0.0000000000    -0.4713344012
         """
 
-        molecule = Molecule.read_str(water_xyz)
+        molecule = Molecule.read_molecule_string(water_xyz)
         basis = MolecularBasis.read(molecule, '6-31G', ostream=None)
 
         # Ground state

@@ -53,6 +53,7 @@ from .rsplinabscross import LinearAbsorptionCrossSection
 from .rspcdspec import CircularDichroismSpectrum
 from .rspc6 import C6
 from .rspshg import SHG
+from .rsptpatransition import TpaTransition
 from .rsptpa import TPA
 from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
@@ -80,7 +81,7 @@ def select_scf_driver(task, scf_type):
 
     # check number of MPI nodes
     if task.mpi_rank == mpi_master():
-        n_ao = task.ao_basis.get_dimensions_of_basis(task.molecule)
+        n_ao = task.ao_basis.get_dimension_of_basis(task.molecule)
         assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ao,
                             'SCF: too many MPI processes')
 
@@ -147,25 +148,32 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     elif prop_type in [
             'linear absorption cross-section',
             'linear absorption (cpp)',
+            'linear absorption(cpp)',
             'absorption (cpp)',
+            'absorption(cpp)',
     ]:
         rsp_prop = LinearAbsorptionCrossSection(rsp_dict, method_dict)
 
     elif prop_type in [
             'circular dichroism spectrum',
             'circular dichroism (cpp)',
+            'circular dichroism(cpp)',
             'ecd (cpp)',
+            'ecd(cpp)',
     ]:
         rsp_prop = CircularDichroismSpectrum(rsp_dict, method_dict)
 
     elif prop_type == 'c6':
         rsp_prop = C6(rsp_dict, method_dict)
 
-    elif prop_type == 'tpa':
-        rsp_prop = TPA(rsp_dict, method_dict)
-
     elif prop_type == 'shg':
         rsp_prop = SHG(rsp_dict, method_dict)
+
+    elif prop_type == 'tpa transition':
+        rsp_prop = TpaTransition(rsp_dict, method_dict)
+
+    elif prop_type == 'tpa':
+        rsp_prop = TPA(rsp_dict, method_dict)
 
     elif prop_type == 'custom':
         rsp_prop = CustomProperty(rsp_dict, method_dict)
@@ -302,17 +310,17 @@ def main():
 
     run_scf = task_type in [
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
-        'wave function', 'mp2', 'gradient', 'hessian', 'optimize', 'response',
-        'pulses', 'visualization', 'loprop'
+        'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'hessian',
+        'optimize', 'response', 'pulses', 'visualization', 'loprop'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
         run_scf = 'read_dalton' not in task.input_dict['visualization']['cubes']
 
     scf_type = 'restricted'
-    if task_type in ['uhf', 'uscf']:
+    if task_type in ['uhf', 'uscf', 'ump2']:
         scf_type = 'unrestricted'
-    elif task_type in ['rohf', 'roscf']:
+    elif task_type in ['rohf', 'roscf', 'romp2']:
         scf_type = 'restricted_openshell'
 
     if run_scf:
@@ -502,13 +510,14 @@ def main():
 
     # MP2 perturbation theory
 
-    if task_type == 'mp2' and scf_drv.scf_type == 'restricted':
+    if task_type in ['mp2', 'ump2', 'romp2']:
         mp2_dict = task.input_dict['mp2'] if 'mp2' in task.input_dict else {}
         mp2_dict = updated_dict_with_eri_settings(mp2_dict, scf_drv)
 
         mp2_drv = Mp2Driver(task.mpi_comm, task.ostream)
         mp2_drv.update_settings(mp2_dict, method_dict)
-        mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs)
+        mp2_drv.compute(task.molecule, task.ao_basis, mol_orbs,
+                        scf_drv.scf_type)
 
     # Cube file
 
