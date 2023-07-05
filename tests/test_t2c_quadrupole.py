@@ -45,8 +45,9 @@ class TestDipoleDriver:
         mcomps = ["XX", "XY", "XZ", "YY", "YZ", "ZZ"]
        
         for idx in range(6):
+            print("*** COMPONENT *** ", mcomps[idx])
             # load matrix for tensor component
-            quad_mat = dip_mats.get_matrix(mcomps[idx])
+            quad_mat = quad_mats.get_matrix(mcomps[idx])
             
             # check individual quadrupole component submatrices
             for i, j in zip(indexes[0], indexes[1]):
@@ -57,15 +58,17 @@ class TestDipoleDriver:
                 sket = basdims[j]
                 eket = basdims[j+1]
                 # load computed submatrix
-                cmat = dip_mat.get_submatrix((i, j))
+                cmat = quad_mat.get_submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
                 rmat.set_values(np.ascontiguousarray(ref_mat[idx, sbra:ebra, sket:eket]))
                 # compare submatrices
-                #Tester.compare_submatrices(cmat, rmat)
+                print("Computed  : ", cmat.to_numpy())
+                print("Reference : ", rmat.to_numpy()) 
+                Tester.compare_submatrices(cmat, rmat)
                 
             # check full quadrupole component matrix
-            fmat = dip_mat.get_full_matrix()
+            fmat = quad_mat.get_full_matrix()
             fref = SubMatrix([0, 0, 62, 62])
             fref.set_values(np.ascontiguousarray(ref_mat[idx]))
-            #Tester.compare_submatrices(fmat, fref)
+            Tester.compare_submatrices(fmat, fref)

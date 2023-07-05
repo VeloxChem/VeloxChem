@@ -103,7 +103,7 @@ compPrimitiveQuadrupoleSS_0_0(TDoubleArray&       buffer_xx,
 
         fints_yy[i] += fss * (rpc_y * rpc_y + 0.5 * fe_0);
 
-        fints_yz[i] += fss * rpc_x * rpc_z;
+        fints_yz[i] += fss * rpc_y * rpc_z;
 
         fints_zz[i] += fss * (rpc_z * rpc_z + 0.5 * fe_0);
     }
