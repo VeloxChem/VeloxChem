@@ -39,6 +39,7 @@ class TestDipoleDriver:
         npyfile = str(here / 'data' / 'co.tzvpp.electric.dipole.npy')
         ref_mat = np.load(npyfile)
  
+        # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 28, 48, 62]
        
