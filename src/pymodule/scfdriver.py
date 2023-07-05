@@ -101,7 +101,7 @@ class ScfDriver:
         - ref_mol_orbs: The reference molecular orbitals read from checkpoint
           file.
         - scf_type: The type of SCF calculation (restricted, unrestricted, or
-          restricted open-shell).
+          restricted_openshell).
         - dft: The flag for running DFT.
         - grid_level: The accuracy level of DFT grid.
         - xcfun: The XC functional.
@@ -657,8 +657,7 @@ class ScfDriver:
             The list of beta occupied orbitals.
         """
 
-        C_start_a = None
-        C_start_b = None
+        C_start_a, C_start_b = None, None
 
         if self.rank == mpi_master():
             n_alpha = molecule.number_of_alpha_electrons()
@@ -666,7 +665,9 @@ class ScfDriver:
 
             # Reorder alpha to match beta
             if self.scf_type == 'restricted_openshell':
-                alpha_list = beta_list + list(set(alpha_list) - set(beta_list))
+                alpha_list = beta_list + [
+                    x for x in alpha_list if x not in beta_list
+                ]
 
             err_excitations = 'ScfDriver.maximum_overlap: '
             err_excitations += 'incorrect definition of occupation lists'
@@ -681,13 +682,13 @@ class ScfDriver:
 
             C_a = mo_a[:, alpha_list]
             C_b = mo_b[:, beta_list]
-            self._mom = [C_a, C_b]
+            self._mom = (C_a, C_b)
 
             # Create guess orbitals
-            virtual_alpha = list(set(range(n_mo)) - set(alpha_list))
+            virtual_alpha = [x for x in range(n_mo) if x not in alpha_list]
             C_start_a = mo_a[:, alpha_list + virtual_alpha]
             if self.scf_type == 'unrestricted':
-                virtual_beta = list(set(range(n_mo)) - set(beta_list))
+                virtual_beta = [x for x in range(n_mo) if x not in beta_list]
                 C_start_b = mo_b[:, beta_list + virtual_beta]
 
         if self.scf_type == 'unrestricted':
@@ -715,6 +716,8 @@ class ScfDriver:
                 'ScfDriver.set_start_orbitals: invalid input for alpha ' +
                 'orbitals')
 
+            C_alpha, C_beta = None, None
+
             if isinstance(array, np.ndarray):
                 C_alpha, C_beta = array, None
 
@@ -730,35 +733,39 @@ class ScfDriver:
                         'input orbitals')
 
             err_array = 'ScfDriver.set_start_orbitals: expecting numpy array'
-            assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
-
-            n_ao = basis.get_dimension_of_basis(molecule)
-            n_mo = C_alpha.shape[1]
-            E_alpha = np.zeros(n_mo)
-
             err_mo = 'ScfDriver.set_start_orbitals: inconsistent number of MOs'
             err_ao = 'ScfDriver.set_start_orbitals: inconsistent number of AOs'
+
+            n_ao = basis.get_dimension_of_basis(molecule)
+
+            assert_msg_critical(isinstance(C_alpha, np.ndarray), err_array)
             assert_msg_critical(n_ao == C_alpha.shape[0], err_ao)
+            n_mo = C_alpha.shape[1]
 
-            if C_beta is None:
-                occ_alpha = molecule.get_aufbau_occupation(n_mo, 'restricted')
+            ene_a = np.zeros(n_mo)
+            occ_a = molecule.get_aufbau_alpha_occupation(n_mo)
 
-                self._molecular_orbitals = MolecularOrbitals([C_alpha],
-                                                             [E_alpha],
-                                                             [occ_alpha],
+            if self.scf_type == 'restricted':
+                self._molecular_orbitals = MolecularOrbitals([C_alpha], [ene_a],
+                                                             [occ_a],
                                                              molorb.rest)
-            else:
+
+            elif self.scf_type == 'unrestricted':
                 assert_msg_critical(isinstance(C_beta, np.ndarray), err_array)
                 assert_msg_critical(n_ao == C_beta.shape[0], err_ao)
                 assert_msg_critical(n_mo == C_beta.shape[1], err_mo)
+                ene_b = np.zeros(n_mo)
+                occ_b = molecule.get_aufbau_beta_occupation(n_mo)
+                self._molecular_orbitals = MolecularOrbitals([C_alpha, C_beta],
+                                                             [ene_a, ene_b],
+                                                             [occ_a, occ_b],
+                                                             molorb.unrest)
 
-                E_beta = np.zeros(n_mo)
-                occ_alpha, occ_beta = molecule.get_aufbau_occupation(
-                    n_mo, 'unrestricted')
-
-                self._molecular_orbitals = MolecularOrbitals(
-                    [C_alpha, C_beta], [E_alpha, E_beta], [occ_alpha, occ_beta],
-                    molorb.unrest)
+            elif self.scf_type == 'restricted_openshell':
+                occ_b = molecule.get_aufbau_beta_occupation(n_mo)
+                self._molecular_orbitals = MolecularOrbitals([C_alpha], [ene_a],
+                                                             [occ_a, occ_b],
+                                                             molorb.restopen)
 
         else:
             self._molecular_orbitals = MolecularOrbitals()

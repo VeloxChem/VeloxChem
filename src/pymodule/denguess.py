@@ -110,7 +110,7 @@ class DensityGuess:
             Name of the AO basis.
         :param scf_type:
             The type of SCF calculation (restricted, unrestricted, or
-            restricted open-shell).
+            restricted_openshell).
 
         :return:
             Validity of the checkpoint file.
@@ -140,7 +140,7 @@ class DensityGuess:
             The output stream.
         :param scf_type:
             The type of SCF calculation (restricted, unrestricted, or
-            restricted open-shell).
+            restricted_openshell).
 
         :return:
             The AO density matrix to restart from.
@@ -174,7 +174,7 @@ class DensityGuess:
             The minimal AO basis for generation of atomic densities.
         :param scf_type:
             The type of SCF calculation (restricted, unrestricted, or
-            restricted open-shell).
+            restricted_openshell).
         :param comm:
             The local MPI communicator.
         :param ostream:
@@ -262,7 +262,7 @@ class DensityGuess:
             The molecular orbitals in reduced AO basis.
         :param scf_type:
             The type of SCF calculation (restricted, unrestricted, or
-            restricted open-shell).
+            restricted_openshell).
 
         :return:
             The AO density matrix from PRCMO.

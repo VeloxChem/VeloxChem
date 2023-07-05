@@ -183,6 +183,13 @@ class TestOrbData:
         assert (den_ref == den_a).all()
         assert (den_ref == den_b).all()
 
+        # test workaround for closed-shell MOs constructor
+        # (see src/python/ExportOrbData.cpp)
+        occ_2 = occ * 2.0
+        orb_rest_2 = MolecularOrbitals([arr], [ene], [occ_2], molorb.rest)
+        assert orb_rest == orb_rest_2
+        assert (orb_rest_2.occa_to_numpy() == occ).all()
+
     def test_unrest_density(self):
 
         mol = Molecule(['H', 'H'], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])

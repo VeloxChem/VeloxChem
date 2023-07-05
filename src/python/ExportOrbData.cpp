@@ -31,6 +31,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <algorithm>
 #include <fstream>
 #include <string>
 
@@ -178,6 +179,23 @@ CMolecularOrbitals_from_numpy_list(const std::vector<py::array_t<double>>& mol_o
         errors::assertMsgCritical(arr.ndim() == 1, errocc);
 
         std::vector<double> vec(arr.data(), arr.data() + arr.size());
+
+        // This is a workaround for closed-shell MOs (molorb::rest). In case
+        // total occupation numbers (instead of alpha occupation numbers) are
+        // passed into this constructor, the occupation numbers will be scaled
+        // by half.
+        if (orbs_type == molorb::rest)
+        {
+            auto vec_max = std::max_element(vec.begin(), vec.end());
+
+            if ((*vec_max) > 1.9)
+            {
+                for (size_t k = 0; k < vec.size(); k++)
+                {
+                    vec[k] *= 0.5;
+                }
+            }
+        }
 
         coccs.push_back(CMemBlock<double>(vec));
     }

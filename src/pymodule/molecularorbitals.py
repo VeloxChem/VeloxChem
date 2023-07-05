@@ -201,8 +201,8 @@ def _MolecularOrbitals_get_density(self, molecule, scf_type=None):
     :param molecule:
         The molecule.
     :param scf_type:
-        The type of SCF calculation (restricted, unrestricted, or restricted
-        open-shell).
+        The type of SCF calculation (restricted, unrestricted, or
+        restricted_openshell).
 
     :return:
         The AO density matrix.
@@ -366,8 +366,8 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set, scf_type):
     :param basis_set:
         Name of the basis set.
     :param scf_type:
-        The type of SCF calculation (restricted, unrestricted, or restricted
-        open-shell).
+        The type of SCF calculation (restricted, unrestricted, or
+        restricted_openshell).
 
     :return:
         Whether the hdf5 file matches the given nuclear charges and basis set.
