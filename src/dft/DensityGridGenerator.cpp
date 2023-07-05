@@ -25,13 +25,12 @@
 
 #include "DensityGridGenerator.hpp"
 
-#include <cstring>
-
 #include <omp.h>
 
-#include "DenseLinearAlgebra.hpp"
-
+#include <cstring>
 #include <iostream>
+
+#include "DenseLinearAlgebra.hpp"
 
 namespace dengridgen {  // dengridgen namespace
 

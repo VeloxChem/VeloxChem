@@ -511,7 +511,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -806,7 +806,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -1111,7 +1111,7 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -1349,7 +1349,7 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -1630,7 +1630,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -1960,7 +1960,7 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -2213,7 +2213,7 @@ CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -2526,7 +2526,7 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -2950,7 +2950,7 @@ CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -3230,7 +3230,7 @@ CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -3605,7 +3605,7 @@ CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -4244,7 +4244,7 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -4481,17 +4481,16 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
-/*
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
-    std::cout << "OpenMP timing" << std::endl;
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
-*/
+
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
+    // std::cout << "OpenMP timing" << std::endl;
+    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    // {
+    //     std::cout << "Thread " << thread_id << std::endl;
+    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
+    // }
 }
 
 void
@@ -4756,17 +4755,16 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
-/*
-    std::cout << "Timing of new integrator" << std::endl;
-    std::cout << "------------------------" << std::endl;
-    std::cout << timer.getSummary() << std::endl;
-    std::cout << "OpenMP timing" << std::endl;
-    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    {
-        std::cout << "Thread " << thread_id << std::endl;
-        std::cout << omptimers[thread_id].getSummary() << std::endl;
-    }
-*/
+
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
+    // std::cout << "OpenMP timing" << std::endl;
+    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    // {
+    //     std::cout << "Thread " << thread_id << std::endl;
+    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
+    // }
 }
 
 CDenseMatrix
