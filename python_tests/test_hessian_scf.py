@@ -21,7 +21,7 @@ class TestScfHessianDriver:
 
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        hessian_settings = {'do_raman': 'yes'}
+        hessian_settings = {'do_raman': 'yes', 'numerical':'yes'}
         method_settings = {}
         scf_hessian_drv = ScfHessianDriver()
         scf_hessian_drv.update_settings(method_settings, hessian_settings)

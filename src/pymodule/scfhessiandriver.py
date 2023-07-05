@@ -147,9 +147,6 @@ class ScfHessianDriver(HessianDriver):
             rsp_dict = {}
         self.rsp_dict = dict(rsp_dict)
 
-        # The electronic energy
-        self.elec_energy = self.scf_drv.get_scf_energy()
-
     def compute(self, molecule, ao_basis, scf_drv):
         """
         Computes the analytical or numerical nuclear Hessian.
@@ -172,8 +169,10 @@ class ScfHessianDriver(HessianDriver):
             'memory_tracing': self.memory_tracing,
         })
 
+        # Save the electronic energy
+        self.elec_energy = scf_drv.get_scf_energy()
+
         if self.numerical:
-        	self.elec_energy = scf_drv.get_scf_energy()
 	        self.compute_numerical(molecule, ao_basis, scf_drv)
         else:
             self.compute_analytical(molecule, ao_basis, min_basis, profiler)
@@ -233,7 +232,7 @@ class ScfHessianDriver(HessianDriver):
         # set up LR solver and member variable
         if self.do_raman:
             # linear response driver for polarizability calculation
-            lr_drv = LinearResponseSolver(self.comm, self.scf_drv.ostream)
+            lr_drv = LinearResponseSolver(self.comm, scf_drv.ostream)
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             # polarizability: 3 coordinates x 3 coordinates
             # (ignoring frequencies)
@@ -376,7 +375,7 @@ class ScfHessianDriver(HessianDriver):
                             'ScfHessianDriver: SCF did not converge')
         scf_drv.ostream.unmute()
 
-    def compute_analytical(self, molecule, ao_basis, min_basis, profiler):
+    def compute_analytical(self, molecule, ao_basis, scf_drv, profiler):
         """
         Computes the analytical nuclear Hessian.
         So far only for restricted Hartree-Fock with PySCF integral derivatives...
@@ -385,13 +384,13 @@ class ScfHessianDriver(HessianDriver):
             The molecule.
         :param ao_basis:
             The AO basis set.
-        :param min_basis:
-            The minimal AO basis set.
+        :param scf_drv:
+            The SCF driver.
         :param profiler:
             The profiler.
         """
 
-        scf_tensors = self.scf_drv.scf_tensors
+        scf_tensors = scf_drv.scf_tensors
         density = scf_tensors['D_alpha']
         natm = molecule.number_of_atoms()
         mo = scf_tensors['C_alpha']
@@ -407,7 +406,7 @@ class ScfHessianDriver(HessianDriver):
 
 
         # Set up a CPHF solver
-        cphf_solver = CphfSolver(self.comm, self.ostream, self.scf_drv) # TODO: remove scf_drv
+        cphf_solver = CphfSolver(self.comm, self.ostream, scf_drv) # TODO: remove scf_drv
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
@@ -448,31 +447,22 @@ class ScfHessianDriver(HessianDriver):
 
         # DFT:
         if self.dft:
-            if self.scf_drv.xcfun.is_hybrid():
-                frac_K = self.scf_drv.xcfun.get_frac_exact_exchange()
+            if scf_drv.xcfun.is_hybrid():
+                frac_K = scf_drv.xcfun.get_frac_exact_exchange()
             else:
                 frac_K = 0.0
 
             grid_drv = GridDriver()
-            grid_drv.set_level(self.scf_drv.grid_level)
+            grid_drv.set_level(scf_drv.grid_level)
 
             xc_mol_hess = XCMolecularHessian()
             mol_grid = grid_drv.generate(molecule)
 
-            gs_density = self.scf_drv.density
+            gs_density = scf_drv.density
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule, ao_basis,
                                                 gs_density, mol_grid,
-                                                self.scf_drv.xcfun.get_func_label())
-                                        #integrate_vxc_hessian(molecule,
-                                        #ao_basis, gs_density, mol_grid,
-                                        #self.scf_drv.xcfun.get_func_label())
-            self.scf_drv.comm.reduce(hessian_dft_xc, root=mpi_master())
-            #hessian_dft_xc += xc_mol_hess.integrate_fxc_hessian(molecule,
-            #                            ao_basis, gs_density, mol_grid,
-            #                            self.scf_drv.xcfun.get_func_label())
-            #    # DFT exchange and correlation contribution
-            #    hessian_dft_xc = dft_xc_second_deriv(molecule, ao_basis,
-            #            self.scf_drv).transpose(0,2,1,3).reshape(3*natm, 3*natm)
+                                                scf_drv.xcfun.get_func_label())
+            scf_drv.comm.reduce(hessian_dft_xc, root=mpi_master())
 
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
@@ -517,16 +507,17 @@ class ScfHessianDriver(HessianDriver):
             lr_drv = LinearResponseSolver()
             lr_drv.update_settings(self.rsp_dict, self.method_dict)
             lr_drv.ostream.state = False
-            lr_results = lr_drv.compute(molecule, ao_basis, self.scf_drv.scf_tensors)
+            lr_results = lr_drv.compute(molecule, ao_basis, scf_drv.scf_tensors)
 
             # Set up the polarizability gradient driver
             polgrad_drv = PolarizabilityGradient()
             self.cphf_dict['frequency'] = 0
             polgrad_drv.update_settings(self.rsp_dict, orbrsp_dict = self.cphf_dict,
                                         method_dict = self.method_dict)
-            polgrad_drv.compute(molecule, ao_basis, self.scf_drv.scf_tensors, lr_results)
+            polgrad_drv.compute(molecule, ao_basis, scf_drv.scf_tensors, lr_results)
             self.polarizability_gradient = polgrad_drv.pol_gradient
 
+	# TODO: add scf_drv
     def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
                       fock_deriv_oo, orben_ovlp_deriv_oo, perturbed_density,
                       profiler):
