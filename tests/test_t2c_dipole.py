@@ -38,7 +38,10 @@ class TestDipoleDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.tzvpp.electric.dipole.npy')
         ref_mat = np.load(npyfile)
-        
+ 
+        indexes = np.triu_indices(4)
+        basdims = [0, 10, 28, 48, 62]
+       
         for idx in range(3):
             # load matrix for axis
             dip_mat = dip_mats.get_matrix('xyz'[idx])
