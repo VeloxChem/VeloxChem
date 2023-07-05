@@ -108,7 +108,12 @@ class TestPDFT:
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
-    def test_O2_ROGGA(self):
+    def test_O2_ROPBE(self):
         ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'tpbe')
         if is_mpi_master():
             assert abs(-16.911864099412625 - pdft) < 1.0e-6
+
+    def test_O2_ROBLYP(self):
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('blyp', 'tblyp')
+        if is_mpi_master():
+            assert abs(-17.056873017749865 - pdft) < 1.0e-6
