@@ -73,8 +73,8 @@ class TestPDFT:
             nAct = nInAct - nIn
             wxc = 2.0 * pdft_wxc.reshape(nAO, nAct, nAct, nAct)
 
-            FA = vxc_mat.get_matrix(True).to_numpy()
-            FB = vxc_mat.get_matrix(False).to_numpy()
+            FA = vxc_mat.get_alpha_matrix().to_numpy()
+            FB = vxc_mat.get_beta_matrix().to_numpy()
 
             FAMO = np.linalg.multi_dot([C.T, FA, C])
             FBMO = np.linalg.multi_dot([C.T, FB, C])
@@ -89,7 +89,7 @@ class TestPDFT:
                 [C[:, :nIn].T, 2.0 * Fock, C])
             grad_pdft[nIn:nInAct, :] = np.linalg.multi_dot(
                 [Dact, mo_act.T, Fock, C])
-            grad_pdft[nIn:nInAct, :] -= np.matmul(C.T, Qpt).T
+            grad_pdft[nIn:nInAct, :] += np.matmul(C.T, Qpt).T
 
             return (vxc_mat.get_energy(), pdft_vxc.get_energy(), grad_ks,
                     grad_pdft)
