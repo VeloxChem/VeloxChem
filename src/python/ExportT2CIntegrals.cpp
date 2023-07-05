@@ -21,7 +21,7 @@ export_t2cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const COverlapDriver& ovl_drv, const CMolecularBasis& basis, const CMolecule& molecule) -> std::shared_ptr<CMatrix> {
+            [](const COverlapDriver& ovl_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> std::shared_ptr<CMatrix> {
                 return std::make_shared<CMatrix>(ovl_drv.compute(basis, molecule));
             },
             "Computes overlap matrix for given molecule and basis.");
@@ -32,7 +32,7 @@ export_t2cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CKineticEnergyDriver& kin_drv, const CMolecularBasis& basis, const CMolecule& molecule) -> std::shared_ptr<CMatrix> {
+            [](const CKineticEnergyDriver& kin_drv, const CMolecule& molecule, const CMolecularBasis& basis) -> std::shared_ptr<CMatrix> {
                 return std::make_shared<CMatrix>(kin_drv.compute(basis, molecule));
             },
             "Computes kinetic energy matrix for given molecule and basis.");
@@ -43,7 +43,7 @@ export_t2cintegrals(py::module& m)
         .def(py::init<>())
         .def(
             "compute",
-            [](const CDipoleDriver& dip_drv, const CMolecularBasis& basis, const CMolecule& molecule, const TPoint3D& point)
+            [](const CDipoleDriver& dip_drv, const CMolecule& molecule, const CMolecularBasis& basis, const TPoint3D& point)
                 -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(dip_drv.compute(basis, molecule, point)); },
             "Computes dipole matrix for given molecule, basis and origin.");
 
