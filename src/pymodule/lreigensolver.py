@@ -489,6 +489,14 @@ class LinearResponseEigenSolver(LinearSolver):
         profiler.check_memory_usage('End of LR eigensolver')
         profiler.print_memory_usage(self.ostream)
 
+        self._dist_bger = None
+        self._dist_bung = None
+        self._dist_e2bger = None
+        self._dist_e2bung = None
+
+        self._dist_fock_ger = None
+        self._dist_fock_ung = None
+
         # calculate properties
         if self.is_converged:
             edip_grad = self.get_prop_grad('electric dipole', 'xyz', molecule,

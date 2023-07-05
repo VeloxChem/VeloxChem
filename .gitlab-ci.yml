@@ -26,7 +26,7 @@
 default:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f3fb247
+  image: ghcr.io/veloxchem/meta-vlx/vlx-ci_intel:sha-c8613aa
   interruptible: true
 
 workflow:
@@ -52,8 +52,8 @@ stages:
     - ulimit -s unlimited
     - lscpu | egrep 'Thread|Core|Socket|^CPU\('
     - python -V
-    - mpiicc --version
-    - mpiicpc --version
+    - mpiicc -cc=icx --version
+    - mpiicpc -cxx=icpx --version
 
 .monkey:setup:
   extends:
@@ -75,12 +75,14 @@ monkey:cmake_build:
     - python -m pip install
         numpy
         pybind11[global]
+    - CC=icx MPICC="mpiicc -cc=icx" python -m pip install
         mpi4py --no-binary=mpi4py
     - cmake
         -S.
         -Bbuild
         -GNinja
         -DCMAKE_CXX_COMPILER=mpiicpc
+        -DCMAKE_CXX_FLAGS="-cxx=icpx"
         -DVLX_LA_VENDOR=MKL
     - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib utests -- -v -d stats
   artifacts:
@@ -100,10 +102,13 @@ monkey:pip_install:
   extends: .monkey:setup
   stage: build
   script:
-    - CC=icc MPICC=mpiicc python -m pip install mpi4py --no-binary=mpi4py
-    - CC=gcc CXX=g++ python -m pip install cppe MDAnalysis
-    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc"
-        python -m pip install .[test,qmmm]
+    - CC=icx MPICC="mpiicc -cc=icx" python -m pip install
+        mpi4py --no-binary=mpi4py
+    - CC=gcc CXX=g++ python -m pip install
+        cppe
+        MDAnalysis
+    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\""
+        python -m pip install -v .[test,qmmm]
   artifacts:
     paths:
       - venv
@@ -116,6 +121,7 @@ monkey:python_tests:
   needs: ["monkey:pip_install"]
   variables:
     OMP_NUM_THREADS: "6"
+    OMP_PLACES: "cores"
   script:
     - source venv/bin/activate
     - python -c "import veloxchem; print(veloxchem.__version__)"

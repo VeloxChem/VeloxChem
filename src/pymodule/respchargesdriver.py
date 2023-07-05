@@ -39,7 +39,7 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .scfrestdriver import ScfRestrictedDriver
 from .scfunrestdriver import ScfUnrestrictedDriver
-from .inputparser import parse_input, print_keywords, get_datetime_string
+from .inputparser import parse_input, print_keywords, get_random_string_parallel
 from .errorhandler import assert_msg_critical
 
 
@@ -99,7 +99,7 @@ class RespChargesDriver:
         self.ostream = ostream
 
         # filename
-        self.filename = f'veloxchem_esp_{get_datetime_string()}'
+        self.filename = 'veloxchem_esp_' + get_random_string_parallel(self.comm)
 
         # conformers
         self.xyz_file = None
