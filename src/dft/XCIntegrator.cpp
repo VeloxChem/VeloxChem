@@ -229,7 +229,7 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
                                 const CAODensityMatrix& densityMatrix,
-                                const CDense4DTensor&   twoBodyDensityMatrix,
+                                const CDenseMatrix&     twoBodyDensityMatrix,
                                 const CDenseMatrix&     activeMOs,
                                 const CMolecularGrid&   molecularGrid,
                                 const std::string&      xcFuncLabel) const
@@ -4256,7 +4256,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
                                        const CAODensityMatrix&         densityMatrix,
-                                       const CDense4DTensor&           twoBodyDensityMatrix,
+                                       const CDenseMatrix&             twoBodyDensityMatrix,
                                        const CDenseMatrix&             activeMOs,
                                        const CMolecularGrid&           molecularGrid,
                                        const CXCPairDensityFunctional& xcFunctional) const
@@ -4481,6 +4481,17 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
+/*
+    std::cout << "Timing of new integrator" << std::endl;
+    std::cout << "------------------------" << std::endl;
+    std::cout << timer.getSummary() << std::endl;
+    std::cout << "OpenMP timing" << std::endl;
+    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    {
+        std::cout << "Thread " << thread_id << std::endl;
+        std::cout << omptimers[thread_id].getSummary() << std::endl;
+    }
+*/
 }
 
 void
@@ -4489,7 +4500,7 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
                                        const CAODensityMatrix&         densityMatrix,
-                                       const CDense4DTensor&           twoBodyDensityMatrix,
+                                       const CDenseMatrix&             twoBodyDensityMatrix,
                                        const CDenseMatrix&             activeMOs,
                                        const CMolecularGrid&           molecularGrid,
                                        const CXCPairDensityFunctional& xcFunctional) const
@@ -4745,6 +4756,17 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
+/*
+    std::cout << "Timing of new integrator" << std::endl;
+    std::cout << "------------------------" << std::endl;
+    std::cout << timer.getSummary() << std::endl;
+    std::cout << "OpenMP timing" << std::endl;
+    for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    {
+        std::cout << "Thread " << thread_id << std::endl;
+        std::cout << omptimers[thread_id].getSummary() << std::endl;
+    }
+*/
 }
 
 CDenseMatrix
