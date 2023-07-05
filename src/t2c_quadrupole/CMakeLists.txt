@@ -1,5 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
+    QuadrupoleDriver.cpp
+    QuadrupoleFunc.cpp
     PrimitiveQuadrupoleDD_XX_XX.cpp
     PrimitiveQuadrupoleDD_XX_XY.cpp
     PrimitiveQuadrupoleDD_XX_XZ.cpp
