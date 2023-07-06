@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem.veloxchemlib import QuadrupoleDriver
+from veloxchem.veloxchemlib import OctupoleDriver
 from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import Molecule
 from veloxchem.veloxchemlib import Matrices
@@ -26,28 +26,28 @@ class TestDipoleDriver:
 
         return mol, bas
 
-    def test_electric_quadrupole_co_tzvpp(self):
+    def test_electric_octupole_co_tzvpp(self):
 
         mol_co, bas_tzvpp = self.get_data()
 
-        # compute electric quadrupole matrices
-        quad_drv = QuadrupoleDriver()
-        quad_mats = quad_drv.compute(mol_co, bas_tzvpp, [0.0, 0.0, 0.0])
+        # compute electric octupole matrices
+        octu_drv = OctupoleDriver()
+        octu_mats = octu_drv.compute(mol_co, bas_tzvpp, [0.0, 0.0, 0.0])
         
         # load reference electric dipole data
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'co.tzvpp.electric.quadrupole.npy')
+        npyfile = str(here / 'data' / 'co.tzvpp.electric.octupole.npy')
         ref_mat = np.load(npyfile)
  
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 28, 48, 62]
-        mcomps = ["XX", "XY", "XZ", "YY", "YZ", "ZZ"]
+        mcomps = ["XXX", "XXY", "XXZ", "XYY", "XYZ", "XZZ", "YYY", "YYZ", "YZZ", "ZZZ"]
        
-        for idx in range(6):
+        for idx in range(10):
             print("*** COMPONENT *** ", mcomps[idx])
             # load matrix for tensor component
-            quad_mat = quad_mats.get_matrix(mcomps[idx])
+            octu_mat = octu_mats.get_matrix(mcomps[idx])
             
             # check individual quadrupole component submatrices
             for i, j in zip(indexes[0], indexes[1]):
@@ -58,15 +58,15 @@ class TestDipoleDriver:
                 sket = basdims[j]
                 eket = basdims[j+1]
                 # load computed submatrix
-                cmat = quad_mat.get_submatrix((i, j))
+                cmat = octu_mat.get_submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
                 rmat.set_values(np.ascontiguousarray(ref_mat[idx, sbra:ebra, sket:eket]))
                 # compare submatrices
                 Tester.compare_submatrices(cmat, rmat)
                 
-            # check full quadrupole component matrix
-            fmat = quad_mat.get_full_matrix()
+            # check full octupole component matrix
+            fmat = octu_mat.get_full_matrix()
             fref = SubMatrix([0, 0, 62, 62])
             fref.set_values(np.ascontiguousarray(ref_mat[idx]))
             Tester.compare_submatrices(fmat, fref)

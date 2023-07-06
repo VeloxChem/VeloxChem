@@ -72,7 +72,7 @@ auto compute(CSubMatrix*      matrix_xx,
              const int64_t    bra_last,
              const mat_t      mat_type) -> void;
 
-}  // namespace dipfunc
+}  // namespace quadfunc
 
 
 #endif /* QuadrupoleFunc_hpp */

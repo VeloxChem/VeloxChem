@@ -1,5 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
+    OctupoleDriver.cpp
+    OctupoleFunc.cpp
     OctupoleRecDD.cpp
     OctupoleRecDF.cpp
     OctupoleRecDP.cpp

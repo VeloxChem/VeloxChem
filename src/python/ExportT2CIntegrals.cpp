@@ -3,6 +3,7 @@
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
+#include "OctupoleDriver.hpp"
 #include "QuadrupoleDriver.hpp"
 #include "DipoleDriver.hpp"
 #include "KineticEnergyDriver.hpp"
@@ -56,7 +57,17 @@ export_t2cintegrals(py::module& m)
             "compute",
             [](const CQuadrupoleDriver& quad_drv, const CMolecule& molecule, const CMolecularBasis& basis, const TPoint3D& point)
                 -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(quad_drv.compute(basis, molecule, point)); },
-            "Computes dipole matrix for given molecule, basis and origin.");
+            "Computes quadrupole matrix for given molecule, basis and origin.");
+    
+    // COctupoleDriver class
+
+    PyClass<COctupoleDriver>(m, "OctupoleDriver")
+        .def(py::init<>())
+        .def(
+            "compute",
+            [](const COctupoleDriver& octu_drv, const CMolecule& molecule, const CMolecularBasis& basis, const TPoint3D& point)
+                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(octu_drv.compute(basis, molecule, point)); },
+            "Computes octupole matrix for given molecule, basis and origin.");
 
     // ...
 }
