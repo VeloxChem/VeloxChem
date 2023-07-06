@@ -136,6 +136,28 @@ class TddftOrbitalResponse(CphfSolver):
 
                 self.ostream.print_blank()
 
+    @staticmethod
+    def get_full_solution_vector(solution):
+        """
+        Gets a full solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector.
+        """
+
+        x_ger = solution.get_full_vector(0)
+        x_ung = solution.get_full_vector(1)
+
+        if solution.rank == mpi_master():
+            x_ger_full = np.hstack((x_ger, x_ger))
+            x_ung_full = np.hstack((x_ung, -x_ung))
+            return x_ger_full + x_ung_full
+        else:
+            return None
+
     def compute_rhs(self, molecule, basis, scf_tensors, rsp_results):
         """
         Computes the right-hand side (RHS) of the RPA orbital response equation
@@ -199,16 +221,16 @@ class TddftOrbitalResponse(CphfSolver):
 
             for i in range(dof):
                 ivec = self.state_deriv_index[i] - 1
-                exc_vec[i] = (
+                if self.tamm_dancoff:
+                    exc_vec[i] = (
                         rsp_results['eigenvectors'][:nocc * nvir,
                                                     ivec].reshape(nocc, nvir)
                                 )
-
-                if not self.tamm_dancoff:
-                    deexc_vec[i] = (
-                            rsp_results['eigenvectors'][nocc * nvir:,
-                                                     ivec].reshape(nocc, nvir)
-                                )
+                else:
+                    eigenvector = self.get_full_solution_vector(
+                                rsp_results['eigenvectors_distributed'][ivec])
+                    exc_vec[i] = eigenvector[:nocc * nvir].reshape(nocc, nvir)
+                    deexc_vec[i] = eigenvector[nocc * nvir:].reshape(nocc, nvir)
 
             # Construct plus/minus combinations of excitation
             # and de-excitation part
