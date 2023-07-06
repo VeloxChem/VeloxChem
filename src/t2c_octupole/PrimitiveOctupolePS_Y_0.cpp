@@ -4,20 +4,20 @@
 
 #include "MathConst.hpp"
 
-namespace octurec {  // octurec namespace
+namespace octurec { // octurec namespace
 
 auto
-compPrimitiveOctupolePS_Y_0(TDoubleArray&       buffer_xxx,
-                            TDoubleArray&       buffer_xxy,
-                            TDoubleArray&       buffer_xxz,
-                            TDoubleArray&       buffer_xyy,
-                            TDoubleArray&       buffer_xyz,
-                            TDoubleArray&       buffer_xzz,
-                            TDoubleArray&       buffer_yyy,
-                            TDoubleArray&       buffer_yyz,
-                            TDoubleArray&       buffer_yzz,
-                            TDoubleArray&       buffer_zzz,
-                            const TPoint3D&     point,
+compPrimitiveOctupolePS_Y_0(      TDoubleArray& buffer_xxx,
+                                  TDoubleArray& buffer_xxy,
+                                  TDoubleArray& buffer_xxz,
+                                  TDoubleArray& buffer_xyy,
+                                  TDoubleArray& buffer_xyz,
+                                  TDoubleArray& buffer_xzz,
+                                  TDoubleArray& buffer_yyy,
+                                  TDoubleArray& buffer_yyz,
+                                  TDoubleArray& buffer_yzz,
+                                  TDoubleArray& buffer_zzz,
+               const TPoint3D& point,
                             const double        bra_exp,
                             const double        bra_norm,
                             const TPoint3D&     bra_coord,
@@ -84,20 +84,20 @@ compPrimitiveOctupolePS_Y_0(TDoubleArray&       buffer_xxx,
 
     auto fints_zzz = buffer_zzz.data();
 
-#pragma omp simd aligned(fints_xxx,     \
-                             fints_xxy, \
-                             fints_xxz, \
-                             fints_xyy, \
-                             fints_xyz, \
-                             fints_xzz, \
-                             fints_yyy, \
-                             fints_yyz, \
-                             fints_yzz, \
-                             fints_zzz, \
-                             ket_fe,    \
-                             ket_fn,    \
-                             ket_rx,    \
-                             ket_ry,    \
+    #pragma omp simd aligned(fints_xxx,\
+                             fints_xxy,\
+                             fints_xxz,\
+                             fints_xyy,\
+                             fints_xyz,\
+                             fints_xzz,\
+                             fints_yyy,\
+                             fints_yyz,\
+                             fints_yzz,\
+                             fints_zzz,\
+                             ket_fe,\
+                             ket_fn,\
+                             ket_rx,\
+                             ket_ry,\
                              ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
@@ -121,6 +121,12 @@ compPrimitiveOctupolePS_Y_0(TDoubleArray&       buffer_xxx,
 
         const auto fss = bra_norm * ket_fn[i] * std::pow(fe_0 * fpi, 1.50) * std::exp(-fz_0);
 
+        const auto faa_x = rpc_x * fss;
+
+        const auto faa_y = rpc_y * fss;
+
+        const auto faa_z = rpc_z * fss;
+
         const auto faa_xx = fss * (rpc_x * rpc_x + 0.5 * fe_0);
 
         const auto faa_xy = fss * rpc_x * rpc_y;
@@ -129,7 +135,7 @@ compPrimitiveOctupolePS_Y_0(TDoubleArray&       buffer_xxx,
 
         const auto faa_yy = fss * (rpc_y * rpc_y + 0.5 * fe_0);
 
-        const auto faa_yz = fss * rpc_x * rpc_z;
+        const auto faa_yz = fss * rpc_y * rpc_z;
 
         const auto faa_zz = fss * (rpc_z * rpc_z + 0.5 * fe_0);
 
@@ -186,7 +192,9 @@ compPrimitiveOctupolePS_Y_0(TDoubleArray&       buffer_xxx,
         fints_yzz[i] += faa_yzz * rpa_y;
 
         fints_zzz[i] += faa_zzz * rpa_y;
+
     }
 }
 
-}  // namespace octurec
+} // octurec namespace
+
