@@ -7,7 +7,7 @@
 #include "MatrixType.hpp"
 #include "SubMatrix.hpp"
 
-namespace octurec { // octurec namespace
+namespace octurec {  // octurec namespace
 
 /**
  Evaluates <F|r^3|F>  integrals for given GTOs block.
@@ -27,21 +27,20 @@ namespace octurec { // octurec namespace
  @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
  @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
 */
-auto
-compOctupoleFF(      CSubMatrix* matrix_xxx,
-                     CSubMatrix* matrix_xxy,
-                     CSubMatrix* matrix_xxz,
-                     CSubMatrix* matrix_xyy,
-                     CSubMatrix* matrix_xyz,
-                     CSubMatrix* matrix_xzz,
-                     CSubMatrix* matrix_yyy,
-                     CSubMatrix* matrix_yyz,
-                     CSubMatrix* matrix_yzz,
-                     CSubMatrix* matrix_zzz,
-               const TPoint3D& point,
-               const CGtoBlock&  gto_block,
-               const int64_t     bra_first,
-               const int64_t     bra_last) -> void;
+auto compOctupoleFF(CSubMatrix*      matrix_xxx,
+                    CSubMatrix*      matrix_xxy,
+                    CSubMatrix*      matrix_xxz,
+                    CSubMatrix*      matrix_xyy,
+                    CSubMatrix*      matrix_xyz,
+                    CSubMatrix*      matrix_xzz,
+                    CSubMatrix*      matrix_yyy,
+                    CSubMatrix*      matrix_yyz,
+                    CSubMatrix*      matrix_yzz,
+                    CSubMatrix*      matrix_zzz,
+                    const TPoint3D&  point,
+                    const CGtoBlock& gto_block,
+                    const int64_t    bra_first,
+                    const int64_t    bra_last) -> void;
 
 /**
  Evaluates <F|r^3|F>  integrals for given pair of GTOs blocks.
@@ -63,24 +62,23 @@ compOctupoleFF(      CSubMatrix* matrix_xxx,
  @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
  @param mat_type the matrix type.
 */
-auto
-compOctupoleFF(      CSubMatrix* matrix_xxx,
-                     CSubMatrix* matrix_xxy,
-                     CSubMatrix* matrix_xxz,
-                     CSubMatrix* matrix_xyy,
-                     CSubMatrix* matrix_xyz,
-                     CSubMatrix* matrix_xzz,
-                     CSubMatrix* matrix_yyy,
-                     CSubMatrix* matrix_yyz,
-                     CSubMatrix* matrix_yzz,
-                     CSubMatrix* matrix_zzz,
-               const TPoint3D& point,
-               const CGtoBlock&  bra_gto_block,
-               const CGtoBlock&  ket_gto_block,
-               const int64_t     bra_first,
-               const int64_t     bra_last,
-               const mat_t       mat_type) -> void;
+auto compOctupoleFF(CSubMatrix*      matrix_xxx,
+                    CSubMatrix*      matrix_xxy,
+                    CSubMatrix*      matrix_xxz,
+                    CSubMatrix*      matrix_xyy,
+                    CSubMatrix*      matrix_xyz,
+                    CSubMatrix*      matrix_xzz,
+                    CSubMatrix*      matrix_yyy,
+                    CSubMatrix*      matrix_yyz,
+                    CSubMatrix*      matrix_yzz,
+                    CSubMatrix*      matrix_zzz,
+                    const TPoint3D&  point,
+                    const CGtoBlock& bra_gto_block,
+                    const CGtoBlock& ket_gto_block,
+                    const int64_t    bra_first,
+                    const int64_t    bra_last,
+                    const mat_t      mat_type) -> void;
 
-} // octurec namespace
+}  // namespace octurec
 
 #endif /* OctupoleRecFF_hpp */

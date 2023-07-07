@@ -4,20 +4,20 @@
 
 #include "MathConst.hpp"
 
-namespace octurec { // octurec namespace
+namespace octurec {  // octurec namespace
 
 auto
-compPrimitiveOctupoleFF_XZZ_ZZZ(      TDoubleArray& buffer_xxx,
-                                      TDoubleArray& buffer_xxy,
-                                      TDoubleArray& buffer_xxz,
-                                      TDoubleArray& buffer_xyy,
-                                      TDoubleArray& buffer_xyz,
-                                      TDoubleArray& buffer_xzz,
-                                      TDoubleArray& buffer_yyy,
-                                      TDoubleArray& buffer_yyz,
-                                      TDoubleArray& buffer_yzz,
-                                      TDoubleArray& buffer_zzz,
-               const TPoint3D& point,
+compPrimitiveOctupoleFF_XZZ_ZZZ(TDoubleArray&       buffer_xxx,
+                                TDoubleArray&       buffer_xxy,
+                                TDoubleArray&       buffer_xxz,
+                                TDoubleArray&       buffer_xyy,
+                                TDoubleArray&       buffer_xyz,
+                                TDoubleArray&       buffer_xzz,
+                                TDoubleArray&       buffer_yyy,
+                                TDoubleArray&       buffer_yyz,
+                                TDoubleArray&       buffer_yzz,
+                                TDoubleArray&       buffer_zzz,
+                                const TPoint3D&     point,
                                 const double        bra_exp,
                                 const double        bra_norm,
                                 const TPoint3D&     bra_coord,
@@ -84,20 +84,20 @@ compPrimitiveOctupoleFF_XZZ_ZZZ(      TDoubleArray& buffer_xxx,
 
     auto fints_zzz = buffer_zzz.data();
 
-    #pragma omp simd aligned(fints_xxx,\
-                             fints_xxy,\
-                             fints_xxz,\
-                             fints_xyy,\
-                             fints_xyz,\
-                             fints_xzz,\
-                             fints_yyy,\
-                             fints_yyz,\
-                             fints_yzz,\
-                             fints_zzz,\
-                             ket_fe,\
-                             ket_fn,\
-                             ket_rx,\
-                             ket_ry,\
+#pragma omp simd aligned(fints_xxx,     \
+                             fints_xxy, \
+                             fints_xxz, \
+                             fints_xyy, \
+                             fints_xyz, \
+                             fints_xzz, \
+                             fints_yyy, \
+                             fints_yyz, \
+                             fints_yzz, \
+                             fints_zzz, \
+                             ket_fe,    \
+                             ket_fn,    \
+                             ket_rx,    \
+                             ket_ry,    \
                              ket_rz : 64)
     for (int64_t i = 0; i < ket_dim; i++)
     {
@@ -165,118 +165,175 @@ compPrimitiveOctupoleFF_XZZ_ZZZ(      TDoubleArray& buffer_xxx,
 
         const auto rpb_z = bra_exp * ab_z * fe_0;
 
-        fints_xxx[i] += faa_xx * ((3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z + (9.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z + (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z);
+        fints_xxx[i] += faa_xx * ((3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z +
+                                  (9.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z +
+                                  (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z);
 
         fints_xxx[i] += faa_xx * (27.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpb_z;
 
-        fints_xxx[i] += faa_xxx * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_xxx[i] += faa_xxx * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_xxx[i] += faa_xxx * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_xxy[i] += faa_xy * (fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z);
+        fints_xxy[i] += faa_xy * (fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z +
+                                  (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z +
+                                  (3.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z);
 
         fints_xxy[i] += faa_xy * (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpb_z;
 
-        fints_xxy[i] += faa_xxy * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_xxy[i] += faa_xxy * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_xxy[i] += faa_xxy * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_xxz[i] += faa_x * (fe_0 * fe_0 * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z + (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpb_z * rpb_z);
+        fints_xxz[i] += faa_x * (fe_0 * fe_0 * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z +
+                                 (9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z +
+                                 (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpb_z * rpb_z);
 
         fints_xxz[i] += faa_x * (15.0 / 8.0) * fe_0 * fe_0 * fe_0 * fe_0;
 
-        fints_xxz[i] += faa_xz * (fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z);
+        fints_xxz[i] += faa_xz * (fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z +
+                                  (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 2.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z +
+                                  (3.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z);
 
         fints_xxz[i] += faa_xz * (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpb_z;
 
-        fints_xxz[i] += faa_xx * (fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
+        fints_xxz[i] += faa_xx * (fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z +
+                                  (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x +
+                                  (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
 
         fints_xxz[i] += faa_xx * (15.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpa_x;
 
-        fints_xxz[i] += faa_xxz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_xxz[i] += faa_xxz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_xxz[i] += faa_xxz * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_xyy[i] += faa_yy * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z);
+        fints_xyy[i] += faa_yy * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z +
+                                  (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z +
+                                  (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z);
 
         fints_xyy[i] += faa_yy * (9.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpb_z;
 
-        fints_xyy[i] += faa_xyy * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_xyy[i] += faa_xyy * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_xyy[i] += faa_xyy * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_xyz[i] += faa_y * ((1.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z + (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpb_z + (3.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z + (9.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpb_z * rpb_z);
+        fints_xyz[i] += faa_y * ((1.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z * rpb_z +
+                                 (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z + (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpb_z +
+                                 (3.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z + (9.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpb_z * rpb_z);
 
         fints_xyz[i] += faa_y * (15.0 / 16.0) * fe_0 * fe_0 * fe_0 * fe_0;
 
-        fints_xyz[i] += faa_yz * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z);
+        fints_xyz[i] += faa_yz * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z +
+                                  (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z +
+                                  (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z);
 
         fints_xyz[i] += faa_yz * (9.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpb_z;
 
-        fints_xyz[i] += faa_xy * (fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
+        fints_xyz[i] += faa_xy * (fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z +
+                                  (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x +
+                                  (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
 
         fints_xyz[i] += faa_xy * (15.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpa_x;
 
-        fints_xyz[i] += faa_xyz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_xyz[i] += faa_xyz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_xyz[i] += faa_xyz * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_xzz[i] += fss * ((3.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * fe_0 * fe_0 * rpa_z + (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * fe_0 * rpb_z);
+        fints_xzz[i] += fss * ((3.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z +
+                               (1.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * fe_0 * fe_0 * rpa_z +
+                               (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * fe_0 * rpb_z);
 
-        fints_xzz[i] += faa_z * (fe_0 * fe_0 * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z + (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpb_z * rpb_z);
+        fints_xzz[i] += faa_z * (fe_0 * fe_0 * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z +
+                                 (9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z +
+                                 (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpb_z * rpb_z);
 
         fints_xzz[i] += faa_z * (15.0 / 8.0) * fe_0 * fe_0 * fe_0 * fe_0;
 
-        fints_xzz[i] += faa_zz * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z);
+        fints_xzz[i] += faa_zz * ((1.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpb_z * rpb_z +
+                                  (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpb_z + (1.0 / 4.0) * fe_0 * fe_0 * rpb_z * rpb_z * rpb_z +
+                                  (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z);
 
         fints_xzz[i] += faa_zz * (9.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpb_z;
 
-        fints_xzz[i] += faa_x * (3.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_xzz[i] += faa_x * (3.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                 (1.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * fe_0 * fe_0 * rpa_z * rpa_x +
+                                 (9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_x * rpb_z);
 
-        fints_xzz[i] += faa_xz * (2.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z + 9.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x + (9.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
+        fints_xzz[i] += faa_xz * (2.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z +
+                                  9.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x +
+                                  (9.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
 
         fints_xzz[i] += faa_xz * (15.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_x;
 
-        fints_xzz[i] += faa_xzz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_xzz[i] += faa_xzz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_xzz[i] += faa_xzz * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_yyy[i] += faa_yyy * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_yyy[i] += faa_yyy * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_yyy[i] += faa_yyy * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_yyz[i] += faa_yy * (fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
+        fints_yyz[i] += faa_yy * (fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z +
+                                  (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x +
+                                  (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
 
         fints_yyz[i] += faa_yy * (15.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpa_x;
 
-        fints_yyz[i] += faa_yyz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_yyz[i] += faa_yyz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_yyz[i] += faa_yyz * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_yzz[i] += faa_y * (3.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_yzz[i] += faa_y * (3.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                 (1.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * fe_0 * fe_0 * rpa_z * rpa_x +
+                                 (9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_x * rpb_z);
 
-        fints_yzz[i] += faa_yz * (2.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z + 9.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x + (9.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
+        fints_yzz[i] += faa_yz * (2.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + 3.0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z +
+                                  9.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x +
+                                  (9.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
 
         fints_yzz[i] += faa_yz * (15.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_x;
 
-        fints_yzz[i] += faa_yzz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_yzz[i] += faa_yzz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_yzz[i] += faa_yzz * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
 
-        fints_zzz[i] += fss * ((9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z + (15.0 / 4.0) * fe_0 * fe_0 * fe_0 * fe_0 * rpa_x);
+        fints_zzz[i] += fss * ((9.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (3.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x +
+                               (9.0 / 4.0) * fe_0 * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z + (15.0 / 4.0) * fe_0 * fe_0 * fe_0 * fe_0 * rpa_x);
 
-        fints_zzz[i] += faa_z * (9.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + 9.0 * fe_0 * fe_0 * fe_0 * rpa_z * rpa_x + (27.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_zzz[i] += faa_z * (9.0 * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                 (3.0 / 2.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + 9.0 * fe_0 * fe_0 * fe_0 * rpa_z * rpa_x +
+                                 (27.0 / 2.0) * fe_0 * fe_0 * fe_0 * rpa_x * rpb_z);
 
-        fints_zzz[i] += faa_zz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z + (27.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (9.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x + (27.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
+        fints_zzz[i] += faa_zz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z + (9.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z +
+                                  (27.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x * rpb_z + (9.0 / 4.0) * fe_0 * fe_0 * rpa_z * rpa_z * rpa_x +
+                                  (27.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z * rpb_z);
 
         fints_zzz[i] += faa_zz * (45.0 / 8.0) * fe_0 * fe_0 * fe_0 * rpa_x;
 
-        fints_zzz[i] += faa_zzz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z + (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x + (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
+        fints_zzz[i] += faa_zzz * (3.0 * fe_0 * rpa_z * rpa_x * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * rpa_z * rpa_z * rpa_x * rpb_z +
+                                   (1.0 / 2.0) * fe_0 * rpa_x * rpb_z * rpb_z * rpb_z + (3.0 / 2.0) * fe_0 * fe_0 * rpa_z * rpa_x +
+                                   (9.0 / 4.0) * fe_0 * fe_0 * rpa_x * rpb_z);
 
         fints_zzz[i] += faa_zzz * rpa_z * rpa_z * rpa_x * rpb_z * rpb_z * rpb_z;
-
     }
 }
 
-} // octurec namespace
-
+}  // namespace octurec

@@ -3,8 +3,6 @@
 #include <cmath>
 
 #include "BatchFunc.hpp"
-#include "T2CDistributor.hpp"
-
 #include "PrimitiveOctupoleDF_XX_XXX.hpp"
 #include "PrimitiveOctupoleDF_XX_XXY.hpp"
 #include "PrimitiveOctupoleDF_XX_XXZ.hpp"
@@ -65,26 +63,27 @@
 #include "PrimitiveOctupoleDF_ZZ_YYZ.hpp"
 #include "PrimitiveOctupoleDF_ZZ_YZZ.hpp"
 #include "PrimitiveOctupoleDF_ZZ_ZZZ.hpp"
+#include "T2CDistributor.hpp"
 
-namespace octurec { // octurec namespace
+namespace octurec {  // octurec namespace
 
 auto
-compOctupoleDF(      CSubMatrix* matrix_xxx,
-                     CSubMatrix* matrix_xxy,
-                     CSubMatrix* matrix_xxz,
-                     CSubMatrix* matrix_xyy,
-                     CSubMatrix* matrix_xyz,
-                     CSubMatrix* matrix_xzz,
-                     CSubMatrix* matrix_yyy,
-                     CSubMatrix* matrix_yyz,
-                     CSubMatrix* matrix_yzz,
-                     CSubMatrix* matrix_zzz,
-               const TPoint3D& point,
-               const CGtoBlock&  bra_gto_block,
-               const CGtoBlock&  ket_gto_block,
-               const bool        ang_order,
-               const int64_t     bra_first,
-               const int64_t     bra_last) -> void
+compOctupoleDF(CSubMatrix*      matrix_xxx,
+               CSubMatrix*      matrix_xxy,
+               CSubMatrix*      matrix_xxz,
+               CSubMatrix*      matrix_xyy,
+               CSubMatrix*      matrix_xyz,
+               CSubMatrix*      matrix_xzz,
+               CSubMatrix*      matrix_yyy,
+               CSubMatrix*      matrix_yyz,
+               CSubMatrix*      matrix_yzz,
+               CSubMatrix*      matrix_zzz,
+               const TPoint3D&  point,
+               const CGtoBlock& bra_gto_block,
+               const CGtoBlock& ket_gto_block,
+               const bool       ang_order,
+               const int64_t    bra_first,
+               const int64_t    bra_last) -> void
 {
     // spherical transformation factors
 
@@ -168,14 +167,9 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
 
         const auto ket_dim = ket_last - ket_first;
 
-        simd::loadCoordinates(ket_coords_x,
-                              ket_coords_y,
-                              ket_coords_z,
-                              ket_gto_coords,
-                              ket_first,
-                              ket_last);
+        simd::loadCoordinates(ket_coords_x, ket_coords_y, ket_coords_z, ket_gto_coords, ket_first, ket_last);
 
-        for (int64_t j = bra_first; j < bra_last; j++) 
+        for (int64_t j = bra_first; j < bra_last; j++)
         {
             const auto bra_coord = bra_gto_coords[j];
 
@@ -238,125 +232,95 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_XXY)
 
@@ -417,125 +381,105 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_XXZ)
 
@@ -596,125 +540,95 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_XYY)
 
@@ -775,125 +689,105 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_XYZ)
 
@@ -954,65 +848,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_XZZ)
 
@@ -1073,65 +957,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_YYY)
 
@@ -1192,125 +1066,105 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_YYZ)
 
@@ -1371,125 +1225,95 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_YZZ)
 
@@ -1550,65 +1374,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, 0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XX_ZZZ)
 
@@ -1669,65 +1483,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_XXX)
 
@@ -1788,65 +1582,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_XXY)
 
@@ -1907,65 +1681,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_XXZ)
 
@@ -2026,65 +1780,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_XYY)
 
@@ -2145,65 +1889,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_XYZ)
 
@@ -2264,35 +1998,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 1, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_XZZ)
 
@@ -2353,35 +2077,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 4, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_YYY)
 
@@ -2442,65 +2156,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                0, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 0, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_YYZ)
 
@@ -2561,65 +2255,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                0, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 0, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_YZZ)
 
@@ -2680,35 +2364,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                0, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 0, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XY_ZZZ)
 
@@ -2769,35 +2443,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                0, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 0, 3, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_XXX)
 
@@ -2858,65 +2522,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_XXY)
 
@@ -2977,65 +2621,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_XXZ)
 
@@ -3096,65 +2720,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_XYY)
 
@@ -3215,65 +2829,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_XYZ)
 
@@ -3334,35 +2938,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 1, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_XZZ)
 
@@ -3423,35 +3017,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 4, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_YYY)
 
@@ -3512,65 +3096,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                3, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 3, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_YYZ)
 
@@ -3631,65 +3195,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                3, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 3, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_YZZ)
 
@@ -3750,35 +3304,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                3, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 3, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (XZ_ZZZ)
 
@@ -3839,35 +3383,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                3, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 3, 3, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_XXX)
 
@@ -3928,125 +3462,95 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_XXY)
 
@@ -4107,125 +3611,95 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_XXZ)
 
@@ -4286,125 +3760,95 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_XYY)
 
@@ -4465,125 +3909,95 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, 0.5 * f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_XYZ)
 
@@ -4644,65 +4058,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 1, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_XZZ)
 
@@ -4763,65 +4167,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 4, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_YYY)
 
@@ -4882,125 +4276,85 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                4, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 4, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_YYZ)
 
@@ -5061,125 +4415,95 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                4, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, 0.5 * f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 4, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_YZZ)
 
@@ -5240,65 +4564,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                4, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -0.5 * f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 4, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YY_ZZZ)
 
@@ -5359,65 +4673,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                4, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -0.5 * f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 4, 3, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_XXX)
 
@@ -5478,65 +4772,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_XXY)
 
@@ -5597,65 +4871,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_XXZ)
 
@@ -5716,65 +4970,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_XYY)
 
@@ -5835,65 +5079,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -f2_3 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_XYZ)
 
@@ -5954,35 +5188,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 1, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_XZZ)
 
@@ -6043,35 +5267,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 4, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_YYY)
 
@@ -6132,65 +5346,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                1, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_5, bra_gto_indexes, ket_gto_indexes, 1, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_YYZ)
 
@@ -6251,65 +5445,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 3.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                1, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -f2_3 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 1, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_YZZ)
 
@@ -6370,35 +5554,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                1, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 1, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (YZ_ZZZ)
 
@@ -6459,35 +5633,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                1, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, f2_3 * 2.0, bra_gto_indexes, ket_gto_indexes, 1, 3, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_XXX)
 
@@ -6548,65 +5712,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_XXY)
 
@@ -6667,65 +5811,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_XXZ)
 
@@ -6786,65 +5910,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_XYY)
 
@@ -6905,65 +6009,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 6, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * 3.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 6, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_XYZ)
 
@@ -7024,35 +6108,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 1, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 1, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_XZZ)
 
@@ -7113,35 +6187,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 4, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 4, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_YYY)
 
@@ -7202,65 +6266,45 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes,
-                                2, 0, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_5, bra_gto_indexes, ket_gto_indexes, 2, 0, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_YYZ)
 
@@ -7321,65 +6365,55 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxx, buffer_xxx, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxy, buffer_xxy, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xxz, buffer_xxz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyy, buffer_xyy, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xyz, buffer_xyz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_xzz, buffer_xzz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyy, buffer_yyy, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yyz, buffer_yyz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_yzz, buffer_yzz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * 3.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes,
-                                2, 5, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(
+                matrix_zzz, buffer_zzz, -2.0 * 0.5 * f3_15, bra_gto_indexes, ket_gto_indexes, 2, 5, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_YZZ)
 
@@ -7440,35 +6474,25 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes,
-                                2, 2, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 4.0 * f3_3, bra_gto_indexes, ket_gto_indexes, 2, 2, j, ket_first, ket_last, ang_order);
 
             // compute primitive integrals block (ZZ_ZZZ)
 
@@ -7529,39 +6553,27 @@ compOctupoleDF(      CSubMatrix* matrix_xxx,
                 }
             }
 
-            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxx, buffer_xxx, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxy, buffer_xxy, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xxz, buffer_xxz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyy, buffer_xyy, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xyz, buffer_xyz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_xzz, buffer_xzz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyy, buffer_yyy, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yyz, buffer_yyz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
+            t2cfunc::distribute(matrix_yzz, buffer_yzz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
 
-            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes,
-                                2, 3, j, ket_first, ket_last, ang_order);
-
+            t2cfunc::distribute(matrix_zzz, buffer_zzz, 2.0 * 2.0, bra_gto_indexes, ket_gto_indexes, 2, 3, j, ket_first, ket_last, ang_order);
         }
     }
 }
 
-} // octurec namespace
-
+}  // namespace octurec

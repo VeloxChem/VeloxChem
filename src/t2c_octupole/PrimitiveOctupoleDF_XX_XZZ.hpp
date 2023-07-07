@@ -3,10 +3,10 @@
 
 #include <cstdint>
 
-#include "SimdTypes.hpp"
 #include "Point.hpp"
+#include "SimdTypes.hpp"
 
-namespace octurec { // octurec namespace
+namespace octurec {  // octurec namespace
 
 /**
  Evaluates block of primitive <D_XX|r^3|F_XZZ> integrals.
@@ -32,28 +32,27 @@ namespace octurec { // octurec namespace
  @param ket_coords_z the array of Cartesian Z coordinates on ket side.
  @param ket_dim the end size of ket arrays.
 */
-auto
-compPrimitiveOctupoleDF_XX_XZZ(      TDoubleArray& buffer_xxx,
-                                     TDoubleArray& buffer_xxy,
-                                     TDoubleArray& buffer_xxz,
-                                     TDoubleArray& buffer_xyy,
-                                     TDoubleArray& buffer_xyz,
-                                     TDoubleArray& buffer_xzz,
-                                     TDoubleArray& buffer_yyy,
-                                     TDoubleArray& buffer_yyz,
-                                     TDoubleArray& buffer_yzz,
-                                     TDoubleArray& buffer_zzz,
-               const TPoint3D& point,
-                               const double        bra_exp,
-                               const double        bra_norm,
-                               const TPoint3D&     bra_coord,
-                               const TDoubleArray& ket_exps,
-                               const TDoubleArray& ket_norms,
-                               const TDoubleArray& ket_coords_x,
-                               const TDoubleArray& ket_coords_y,
-                               const TDoubleArray& ket_coords_z,
-                               const int64_t       ket_dim) -> void;
+auto compPrimitiveOctupoleDF_XX_XZZ(TDoubleArray&       buffer_xxx,
+                                    TDoubleArray&       buffer_xxy,
+                                    TDoubleArray&       buffer_xxz,
+                                    TDoubleArray&       buffer_xyy,
+                                    TDoubleArray&       buffer_xyz,
+                                    TDoubleArray&       buffer_xzz,
+                                    TDoubleArray&       buffer_yyy,
+                                    TDoubleArray&       buffer_yyz,
+                                    TDoubleArray&       buffer_yzz,
+                                    TDoubleArray&       buffer_zzz,
+                                    const TPoint3D&     point,
+                                    const double        bra_exp,
+                                    const double        bra_norm,
+                                    const TPoint3D&     bra_coord,
+                                    const TDoubleArray& ket_exps,
+                                    const TDoubleArray& ket_norms,
+                                    const TDoubleArray& ket_coords_x,
+                                    const TDoubleArray& ket_coords_y,
+                                    const TDoubleArray& ket_coords_z,
+                                    const int64_t       ket_dim) -> void;
 
-} // octurec namespace
+}  // namespace octurec
 
 #endif /* PrimitiveOctupoleDF_XX_XZZ */

@@ -6,7 +6,7 @@
 #include "GtoBlock.hpp"
 #include "SubMatrix.hpp"
 
-namespace octurec { // octurec namespace
+namespace octurec {  // octurec namespace
 
 /**
  Evaluates <P|r^3|D>  integrals for given pair of GTOs blocks.
@@ -28,24 +28,23 @@ namespace octurec { // octurec namespace
  @param bra_first the index of the range [bra_first, bra_last) of GTOs on bra side.
  @param bra_last the index of the range [bra_first, bra_last) of GTOs on bra side.
 */
-auto
-compOctupolePD(      CSubMatrix* matrix_xxx,
-                     CSubMatrix* matrix_xxy,
-                     CSubMatrix* matrix_xxz,
-                     CSubMatrix* matrix_xyy,
-                     CSubMatrix* matrix_xyz,
-                     CSubMatrix* matrix_xzz,
-                     CSubMatrix* matrix_yyy,
-                     CSubMatrix* matrix_yyz,
-                     CSubMatrix* matrix_yzz,
-                     CSubMatrix* matrix_zzz,
-               const TPoint3D& point,
-               const CGtoBlock&  bra_gto_block,
-               const CGtoBlock&  ket_gto_block,
-               const bool        ang_order,
-               const int64_t     bra_first,
-               const int64_t     bra_last) -> void;
+auto compOctupolePD(CSubMatrix*      matrix_xxx,
+                    CSubMatrix*      matrix_xxy,
+                    CSubMatrix*      matrix_xxz,
+                    CSubMatrix*      matrix_xyy,
+                    CSubMatrix*      matrix_xyz,
+                    CSubMatrix*      matrix_xzz,
+                    CSubMatrix*      matrix_yyy,
+                    CSubMatrix*      matrix_yyz,
+                    CSubMatrix*      matrix_yzz,
+                    CSubMatrix*      matrix_zzz,
+                    const TPoint3D&  point,
+                    const CGtoBlock& bra_gto_block,
+                    const CGtoBlock& ket_gto_block,
+                    const bool       ang_order,
+                    const int64_t    bra_first,
+                    const int64_t    bra_last) -> void;
 
-} // octurec namespace
+}  // namespace octurec
 
 #endif /* OctupoleRecPD_hpp */
