@@ -74,5 +74,4 @@ auto compute(CSubMatrix*      matrix_xx,
 
 }  // namespace quadfunc
 
-
 #endif /* QuadrupoleFunc_hpp */

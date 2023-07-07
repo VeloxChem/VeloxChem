@@ -31,5 +31,4 @@ class CQuadrupoleDriver
     auto compute(const CMolecularBasis& basis, const CMolecule& molecule, const TPoint3D& point) const -> CMatrices;
 };
 
-
 #endif /* QuadrupoleDriver_hpp */

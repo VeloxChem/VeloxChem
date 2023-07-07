@@ -38,28 +38,80 @@ compute(CSubMatrix*      matrix_xxx,
 {
     if (angmom == 0)
     {
-        octurec::compOctupoleSS(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, gto_block, bra_first, bra_last);
+        octurec::compOctupoleSS(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                gto_block,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if (angmom == 1)
     {
-        octurec::compOctupolePP(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, gto_block, bra_first, bra_last);
+        octurec::compOctupolePP(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                gto_block,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if (angmom == 2)
     {
-        octurec::compOctupoleDD(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, gto_block, bra_first, bra_last);
+        octurec::compOctupoleDD(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                gto_block,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if (angmom == 3)
     {
-        octurec::compOctupoleFF(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, gto_block, bra_first, bra_last);
+        octurec::compOctupoleFF(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                gto_block,
+                                bra_first,
+                                bra_last);
 
         return;
     }
@@ -88,112 +140,352 @@ compute(CSubMatrix*      matrix_xxx,
 {
     if ((bra_angmom == 0) && (ket_angmom == 0))
     {
-        octurec::compOctupoleSS(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        octurec::compOctupoleSS(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                bra_first,
+                                bra_last,
+                                mat_type);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 1))
     {
-        octurec::compOctupoleSP(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleSP(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 0))
     {
-        octurec::compOctupolePS(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupolePS(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 2))
     {
-        octurec::compOctupoleSD(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleSD(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 0))
     {
-        octurec::compOctupoleDS(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleDS(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 3))
     {
-        octurec::compOctupoleSF(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleSF(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 0))
     {
-        octurec::compOctupoleFS(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleFS(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 1))
     {
-        octurec::compOctupolePP(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        octurec::compOctupolePP(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                bra_first,
+                                bra_last,
+                                mat_type);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 2))
     {
-        octurec::compOctupolePD(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupolePD(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 1))
     {
-        octurec::compOctupoleDP(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleDP(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 3))
     {
-        octurec::compOctupolePF(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupolePF(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 1))
     {
-        octurec::compOctupoleFP(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleFP(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 2))
     {
-        octurec::compOctupoleDD(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        octurec::compOctupoleDD(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                bra_first,
+                                bra_last,
+                                mat_type);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 3))
     {
-        octurec::compOctupoleDF(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleDF(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 2))
     {
-        octurec::compOctupoleFD(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        octurec::compOctupoleFD(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                ang_order,
+                                bra_first,
+                                bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 3))
     {
-        octurec::compOctupoleFF(matrix_xxx, matrix_xxy, matrix_xxz, matrix_xyy, matrix_xyz, matrix_xzz, matrix_yyy, matrix_yyz, matrix_yzz, matrix_zzz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        octurec::compOctupoleFF(matrix_xxx,
+                                matrix_xxy,
+                                matrix_xxz,
+                                matrix_xyy,
+                                matrix_xyz,
+                                matrix_xzz,
+                                matrix_yyy,
+                                matrix_yyz,
+                                matrix_yzz,
+                                matrix_zzz,
+                                point,
+                                bra_gto_block,
+                                ket_gto_block,
+                                bra_first,
+                                bra_last,
+                                mat_type);
 
         return;
     }

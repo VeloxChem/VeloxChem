@@ -80,112 +80,128 @@ compute(CSubMatrix*      matrix_xx,
 {
     if ((bra_angmom == 0) && (ket_angmom == 0))
     {
-        quadrec::compQuadrupoleSS(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        quadrec::compQuadrupoleSS(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 1))
     {
-        quadrec::compQuadrupoleSP(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleSP(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 0))
     {
-        quadrec::compQuadrupolePS(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupolePS(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 2))
     {
-        quadrec::compQuadrupoleSD(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleSD(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 0))
     {
-        quadrec::compQuadrupoleDS(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleDS(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 0) && (ket_angmom == 3))
     {
-        quadrec::compQuadrupoleSF(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleSF(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 0))
     {
-        quadrec::compQuadrupoleFS(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleFS(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 1))
     {
-        quadrec::compQuadrupolePP(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        quadrec::compQuadrupolePP(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 2))
     {
-        quadrec::compQuadrupolePD(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupolePD(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 1))
     {
-        quadrec::compQuadrupoleDP(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleDP(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 1) && (ket_angmom == 3))
     {
-        quadrec::compQuadrupolePF(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupolePF(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 1))
     {
-        quadrec::compQuadrupoleFP(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleFP(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 2))
     {
-        quadrec::compQuadrupoleDD(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        quadrec::compQuadrupoleDD(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }
 
     if ((bra_angmom == 2) && (ket_angmom == 3))
     {
-        quadrec::compQuadrupoleDF(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleDF(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 2))
     {
-        quadrec::compQuadrupoleFD(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
+        quadrec::compQuadrupoleFD(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, ang_order, bra_first, bra_last);
 
         return;
     }
 
     if ((bra_angmom == 3) && (ket_angmom == 3))
     {
-        quadrec::compQuadrupoleFF(matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
+        quadrec::compQuadrupoleFF(
+            matrix_xx, matrix_xy, matrix_xz, matrix_yy, matrix_yz, matrix_zz, point, bra_gto_block, ket_gto_block, bra_first, bra_last, mat_type);
 
         return;
     }
