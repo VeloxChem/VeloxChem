@@ -136,6 +136,12 @@ class HessianDriver:
         self.grid_level = None
         self.xcfun = None
 
+        # Timing and profiling
+        self.timing = False
+        self.profiling = False
+        self.memory_profiling = False
+        self.memory_tracing = False
+
     def update_settings(self, method_dict, freq_dict=None):
         """
         Updates settings in HessianDriver.
