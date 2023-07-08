@@ -67,15 +67,6 @@ double getTauScreeningThreshold();
 void screenExcVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* exc, double* vrho);
 
 /**
- Screens Vxc Fock for LDA.
-
- @param npoints the number of grid points.
- @param rho the density.
- @param vrho the 1st-order functional derivative wrt density.
- */
-void screenVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* vrho);
-
-/**
  Screens Exc and Vxc Fock for GGA.
 
  @param npoints the number of grid points.
@@ -92,22 +83,6 @@ void screenExcVxcForGGA(const CXCFunctional* xcFunctionalPointer,
                         double*              exc,
                         double*              vrho,
                         double*              vsigma);
-
-/**
- Screens Vxc Fock for GGA.
-
- @param npoints the number of grid points.
- @param rho the density.
- @param sigma the dot product of density gradient.
- @param vrho the 1st-order functional derivative wrt rho.
- @param vsigma the 1st-order functional derivative wrt sigma.
- */
-void screenVxcForGGA(const CXCFunctional* xcFunctionalPointer,
-                     const int32_t        npoints,
-                     const double*        rho,
-                     const double*        sigma,
-                     double*              vrho,
-                     double*              vsigma);
 
 /**
  Screens Exc and Vxc Fock for meta-GGA.
@@ -136,6 +111,31 @@ void screenExcVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
                          double*              vtau);
 
 /**
+ Screens Vxc Fock for LDA.
+
+ @param npoints the number of grid points.
+ @param rho the density.
+ @param vrho the 1st-order functional derivative wrt density.
+ */
+void screenVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* vrho);
+
+/**
+ Screens Vxc Fock for GGA.
+
+ @param npoints the number of grid points.
+ @param rho the density.
+ @param sigma the dot product of density gradient.
+ @param vrho the 1st-order functional derivative wrt rho.
+ @param vsigma the 1st-order functional derivative wrt sigma.
+ */
+void screenVxcForGGA(const CXCFunctional* xcFunctionalPointer,
+                     const int32_t        npoints,
+                     const double*        rho,
+                     const double*        sigma,
+                     double*              vrho,
+                     double*              vsigma);
+
+/**
  Screens Vxc Fock for meta-GGA.
 
  @param npoints the number of grid points.
@@ -158,28 +158,6 @@ void screenVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
                       double*              vsigma,
                       double*              vlapl,
                       double*              vtau);
-
-/**
- Screens Vxc Fock for PLDA.
-
- @param npoints the number of grid points.
- @param rho the density.
- @param exc the functional value.
- @param vrho the 1st-order functional derivative wrt density.
- */
-void screenVxcForPLDA(const int32_t npoints, const double* rho, double* exc, double* vrho);
-
-/**
- Screens Vxc Fock for PGGA.
-
- @param npoints the number of grid points.
- @param rho the density.
- @param sigma the dot product of density gradient.
- @param exc the functional value.
- @param vrho the 1st-order functional derivative wrt density.
- @param vsigma the 1st-order functional derivative wrt sigma.
- */
-void screenVxcForPGGA(const int32_t npoints, const double* rho, const double* sigma, double* exc, double* vrho, double* vsigma);
 
 /**
  Screens Fxc Fock for LDA.
