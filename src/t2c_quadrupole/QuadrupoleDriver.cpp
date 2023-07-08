@@ -54,25 +54,23 @@ CQuadrupoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecu
                 {
                     for (const auto& task : ptr_work_groups[i])
                     {
-                        const auto mat_type = mat_t::symm;
+                        auto ptr_matrix_xx = ptr_quad_matrix->getMatrix("XX");
+
+                        auto ptr_matrix_xy = ptr_quad_matrix->getMatrix("XY");
+
+                        auto ptr_matrix_xz = ptr_quad_matrix->getMatrix("XZ");
+
+                        auto ptr_matrix_yy = ptr_quad_matrix->getMatrix("YY");
+
+                        auto ptr_matrix_yz = ptr_quad_matrix->getMatrix("YZ");
+
+                        auto ptr_matrix_zz = ptr_quad_matrix->getMatrix("ZZ");
 
                         if (task[0] == task[1])
                         {
                             const auto gto_block = ptr_gto_blocks[task[0]];
 
                             const auto angmom = gto_block.getAngularMomentum();
-
-                            auto ptr_matrix_xx = ptr_quad_matrix->getMatrix("XX");
-
-                            auto ptr_matrix_xy = ptr_quad_matrix->getMatrix("XY");
-
-                            auto ptr_matrix_xz = ptr_quad_matrix->getMatrix("XZ");
-
-                            auto ptr_matrix_yy = ptr_quad_matrix->getMatrix("YY");
-
-                            auto ptr_matrix_yz = ptr_quad_matrix->getMatrix("YZ");
-
-                            auto ptr_matrix_zz = ptr_quad_matrix->getMatrix("ZZ");
 
                             auto ptr_submatrix_xx = ptr_matrix_xx->getSubMatrix({angmom, angmom});
 
@@ -108,18 +106,6 @@ CQuadrupoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecu
 
                             const auto ket_angmom = ket_gto_block.getAngularMomentum();
 
-                            auto ptr_matrix_xx = ptr_quad_matrix->getMatrix("XX");
-
-                            auto ptr_matrix_xy = ptr_quad_matrix->getMatrix("XY");
-
-                            auto ptr_matrix_xz = ptr_quad_matrix->getMatrix("XZ");
-
-                            auto ptr_matrix_yy = ptr_quad_matrix->getMatrix("YY");
-
-                            auto ptr_matrix_yz = ptr_quad_matrix->getMatrix("YZ");
-
-                            auto ptr_matrix_zz = ptr_quad_matrix->getMatrix("ZZ");
-
                             auto ptr_submatrix_xx = ptr_matrix_xx->getSubMatrix({bra_angmom, ket_angmom});
 
                             auto ptr_submatrix_xy = ptr_matrix_xy->getSubMatrix({bra_angmom, ket_angmom});
@@ -148,7 +134,7 @@ CQuadrupoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecu
                                               ang_order,
                                               task[2],
                                               task[3],
-                                              mat_type);
+                                              mat_t::symm);
                         }
                     }
                 }

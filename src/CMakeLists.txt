@@ -51,7 +51,7 @@ target_link_libraries(vlxobjs
 add_subdirectory(t2c_nuclear_potential_geom_020)
 add_subdirectory(t2c_nuclear_potential_geom_010)
 add_subdirectory(pymodule)
-add_subdirectory(t2cfunc)
+add_subdirectory(t2c_func)
 add_subdirectory(python)
 add_subdirectory(moldata)
 add_subdirectory(general)

@@ -62,33 +62,31 @@ COctupoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule
                 {
                     for (const auto& task : ptr_work_groups[i])
                     {
-                        const auto mat_type = mat_t::symm;
+                        auto ptr_matrix_xxx = ptr_octu_matrix->getMatrix("XXX");
+
+                        auto ptr_matrix_xxy = ptr_octu_matrix->getMatrix("XXY");
+
+                        auto ptr_matrix_xxz = ptr_octu_matrix->getMatrix("XXZ");
+
+                        auto ptr_matrix_xyy = ptr_octu_matrix->getMatrix("XYY");
+
+                        auto ptr_matrix_xyz = ptr_octu_matrix->getMatrix("XYZ");
+
+                        auto ptr_matrix_xzz = ptr_octu_matrix->getMatrix("XZZ");
+
+                        auto ptr_matrix_yyy = ptr_octu_matrix->getMatrix("YYY");
+
+                        auto ptr_matrix_yyz = ptr_octu_matrix->getMatrix("YYZ");
+
+                        auto ptr_matrix_yzz = ptr_octu_matrix->getMatrix("YZZ");
+
+                        auto ptr_matrix_zzz = ptr_octu_matrix->getMatrix("ZZZ");
 
                         if (task[0] == task[1])
                         {
                             const auto gto_block = ptr_gto_blocks[task[0]];
 
                             const auto angmom = gto_block.getAngularMomentum();
-
-                            auto ptr_matrix_xxx = ptr_octu_matrix->getMatrix("XXX");
-
-                            auto ptr_matrix_xxy = ptr_octu_matrix->getMatrix("XXY");
-
-                            auto ptr_matrix_xxz = ptr_octu_matrix->getMatrix("XXZ");
-
-                            auto ptr_matrix_xyy = ptr_octu_matrix->getMatrix("XYY");
-
-                            auto ptr_matrix_xyz = ptr_octu_matrix->getMatrix("XYZ");
-
-                            auto ptr_matrix_xzz = ptr_octu_matrix->getMatrix("XZZ");
-
-                            auto ptr_matrix_yyy = ptr_octu_matrix->getMatrix("YYY");
-
-                            auto ptr_matrix_yyz = ptr_octu_matrix->getMatrix("YYZ");
-
-                            auto ptr_matrix_yzz = ptr_octu_matrix->getMatrix("YZZ");
-
-                            auto ptr_matrix_zzz = ptr_octu_matrix->getMatrix("ZZZ");
 
                             auto ptr_submatrix_xxx = ptr_matrix_xxx->getSubMatrix({angmom, angmom});
 
@@ -136,26 +134,6 @@ COctupoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule
 
                             const auto ket_angmom = ket_gto_block.getAngularMomentum();
 
-                            auto ptr_matrix_xxx = ptr_octu_matrix->getMatrix("XXX");
-
-                            auto ptr_matrix_xxy = ptr_octu_matrix->getMatrix("XXY");
-
-                            auto ptr_matrix_xxz = ptr_octu_matrix->getMatrix("XXZ");
-
-                            auto ptr_matrix_xyy = ptr_octu_matrix->getMatrix("XYY");
-
-                            auto ptr_matrix_xyz = ptr_octu_matrix->getMatrix("XYZ");
-
-                            auto ptr_matrix_xzz = ptr_octu_matrix->getMatrix("XZZ");
-
-                            auto ptr_matrix_yyy = ptr_octu_matrix->getMatrix("YYY");
-
-                            auto ptr_matrix_yyz = ptr_octu_matrix->getMatrix("YYZ");
-
-                            auto ptr_matrix_yzz = ptr_octu_matrix->getMatrix("YZZ");
-
-                            auto ptr_matrix_zzz = ptr_octu_matrix->getMatrix("ZZZ");
-
                             auto ptr_submatrix_xxx = ptr_matrix_xxx->getSubMatrix({bra_angmom, ket_angmom});
 
                             auto ptr_submatrix_xxy = ptr_matrix_xxy->getSubMatrix({bra_angmom, ket_angmom});
@@ -196,7 +174,7 @@ COctupoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule
                                               ang_order,
                                               task[2],
                                               task[3],
-                                              mat_type);
+                                              mat_t::symm);
                         }
                     }
                 }

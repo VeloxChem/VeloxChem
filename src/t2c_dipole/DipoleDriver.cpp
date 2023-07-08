@@ -48,19 +48,17 @@ CDipoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule, 
                 {
                     for (const auto& task : ptr_work_groups[i])
                     {
-                        const auto mat_type = mat_t::symm;
+                        auto ptr_matrix_x = ptr_dip_matrix->getMatrix("X");
+
+                        auto ptr_matrix_y = ptr_dip_matrix->getMatrix("Y");
+
+                        auto ptr_matrix_z = ptr_dip_matrix->getMatrix("Z");
 
                         if (task[0] == task[1])
                         {
                             const auto gto_block = ptr_gto_blocks[task[0]];
 
                             const auto angmom = gto_block.getAngularMomentum();
-
-                            auto ptr_matrix_x = ptr_dip_matrix->getMatrix("X");
-
-                            auto ptr_matrix_y = ptr_dip_matrix->getMatrix("Y");
-
-                            auto ptr_matrix_z = ptr_dip_matrix->getMatrix("Z");
 
                             auto ptr_submatrix_x = ptr_matrix_x->getSubMatrix({angmom, angmom});
 
@@ -79,12 +77,6 @@ CDipoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule, 
                             const auto bra_angmom = bra_gto_block.getAngularMomentum();
 
                             const auto ket_angmom = ket_gto_block.getAngularMomentum();
-
-                            auto ptr_matrix_x = ptr_dip_matrix->getMatrix("X");
-
-                            auto ptr_matrix_y = ptr_dip_matrix->getMatrix("Y");
-
-                            auto ptr_matrix_z = ptr_dip_matrix->getMatrix("Z");
 
                             auto ptr_submatrix_x = ptr_matrix_x->getSubMatrix({bra_angmom, ket_angmom});
 
@@ -105,7 +97,7 @@ CDipoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule, 
                                              ang_order,
                                              task[2],
                                              task[3],
-                                             mat_type);
+                                             mat_t::symm);
                         }
                     }
                 }
