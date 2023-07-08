@@ -1,5 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
+    NuclearPotentialDriver.cpp
+    NuclearPotentialFunc.cpp
     NuclearPotentialRecDD.cpp
     NuclearPotentialRecDF.cpp
     NuclearPotentialRecDP.cpp

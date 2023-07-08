@@ -7,6 +7,7 @@ from .veloxchemlib import GtoBlock
 from .veloxchemlib import Matrices
 from .veloxchemlib import OverlapDriver
 from .veloxchemlib import KineticEnergyDriver
+from .veloxchemlib import NuclearPotentialDriver
 from .veloxchemlib import DipoleDriver
 from .veloxchemlib import QuadrupoleDriver
 from .veloxchemlib import OctupoleDriver
