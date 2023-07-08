@@ -57,7 +57,7 @@ screenExcVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoin
     for (int32_t g = 0; g < npoints; ++g)
     {
         // rho
-        if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)))
+        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold))
         {
             exc[g] = 0.0;
         }
@@ -233,7 +233,7 @@ screenExcVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 
     for (int32_t g = 0; g < npoints; ++g)
     {
-        // rho, tau and sigma
+        // rhog, sigma and tau
         if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)) ||
             ((std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) && (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold)) ||
             ((std::fabs(tau[2 * g + 0]) <= tauThreshold) && (std::fabs(tau[2 * g + 1]) <= tauThreshold)))
@@ -353,55 +353,6 @@ screenVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
             {
                 vtau[dim->vtau * g + ind] = 0.0;
             }
-        }
-    }
-}
-
-void
-screenVxcForMGGA(const int32_t npoints,
-                 const double* rho,
-                 const double* sigma,
-                 const double* lapl,
-                 const double* tau,
-                 double*       vrho,
-                 double*       vsigma,
-                 double*       vlapl,
-                 double*       vtau)
-{
-    double densityThreshold = getDensityScreeningThreshold();
-
-    double sigmaThreshold = getSigmaScreeningThreshold(densityThreshold);
-
-    double tauThreshold = getTauScreeningThreshold();
-
-    for (int32_t g = 0; g < npoints; ++g)
-    {
-        // rho_a, sigma_aa and tau_a
-        if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
-            (std::fabs(tau[2 * g + 0]) <= tauThreshold))
-        {
-            vrho[2 * g + 0] = 0.0;
-
-            vsigma[3 * g + 0] = 0.0;
-            vsigma[3 * g + 1] = 0.0;
-
-            vlapl[2 * g + 0] = 0.0;
-
-            vtau[2 * g + 0] = 0.0;
-        }
-
-        // rho_b, sigma_bb and tau_b
-        if ((std::fabs(rho[2 * g + 1]) <= densityThreshold) || (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold) ||
-            (std::fabs(tau[2 * g + 1]) <= tauThreshold))
-        {
-            vrho[2 * g + 1] = 0.0;
-
-            vsigma[3 * g + 1] = 0.0;
-            vsigma[3 * g + 2] = 0.0;
-
-            vlapl[2 * g + 1] = 0.0;
-
-            vtau[2 * g + 1] = 0.0;
         }
     }
 }
