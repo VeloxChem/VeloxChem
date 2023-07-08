@@ -161,7 +161,7 @@ screenExcVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 
     for (int32_t g = 0; g < npoints; ++g)
     {
-        // rhog, sigma and tau
+        // rho, sigma and tau
         if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)) ||
             ((std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) && (std::fabs(sigma[3 * g + 2]) <= sigmaThreshold)) ||
             ((std::fabs(tau[2 * g + 0]) <= tauThreshold) && (std::fabs(tau[2 * g + 1]) <= tauThreshold)))

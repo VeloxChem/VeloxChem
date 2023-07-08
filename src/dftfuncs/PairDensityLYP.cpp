@@ -71,9 +71,9 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double rhom13 = std::pow(density, -1.0 / 3.0);
 
-        double rho13 = std::pow(density, 1.0 / 3.0);
+        // double rho13 = std::pow(density, 1.0 / 3.0);
 
-        double expcr = std::exp(-c / rho13);
+        // double expcr = std::exp(-c / rho13);
 
         double denom = 1.0 + d * rhom13;
 

@@ -218,7 +218,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double r32 = r * r12;
 
-        double r3 = r * r * r;
+        // double r3 = r * r * r;
 
         double dr_drho = - onethird * frg * std::pow(density,- fourthird);
 
@@ -307,7 +307,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double N2 = N_ab * N_ab;
 
-        double f2 =-2.0 * l / lambda2;
+        // double f2 =-2.0 * l / lambda2;
 
         double f = 2.0 * l / lambda;
 
@@ -329,7 +329,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double U = exp(G)-1;
 
-        double M = 1/U;
+        // double M = 1/U;
 
         double dM_dU = -1.0/std::pow(U,2);
 
