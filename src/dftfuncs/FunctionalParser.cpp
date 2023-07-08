@@ -150,7 +150,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 std::vector<std::string>
 getAvailablePairDensityFunctionals()
 {
-    return std::vector<std::string>({"PSLATER", "PLDA", "PPBE"});
+    return std::vector<std::string>({"TSLATER", "TLDA", "TPBE", "TBLYP"});
 }
 
 CXCPairDensityFunctional
@@ -162,12 +162,13 @@ getPairDensityExchangeCorrelationFunctional(const std::string &xcLabel)
     {
         // Pair-density local density exchange-correlation functional
 
-        if (fstr::upcase(xcLabel) == "PSLATER") return CXCPairDensityFunctional("PSLATER", {"PSLATER"}, {1.0});
+        if (fstr::upcase(xcLabel) == "TSLATER") return CXCPairDensityFunctional("TSLATER", {"TSLATER"}, {1.0});
 
-        if (fstr::upcase(xcLabel) == "PLDA") return CXCPairDensityFunctional("PLDA", {"PSLATER", "PVWN"}, {1.0, 1.0});
+        if (fstr::upcase(xcLabel) == "TLDA") return CXCPairDensityFunctional("TLDA", {"TSLATER", "TVWN"}, {1.0, 1.0});
 
-        if (fstr::upcase(xcLabel) == "PPBE") return CXCPairDensityFunctional("PPBE", {"PPBE_X", "PPBE_C"}, {1.0, 1.0});
+        if (fstr::upcase(xcLabel) == "TPBE") return CXCPairDensityFunctional("TPBE", {"TPBE_X", "TPBE_C"}, {1.0, 1.0});
 
+        if (fstr::upcase(xcLabel) == "TBLYP") return CXCPairDensityFunctional("TBLYP", {"TSLATER", "TB88", "TLYP"}, {1.0, 1.0, 1.0});
         // FIX ME: add other functionals here...
     }
 

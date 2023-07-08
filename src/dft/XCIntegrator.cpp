@@ -229,7 +229,7 @@ CXCIntegrator::integrateVxcPDFT(CAOKohnShamMatrix&      aoFockMatrix,
                                 const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
                                 const CAODensityMatrix& densityMatrix,
-                                const CDense4DTensor&   twoBodyDensityMatrix,
+                                const CDenseMatrix&     twoBodyDensityMatrix,
                                 const CDenseMatrix&     activeMOs,
                                 const CMolecularGrid&   molecularGrid,
                                 const std::string&      xcFuncLabel) const
@@ -511,7 +511,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -806,7 +806,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -1111,7 +1111,7 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -1349,7 +1349,7 @@ CXCIntegrator::_integrateFxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -1630,7 +1630,7 @@ CXCIntegrator::_integrateFxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -1960,7 +1960,7 @@ CXCIntegrator::_integrateFxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -2213,7 +2213,7 @@ CXCIntegrator::_integrateKxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -2526,7 +2526,7 @@ CXCIntegrator::_integrateKxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -2950,7 +2950,7 @@ CXCIntegrator::_integrateKxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -3230,7 +3230,7 @@ CXCIntegrator::_integrateKxcLxcFockForLDA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -3605,7 +3605,7 @@ CXCIntegrator::_integrateKxcLxcFockForGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -4244,7 +4244,7 @@ CXCIntegrator::_integrateKxcLxcFockForMGGA(CAOFockMatrix&          aoFockMatrix,
     // std::cout << timer.getSummary() << std::endl;
     // std::cout << "OpenMP timing" << std::endl;
     // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    //{
+    // {
     //     std::cout << "Thread " << thread_id << std::endl;
     //     std::cout << omptimers[thread_id].getSummary() << std::endl;
     // }
@@ -4256,7 +4256,7 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
                                        const CAODensityMatrix&         densityMatrix,
-                                       const CDense4DTensor&           twoBodyDensityMatrix,
+                                       const CDenseMatrix&             twoBodyDensityMatrix,
                                        const CDenseMatrix&             activeMOs,
                                        const CMolecularGrid&           molecularGrid,
                                        const CXCPairDensityFunctional& xcFunctional) const
@@ -4481,15 +4481,25 @@ CXCIntegrator::_integrateVxcPDFTForLDA(CAOKohnShamMatrix&              aoFockMat
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
+
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
+    // std::cout << "OpenMP timing" << std::endl;
+    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    // {
+    //     std::cout << "Thread " << thread_id << std::endl;
+    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
+    // }
 }
 
 void
 CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMatrix,
-                                       CDense4DTensor&                 moTwoBodyGradient,
+                                       CDense4DTensor&                 tensorWxc,
                                        const CMolecule&                molecule,
                                        const CMolecularBasis&          basis,
                                        const CAODensityMatrix&         densityMatrix,
-                                       const CDense4DTensor&           twoBodyDensityMatrix,
+                                       const CDenseMatrix&             twoBodyDensityMatrix,
                                        const CDenseMatrix&             activeMOs,
                                        const CMolecularGrid&           molecularGrid,
                                        const CXCPairDensityFunctional& xcFunctional) const
@@ -4697,18 +4707,28 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
 
         timer.stop("XC functional eval.");
 
-        auto partial_mat_Vxc =
-            _integratePartialVxcFockForGGA(npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer);
+        // Compute Vxc matrix
 
-        // TODO (MGD) 2-body gradient
-
-        // distribute partial Vxc to full Kohn-Sham matrix
+        // TODO (MGD) gradient not correct for vsigma[1] and vsigma[2]
 
         timer.start("Vxc matrix dist.");
+
+        auto partial_mat_Vxc =
+            _integratePartialVxcFockForGGA(npoints, local_weights, mat_chi, mat_chi_x, mat_chi_y, mat_chi_z, rhograd, vrho, vsigma, timer);
 
         submat::distributeSubMatrixToKohnSham(aoFockMatrix, partial_mat_Vxc, aoinds, aocount, naos);
 
         timer.stop("Vxc matrix dist.");
+
+        // Compute Wxc tensor
+
+        timer.start("Wxc matrix dist.");
+
+        auto partial_tensorWxc = _integratePartialWxcFockForPLDA(npoints, local_weights, mat_chi, sub_active_mos, vrho, timer);
+
+        submat::distributeSubmatrixTo4DTensor(tensorWxc, partial_tensorWxc, aoinds, aocount);
+
+        timer.stop("Wxc matrix dist.");
 
         // compute partial contribution to XC energy
 
@@ -4735,6 +4755,16 @@ CXCIntegrator::_integrateVxcPDFTForGGA(CAOKohnShamMatrix&              aoFockMat
     aoFockMatrix.setNumberOfElectrons(nele);
 
     aoFockMatrix.setExchangeCorrelationEnergy(xcene);
+
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
+    // std::cout << "OpenMP timing" << std::endl;
+    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    // {
+    //     std::cout << "Thread " << thread_id << std::endl;
+    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
+    // }
 }
 
 CDenseMatrix

@@ -92,7 +92,7 @@ integrate_vxc_pdft(const CXCIntegrator&       self,
 
     std::vector<double> vec(active2DM.data(), active2DM.data() + active2DM.size());
 
-    CDense4DTensor tensor2DM(vec, n_active, n_active, n_active, n_active);
+    CDenseMatrix tensor2DM(vec, n_active * n_active, n_active * n_active);
 
     // activeMOs
 

@@ -192,7 +192,7 @@ void generatePairDensityForLDA(double*               rho,
                                const CDenseMatrix&   gtoValues,
                                const CDenseMatrix&   densityMatrix,
                                const CDenseMatrix&   activeMOs,
-                               const CDense4DTensor& twoBodyDensityMatrix,
+                               const CDenseMatrix&   twoBodyDensityMatrix,
                                CMultiTimer&          timer);
 
 /**
@@ -222,7 +222,7 @@ void generatePairDensityForGGA(double*               rho,
                                const CDenseMatrix&   gtoValuesZ,
                                const CDenseMatrix&   densityMatrix,
                                const CDenseMatrix&   activeMOs,
-                               const CDense4DTensor& twoBodyDensityMatrix,
+                               const CDenseMatrix&   twoBodyDensityMatrix,
                                CMultiTimer&          timer);
 
 /**
