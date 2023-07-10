@@ -38,7 +38,8 @@
 enum class molorb
 {
     rest,
-    unrest
+    unrest,
+    restopen
 };
 
 /**
@@ -66,6 +67,8 @@ to_molorb(const int32_t keyValue)
 
     if (keyValue == to_int(molorb::unrest)) return molorb::unrest;
 
+    if (keyValue == to_int(molorb::restopen)) return molorb::restopen;
+
     return molorb::rest;
 }
 
@@ -86,6 +89,11 @@ to_string(const molorb molecularOrbitals)
     if (molecularOrbitals == molorb::unrest)
     {
         return std::string("Spin Unrestricted Molecular Orbitals");
+    }
+
+    if (molecularOrbitals == molorb::restopen)
+    {
+        return std::string("Spin Restricted Open-Shell Molecular Orbitals");
     }
 
     return std::string("UNKNOWN");

@@ -5,6 +5,8 @@ target_sources(vlxobjs
     PairDensityVWN.cpp
     PairDensityPBE_C.cpp
     PairDensityPBE_X.cpp
+    PairDensityBecke88.cpp
+    PairDensityLYP.cpp
   )
 
 target_include_directories(vlxobjs

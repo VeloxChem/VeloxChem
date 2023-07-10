@@ -270,8 +270,8 @@ class ScfUnrestrictedDriver(ScfDriver):
             orb_coefs_a, eigs_a = self._delete_mos(orb_coefs_a, eigs_a)
             orb_coefs_b, eigs_b = self._delete_mos(orb_coefs_b, eigs_b)
 
-            occa, occb = molecule.get_aufbau_occupation(eigs_a.size,
-                                                        'unrestricted')
+            occa = molecule.get_aufbau_alpha_occupation(eigs_a.size)
+            occb = molecule.get_aufbau_beta_occupation(eigs_b.size)
 
             return MolecularOrbitals([orb_coefs_a, orb_coefs_b],
                                      [eigs_a, eigs_b], [occa, occb],
@@ -317,21 +317,27 @@ class ScfUnrestrictedDriver(ScfDriver):
 
         return
 
-    def natural_orbitals(self):
+    def natural_orbitals(self, scf_tensors=None):
         """
         Compute the UHF natural orbitals
+
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
 
         :return:
             The natural orbitals.
         """
 
+        if scf_tensors is None:
+            scf_tensors = self.scf_tensors
+
         if self.rank == mpi_master():
             # Get total density
-            D_total = self.scf_tensors['D_alpha'] + self.scf_tensors['D_beta']
+            D_total = scf_tensors['D_alpha'] + scf_tensors['D_beta']
 
             # Get some MO coefficients and create C^-1
-            C = self.scf_tensors['C_alpha']
-            S = self.scf_tensors['S']
+            C = scf_tensors['C_alpha']
+            S = scf_tensors['S']
             C_inv = np.matmul(S, C)
 
             # Transform total density to MO basis
@@ -345,8 +351,8 @@ class ScfUnrestrictedDriver(ScfDriver):
 
             # Compute the orbital energy as expectation value of the averaged Fock
             # matrix (they are not eigenvalues!)
-            F_alpha = self.scf_tensors['F_alpha']
-            F_beta = self.scf_tensors['F_beta']
+            F_alpha = scf_tensors['F_alpha']
+            F_beta = scf_tensors['F_beta']
             F_avg = 0.5 * (F_alpha + F_beta)
 
             orbital_energies = np.diag(

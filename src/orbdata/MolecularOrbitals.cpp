@@ -122,19 +122,17 @@ CMolecularOrbitals::operator==(const CMolecularOrbitals& other) const
     if (_orbitalsType != other._orbitalsType) return false;
 
     if (_orbitals.size() != other._orbitals.size()) return false;
+    if (_energies.size() != other._energies.size()) return false;
+    if (_occupations.size() != other._occupations.size()) return false;
 
     for (size_t i = 0; i < _orbitals.size(); i++)
     {
         if (_orbitals[i] != other._orbitals[i]) return false;
     }
-
-    if (_energies.size() != other._energies.size()) return false;
-
     for (size_t i = 0; i < _energies.size(); i++)
     {
         if (_energies[i] != other._energies[i]) return false;
     }
-
     for (size_t i = 0; i < _occupations.size(); i++)
     {
         if (_occupations[i] != other._occupations[i]) return false;
@@ -250,12 +248,11 @@ CMolecularOrbitals::alphaOrbitals() const
 const double*
 CMolecularOrbitals::betaOrbitals() const
 {
-    if (_orbitalsType == molorb::rest)
+    if ((_orbitalsType == molorb::rest) || (_orbitalsType == molorb::restopen))
     {
         return alphaOrbitals();
     }
-
-    if (_orbitalsType == molorb::unrest)
+    else if (_orbitalsType == molorb::unrest)
     {
         return _orbitals[1].values();
     }
@@ -316,12 +313,11 @@ CMolecularOrbitals::alphaEnergies() const
 const double*
 CMolecularOrbitals::betaEnergies() const
 {
-    if (_orbitalsType == molorb::rest)
+    if ((_orbitalsType == molorb::rest) || (_orbitalsType == molorb::restopen))
     {
         return alphaEnergies();
     }
-
-    if (_orbitalsType == molorb::unrest)
+    else if (_orbitalsType == molorb::unrest)
     {
         return _energies[1].data();
     }
@@ -342,8 +338,7 @@ CMolecularOrbitals::betaOccupations() const
     {
         return alphaOccupations();
     }
-
-    if (_orbitalsType == molorb::unrest)
+    else if ((_orbitalsType == molorb::unrest) || (_orbitalsType == molorb::restopen))
     {
         return _occupations[1].data();
     }
@@ -364,79 +359,6 @@ CMolecularOrbitals::getString() const
     }
 
     return orb_str;
-}
-
-CAODensityMatrix
-CMolecularOrbitals::getAODensity(const int32_t nElectrons) const
-{
-    if ((nElectrons % 2) == 0)
-    {
-        auto ndim = nElectrons / 2;
-
-        auto nrow = _orbitals[0].getNumberOfRows();
-
-        auto ncol = _orbitals[0].getNumberOfColumns();
-
-        if (ndim <= ncol)
-        {
-            auto cmo = _orbitals[0].slice(0, 0, nrow, ndim);
-
-            auto den = denblas::multABt(cmo, cmo);
-
-            return CAODensityMatrix({den}, denmat::rest);
-        }
-    }
-
-    return CAODensityMatrix();
-}
-
-CAODensityMatrix
-CMolecularOrbitals::getAODensity(const int32_t nAlphaElectrons, const int32_t nBetaElectrons) const
-{
-    auto ndima = nAlphaElectrons;
-
-    auto ndimb = nBetaElectrons;
-
-    auto nrowa = _orbitals[0].getNumberOfRows();
-
-    auto ncola = _orbitals[0].getNumberOfColumns();
-
-    auto nrowb = _orbitals[1].getNumberOfRows();
-
-    auto ncolb = _orbitals[1].getNumberOfColumns();
-
-    if ((ndima <= ncola) && (ndimb <= ncolb))
-    {
-        CDenseMatrix dena(nrowa, nrowa);
-        
-        CDenseMatrix denb(nrowb, nrowb);
-        
-        if (nAlphaElectrons > 0)
-        {
-            auto cmoa = _orbitals[0].slice(0, 0, nrowa, ndima);
-        
-            dena = denblas::multABt(cmoa, cmoa);
-        }
-        else
-        {
-            dena.zero();
-        }
-
-        if (nBetaElectrons > 0)
-        {
-            auto cmob = _orbitals[1].slice(0, 0, nrowb, ndimb);
-
-            denb = denblas::multABt(cmob, cmob);
-        }
-        else
-        {
-            denb.zero();
-        }
-    
-        return CAODensityMatrix({dena, denb}, denmat::unrest);
-    }
-
-    return CAODensityMatrix();
 }
 
 CAODensityMatrix

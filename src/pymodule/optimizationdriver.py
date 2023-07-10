@@ -34,7 +34,7 @@ from .veloxchemlib import CommonNeighbors
 from .veloxchemlib import mpi_master, hartree_in_kcalpermol, bohr_in_angstrom
 from .molecule import Molecule
 from .optimizationengine import OptimizationEngine
-from .inputparser import parse_input, print_keywords, get_datetime_string
+from .inputparser import parse_input, print_keywords, get_random_string_parallel
 from .errorhandler import assert_msg_critical
 
 with redirect_stderr(StringIO()) as fg_err:
@@ -92,7 +92,7 @@ class OptimizationDriver:
 
         self.keep_files = True
 
-        self.filename = f'veloxchem_opt_{get_datetime_string()}'
+        self.filename = 'veloxchem_opt_' + get_random_string_parallel(self.comm)
         self.grad_drv = grad_drv
 
         self.cna = False

@@ -124,7 +124,7 @@ def select_rsp_property(task, mol_orbs, rsp_dict, method_dict):
     # check number of MPI nodes
     if task.mpi_rank == mpi_master():
         nocc = task.molecule.number_of_alpha_electrons()
-        n_ov = nocc * (mol_orbs.number_mos() - nocc)
+        n_ov = nocc * (mol_orbs.number_of_mos() - nocc)
         assert_msg_critical(task.mpi_size == 1 or task.mpi_size <= n_ov,
                             'Response: too many MPI processes')
 

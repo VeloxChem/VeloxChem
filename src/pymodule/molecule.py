@@ -30,6 +30,8 @@ from .veloxchemlib import Molecule
 from .veloxchemlib import ChemicalElement
 from .veloxchemlib import bohr_in_angstrom
 
+from .outputstream import OutputStream
+from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical
 
 
@@ -196,8 +198,11 @@ def _Molecule_from_dict(mol_dict):
         The molecule.
     """
 
-    assert_msg_critical(('xyz' in mol_dict) ^ ('xyzfile' in mol_dict),
+    assert_msg_critical('xyz' in mol_dict or 'xyzfile' in mol_dict,
                         'Molecule: Expecting either "xyz" or "xyzfile" input')
+
+    assert_msg_critical(not ('xyz' in mol_dict and 'xyzfile' in mol_dict),
+                        'Molecule: Cannot have both "xyz" and "xyzfile" input')
 
     if 'xyz' in mol_dict:
         mol_str = '\n'.join(mol_dict['xyz'])
@@ -502,33 +507,90 @@ def _Molecule_is_linear(self):
         return False
 
 
-def _Molecule_get_aufbau_occupation(self, norb, flag='restricted'):
+def _Molecule_get_aufbau_alpha_occupation(self, n_mo):
     """
-    Creates an occupation vector based on the aufbau principle.
+    Gets occupation numbers for alpha spin based on the aufbau principle.
 
-    :param norb:
-        The number of molecular orbitals
+    :param n_mo:
+        The number of molecular orbitals.
+
+    :return:
+        The occupation numbers for alpha spin.
+    """
+
+    nalpha = self.number_of_alpha_electrons()
+
+    return np.hstack((np.ones(nalpha), np.zeros(n_mo - nalpha)))
+
+
+def _Molecule_get_aufbau_beta_occupation(self, n_mo):
+    """
+    Gets occupation numbers for beta spin based on the aufbau principle.
+
+    :param n_mo:
+        The number of molecular orbitals.
+
+    :return:
+        The occupation numbers for beta spin.
+    """
+
+    nbeta = self.number_of_beta_electrons()
+
+    return np.hstack((np.ones(nbeta), np.zeros(n_mo - nbeta)))
+
+
+def _Molecule_get_aufbau_occupation(self, n_mo, flag='restricted'):
+    """
+    Gets occupation vector(s) based on the aufbau principle.
+
+    :param n_mo:
+        The number of molecular orbitals.
     :param flag:
         The flag (restricted or unrestricted).
 
     :return:
-        flag=='restricted': single vector assuming doubly occupied orbitals.
-        flag=='unrestricted': two vectors assuming singly occupied spin-orbitals.
+        The occupation vector(s).
     """
 
-    nalpha = self.number_of_alpha_electrons()
-    nbeta = self.number_of_beta_electrons()
+    occ_a = self.get_aufbau_alpha_occupation(n_mo)
+    occ_b = self.get_aufbau_beta_occupation(n_mo)
 
     if flag == 'restricted':
-        occ = [
-            2.0 if x < nbeta else 1.0 if x < nalpha else 0.0
-            for x in range(norb)
-        ]
-        return occ
-    else:
-        occa = [1.0 if x < nalpha else 0.0 for x in range(norb)]
-        occb = [1.0 if x < nbeta else 0.0 for x in range(norb)]
-        return occa, occb
+        return 0.5 * (occ_a + occ_b)
+
+    elif flag == 'unrestricted':
+        return occ_a, occ_b
+
+    return None
+
+
+@staticmethod
+def _Molecule_get_input_keywords():
+    """
+    Returns input keywords for Molecule.
+    """
+
+    return {
+        'molecule': {
+            'charge': ('int', 'net charge'),
+            'multiplicity': ('int', 'spin multiplicity'),
+            'units': ('str_lower', 'unit of coordinates, default is Angstrom'),
+            'xyz': ('list', 'atom and Cartesian coordinates'),
+            'xyzfile': ('str', 'XYZ file name (conflicts with units/xyz)'),
+        },
+    }
+
+
+@staticmethod
+def _Molecule_print_keywords():
+    """
+    Prints keywords for Molecule.
+    """
+
+    input_keywords = Molecule._get_input_keywords()
+    ostream = OutputStream()
+
+    print_keywords(input_keywords, ostream)
 
 
 def _Molecule_deepcopy(self, memo):
@@ -545,7 +607,8 @@ def _Molecule_deepcopy(self, memo):
     return Molecule(self)
 
 
-Molecule._smiles_to_xyz = _Molecule_smiles_to_xyz
+Molecule._get_input_keywords = _Molecule_get_input_keywords
+
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.draw_2d_svg = _Molecule_draw_2d_svg
 Molecule.read_smiles = _Molecule_read_smiles
@@ -565,7 +628,10 @@ Molecule.get_xyz_string = _Molecule_get_xyz_string
 Molecule.write_xyz_file = _Molecule_write_xyz_file
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
 Molecule.is_linear = _Molecule_is_linear
+Molecule.get_aufbau_alpha_occupation = _Molecule_get_aufbau_alpha_occupation
+Molecule.get_aufbau_beta_occupation = _Molecule_get_aufbau_beta_occupation
 Molecule.get_aufbau_occupation = _Molecule_get_aufbau_occupation
+Molecule.print_keywords = _Molecule_print_keywords
 Molecule.__deepcopy__ = _Molecule_deepcopy
 
 # aliases for backward compatibility

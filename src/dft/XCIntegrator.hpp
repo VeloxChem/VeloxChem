@@ -360,7 +360,7 @@ class CXCIntegrator
                                  const CMolecule&                molecule,
                                  const CMolecularBasis&          basis,
                                  const CAODensityMatrix&         densityMatrix,
-                                 const CDense4DTensor&           twoBodyDensityMatrix,
+                                 const CDenseMatrix&           twoBodyDensityMatrix,
                                  const CDenseMatrix&             activeMOs,
                                  const CMolecularGrid&           molecularGrid,
                                  const CXCPairDensityFunctional& xcFunctional) const;
@@ -384,7 +384,7 @@ class CXCIntegrator
                                  const CMolecule&                molecule,
                                  const CMolecularBasis&          basis,
                                  const CAODensityMatrix&         densityMatrix,
-                                 const CDense4DTensor&           twoBodyDensityMatrix,
+                                 const CDenseMatrix&           twoBodyDensityMatrix,
                                  const CDenseMatrix&             activeMOs,
                                  const CMolecularGrid&           molecularGrid,
                                  const CXCPairDensityFunctional& xcFunctional) const;
@@ -1355,7 +1355,7 @@ class CXCIntegrator
                           const CMolecule&        molecule,
                           const CMolecularBasis&  basis,
                           const CAODensityMatrix& densityMatrix,
-                          const CDense4DTensor&   twoBodyDensityMatrix,
+                          const CDenseMatrix&   twoBodyDensityMatrix,
                           const CDenseMatrix&     activeMOs,
                           const CMolecularGrid&   molecularGrid,
                           const std::string&      xcFuncLabel) const;

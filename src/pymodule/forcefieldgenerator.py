@@ -37,7 +37,7 @@ from .respchargesdriver import RespChargesDriver
 from .openmmdriver import OpenMMDriver
 from .openmmgradientdriver import OpenMMGradientDriver
 from .optimizationdriver import OptimizationDriver
-from .inputparser import parse_input, get_datetime_string
+from .inputparser import parse_input, get_random_string_parallel
 from .errorhandler import assert_msg_critical
 
 
@@ -87,7 +87,17 @@ class ForceFieldGenerator:
             else:
                 ostream = OutputStream(None)
 
-        self.molecule_name = f'veloxchem_ff_{get_datetime_string()}'
+        # mpi information
+        self.comm = comm
+        self.rank = self.comm.Get_rank()
+        self.nodes = self.comm.Get_size()
+
+        # output stream
+        self.ostream = ostream
+
+        # molecule
+        self.molecule_name = 'veloxchem_ff_' + get_random_string_parallel(
+            self.comm)
         self.scan_xyz_files = None
         self.atom_types = None
 
@@ -127,14 +137,6 @@ class ForceFieldGenerator:
         self.resp_dict = None
 
         self.keep_files = True
-
-        # mpi information
-        self.comm = comm
-        self.rank = self.comm.Get_rank()
-        self.nodes = self.comm.Get_size()
-
-        # output stream
-        self.ostream = ostream
 
     def update_settings(self, ffg_dict, resp_dict=None):
         """

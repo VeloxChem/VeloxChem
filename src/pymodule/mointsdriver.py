@@ -445,7 +445,7 @@ class MOIntegralsDriver:
         """
 
         nocc = molecule.number_of_alpha_electrons()
-        nvirt = mol_orbs.number_mos() - nocc
+        nvirt = mol_orbs.number_of_mos() - nocc
 
         return (nocc, nvirt)
 

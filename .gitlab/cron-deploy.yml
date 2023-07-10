@@ -1,9 +1,10 @@
 monkey:cron_deploy:
   tags:
     - vlx-docker
-  image: ghcr.io/enccs/meta-vlx/vlx-ci_intel:sha-f3fb247
+  image: ghcr.io/veloxchem/meta-vlx/vlx-ci_intel:sha-c8613aa
   variables:
     OMP_NUM_THREADS: "6"
+    OMP_PLACES: "cores"
     TARBALL: "veloxchem.tar.bz2"
   stage: deploy
   rules:
@@ -16,7 +17,7 @@ monkey:cron_deploy:
     - ulimit -s unlimited
     - lscpu | egrep 'Thread|Core|Socket|^CPU\('
     - python -V
-    - mpiicpc --version
+    - mpiicpc -cxx=icpx --version
     - cmake --version
     - python -m venv --clear venv
     - source venv/bin/activate
@@ -31,6 +32,7 @@ monkey:cron_deploy:
         h5py
         psutil
         geometric
+    - CC=icx MPICC="mpiicc -cc=icx" python -m pip install
         mpi4py --no-binary=mpi4py
     - CC=gcc CXX=g++ python -m pip install
         cppe
@@ -41,6 +43,7 @@ monkey:cron_deploy:
         -Bbuild
         -GNinja
         -DCMAKE_CXX_COMPILER=mpiicpc
+        -DCMAKE_CXX_FLAGS="-cxx=icpx"
         -DVLX_LA_VENDOR=MKL
     - cmake --build build --parallel 6 -- -v -d stats
     - ctest --test-dir build --output-on-failure

@@ -508,6 +508,8 @@ def get_datetime_string():
         The datetime string (ISO format with ':' replaced by '.').
     """
 
+    # TODO: deprecate get_datetime_string
+
     return datetime.now().isoformat(sep='T',
                                     timespec='seconds').replace(':', '.')
 
@@ -520,12 +522,17 @@ def get_random_string_serial():
         The random string.
     """
 
-    return '{:>08s}'.format(hex(getrandbits(32))[2:])
+    datetime_string = datetime.now().isoformat(sep='T', timespec='seconds')
+    datetime_string = datetime_string.replace(':', '.')
+
+    random_string = '{:>08s}'.format(hex(getrandbits(32))[2:])
+
+    return datetime_string + '_' + random_string
 
 
 def get_random_string_parallel(comm=None):
     """
-    Gets a random string.
+    Gets a random string for an MPI communicator.
 
     :param comm:
         The MPI communicator.

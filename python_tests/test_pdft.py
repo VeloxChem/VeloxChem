@@ -73,8 +73,8 @@ class TestPDFT:
             nAct = nInAct - nIn
             wxc = 2.0 * pdft_wxc.reshape(nAO, nAct, nAct, nAct)
 
-            FA = vxc_mat.get_matrix(True).to_numpy()
-            FB = vxc_mat.get_matrix(False).to_numpy()
+            FA = vxc_mat.get_alpha_matrix().to_numpy()
+            FB = vxc_mat.get_beta_matrix().to_numpy()
 
             FAMO = np.linalg.multi_dot([C.T, FA, C])
             FBMO = np.linalg.multi_dot([C.T, FB, C])
@@ -89,7 +89,7 @@ class TestPDFT:
                 [C[:, :nIn].T, 2.0 * Fock, C])
             grad_pdft[nIn:nInAct, :] = np.linalg.multi_dot(
                 [Dact, mo_act.T, Fock, C])
-            grad_pdft[nIn:nInAct, :] -= np.matmul(C.T, Qpt).T
+            grad_pdft[nIn:nInAct, :] += np.matmul(C.T, Qpt).T
 
             return (vxc_mat.get_energy(), pdft_vxc.get_energy(), grad_ks,
                     grad_pdft)
@@ -97,18 +97,23 @@ class TestPDFT:
             return None, None, None, None
 
     def test_O2_ROSlater(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slater', 'pslater')
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slater', 'tslater')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
     def test_O2_ROLDA(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slda', 'plda')
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('slda', 'tlda')
         if is_mpi_master():
             assert abs(ksdft - pdft) < 1.0e-6
             assert np.allclose(ks_grad, pdft_grad)
 
-    def test_O2_ROGGA(self):
-        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'ppbe')
+    def test_O2_ROPBE(self):
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('pbe', 'tpbe')
         if is_mpi_master():
-            assert abs(-16.924117087238564 - pdft) < 1.0e-6
+            assert abs(-16.911864099412625 - pdft) < 1.0e-6
+
+    def test_O2_ROBLYP(self):
+        ksdft, pdft, ks_grad, pdft_grad = self.run_RODFT('blyp', 'tblyp')
+        if is_mpi_master():
+            assert abs(-17.056873017749865 - pdft) < 1.0e-6
