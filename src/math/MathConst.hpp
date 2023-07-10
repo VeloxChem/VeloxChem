@@ -8,8 +8,8 @@ namespace mathconst {  // mathconst namespace
 
  @return the PI constant.
  */
-inline double
-getPiValue()
+inline auto
+getPiValue() -> double
 {
     return 3.14159265358979323846;
 }

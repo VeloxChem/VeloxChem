@@ -198,6 +198,39 @@ CMatrices::_to_key(const std::string& label) const -> int64_t
 
         if (index == "ZZZ") return 9;
     }
+    
+    if (index.size() == 4)
+    {
+        if (index == "XXXX") return 0;
 
+        if (index == "XXXY") return 1;
+
+        if (index == "XXXZ") return 2;
+
+        if (index == "XXYY") return 3;
+
+        if (index == "XXYZ") return 4;
+
+        if (index == "XXZZ") return 5;
+
+        if (index == "XYYY") return 6;
+
+        if (index == "XYYZ") return 7;
+
+        if (index == "XYZZ") return 8;
+
+        if (index == "XZZZ") return 9;
+        
+        if (index == "YYYY") return 10;
+
+        if (index == "YYYZ") return 11;
+
+        if (index == "YYZZ") return 12;
+
+        if (index == "YZZZ") return 13;
+        
+        if (index == "ZZZZ") return 14;
+    }
+    
     return -1;
 }

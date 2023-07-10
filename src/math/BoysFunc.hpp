@@ -46,7 +46,7 @@ class CBoysFunc
      @param nelements the number of important elements.
      */
     template <int64_t M>
-    void compute(std::array<TDoubleArray, M>& values, const TDoubleArray& arguments, const int64_t nelements) const;
+    auto compute(std::array<TDoubleArray, M>& values, const TDoubleArray& arguments, const int64_t nelements) const -> void;
 };
 
 template <int64_t N>
@@ -24736,8 +24736,8 @@ CBoysFunc<N>::CBoysFunc()
 
 template <int64_t N>
 template <int64_t M>
-void
-CBoysFunc<N>::compute(TDoubleArray2D<M>& values, const TDoubleArray& arguments, const int64_t nelements) const
+auto
+CBoysFunc<N>::compute(TDoubleArray2D<M>& values, const TDoubleArray& arguments, const int64_t nelements) const -> void 
 {
     const double fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 
