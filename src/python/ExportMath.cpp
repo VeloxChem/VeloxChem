@@ -199,7 +199,61 @@ export_math(py::module& m) -> void
                     return std::make_shared<CMatrix>();
                 }
             },
-            "Gets specific matrix from matrices.");
+            "Gets specific matrix from matrices.")
+        .def(
+            "get_matrix",
+            [](const CMatrices& self, const int64_t atom, const std::string& label) -> std::shared_ptr<CMatrix> {
+                if (auto mat = self.getMatrix(atom, label); mat != nullptr)
+                {
+                    return std::make_shared<CMatrix>(*mat);
+                }
+                else
+                {
+                    return std::make_shared<CMatrix>();
+                }
+            },
+            "Gets specific matrix from matrices.")
+        .def(
+            "get_matrix",
+            [](const CMatrices& self, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b) -> std::shared_ptr<CMatrix> {
+                if (auto mat = self.getMatrix(atom_a, label_a, atom_b, label_b); mat != nullptr)
+                {
+                    return std::make_shared<CMatrix>(*mat);
+                }
+                else
+                {
+                    return std::make_shared<CMatrix>();
+                }
+            },
+            "Gets specific matrix from matrices.")
+        .def(
+            "get_matrix",
+             [](const CMatrices& self, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
+                const int64_t atom_c, const std::string& label_c) -> std::shared_ptr<CMatrix> {
+                 if (auto mat = self.getMatrix(atom_a, label_a, atom_b, label_b, atom_c, label_c); mat != nullptr)
+                 {
+                     return std::make_shared<CMatrix>(*mat);
+                 }
+                 else
+                 {
+                     return std::make_shared<CMatrix>();
+                 }
+             },
+             "Gets specific matrix from matrices.")
+        .def(
+            "get_matrix",
+             [](const CMatrices& self, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
+                const int64_t atom_c, const std::string& label_c, const int64_t atom_d, const std::string& label_d) -> std::shared_ptr<CMatrix> {
+                 if (auto mat = self.getMatrix(atom_a, label_a, atom_b, label_b, atom_c, label_c, atom_d, label_d); mat != nullptr)
+                 {
+                     return std::make_shared<CMatrix>(*mat);
+                 }
+                 else
+                 {
+                     return std::make_shared<CMatrix>();
+                 }
+             },
+             "Gets specific matrix from matrices."); 
 
     // ...
 }

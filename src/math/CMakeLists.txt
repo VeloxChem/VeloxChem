@@ -1,12 +1,9 @@
 target_sources(vlxobjs
   PRIVATE
-    GeomThreeMatrices.cpp
-    GeomFourMatrices.cpp
     Matrices.cpp
     MatrixFunc.cpp
     Matrix.cpp
     AngularMomentum.cpp
-    GeomTwoMatrices.cpp
     SubMatrix.cpp
   )
 
