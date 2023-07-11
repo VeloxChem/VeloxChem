@@ -7,6 +7,7 @@
 
 #include "AngularMomentum.hpp"
 #include "MathConst.hpp"
+#include "CantorFunc.hpp"
 #include "Matrices.hpp"
 #include "Matrix.hpp"
 #include "MatrixFunc.hpp"
@@ -27,6 +28,12 @@ export_math(py::module& m) -> void
     // exposing functions from MathConst.hpp
 
     m.def("get_pi", &mathconst::getPiValue, "Gets PI value.");
+    
+    // exposing functions from CantorFunc.hpp
+
+    m.def("cantor_index", &mathfunc::getCantorIndex, "Computes Cantor index for pair of non-negative numbers.");
+    
+    m.def("cantor_pair", &mathfunc::getCantorPair, "Extractes pair of non-negative numbers from Cantor index.");
 
     // exposing functions from AngularMomentum.hpp
 

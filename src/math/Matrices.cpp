@@ -1,6 +1,7 @@
 #include "Matrices.hpp"
 
 #include "StringFormat.hpp"
+#include "CantorFunc.hpp"
 
 CMatrices::CMatrices()
 
@@ -55,6 +56,14 @@ CMatrices::add(const CMatrix& matrix, const int64_t key) -> void
 auto
 CMatrices::add(const CMatrix& matrix, const std::string& label) -> void
 {
+    _matrices.insert({_to_key(label), new CMatrix(matrix)});
+}
+
+auto
+CMatrices::add(const CMatrix& matrix, const int64_t atom, const std::string& label) -> void
+{
+    const auto key = mathfunc::getCantorIndex({atom, _to_key(label)});
+    
     _matrices.insert({_to_key(label), new CMatrix(matrix)});
 }
 
@@ -118,33 +127,29 @@ CMatrices::getMatrix(const int64_t key) const -> const CMatrix*
 auto
 CMatrices::getMatrix(const std::string& label) -> CMatrix*
 {
-    const auto key = _to_key(label);
-
-    for (const auto& mvalue : _matrices)
-    {
-        if (mvalue.first == key)
-        {
-            return mvalue.second;
-        }
-    }
-
-    return nullptr;
+    return getMatrix(_to_key(label));
 }
 
 auto
 CMatrices::getMatrix(const std::string& label) const -> const CMatrix*
 {
-    const auto key = _to_key(label);
+    return getMatrix(_to_key(label));
+}
 
-    for (const auto& mvalue : _matrices)
-    {
-        if (mvalue.first == key)
-        {
-            return mvalue.second;
-        }
-    }
+auto
+CMatrices::getMatrix(const int64_t atom, const std::string& label) -> CMatrix*
+{
+    const auto key = mathfunc::getCantorIndex({atom, _to_key(label)});
+    
+    return getMatrix(key);
+}
 
-    return nullptr;
+auto
+CMatrices::getMatrix(const int64_t atom, const std::string& label) const -> const CMatrix*
+{
+    const auto key = mathfunc::getCantorIndex({atom, _to_key(label)});
+    
+    return getMatrix(key);
 }
 
 auto

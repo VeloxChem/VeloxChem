@@ -16,6 +16,8 @@ from .veloxchemlib import OctupoleDriver
 from .veloxchemlib import bohr_in_angstroms
 from .veloxchemlib import hartree_in_ev
 from .veloxchemlib import get_pi
+from .veloxchemlib import cantor_index
+from .veloxchemlib import cantor_pair
 from .veloxchemlib import to_spherical_components
 from .veloxchemlib import to_cartesian_components
 from .veloxchemlib import angular_component_to_str

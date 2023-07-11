@@ -1,6 +1,5 @@
 target_sources(vlxobjs
   PRIVATE
-    GeomOneMatrices.cpp
     GeomThreeMatrices.cpp
     GeomFourMatrices.cpp
     Matrices.cpp

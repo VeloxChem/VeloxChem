@@ -5,15 +5,15 @@
 
 #include "T2Pair.hpp"
 
-namespace mathconst {  // mathfunc namespace
+namespace mathfunc {  // mathfunc namespace
 
 /**
  Computes Cantor pairing index for two integer non-negative numbers.
 
- @return the PI constant.
+ @return the Cantor index.
  */
 inline auto
-getCantorPair(const T2Pair& pair) -> int64_t
+getCantorIndex(const T2Pair& pair) -> int64_t
 {
     const auto x = pair.first;
     
@@ -23,9 +23,9 @@ getCantorPair(const T2Pair& pair) -> int64_t
 }
 
 /**
- Reduces Cantor pairing index to two integer non-negative numbers.
+ Reduces Cantor pairing index to Cantor pair i.e. two integer non-negative numbers.
 
- @return the PI constant.
+ @return the Cantor pair.
  */
 inline auto
 getCantorPair(const int64_t index) -> T2Pair
