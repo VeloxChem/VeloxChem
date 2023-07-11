@@ -6,20 +6,19 @@
 #include "MatrixFunc.hpp"
 #include "MatrixType.hpp"
 #include "OpenMPFunc.hpp"
+#include "MatricesFunc.hpp"
 
 auto
 CDipoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule, const TPoint3D& point) const -> CMatrices
 {
-    CMatrices dip_matrix;
-
-    dip_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "x");
-
-    dip_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "y");
-
-    dip_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "z");
+    // set up dipole matrix
+    
+    auto dip_matrix = matfunc::makeMatrices(1, basis, mat_t::symm);
 
     dip_matrix.zero();
 
+    // set work groups 
+    
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     const auto work_groups = omp::makeWorkGroup(gto_blocks);

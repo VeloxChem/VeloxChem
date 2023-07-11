@@ -6,34 +6,19 @@
 #include "MatrixType.hpp"
 #include "OctupoleFunc.hpp"
 #include "OpenMPFunc.hpp"
+#include "MatricesFunc.hpp"
 
 auto
 COctupoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule, const TPoint3D& point) const -> CMatrices
 {
-    CMatrices octu_matrix;
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "xxx");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "xxy");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "xxz");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "xyy");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "xyz");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "xzz");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "yyy");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "yyz");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "yzz");
-
-    octu_matrix.add(matfunc::makeMatrix(basis, mat_t::symm), "zzz");
+    // set up octupoles matrix
+    
+    auto octu_matrix = matfunc::makeMatrices(3, basis, mat_t::symm);
 
     octu_matrix.zero();
 
+    // set up work groups 
+    
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     const auto work_groups = omp::makeWorkGroup(gto_blocks);

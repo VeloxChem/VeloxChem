@@ -83,6 +83,22 @@ auto to_AngularMomentum(const std::string& label) -> int64_t;
  */
 auto to_AngularMomentum(const int64_t angmom) -> std::string;
 
+/**
+ Converts tensor of given order to vector of it's component labels.
+
+ @param torder the order of tensor.
+ @return the vector of tensor component labels.
+ */
+auto to_TensorComponents(const int64_t torder) -> std::vector<std::string>;
+
+/**
+ Converts tensor component label to it's standard index.
+
+ @param tlabel the tensor component label.
+ @return the index of tensor component.
+ */
+auto to_TensorComponent(const std::string& tlabel) -> int64_t;
+
 }  // namespace fstr
 
 #endif /* StringFormat_hpp */

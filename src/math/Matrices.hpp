@@ -21,14 +21,6 @@ class CMatrices
      */
     std::map<int64_t, CMatrix*> _matrices;
 
-    /**
-     Converts string label to integer key of matrix.
-
-     @param label the label of key.
-     @return the integer key of matrix.
-     */
-    auto _to_key(const std::string& label) const -> int64_t;
-
    public:
     /**
      Creates an empty matrices.

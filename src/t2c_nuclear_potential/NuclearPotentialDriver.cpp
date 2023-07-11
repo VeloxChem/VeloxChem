@@ -6,6 +6,7 @@
 #include "MatrixType.hpp"
 #include "NuclearPotentialFunc.hpp"
 #include "OpenMPFunc.hpp"
+#include "MatricesFunc.hpp"
 
 auto
 CNuclearPotentialDriver::compute(const CMolecularBasis&       basis,
@@ -13,20 +14,22 @@ CNuclearPotentialDriver::compute(const CMolecularBasis&       basis,
                                  const std::vector<double>&   charges,
                                  const std::vector<TPoint3D>& points) const -> CMatrices
 {
-    CMatrices matrices;
-
     if (const auto natoms = static_cast<int64_t>(charges.size()); natoms > 0)
     {
         // set up matrices
 
+        std::vector<int64_t> atoms;
+        
         for (int64_t i = 0; i < natoms; i++)
         {
-            matrices.add(matfunc::makeMatrix(basis, mat_t::symm), i);
+            atoms.push_back(i);
         }
+        
+        auto matrices = matfunc::makeMatrices(atoms, basis, mat_t::symm);
 
         matrices.zero();
 
-        // set up parallelization data
+        // set up work groups
 
         const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -64,7 +67,7 @@ CNuclearPotentialDriver::compute(const CMolecularBasis&       basis,
                         {
                             for (const auto& task : ptr_work_groups[j])
                             {
-                                auto ptr_matrix = ptr_matrices->getMatrix("X");
+                                auto ptr_matrix = ptr_matrices->getMatrix(i);
 
                                 if (task[0] == task[1])
                                 {
@@ -108,7 +111,11 @@ CNuclearPotentialDriver::compute(const CMolecularBasis&       basis,
                 }
             }
         }
+        
+        return matrices;
     }
-
-    return matrices;
+    else
+    {
+        return CMatrices();
+    }
 }

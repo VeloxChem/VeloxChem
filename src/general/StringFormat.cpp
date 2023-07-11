@@ -144,4 +144,118 @@ to_AngularMomentum(const int64_t angmom) -> std::string
     return std::string();
 }
 
+auto
+to_TensorComponents(const int64_t torder) -> std::vector<std::string>
+{
+    if (torder == 1)
+    {
+        return {"X", "Y", "Z"};
+    }
+    
+    if (torder == 2)
+    {
+        return {"XX", "XY", "XZ", "YY", "YZ", "ZZ"};
+    }
+    
+    if (torder == 3)
+    {
+        return {"XXX", "XXY", "XXZ", "XYY", "XYZ", "XZZ", "YYY", "YYZ", "YZZ", "ZZZ"};
+    }
+    
+    if (torder == 4)
+    {
+        return {"XXXX", "XXXY", "XXXZ", "XXYY", "XXYZ", "XXZZ", "XYYY", "XYYZ", "XYZZ", "XZZZ",
+                "YYYY", "YYYZ", "YYZZ", "YZZZ", "ZZZZ"};
+    }
+    
+    return std::vector<std::string>();
+}
+
+auto to_TensorComponent(const std::string& tlabel) -> int64_t
+{
+    const auto index = fstr::upcase(tlabel);
+
+    if (index.size() == 1)
+    {
+        if (index == "X") return 0;
+
+        if (index == "Y") return 1;
+
+        if (index == "Z") return 2;
+    }
+
+    if (index.size() == 2)
+    {
+        if (index == "XX") return 0;
+
+        if (index == "XY") return 1;
+
+        if (index == "XZ") return 2;
+
+        if (index == "YY") return 3;
+
+        if (index == "YZ") return 4;
+
+        if (index == "ZZ") return 5;
+    }
+
+    if (index.size() == 3)
+    {
+        if (index == "XXX") return 0;
+
+        if (index == "XXY") return 1;
+
+        if (index == "XXZ") return 2;
+
+        if (index == "XYY") return 3;
+
+        if (index == "XYZ") return 4;
+
+        if (index == "XZZ") return 5;
+
+        if (index == "YYY") return 6;
+
+        if (index == "YYZ") return 7;
+
+        if (index == "YZZ") return 8;
+
+        if (index == "ZZZ") return 9;
+    }
+    
+    if (index.size() == 4)
+    {
+        if (index == "XXXX") return 0;
+
+        if (index == "XXXY") return 1;
+
+        if (index == "XXXZ") return 2;
+
+        if (index == "XXYY") return 3;
+
+        if (index == "XXYZ") return 4;
+
+        if (index == "XXZZ") return 5;
+
+        if (index == "XYYY") return 6;
+
+        if (index == "XYYZ") return 7;
+
+        if (index == "XYZZ") return 8;
+
+        if (index == "XZZZ") return 9;
+        
+        if (index == "YYYY") return 10;
+
+        if (index == "YYYZ") return 11;
+
+        if (index == "YYZZ") return 12;
+
+        if (index == "YZZZ") return 13;
+        
+        if (index == "ZZZZ") return 14;
+    }
+    
+    return -1;
+}
+
 }  // namespace fstr
