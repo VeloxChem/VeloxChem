@@ -59,7 +59,7 @@ def set_omp_num_threads(ncores=None):
     """
 
     if ncores is not None:
-        environ['OMP_NUM_THREADS'] = ncores
+        environ['OMP_NUM_THREADS'] = str(ncores)
     else:
         if 'OMP_NUM_THREADS' not in environ:
             ncores = cpu_count()
