@@ -114,7 +114,7 @@ class HessianDriver:
         self.raman_intensities = None
         self.flag = None
 
-        self.numerical = True
+        self.numerical = False
         self.delta_h = 0.001
 
         # flag for two-point or four-point approximation
@@ -642,9 +642,42 @@ class HessianDriver:
         Prints Hessian calculation setup details to output stream.
         """
 
+        str_width = 70
+
         self.ostream.print_blank()
         self.ostream.print_header(self.flag)
         self.ostream.print_header((len(self.flag) + 2) * '=')
+        self.ostream.flush()
+
+        cur_str = 'Hessian Type                 : '
+
+        if self.numerical:
+            cur_str += 'Numerical'
+            cur_str2 = 'Numerical Method             : '
+            if self.do_four_point:
+                cur_str2 += 'Five-Point Stencil'
+            else:
+                cur_str2 += 'Symmetric Difference Quotient'
+            cur_str3 = 'Finite Difference Step Size  : '
+            cur_str3 += str(self.delta_h) + ' a.u.'
+        else:
+            cur_str += 'Analytical'
+
+        self.ostream.print_blank()
+        self.ostream.print_header(cur_str.ljust(str_width))
+        if self.numerical:
+            self.ostream.print_header(cur_str2.ljust(str_width))
+            self.ostream.print_header(cur_str3.ljust(str_width))
+
+        if self.dft:
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         self.ostream.print_blank()
         self.ostream.flush()
 

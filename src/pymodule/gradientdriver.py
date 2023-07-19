@@ -457,6 +457,7 @@ class GradientDriver:
                 self.ostream.print_header(valstr)
         else:
             index = 0
+            gradient_shape = self.gradient.shape
             for s in state_deriv_index:
                 self.ostream.print_blank()
                 state = 'Excited State %d' % s
@@ -470,7 +471,7 @@ class GradientDriver:
                 self.ostream.print_blank()
                 for i in range(molecule.number_of_atoms()):
                     valstr = '  {:<4s}'.format(labels[i])
-                    if len(state_deriv_index) == 1:
+                    if len(gradient_shape)==2:
                         for d in range(3):
                             valstr += '{:22.12f}'.format(self.gradient[i, d])
                     else:
@@ -486,23 +487,23 @@ class GradientDriver:
         Prints gradient calculation setup details to output stream.
         """
 
-        str_width = 60
+        str_width = 70
 
         self.ostream.print_blank()
         self.ostream.print_header(self.flag)
         self.ostream.print_header((len(self.flag) + 2) * '=')
         self.ostream.flush()
 
-        cur_str = 'Gradient Type               : '
+        cur_str = 'Gradient Type                   : '
 
         if self.numerical:
             cur_str += 'Numerical'
-            cur_str2 = 'Numerical Method            : '
+            cur_str2 = 'Numerical Method                : '
             if self.do_four_point:
                 cur_str2 += 'Five-Point Stencil'
             else:
                 cur_str2 += 'Symmetric Difference Quotient'
-            cur_str3 = 'Finite Difference Step Size : '
+            cur_str3 = 'Finite Difference Step Size     : '
             cur_str3 += str(self.delta_h) + ' a.u.'
         else:
             cur_str += 'Analytical'
@@ -516,13 +517,17 @@ class GradientDriver:
             self.ostream.print_header(cur_str3.ljust(str_width))
 
         if self.dft:
-            cur_str = 'DFT Functional              : '
-            cur_str += self.xcfun.get_func_label()
+            cur_str = 'Exchange-Correlation Functional : '
+            cur_str += self.xcfun.get_func_label().upper()
+            self.ostream.print_header(cur_str.ljust(str_width))
+            grid_level = (get_default_grid_level(self.xcfun)
+                          if self.grid_level is None else self.grid_level)
+            cur_str = 'Molecular Grid Level            : ' + str(grid_level)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         if state_deriv_index is not None:
             if type(state_deriv_index) is int:
-                cur_str = ( 'Excited State of Interest   : ' 
+                cur_str = ( 'Excited State of Interest       : ' 
                             + str(state_deriv_index + 1) )
                 self.ostream.print_header(cur_str.ljust(str_width))
             elif type(state_deriv_index) is tuple:
@@ -533,7 +538,7 @@ class GradientDriver:
                         states_txt += "%d." % s
                     else:
                         states_txt += "%d, " % s
-                cur_str = 'Excited States of Interest  : ' + states_txt
+                cur_str = 'Excited States of Interest      : ' + states_txt
                 self.ostream.print_header(cur_str.ljust(str_width))
 
         self.ostream.print_blank()

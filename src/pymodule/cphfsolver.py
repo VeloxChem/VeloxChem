@@ -86,7 +86,7 @@ class CphfSolver(LinearSolver):
 
         super().__init__(comm, ostream)
 
-        self.use_subspace_solver = False
+        self.use_subspace_solver = True
         self.print_residuals = False
         self.max_iter = 25
 
@@ -142,6 +142,11 @@ class CphfSolver(LinearSolver):
             and an auxiliary Fock matrix (oo block of the CPHF coefficients
             contracted with the two-electron integrals).
         """
+
+        if self.norm_thresh is None:
+            self.norm_thresh = self.conv_thresh * 1.0e-6
+        if self.lindep_thresh is None:
+            self.lindep_thresh = self.conv_thresh * 1.0e-2
 
         # sanity check
         nalpha = molecule.number_of_alpha_electrons()
@@ -571,23 +576,6 @@ class CphfSolver(LinearSolver):
             dist_trials_proj = old_trials.matmul_AB_no_gather(bT_new_trials)
             dist_trials.data -= dist_trials_proj.data
 
-            # TODO: remove commented out code!!
-            ### b b.T
-            ###bT_new_trials = np.matmul(old_trials.data, old_trials.data.T)
-            ##bT_new = np.matmul(old_trials.data.T, dist_trials.data)
-            ### (b b.T) t
-            ###dist_trials_proj = np.matmul(bT_new_trials, dist_trials.data)
-
-            ###print("Shapes: old trials, new trials      b b.T       b.T n\n", old_trials.data.shape, dist_trials.data.shape, bT_new_trials.shape, bT_new.shape)
-            ##dist_trials_proj_proper = np.matmul(old_trials.data, bT_new)
-
-            ###print("\nHERE\n", dist_trials_proj-dist_trials_proj_proper)
-            ###print()
-            ###print(dist_trials_proj_proper)
-            ### t = t - (b b.T) t
-            #dist_trials.data -= dist_trials_proj_proper
-
-
         # remove linear dependencies and orthonormalize trial vectors
         if renormalize:
             if dist_trials.data.ndim > 0 and dist_trials.shape(0) > 0:
@@ -914,7 +902,7 @@ class CphfSolver(LinearSolver):
     def compute_rhs(self, molecule, basis, scf_tensors):
         """
         Computes the right hand side for the CPHF equations for
-        all atomic coordinates.
+        the analytical Hessian, all atomic coordinates.
 
         :param molecule:
             The molecule.
@@ -927,6 +915,7 @@ class CphfSolver(LinearSolver):
             The RHS of the CPHF equations.
         """
 
+        t1 = tm.time()
         if self.rank == mpi_master():
             density = scf_tensors['D_alpha']
             #overlap = self.scf_drv.scf_tensors['S']
@@ -1007,8 +996,13 @@ class CphfSolver(LinearSolver):
 
         self._comp_lr_fock(fock_uij, ao_density_uij, molecule,
                           basis, eri_dict, dft_dict, pe_dict, self.profiler)
-
+        t2 = tm.time()
         if self.rank == mpi_master():
+            self.ostream.print_info('CPHF/CPKS RHS computed in' +
+                                     ' {:.2f} sec.'.format(t2 - t1))
+            self.ostream.print_blank()
+            self.ostream.flush()
+
             # TODO: how can this be done better?
             fock_uij_numpy = np.zeros((natm,3,nao,nao))
             for i in range(natm):

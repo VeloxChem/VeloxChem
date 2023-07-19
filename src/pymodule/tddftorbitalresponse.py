@@ -10,6 +10,7 @@ from .veloxchemlib import XCIntegrator
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
 from .inputparser import parse_seq_fixed
+from .visualizationdriver import VisualizationDriver
 
 class TddftOrbitalResponse(CphfSolver):
     """
@@ -586,3 +587,4 @@ class TddftOrbitalResponse(CphfSolver):
             return omega
         else:
             return None
+

@@ -375,6 +375,7 @@ class ScfHessianDriver(HessianDriver):
                             'ScfHessianDriver: SCF did not converge')
         scf_drv.ostream.unmute()
 
+    # TODO: replace all einsum with multidot!
     def compute_analytical(self, molecule, ao_basis, scf_drv, profiler):
         """
         Computes the analytical nuclear Hessian.
@@ -424,7 +425,7 @@ class ScfHessianDriver(HessianDriver):
                               + np.einsum('mi,xyia,na->xymn',
                                         mo_occ, cphf_ov, mo_vir)
                             )
-
+        t1 = tm.time()
         # Parts related to first-order integral derivatives
         if self.pople_hessian:
             fock_uij = cphf_solution_dict['fock_uij']
@@ -467,6 +468,13 @@ class ScfHessianDriver(HessianDriver):
                                                 scf_drv.xcfun.get_func_label())
             scf_drv.comm.reduce(hessian_dft_xc, root=mpi_master())
 
+        t2 = tm.time()
+        if self.rank == mpi_master():
+            self.ostream.print_info('First order derivative contributions'
+                                    + ' to the Hessian computed in' +
+                                     ' {:.2f} sec.'.format(t2 - t1))
+            self.ostream.print_blank()
+            self.ostream.flush()
         # Parts related to second-order integral derivatives
         hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
         for i in range(natm):
@@ -514,6 +522,13 @@ class ScfHessianDriver(HessianDriver):
         if self.dft:
             self.hessian += hessian_dft_xc
 
+        t3 = tm.time()
+        if self.rank == mpi_master():
+            self.ostream.print_info('Second order derivative contributions'
+                                    + ' to the Hessian computed in' +
+                                     ' {:.2f} sec.'.format(t3 - t2))
+            self.ostream.print_blank()
+            self.ostream.flush()
         # Calculate the gradient of the dipole moment, needed for IR intensities
         self.compute_dipole_gradient(molecule, ao_basis, scf_drv,
                                     perturbed_density)

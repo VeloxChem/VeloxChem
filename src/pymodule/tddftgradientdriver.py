@@ -187,8 +187,7 @@ class TddftGradientDriver(GradientDriver):
         # the first state only.
         if self.numerical:
             scf_drv.ostream.mute()
-            self.compute_numerical(molecule, basis, scf_drv, rsp_drv, 
-                                   self.state_deriv_index[0]-1)
+            self.compute_numerical(molecule, basis, scf_drv, rsp_drv, rsp_results)
             scf_drv.ostream.unmute()
         else:
             self.compute_analytical(molecule, basis, scf_drv, rsp_results)
@@ -207,6 +206,7 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
+    # TODO: replace all np.einsum with multidot!
     def compute_analytical(self, molecule, basis, scf_drv, rsp_results):
         """
         Performs calculation of analytical gradient.
@@ -271,14 +271,26 @@ class TddftGradientDriver(GradientDriver):
         dof = self.comm.bcast(dof, root=mpi_master())
 
         # ground state gradient
+        t1 = tm.time()
         gs_grad_drv = ScfGradientDriver()
         gs_grad_drv.update_settings(self.grad_dict, self.method_dict)
 
         gs_grad_drv.ostream.mute()
         gs_grad_drv.compute(molecule, basis, scf_drv)
         gs_grad_drv.ostream.unmute()
+        t2 = tm.time()
 
         if self.rank == mpi_master():
+            if gs_grad_drv.numerical:
+                gs_gradient_type = "Numerical GS gradient"
+            else:
+                gs_gradient_type = "Analytical GS gradient"
+            self.ostream.print_info(gs_gradient_type
+                                    + ' computed in'
+                                    + ' {:.2f} sec.'.format(t2 - t1))
+            self.ostream.print_blank()
+            self.ostream.flush()
+
             self.gradient = np.zeros((dof, natm, 3))
             self.gradient += gs_grad_drv.get_gradient()
 
@@ -291,6 +303,8 @@ class TddftGradientDriver(GradientDriver):
                 d_hcore = hcore_deriv(molecule, basis, i)
                 d_eri = eri_deriv(molecule, basis, i)
 
+                #for x in range(dof):
+                #    self.gradient[s,x,i] += np.sum(np.matmul(relaxed_density_ao[
                 self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
                                                     relaxed_density_ao,
                                                     d_hcore)
@@ -360,8 +374,7 @@ class TddftGradientDriver(GradientDriver):
                 if self.rank == mpi_master():
                     self.gradient[s] += tddft_xcgrad
 
-    def compute_energy(self, molecule, basis, scf_drv, rsp_drv,
-                       state_deriv_index=0):
+    def compute_energy(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
         """
         Computes the energy at the current position.
 
@@ -377,6 +390,12 @@ class TddftGradientDriver(GradientDriver):
             The index of the excited state of interest.
         """
 
+        if isinstance(self.state_deriv_index, int):
+            # Python numbering starts at 0
+            print("!!!!! Int!")
+            state_deriv_index = self.state_deriv_index - 1
+        else:
+            state_deriv_index = self.state_deriv_index[0] - 1
         scf_drv.restart = False
         scf_results = scf_drv.compute(molecule, basis)
         assert_msg_critical(scf_drv.is_converged,
