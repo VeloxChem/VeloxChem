@@ -649,7 +649,7 @@ class HessianDriver:
         self.ostream.print_header((len(self.flag) + 2) * '=')
         self.ostream.flush()
 
-        cur_str = 'Hessian Type                 : '
+        cur_str = 'Hessian Type                    : '
 
         if self.numerical:
             cur_str += 'Numerical'

@@ -479,7 +479,7 @@ def main():
             opt_drv = OptimizationDriver(tddftgrad_drv)
             opt_drv.update_settings(opt_dict)
             opt_drv.compute(task.molecule, task.ao_basis, scf_drv,
-                            rsp_prop.rsp_driver)
+                            rsp_prop.rsp_driver, rsp_prop._rsp_property)
 
     # Ground state Hessian / Vibrational analysis
 
@@ -490,9 +490,9 @@ def main():
         else:
             freq_dict = {}
 
-        hessian_drv = ScfHessianDriver(scf_drv, task.mpi_comm, task.ostream)
+        hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)
         hessian_drv.update_settings(method_dict, freq_dict)
-        hessian_drv.compute(task.molecule, task.ao_basis)
+        hessian_drv.compute(task.molecule, task.ao_basis, scf_drv)
         # TODO: add output file name for geomeTRIC vibrational analysis
         hessian_drv.vibrational_analysis(task.molecule, task.ao_basis)
 
@@ -546,14 +546,16 @@ def main():
             # Excited state gradient
             if 'gradient' in task.input_dict:
                 grad_dict = task.input_dict['gradient']
-                tdhfgrad_drv = TdhfGradientDriver(scf_drv, 
-                                                  task.mpi_comm, task.ostream)
-                tdhfgrad_drv.update_settings(grad_dict, rsp_dict,
+                tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+                tddftgrad_drv.update_settings(grad_dict, rsp_dict,
                                              orbrsp_dict, method_dict)
-                tdhfgrad_drv.compute(task.molecule, task.ao_basis,
-                                     rsp_prop._rsp_driver.solver, rsp_prop._rsp_property)
+                tddftgrad_drv.compute(task.molecule, task.ao_basis,
+                                     scf_drv,
+                                     rsp_prop._rsp_driver.solver,
+                                     rsp_prop._rsp_property)
                                      # solver is the actual RPA/TDA driver
-                                     # with rsp_prop.rsp_driver it works for TDA, but not RPA
+                                     # with rsp_prop.rsp_driver
+                                     # it works for TDA, but not RPA
 
             # Excited state Hessian and vibrational analysis
             if 'frequencies' in task.input_dict:
@@ -571,13 +573,14 @@ def main():
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:
                 opt_dict = task.input_dict['optimize_excited_state']
-                tdhfgrad_drv = TdhfGradientDriver(scf_drv,
-                                                  task.mpi_comm, task.ostream)
-                tdhfgrad_drv.update_settings(opt_dict, rsp_dict,
+                tddftgrad_drv = TddftGradientDriver(task.mpi_comm, task.ostream)
+                tddftgrad_drv.update_settings(opt_dict, rsp_dict,
                                              orbrsp_dict, method_dict)
-                opt_drv = OptimizationDriver(tdhfgrad_drv)
+                opt_drv = OptimizationDriver(tddftgrad_drv)
                 opt_drv.compute(task.molecule, task.ao_basis,
-                                rsp_prop._rsp_driver.solver, rsp_prop._rsp_property)
+                                scf_drv,
+                                rsp_prop._rsp_driver,
+                                rsp_prop._rsp_property)
 
         else:
             task.ostream.print_blank()

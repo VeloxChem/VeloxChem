@@ -407,11 +407,12 @@ class ScfHessianDriver(HessianDriver):
 
         # Set up a CPHF solver
         # TODO: remove scf_drv
-        cphf_solver = CphfSolver(self.comm, self.ostream, scf_drv)
+        cphf_solver = CphfSolver(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
-        cphf_solver.compute(molecule, ao_basis, scf_tensors)
+        cphf_solver.compute(molecule, ao_basis, scf_tensors,
+                            scf_drv)
         cphf_solution_dict = cphf_solver.cphf_results
         cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
         ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
@@ -704,7 +705,7 @@ class ScfHessianDriver(HessianDriver):
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
-        cphf_solver = CphfSolver(self.comm, self.ostream, scf_drv) # TODO: remove scf_drv
+        cphf_solver = CphfSolver(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         # ERI information
         eri_dict = cphf_solver._init_eri(molecule, ao_basis)
@@ -834,7 +835,7 @@ class ScfHessianDriver(HessianDriver):
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
-        cphf_solver = CphfSolver(self.comm, self.ostream, scf_drv)
+        cphf_solver = CphfSolver(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
         # ERI information
         eri_dict = cphf_solver._init_eri(molecule, ao_basis)
@@ -887,11 +888,11 @@ class ScfHessianDriver(HessianDriver):
         eoo = eocc.reshape(-1, 1) + eocc #ei+ej
         scf_tensors = scf_drv.scf_tensors
         # Set up a CPHF solver
-        cphf_solver = CphfSolver(self.comm, self.ostream, scf_drv)
+        cphf_solver = CphfSolver(self.comm, self.ostream)
         cphf_solver.update_settings(self.cphf_dict, self.method_dict)
 
         # Solve the CPHF equations
-        cphf_solver.compute(molecule, ao_basis, scf_tensors)
+        cphf_solver.compute(molecule, ao_basis, scf_tensors, scf_drv)
 
         # Extract the relevant results
         cphf_solution_dict = cphf_solver.cphf_results

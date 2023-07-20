@@ -67,7 +67,7 @@ class CphfSolver(LinearSolver):
           instead of conjugate gradient.
     """
 
-    def __init__(self, comm=None, ostream=None, scfdrv=None):
+    def __init__(self, comm=None, ostream=None):
         """
         Initializes CPHF solver to default setup.
 
@@ -80,9 +80,6 @@ class CphfSolver(LinearSolver):
 
         if ostream is None:
             ostream = OutputStream(sys.stdout)
-
-        # TODO: to be removed again
-        self.scfdrv = scfdrv
 
         super().__init__(comm, ostream)
 
@@ -899,7 +896,7 @@ class CphfSolver(LinearSolver):
 
 
 
-    def compute_rhs(self, molecule, basis, scf_tensors):
+    def compute_rhs(self, molecule, basis, scf_tensors, scf_drv):
         """
         Computes the right hand side for the CPHF equations for
         the analytical Hessian, all atomic coordinates.
@@ -910,6 +907,8 @@ class CphfSolver(LinearSolver):
             The AO basis set.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
+        :param scf_drv:
+            The scf_driver
 
         :returns:
             The RHS of the CPHF equations.
@@ -918,7 +917,6 @@ class CphfSolver(LinearSolver):
         t1 = tm.time()
         if self.rank == mpi_master():
             density = scf_tensors['D_alpha']
-            #overlap = self.scf_drv.scf_tensors['S']
             natm = molecule.number_of_atoms()
             mo = scf_tensors['C_alpha']
             mo_energies = scf_tensors['E']
@@ -947,7 +945,7 @@ class CphfSolver(LinearSolver):
             for i in range(natm):
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
                 fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
-                                              i, self.scfdrv)
+                                              i, scf_drv)
             t1 = tm.time()
             self.ostream.print_info("CPHF/CPKS import of integral derivatives"
                                     + ' took'
