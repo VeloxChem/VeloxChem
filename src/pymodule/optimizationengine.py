@@ -110,15 +110,15 @@ class OptimizationEngine(geometric.engine.Engine):
         self.grad_drv.ostream.flush()
 
         # manually mute the output stream
-        ostream_state_orig = self.grad_drv.ostream.state
-        self.grad_drv.ostream.state = False
+        #ostream_state_orig = self.grad_drv.ostream.state
+        #self.grad_drv.ostream.state = False
 
         energy = self.grad_drv.compute_energy(new_mol, *self.args)
         self.grad_drv.compute(new_mol, *self.args)
         gradient = self.grad_drv.get_gradient()
 
         # manually unmute the output stream
-        self.grad_drv.ostream.state = ostream_state_orig
+        #self.grad_drv.ostream.state = ostream_state_orig
 
         energy = self.comm.bcast(energy, root=mpi_master())
         gradient = self.comm.bcast(gradient, root=mpi_master())

@@ -943,10 +943,17 @@ class CphfSolver(LinearSolver):
             # import the integral derivatives
             self.profiler.set_timing_key('derivs')
             self.profiler.start_timer('derivs')
+            t0 = tm.time()
             for i in range(natm):
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
                 fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
                                               i, self.scfdrv)
+            t1 = tm.time()
+            self.ostream.print_info("CPHF/CPKS import of integral derivatives"
+                                    + ' took'
+                                    + ' {:.2f} sec.'.format(t1 - t0))
+            self.ostream.print_blank()
+            self.ostream.flush()
             self.profiler.stop_timer('derivs')
 
             # transform integral derivatives to MO basis

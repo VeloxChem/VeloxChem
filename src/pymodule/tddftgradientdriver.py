@@ -298,6 +298,7 @@ class TddftGradientDriver(GradientDriver):
             # with density matrices
             # add the corresponding contribution to the gradient
             for i in range(natm):
+                t0 = tm.time()
                 # taking integral derivatives from pyscf
                 d_ovlp = overlap_deriv(molecule, basis, i)
                 d_hcore = hcore_deriv(molecule, basis, i)
@@ -305,12 +306,26 @@ class TddftGradientDriver(GradientDriver):
 
                 #for x in range(dof):
                 #    self.gradient[s,x,i] += np.sum(np.matmul(relaxed_density_ao[
+                t2 = tm.time()
+                self.ostream.print_info("Import of integral derivatives"
+                                    + ' took'
+                                    + ' {:.2f} sec.'.format(t2 - t0))
+                self.ostream.flush()
                 self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
                                                     relaxed_density_ao,
                                                     d_hcore)
+                t3 = tm.time()
+                self.ostream.print_info("Core Hamiltonian derivative"
+                                    + ' contribution computed in'
+                                    + ' {:.2f} sec.'.format(t3 - t2))
+                self.ostream.flush()
                 self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
                                                        2.0 * omega_ao, d_ovlp)
-
+                t4 = tm.time()
+                self.ostream.print_info("Overlap derivative contribution "
+                                    + ' computed in'
+                                    + ' {:.2f} sec.'.format(t4 - t3))
+                self.ostream.flush()
                 if self.dft:
                     if self.xcfun.is_hybrid():
                         frac_K = self.xcfun.get_frac_exact_exchange()
@@ -341,6 +356,12 @@ class TddftGradientDriver(GradientDriver):
                                 'smn,spt,xtnmp->sx', x_minus_y_ao,
                                 x_minus_y_ao + x_minus_y_ao.transpose(0,2,1),
                                 d_eri)
+                t5 = tm.time()
+                self.ostream.print_info("Two electron integral derivatives"
+                                    + ' computed in'
+                                    + ' {:.2f} sec.'.format(t5 - t4))
+                self.ostream.print_blank()
+                self.ostream.flush()
 
         # TODO: enable multiple DMs for DFT to avoid for-loops.
         if self.dft:
@@ -392,7 +413,6 @@ class TddftGradientDriver(GradientDriver):
 
         if isinstance(self.state_deriv_index, int):
             # Python numbering starts at 0
-            print("!!!!! Int!")
             state_deriv_index = self.state_deriv_index - 1
         else:
             state_deriv_index = self.state_deriv_index[0] - 1
