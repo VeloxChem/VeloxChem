@@ -4,7 +4,6 @@ from veloxchem.veloxchemlib import cantor_index
 from veloxchem.veloxchemlib import cantor_pair
 
 
-
 class TestMathConst:
     """
     Implements tests for src/math/CantorFunc.hpp
@@ -21,7 +20,7 @@ class TestMathConst:
         assert cantor_index((1, 2)) == 8
         assert cantor_index((2, 1)) == 7
         assert cantor_index((2, 2)) == 12
-        
+
     def test_cantor_apir(self):
 
         assert cantor_pair(0) == (0, 0)
@@ -33,4 +32,3 @@ class TestMathConst:
         assert cantor_pair(8) == (1, 2)
         assert cantor_pair(7) == (2, 1)
         assert cantor_pair(12) == (2, 2)
-        

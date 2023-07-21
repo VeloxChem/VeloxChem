@@ -98,6 +98,7 @@ export_orbdata(py::module &m)
         .def(py::pickle([](const CMolecularBasis &basis) { return py::make_tuple(basis.getBasisSets(), basis.getBasisSetsIndexes()); },
                         [](py::tuple t) { return CMolecularBasis(t[0].cast<std::vector<CAtomBasis>>(), t[1].cast<std::vector<int64_t>>()); }))
         .def("add", &CMolecularBasis::add, "Adds atomic basis to molecular basis.")
+        .def("slice", &CMolecularBasis::slice, "Slices fraction of molecular basis for specific atoms.")
         .def("reduce_to_valence_basis", &CMolecularBasis::reduceToValenceBasis, "Reduces molecular basis to it's valence only form.")
         .def("get_basis_sets", &CMolecularBasis::getBasisSets, "Gets unique atomic basis sets in molecular basis")
         .def("get_basis_sets_indexes", &CMolecularBasis::getBasisSetsIndexes, "Gets vector of basis sets indexes.")

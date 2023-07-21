@@ -7,6 +7,7 @@ from veloxchem.veloxchemlib import Molecule
 from veloxchem.submatrix import SubMatrix
 from tester import Tester
 
+
 class TestOverlapDriver:
 
     def get_data(self):
@@ -30,7 +31,7 @@ class TestOverlapDriver:
         # compute overlap matrix
         ovl_drv = OverlapDriver()
         ovl_mat = ovl_drv.compute(mol_co, bas_tzvpp)
-        
+
         # load reference overlap data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.tzvpp.overlap.npy')
@@ -39,15 +40,15 @@ class TestOverlapDriver:
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 28, 48, 62]
-        
+
         # check individual overlap submatrices
         for i, j in zip(indexes[0], indexes[1]):
             # bra side
             sbra = basdims[i]
-            ebra = basdims[i+1]
+            ebra = basdims[i + 1]
             # ket side
             sket = basdims[j]
-            eket = basdims[j+1]
+            eket = basdims[j + 1]
             # load computed submatrix
             cmat = ovl_mat.get_submatrix((i, j))
             # load reference submatrix
@@ -55,7 +56,7 @@ class TestOverlapDriver:
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             Tester.compare_submatrices(cmat, rmat)
-        
+
         # check full overlap matrix
         fmat = ovl_mat.get_full_matrix()
         fref = SubMatrix([0, 0, 62, 62])

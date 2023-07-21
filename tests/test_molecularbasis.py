@@ -219,6 +219,47 @@ class TestMolecularBasis:
 
         Tester.compare_molecular_basis(a_basis, b_basis)
 
+    def test_slice(self):
+
+        ref_basis = self.get_h2o_svp()
+
+        o_bas = self.get_oxygen_svp()
+        h_bas = self.get_hydrogen_svp()
+
+        a_basis = MolecularBasis([o_bas, h_bas], [0, 1])
+        b_basis = ref_basis.slice([0, 1])
+        Tester.compare_molecular_basis(a_basis, b_basis)
+        b_basis = ref_basis.slice([0, 2])
+        Tester.compare_molecular_basis(a_basis, b_basis)
+
+        a_basis = MolecularBasis([
+            o_bas,
+        ], [
+            0,
+        ])
+        b_basis = ref_basis.slice([
+            0,
+        ])
+        Tester.compare_molecular_basis(a_basis, b_basis)
+
+        a_basis = MolecularBasis([
+            h_bas,
+        ], [0])
+        b_basis = ref_basis.slice([
+            1,
+        ])
+        Tester.compare_molecular_basis(a_basis, b_basis)
+        b_basis = ref_basis.slice([
+            2,
+        ])
+        Tester.compare_molecular_basis(a_basis, b_basis)
+
+        a_basis = MolecularBasis([
+            h_bas,
+        ], [0, 0])
+        b_basis = ref_basis.slice([1, 2])
+        Tester.compare_molecular_basis(a_basis, b_basis)
+
     def test_get_basis_sets(self):
 
         basis = self.get_h2o_svp()

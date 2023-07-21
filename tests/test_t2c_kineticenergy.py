@@ -31,7 +31,7 @@ class TestKineticEnergyDriver:
         # compute kinetic energy matrix
         kin_drv = KineticEnergyDriver()
         kin_mat = kin_drv.compute(mol_co, bas_tzvpp)
-        
+
         # load reference kinetic energy data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.tzvpp.kinetic.energy.npy')
@@ -40,15 +40,15 @@ class TestKineticEnergyDriver:
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 28, 48, 62]
-        
+
         # check individual kinetic energy submatrices
         for i, j in zip(indexes[0], indexes[1]):
             # bra side
             sbra = basdims[i]
-            ebra = basdims[i+1]
+            ebra = basdims[i + 1]
             # ket side
             sket = basdims[j]
-            eket = basdims[j+1]
+            eket = basdims[j + 1]
             # load computed submatrix
             cmat = kin_mat.get_submatrix((i, j))
             # load reference submatrix
@@ -56,10 +56,9 @@ class TestKineticEnergyDriver:
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             Tester.compare_submatrices(cmat, rmat)
-        
+
         # check full kinetic energy matrix
         fmat = kin_mat.get_full_matrix()
         fref = SubMatrix([0, 0, 62, 62])
         fref.set_values(np.ascontiguousarray(ref_mat))
         Tester.compare_submatrices(fmat, fref)
-

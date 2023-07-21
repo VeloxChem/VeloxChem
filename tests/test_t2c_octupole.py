@@ -33,38 +33,41 @@ class TestDipoleDriver:
         # compute electric octupole matrices
         octu_drv = OctupoleDriver()
         octu_mats = octu_drv.compute(mol_co, bas_tzvpp, [0.0, 0.0, 0.0])
-        
+
         # load reference electric dipole data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.tzvpp.electric.octupole.npy')
         ref_mat = np.load(npyfile)
- 
+
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 28, 48, 62]
-        mcomps = ["XXX", "XXY", "XXZ", "XYY", "XYZ", "XZZ", "YYY", "YYZ", "YZZ", "ZZZ"]
-       
+        mcomps = [
+            "XXX", "XXY", "XXZ", "XYY", "XYZ", "XZZ", "YYY", "YYZ", "YZZ", "ZZZ"
+        ]
+
         for idx in range(10):
             print("*** COMPONENT *** ", mcomps[idx])
             # load matrix for tensor component
             octu_mat = octu_mats.get_matrix(mcomps[idx])
-            
+
             # check individual quadrupole component submatrices
             for i, j in zip(indexes[0], indexes[1]):
                 # bra side
                 sbra = basdims[i]
-                ebra = basdims[i+1]
+                ebra = basdims[i + 1]
                 # ket side
                 sket = basdims[j]
-                eket = basdims[j+1]
+                eket = basdims[j + 1]
                 # load computed submatrix
                 cmat = octu_mat.get_submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[idx, sbra:ebra, sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[idx, sbra:ebra, sket:eket]))
                 # compare submatrices
                 Tester.compare_submatrices(cmat, rmat)
-                
+
             # check full octupole component matrix
             fmat = octu_mat.get_full_matrix()
             fref = SubMatrix([0, 0, 62, 62])

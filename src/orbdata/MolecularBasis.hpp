@@ -61,6 +61,14 @@ class CMolecularBasis
      @return the valence molecular basis.
      */
     auto reduceToValenceBasis() const -> CMolecularBasis;
+    
+    /**
+     Slice fraction of molecular basis for specific atoms.
+
+     @param atoms the vector of atoms. 
+     @return the fractional molecular basis.
+     */
+    auto slice(const std::vector<int64_t>& atoms) const -> CMolecularBasis;
 
     /**
      Gets vector of unique atomic basis sets.

@@ -32,28 +32,32 @@ class TestNuclearPotentialDriver:
 
         # compute electric dipole matrices
         npot_drv = NuclearPotentialDriver()
-        npot_mats = npot_drv.compute(mol_co, bas_tzvpp, [0.78, ], [[0.0, 0.0, 0.0],])
-        
+        npot_mats = npot_drv.compute(mol_co, bas_tzvpp, [
+            0.78,
+        ], [
+            [0.0, 0.0, 0.0],
+        ])
+
         # load reference electric dipole data
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.tzvpp.nuclear.potential.npy')
         ref_mat = np.load(npyfile)
- 
+
         # dimension of molecular basis
         indexes = np.triu_indices(4)
         basdims = [0, 10, 28, 48, 62]
-       
+
         # load matrix for axis
         npot_mat = npot_mats.get_matrix(0)
-            
+
         # check individual dipole component submatrices
         for i, j in zip(indexes[0], indexes[1]):
             # bra side
             sbra = basdims[i]
-            ebra = basdims[i+1]
+            ebra = basdims[i + 1]
             # ket side
             sket = basdims[j]
-            eket = basdims[j+1]
+            eket = basdims[j + 1]
             # load computed submatrix
             cmat = npot_mat.get_submatrix((i, j))
             # load reference submatrix
@@ -61,7 +65,7 @@ class TestNuclearPotentialDriver:
             rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
             # compare submatrices
             Tester.compare_submatrices(cmat, rmat)
-                
+
         # check full dipole component matrix
         fmat = npot_mat.get_full_matrix()
         fref = SubMatrix([0, 0, 62, 62])
