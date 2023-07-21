@@ -2,6 +2,7 @@ target_sources(vlxobjs
   PRIVATE
     Matrices.cpp
     MatrixFunc.cpp
+    MatricesFunc.cpp	
     Matrix.cpp
     AngularMomentum.cpp
     SubMatrix.cpp
