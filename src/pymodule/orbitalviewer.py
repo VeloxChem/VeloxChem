@@ -269,6 +269,9 @@ class OrbitalViewer:
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
         orb_occ = mo_object.occa_to_numpy()
+        orb_occ_beta = mo_object.occb_to_numpy()
+        if not self.is_uhf:
+            orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):
             orb_label = f'{i+1:3d} occ={orb_occ[i]:.3f} '
@@ -278,7 +281,6 @@ class OrbitalViewer:
         # Also do for beta if UHF
         if self.is_uhf:
             orb_ene_beta = mo_object.eb_to_numpy()
-            orb_occ_beta = mo_object.occb_to_numpy()
             orblist_beta = [('', -1)]
             for i in range(len(orb_ene_beta)):
                 orb_label = f'{i+1:3d} occ={orb_occ_beta[i]:.3f} '
