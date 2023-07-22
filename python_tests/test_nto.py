@@ -58,7 +58,13 @@ class TestNTO:
                 lam_diag = rsp_results['nto_lambdas'][s]
                 nto_lambdas.append(lam_diag[0])
 
+                nto_h5_fname = rsp_results['nto_h5_files'][s]
                 nto_cube_fnames = rsp_results['nto_cubes'][s]
+                assert Path(
+                    nto_cube_fnames[0]).stem == Path(nto_h5_fname).stem + '_H1'
+                assert Path(
+                    nto_cube_fnames[1]).stem == Path(nto_h5_fname).stem + '_P1'
+
                 for fname in nto_cube_fnames[:2]:
                     read_grid = CubicGrid.read_cube(fname)
                     nto_cube_vals.append(read_grid.values_to_numpy().flatten())
@@ -109,15 +115,17 @@ class TestNTO:
                 rsp_solutions_h5.unlink()
 
             for s in range(ref_eig_vals.shape[0]):
+                nto_h5_fname = rsp_results['nto_h5_files'][s]
+                nto_h5 = Path(nto_h5_fname)
+                if nto_h5.is_file():
+                    nto_h5.unlink()
+
                 nto_cube_fnames = rsp_results['nto_cubes'][s]
                 dens_cube_fnames = rsp_results['density_cubes'][s]
                 for fname in (nto_cube_fnames + dens_cube_fnames):
                     fpath = Path(fname)
                     if fpath.is_file():
                         fpath.unlink()
-                nto_h5 = inpfile.parent / (inpfile.stem + f'_S{s+1}_NTO.h5')
-                if nto_h5.is_file():
-                    nto_h5.unlink()
 
         mpi_barrier()
 
