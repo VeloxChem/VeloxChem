@@ -115,6 +115,9 @@ class TestNTO:
                     fpath = Path(fname)
                     if fpath.is_file():
                         fpath.unlink()
+                nto_h5 = inpfile.parent / (inpfile.stem + f'_S{s+1}_NTO.h5')
+                if nto_h5.is_file():
+                    nto_h5.unlink()
 
         mpi_barrier()
 
