@@ -271,11 +271,9 @@ class OrbitalViewer:
         orb_occ = mo_object.occa_to_numpy()
         orb_occ_beta = mo_object.occb_to_numpy()
         if not self.is_uhf:
-            # Check if MO is NTO. In case of NTO, only print alpha occupation
-            # numbers which are actually lambda's
-            is_nto = (np.min(orb_ene) == 0.0 and np.max(orb_ene) == 0.0 and
-                      np.min(orb_occ) < 0.0)
-            if not is_nto:
+            # In case of NTO, only print alpha occupation numbers (lambda's)
+            # Otherwise print the sum of alpha and beta occupation numbers
+            if not mo_object.is_nto():
                 orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):

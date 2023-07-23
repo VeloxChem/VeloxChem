@@ -67,10 +67,7 @@ class TestNTO:
                     nto_cube_fnames[1]).stem == Path(nto_h5_fname).stem + '_P1'
 
                 nto_mo = MolecularOrbitals.read_hdf5(nto_h5_fname)
-                nto_lam = nto_mo.occa_to_numpy()
-                nto_ene = nto_mo.ea_to_numpy()
-                assert (np.min(nto_ene) == 0.0 and np.max(nto_ene) == 0.0)
-                assert (np.min(nto_lam) < 0.0)
+                assert nto_mo.is_nto()
 
                 for fname in nto_cube_fnames[:2]:
                     read_grid = CubicGrid.read_cube(fname)
