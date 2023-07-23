@@ -271,7 +271,12 @@ class OrbitalViewer:
         orb_occ = mo_object.occa_to_numpy()
         orb_occ_beta = mo_object.occb_to_numpy()
         if not self.is_uhf:
-            orb_occ += orb_occ_beta
+            # Check if MO is NTO. In case of NTO, only print alpha occupation
+            # numbers which are actually lambda's
+            is_nto = (np.min(orb_ene) == 0.0 and np.max(orb_ene) == 0.0 and
+                      np.min(orb_occ) < 0.0)
+            if not is_nto:
+                orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):
             orb_label = f'{i+1:3d} occ={orb_occ[i]:.3f} '

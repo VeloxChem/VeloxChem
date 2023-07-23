@@ -4,6 +4,7 @@ import numpy as np
 from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
 from veloxchem.mpitask import MpiTask
 from veloxchem.cubicgrid import CubicGrid
+from veloxchem.molecularorbitals import MolecularOrbitals
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -64,6 +65,12 @@ class TestNTO:
                     nto_cube_fnames[0]).stem == Path(nto_h5_fname).stem + '_H1'
                 assert Path(
                     nto_cube_fnames[1]).stem == Path(nto_h5_fname).stem + '_P1'
+
+                nto_mo = MolecularOrbitals.read_hdf5(nto_h5_fname)
+                nto_lam = nto_mo.occa_to_numpy()
+                nto_ene = nto_mo.ea_to_numpy()
+                assert (np.min(nto_ene) == 0.0 and np.max(nto_ene) == 0.0)
+                assert (np.min(nto_lam) < 0.0)
 
                 for fname in nto_cube_fnames[:2]:
                     read_grid = CubicGrid.read_cube(fname)
