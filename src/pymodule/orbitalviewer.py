@@ -65,6 +65,9 @@ class OrbitalViewer:
         # Do not compute AO if MO coefficient is below this value
         self.mo_threshold = 0.01
 
+        # flag for using interpolation when computing orbitals
+        self.interpolate = False
+
         # molecule
         self.molecule = None
         self.basis = None
@@ -183,6 +186,24 @@ class OrbitalViewer:
             A numpy array with the value of the MO on the grid.
         """
 
+        if self.interpolate:
+            return self.compute_orbital_interp(orbital, index)
+        else:
+            return self.compute_orbital_simple(orbital, index)
+
+    def compute_orbital_simple(self, orbital, index):
+        """
+        Compute a specific molecular orbital by shifting atom grids.
+
+        :param orbital:
+            A numpy array containing MO coefficients.
+        :param index:
+            The index of the MO of interest.
+
+        :return:
+            A numpy array with the value of the MO on the grid.
+        """
+
         this_orb = orbital[:, index]
 
         # Create full grid
@@ -211,6 +232,76 @@ class OrbitalViewer:
                        ncopy[2]] += coef * atom_orb[p1[0]:p1[0] + ncopy[0],
                                                     p1[1]:p1[1] + ncopy[1],
                                                     p1[2]:p1[2] + ncopy[2]]
+
+        return np_orb
+
+    def compute_orbital_interp(self, orbital, index):
+        """
+        Compute a specific molecular orbital by interpolating atom grids.
+
+        :param orbital:
+            A numpy array containing MO coefficients.
+        :param index:
+            The index of the MO of interest.
+
+        :return:
+            A numpy array with the value of the MO on the grid.
+        """
+
+        this_orb = orbital[:, index]
+
+        # Create full grid
+        nx, ny, nz = self.atom_npoints
+        np_orb = np.zeros(self.npoints)
+
+        ijk_inds = [(i, j, k) for i in [0, 1] for j in [0, 1] for k in [0, 1]]
+
+        # Loop over AOs
+        for i_coef, orb_coef in enumerate(this_orb):
+            if abs(orb_coef) > self.mo_threshold:
+                i_atom, i_orb = self.ao_to_atom[i_coef]
+                this_atom = self.atomnr[i_atom]
+                atom_orb = self.ao_dict[this_atom][i_orb]
+
+                t = (self.coords[i_atom] - self.origin +
+                     self.atom_origin) / self.stepsize
+                t_floor = np.floor(t)
+                alpha = t - t_floor
+
+                for i, j, k in ijk_inds:
+                    # coefficient for trilinear interpolation
+                    x_coef = (1.0 - alpha[0]) if i == 0 else alpha[0]
+                    y_coef = (1.0 - alpha[1]) if j == 0 else alpha[1]
+                    z_coef = (1.0 - alpha[2]) if k == 0 else alpha[2]
+                    xyz_coef = x_coef * y_coef * z_coef
+
+                    # t1: starting index in molecule grid
+                    # p1: starting index in atom grid
+                    # ncopy: number of grid points to copy from atom grid to
+                    #        molecule grid
+                    t1 = t_floor.astype('int') + np.array([i, j, k])
+                    ncopy = [nx, ny, nz]
+                    p1 = [0, 0, 0]
+
+                    for i in range(3):
+                        # match lower bound
+                        if t1[i] < 0:
+                            p1[i] = -t1[i]
+                            t1[i] = 0
+                            ncopy[i] -= p1[i]
+                        # match upper bound
+                        if t1[i] + ncopy[i] > self.npoints[i]:
+                            ncopy[i] = self.npoints[i] - t1[i]
+
+                    np_orb[
+                        t1[0]:t1[0] + ncopy[0],
+                        t1[1]:t1[1] + ncopy[1],
+                        t1[2]:t1[2] + ncopy[2],
+                    ] += xyz_coef * orb_coef * atom_orb[
+                        p1[0]:p1[0] + ncopy[0],
+                        p1[1]:p1[1] + ncopy[1],
+                        p1[2]:p1[2] + ncopy[2],
+                    ]
 
         return np_orb
 
