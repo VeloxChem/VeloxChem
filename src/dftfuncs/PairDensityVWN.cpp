@@ -138,7 +138,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             f_zet1 =  - spinpolf * zeta * fl_zeta;
 
-            if (pair_density > -1.0e-12)
+            if (pair_density > -1.0e-16)
             {
                 f_zetpi =  - spinpolf * f89 / density;
             }
@@ -166,7 +166,7 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             f_zet1 = spinpolf * eta * flim_eta;
 
-            if (pair_density < 1.0e-12)
+            if (pair_density < 1.0e-16)
             {
                 f_zetpi =  - spinpolf * f89 / density;
             }

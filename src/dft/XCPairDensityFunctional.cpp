@@ -305,9 +305,12 @@ CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int32_t np, const double* rho
             vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
             vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
 
-            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+            if (fstr::upcase(funcname) != "TSLATER" && fstr::upcase(funcname) != "TVWN")
+            {
+                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+            }
         }
     }
 
