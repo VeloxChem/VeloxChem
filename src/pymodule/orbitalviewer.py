@@ -29,6 +29,8 @@ import math
 from .veloxchemlib import VisualizationDriver, CubicGrid
 from .veloxchemlib import molorb
 from .veloxchemlib import bohr_in_angstrom
+from .molecularorbitals import MolecularOrbitals
+from .errorhandler import assert_msg_critical
 
 
 class OrbitalViewer:
@@ -305,7 +307,7 @@ class OrbitalViewer:
 
         return np_orb
 
-    def plot(self, molecule, basis, mo_object):
+    def plot(self, molecule, basis, mo_inp):
         """
         Plots the orbitals, with a widget to choose which.
 
@@ -313,8 +315,9 @@ class OrbitalViewer:
             The molecule.
         :param basis:
             The AO basis set.
-        :param mo_object:
-            The MolecularOrbitals object.
+        :param mo_inp:
+            The MolecularOrbitals input (filename of h5 file storing the
+            MolecularOrbitals, or a MolecularOrbitals object).
         """
 
         try:
@@ -327,6 +330,13 @@ class OrbitalViewer:
             from IPython.display import display
         except ImportError:
             raise ImportError(self.help_string_widgets_and_display())
+
+        if isinstance(mo_inp, str):
+            mo_object = MolecularOrbitals.read_hdf5(mo_inp)
+        elif isinstance(mo_inp, MolecularOrbitals):
+            mo_object = mo_inp
+        else:
+            assert_msg_critical(False, 'OrbitalViewer.plot: Invalid MO input')
 
         self.initialize(molecule, basis)
 
