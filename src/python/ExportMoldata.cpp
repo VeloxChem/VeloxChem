@@ -47,18 +47,6 @@ export_moldata(py::module& m)
         .def(py::init<const std::vector<std::string>&, const std::vector<TPoint3D>&, const std::string&>())
         .def(py::init<const CMolecule&>())
         .def(py::init<const CMolecule&, const CMolecule&>())
-        .def(py::pickle(
-            [](const CMolecule& mol) {
-                return py::make_tuple(mol.getCharge(), mol.getMultiplicity(), mol.getIdsElemental(), mol.getCoordinates("au"));
-            },
-            [](py::tuple t) {
-                auto mol = CMolecule(t[2].cast<std::vector<int64_t>>(), t[3].cast<std::vector<TPoint3D>>(), "au");
-                mol.setCharge(t[0].cast<double>());
-
-                mol.setMultiplicity(t[1].cast<int64_t>());
-
-                return mol;
-            }))
         .def("add_atom", py::overload_cast<const std::string&, const TPoint3D&, const std::string&>(&CMolecule::addAtom), "Adds atom to molecule.")
         .def("add_atom", py::overload_cast<const int64_t, const TPoint3D&, const std::string&>(&CMolecule::addAtom), "Adds atom to molecule.")
         .def("set_charge", &CMolecule::setCharge, "Sets charge of molecule.")

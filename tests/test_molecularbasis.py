@@ -1,11 +1,7 @@
-import pickle
-
-from mpi4py import MPI
 from veloxchem.veloxchemlib import BasisFunction
 from veloxchem.veloxchemlib import AtomBasis
 from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import Molecule
-from veloxchem.mpitools import is_master
 from tester import Tester
 
 
@@ -178,15 +174,6 @@ class TestMolecularBasis:
                                            'basis',
                                            ostream=None)
         b_basis = self.get_h2o_mixed()
-        Tester.compare_molecular_basis(a_basis, b_basis)
-
-    def test_pickle(self):
-
-        a_basis = self.get_h2o_svp()
-
-        # test pickling
-        bobj = pickle.dumps(a_basis)
-        b_basis = pickle.loads(bobj)
         Tester.compare_molecular_basis(a_basis, b_basis)
 
     def test_add(self):
@@ -804,16 +791,3 @@ class TestMolecularBasis:
         assert basis.get_index_map([0, 2], 2, 5) == [1]
         assert basis.get_index_map([0, 2], 2, 3) == [1]
         assert basis.get_index_map([0, 2], 2, 1) == [1, 19]
-
-    def test_mpi_bcast(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-
-        if is_master(rank):
-            a_basis = self.get_h2o_svp()
-        else:
-            a_basis = None
-        a_basis = comm.bcast(a_basis)
-        b_basis = self.get_h2o_svp()
-        Tester.compare_molecular_basis(a_basis, b_basis)

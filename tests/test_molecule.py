@@ -1,13 +1,11 @@
 import tempfile
 import numpy as np
 import math as mt
-import pickle
 
 from mpi4py import MPI
 from pathlib import Path
 from veloxchem.veloxchemlib import bohr_in_angstroms
 from veloxchem.molecule import Molecule
-from veloxchem.mpitools import is_master
 from tester import Tester
 
 
@@ -111,15 +109,6 @@ class TestMolecule:
         xyzstr = self.nh3_h2o_xyzstr()
         mol_d = Molecule.read_str(xyzstr, 'au')
         Tester.compare_molecules(mol_c, mol_d)
-
-    def test_pickle(self):
-
-        mol_a = self.nh3_molecule()
-
-        # test pickling
-        bobj = pickle.dumps(mol_a)
-        mol_b = pickle.loads(bobj)
-        Tester.compare_molecules(mol_a, mol_b)
 
     def test_add_atom(self):
 
@@ -365,7 +354,7 @@ class TestMolecule:
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
 
-        if is_master(rank):
+        if rank == 0:
             with tempfile.TemporaryDirectory() as temp_dir:
                 fname = str(Path(temp_dir, 'mol.xyz'))
                 mol_a = self.nh3_molecule()
@@ -465,16 +454,3 @@ class TestMolecule:
         roccb = np.array([1.0, 1.0, 1.0, 1.0, 0.0, 0.0])
         assert np.allclose(rocca, nocca, tol, tol, False)
         assert np.allclose(roccb, noccb, tol, tol, False)
-
-    def test_mpi_bcast(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-
-        if is_master(rank):
-            mol_a = self.nh3_molecule()
-        else:
-            mol_a = None
-        mol_a = comm.bcast(mol_a)
-        mol_b = self.nh3_molecule()
-        Tester.compare_molecules(mol_a, mol_b)

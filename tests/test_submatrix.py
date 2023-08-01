@@ -1,9 +1,7 @@
 import numpy as np
 import math as mt
 
-from mpi4py import MPI
 from veloxchem.submatrix import SubMatrix
-from veloxchem.mpitools import is_master
 from tester import Tester
 
 
@@ -173,46 +171,3 @@ class TestSubMatrix:
 
         assert mat.number_of_columns() == 6
 
-    def test_mpi_bcast(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-
-        if is_master(rank):
-            mat_a = SubMatrix(self.get_values(), [1, 5, 3, 6])
-        else:
-            mat_a = None
-
-        mat_a = SubMatrix.bcast(mat_a, rank, comm)
-
-        mat_b = SubMatrix(self.get_values(), [1, 5, 3, 6])
-
-        Tester.compare_submatrices(mat_a, mat_b)
-
-    def test_mpi_reduce(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        nodes = comm.Get_size()
-
-        if is_master(rank):
-            mat_a = SubMatrix(self.get_values(), [1, 5, 3, 6])
-        elif rank == 1:
-            mat_a = SubMatrix([
-                1.2, 2.2, 3.2, 4.2, 5.2, 6.2, 1.4, 2.4, 3.4, 4.4, 5.4, 6.4, 1.5,
-                2.5, 3.5, 4.5, 5.5, 6.5
-            ], [1, 5, 3, 6])
-        else:
-            mat_a = SubMatrix([1, 5, 3, 6])
-
-        mat_a = SubMatrix.reduce(mat_a, rank, comm)
-
-        if is_master(rank):
-            if nodes == 1:
-                mat_b = SubMatrix(self.get_values(), [1, 5, 3, 6])
-            else:
-                mat_b = SubMatrix([
-                    2.2, 4.2, 6.2, 8.2, 10.2, 12.2, 2.5, 4.5, 6.5, 8.5, 10.5,
-                    12.5, 2.7, 4.7, 6.7, 8.7, 10.7, 12.7
-                ], [1, 5, 3, 6])
-            Tester.compare_submatrices(mat_a, mat_b)

@@ -32,9 +32,6 @@ export_orbdata(py::module &m)
         .def(py::init<>())
         .def(py::init<const CBasisFunction &>())
         .def(py::init<const std::vector<double> &, const std::vector<double> &, const int64_t>())
-        .def(py::pickle(
-            [](const CBasisFunction &bf) { return py::make_tuple(bf.getExponents(), bf.getNormalizationFactors(), bf.getAngularMomentum()); },
-            [](py::tuple t) { return CBasisFunction(t[0].cast<std::vector<double>>(), t[1].cast<std::vector<double>>(), t[2].cast<int64_t>()); }))
         .def("set_exponents", &CBasisFunction::setExponents, "Sets exponents of basis function.")
         .def("set_normalization_factors", &CBasisFunction::setNormalizationFactors, "Gets name of chemical element.")
         .def("set_angular_momentum", &CBasisFunction::setAngularMomentum, "Sets angular momentum of basis function.")
@@ -52,13 +49,6 @@ export_orbdata(py::module &m)
         .def(py::init<>())
         .def(py::init<const CAtomBasis &>())
         .def(py::init<const std::vector<CBasisFunction> &, const int64_t, const std::string &, const std::string &>())
-        .def(py::pickle(
-            [](const CAtomBasis &basis) {
-                return py::make_tuple(basis.getBasisFunctions(), basis.getIdentifier(), basis.getName(), basis.getEffectiveCorePotentialLabel());
-            },
-            [](py::tuple t) {
-                return CAtomBasis(t[0].cast<std::vector<CBasisFunction>>(), t[1].cast<int64_t>(), t[2].cast<std::string>(), t[3].cast<std::string>());
-            }))
         .def("set_identifier", &CAtomBasis::setIdentifier, "Sets identifier of atom basis.")
         .def("set_name", &CAtomBasis::setName, "Sets name of atom basis.")
         .def("set_ecp_label", &CAtomBasis::setEffectiveCorePotentialLabel, "Sets effective core potential label of atom basis.")
@@ -95,8 +85,6 @@ export_orbdata(py::module &m)
         .def(py::init<>())
         .def(py::init<const CMolecularBasis &>())
         .def(py::init<const std::vector<CAtomBasis> &, const std::vector<int64_t> &>())
-        .def(py::pickle([](const CMolecularBasis &basis) { return py::make_tuple(basis.getBasisSets(), basis.getBasisSetsIndexes()); },
-                        [](py::tuple t) { return CMolecularBasis(t[0].cast<std::vector<CAtomBasis>>(), t[1].cast<std::vector<int64_t>>()); }))
         .def("add", &CMolecularBasis::add, "Adds atomic basis to molecular basis.")
         .def("slice", &CMolecularBasis::slice, "Slices fraction of molecular basis for specific atoms.")
         .def("reduce_to_valence_basis", &CMolecularBasis::reduceToValenceBasis, "Reduces molecular basis to it's valence only form.")

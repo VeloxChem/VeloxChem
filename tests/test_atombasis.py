@@ -1,9 +1,7 @@
 import pickle
 
-from mpi4py import MPI
 from veloxchem.veloxchemlib import BasisFunction
 from veloxchem.veloxchemlib import AtomBasis
-from veloxchem.mpitools import is_master
 from tester import Tester
 
 
@@ -91,15 +89,6 @@ class TestAtomBasis:
             self.get_lithium_svp_1p(),
             self.get_lithium_svp_2p()
         ], 3, 'DEF2-SVP', '')
-
-    def test_pickle(self):
-
-        bas_a = self.get_lithium_svp()
-
-        # test pickling
-        bobj = pickle.dumps(bas_a)
-        bas_b = pickle.loads(bobj)
-        Tester.compare_atom_basis(bas_a, bas_b)
 
     def test_set_and_get_identifier(self):
 
@@ -246,16 +235,3 @@ class TestAtomBasis:
 
         bas = self.get_lithium_svp()
         assert bas.primitives_str() == '(7S,3P)'
-
-    def test_mpi_bcast(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-
-        if is_master(rank):
-            bas_a = self.get_lithium_svp()
-        else:
-            bas_a = None
-        bas_a = comm.bcast(bas_a)
-        bas_b = self.get_lithium_svp()
-        Tester.compare_atom_basis(bas_a, bas_b)

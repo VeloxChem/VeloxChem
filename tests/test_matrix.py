@@ -1,8 +1,5 @@
-from mpi4py import MPI
-
 from veloxchem.matrix import Matrix
 from veloxchem.submatrix import SubMatrix
-from veloxchem.mpitools import is_master
 from veloxchem.veloxchemlib import mat_t
 from tester import Tester
 
@@ -294,86 +291,3 @@ class TestMatrix:
         Tester.compare_submatrices(mat.get_full_matrix(),
                                    self.get_mat_full_gen())
 
-    def test_mpi_bcast(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-
-        if is_master(rank):
-            mat_a = Matrix(
-                {
-                    (0, 0): self.get_mat_ss(),
-                    (0, 1): self.get_mat_sp(),
-                    (1, 1): self.get_mat_pp()
-                }, mat_t.symm)
-        else:
-            mat_a = None
-
-        mat_a = Matrix.bcast(mat_a, rank, comm)
-
-        mat_b = Matrix(
-            {
-                (0, 0): self.get_mat_ss(),
-                (0, 1): self.get_mat_sp(),
-                (1, 1): self.get_mat_pp()
-            }, mat_t.symm)
-
-        # TODO: fix "'Matrix' object has no attribute 'get_submatrices'"
-        # Tester.compare_matrices(mat_a, mat_b)
-        assert mat_a.get_type() == mat_b.get_type()
-        for key in [(0, 0), (0, 1), (1, 1)]:
-            Tester.compare_submatrices(mat_a.get_submatrix(key),
-                                       mat_b.get_submatrix(key))
-
-    def test_mpi_reduce(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        nodes = comm.Get_size()
-
-        if is_master(rank):
-            mat_a = Matrix(
-                {
-                    (0, 0): self.get_mat_ss(),
-                    (0, 1): self.get_mat_sp(),
-                    (1, 1): self.get_mat_pp()
-                }, mat_t.symm)
-        elif rank == 1:
-            mat_a = Matrix(
-                {
-                    (0, 0): self.get_mat_ss_r1(),
-                    (0, 1): self.get_mat_sp_r1(),
-                    (1, 1): self.get_mat_pp_r1()
-                }, mat_t.symm)
-        else:
-            mat_a = Matrix(
-                {
-                    (0, 0): SubMatrix([0, 0, 3, 3]),
-                    (0, 1): SubMatrix([0, 3, 3, 6]),
-                    (1, 1): SubMatrix([3, 3, 6, 6])
-                }, mat_t.symm)
-
-        mat_a = Matrix.reduce(mat_a, rank, comm)
-
-        if is_master(rank):
-            if nodes == 1:
-                mat_b = Matrix(
-                    {
-                        (0, 0): self.get_mat_ss(),
-                        (0, 1): self.get_mat_sp(),
-                        (1, 1): self.get_mat_pp()
-                    }, mat_t.symm)
-            else:
-                mat_b = Matrix(
-                    {
-                        (0, 0): self.get_mat_ss_f(),
-                        (0, 1): self.get_mat_sp_f(),
-                        (1, 1): self.get_mat_pp_f()
-                    }, mat_t.symm)
-
-            # TODO: fix "'Matrix' object has no attribute 'get_submatrices'"
-            # Tester.compare_matrices(mat_a, mat_b)
-            assert mat_a.get_type() == mat_b.get_type()
-            for key in [(0, 0), (0, 1), (1, 1)]:
-                Tester.compare_submatrices(mat_a.get_submatrix(key),
-                                           mat_b.get_submatrix(key))

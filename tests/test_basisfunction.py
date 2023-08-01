@@ -1,7 +1,5 @@
 import numpy as np
-import pickle
 
-from mpi4py import MPI
 from veloxchem.veloxchemlib import BasisFunction
 from veloxchem.mpitools import is_master
 from tester import Tester
@@ -21,14 +19,6 @@ class TestBasisFunction:
         bf_b.add(0.8, 2.4)
         bf_b.add(1.5, 0.7)
         bf_b.add(2.7, -0.5)
-        Tester.compare_basis_functions(bf_a, bf_b)
-
-    def test_pickle(self):
-
-        # test pickling
-        bf_a = self.basis_funtion(2)
-        bobj = pickle.dumps(bf_a)
-        bf_b = pickle.loads(bobj)
         Tester.compare_basis_functions(bf_a, bf_b)
 
     def test_set_exponents(self):
@@ -140,16 +130,3 @@ class TestBasisFunction:
 
         bf = self.basis_funtion(2)
         assert bf.number_of_primitives() == 3
-
-    def test_mpi_bcast(self):
-
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-
-        if is_master(rank):
-            bf_a = self.basis_funtion(2)
-        else:
-            bf_a = None
-        bf_a = comm.bcast(bf_a)
-        bf_b = self.basis_funtion(2)
-        Tester.compare_basis_functions(bf_a, bf_b)
