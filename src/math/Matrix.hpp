@@ -141,7 +141,7 @@ class CMatrix
     /**
      Gets number of columns in matrix.
 
-     @return the unique vector of angular momentums of matrix column.
+     @return the number of columns in Fock matrix.
      */
     auto getNumberOfColumns() const -> int64_t;
 

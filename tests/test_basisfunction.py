@@ -1,7 +1,6 @@
 import numpy as np
 
 from veloxchem.veloxchemlib import BasisFunction
-from veloxchem.mpitools import is_master
 from tester import Tester
 
 
