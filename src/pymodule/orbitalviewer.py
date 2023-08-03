@@ -374,7 +374,7 @@ class OrbitalViewer:
         if not self.is_uhf:
             # In case of NTO, only print alpha occupation numbers (lambda's)
             # Otherwise print the sum of alpha and beta occupation numbers
-            if not mo_object.is_nto():
+            if mo_object.get_orbitals_type() != molorb.rest or not mo_object.is_nto():
                 orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):
