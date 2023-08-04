@@ -5,6 +5,7 @@ target_sources(vlxobjs
     MolecularBasis.cpp
     GtoBlock.cpp
     BasisFunction.cpp
+    GtoPairBlock.cpp 	
   )
 
 target_include_directories(vlxobjs

@@ -2,7 +2,6 @@
 #define GtoBlock_hpp
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -120,9 +119,9 @@ class CGtoBlock
     auto getNormalizationFactors() const -> std::vector<double>;
 
     /**
-     Gets vector of orbital indexes of contracted GTOss.
+     Gets vector of orbital indexes of contracted GTOs.
 
-     @return the vector of orbital indexes of GTOss.
+     @return the vector of orbital indexes of GTOs.
      */
     auto getOrbitalIndexes() const -> std::vector<int64_t>;
 
