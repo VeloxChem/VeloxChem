@@ -400,6 +400,85 @@ def _MolecularOrbitals_match_hdf5(fname, nuclear_charges, basis_set, scf_type):
     return (match_nuclear_charges and match_basis_set and match_scf_type)
 
 
+@staticmethod
+def _MolecularOrbitals_create_nto(nto_orbitals_list, nto_lambdas_list, mo_type):
+    """
+    Creates molecular orbitals object for natural transiton orbitals (NTO).
+
+    :param nto_orbs_list:
+        The list of NTO orbital coefficients.
+    :param nto_lambdas_list:
+        The list of NTO lambda's.
+    :param mo_type:
+        The molecular orbital type.
+
+    :return:
+        The molecular orbitals object for NTO.
+    """
+
+    assert_msg_critical(
+        len(nto_orbitals_list) == 1 and len(nto_lambdas_list) == 1 and
+        mo_type == molorb.rest,
+        'MolecularOrbitals.create_nto: Only restricted case is implemented')
+
+    nto_orbitals = nto_orbitals_list[0]
+    nto_lambdas = nto_lambdas_list[0]
+
+    assert_msg_critical(nto_orbitals.shape[1] == nto_lambdas.shape[0],
+                        'MolecularOrbitals.create_nto: Inconsistent size')
+
+    negative_lambdas = [x for x in nto_lambdas if x < 0.0]
+    positive_lambdas = [x for x in nto_lambdas if x > 0.0]
+
+    assert_msg_critical(
+        len(negative_lambdas) == len(positive_lambdas),
+        'MolecularOrbitals.create_nto: Inconsistent number of lambda values')
+
+    for m, p in zip(negative_lambdas[::-1], positive_lambdas):
+        assert_msg_critical(
+            abs(m + p) < 1.0e-6,
+            'MolecularOrbitals.create_nto: Inconsistent lambda values')
+
+    nto_energies = np.zeros(nto_lambdas.shape[0])
+
+    return MolecularOrbitals([nto_orbitals], [nto_energies], [nto_lambdas],
+                             mo_type)
+
+
+def _MolecularOrbitals_is_nto(self):
+    """
+    Checks if this molecular orbitals object is natural transiton orbitals
+    (NTO).
+
+    :return:
+        True if this molecular orbitals object is NTO, False otherwise.
+    """
+
+    assert_msg_critical(
+        self.get_orbitals_type() == molorb.rest,
+        'MolecularOrbitals.is_nto: Only restricted case is implemented')
+
+    nto_lambdas = self.occa_to_numpy()
+
+    negative_lambdas = [x for x in nto_lambdas if x < 0.0]
+    positive_lambdas = [x for x in nto_lambdas if x > 0.0]
+
+    if len(negative_lambdas) != len(positive_lambdas):
+        return False
+
+    for m, p in zip(negative_lambdas[::-1], positive_lambdas):
+        if abs(m + p) >= 1.0e-6:
+            return False
+
+    nto_energies = self.ea_to_numpy()
+
+    for e in nto_energies:
+        if e != 0.0:
+            return False
+
+    return True
+
+
 def _MolecularOrbitals_deepcopy(self, memo):
     """
     Implements deepcopy.
@@ -419,4 +498,6 @@ MolecularOrbitals.get_density = _MolecularOrbitals_get_density
 MolecularOrbitals.write_hdf5 = _MolecularOrbitals_write_hdf5
 MolecularOrbitals.read_hdf5 = _MolecularOrbitals_read_hdf5
 MolecularOrbitals.match_hdf5 = _MolecularOrbitals_match_hdf5
+MolecularOrbitals.create_nto = _MolecularOrbitals_create_nto
+MolecularOrbitals.is_nto = _MolecularOrbitals_is_nto
 MolecularOrbitals.__deepcopy__ = _MolecularOrbitals_deepcopy

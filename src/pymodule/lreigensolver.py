@@ -96,6 +96,7 @@ class LinearResponseEigenSolver(LinearSolver):
 
         self.nto = False
         self.nto_pairs = None
+        self.nto_cubes = True
         self.detach_attach = False
         self.cube_origin = None
         self.cube_stepsize = None
@@ -107,6 +108,7 @@ class LinearResponseEigenSolver(LinearSolver):
             'num_core_orbitals': ('int', 'number of involved core-orbitals'),
             'nto': ('bool', 'analyze natural transition orbitals'),
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
+            'nto_cubes': ('bool', 'write NTO cube files'),
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
             'cube_origin': ('seq_fixed', 'origin of cubic grid points'),
             'cube_stepsize': ('seq_fixed', 'step size of cubic grid points'),
@@ -522,6 +524,7 @@ class LinearResponseEigenSolver(LinearSolver):
                                 pe_dict['potfile_text'])
 
             nto_lambdas = []
+            nto_h5_files = []
             nto_cube_files = []
             dens_cube_files = []
 
@@ -562,16 +565,27 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.rank == mpi_master():
                         nto_mo = self.get_nto(z_mat, mo_occ, mo_vir)
+
+                        nto_lam = nto_mo.occa_to_numpy()
+                        lam_start = mo_occ.shape[1]
+                        lam_end = lam_start + min(mo_occ.shape[1],
+                                                  mo_vir.shape[1])
+                        nto_lambdas.append(nto_lam[lam_start:lam_end])
+
+                        nto_h5_fname = f'{self._filename}_S{s+1}_NTO.h5'
+                        nto_mo.write_hdf5(nto_h5_fname)
+                        nto_h5_files.append(nto_h5_fname)
                     else:
                         nto_mo = MolecularOrbitals()
                     nto_mo.broadcast(self.rank, self.comm)
 
-                    lam_diag, nto_cube_fnames = self.write_nto_cubes(
-                        cubic_grid, molecule, basis, s, nto_mo, self.nto_pairs)
+                    if self.nto_cubes:
+                        lam_diag, nto_cube_fnames = self.write_nto_cubes(
+                            cubic_grid, molecule, basis, s, nto_mo,
+                            self.nto_pairs)
 
-                    if self.rank == mpi_master():
-                        nto_lambdas.append(lam_diag)
-                        nto_cube_files.append(nto_cube_fnames)
+                        if self.rank == mpi_master():
+                            nto_cube_files.append(nto_cube_fnames)
 
                 if self.detach_attach:
                     self.ostream.print_info(
@@ -638,7 +652,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.nto:
                         ret_dict['nto_lambdas'] = nto_lambdas
-                        ret_dict['nto_cubes'] = nto_cube_files
+                        ret_dict['nto_h5_files'] = nto_h5_files
+                        if self.nto_cubes:
+                            ret_dict['nto_cubes'] = nto_cube_files
 
                     if self.detach_attach:
                         ret_dict['density_cubes'] = dens_cube_files

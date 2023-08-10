@@ -29,6 +29,8 @@ import math
 from .veloxchemlib import VisualizationDriver, CubicGrid
 from .veloxchemlib import molorb
 from .veloxchemlib import bohr_in_angstrom
+from .molecularorbitals import MolecularOrbitals
+from .errorhandler import assert_msg_critical
 
 
 class OrbitalViewer:
@@ -64,6 +66,9 @@ class OrbitalViewer:
 
         # Do not compute AO if MO coefficient is below this value
         self.mo_threshold = 0.01
+
+        # flag for using interpolation when computing orbitals
+        self.interpolate = False
 
         # molecule
         self.molecule = None
@@ -183,6 +188,24 @@ class OrbitalViewer:
             A numpy array with the value of the MO on the grid.
         """
 
+        if self.interpolate:
+            return self.compute_orbital_interp(orbital, index)
+        else:
+            return self.compute_orbital_simple(orbital, index)
+
+    def compute_orbital_simple(self, orbital, index):
+        """
+        Compute a specific molecular orbital by shifting atom grids.
+
+        :param orbital:
+            A numpy array containing MO coefficients.
+        :param index:
+            The index of the MO of interest.
+
+        :return:
+            A numpy array with the value of the MO on the grid.
+        """
+
         this_orb = orbital[:, index]
 
         # Create full grid
@@ -214,7 +237,77 @@ class OrbitalViewer:
 
         return np_orb
 
-    def plot(self, molecule, basis, mo_object):
+    def compute_orbital_interp(self, orbital, index):
+        """
+        Compute a specific molecular orbital by interpolating atom grids.
+
+        :param orbital:
+            A numpy array containing MO coefficients.
+        :param index:
+            The index of the MO of interest.
+
+        :return:
+            A numpy array with the value of the MO on the grid.
+        """
+
+        this_orb = orbital[:, index]
+
+        # Create full grid
+        nx, ny, nz = self.atom_npoints
+        np_orb = np.zeros(self.npoints)
+
+        ijk_inds = [(i, j, k) for i in [0, 1] for j in [0, 1] for k in [0, 1]]
+
+        # Loop over AOs
+        for i_coef, orb_coef in enumerate(this_orb):
+            if abs(orb_coef) > self.mo_threshold:
+                i_atom, i_orb = self.ao_to_atom[i_coef]
+                this_atom = self.atomnr[i_atom]
+                atom_orb = self.ao_dict[this_atom][i_orb]
+
+                t = (self.coords[i_atom] - self.origin +
+                     self.atom_origin) / self.stepsize
+                t_floor = np.floor(t)
+                alpha = t - t_floor
+
+                for i, j, k in ijk_inds:
+                    # coefficient for trilinear interpolation
+                    x_coef = (1.0 - alpha[0]) if i == 0 else alpha[0]
+                    y_coef = (1.0 - alpha[1]) if j == 0 else alpha[1]
+                    z_coef = (1.0 - alpha[2]) if k == 0 else alpha[2]
+                    xyz_coef = x_coef * y_coef * z_coef
+
+                    # t1: starting index in molecule grid
+                    # p1: starting index in atom grid
+                    # ncopy: number of grid points to copy from atom grid to
+                    #        molecule grid
+                    t1 = t_floor.astype('int') + np.array([i, j, k])
+                    ncopy = [nx, ny, nz]
+                    p1 = [0, 0, 0]
+
+                    for i in range(3):
+                        # match lower bound
+                        if t1[i] < 0:
+                            p1[i] = -t1[i]
+                            t1[i] = 0
+                            ncopy[i] -= p1[i]
+                        # match upper bound
+                        if t1[i] + ncopy[i] > self.npoints[i]:
+                            ncopy[i] = self.npoints[i] - t1[i]
+
+                    np_orb[
+                        t1[0]:t1[0] + ncopy[0],
+                        t1[1]:t1[1] + ncopy[1],
+                        t1[2]:t1[2] + ncopy[2],
+                    ] += xyz_coef * orb_coef * atom_orb[
+                        p1[0]:p1[0] + ncopy[0],
+                        p1[1]:p1[1] + ncopy[1],
+                        p1[2]:p1[2] + ncopy[2],
+                    ]
+
+        return np_orb
+
+    def plot(self, molecule, basis, mo_inp):
         """
         Plots the orbitals, with a widget to choose which.
 
@@ -222,8 +315,9 @@ class OrbitalViewer:
             The molecule.
         :param basis:
             The AO basis set.
-        :param mo_object:
-            The MolecularOrbitals object.
+        :param mo_inp:
+            The MolecularOrbitals input (filename of h5 file storing the
+            MolecularOrbitals, or a MolecularOrbitals object).
         """
 
         try:
@@ -236,6 +330,13 @@ class OrbitalViewer:
             from IPython.display import display
         except ImportError:
             raise ImportError(self.help_string_widgets_and_display())
+
+        if isinstance(mo_inp, str):
+            mo_object = MolecularOrbitals.read_hdf5(mo_inp)
+        elif isinstance(mo_inp, MolecularOrbitals):
+            mo_object = mo_inp
+        else:
+            assert_msg_critical(False, 'OrbitalViewer.plot: Invalid MO input')
 
         self.initialize(molecule, basis)
 
@@ -269,6 +370,12 @@ class OrbitalViewer:
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
         orb_occ = mo_object.occa_to_numpy()
+        orb_occ_beta = mo_object.occb_to_numpy()
+        if not self.is_uhf:
+            # In case of NTO, only print alpha occupation numbers (lambda's)
+            # Otherwise print the sum of alpha and beta occupation numbers
+            if mo_object.get_orbitals_type() != molorb.rest or not mo_object.is_nto():
+                orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):
             orb_label = f'{i+1:3d} occ={orb_occ[i]:.3f} '
@@ -278,7 +385,6 @@ class OrbitalViewer:
         # Also do for beta if UHF
         if self.is_uhf:
             orb_ene_beta = mo_object.eb_to_numpy()
-            orb_occ_beta = mo_object.occb_to_numpy()
             orblist_beta = [('', -1)]
             for i in range(len(orb_ene_beta)):
                 orb_label = f'{i+1:3d} occ={orb_occ_beta[i]:.3f} '

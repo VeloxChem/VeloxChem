@@ -4,6 +4,7 @@ import numpy as np
 from veloxchem.veloxchemlib import is_mpi_master, mpi_barrier
 from veloxchem.mpitask import MpiTask
 from veloxchem.cubicgrid import CubicGrid
+from veloxchem.molecularorbitals import MolecularOrbitals
 from veloxchem.scfrestdriver import ScfRestrictedDriver
 from veloxchem.tdaeigensolver import TdaEigenSolver
 from veloxchem.lreigensolver import LinearResponseEigenSolver
@@ -58,7 +59,16 @@ class TestNTO:
                 lam_diag = rsp_results['nto_lambdas'][s]
                 nto_lambdas.append(lam_diag[0])
 
+                nto_h5_fname = rsp_results['nto_h5_files'][s]
                 nto_cube_fnames = rsp_results['nto_cubes'][s]
+                assert Path(
+                    nto_cube_fnames[0]).stem == Path(nto_h5_fname).stem + '_H1'
+                assert Path(
+                    nto_cube_fnames[1]).stem == Path(nto_h5_fname).stem + '_P1'
+
+                nto_mo = MolecularOrbitals.read_hdf5(nto_h5_fname)
+                assert nto_mo.is_nto()
+
                 for fname in nto_cube_fnames[:2]:
                     read_grid = CubicGrid.read_cube(fname)
                     nto_cube_vals.append(read_grid.values_to_numpy().flatten())
@@ -109,6 +119,11 @@ class TestNTO:
                 rsp_solutions_h5.unlink()
 
             for s in range(ref_eig_vals.shape[0]):
+                nto_h5_fname = rsp_results['nto_h5_files'][s]
+                nto_h5 = Path(nto_h5_fname)
+                if nto_h5.is_file():
+                    nto_h5.unlink()
+
                 nto_cube_fnames = rsp_results['nto_cubes'][s]
                 dens_cube_fnames = rsp_results['density_cubes'][s]
                 for fname in (nto_cube_fnames + dens_cube_fnames):

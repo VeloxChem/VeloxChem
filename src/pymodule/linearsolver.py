@@ -1916,9 +1916,8 @@ class LinearSolver:
             nto_lam[nocc - 1 - i_nto] = -lam_diag[i_nto]
             nto_lam[nocc + i_nto] = lam_diag[i_nto]
 
-        nto_ener = np.zeros(nto_orbs.shape[1])
-        nto_mo = MolecularOrbitals([nto_orbs], [nto_ener], [nto_lam],
-                                   molorb.rest)
+        nto_mo = MolecularOrbitals.create_nto([nto_orbs], [nto_lam],
+                                              molorb.rest)
 
         return nto_mo
 
