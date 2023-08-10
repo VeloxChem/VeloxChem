@@ -110,6 +110,7 @@ class FirstOrderProperties:
         dipole_drv.origin = origin
         dipole_mats = dipole_drv.compute(molecule, basis)
 
+        dipole_moment = None
         if self.rank == mpi_master():
             dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
                            dipole_mats.z_to_numpy())
@@ -124,8 +125,9 @@ class FirstOrderProperties:
             nuclear_dipole = np.sum((coords - origin).T * nuclear_charges,
                                     axis=1)
 
-            self.properties['dipole moment'] = (nuclear_dipole +
-                                                electronic_dipole)
+            dipole_moment = nuclear_dipole + electronic_dipole
+        dipole_moment = self.comm.bcast(dipole_moment, root = mpi_master())
+        self.properties['dipole moment'] = dipole_moment
 
     def get_property(self, key):
         """
