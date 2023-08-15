@@ -24737,7 +24737,7 @@ CBoysFunc<N>::CBoysFunc()
 template <int64_t N>
 template <int64_t M>
 auto
-CBoysFunc<N>::compute(TDoubleArray2D<M>& values, const TDoubleArray& arguments, const int64_t nelements) const -> void 
+CBoysFunc<N>::compute(TDoubleArray2D<M>& values, const TDoubleArray& arguments, const int64_t nelements) const -> void
 {
     const double fpi = 0.5 * std::sqrt(mathconst::getPiValue());
 

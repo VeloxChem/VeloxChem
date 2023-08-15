@@ -250,4 +250,3 @@ class TestMatrix:
 
         Tester.compare_submatrices(mat.get_full_matrix(),
                                    self.get_mat_full_gen())
-

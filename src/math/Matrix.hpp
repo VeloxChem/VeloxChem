@@ -66,6 +66,13 @@ class CMatrix
     ~CMatrix();
 
     /**
+     Assigns a matrix  by copying other matrix.
+
+     @param source the matrix to copy.
+    */
+    auto operator=(const CMatrix& source) -> CMatrix&;
+
+    /**
      Adds submatrix to matrix.
 
      @param sub_matrix the submatrix to be added.

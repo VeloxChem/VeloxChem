@@ -151,27 +151,27 @@ to_TensorComponents(const int64_t torder) -> std::vector<std::string>
     {
         return {"X", "Y", "Z"};
     }
-    
+
     if (torder == 2)
     {
         return {"XX", "XY", "XZ", "YY", "YZ", "ZZ"};
     }
-    
+
     if (torder == 3)
     {
         return {"XXX", "XXY", "XXZ", "XYY", "XYZ", "XZZ", "YYY", "YYZ", "YZZ", "ZZZ"};
     }
-    
+
     if (torder == 4)
     {
-        return {"XXXX", "XXXY", "XXXZ", "XXYY", "XXYZ", "XXZZ", "XYYY", "XYYZ", "XYZZ", "XZZZ",
-                "YYYY", "YYYZ", "YYZZ", "YZZZ", "ZZZZ"};
+        return {"XXXX", "XXXY", "XXXZ", "XXYY", "XXYZ", "XXZZ", "XYYY", "XYYZ", "XYZZ", "XZZZ", "YYYY", "YYYZ", "YYZZ", "YZZZ", "ZZZZ"};
     }
-    
+
     return std::vector<std::string>();
 }
 
-auto to_TensorComponent(const std::string& tlabel) -> int64_t
+auto
+to_TensorComponent(const std::string& tlabel) -> int64_t
 {
     const auto index = fstr::upcase(tlabel);
 
@@ -221,7 +221,7 @@ auto to_TensorComponent(const std::string& tlabel) -> int64_t
 
         if (index == "ZZZ") return 9;
     }
-    
+
     if (index.size() == 4)
     {
         if (index == "XXXX") return 0;
@@ -243,7 +243,7 @@ auto to_TensorComponent(const std::string& tlabel) -> int64_t
         if (index == "XYZZ") return 8;
 
         if (index == "XZZZ") return 9;
-        
+
         if (index == "YYYY") return 10;
 
         if (index == "YYYZ") return 11;
@@ -251,10 +251,10 @@ auto to_TensorComponent(const std::string& tlabel) -> int64_t
         if (index == "YYZZ") return 12;
 
         if (index == "YZZZ") return 13;
-        
+
         if (index == "ZZZZ") return 14;
     }
-    
+
     return -1;
 }
 

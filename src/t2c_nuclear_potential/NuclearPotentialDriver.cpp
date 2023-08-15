@@ -1,12 +1,12 @@
 #include "NuclearPotentialDriver.hpp"
 
 #include "GtoFunc.hpp"
+#include "MatricesFunc.hpp"
 #include "Matrix.hpp"
 #include "MatrixFunc.hpp"
 #include "MatrixType.hpp"
 #include "NuclearPotentialFunc.hpp"
 #include "OpenMPFunc.hpp"
-#include "MatricesFunc.hpp"
 
 auto
 CNuclearPotentialDriver::compute(const CMolecularBasis&       basis,
@@ -19,12 +19,12 @@ CNuclearPotentialDriver::compute(const CMolecularBasis&       basis,
         // set up matrices
 
         std::vector<int64_t> atoms;
-        
+
         for (int64_t i = 0; i < natoms; i++)
         {
             atoms.push_back(i);
         }
-        
+
         auto matrices = matfunc::makeMatrices(atoms, basis, mat_t::symm);
 
         matrices.zero();
@@ -111,7 +111,7 @@ CNuclearPotentialDriver::compute(const CMolecularBasis&       basis,
                 }
             }
         }
-        
+
         return matrices;
     }
     else

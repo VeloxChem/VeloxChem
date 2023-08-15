@@ -8,12 +8,9 @@ CFockMatrix::CFockMatrix()
 
     , _ftype(fock_t::restjk)
 {
-    
 }
 
-CFockMatrix::CFockMatrix(const CMatrix& matrix,
-                         const double   exc_scale,
-                         const fock_t   ftype)
+CFockMatrix::CFockMatrix(const CMatrix& matrix, const double exc_scale, const fock_t ftype)
 
     : _matrix(matrix)
 
@@ -21,15 +18,14 @@ CFockMatrix::CFockMatrix(const CMatrix& matrix,
 
     , _ftype(ftype)
 {
-    
 }
 
 CFockMatrix::CFockMatrix(const CFockMatrix& other)
 {
     _matrix = other._matrix;
-    
+
     _exc_scale = other._exc_scale;
-    
+
     _ftype = other._ftype;
 }
 
@@ -73,6 +69,18 @@ auto
 CFockMatrix::getStorageType() const -> mat_t
 {
     return _matrix.getType();
+}
+
+auto
+CFockMatrix::getMatrix() -> CMatrix*
+{
+    return &_matrix;
+}
+
+auto
+CFockMatrix::getMatrix() const -> const CMatrix*
+{
+    return &_matrix;
 }
 
 auto

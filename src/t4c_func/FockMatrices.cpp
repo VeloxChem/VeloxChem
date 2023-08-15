@@ -4,7 +4,6 @@ CFockMatrices::CFockMatrices()
 
     : _matrices(std::vector<CFockMatrix*>())
 {
-    
 }
 
 CFockMatrices::CFockMatrices(const std::vector<CFockMatrix>& matrices)
@@ -60,4 +59,10 @@ auto
 CFockMatrices::getMatrix(const int64_t index) const -> const CFockMatrix*
 {
     return _matrices[index];
+}
+
+auto
+CFockMatrices::getNumberOfMatrices() const -> int64_t
+{
+    return static_cast<int64_t>(_matrices.size());
 }

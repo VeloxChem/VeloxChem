@@ -65,12 +65,12 @@ auto
 CMolecularBasis::slice(const std::vector<int64_t>& atoms) const -> CMolecularBasis
 {
     CMolecularBasis mbasis;
-    
+
     for (const auto atom : atoms)
     {
         mbasis.add(_basis_sets[_indexes[atom]]);
     }
-    
+
     return mbasis;
 }
 

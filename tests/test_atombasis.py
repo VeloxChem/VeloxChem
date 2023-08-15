@@ -1,5 +1,3 @@
-import pickle
-
 from veloxchem.veloxchemlib import BasisFunction
 from veloxchem.veloxchemlib import AtomBasis
 from tester import Tester

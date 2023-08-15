@@ -69,7 +69,7 @@ class CMatrices
      @param label the label of key.
      */
     auto add(const CMatrix& matrix, const std::string& label) -> void;
-    
+
     /**
     Adds matrix to matrices.
 
@@ -78,10 +78,10 @@ class CMatrices
     @param label the label of specific atom.
     */
     auto add(const CMatrix& matrix, const int64_t atom, const std::string& label) -> void;
-    
+
     /**
     Adds matrix to matrices.
-    
+
     @param matrix the matrix to be added.
     @param atom_a the atomic index of atom A.
     @param label_a the label of atom A.
@@ -89,10 +89,10 @@ class CMatrices
     @param label_b the label of atom B.
     */
     auto add(const CMatrix& matrix, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b) -> void;
-    
+
     /**
     Adds matrix to matrices.
-    
+
     @param matrix the matrix to be added.
     @param atom_a the atomic index of atom A.
     @param label_a the label of atom A.
@@ -101,12 +101,17 @@ class CMatrices
     @param atom_c the atomic index of atom C.
     @param label_c the label of atom C.
     */
-    auto add(const CMatrix& matrix, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-             const int64_t atom_c, const std::string& label_c) -> void;
-    
+    auto add(const CMatrix&     matrix,
+             const int64_t      atom_a,
+             const std::string& label_a,
+             const int64_t      atom_b,
+             const std::string& label_b,
+             const int64_t      atom_c,
+             const std::string& label_c) -> void;
+
     /**
     Adds matrix to matrices.
-    
+
     @param matrix the matrix to be added.
     @param atom_a the atomic index of atom A.
     @param label_a the label of atom A.
@@ -117,8 +122,15 @@ class CMatrices
     @param atom_d the atomic index of atom D.
     @param label_d the label of atom D.
     */
-    auto add(const CMatrix& matrix, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-             const int64_t atom_c, const std::string& label_c, const int64_t atom_d, const std::string& label_d) -> void;
+    auto add(const CMatrix&     matrix,
+             const int64_t      atom_a,
+             const std::string& label_a,
+             const int64_t      atom_b,
+             const std::string& label_b,
+             const int64_t      atom_c,
+             const std::string& label_c,
+             const int64_t      atom_d,
+             const std::string& label_d) -> void;
 
     /**
      Sets all matrices to zero.
@@ -164,7 +176,7 @@ class CMatrices
      @return the constant pointer to requested matrix.
      */
     auto getMatrix(const std::string& label) const -> const CMatrix*;
-    
+
     /**
      Get pointer to specific matrix.
 
@@ -182,7 +194,7 @@ class CMatrices
      @return the constant pointer to requested matrix.
      */
     auto getMatrix(const int64_t atom, const std::string& label) const -> const CMatrix*;
-    
+
     /**
      Get pointer to specific matrix.
 
@@ -204,7 +216,7 @@ class CMatrices
      @return the constant pointer to requested matrix.
      */
     auto getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b) const -> const CMatrix*;
-    
+
     /**
      Get pointer to specific matrix.
 
@@ -216,8 +228,12 @@ class CMatrices
      @param label_c the label of atom C.
      @return the pointer to requested matrix.
      */
-    auto getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-                   const int64_t atom_c, const std::string& label_c) -> CMatrix*;
+    auto getMatrix(const int64_t      atom_a,
+                   const std::string& label_a,
+                   const int64_t      atom_b,
+                   const std::string& label_b,
+                   const int64_t      atom_c,
+                   const std::string& label_c) -> CMatrix*;
 
     /**
      Get constant pointer to specific matrix.
@@ -230,9 +246,13 @@ class CMatrices
      @param label_c the label of atom C.
      @return the constant pointer to requested matrix.
      */
-    auto getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-                   const int64_t atom_c, const std::string& label_c) const -> const CMatrix*;
-    
+    auto getMatrix(const int64_t      atom_a,
+                   const std::string& label_a,
+                   const int64_t      atom_b,
+                   const std::string& label_b,
+                   const int64_t      atom_c,
+                   const std::string& label_c) const -> const CMatrix*;
+
     /**
      Get pointer to specific matrix.
 
@@ -246,8 +266,14 @@ class CMatrices
      @param label_d the label of atom D.
      @return the pointer to requested matrix.
      */
-    auto getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-                   const int64_t atom_c, const std::string& label_c, const int64_t atom_d, const std::string& label_d) -> CMatrix*;
+    auto getMatrix(const int64_t      atom_a,
+                   const std::string& label_a,
+                   const int64_t      atom_b,
+                   const std::string& label_b,
+                   const int64_t      atom_c,
+                   const std::string& label_c,
+                   const int64_t      atom_d,
+                   const std::string& label_d) -> CMatrix*;
 
     /**
      Get constant pointer to specific matrix.
@@ -262,8 +288,14 @@ class CMatrices
      @param label_d the label of atom D.
      @return the constant pointer to requested matrix.
      */
-    auto getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-                   const int64_t atom_c, const std::string& label_c, const int64_t atom_d, const std::string& label_d) const -> const CMatrix*;
+    auto getMatrix(const int64_t      atom_a,
+                   const std::string& label_a,
+                   const int64_t      atom_b,
+                   const std::string& label_b,
+                   const int64_t      atom_c,
+                   const std::string& label_c,
+                   const int64_t      atom_d,
+                   const std::string& label_d) const -> const CMatrix*;
 };
 
 #endif /* Matrices_hpp */

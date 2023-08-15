@@ -46,6 +46,28 @@ CMatrix::~CMatrix()
 }
 
 auto
+CMatrix::operator=(const CMatrix& source) -> CMatrix&
+{
+    if (this == &source) return *this;
+
+    _mat_type = source._mat_type;
+
+    for (auto& mvalue : _sub_matrices)
+    {
+        delete mvalue.second;
+    }
+
+    _sub_matrices.clear();
+
+    for (const auto& mvalue : source._sub_matrices)
+    {
+        _sub_matrices.insert({mvalue.first, new CSubMatrix(*mvalue.second)});
+    }
+
+    return *this;
+}
+
+auto
 CMatrix::add(const CSubMatrix& sub_matrix, const T2Pair& angpair) -> void
 {
     _sub_matrices.insert({angpair, new CSubMatrix(sub_matrix)});

@@ -1,23 +1,23 @@
 #include "QuadrupoleDriver.hpp"
 
 #include "GtoFunc.hpp"
+#include "MatricesFunc.hpp"
 #include "Matrix.hpp"
 #include "MatrixFunc.hpp"
 #include "MatrixType.hpp"
 #include "OpenMPFunc.hpp"
 #include "QuadrupoleFunc.hpp"
-#include "MatricesFunc.hpp"
 
 auto
 CQuadrupoleDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule, const TPoint3D& point) const -> CMatrices
 {
     // set up quadrupoles matrix
-    
+
     auto quad_matrix = matfunc::makeMatrices(2, basis, mat_t::symm);
 
     quad_matrix.zero();
-    
-    // set up work groups 
+
+    // set up work groups
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 

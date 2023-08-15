@@ -38,8 +38,7 @@ class CFockMatrices
      @param other the Fock matrices to copy.
      */
     CFockMatrices(const CFockMatrices& other);
-    
-    
+
     /**
      Destroys a Fock matrices.
      */
@@ -73,6 +72,13 @@ class CFockMatrices
      @return the constant pointer to requested Fock matrix.
      */
     auto getMatrix(const int64_t index) const -> const CFockMatrix*;
+
+    /**
+     Gets number of Fock matrices.
+
+     @return the number of Fock matrices.
+    */
+    auto getNumberOfMatrices() const -> int64_t;
 };
 
 #endif /* FockMatrices_hpp */

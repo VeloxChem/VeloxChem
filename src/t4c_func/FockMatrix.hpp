@@ -3,8 +3,8 @@
 
 #include <cstdint>
 
-#include "Matrix.hpp"
 #include "FockType.hpp"
+#include "Matrix.hpp"
 
 /**
  Class CFockMatrix stores Fock matrix and provides set of methods
@@ -18,17 +18,17 @@ class CFockMatrix
      The matrix to store Fock matrix values.
      */
     CMatrix _matrix;
-    
+
     /**
      The scaling factor of exchange contribution to Fock matrix.
      */
     double _exc_scale;
-    
+
     /**
      The type of Fock matrix.
      */
     fock_t _ftype;
-    
+
    public:
     /**
      Creates an empty Fock matrix.
@@ -42,9 +42,7 @@ class CFockMatrix
      @param exc_scale the scaling factor of exchange contribution to Fock matrix.
      @param ftype the Fock matrix type.
      */
-    CFockMatrix(const CMatrix& matrix,
-                const double   exc_scale,
-                const fock_t   ftype);
+    CFockMatrix(const CMatrix& matrix, const double exc_scale, const fock_t ftype);
 
     /**
      Creates a Fock matrix.
@@ -59,7 +57,7 @@ class CFockMatrix
      @param exc_scale the scalling factor of exchange contribution to Fock matrix type.
      */
     auto setExchangeScale(const double exc_scale) -> void;
-    
+
     /**
      Sets the type of Fock matrix.
 
@@ -71,21 +69,21 @@ class CFockMatrix
      Sets Fock matrix to zero.
      */
     auto zero() -> void;
-    
+
     /**
      Gets the scaling factor of exchange contribution to Fock matrix type.
 
      @return the scalling factor of exchange contribution to Fock matrix type.
      */
     auto getExchangeScale() const -> double;
-    
+
     /**
      Gets the type of Fock matrix.
 
      @return the type of Fock matrix
      */
     auto getFockType() const -> fock_t;
-    
+
     /**
      Get vector of angular pairs from map of Fock submatrices.
 
@@ -99,6 +97,20 @@ class CFockMatrix
      @return the storage type of Fock matrix.
      */
     auto getStorageType() const -> mat_t;
+
+    /**
+     Get pointer to values matrix.
+
+     @return the pointer to values matrix.
+     */
+    auto getMatrix() -> CMatrix*;
+
+    /**
+     Get constant pointer to values matrix.
+
+     @return the constant pointer to values matrix.
+     */
+    auto getMatrix() const -> const CMatrix*;
 
     /**
      Get pointer to specific Fock submatrix.

@@ -7,6 +7,7 @@ from veloxchem.veloxchemlib import fock_t
 from veloxchem.veloxchemlib import mat_t
 from tester import Tester
 
+
 class TestFockMatrix:
 
     def get_mat_ss(self):
@@ -42,7 +43,7 @@ class TestFockMatrix:
         ], [0, 0, 9, 9])
 
     def get_symm_mat(self):
-        
+
         return Matrix(
             {
                 (0, 0): self.get_mat_ss(),
@@ -55,23 +56,29 @@ class TestFockMatrix:
         fmat = FockMatrix(self.get_symm_mat(), 1.0, fock_t.restk)
 
         assert fmat.get_fock_type() == fock_t.restk
-        
+
         fmat.set_fock_type(fock_t.restjkx)
-        
+
         assert fmat.get_fock_type() == fock_t.restjkx
-        
+
     def test_set_and_get_exchange_scale(self):
 
         tol = 1.0e-12
-                
+
         fmat = FockMatrix(self.get_symm_mat(), 1.0, fock_t.restk)
-        
-        assert mt.isclose(fmat.get_exchange_scale(), 1.0, rel_tol=tol, abs_tol=tol)
-        
+
+        assert mt.isclose(fmat.get_exchange_scale(),
+                          1.0,
+                          rel_tol=tol,
+                          abs_tol=tol)
+
         fmat.set_exchange_scale(0.5)
-        
-        assert mt.isclose(fmat.get_exchange_scale(), 0.5, rel_tol=tol, abs_tol=tol)
-        
+
+        assert mt.isclose(fmat.get_exchange_scale(),
+                          0.5,
+                          rel_tol=tol,
+                          abs_tol=tol)
+
     def test_zero(self):
 
         fmat = FockMatrix(self.get_symm_mat(), 1.0, fock_t.restk)
@@ -79,17 +86,17 @@ class TestFockMatrix:
         smat_ss = self.get_mat_ss()
         smat_sp = self.get_mat_sp()
         smat_pp = self.get_mat_pp()
-        
+
         Tester.compare_submatrices(smat_ss, fmat.get_submatrix((0, 0)))
         Tester.compare_submatrices(smat_sp, fmat.get_submatrix((0, 1)))
         Tester.compare_submatrices(smat_pp, fmat.get_submatrix((1, 1)))
-        
+
         smat_ss.zero()
         smat_sp.zero()
         smat_pp.zero()
-    
+
         fmat.zero()
-        
+
         Tester.compare_submatrices(smat_ss, fmat.get_submatrix((0, 0)))
         Tester.compare_submatrices(smat_sp, fmat.get_submatrix((0, 1)))
         Tester.compare_submatrices(smat_pp, fmat.get_submatrix((1, 1)))
@@ -100,13 +107,22 @@ class TestFockMatrix:
 
         assert fmat.get_angular_pairs() == [(0, 0), (0, 1), (1, 1)]
 
+    def test_get_matrix(self):
+
+        fmat = FockMatrix(self.get_symm_mat(), 1.0, fock_t.restk)
+
+        Tester.compare_matrices(fmat.get_matrix(), self.get_symm_mat())
+
     def test_get_submatrix(self):
 
         fmat = FockMatrix(self.get_symm_mat(), 1.0, fock_t.restk)
 
-        Tester.compare_submatrices(fmat.get_submatrix((0, 0)), self.get_mat_ss())
-        Tester.compare_submatrices(fmat.get_submatrix((0, 1)), self.get_mat_sp())
-        Tester.compare_submatrices(fmat.get_submatrix((1, 1)), self.get_mat_pp())
+        Tester.compare_submatrices(fmat.get_submatrix((0, 0)),
+                                   self.get_mat_ss())
+        Tester.compare_submatrices(fmat.get_submatrix((0, 1)),
+                                   self.get_mat_sp())
+        Tester.compare_submatrices(fmat.get_submatrix((1, 1)),
+                                   self.get_mat_pp())
 
     def test_is_angular_order(self):
 
@@ -139,5 +155,3 @@ class TestFockMatrix:
 
         Tester.compare_submatrices(fmat.get_full_matrix(),
                                    self.get_mat_full_symm())
-
-

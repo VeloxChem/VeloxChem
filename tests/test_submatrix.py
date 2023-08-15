@@ -170,4 +170,3 @@ class TestSubMatrix:
         mat = SubMatrix(self.get_values(), [1, 5, 3, 6])
 
         assert mat.number_of_columns() == 6
-

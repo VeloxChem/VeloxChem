@@ -1,14 +1,14 @@
 #ifndef GtoPairBlock_hpp
 #define GtoPairBlock_hpp
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <array>
 
+#include "GtoBlock.hpp"
 #include "Point.hpp"
 #include "T2Index.hpp"
-#include "GtoBlock.hpp"
 
 /**
  Class CGtoPairBlock stores data about contarcted GTO pairs block and provides set of methods
@@ -84,15 +84,14 @@ class CGtoPairBlock
      @param gto_block the GTOs block.
      */
     CGtoPairBlock(const CGtoBlock& gto_block);
-    
+
     /**
      Creates a contarcted GTO pairs block.
 
      @param bra_gto_block the GTOs block on bra side.
      @param ket_gto_block the GTOs block on ket side.
      */
-    CGtoPairBlock(const CGtoBlock& bra_gto_block,
-                  const CGtoBlock& ket_gto_block);
+    CGtoPairBlock(const CGtoBlock& bra_gto_block, const CGtoBlock& ket_gto_block);
 
     /**
      Gets vector of GTO pair coordinates.

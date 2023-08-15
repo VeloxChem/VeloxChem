@@ -5,7 +5,7 @@
 
 /**
  Enumerate class fock_t:
- 
+
  Defines supported Fock matrix types:
  fock_t::restjk  - the restricted Fock matrix (Coulomb + exchange)
  fock_t::restjkx - the restricted scaled Fock matrix (Coulomb + scaled exchange)
@@ -40,57 +40,58 @@ enum class fock_t
 
 /**
  Converts enumerate class value to it's string label.
- 
+
  @param matrix the enumerate class value.
  @return the label of enumerate class value.
  */
-inline std::string to_string(const fock_t matrix)
+inline std::string
+to_string(const fock_t matrix)
 {
     if (matrix == fock_t::restjk)
     {
         return std::string("Restricted 2J + K Matrix");
     }
-   
+
     if (matrix == fock_t::restjkx)
     {
         return std::string("Restricted 2J + xK Matrix");
     }
-    
+
     if (matrix == fock_t::restj)
     {
         return std::string("Restricted J Matrix");
     }
-    
+
     if (matrix == fock_t::restk)
     {
         return std::string("Restricted K Matrix");
     }
-    
+
     if (matrix == fock_t::restkx)
     {
         return std::string("Restricted xK Matrix");
     }
-    
+
     if (matrix == fock_t::rgenjk)
     {
         return std::string("Restricted general 2J + K Matrix");
     }
-    
+
     if (matrix == fock_t::rgenjkx)
     {
         return std::string("Restricted general 2J + xK Matrix");
     }
-    
+
     if (matrix == fock_t::rgenj)
     {
         return std::string("Restricted general J Matrix");
     }
-    
+
     if (matrix == fock_t::rgenk)
     {
         return std::string("Restricted general K Matrix");
     }
-    
+
     if (matrix == fock_t::rgenkx)
     {
         return std::string("Restricted general xK Matrix");
@@ -105,12 +106,12 @@ inline std::string to_string(const fock_t matrix)
     {
         return std::string("Unrestricted 2J Matrix");
     }
-    
+
     if (matrix == fock_t::unrestjkx)
     {
         return std::string("Unrestricted 2J + xK Matrix");
     }
-    
+
     return std::string("UNKNOWN");
 }
 

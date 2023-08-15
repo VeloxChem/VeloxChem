@@ -3,9 +3,9 @@
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
-#include "NuclearPotentialDriver.hpp"
 #include "DipoleDriver.hpp"
 #include "KineticEnergyDriver.hpp"
+#include "NuclearPotentialDriver.hpp"
 #include "OctupoleDriver.hpp"
 #include "OverlapDriver.hpp"
 #include "Point.hpp"
@@ -39,15 +39,20 @@ export_t2cintegrals(py::module& m)
                 return std::make_shared<CMatrix>(kin_drv.compute(basis, molecule));
             },
             "Computes kinetic energy matrix for given molecule and basis.");
-    
+
     // CNuclearPotentialDriver class
 
     PyClass<CNuclearPotentialDriver>(m, "NuclearPotentialDriver")
         .def(py::init<>())
         .def(
             "compute",
-            [](const CNuclearPotentialDriver& npot_drv, const CMolecule& molecule, const CMolecularBasis& basis, const std::vector<double>& charges, const std::vector<TPoint3D>& points)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(npot_drv.compute(basis, molecule, charges, points)); },
+            [](const CNuclearPotentialDriver& npot_drv,
+               const CMolecule&               molecule,
+               const CMolecularBasis&         basis,
+               const std::vector<double>&     charges,
+               const std::vector<TPoint3D>&   points) -> std::shared_ptr<CMatrices> {
+                return std::make_shared<CMatrices>(npot_drv.compute(basis, molecule, charges, points));
+            },
             "Computes nuclear potential matrix for given molecule, basis and vector of external charges.");
 
     // CDipoleDriver class

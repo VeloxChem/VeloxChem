@@ -1,7 +1,7 @@
 #include "Matrices.hpp"
 
-#include "StringFormat.hpp"
 #include "CantorFunc.hpp"
+#include "StringFormat.hpp"
 
 CMatrices::CMatrices()
 
@@ -63,7 +63,7 @@ auto
 CMatrices::add(const CMatrix& matrix, const int64_t atom, const std::string& label) -> void
 {
     const auto key = mathfunc::getCantorIndex({atom, fstr::to_TensorComponent(label)});
-    
+
     _matrices.insert({key, new CMatrix(matrix)});
 }
 
@@ -71,43 +71,55 @@ auto
 CMatrices::add(const CMatrix& matrix, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b) -> void
 {
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
-    
+
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     _matrices.insert({mathfunc::getCantorIndex({key_a, key_b}), new CMatrix(matrix)});
 }
 
 auto
-CMatrices::add(const CMatrix& matrix, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-               const int64_t atom_c, const std::string& label_c) -> void
+CMatrices::add(const CMatrix&     matrix,
+               const int64_t      atom_a,
+               const std::string& label_a,
+               const int64_t      atom_b,
+               const std::string& label_b,
+               const int64_t      atom_c,
+               const std::string& label_c) -> void
 {
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
 
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     const auto key_c = mathfunc::getCantorIndex({atom_c, fstr::to_TensorComponent(label_c)});
 
     const auto key_ab = mathfunc::getCantorIndex({key_a, key_b});
-    
+
     _matrices.insert({mathfunc::getCantorIndex({key_ab, key_c}), new CMatrix(matrix)});
 }
 
 auto
-CMatrices::add(const CMatrix& matrix, const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-               const int64_t atom_c, const std::string& label_c, const int64_t atom_d, const std::string& label_d) -> void
+CMatrices::add(const CMatrix&     matrix,
+               const int64_t      atom_a,
+               const std::string& label_a,
+               const int64_t      atom_b,
+               const std::string& label_b,
+               const int64_t      atom_c,
+               const std::string& label_c,
+               const int64_t      atom_d,
+               const std::string& label_d) -> void
 {
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
 
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     const auto key_c = mathfunc::getCantorIndex({atom_c, fstr::to_TensorComponent(label_c)});
-    
+
     const auto key_d = mathfunc::getCantorIndex({atom_d, fstr::to_TensorComponent(label_d)});
 
     const auto key_ab = mathfunc::getCantorIndex({key_a, key_b});
-    
+
     const auto key_cd = mathfunc::getCantorIndex({key_c, key_d});
-    
+
     _matrices.insert({mathfunc::getCantorIndex({key_ab, key_cd}), new CMatrix(matrix)});
 }
 
@@ -184,7 +196,7 @@ auto
 CMatrices::getMatrix(const int64_t atom, const std::string& label) -> CMatrix*
 {
     const auto key = mathfunc::getCantorIndex({atom, fstr::to_TensorComponent(label)});
-    
+
     return getMatrix(key);
 }
 
@@ -192,7 +204,7 @@ auto
 CMatrices::getMatrix(const int64_t atom, const std::string& label) const -> const CMatrix*
 {
     const auto key = mathfunc::getCantorIndex({atom, fstr::to_TensorComponent(label)});
-    
+
     return getMatrix(key);
 }
 
@@ -202,7 +214,7 @@ CMatrices::getMatrix(const int64_t atom_a, const std::string& label_a, const int
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
 
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     return getMatrix(mathfunc::getCantorIndex({key_a, key_b}));
 }
 
@@ -212,76 +224,94 @@ CMatrices::getMatrix(const int64_t atom_a, const std::string& label_a, const int
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
 
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     return getMatrix(mathfunc::getCantorIndex({key_a, key_b}));
 }
 
 auto
-CMatrices::getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-               const int64_t atom_c, const std::string& label_c) -> CMatrix*
+CMatrices::getMatrix(const int64_t      atom_a,
+                     const std::string& label_a,
+                     const int64_t      atom_b,
+                     const std::string& label_b,
+                     const int64_t      atom_c,
+                     const std::string& label_c) -> CMatrix*
 {
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
 
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     const auto key_c = mathfunc::getCantorIndex({atom_c, fstr::to_TensorComponent(label_c)});
 
     const auto key_ab = mathfunc::getCantorIndex({key_a, key_b});
-    
+
     return getMatrix(mathfunc::getCantorIndex({key_ab, key_c}));
 }
 
 auto
-CMatrices::getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-                     const int64_t atom_c, const std::string& label_c) const -> const CMatrix*
+CMatrices::getMatrix(const int64_t      atom_a,
+                     const std::string& label_a,
+                     const int64_t      atom_b,
+                     const std::string& label_b,
+                     const int64_t      atom_c,
+                     const std::string& label_c) const -> const CMatrix*
 {
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
 
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     const auto key_c = mathfunc::getCantorIndex({atom_c, fstr::to_TensorComponent(label_c)});
 
     const auto key_ab = mathfunc::getCantorIndex({key_a, key_b});
-    
+
     return getMatrix(mathfunc::getCantorIndex({key_ab, key_c}));
 }
 
 auto
-CMatrices::getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-                     const int64_t atom_c, const std::string& label_c, const int64_t atom_d, const std::string& label_d) -> CMatrix*
+CMatrices::getMatrix(const int64_t      atom_a,
+                     const std::string& label_a,
+                     const int64_t      atom_b,
+                     const std::string& label_b,
+                     const int64_t      atom_c,
+                     const std::string& label_c,
+                     const int64_t      atom_d,
+                     const std::string& label_d) -> CMatrix*
 {
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
 
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     const auto key_c = mathfunc::getCantorIndex({atom_c, fstr::to_TensorComponent(label_c)});
-    
+
     const auto key_d = mathfunc::getCantorIndex({atom_d, fstr::to_TensorComponent(label_d)});
 
     const auto key_ab = mathfunc::getCantorIndex({key_a, key_b});
-    
+
     const auto key_cd = mathfunc::getCantorIndex({key_c, key_d});
-    
+
     return getMatrix(mathfunc::getCantorIndex({key_ab, key_cd}));
 }
-
 
 auto
-CMatrices::getMatrix(const int64_t atom_a, const std::string& label_a, const int64_t atom_b, const std::string& label_b,
-                     const int64_t atom_c, const std::string& label_c, const int64_t atom_d, const std::string& label_d) const -> const CMatrix*
+CMatrices::getMatrix(const int64_t      atom_a,
+                     const std::string& label_a,
+                     const int64_t      atom_b,
+                     const std::string& label_b,
+                     const int64_t      atom_c,
+                     const std::string& label_c,
+                     const int64_t      atom_d,
+                     const std::string& label_d) const -> const CMatrix*
 {
     const auto key_a = mathfunc::getCantorIndex({atom_a, fstr::to_TensorComponent(label_a)});
 
     const auto key_b = mathfunc::getCantorIndex({atom_b, fstr::to_TensorComponent(label_b)});
-    
+
     const auto key_c = mathfunc::getCantorIndex({atom_c, fstr::to_TensorComponent(label_c)});
-    
+
     const auto key_d = mathfunc::getCantorIndex({atom_d, fstr::to_TensorComponent(label_d)});
 
     const auto key_ab = mathfunc::getCantorIndex({key_a, key_b});
-    
+
     const auto key_cd = mathfunc::getCantorIndex({key_c, key_d});
-    
+
     return getMatrix(mathfunc::getCantorIndex({key_ab, key_cd}));
 }
-

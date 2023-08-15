@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <vector>
 
-#include "MatrixType.hpp"
 #include "Matrices.hpp"
+#include "MatrixType.hpp"
 #include "MolecularBasis.hpp"
 
 namespace matfunc {  // matfunc namespace
@@ -70,7 +70,8 @@ auto makeMatrices(const std::vector<int64_t>& atoms, const int64_t torder, const
  @param ket_basis the molecular basis on ket side.
  @return the matrices.
  */
-auto makeMatrices(const std::vector<int64_t>& atoms, const int64_t torder, const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis) -> CMatrices;
+auto makeMatrices(const std::vector<int64_t>& atoms, const int64_t torder, const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis)
+    -> CMatrices;
 
 }  // namespace matfunc
 

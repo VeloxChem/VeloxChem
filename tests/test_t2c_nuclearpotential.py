@@ -4,9 +4,7 @@ import numpy as np
 from veloxchem.veloxchemlib import NuclearPotentialDriver
 from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import Molecule
-from veloxchem.veloxchemlib import Matrices
 from veloxchem.submatrix import SubMatrix
-from veloxchem.matrix import Matrix
 from tester import Tester
 
 

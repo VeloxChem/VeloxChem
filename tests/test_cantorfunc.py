@@ -1,5 +1,3 @@
-import math as mt
-
 from veloxchem.veloxchemlib import cantor_index
 from veloxchem.veloxchemlib import cantor_pair
 
