@@ -137,16 +137,16 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double alpha = 1.0 + mus2r * grada2 / std::pow(rhoa, f83);
 
-            double beta = 1.0 + mus2r * gradb2 / std::pow(rhob, f83);
+            double beta = 1.0;
+
+            if (rhob > 1.0e-16)
+            {
+                beta = 1.0 + mus2r * gradb2 / std::pow(rhob, f83);
+            }
 
             double Fxc_a = R / alpha;
 
-            double Fxc_b = R;
-
-            if (rhob > 1.0e-12)
-            {
-                Fxc_b = R / beta;
-            }
+            double Fxc_b = R / beta;
 
             fg_zeta = fa * Fxc_a + fb * Fxc_b;
 
@@ -160,11 +160,18 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double dFxc_a_pref = -R / std::pow(alpha, 2.0) * mus2r / std::pow(rhoa, f83);
 
-            double dFxc_b_pref = -R / std::pow(beta, 2.0) * mus2r / std::pow(rhob, f83);
-
             double dFxc_a_rho  = dFxc_a_pref * (dgradR_rho + dgradI_rho - f43 / rhoa * grada2);
 
-            double dFxc_b_rho  = dFxc_b_pref * (dgradR_rho - dgradI_rho - f43 / rhob * gradb2);
+            double dFxc_b_pref = 0.0;
+
+            double dFxc_b_rho  = 0.0;
+
+            if (rhob > 1.0e-16)
+            {
+                dFxc_b_pref = -R / std::pow(beta, 2.0) * mus2r / std::pow(rhob, f83);
+
+                dFxc_b_rho  = dFxc_b_pref * (dgradR_rho - dgradI_rho - f43 / rhob * gradb2);
+            }
 
             dFg_rho     = (dfa_rho * Fxc_a + fa * dFxc_a_rho) + (dfb_rho * Fxc_b + fb * dFxc_b_rho);
 
@@ -184,7 +191,12 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
                 double dFxc_a_pi  = dFxc_a_pref * (dgradR_pi + dgradI_pi + f43 * grada2 / rhoa / delta);
 
-                double dFxc_b_pi  = dFxc_b_pref * (dgradR_pi - dgradI_pi - f43 * gradb2 / rhob / delta);
+                double dFxc_b_pi = 0.0;
+
+                if (rhob > 1.0e-16)
+                {
+                    dFxc_b_pi  = dFxc_b_pref * (dgradR_pi - dgradI_pi - f43 * gradb2 / rhob / delta);
+                }
 
                 // 2* f43 / rhoa  * 0.25 * sig /rho
 

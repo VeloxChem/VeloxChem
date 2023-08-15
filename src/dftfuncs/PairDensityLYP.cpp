@@ -126,7 +126,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
       // Real part
       if (pair_density < -1.0e-30)
       {
-         double zeta = M_SQRT2*sqrt(-pair_density)/density;
+         double zeta = sqrt(-2.0*pair_density)/density;
          double dzeta_drho = -M_SQRT2*sqrt(-pair_density)/pow(density, 2);
          double dzeta_dpi = (1.0/2.0)*M_SQRT2*sqrt(-pair_density)/(density*pair_density);
 
@@ -198,7 +198,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
       double dExc_drarb = -a*(b*omega*(t1 + t2 + t3 + t4) + 4/(denom2*density));
       double dExc_dt6 = -a*b*omega;
       double dExc_dt1 = -a*b*omega*rarb;
-
 
       vrho[2 * g + 0] =  -a*b*domega_drho*(rarb*(t1 + t2 + t3 + t4) + t5 + t6) + 4*a*ddenom2_drho*rarb/(pow(denom2, 2)*density) + 4*a*rarb/(denom2*pow(density, 2)) + dExc_drarb*drarb_drho + dExc_dt1*dt1_drho + dExc_dt2*dt2_drho + dExc_dt3*dt3_drho + dExc_dt4*dt4_drho + dExc_dt5*dt5_drho + dExc_dt6*dt6_drho;
       vrho[2 * g + 1] =  dExc_drarb*drarb_dpi + dExc_dt1*dt1_dpi + dExc_dt3*dt3_dpi + dExc_dt4*dt4_dpi + dExc_dt6*dt6_dpi;
