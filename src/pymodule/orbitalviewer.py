@@ -50,7 +50,6 @@ class OrbitalViewer:
         - mo_threshold: Do not compute AO contribution if corresponding MO
           coefficient is below this value
     """
-
     def __init__(self):
         """
         Initializes the orbital viewer.
@@ -100,10 +99,11 @@ class OrbitalViewer:
 
     def help_string_k3d(self):
 
-        return ('Unable to import k3d. Please install k3d via pip or conda,\n' +
-                '  and then run\n' +
-                '  jupyter nbextension install --py --sys-prefix k3d\n' +
-                '  jupyter nbextension enable --py --sys-prefix k3d\n')
+        return (
+            'Unable to import k3d. Please install k3d via pip or conda,\n' +
+            '  and then run\n' +
+            '  jupyter nbextension install --py --sys-prefix k3d\n' +
+            '  jupyter nbextension enable --py --sys-prefix k3d\n')
 
     def help_string_widgets_and_display(self):
 
@@ -155,7 +155,7 @@ class OrbitalViewer:
         ny_atom = math.ceil(self.atombox_radius / dy * 2)
         nz_atom = math.ceil(self.atombox_radius / dz * 2)
         self._atom_origin = (-nx_atom * dx / 2, -ny_atom * dy / 2,
-                            -nz_atom * dz / 2)
+                             -nz_atom * dz / 2)
         self._atom_npoints = (nx_atom, ny_atom, nz_atom)
 
         atom_grid = CubicGrid(self._atom_origin, self.stepsize,
@@ -320,15 +320,11 @@ class OrbitalViewer:
                             ncopy[i] = self.npoints[i] - t1[i]
                     if discard:
                         continue
-                    np_orb[
-                        t1[0]:t1[0] + ncopy[0],
-                        t1[1]:t1[1] + ncopy[1],
-                        t1[2]:t1[2] + ncopy[2],
-                    ] += xyz_coef * orb_coef * atom_orb[
-                        p1[0]:p1[0] + ncopy[0],
-                        p1[1]:p1[1] + ncopy[1],
-                        p1[2]:p1[2] + ncopy[2],
-                    ]
+                    np_orb[t1[0]:t1[0] + ncopy[0], t1[1]:t1[1] + ncopy[1],
+                           t1[2]:t1[2] +
+                           ncopy[2], ] += xyz_coef * orb_coef * atom_orb[
+                               p1[0]:p1[0] + ncopy[0], p1[1]:p1[1] + ncopy[1],
+                               p1[2]:p1[2] + ncopy[2], ]
 
         return np_orb
 
@@ -399,7 +395,8 @@ class OrbitalViewer:
         if not self._is_uhf:
             # In case of NTO, only print alpha occupation numbers (lambda's)
             # Otherwise print the sum of alpha and beta occupation numbers
-            if mo_object.get_orbitals_type() != molorb.rest or not mo_object.is_nto():
+            if mo_object.get_orbitals_type(
+            ) != molorb.rest or not mo_object.is_nto():
                 orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):
@@ -420,7 +417,9 @@ class OrbitalViewer:
             orblist.insert(0, ('', -1))
             # Add widget
             self.orbital_selector = widgets.Dropdown(
-                options=orblist, value=self._i_orb, description='Alpha orbital:')
+                options=orblist,
+                value=self._i_orb,
+                description='Alpha orbital:')
             self.orbital_selector_beta = widgets.Dropdown(
                 options=orblist_beta, value=-1, description='Beta orbital:')
             hbox = widgets.HBox(
@@ -568,30 +567,48 @@ class OrbitalViewer:
         rad_segments = 16
         if natoms > 300:
             rad_segments = 8
-        plt_bonds = []
+
+        # Create a lines object for each atom type
+        bonddict = {}
+        labels = molecule.get_labels()
+        names = {}
         for i in range(natoms):
-            color_i = colors[i]
+            if atomnr[i] not in bonddict:
+                bonddict[atomnr[i]] = []
+            if atomnr[i] not in names:
+                names[atomnr[i]] = labels[i]
+
+        newcoords = []
+        ncoords = natoms
+        for i in range(natoms):
             for j in range(i + 1, natoms):
+                # Check if there is a bond
                 bond = (radii[i] + radii[j]) / bohr_in_angstrom()
                 if np.linalg.norm(coords[i, :] - coords[j, :]) > 1.25 * bond:
                     continue
-                color_j = colors[j]
-                plt_bonds.append(
-                    k3d.line(
-                        [coords[i, :], 0.5 * (coords[i, :] + coords[j, :])],
-                        width=0.35,
-                        colors=[color_i, color_i],
-                        shader='mesh',
-                        radial_segments=rad_segments,
-                        group='Molecule'))
-                plt_bonds.append(
-                    k3d.line(
-                        [0.5 * (coords[i, :] + coords[j, :]), coords[j, :]],
-                        width=0.35,
-                        colors=[color_j, color_j],
-                        shader='mesh',
-                        radial_segments=rad_segments,
-                        group='Molecule'))
+                # If single atom type, just record it
+                if atomnr[i] == atomnr[j]:
+                    bonddict[atomnr[i]].append([i, j])
+                # Else do 2 segments (which means adding a new middle-vertex)
+                else:
+                    newcoords.append(0.5 * (coords[i, :] + coords[j, :]))
+                    bonddict[atomnr[i]].append([i, ncoords])
+                    bonddict[atomnr[j]].append([ncoords, j])
+                    ncoords += 1
+
+        finalcoords = np.append(coords, newcoords)
+        plt_bonds = []
+        for atom, bondlist in bonddict.items():
+            plt_bonds.append(
+                k3d.lines(finalcoords,
+                          bondlist,
+                          width=0.35,
+                          color=int(atomcolor[atom]),
+                          shader='mesh',
+                          radial_segments=16,
+                          indices_type='segment',
+                          name=names[atom] + ' bonds',
+                          group='Molecule'))
 
         return plt_atoms, plt_bonds
 
