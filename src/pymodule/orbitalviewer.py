@@ -46,10 +46,12 @@ class OrbitalViewer:
         - grid_margins: Minimal distance in a.u. between the box edge and all
           atomic nuclei
         - atombox_radius: Radius in a.u. of the atomix grid
-        - atom_centers: List of atomic indices around which the box is focused (default all)
+        - atom_centers: List of atomic indices around which the box is focused
+          (default all)
         - mo_threshold: Do not compute AO contribution if corresponding MO
           coefficient is below this value
     """
+
     def __init__(self):
         """
         Initializes the orbital viewer.
@@ -99,11 +101,10 @@ class OrbitalViewer:
 
     def help_string_k3d(self):
 
-        return (
-            'Unable to import k3d. Please install k3d via pip or conda,\n' +
-            '  and then run\n' +
-            '  jupyter nbextension install --py --sys-prefix k3d\n' +
-            '  jupyter nbextension enable --py --sys-prefix k3d\n')
+        return ('Unable to import k3d. Please install k3d via pip or conda,\n' +
+                '  and then run\n' +
+                '  jupyter nbextension install --py --sys-prefix k3d\n' +
+                '  jupyter nbextension enable --py --sys-prefix k3d\n')
 
     def help_string_widgets_and_display(self):
 
@@ -320,11 +321,15 @@ class OrbitalViewer:
                             ncopy[i] = self.npoints[i] - t1[i]
                     if discard:
                         continue
-                    np_orb[t1[0]:t1[0] + ncopy[0], t1[1]:t1[1] + ncopy[1],
-                           t1[2]:t1[2] +
-                           ncopy[2], ] += xyz_coef * orb_coef * atom_orb[
-                               p1[0]:p1[0] + ncopy[0], p1[1]:p1[1] + ncopy[1],
-                               p1[2]:p1[2] + ncopy[2], ]
+                    np_orb[
+                        t1[0]:t1[0] + ncopy[0],
+                        t1[1]:t1[1] + ncopy[1],
+                        t1[2]:t1[2] + ncopy[2],
+                    ] += xyz_coef * orb_coef * atom_orb[
+                        p1[0]:p1[0] + ncopy[0],
+                        p1[1]:p1[1] + ncopy[1],
+                        p1[2]:p1[2] + ncopy[2],
+                    ]
 
         return np_orb
 
@@ -395,8 +400,8 @@ class OrbitalViewer:
         if not self._is_uhf:
             # In case of NTO, only print alpha occupation numbers (lambda's)
             # Otherwise print the sum of alpha and beta occupation numbers
-            if mo_object.get_orbitals_type(
-            ) != molorb.rest or not mo_object.is_nto():
+            if (mo_object.get_orbitals_type() != molorb.rest or
+                    not mo_object.is_nto()):
                 orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):
@@ -564,9 +569,10 @@ class OrbitalViewer:
                                group='Molecule')
 
         # Sticks
-        rad_segments = 16
-        if natoms > 300:
-            rad_segments = 8
+        # TODO: check whether lower rad_segments is necessary
+        # rad_segments = 16
+        # if natoms > 300:
+        #     rad_segments = 8
 
         # Create a lines object for each atom type
         bonddict = {}
