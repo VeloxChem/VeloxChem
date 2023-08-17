@@ -13,6 +13,7 @@
 #include "MatrixFunc.hpp"
 #include "MatrixType.hpp"
 #include "SubMatrix.hpp"
+#include "MatrixIndex.hpp"
 
 namespace vlx_math {  // vlx_math namespace
 
@@ -28,6 +29,10 @@ export_math(py::module& m) -> void
     // exposing functions from MathConst.hpp
 
     m.def("get_pi", &mathconst::getPiValue, "Gets PI value.");
+    
+    // exposing functions from MathIndex.hpp
+
+    m.def("uplo_index", &mathfunc::uplo_index, "Gets index of upper triangular matrix.");
 
     // exposing functions from CantorFunc.hpp
 

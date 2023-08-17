@@ -6,6 +6,7 @@
 #include "AtomBasis.hpp"
 #include "BasisFunction.hpp"
 #include "GtoBlock.hpp"
+#include "GtoPairBlock.hpp"
 #include "GtoFunc.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
@@ -199,6 +200,29 @@ export_orbdata(py::module &m)
         .def("get_angular_momentum", &CGtoBlock::getAngularMomentum, "Gets angular momentum of GTOs block.")
         .def("number_of_primitives", &CGtoBlock::getNumberOfPrimitives, "Gets number of primitive GTOs in basis function.")
         .def("number_of_basis_functions", &CGtoBlock::getNumberOfBasisFunctions, "Gets number of GTOs in basis function block.");
+    
+    // CGtoPairBlock class
+
+    PyClass<CGtoPairBlock>(m, "GtoPairBlock")
+        .def(py::init<>())
+        .def(py::init<const CGtoPairBlock&>())
+        .def(py::init<const std::vector<TPairOfPoints3D>&,
+                      const std::vector<TPoint2D>&,
+                      const std::vector<TPoint2D>&,
+                      const std::vector<T2Index>&,
+                      const std::vector<T2Index>&,
+                      const T2Index&,
+                      const int64_t>())
+        .def(py::init<const CGtoBlock&>())
+        .def(py::init<const CGtoBlock&, const CGtoBlock&>())
+        .def("get_coordinates", &CGtoPairBlock::getCoordinates, "Gets vector of atoms pair coordinates.")
+        .def("get_exponents", &CGtoPairBlock::getExponents, "Gets vector of basis function exponents pairs.")
+        .def("get_normalization_factors", &CGtoPairBlock::getNormalizationFactors, "Gets vector of basis function normalization factors pairs.")
+        .def("get_orbital_indexes", &CGtoPairBlock::getOrbitalIndexes, "Gets vector of orbital index pairs.")
+        .def("get_atomic_indexes", &CGtoPairBlock::getAtomicIndexes, "Gets vector of atomic index pairs.")
+        .def("get_angular_momentum", &CGtoPairBlock::getAngularMomentums, "Gets angular momentum of GTOs pair.")
+        .def("number_of_primitives", &CGtoPairBlock::getNumberOfPrimitivePairs, "Gets number of primitive GTO pairs in GTO pair.")
+        .def("number_of_basis_functions", &CGtoPairBlock::getNumberOfContractedPairs, "Gets number of contracted GTO pairs in basis function pairs block.");
 
     // ...
 }
