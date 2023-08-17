@@ -1,3 +1,4 @@
+if(USE_3RD_GEOM_DERIV)
 target_sources(vlxobjs
   PRIVATE
     OverlapGeom300RecDD.cpp
@@ -417,6 +418,7 @@ target_sources(vlxobjs
     PrimitiveOverlapGeom300SP_0_Z.cpp
     PrimitiveOverlapGeom300SS_0_0.cpp
 )
+endif()
 
 target_include_directories(vlxobjs
  PUBLIC

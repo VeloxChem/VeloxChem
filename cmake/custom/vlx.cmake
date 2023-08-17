@@ -23,6 +23,18 @@ if(DEFINED EXTRA_CXXFLAGS)
   string(REPLACE " " ";" EXTRA_CXXFLAGS ${EXTRA_CXXFLAGS})
 endif()
 
+# option for using higher order geometric derivatives
+option(USE_4TH_GEOM_DERIV "Use 4th-order geometric derivatives" ON)
+option(USE_3RD_GEOM_DERIV "Use 3rd-order geometric derivatives" ON)
+if(USE_4TH_GEOM_DERIV)
+  print_option(USE_4TH_GEOM_DERIV "${USE_4TH_GEOM_DERIV}")
+  add_compile_definitions(USE_4TH_GEOM_DERIV)
+  add_compile_definitions(USE_3RD_GEOM_DERIV)
+elseif(USE_3RD_GEOM_DERIV)
+  print_option(USE_3RD_GEOM_DERIV "${USE_3RD_GEOM_DERIV}")
+  add_compile_definitions(USE_3RD_GEOM_DERIV)
+endif()
+
 # figure out where to put the Python module
 if(NOT DEFINED PYMOD_INSTALL_FULLDIR)
   if(NOT WIN32)
