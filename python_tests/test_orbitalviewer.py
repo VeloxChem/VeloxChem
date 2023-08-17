@@ -64,14 +64,14 @@ class TestOrbitalViewer:
         orbviewer = OrbitalViewer()
         orbviewer.interpolate = True
         orbviewer.initialize(mol, bas)
-        orbviewer.i_orb = mol.number_of_alpha_electrons() - 1
-        orbviewer.mo_coefs = mol_orbs.alpha_to_numpy()
-        orbital = orbviewer.compute_orbital(orbviewer.mo_coefs, orbviewer.i_orb)
+        orbviewer._i_orb = mol.number_of_alpha_electrons() - 1
+        orbviewer._mo_coefs = mol_orbs.alpha_to_numpy()
+        orbital = orbviewer.compute_orbital(orbviewer._mo_coefs, orbviewer._i_orb)
 
         vis_drv = VisualizationDriver()
         cubic_grid = CubicGrid(orbviewer.origin, orbviewer.stepsize,
                                orbviewer.npoints)
-        vis_drv.compute(cubic_grid, mol, bas, mol_orbs, orbviewer.i_orb,
+        vis_drv.compute(cubic_grid, mol, bas, mol_orbs, orbviewer._i_orb,
                         'alpha')
 
         if scf_drv.rank == mpi_master():

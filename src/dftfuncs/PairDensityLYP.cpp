@@ -39,7 +39,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
    //Constants
    double a = 0.04918, b = 0.132, c = 0.2533, d = 0.349;
    double cf = (3.0/10.0)*pow(3, 2.0/3.0)*pow(M_PI, 4.0/3.0);
-   double fb = 21.0/5000.0;
+   // double fb = 21.0/5000.0;
 
    double f83 = 8.0/3.0;
 
@@ -70,8 +70,8 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
       double rhom13 = pow(density, -1.0/3.0);
       double drhom13_drho = -(1.0/3.0)/pow(density, 4.0/3.0);
 
-      double rho13 = cbrt(density);
-      double drho13_drho = (1.0/3.0)/pow(density, 2.0/3.0);
+      // double rho13 = cbrt(density);
+      // double drho13_drho = (1.0/3.0)/pow(density, 2.0/3.0);
 
       double denom2 = d*rhom13 + 1;
       double ddenom2_drho = d*drhom13_drho;
