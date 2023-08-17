@@ -569,11 +569,6 @@ class OrbitalViewer:
                                group='Molecule')
 
         # Sticks
-        # TODO: check whether lower rad_segments is necessary
-        # rad_segments = 16
-        # if natoms > 300:
-        #     rad_segments = 8
-
         # Create a lines object for each atom type
         bonddict = {}
         labels = molecule.get_labels()
