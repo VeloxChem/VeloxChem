@@ -261,7 +261,7 @@ class OutputStream:
         self.print_title('VELOXCHEM')
         self.print_title('AN ELECTRONIC STRUCTURE CODE')
         self.print_title('')
-        self.print_title('Copyright (C) 2018-2021 VeloxChem developers.')
+        self.print_title('Copyright (C) 2018-2023 VeloxChem developers.')
         self.print_title('All rights reserved.')
         self.print_separator()
         exec_str = 'VeloxChem execution started'

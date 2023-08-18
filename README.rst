@@ -30,7 +30,7 @@ License
 
 VeloxChem: an electronic structure code
 
-Copyright (C) 2018-2022 The VeloxChem developers.
+Copyright (C) 2018-2023 The VeloxChem developers.
 
 The copyrights for code used from other parties are included in the
 corresponding files.
