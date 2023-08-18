@@ -3,6 +3,7 @@ target_sources(vlxobjs
     ChemicalElement.cpp
     CoordinationNumber.cpp
     Molecule.cpp
+    PartialCharges.cpp
   )
 
 target_include_directories(vlxobjs
