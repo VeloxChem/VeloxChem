@@ -1,6 +1,7 @@
 target_sources(vlxobjs
   PRIVATE
     ChemicalElement.cpp
+    CoordinationNumber.cpp
     Molecule.cpp
   )
 
