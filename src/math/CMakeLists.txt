@@ -1,5 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
+    DenseMatrix.cpp
     Matrices.cpp
     MatrixFunc.cpp
     MatricesFunc.cpp	
