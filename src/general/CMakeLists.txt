@@ -1,5 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
+    ErrorHandler.cpp
     StringFormat.cpp
     OpenMPFunc.cpp
   )
