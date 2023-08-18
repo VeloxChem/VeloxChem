@@ -104,9 +104,11 @@ CGtoBlock::CGtoBlock(const CMolecularBasis&      basis,
 
             for (int64_t j = 0; j < npgtos; j++)
             {
-                _exponents[j * ncgtos + i] = fexps[j];
+                const auto joff = j * ncgtos + i;
+                
+                _exponents[joff] = fexps[j];
 
-                _norms[j * ncgtos + i] = fnorms[j];
+                _norms[joff] = fnorms[j];
             }
         }
     }

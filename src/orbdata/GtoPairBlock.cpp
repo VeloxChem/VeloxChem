@@ -1,5 +1,7 @@
 #include "GtoPairBlock.hpp"
 
+#include "MatrixIndex.hpp"
+
 CGtoPairBlock::CGtoPairBlock(const std::vector<TPairOfPoints3D>& coordinates,
                              const std::vector<TPoint2D>&        exponents,
                              const std::vector<TPoint2D>&        norms,
@@ -58,27 +60,27 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock& gto_block)
 
     auto npgtos = gto_block.getNumberOfPrimitives();
 
-    // reserve memory
+    // allocate memory
 
     const auto cdim = ncgtos * (ncgtos + 1) / 2;
 
-    _coordinates.reserve(cdim);
+    _coordinates = std::vector<TPairOfPoints3D>(cdim, TPairOfPoints3D());
 
-    _orb_indexes.reserve(cdim);
+    _orb_indexes = std::vector<T2Index>(cdim + 1, T2Index());
 
-    _atm_indexes.reserve(cdim);
+    _atm_indexes = std::vector<T2Index>(cdim, T2Index());
 
     const auto pdim = cdim * npgtos * npgtos;
 
-    _exponents.reserve(pdim);
+    _exponents = std::vector<TPoint2D>(pdim, TPoint2D({0.0, 0.0}));
 
-    _norms.reserve(pdim);
+    _norms = std::vector<TPoint2D>(pdim, TPoint2D({0.0, 0.0}));
 
     // set up GTO pairs data
 
     const auto angmom = gto_block.getAngularMomentum();
 
-    _orb_indexes.push_back({orbidx[0], orbidx[0]});
+    _orb_indexes[0] = T2Index({orbidx[0], orbidx[0]});
 
     _angmoms = {angmom, angmom};
 
@@ -86,25 +88,29 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock& gto_block)
 
     for (int64_t i = 0; i < ncgtos; i++)
     {
-        const auto ioff = i * npgtos;
-
         for (int64_t j = i; j < ncgtos; j++)
         {
-            const auto joff = j * npgtos;
+            const auto ij_idx = mathfunc::uplo_index(i, j);
 
-            _coordinates.push_back({coords[i], coords[j]});
+            _coordinates[ij_idx] = TPairOfPoints3D({coords[i], coords[j]});
 
-            _orb_indexes.push_back({orbidx[i + 1], orbidx[j + 1]});
+            _orb_indexes[ij_idx + 1] = T2Index({orbidx[i + 1], orbidx[j + 1]});
 
-            _atm_indexes.push_back({atmidx[i], atmidx[j]});
+            _atm_indexes[ij_idx] = T2Index({atmidx[i], atmidx[j]});
 
             for (int64_t k = 0; k < npgtos; k++)
             {
+                const auto koff = k * ncgtos + i;
+                
                 for (int64_t l = 0; l < npgtos; l++)
                 {
-                    _exponents.push_back({gexps[ioff + k], gexps[joff + l]});
+                    const auto loff = l * ncgtos + j; 
+                 
+                    const auto ijoff = (k * npgtos + l) * cdim + ij_idx;
+                    
+                    _exponents[ijoff] = TPoint2D({gexps[koff], gexps[loff]});
 
-                    _norms.push_back({gnorms[ioff + k], gnorms[joff + l]});
+                    _norms[ijoff] = TPoint2D({gnorms[koff], gnorms[loff]});
                 }
             }
         }
@@ -165,17 +171,17 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock& bra_gto_block, const CGtoBlock& ke
 
     const auto cdim = bcgtos * kcgtos;
 
-    _coordinates.reserve(cdim);
+    _coordinates = std::vector<TPairOfPoints3D>(cdim, TPairOfPoints3D());
 
-    _orb_indexes.reserve(cdim);
+    _orb_indexes = std::vector<T2Index>(cdim + 1, T2Index());
 
-    _atm_indexes.reserve(cdim);
+    _atm_indexes = std::vector<T2Index>(cdim, T2Index());
 
     const auto pdim = cdim * bpgtos * kpgtos;
 
-    _exponents.reserve(pdim);
+    _exponents = std::vector<TPoint2D>(pdim, TPoint2D({0.0, 0.0}));
 
-    _norms.reserve(pdim);
+    _norms = std::vector<TPoint2D>(pdim, TPoint2D({0.0, 0.0}));
 
     // set up GTO pairs data
 
@@ -183,7 +189,7 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock& bra_gto_block, const CGtoBlock& ke
 
     const auto kangmom = ket_gto_block.getAngularMomentum();
 
-    _orb_indexes.push_back({borbidx[0], korbidx[0]});
+    _orb_indexes[0] = T2Index({borbidx[0], korbidx[0]});
 
     _angmoms = {bangmom, kangmom};
 
@@ -191,25 +197,29 @@ CGtoPairBlock::CGtoPairBlock(const CGtoBlock& bra_gto_block, const CGtoBlock& ke
 
     for (int64_t i = 0; i < bcgtos; i++)
     {
-        const auto ioff = i * bpgtos;
-
         for (int64_t j = 0; j < kcgtos; j++)
         {
-            const auto joff = j * kpgtos;
+            const auto ij_idx = i * kcgtos + j;
 
-            _coordinates.push_back({bcoords[i], kcoords[j]});
+            _coordinates[ij_idx] = TPairOfPoints3D({bcoords[i], kcoords[j]});
 
-            _orb_indexes.push_back({borbidx[i + 1], korbidx[j + 1]});
+            _orb_indexes[ij_idx + 1] = T2Index({borbidx[i + 1], korbidx[j + 1]});
 
-            _atm_indexes.push_back({batmidx[i], katmidx[j]});
+            _atm_indexes[ij_idx] = T2Index({batmidx[i], katmidx[j]});
 
             for (int64_t k = 0; k < bpgtos; k++)
             {
+                const auto koff = k * bcgtos + i;
+                
                 for (int64_t l = 0; l < kpgtos; l++)
                 {
-                    _exponents.push_back({bexps[ioff + k], kexps[joff + l]});
+                    const auto loff = l * kcgtos + j;
+                 
+                    const auto ijoff = (k * kpgtos + l) * cdim + ij_idx;
+                    
+                    _exponents[ijoff] = TPoint2D({bexps[koff], kexps[loff]});
 
-                    _norms.push_back({bnorms[ioff + k], knorms[joff + l]});
+                    _norms[ijoff] = TPoint2D({bnorms[koff], knorms[loff]});
                 }
             }
         }
