@@ -10,6 +10,7 @@
 #include "Codata.hpp"
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
+#include "PartialCharges.hpp"
 #include "StringFormat.hpp"
 
 namespace vlx_moldata {  // vlx_moldata namespace
@@ -65,6 +66,11 @@ export_moldata(py::module& m)
         .def("get_identifiers", &CMolecule::getIdsElemental, "Gets a vector of elemental identidiers in molecule.")
         .def("get_coordinates", &CMolecule::getCoordinates, py::arg("units") = "au", "Gets coordinates of atoms in molecules")
         .def("get_charges", &CMolecule::getCharges, "Gets a vector of atomic charges in molecule.")
+        .def("get_element_ids", &CMolecule::getCharges, "Gets a vector of atomic charges in molecule.")
+        .def(
+            "get_partial_charges",
+            [](const CMolecule& self, const double net_charge) -> std::vector<double> { return parchg::getPartialCharges(self, net_charge); },
+            "Gets partial charges for molecule.")
         .def("get_masses", &CMolecule::getMasses, "Gets a vector of atomic masses in molecule.")
         .def("get_labels", &CMolecule::getLabels, "Gets a vector of atomic labels in molecule.")
         .def("get_label", &CMolecule::getLabel, "Gets an atomic labels of specific atom in molecule.")

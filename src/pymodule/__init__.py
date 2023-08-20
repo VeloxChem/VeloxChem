@@ -42,5 +42,6 @@ from .molecule import Molecule
 from .molecularbasis import MolecularBasis
 from .submatrix import SubMatrix
 from .matrix import Matrix
+from .sadguessdriver import SadGuessDriver
 
 __version__ = "1.0rc0"
