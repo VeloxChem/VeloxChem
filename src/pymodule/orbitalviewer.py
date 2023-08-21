@@ -46,6 +46,8 @@ class OrbitalViewer:
         - grid_margins: Minimal distance in a.u. between the box edge and all
           atomic nuclei
         - atombox_radius: Radius in a.u. of the atomix grid
+        - atom_centers: List of atomic indices around which the box is focused
+          (default all)
         - mo_threshold: Do not compute AO contribution if corresponding MO
           coefficient is below this value
     """
@@ -70,31 +72,32 @@ class OrbitalViewer:
         # flag for using interpolation when computing orbitals
         self.interpolate = False
 
+        # To focus the grid around only specific atoms (for large systems)
+        self.atom_centers = None
+
         # molecule
-        self.molecule = None
-        self.basis = None
-        self.atomnr = None
-        self.coords = None
+        self._atomnr = None
+        self._coords = None
 
         # grid
-        self.grid = None
+        self._grid = None
         self.origin = None
         self.stepsize = None
         self.npoints = None
-        self.atom_origin = None
-        self.atom_npoints = None
+        self._atom_origin = None
+        self._atom_npoints = None
 
         # orbital
-        self.ao_to_atom = None
-        self.ao_dict = None
-        self.i_orb = None
-        self.mo_coefs = None
-        self.is_uhf = False
+        self._ao_to_atom = None
+        self._ao_dict = None
+        self._i_orb = None
+        self._mo_coefs = None
+        self._is_uhf = False
 
         # plot
-        self.this_plot = None
-        self.plt_iso_one = None
-        self.plt_iso_two = None
+        self._this_plot = None
+        self._plt_iso_one = None
+        self._plt_iso_two = None
 
     def help_string_k3d(self):
 
@@ -118,18 +121,24 @@ class OrbitalViewer:
             The AO basis set.
         """
 
-        self.molecule = molecule
-        self.basis = basis
-
         # Define box size
-        self.atomnr = molecule.elem_ids_to_numpy()
-        self.coords = molecule.get_coordinates_in_bohr()
-        xmin = self.coords[:, 0].min() - self.grid_margins
-        xmax = self.coords[:, 0].max() + self.grid_margins
-        ymin = self.coords[:, 1].min() - self.grid_margins
-        ymax = self.coords[:, 1].max() + self.grid_margins
-        zmin = self.coords[:, 2].min() - self.grid_margins
-        zmax = self.coords[:, 2].max() + self.grid_margins
+        self._atomnr = molecule.elem_ids_to_numpy()
+        self._coords = molecule.get_coordinates_in_bohr()
+        if self.atom_centers is None:
+            xmin = self._coords[:, 0].min() - self.grid_margins
+            xmax = self._coords[:, 0].max() + self.grid_margins
+            ymin = self._coords[:, 1].min() - self.grid_margins
+            ymax = self._coords[:, 1].max() + self.grid_margins
+            zmin = self._coords[:, 2].min() - self.grid_margins
+            zmax = self._coords[:, 2].max() + self.grid_margins
+        else:
+            xmin = self._coords[self.atom_centers, 0].min() - self.grid_margins
+            xmax = self._coords[self.atom_centers, 0].max() + self.grid_margins
+            ymin = self._coords[self.atom_centers, 1].min() - self.grid_margins
+            ymax = self._coords[self.atom_centers, 1].max() + self.grid_margins
+            zmin = self._coords[self.atom_centers, 2].min() - self.grid_margins
+            zmax = self._coords[self.atom_centers, 2].max() + self.grid_margins
+
         nx = math.ceil((xmax - xmin) * self.grid_density)
         ny = math.ceil((ymax - ymin) * self.grid_density)
         nz = math.ceil((zmax - zmin) * self.grid_density)
@@ -140,18 +149,18 @@ class OrbitalViewer:
         self.origin = (xmin, ymin, zmin)
         self.stepsize = (dx, dy, dz)
         self.npoints = (nx, ny, nz)
-        self.grid = CubicGrid(self.origin, self.stepsize, self.npoints)
+        self._grid = CubicGrid(self.origin, self.stepsize, self.npoints)
 
         # Create a small box for each atom
         nx_atom = math.ceil(self.atombox_radius / dx * 2)
         ny_atom = math.ceil(self.atombox_radius / dy * 2)
         nz_atom = math.ceil(self.atombox_radius / dz * 2)
-        self.atom_origin = (-nx_atom * dx / 2, -ny_atom * dy / 2,
-                            -nz_atom * dz / 2)
-        self.atom_npoints = (nx_atom, ny_atom, nz_atom)
+        self._atom_origin = (-nx_atom * dx / 2, -ny_atom * dy / 2,
+                             -nz_atom * dz / 2)
+        self._atom_npoints = (nx_atom, ny_atom, nz_atom)
 
-        atom_grid = CubicGrid(self.atom_origin, self.stepsize,
-                              self.atom_npoints)
+        atom_grid = CubicGrid(self._atom_origin, self.stepsize,
+                              self._atom_npoints)
 
         # Create atomic map
         vis_drv = VisualizationDriver()
@@ -159,21 +168,21 @@ class OrbitalViewer:
 
         # Create reverse atomic map
         atom_to_ao = vis_drv.map_atom_to_atomic_orbitals(molecule, basis)
-        self.ao_to_atom = [[] for i in range(len(ao_info))]
+        self._ao_to_atom = [[] for i in range(len(ao_info))]
         for i_atom, atom_orbs in enumerate(atom_to_ao):
             for i_orb, orb in enumerate(atom_orbs):
-                self.ao_to_atom[orb] = [i_atom, i_orb]
+                self._ao_to_atom[orb] = [i_atom, i_orb]
 
         # Compute each unique AO on the grid
-        self.ao_dict = {}
-        for i_atom, atom in enumerate(self.atomnr):
-            if atom not in self.ao_dict:
+        self._ao_dict = {}
+        for i_atom, atom in enumerate(self._atomnr):
+            if atom not in self._ao_dict:
                 atomlist = []
                 for orb in atom_to_ao[i_atom]:
                     vis_drv.compute_atomic_orbital_for_grid(
                         atom_grid, basis, ao_info[orb])
                     atomlist.append(atom_grid.values_to_numpy())
-                self.ao_dict[atom] = atomlist
+                self._ao_dict[atom] = atomlist
 
     def compute_orbital(self, orbital, index):
         """
@@ -209,27 +218,36 @@ class OrbitalViewer:
         this_orb = orbital[:, index]
 
         # Create full grid
-        nx, ny, nz = self.atom_npoints
+        nx, ny, nz = self._atom_npoints
         np_orb = np.zeros(self.npoints)
 
         # Loop over AOs
         for i_coef, coef in enumerate(this_orb):
             if abs(coef) > self.mo_threshold:
-                i_atom, i_orb = self.ao_to_atom[i_coef]
-                this_atom = self.atomnr[i_atom]
-                atom_orb = self.ao_dict[this_atom][i_orb]
+                i_atom, i_orb = self._ao_to_atom[i_coef]
+                this_atom = self._atomnr[i_atom]
+                atom_orb = self._ao_dict[this_atom][i_orb]
                 t = np.round(
-                    (self.coords[i_atom] - self.origin + self.atom_origin) /
+                    (self._coords[i_atom] - self.origin + self._atom_origin) /
                     self.stepsize).astype('int')
                 ncopy = [nx, ny, nz]
                 p1 = [0, 0, 0]
+                discard = False
                 for i in range(3):
+                    if t[i] >= self.npoints[i]:
+                        discard = True
+                        break
+                    if t[i] + ncopy[i] < 0:
+                        discard = True
+                        break
                     if t[i] < 0:
                         p1[i] = -t[i]
                         t[i] = 0
                         ncopy[i] -= p1[i]
                     if t[i] + ncopy[i] >= self.npoints[i]:
                         ncopy[i] = self.npoints[i] - t[i]
+                if discard:
+                    continue
                 np_orb[t[0]:t[0] + ncopy[0], t[1]:t[1] + ncopy[1], t[2]:t[2] +
                        ncopy[2]] += coef * atom_orb[p1[0]:p1[0] + ncopy[0],
                                                     p1[1]:p1[1] + ncopy[1],
@@ -253,7 +271,7 @@ class OrbitalViewer:
         this_orb = orbital[:, index]
 
         # Create full grid
-        nx, ny, nz = self.atom_npoints
+        nx, ny, nz = self._atom_npoints
         np_orb = np.zeros(self.npoints)
 
         ijk_inds = [(i, j, k) for i in [0, 1] for j in [0, 1] for k in [0, 1]]
@@ -261,12 +279,12 @@ class OrbitalViewer:
         # Loop over AOs
         for i_coef, orb_coef in enumerate(this_orb):
             if abs(orb_coef) > self.mo_threshold:
-                i_atom, i_orb = self.ao_to_atom[i_coef]
-                this_atom = self.atomnr[i_atom]
-                atom_orb = self.ao_dict[this_atom][i_orb]
+                i_atom, i_orb = self._ao_to_atom[i_coef]
+                this_atom = self._atomnr[i_atom]
+                atom_orb = self._ao_dict[this_atom][i_orb]
 
-                t = (self.coords[i_atom] - self.origin +
-                     self.atom_origin) / self.stepsize
+                t = (self._coords[i_atom] - self.origin +
+                     self._atom_origin) / self.stepsize
                 t_floor = np.floor(t)
                 alpha = t - t_floor
 
@@ -285,7 +303,14 @@ class OrbitalViewer:
                     ncopy = [nx, ny, nz]
                     p1 = [0, 0, 0]
 
+                    discard = False
                     for i in range(3):
+                        if t[i] >= self.npoints[i]:
+                            discard = True
+                            break
+                        if t[i] + ncopy[i] < 0:
+                            discard = True
+                            break
                         # match lower bound
                         if t1[i] < 0:
                             p1[i] = -t1[i]
@@ -294,7 +319,8 @@ class OrbitalViewer:
                         # match upper bound
                         if t1[i] + ncopy[i] > self.npoints[i]:
                             ncopy[i] = self.npoints[i] - t1[i]
-
+                    if discard:
+                        continue
                     np_orb[
                         t1[0]:t1[0] + ncopy[0],
                         t1[1]:t1[1] + ncopy[1],
@@ -340,41 +366,42 @@ class OrbitalViewer:
 
         self.initialize(molecule, basis)
 
-        self.is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
+        self._is_uhf = (mo_object.get_orbitals_type() == molorb.unrest)
 
         # i_orb is an instance variable accessed by MultiPsi
-        self.i_orb = self.molecule.number_of_alpha_electrons() - 1
-        self.mo_coefs = mo_object.alpha_to_numpy()
+        self._i_orb = molecule.number_of_alpha_electrons() - 1
+        self._mo_coefs = mo_object.alpha_to_numpy()
 
         # In some cases (for example NTOs) the number of orbitals is less than
         # the number of electrons. In this case, print the middle orbital
-        if self.mo_coefs.shape[1] < self.molecule.number_of_alpha_electrons():
-            self.i_orb = self.mo_coefs.shape[1] // 2
-        if self.is_uhf:
-            self.mo_coefs_beta = mo_object.beta_to_numpy()
+        if self._mo_coefs.shape[1] < molecule.number_of_alpha_electrons():
+            self._i_orb = self._mo_coefs.shape[1] // 2
+        if self._is_uhf:
+            self._mo_coefs_beta = mo_object.beta_to_numpy()
         else:
-            self.mo_coefs_beta = self.mo_coefs
+            self._mo_coefs_beta = self._mo_coefs
 
-        self.this_plot = k3d.plot(grid_visible=False)
-        plt_atoms, plt_bonds = self.draw_molecule(self.molecule)
-        self.this_plot += plt_atoms
+        self._this_plot = k3d.plot(grid_visible=False)
+        plt_atoms, plt_bonds = self.draw_molecule(molecule)
+        self._this_plot += plt_atoms
         for bonds in plt_bonds:
-            self.this_plot += bonds
+            self._this_plot += bonds
 
-        orbital = self.compute_orbital(self.mo_coefs, self.i_orb)
-        self.plt_iso_one, self.plt_iso_two = self.draw_orbital(orbital)
-        self.this_plot += self.plt_iso_one
-        self.this_plot += self.plt_iso_two
-        self.this_plot.display()
+        orbital = self.compute_orbital(self._mo_coefs, self._i_orb)
+        self._plt_iso_one, self._plt_iso_two = self.draw_orbital(orbital)
+        self._this_plot += self._plt_iso_one
+        self._this_plot += self._plt_iso_two
+        self._this_plot.display()
 
         # Create orbital list:
         orb_ene = mo_object.ea_to_numpy()
         orb_occ = mo_object.occa_to_numpy()
         orb_occ_beta = mo_object.occb_to_numpy()
-        if not self.is_uhf:
+        if not self._is_uhf:
             # In case of NTO, only print alpha occupation numbers (lambda's)
             # Otherwise print the sum of alpha and beta occupation numbers
-            if mo_object.get_orbitals_type() != molorb.rest or not mo_object.is_nto():
+            if (mo_object.get_orbitals_type() != molorb.rest or
+                    not mo_object.is_nto()):
                 orb_occ += orb_occ_beta
         orblist = []
         for i in range(len(orb_ene)):
@@ -383,7 +410,7 @@ class OrbitalViewer:
             orblist.append((orb_label, i))
 
         # Also do for beta if UHF
-        if self.is_uhf:
+        if self._is_uhf:
             orb_ene_beta = mo_object.eb_to_numpy()
             orblist_beta = [('', -1)]
             for i in range(len(orb_ene_beta)):
@@ -395,7 +422,9 @@ class OrbitalViewer:
             orblist.insert(0, ('', -1))
             # Add widget
             self.orbital_selector = widgets.Dropdown(
-                options=orblist, value=self.i_orb, description='Alpha orbital:')
+                options=orblist,
+                value=self._i_orb,
+                description='Alpha orbital:')
             self.orbital_selector_beta = widgets.Dropdown(
                 options=orblist_beta, value=-1, description='Beta orbital:')
             hbox = widgets.HBox(
@@ -406,7 +435,7 @@ class OrbitalViewer:
         else:
             # Add widget
             self.orbital_selector = widgets.Dropdown(options=orblist,
-                                                     value=self.i_orb,
+                                                     value=self._i_orb,
                                                      description='Orbital:')
             display(self.orbital_selector)
         self.orbital_selector.observe(self.on_orbital_index_change,
@@ -428,27 +457,27 @@ class OrbitalViewer:
         if i_orb < 0:
             return
 
-        self.i_orb = i_orb
+        self._i_orb = i_orb
 
         # To avoid disturbing the current view
-        self.this_plot.camera_auto_fit = False
-        self.this_plot -= self.plt_iso_one
-        self.this_plot -= self.plt_iso_two
+        self._this_plot.camera_auto_fit = False
+        self._this_plot -= self._plt_iso_one
+        self._this_plot -= self._plt_iso_two
 
         if spin == 'alpha':
-            if self.is_uhf:
+            if self._is_uhf:
                 # Reset the beta index to blank if exists
                 self.orbital_selector_beta.value = -1
-            orbital = self.compute_orbital(self.mo_coefs, self.i_orb)
+            orbital = self.compute_orbital(self._mo_coefs, self._i_orb)
         else:
             # Reset the alpha index to blank
             self.orbital_selector.value = -1
-            orbital = self.compute_orbital(self.mo_coefs_beta, self.i_orb)
+            orbital = self.compute_orbital(self._mo_coefs_beta, self._i_orb)
 
-        self.plt_iso_one, self.plt_iso_two = self.draw_orbital(orbital)
-        self.this_plot += self.plt_iso_one
-        self.this_plot += self.plt_iso_two
-        self.this_plot.render()
+        self._plt_iso_one, self._plt_iso_two = self.draw_orbital(orbital)
+        self._this_plot += self._plt_iso_one
+        self._this_plot += self._plt_iso_two
+        self._this_plot.render()
 
     def on_orbital_index_change_beta(self, change):
         """
@@ -540,30 +569,47 @@ class OrbitalViewer:
                                group='Molecule')
 
         # Sticks
-        plt_bonds = []
+        # Create a lines object for each atom type
+        bonddict = {}
+        labels = molecule.get_labels()
+        names = {}
         for i in range(natoms):
-            color_i = colors[i]
+            if atomnr[i] not in bonddict:
+                bonddict[atomnr[i]] = []
+            if atomnr[i] not in names:
+                names[atomnr[i]] = labels[i]
+
+        newcoords = []
+        ncoords = natoms
+        for i in range(natoms):
             for j in range(i + 1, natoms):
+                # Check if there is a bond
                 bond = (radii[i] + radii[j]) / bohr_in_angstrom()
                 if np.linalg.norm(coords[i, :] - coords[j, :]) > 1.25 * bond:
                     continue
-                color_j = colors[j]
-                plt_bonds.append(
-                    k3d.line(
-                        [coords[i, :], 0.5 * (coords[i, :] + coords[j, :])],
-                        width=0.35,
-                        colors=[color_i, color_i],
-                        shader='mesh',
-                        radial_segments=16,
-                        group='Molecule'))
-                plt_bonds.append(
-                    k3d.line(
-                        [0.5 * (coords[i, :] + coords[j, :]), coords[j, :]],
-                        width=0.35,
-                        colors=[color_j, color_j],
-                        shader='mesh',
-                        radial_segments=16,
-                        group='Molecule'))
+                # If single atom type, just record it
+                if atomnr[i] == atomnr[j]:
+                    bonddict[atomnr[i]].append([i, j])
+                # Else do 2 segments (which means adding a new middle-vertex)
+                else:
+                    newcoords.append(0.5 * (coords[i, :] + coords[j, :]))
+                    bonddict[atomnr[i]].append([i, ncoords])
+                    bonddict[atomnr[j]].append([ncoords, j])
+                    ncoords += 1
+
+        finalcoords = np.append(coords, newcoords)
+        plt_bonds = []
+        for atom, bondlist in bonddict.items():
+            plt_bonds.append(
+                k3d.lines(finalcoords,
+                          bondlist,
+                          width=0.35,
+                          color=int(atomcolor[atom]),
+                          shader='mesh',
+                          radial_segments=16,
+                          indices_type='segment',
+                          name=names[atom] + ' bonds',
+                          group='Molecule'))
 
         return plt_atoms, plt_bonds
 
@@ -589,9 +635,9 @@ class OrbitalViewer:
         orbital_k3d = orbital.swapaxes(0, 2).astype('float32')
 
         # Plot orbitals
-        xmin, ymin, zmin = self.grid.get_origin()
-        dx, dy, dz = self.grid.get_step_size()
-        nx, ny, nz = self.grid.get_num_points()
+        xmin, ymin, zmin = self._grid.get_origin()
+        dx, dy, dz = self._grid.get_step_size()
+        nx, ny, nz = self._grid.get_num_points()
         xmax = xmin + (nx - 1) * dx
         ymax = ymin + (ny - 1) * dy
         zmax = zmin + (nz - 1) * dz
@@ -600,16 +646,16 @@ class OrbitalViewer:
 
         # Default settings
         isovalue = 0.05
-        opacity = 1.0
+        opacity = 0.7
         wireframe = False
         color = 0x0000ff
 
         # Find if the user changed the defaults
-        if self.plt_iso_one:
-            isovalue = self.plt_iso_one.level
-            opacity = self.plt_iso_one.opacity
-            wireframe = self.plt_iso_one.wireframe
-            color = self.plt_iso_one.color
+        if self._plt_iso_one:
+            isovalue = self._plt_iso_one.level
+            opacity = self._plt_iso_one.opacity
+            wireframe = self._plt_iso_one.wireframe
+            color = self._plt_iso_one.color
 
         plt_iso_one = k3d.marching_cubes(orbital_k3d,
                                          compression_level=9,
@@ -625,11 +671,11 @@ class OrbitalViewer:
         # Find if the user changed the defaults
         isovalue = -isovalue
         color = 0xff0000
-        if self.plt_iso_two:
-            isovalue = self.plt_iso_two.level
-            opacity = self.plt_iso_two.opacity
-            wireframe = self.plt_iso_two.wireframe
-            color = self.plt_iso_two.color
+        if self._plt_iso_two:
+            isovalue = self._plt_iso_two.level
+            opacity = self._plt_iso_two.opacity
+            wireframe = self._plt_iso_two.wireframe
+            color = self._plt_iso_two.color
 
         plt_iso_two = k3d.marching_cubes(orbital_k3d,
                                          compression_level=9,

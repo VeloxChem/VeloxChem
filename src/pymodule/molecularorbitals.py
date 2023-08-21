@@ -40,7 +40,7 @@ from .errorhandler import assert_msg_critical
 def _MolecularOrbitals_print_orbitals(self,
                                       molecule,
                                       ao_basis,
-                                      all_orbs=False,
+                                      orb_inds=None,
                                       ostream=None):
     """
     Prints molecular orbitals to output stream.
@@ -49,8 +49,8 @@ def _MolecularOrbitals_print_orbitals(self,
         The molecule.
     :param ao_basis:
         The AO basis set.
-    :param all_orbs:
-        The flag to print all orbitals.
+    :param orb_inds:
+        The starting and ending indices of orbitals.
     :param ostream:
         The output stream.
     """
@@ -70,10 +70,16 @@ def _MolecularOrbitals_print_orbitals(self,
 
         nocc = molecule.number_of_electrons() // 2
 
-        if all_orbs:
-            nstart, nend = 0, norb
+        if isinstance(orb_inds, (np.ndarray, tuple, list)):
+            assert_msg_critical(
+                len(orb_inds) == 2, 'MolecularOrbitals.print_orbitals: ' +
+                'Expecting starting and ending indices of orbitals')
+            nstart, nend = max(0, orb_inds[0]), min(norb, orb_inds[1])
         else:
-            nstart, nend = max(0, nocc - 5), min(norb, nocc + 5)
+            if not orb_inds:
+                nstart, nend = max(0, nocc - 5), min(norb, nocc + 5)
+            else:
+                nstart, nend = 0, norb
 
         rvecs = self.alpha_to_numpy()
         reigs = self.ea_to_numpy()
@@ -94,10 +100,16 @@ def _MolecularOrbitals_print_orbitals(self,
 
         nalpha = molecule.number_of_alpha_electrons()
 
-        if all_orbs:
-            nstart, nend = 0, norb
+        if isinstance(orb_inds, (np.ndarray, tuple, list)):
+            assert_msg_critical(
+                len(orb_inds) == 2, 'MolecularOrbitals.print_orbitals: ' +
+                'Expecting starting and ending indices of orbitals')
+            nstart, nend = max(0, orb_inds[0]), min(norb, orb_inds[1])
         else:
-            nstart, nend = max(0, nalpha - 5), min(norb, nalpha + 5)
+            if not orb_inds:
+                nstart, nend = max(0, nalpha - 5), min(norb, nalpha + 5)
+            else:
+                nstart, nend = 0, norb
 
         uvecs = self.alpha_to_numpy()
         ueigs = self.ea_to_numpy()
@@ -114,10 +126,16 @@ def _MolecularOrbitals_print_orbitals(self,
 
         nbeta = molecule.number_of_beta_electrons()
 
-        if all_orbs:
-            nstart, nend = 0, norb
+        if isinstance(orb_inds, (np.ndarray, tuple, list)):
+            assert_msg_critical(
+                len(orb_inds) == 2, 'MolecularOrbitals.print_orbitals: ' +
+                'Expecting starting and ending indices of orbitals')
+            nstart, nend = max(0, orb_inds[0]), min(norb, orb_inds[1])
         else:
-            nstart, nend = max(0, nbeta - 5), min(norb, nbeta + 5)
+            if not orb_inds:
+                nstart, nend = max(0, nbeta - 5), min(norb, nbeta + 5)
+            else:
+                nstart, nend = 0, norb
 
         uvecs = self.beta_to_numpy()
         ueigs = self.eb_to_numpy()

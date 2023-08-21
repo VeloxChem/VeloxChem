@@ -266,7 +266,7 @@ CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int32_t np, const double* rho
     auto stage_vrho   = (alloc) ? mem::malloc<double>(2 * np) : &_stagingBuffer[1 * _ldStaging];
     auto stage_vsigma = (alloc) ? mem::malloc<double>(3 * np) : &_stagingBuffer[3 * _ldStaging];
 
-#pragma omp simd aligned(exc, vrho : VLX_ALIGN)
+#pragma omp simd aligned(exc, vrho, vsigma : VLX_ALIGN)
     for (auto g = 0; g < np; ++g)
     {
         exc[g] = 0.0;
@@ -304,10 +304,17 @@ CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int32_t np, const double* rho
 
             vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
             vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+        }
 
-            vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
-            vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
-            vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+        if (fstr::upcase(funcname) != "TSLATER" && fstr::upcase(funcname) != "TVWN")
+        {
+#pragma omp simd aligned(vsigma, stage_vsigma : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
+                vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
+                vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
+            }
         }
     }
 
