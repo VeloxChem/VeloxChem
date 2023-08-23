@@ -405,6 +405,28 @@ class PolOrbitalResponse(CphfSolver):
         if 'vector_components' in orbrsp_dict:
             self.vector_components = orbrsp_dict['vector_components']
 
+    @staticmethod
+    def get_full_solution_vector(solution):
+        """
+        Gets a full solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector.
+        """
+
+        x_ger = solution.get_full_vector(0)
+        x_ung = solution.get_full_vector(1)
+
+        if solution.rank == mpi_master():
+            x_ger_full = np.hstack((x_ger, x_ger))
+            x_ung_full = np.hstack((x_ung, -x_ung))
+            return x_ger_full + x_ung_full
+        else:
+            return None
+
     def compute_rhs(self, molecule, basis, scf_tensors, lr_results):
         """
         Computes the right-hand side (RHS) of the polarizability
@@ -461,12 +483,23 @@ class PolOrbitalResponse(CphfSolver):
                 error_text += "found in linear response results."
                 raise ValueError(error_text)
 
+            ## Take response vectors and convert to matrix form
+            #exc_vec = 1/sqrt2 * np.array([lr_results['solutions'][x,
+            #                    self.frequency][:nocc * nvir].reshape(nocc,nvir)
+            #                    for x in self.vector_components])
+            #deexc_vec = 1/sqrt2 * np.array([lr_results['solutions'][x,
+            #                    self.frequency][nocc * nvir:].reshape(nocc,nvir)
+            #                    for x in self.vector_components])
             # Take response vectors and convert to matrix form
-            exc_vec = 1/sqrt2 * np.array([lr_results['solutions'][x,
-                                self.frequency][:nocc * nvir].reshape(nocc, nvir)
+            exc_vec = 1/sqrt2 * np.array([self.get_full_solution_vector(
+                                lr_results['solutions'][x,
+                                self.frequency])[:nocc * nvir].reshape(nocc,
+                                                                       nvir)
                                 for x in self.vector_components])
-            deexc_vec = 1/sqrt2 * np.array([lr_results['solutions'][x,
-                                self.frequency][nocc * nvir:].reshape(nocc, nvir)
+            deexc_vec = 1/sqrt2 * np.array([self.get_full_solution_vector(
+                                  lr_results['solutions'][x,
+                                  self.frequency])[nocc * nvir:].reshape(nocc,
+                                                                         nvir)
                                 for x in self.vector_components])
 
             # Number of vector components
@@ -823,12 +856,23 @@ class PolOrbitalResponse(CphfSolver):
             sqrt2 = np.sqrt(2.0)
 
             # Take response vectors and convert to matrix form
-            exc_vec = 1/sqrt2 * np.array([lr_results['solutions'][x,
-                               self.frequency][:nocc * nvir].reshape(nocc, nvir)
-                                    for x in self.vector_components])
-            deexc_vec = 1/sqrt2 * np.array([lr_results['solutions'][x,
-                               self.frequency][nocc * nvir:].reshape(nocc, nvir)
-                                    for x in self.vector_components])
+            #exc_vec = 1/sqrt2 * np.array([lr_results['solutions'][x,
+            #                   self.frequency][:nocc * nvir].reshape(nocc, nvir)
+            #                        for x in self.vector_components])
+            #deexc_vec = 1/sqrt2 * np.array([lr_results['solutions'][x,
+            #                   self.frequency][nocc * nvir:].reshape(nocc, nvir)
+            #                        for x in self.vector_components])
+
+            exc_vec = 1/sqrt2 * np.array([self.get_full_solution_vector(
+                                lr_results['solutions'][x,
+                                self.frequency])[:nocc * nvir].reshape(nocc,
+                                                                       nvir)
+                                for x in self.vector_components])
+            deexc_vec = 1/sqrt2 * np.array([self.get_full_solution_vector(
+                                  lr_results['solutions'][x,
+                                  self.frequency])[nocc * nvir:].reshape(nocc,
+                                                                         nvir)
+                                for x in self.vector_components])
 
             # Number of vector components
             dof = exc_vec.shape[0]
