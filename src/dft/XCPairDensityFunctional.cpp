@@ -47,28 +47,18 @@ CXCPairDensityFunctional::CXCPairDensityFunctional(const std::string&           
 
     _components.clear();
 
+    bool isPLDA = false, isPGGA = false;
+
     for (int32_t i = 0; i < static_cast<int32_t>(labels.size()); i++)
     {
         _components.push_back(std::make_tuple(labels[i], coeffs[i]));
+
+        isPGGA = (isPGGA || _isComponentPGGA(labels[i]));
+        isPLDA = ((!isPGGA) && (isPLDA || _isComponentPLDA(labels[i])));
     }
 
-    // TODO: make a more general system to find out family
-    if (fstr::upcase(nameOfFunctional) == "TLDA")
-    {
-        _familyOfFunctional = std::string("PLDA");
-    }
-    else if (fstr::upcase(nameOfFunctional) == "TSLATER")
-    {
-        _familyOfFunctional = std::string("PLDA");
-    }
-    else if (fstr::upcase(nameOfFunctional) == "TPBE")
-    {
-        _familyOfFunctional = std::string("PGGA");
-    }
-    else if (fstr::upcase(nameOfFunctional) == "TBLYP")
-    {
-        _familyOfFunctional = std::string("PGGA");
-    }
+    if (isPLDA) _familyOfFunctional = std::string("PLDA");
+    if (isPGGA) _familyOfFunctional = std::string("PGGA");
 
     _allocateStagingBuffer();
 }
@@ -133,6 +123,90 @@ CXCPairDensityFunctional::_freeStagingBuffer()
         mem::free(_stagingBuffer);
 
         _stagingBuffer = nullptr;
+    }
+}
+
+bool
+CXCPairDensityFunctional::_isComponentPLDA(const std::string& compName) const
+{
+    auto upcasename = fstr::upcase(compName);
+
+    if (upcasename == "TSLATER") return true;
+
+    if (upcasename == "TVWN") return true;
+
+    return false;
+}
+
+bool
+CXCPairDensityFunctional::_isComponentPGGA(const std::string& compName) const
+{
+    auto upcasename = fstr::upcase(compName);
+
+    if (upcasename == "TPBE_X") return true;
+
+    if (upcasename == "TPBE_C") return true;
+
+    if (upcasename == "TB88") return true;
+
+    if (upcasename == "TLYP") return true;
+
+    return false;
+}
+
+void
+CXCPairDensityFunctional::_plda_exc_vxc(const std::string& compName, const int32_t np, const double* rho, double* exc, double* vrho) const
+{
+    auto upcasename = fstr::upcase(compName);
+
+    if (upcasename == "TSLATER")
+    {
+        pdftslater::compute_exc_vxc(np, rho, exc, vrho);
+    }
+    else if (upcasename == "TVWN")
+    {
+        pdftvwn::compute_exc_vxc(np, rho, exc, vrho);
+    }
+    else
+    {
+        std::string errmsg("XCPairDensityFunctional._plda_exc_vxc: Invalid functional name");
+
+        errors::assertMsgCritical(false, errmsg);
+    }
+}
+
+void
+CXCPairDensityFunctional::_pgga_exc_vxc(const std::string& compName,
+                                        const int32_t      np,
+                                        const double*      rho,
+                                        const double*      sigma,
+                                        double*            exc,
+                                        double*            vrho,
+                                        double*            vsigma) const
+{
+    auto upcasename = fstr::upcase(compName);
+
+    if (upcasename == "TPBE_X")
+    {
+        pdftpbe_x::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma);
+    }
+    else if (upcasename == "TPBE_C")
+    {
+        pdftpbe_c::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma);
+    }
+    else if (upcasename == "TB88")
+    {
+        pdftb88::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma);
+    }
+    else if (upcasename == "TLYP")
+    {
+        pdftlyp::compute_exc_vxc(np, rho, sigma, exc, vrho, vsigma);
+    }
+    else
+    {
+        std::string errmsg("XCPairDensityFunctional._pgga_exc_vxc: Invalid functional name");
+
+        errors::assertMsgCritical(false, errmsg);
     }
 }
 
@@ -232,19 +306,20 @@ CXCPairDensityFunctional::compute_exc_vxc_for_plda(int32_t np, const double* rho
     {
         const auto funcname = std::get<0>(comp);
 
-        if (fstr::upcase(funcname) == "TSLATER") pdftslater::compute_exc_vxc(np, rho, stage_exc, stage_vrho);
-
-        if (fstr::upcase(funcname) == "TVWN") pdftvwn::compute_exc_vxc(np, rho, stage_exc, stage_vrho);
-
         const auto c = std::get<1>(comp);
 
-#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
+        if (_isComponentPLDA(funcname))
         {
-            exc[g] += c * stage_exc[g];
+            _plda_exc_vxc(funcname, np, rho, stage_exc, stage_vrho);
 
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                exc[g] += c * stage_exc[g];
+
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+            }
         }
     }
 
@@ -283,34 +358,33 @@ CXCPairDensityFunctional::compute_exc_vxc_for_pgga(int32_t np, const double* rho
     {
         const auto funcname = std::get<0>(comp);
 
-        if (fstr::upcase(funcname) == "TSLATER") pdftslater::compute_exc_vxc(np, rho, stage_exc, stage_vrho);
-
-        if (fstr::upcase(funcname) == "TVWN") pdftvwn::compute_exc_vxc(np, rho, stage_exc, stage_vrho);
-
-        if (fstr::upcase(funcname) == "TPBE_X") pdftpbe_x::compute_exc_vxc(np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
-
-        if (fstr::upcase(funcname) == "TPBE_C") pdftpbe_c::compute_exc_vxc(np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
-
-        if (fstr::upcase(funcname) == "TB88") pdftb88::compute_exc_vxc(np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
-
-        if (fstr::upcase(funcname) == "TLYP") pdftlyp::compute_exc_vxc(np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
-
         const auto c = std::get<1>(comp);
 
+        if (_isComponentPLDA(funcname))
+        {
+            _plda_exc_vxc(funcname, np, rho, stage_exc, stage_vrho);
+
 #pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho : VLX_ALIGN)
-        for (auto g = 0; g < np; ++g)
-        {
-            exc[g] += c * stage_exc[g];
-
-            vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
-            vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
-        }
-
-        if (fstr::upcase(funcname) != "TSLATER" && fstr::upcase(funcname) != "TVWN")
-        {
-#pragma omp simd aligned(vsigma, stage_vsigma : VLX_ALIGN)
             for (auto g = 0; g < np; ++g)
             {
+                exc[g] += c * stage_exc[g];
+
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+            }
+        }
+        else if (_isComponentPGGA(funcname))
+        {
+            _pgga_exc_vxc(funcname, np, rho, sigma, stage_exc, stage_vrho, stage_vsigma);
+
+#pragma omp simd aligned(exc, stage_exc, vrho, stage_vrho, vsigma, stage_vsigma : VLX_ALIGN)
+            for (auto g = 0; g < np; ++g)
+            {
+                exc[g] += c * stage_exc[g];
+
+                vrho[2 * g + 0] += c * stage_vrho[2 * g + 0];
+                vrho[2 * g + 1] += c * stage_vrho[2 * g + 1];
+
                 vsigma[3 * g + 0] += c * stage_vsigma[3 * g + 0];
                 vsigma[3 * g + 1] += c * stage_vsigma[3 * g + 1];
                 vsigma[3 * g + 2] += c * stage_vsigma[3 * g + 2];
