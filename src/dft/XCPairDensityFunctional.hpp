@@ -62,6 +62,53 @@ class CXCPairDensityFunctional
     /** Frees the staging buffer. */
     void _freeStagingBuffer();
 
+    /** Checks if a component is PLDA.
+     *
+     * @param[in] compName name of the functional component.
+     * @return whether the component is PLDA.
+     */
+    bool _isComponentPLDA(const std::string& compName) const;
+
+    /** Checks if a component is PGGA.
+     *
+     * @param[in] compName name of the functional component.
+     * @return whether the component is PGGA.
+     */
+    bool _isComponentPGGA(const std::string& compName) const;
+
+    /** Computes values and first derivative of pair-LDA exchange-correlation
+     * functional component on grid.
+     *
+     * @param[in] compName name of the functional component.
+     * @param[in] np number of grid points.
+     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
+     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
+     * @param[in,out] vrho values of the first derivative of the
+     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
+     */
+    void _plda_exc_vxc(const std::string& compName, const int32_t np, const double* rho, double* exc, double* vrho) const;
+
+    /** Computes values and first derivative of pair-GGA exchange-correlation
+     * functional component on grid.
+     *
+     * @param[in] compName name of the functional component.
+     * @param[in] np number of grid points.
+     * @param[in] rho values of the density at grid points. Order: [(0), (1)].
+     * @param[in] sigma values of the contracted gradient of density at grid points. Order: [(0, 0), (0, 1), (1, 1)].
+     * @param[in,out] exc values of the exchange-correlation kernel. Size: np.
+     * @param[in,out] vrho values of the first derivative of the
+     * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
+     * @param[in,out] vsigma values of the first derivative of the
+     * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
+     */
+    void _pgga_exc_vxc(const std::string& compName,
+                       const int32_t      np,
+                       const double*      rho,
+                       const double*      sigma,
+                       double*            exc,
+                       double*            vrho,
+                       double*            vsigma) const;
+
    public:
     /** Creates an exchange-correlation functional object.
      *
