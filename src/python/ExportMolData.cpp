@@ -37,6 +37,7 @@
 #include "AtomicRadii.hpp"
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
+#include "CommonNeighbors.hpp"
 #include "CoordinationNumber.hpp"
 #include "DispersionModel.hpp"
 #include "ErrorHandler.hpp"
@@ -44,8 +45,6 @@
 #include "Molecule.hpp"
 #include "PartialCharges.hpp"
 #include "StringFormat.hpp"
-#include "CommonNeighbors.hpp"
-#include "AtomicRadii.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -246,12 +245,14 @@ export_moldata(py::module& m)
         .def("number_of_electrons", &CMolecule::getNumberOfElectrons, "Gets a number of electrons in molecule.")
         .def("check_proximity", &CMolecule_check_proximity, "Checks proximity of atoms.", "minDistance"_a)
         .def("atom_indexes", &CMolecule::getAtomIndexes, "Gets indexes of atoms with requested atomic label", "atomLabel"_a)
-        .def("add_atom", &CMolecule::addAtom, "Adds atom to molecule", "atomLabel"_a, "atomCoordinateX"_a, "atomCoordinateY"_a,
-             "atomCoordinateZ"_a)
-        .def("min_distance", &CMolecule::getMinDistance, "Get minimal distance from external point to closest atom in molecule.",
-             "coordinateX"_a, "coordinateY"_a, "coordinateZ"_a)
-        .def("index_of_nearest_atom", &CMolecule::getIndexOfNearestAtom, "Gets index of nearest atom with specific label to given atom.",
-             "iAtom"_a)
+        .def("add_atom", &CMolecule::addAtom, "Adds atom to molecule", "atomLabel"_a, "atomCoordinateX"_a, "atomCoordinateY"_a, "atomCoordinateZ"_a)
+        .def("min_distance",
+             &CMolecule::getMinDistance,
+             "Get minimal distance from external point to closest atom in molecule.",
+             "coordinateX"_a,
+             "coordinateY"_a,
+             "coordinateZ"_a)
+        .def("index_of_nearest_atom", &CMolecule::getIndexOfNearestAtom, "Gets index of nearest atom with specific label to given atom.", "iAtom"_a)
         .def("coordination_number", &CMolecule::getCoordinationNummber, "Gets coordination number of specific atom.", "iAtom"_a, "radius"_a)
         .def(
             "number_of_alpha_electrons",
@@ -309,6 +310,13 @@ export_moldata(py::module& m)
             },
             "Gets MK radii for molecule.")
         .def(
+            "chelpg_radii_to_numpy",
+            [](const CMolecule& self) -> py::array_t<double> {
+                auto atomradii = self.getChelpgRadii();
+                return vlx_general::pointer_to_numpy(atomradii.data(), static_cast<int32_t>(atomradii.size()));
+            },
+            "Gets CHELPG radii for molecule.")
+        .def(
             "covalent_radii_to_numpy",
             [](const CMolecule& self) -> py::array_t<double> {
                 auto atomradii = self.getCovalentRadii();
@@ -365,7 +373,7 @@ export_moldata(py::module& m)
              "xcLabel"_a)
         .def("get_energy", &CDispersionModel::getEnergy, "Gets dispersion energy.")
         .def("get_gradient", &CDispersionModel::getGradient, "Gets dispersion gradient.");
-    
+
     // CCommonNeighbors class
 
     PyClass<CCommonNeighbors>(m, "CommonNeighbors")

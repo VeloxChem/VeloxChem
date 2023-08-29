@@ -111,8 +111,15 @@ class RespChargesDriver:
         self.temperature = 298.15
 
         # grid information
+        self.grid_type = 'mk'
+
+        # MK grid
         self.number_layers = 4
         self.density = 1.0
+
+        # CHELPG grid
+        self.chelpg_spacing = 0.3 / bohr_in_angstrom()
+        self.chelpg_margin = 2.8 / bohr_in_angstrom()
 
         # esp fitting to user specified points
         self.fitting_points = None
@@ -128,9 +135,12 @@ class RespChargesDriver:
         # input keywords
         self.input_keywords = {
             'resp_charges': {
+                'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
                 'density': ('float', 'density of points in each layer'),
+                'chelpg_spacing': ('float', 'step size for CHELPG grid'),
+                'chelpg_margin': ('float', 'maximum radius for CHELPG grid'),
                 'restrain_hydrogen': ('bool', 'restrain hydrogen atoms'),
                 'weak_restraint':
                     ('float', 'strength of restraint in 1st RESP stage'),
@@ -464,8 +474,17 @@ class RespChargesDriver:
         self.print_header(n_conf, n_points)
         self.print_esp_header()
 
+        if self.equal_charges is not None:
+            constr = [0] * molecules[0].number_of_atoms()
+            for points in self.equal_charges:
+                for i in range(len(points) - 1):
+                    constr[points[i + 1] - 1] = points[i]
+        else:
+            constr = None
+
         # generate and solve equation system (ESP fit)
-        a, b = self.generate_equation_system(molecules, grids, esp, weights)
+        a, b = self.generate_equation_system(molecules, grids, esp, weights,
+                                             None, constr)
         q = np.linalg.solve(a, b)
 
         n_atoms = molecules[0].number_of_atoms()
@@ -827,13 +846,35 @@ class RespChargesDriver:
 
     def get_grid_points(self, molecule):
         """
-        Gets grid points in the solvent-accessible region.
+        Gets grid points for (R)ESP fitting.
 
         :param molecule:
             The molecule.
 
         :return:
-            The coordinates of each grid point listed in an array.
+            The coordinates of grid points as an array.
+        """
+
+        if self.grid_type == 'mk':
+            return self.get_grid_points_mk(molecule)
+
+        elif self.grid_type == 'chelpg':
+            return self.get_grid_points_chelpg(molecule)
+
+        else:
+            assert_msg_critical(
+                False, 'RespChargesDriver.compute: Invalid grid_type ' +
+                self.grid_type)
+
+    def get_grid_points_mk(self, molecule):
+        """
+        Gets MK grid points.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The coordinates of grid points as an array.
         """
 
         grid = []
@@ -881,6 +922,80 @@ class RespChargesDriver:
                             grid.append(point)
 
         return np.array(grid)
+
+    def get_grid_points_chelpg(self, molecule):
+        """
+        Gets CHELPG grid points.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The coordinates of grid points as an array.
+        """
+
+        coords = molecule.get_coordinates_in_bohr()
+
+        x_max = np.max(coords[:, 0] + self.chelpg_margin)
+        x_min = np.min(coords[:, 0] - self.chelpg_margin)
+
+        y_max = np.max(coords[:, 1] + self.chelpg_margin)
+        y_min = np.min(coords[:, 1] - self.chelpg_margin)
+
+        z_max = np.max(coords[:, 2] + self.chelpg_margin)
+        z_min = np.min(coords[:, 2] - self.chelpg_margin)
+
+        n_x_half = int(0.5 * (x_max - x_min) / self.chelpg_spacing)
+        n_y_half = int(0.5 * (y_max - y_min) / self.chelpg_spacing)
+        n_z_half = int(0.5 * (z_max - z_min) / self.chelpg_spacing)
+
+        x_min = 0.5 * (x_min + x_max) - self.chelpg_spacing * n_x_half
+        y_min = 0.5 * (y_min + y_max) - self.chelpg_spacing * n_y_half
+        z_min = 0.5 * (z_min + z_max) - self.chelpg_spacing * n_z_half
+
+        x_max = 0.5 * (x_min + x_max) + self.chelpg_spacing * n_x_half
+        y_max = 0.5 * (y_min + y_max) + self.chelpg_spacing * n_y_half
+        z_max = 0.5 * (z_min + z_max) + self.chelpg_spacing * n_z_half
+
+        natoms = molecule.number_of_atoms()
+        atom_radii = molecule.chelpg_radii_to_numpy()
+
+        margin_squared = self.chelpg_margin**2
+        atom_radii_squared = atom_radii * atom_radii
+
+        grid_points = []
+
+        x_grid = np.arange(x_min, x_max + 0.01 * self.chelpg_spacing,
+                           self.chelpg_spacing)
+        y_grid = np.arange(y_min, y_max + 0.01 * self.chelpg_spacing,
+                           self.chelpg_spacing)
+        z_grid = np.arange(z_min, z_max + 0.01 * self.chelpg_spacing,
+                           self.chelpg_spacing)
+
+        for x in x_grid:
+            for y in y_grid:
+                for z in z_grid:
+
+                    # criteria for including the grid point:
+                    # 1. grid point is outside CHELPG radii
+                    # 2. grid point is inside maximum radius (margin)
+
+                    within_vdw_radii = False
+                    min_r2 = None
+
+                    for a in range(natoms):
+                        ax, ay, az = coords[a]
+                        r2 = (x - ax)**2 + (y - ay)**2 + (z - az)**2
+                        if r2 < atom_radii_squared[a]:
+                            within_vdw_radii = True
+                            break
+                        if min_r2 is None or min_r2 > r2:
+                            min_r2 = r2
+
+                    if not (within_vdw_radii or min_r2 > margin_squared):
+                        grid_points.append([x, y, z])
+
+        return np.array(grid_points)
 
     def get_electrostatic_potential(self, grid, molecule, basis, scf_results):
         """
@@ -1051,7 +1166,11 @@ class RespChargesDriver:
         """
 
         self.ostream.print_blank()
-        title = 'RESP Charges Driver Setup'
+
+        if self.grid_type == 'mk':
+            title = 'RESP Charges Driver Setup'
+        elif self.grid_type == 'chelpg':
+            title = 'ESP Charges Driver Setup'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
@@ -1067,10 +1186,22 @@ class RespChargesDriver:
                 cur_str = '                                {:4f}'.format(
                     self.weights[i])
                 self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Number of Layers             :  ' + str(self.number_layers)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Points per Square Angstrom   :  ' + str(self.density)
-        self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.grid_type == 'mk':
+            cur_str = 'Number of Layers             :  ' + str(
+                self.number_layers)
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Points per Square Angstrom   :  ' + str(self.density)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        elif self.grid_type == 'chelpg':
+            cur_str = 'Grid Spacing in Angstrom     :  ' + str(
+                self.chelpg_spacing * bohr_in_angstrom())
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Grid Margin in Angstrom      :  ' + str(
+                self.chelpg_margin * bohr_in_angstrom())
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         cur_str = 'Total Number of Grid Points  :  ' + str(n_points)
         self.ostream.print_header(cur_str.ljust(str_width))
         if fitting_coords is not None:
@@ -1127,7 +1258,12 @@ class RespChargesDriver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header('Merz-Kollman ESP Charges')
+
+        if self.grid_type == 'mk':
+            self.ostream.print_header('Merz-Kollman ESP Charges')
+        elif self.grid_type == 'chelpg':
+            self.ostream.print_header('CHELPG ESP Charges')
+
         self.ostream.print_header(26 * '-')
         self.ostream.print_blank()
         cur_str = '{}   {}      {}'.format('No.', 'Atom', 'Charge (a.u.)')
@@ -1236,17 +1372,25 @@ class RespChargesDriver:
 
         str_width = 44
 
-        if flag.lower() == 'esp' and n_conf == 1:
-            return
-
         title = 'Reference: '
         self.ostream.print_header(title.ljust(str_width))
+
         if flag.lower() == 'resp':
             title = 'J. Phys. Chem. 1993, 97, 10269-10280.'
             self.ostream.print_header(title.ljust(str_width))
+
+        elif flag.lower() == 'esp':
+            if self.grid_type == 'mk':
+                title = 'J. Comput. Chem. 1984, 5, 129-145.'
+                self.ostream.print_header(title.ljust(str_width))
+            elif self.grid_type == 'chelpg':
+                title = 'J. Comput. Chem. 1990, 11, 361-373.'
+                self.ostream.print_header(title.ljust(str_width))
+
         if n_conf > 1:
             title = 'J. Am. Chem. Soc. 1992, 114, 9075-9079.'
             self.ostream.print_header(title.ljust(str_width))
+
         self.ostream.print_blank()
 
     def recommended_resp_parameters(self):

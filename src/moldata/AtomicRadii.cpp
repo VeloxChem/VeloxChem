@@ -36,6 +36,7 @@ buildVdwRadii()
 {
     // VDW radii in Angstrom
 
+    // clang-format off
     std::vector<double> radii({
         0.00,                          // dummy atom
         1.09, 1.40, 1.82, 2.00, 2.00,  // H-B
@@ -57,6 +58,7 @@ buildVdwRadii()
         1.96, 2.02, 2.00, 2.00, 2.00,  // Tl-At
         2.00                           // Rn
     });
+    // clang-format on
 
     // VDW radii in Bohr
 
@@ -74,6 +76,7 @@ buildMkRadii()
     // MK radii in Angstrom
     // (from: A. Alenazian, L. A. Burns, C. D. Sherrill, Int. J. Quantum Chem. 2020, 120, e26035)
 
+    // clang-format off
     std::vector<double> radii({
         0.00,                          // dummy atom
         1.20, 1.20, 1.37, 1.45, 1.45,  // H-B
@@ -81,8 +84,33 @@ buildMkRadii()
         1.57, 1.36, 1.24, 1.17, 1.80,  // Na-P
         1.75, 1.70                     // S-Cl
     });
+    // clang-format on
 
     // MK radii in Bohr
+
+    for (size_t i = 0; i < radii.size(); i++)
+    {
+        radii[i] /= units::getBohrValueInAngstroms();
+    }
+
+    return radii;
+}
+
+std::vector<double>
+buildChelpgRadii()
+{
+    // CHELPG radii in Angstrom
+    // C. M. Breneman, K. B. Wiberg, J. Comput. Chem. 1990, 11, 361-373
+
+    // clang-format off
+    std::vector<double> radii({
+        0.00,                          // dummy atom
+        1.45, 1.45, 1.50, 1.50, 1.50,  // H-B
+        1.50, 1.70, 1.70, 1.70, 1.70,  // C-Ne
+    });
+    // clang-format on
+
+    // CHELPG radii in Bohr
 
     for (size_t i = 0; i < radii.size(); i++)
     {
@@ -98,6 +126,7 @@ buildCovalentRadii()
     // covalent radii in Angstrom
     // (from: ccdc.cam.ac.uk/support-and-resources/ccdcresources/Elemental_Radii.xlsx)
 
+    // clang-format off
     std::vector<double> radii({
         0.00,                          // dummy atom
         0.23, 1.50, 1.28, 0.96, 0.83,  // H-B
@@ -119,6 +148,7 @@ buildCovalentRadii()
         1.45, 1.46, 1.48, 1.40, 1.21,  // Tl-At
         1.50                           // Rn
     });
+    // clang-format on
 
     // covalent radii in Bohr
 
