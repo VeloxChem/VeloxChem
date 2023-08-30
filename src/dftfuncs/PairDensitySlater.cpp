@@ -142,9 +142,13 @@ compute_exc_vxc(const int32_t np, const double* rho, double* exc, double* vrho)
 
             double flim_eta = std::sin(gtheta);
 
+            double pref = eightthird * std::pow(rs, -onethird) * eta / density;
+
+            double df_zeta_drho = pref * (-eta * std::cos(theta) + std::sin(theta));
+
             // dExc/d(rho)
 
-            dexc_rho = fre * fourthird * rhothird * (f_zeta - eta * 2.0 * gr * flim_eta);
+            dexc_rho = fre * rhothird * (fourthird * f_zeta + density * df_zeta_drho);
 
             // dExc/d(Pi)
 
