@@ -113,13 +113,13 @@ class RespChargesDriver:
         # grid information
         self.grid_type = 'mk'
 
-        # MK grid
+        # MK grid settings (density in Angstrom^-2)
         self.number_layers = 4
         self.density = 1.0
 
-        # CHELPG grid
-        self.chelpg_spacing = 0.3 / bohr_in_angstrom()
-        self.chelpg_margin = 2.8 / bohr_in_angstrom()
+        # CHELPG grid settings (in Angstrom)
+        self.chelpg_spacing = 0.3
+        self.chelpg_margin = 2.8
 
         # esp fitting to user specified points
         self.fitting_points = None
@@ -947,61 +947,64 @@ class RespChargesDriver:
             The coordinates of grid points as an array.
         """
 
+        chelpg_spacing_au = self.chelpg_spacing / bohr_in_angstrom()
+        chelpg_margin_au = self.chelpg_margin / bohr_in_angstrom()
+
         coords = molecule.get_coordinates_in_bohr()
 
-        x_max = np.max(coords[:, 0] + self.chelpg_margin)
-        x_min = np.min(coords[:, 0] - self.chelpg_margin)
+        x_max = np.max(coords[:, 0] + chelpg_margin_au)
+        x_min = np.min(coords[:, 0] - chelpg_margin_au)
 
-        y_max = np.max(coords[:, 1] + self.chelpg_margin)
-        y_min = np.min(coords[:, 1] - self.chelpg_margin)
+        y_max = np.max(coords[:, 1] + chelpg_margin_au)
+        y_min = np.min(coords[:, 1] - chelpg_margin_au)
 
-        z_max = np.max(coords[:, 2] + self.chelpg_margin)
-        z_min = np.min(coords[:, 2] - self.chelpg_margin)
+        z_max = np.max(coords[:, 2] + chelpg_margin_au)
+        z_min = np.min(coords[:, 2] - chelpg_margin_au)
 
-        n_x_half_float = 0.5 * (x_max - x_min) / self.chelpg_spacing
-        n_y_half_float = 0.5 * (y_max - y_min) / self.chelpg_spacing
-        n_z_half_float = 0.5 * (z_max - z_min) / self.chelpg_spacing
+        n_x_half_float = 0.5 * (x_max - x_min) / chelpg_spacing_au
+        n_y_half_float = 0.5 * (y_max - y_min) / chelpg_spacing_au
+        n_z_half_float = 0.5 * (z_max - z_min) / chelpg_spacing_au
 
         n_x_half = int(n_x_half_float)
         n_y_half = int(n_y_half_float)
         n_z_half = int(n_z_half_float)
 
-        x_min = 0.5 * (x_min + x_max) - self.chelpg_spacing * n_x_half
-        y_min = 0.5 * (y_min + y_max) - self.chelpg_spacing * n_y_half
-        z_min = 0.5 * (z_min + z_max) - self.chelpg_spacing * n_z_half
+        x_min = 0.5 * (x_min + x_max) - chelpg_spacing_au * n_x_half
+        y_min = 0.5 * (y_min + y_max) - chelpg_spacing_au * n_y_half
+        z_min = 0.5 * (z_min + z_max) - chelpg_spacing_au * n_z_half
 
-        x_max = 0.5 * (x_min + x_max) + self.chelpg_spacing * n_x_half
-        y_max = 0.5 * (y_min + y_max) + self.chelpg_spacing * n_y_half
-        z_max = 0.5 * (z_min + z_max) + self.chelpg_spacing * n_z_half
+        x_max = 0.5 * (x_min + x_max) + chelpg_spacing_au * n_x_half
+        y_max = 0.5 * (y_min + y_max) + chelpg_spacing_au * n_y_half
+        z_max = 0.5 * (z_min + z_max) + chelpg_spacing_au * n_z_half
 
         # try to fill the box with fewer grid points
 
         if n_x_half_float - n_x_half <= 0.5:
-            x_min += 0.5 * self.chelpg_spacing
-            x_max -= 0.5 * self.chelpg_spacing
+            x_min += 0.5 * chelpg_spacing_au
+            x_max -= 0.5 * chelpg_spacing_au
 
         if n_y_half_float - n_y_half <= 0.5:
-            y_min += 0.5 * self.chelpg_spacing
-            y_max -= 0.5 * self.chelpg_spacing
+            y_min += 0.5 * chelpg_spacing_au
+            y_max -= 0.5 * chelpg_spacing_au
 
         if n_z_half_float - n_z_half <= 0.5:
-            z_min += 0.5 * self.chelpg_spacing
-            z_max -= 0.5 * self.chelpg_spacing
+            z_min += 0.5 * chelpg_spacing_au
+            z_max -= 0.5 * chelpg_spacing_au
 
         natoms = molecule.number_of_atoms()
         atom_radii = molecule.chelpg_radii_to_numpy()
 
-        margin_squared = self.chelpg_margin**2
+        margin_squared = chelpg_margin_au**2
         atom_radii_squared = atom_radii * atom_radii
 
         grid_points = []
 
-        x_grid = np.arange(x_min, x_max + 0.01 * self.chelpg_spacing,
-                           self.chelpg_spacing)
-        y_grid = np.arange(y_min, y_max + 0.01 * self.chelpg_spacing,
-                           self.chelpg_spacing)
-        z_grid = np.arange(z_min, z_max + 0.01 * self.chelpg_spacing,
-                           self.chelpg_spacing)
+        x_grid = np.arange(x_min, x_max + 0.01 * chelpg_spacing_au,
+                           chelpg_spacing_au)
+        y_grid = np.arange(y_min, y_max + 0.01 * chelpg_spacing_au,
+                           chelpg_spacing_au)
+        z_grid = np.arange(z_min, z_max + 0.01 * chelpg_spacing_au,
+                           chelpg_spacing_au)
 
         for x in x_grid:
             for y in y_grid:
@@ -1227,10 +1230,10 @@ class RespChargesDriver:
 
         elif self.grid_type == 'chelpg':
             cur_str = 'Grid Spacing in Angstrom     :  ' + str(
-                self.chelpg_spacing * bohr_in_angstrom())
+                self.chelpg_spacing)
             self.ostream.print_header(cur_str.ljust(str_width))
             cur_str = 'Grid Margin in Angstrom      :  ' + str(
-                self.chelpg_margin * bohr_in_angstrom())
+                self.chelpg_margin)
             self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'Total Number of Grid Points  :  ' + str(n_points)
