@@ -148,6 +148,7 @@ class RespChargesDriver:
                     ('float', 'strength of restraint in 2nd RESP stage'),
                 'max_iter': ('int', 'maximum iterations in RESP fit'),
                 'threshold': ('float', 'convergence threshold of RESP fit'),
+                'equal_charges': ('str', 'constraints for equal charges'),
                 'xyz_file': ('str', 'xyz file containing the conformers'),
                 'net_charge': ('float', 'net charge of the molecule'),
                 'multiplicity': ('int', 'spin multiplicity of the molecule'),
@@ -187,11 +188,6 @@ class RespChargesDriver:
         if 'filename' in resp_dict:
             self.filename = resp_dict['filename']
 
-        if 'equal_charges' in resp_dict:
-            self.equal_charges = []
-            for q in resp_dict['equal_charges'].split(','):
-                self.equal_charges.append(list(map(int, q.split('='))))
-
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
@@ -209,6 +205,18 @@ class RespChargesDriver:
         :return:
             The charges.
         """
+
+        # sanity check for equal_charges
+        if self.equal_charges is not None:
+            if isinstance(self.equal_charges, str):
+                eq_chgs = []
+                for q in self.equal_charges.split(','):
+                    if q:
+                        eq_chgs.append(list(map(int, q.split('='))))
+                self.equal_charges = eq_chgs
+            assert_msg_critical(
+                isinstance(self.equal_charges, (list, tuple)),
+                'RespChargesDriver.compute: Invalid equal_charges')
 
         molecules = []
         basis_sets = []
@@ -304,11 +312,16 @@ class RespChargesDriver:
         use_631gs_basis = all(
             [bas.get_label() in ['6-31G*', '6-31G_D_'] for bas in basis_sets])
 
-        if flag.lower() == 'resp' and not use_631gs_basis:
-            cur_str = '*** Warning: Recommended basis set 6-31G* '
-            cur_str += 'is not used!'
-            self.ostream.print_header(cur_str.ljust(40))
-            self.ostream.print_blank()
+        # sanity check for RESP
+        if flag.lower() == 'resp':
+            assert_msg_critical(
+                self.grid_type == 'mk',
+                'RespChargesDriver.compute: For RESP charges, ' +
+                'grid_type must be \'mk\'')
+            if not use_631gs_basis:
+                cur_str = 'Recommended basis set 6-31G* is not used!'
+                self.ostream.print_warning(cur_str)
+                self.ostream.print_blank()
 
         grids = []
         esp = []
@@ -945,9 +958,13 @@ class RespChargesDriver:
         z_max = np.max(coords[:, 2] + self.chelpg_margin)
         z_min = np.min(coords[:, 2] - self.chelpg_margin)
 
-        n_x_half = int(0.5 * (x_max - x_min) / self.chelpg_spacing)
-        n_y_half = int(0.5 * (y_max - y_min) / self.chelpg_spacing)
-        n_z_half = int(0.5 * (z_max - z_min) / self.chelpg_spacing)
+        n_x_half_float = 0.5 * (x_max - x_min) / self.chelpg_spacing
+        n_y_half_float = 0.5 * (y_max - y_min) / self.chelpg_spacing
+        n_z_half_float = 0.5 * (z_max - z_min) / self.chelpg_spacing
+
+        n_x_half = int(n_x_half_float)
+        n_y_half = int(n_y_half_float)
+        n_z_half = int(n_z_half_float)
 
         x_min = 0.5 * (x_min + x_max) - self.chelpg_spacing * n_x_half
         y_min = 0.5 * (y_min + y_max) - self.chelpg_spacing * n_y_half
@@ -956,6 +973,20 @@ class RespChargesDriver:
         x_max = 0.5 * (x_min + x_max) + self.chelpg_spacing * n_x_half
         y_max = 0.5 * (y_min + y_max) + self.chelpg_spacing * n_y_half
         z_max = 0.5 * (z_min + z_max) + self.chelpg_spacing * n_z_half
+
+        # try to fill the box with fewer grid points
+
+        if n_x_half_float - n_x_half <= 0.5:
+            x_min += 0.5 * self.chelpg_spacing
+            x_max -= 0.5 * self.chelpg_spacing
+
+        if n_y_half_float - n_y_half <= 0.5:
+            y_min += 0.5 * self.chelpg_spacing
+            y_max -= 0.5 * self.chelpg_spacing
+
+        if n_z_half_float - n_z_half <= 0.5:
+            z_min += 0.5 * self.chelpg_spacing
+            z_max -= 0.5 * self.chelpg_spacing
 
         natoms = molecule.number_of_atoms()
         atom_radii = molecule.chelpg_radii_to_numpy()
@@ -1225,9 +1256,9 @@ class RespChargesDriver:
 
         if stage.lower() == 'first':
             if not self.recommended_resp_parameters():
-                cur_str = '*** Warning: Parameters for RESP fitting differ '
-                cur_str += 'from recommended choice!'
-                self.ostream.print_header(cur_str.ljust(str_width))
+                cur_str = 'Parameters for RESP fitting differ from '
+                cur_str += 'recommended choices!'
+                self.ostream.print_warning(cur_str)
             self.ostream.print_blank()
             self.ostream.print_header('First Stage Fit')
             self.ostream.print_header(17 * '-')
@@ -1280,9 +1311,9 @@ class RespChargesDriver:
 
         self.ostream.print_blank()
         if n_conf > 1:
-            cur_str = '*** Warning: Multiple conformers are given, '
-            cur_str += 'but only one can be processed!'
-            self.ostream.print_header(cur_str.ljust(40))
+            cur_str = 'Multiple conformers are given, but only one '
+            cur_str += 'can be processed!'
+            self.ostream.print_warning(cur_str)
 
         self.ostream.print_blank()
         self.ostream.print_header('ESP Charges on Fitting Points')
