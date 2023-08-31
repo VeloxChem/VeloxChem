@@ -101,6 +101,9 @@ class RespChargesDriver:
         # filename
         self.filename = 'veloxchem_esp_' + get_random_string_parallel(self.comm)
 
+        # method
+        self.xcfun = None
+
         # conformers
         self.xyz_file = None
         self.net_charge = 0.0
@@ -135,6 +138,7 @@ class RespChargesDriver:
         # input keywords
         self.input_keywords = {
             'resp_charges': {
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
@@ -353,6 +357,8 @@ class RespChargesDriver:
                     'checkpoint_file': self.filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
+                if self.method_dict is None:
+                    scf_drv.xcfun = self.xcfun
                 scf_results = scf_drv.compute(mol, bas)
 
             else:
@@ -370,6 +376,8 @@ class RespChargesDriver:
                     'checkpoint_file': filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
+                if self.method_dict is None:
+                    scf_drv.xcfun = self.xcfun
                 scf_results = scf_drv.compute(mol, bas)
                 ostream.close()
 
