@@ -39,7 +39,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
    //Constants
    double a = 0.04918, b = 0.132, c = 0.2533, d = 0.349;
    double cf = (3.0/10.0)*pow(3, 2.0/3.0)*pow(M_PI, 4.0/3.0);
-   // double fb = 21.0/5000.0;
 
    double f83 = 8.0/3.0;
 
@@ -69,9 +68,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
       double rhom13 = pow(density, -1.0/3.0);
       double drhom13_drho = -(1.0/3.0)/pow(density, 4.0/3.0);
-
-      // double rho13 = cbrt(density);
-      // double drho13_drho = (1.0/3.0)/pow(density, 2.0/3.0);
 
       double denom2 = d*rhom13 + 1;
       double ddenom2_drho = d*drhom13_drho;
@@ -127,8 +123,8 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
       if (pair_density < -1.0e-30)
       {
          double zeta = sqrt(-2.0*pair_density)/density;
-         double dzeta_drho = -M_SQRT2*sqrt(-pair_density)/pow(density, 2);
-         double dzeta_dpi = (1.0/2.0)*M_SQRT2*sqrt(-pair_density)/(density*pair_density);
+         double dzeta_drho = -sqrt(-2.0*pair_density)/pow(density, 2);
+         double dzeta_dpi = (1.0/2.0)*sqrt(-2.0*pair_density)/(density*pair_density);
 
          t1 = 2*cf*pow(density, f83)*(pow(1 - zeta, f83) + pow(zeta + 1, f83));
          double dt1_dzeta = 2*cf*pow(density, f83)*(-f83*pow(1 - zeta, 5.0/3.0) + f83*pow(zeta + 1, 5.0/3.0));
@@ -151,7 +147,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
          dt1_drho = (32.0/3.0)*cf*pow(density, 5.0/3.0);
 
          t6 = 2*gradR*rho2 * (-1.0/4.0*(zeta2 + 1) + (2.0/3.0));
-         dt6_dpi = -rho2*sig/pow(density, 2);
+         dt6_dpi = -sig  + 0.25*sig * (zeta2 - 5.0/3.0) + gradR;
          double dt6_dgradR = -1.0/2.0*rho2*(zeta2 + 1) + (4.0/3.0)*rho2;
          double dt6_dzeta2 = -1.0/2.0*gradR*rho2;
          dt6_drho = dgradR_drho*dt6_dgradR + 2*drho2_drho*gradR*(5.0/12.0 - 1.0/4.0*zeta2) + dt6_dzeta2*dzeta2_drho;
@@ -160,9 +156,9 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
       // imaginary part
       else
       {
-         double eta = M_SQRT2*sqrt(pair_density)/density;
-         double deta_drho = -M_SQRT2*sqrt(pair_density)/pow(density, 2);
-         double deta_dpi = 1.0/(M_SQRT2*density*sqrt(pair_density));
+         double eta = sqrt(2.0*pair_density)/density;
+         double deta_drho = -sqrt(2.0*pair_density)/pow(density, 2);
+         double deta_dpi = 1.0/(density*sqrt(2.0*pair_density));
 
          t1 = 4*cf*pow(1.0*pow(eta, 2) + 1, 4.0/3.0)*cos(f83*atan(eta))*pow(density, f83);
          double eta_arg = f83*atan(eta);
@@ -172,7 +168,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
          dt1_dpi = deta_dpi*dt1_deta;
 
          t6 = -0.5*pow(eta, 2)*rho2*sig - 1.0/2.0*gradR*rho2*(zeta2 + 1) + (4.0/3.0)*gradR*rho2;
-         double dt6_deta = -1.0*eta*rho2*sig;
+         double dt6_deta = - eta*rho2*sig;
          double dt6_dgradR = -1.0/2.0*rho2*(zeta2 + 1) + (4.0/3.0)*rho2;
          double dt6_dzeta2 = -1.0/2.0*gradR*rho2;
          dt6_drho = deta_drho*dt6_deta + dgradR_drho*dt6_dgradR + drho2_drho*(-0.5*pow(eta, 2)*sig - 1.0/2.0*gradR*(zeta2 + 1) + (4.0/3.0)*gradR) + dt6_dzeta2*dzeta2_drho;
@@ -203,7 +199,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
       vrho[2 * g + 1] =  dExc_drarb*drarb_dpi + dExc_dt1*dt1_dpi + dExc_dt3*dt3_dpi + dExc_dt4*dt4_dpi + dExc_dt6*dt6_dpi;
 
       vsigma[3 * g + 0] =  dExc_dt2*dt2_dsig + dExc_dt3*dt3_dsig + dExc_dt4*dt4_dsig + dExc_dt5*dt5_dsig + dExc_dt6*dt6_dsig;
-
    }
 }
 
