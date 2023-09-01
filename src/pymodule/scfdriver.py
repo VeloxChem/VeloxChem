@@ -997,7 +997,7 @@ class ScfDriver:
 
             self._print_iter_data(i)
 
-            self._check_convergence()
+            self._check_convergence(molecule, ovl_mat)
 
             if self.is_converged:
                 break
@@ -1872,10 +1872,15 @@ class ScfDriver:
 
         return nteri
 
-    def _check_convergence(self):
+    def _check_convergence(self, molecule, ovl_mat):
         """
         Sets SCF convergence flag by checking if convergence condition for
         electronic gradient is fullfiled.
+
+        :param molecule:
+            The molecule.
+        :param ovl_mat:
+            The overlap matrix.
         """
 
         self._is_converged = False
@@ -1885,7 +1890,40 @@ class ScfDriver:
             e_grad = self._iter_data['gradient_norm']
 
             if e_grad < self.conv_thresh:
-                self._is_converged = True
+                if self.restart:
+                    # Note: when restarting from checkpoint, double check that the
+                    # number of electrons are reasonable
+                    nalpha = molecule.number_of_alpha_electrons()
+                    nbeta = molecule.number_of_beta_electrons()
+                    calc_nelec = self._comp_number_of_electrons(ovl_mat)
+                    if (abs(calc_nelec[0] - nalpha) < 1.0e-3 and
+                            abs(calc_nelec[1] - nbeta) < 1.0e-3):
+                        self._is_converged = True
+                else:
+                    self._is_converged = True
+
+    def _comp_number_of_electrons(self, ovl_mat):
+        """
+        Computes number of alpha and beta electrons from density matrices and
+        overlap matrix.
+
+        :param ovl_mat:
+            The overlap matrix.
+
+        :return:
+            The number of alpha and beta electrons.
+        """
+
+        if self.rank == mpi_master():
+            D_alpha = self.density.alpha_to_numpy(0)
+            D_beta = self.density.beta_to_numpy(0)
+            S = ovl_mat.to_numpy()
+            calc_nelec = (np.sum(D_alpha * S), np.sum(D_beta * S))
+        else:
+            calc_nelec = None
+        calc_nelec = self.comm.bcast(calc_nelec, root=mpi_master())
+
+        return calc_nelec
 
     def _get_scf_range(self):
         """

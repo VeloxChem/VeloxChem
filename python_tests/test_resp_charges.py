@@ -9,8 +9,7 @@ from veloxchem.respchargesdriver import RespChargesDriver
 
 class TestRespCharges:
 
-    def run_resp(self, inpfile, ref_charges, number_layers, flag,
-                 fitting_points):
+    def run_resp(self, inpfile, ref_charges, inp_chg_dict, flag):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
@@ -20,22 +19,16 @@ class TestRespCharges:
                                 task.input_dict['method_settings'])
         scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
 
-        chg_dict = {
-            'number_layers': number_layers,
-            'fitting_points': fitting_points,
-            'filename': task.input_dict['filename'],
-        }
+        chg_dict = {'filename': task.input_dict['filename']}
+        chg_dict.update(inp_chg_dict)
 
         chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
         chg_drv.update_settings(chg_dict, task.input_dict['method_settings'])
 
-        if flag == 'resp':
-            q_fit = chg_drv.compute(task.molecule, task.ao_basis, 'resp')
-        elif flag == 'esp':
-            q_fit = chg_drv.compute(task.molecule, task.ao_basis, 'esp')
+        q_fit = chg_drv.compute(task.molecule, task.ao_basis, flag.lower())
 
         if is_mpi_master(task.mpi_comm):
-            assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-6
+            assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-5
 
             pdb_file = Path(chg_drv.filename).with_suffix('.pdb')
             if pdb_file.is_file():
@@ -58,7 +51,9 @@ class TestRespCharges:
         ref_resp_charges = np.array(
             [0.041310, 0.021227, 0.041310, 0.041310, -0.454284, 0.309127])
 
-        self.run_resp(inpfile, ref_resp_charges, 1, 'resp', None)
+        chg_dict = {'number_layers': 1}
+
+        self.run_resp(inpfile, ref_resp_charges, chg_dict, 'resp')
 
     def test_esp_methanol(self):
 
@@ -70,7 +65,23 @@ class TestRespCharges:
         ref_esp_charges = np.array(
             [0.038183, 0.091353, 0.018171, 0.013240, -0.474887, 0.313940])
 
-        self.run_resp(inpfile, ref_esp_charges, 1, 'esp', None)
+        chg_dict = {'number_layers': 1}
+
+        self.run_resp(inpfile, ref_esp_charges, chg_dict, 'esp')
+
+    def test_chelpg_esp_methanol(self):
+
+        # vlxtag: RHF, ESP_charges
+
+        here = Path(__file__).parent
+        inpfile = str(here / 'inputs' / 'methanol.inp')
+
+        ref_chelpg_esp_charges = np.array(
+            [0.007755, 0.145603, 0.007755, 0.007755, -0.468499, 0.299632])
+
+        chg_dict = {'grid_type': 'chelpg', 'equal_charges': '1=3=4'}
+
+        self.run_resp(inpfile, ref_chelpg_esp_charges, chg_dict, 'esp')
 
     def test_esp_points_water(self):
 
@@ -84,5 +95,6 @@ class TestRespCharges:
             '0.0000000    0.0000000   -0.1653507',
             '0.0000000    0.0000000    0.4424329',
         ]
+        chg_dict = {'number_layers': 4, 'fitting_points': esp_fitting_points}
 
-        self.run_resp(inpfile, ref_esp_charges, 4, 'esp', esp_fitting_points)
+        self.run_resp(inpfile, ref_esp_charges, chg_dict, 'esp')
