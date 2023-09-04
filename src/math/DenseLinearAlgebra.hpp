@@ -37,7 +37,7 @@ namespace denblas {  // denblas namespace
  @param matrixB the matrix B
  @return the matrix A * B.
  */
-CDenseMatrix multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
+auto multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
  Computes matrix multiplication: A * B^T.
@@ -46,7 +46,7 @@ CDenseMatrix multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
  @param matrixB the matrix B
  @return the matrix A * B^T.
  */
-CDenseMatrix multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
+auto multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
  Computes matrix multiplication: A^T * B.
@@ -55,7 +55,7 @@ CDenseMatrix multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
  @param matrixB the matrix B
  @return the matrix A^T * B.
  */
-CDenseMatrix multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
+auto multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
  Computes diagonal matrix and matrix multiplication: diag(M) * A.
@@ -64,7 +64,7 @@ CDenseMatrix multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
  @param matrix the square matrix.
  @return the matrix diag(M) * A.
  */
-CDenseMatrix multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix);
+auto multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix;
 
 /**
  Computes diagonal matrix and matrix multiplication: diag(M) * A^T.
@@ -73,7 +73,7 @@ CDenseMatrix multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix
  @param matrix the square matrix.
  @return the matrix diag(M) * A^T.
  */
-CDenseMatrix multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix);
+auto multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix;
 
 /**
  Computes matrix substraction: A - B.
@@ -82,7 +82,7 @@ CDenseMatrix multDiagByAt(const std::vector<double>& diagonal, const CDenseMatri
  @param matrixB the matrix B
  @return the matrix A - B.
  */
-CDenseMatrix subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
+auto subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix;
 
 /**
  Computes matrix addition: A + factor * B.
@@ -92,7 +92,7 @@ CDenseMatrix subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB);
  @param factor the scaling factor of matrix B.
  @return the matrix A +  factor * B.
  */
-CDenseMatrix addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor);
+auto addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix;
 
 /**
  Computes dot product of two vectors.
@@ -101,7 +101,7 @@ CDenseMatrix addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, con
  @param vectorB the vector B.
  @return the dot product of A and B.
  */
-double dot(const std::vector<double>& vectorA, const std::vector<double>& vectorB);
+auto dot(const std::vector<double>& vectorA, const std::vector<double>& vectorB) -> double;
 
 /**
  Computes trace of matrix.
@@ -109,7 +109,7 @@ double dot(const std::vector<double>& vectorA, const std::vector<double>& vector
  @param matrix the matrix.
  @return the trace of matrix.
  */
-double trace(const CDenseMatrix& matrix);
+auto trace(const CDenseMatrix& matrix) -> double;
 
 }  // namespace denblas
 

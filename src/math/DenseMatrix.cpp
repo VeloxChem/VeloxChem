@@ -58,14 +58,14 @@ CDenseMatrix::~CDenseMatrix()
 {
 }
 
-void
-CDenseMatrix::zero()
+auto
+CDenseMatrix::zero() -> void
 {
     _values.zero();
 }
 
-CDenseMatrix
-CDenseMatrix::transpose() const
+auto
+CDenseMatrix::transpose() const -> CDenseMatrix
 {
     auto nrows = getNumberOfRows();
 
@@ -88,8 +88,8 @@ CDenseMatrix::transpose() const
     return tmat;
 }
 
-void
-CDenseMatrix::symmetrize()
+auto
+CDenseMatrix::symmetrize() -> void
 {
     auto nrows = getNumberOfRows();
 
@@ -117,8 +117,8 @@ CDenseMatrix::symmetrize()
     }
 }
 
-void
-CDenseMatrix::symmetrizeAndScale(const double factor)
+auto
+CDenseMatrix::symmetrizeAndScale(const double factor) -> void
 {
     auto nrows = getNumberOfRows();
 
@@ -146,38 +146,38 @@ CDenseMatrix::symmetrizeAndScale(const double factor)
     }
 }
 
-int32_t
-CDenseMatrix::getNumberOfRows() const
+auto
+CDenseMatrix::getNumberOfRows() const -> int32_t
 {
     return static_cast<int32_t>(_values.getNumberOfRows());
 }
 
-int32_t
-CDenseMatrix::getNumberOfColumns() const
+auto
+CDenseMatrix::getNumberOfColumns() const -> int32_t
 {
     return static_cast<int32_t>(_values.getNumberOfColumns());
 }
 
-int32_t
-CDenseMatrix::getNumberOfElements() const
+auto
+CDenseMatrix::getNumberOfElements() const -> int32_t
 {
     return getNumberOfRows() * getNumberOfColumns();
 }
 
-const double*
-CDenseMatrix::values() const
+auto
+CDenseMatrix::values() const -> const double*
 {
     return _values.getData();
 }
 
-double*
-CDenseMatrix::values()
+auto
+CDenseMatrix::values() -> double*
 {
     return _values.getData();
 }
 
-const double*
-CDenseMatrix::row(const int32_t iRow) const
+auto
+CDenseMatrix::row(const int32_t iRow) const -> const double*
 {
     if (iRow < getNumberOfRows())
     {
@@ -189,8 +189,8 @@ CDenseMatrix::row(const int32_t iRow) const
     }
 }
 
-double*
-CDenseMatrix::row(const int32_t iRow)
+auto
+CDenseMatrix::row(const int32_t iRow) -> double*
 {
     if (iRow < getNumberOfRows())
     {

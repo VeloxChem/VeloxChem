@@ -43,8 +43,8 @@ CDenseDiagonalizer::CDenseDiagonalizer()
 {
 }
 
-void
-CDenseDiagonalizer::diagonalize(const CDenseMatrix& matrix)
+auto
+CDenseDiagonalizer::diagonalize(const CDenseMatrix& matrix) -> void
 {
     // copy matrix into temporary storage
 
@@ -89,26 +89,26 @@ CDenseDiagonalizer::diagonalize(const CDenseMatrix& matrix)
     if (_state) _isSolved = true;
 }
 
-bool
-CDenseDiagonalizer::getState() const
+auto
+CDenseDiagonalizer::getState() const -> bool
 {
     return _state;
 }
 
-CDenseMatrix
-CDenseDiagonalizer::getEigenVectors() const
+auto
+CDenseDiagonalizer::getEigenVectors() const -> CDenseMatrix
 {
     return _eigenVectors;
 }
 
-std::vector<double>
-CDenseDiagonalizer::getEigenValues() const
+auto
+CDenseDiagonalizer::getEigenValues() const -> std::vector<double>
 {
     return _eigenValues;
 }
 
-CDenseMatrix
-CDenseDiagonalizer::getInvertedSqrtMatrix() const
+auto
+CDenseDiagonalizer::getInvertedSqrtMatrix() const -> CDenseMatrix
 {
     if (_isSolved)
     {
@@ -139,8 +139,8 @@ CDenseDiagonalizer::getInvertedSqrtMatrix() const
     return CDenseMatrix();
 }
 
-CDenseMatrix
-CDenseDiagonalizer::getInvertedMatrix() const
+auto
+CDenseDiagonalizer::getInvertedMatrix() const -> CDenseMatrix
 {
     if (_isSolved)
     {

@@ -41,7 +41,7 @@ namespace parchg {  // parchg namespace
  @param netcharge net charge of the molecule.
  @return a vector of atomic partial charges for a molecule.
  */
-std::vector<double> getPartialCharges(const CMolecule& molecule, const double netcharge);
+auto getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vector<double>;
 
 /**
  Creates atomic partial charges (reference: dftd4 v2.4.0).
@@ -51,7 +51,7 @@ std::vector<double> getPartialCharges(const CMolecule& molecule, const double ne
  @param dqdr the derivative matrix of dimension (3N,N+1).
  @return a vector of atomic partial charges for a molecule.
  */
-std::vector<double> getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatrix& dqdr);
+auto getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatrix& dqdr) -> std::vector<double>;
 
 }  // namespace parchg
 

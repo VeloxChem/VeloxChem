@@ -40,16 +40,16 @@
 
 namespace parchg {  // parchg namespace
 
-std::vector<double>
-getPartialCharges(const CMolecule& molecule, const double netcharge)
+auto
+getPartialCharges(const CMolecule& molecule, const double netcharge) -> std::vector<double>
 {
     CDenseMatrix dqdr;
 
     return getPartialCharges(molecule, netcharge, dqdr);
 }
 
-std::vector<double>
-getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatrix& dqdr)
+auto
+getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatrix& dqdr) -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 

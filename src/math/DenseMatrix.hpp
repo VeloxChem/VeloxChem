@@ -84,75 +84,75 @@ class CDenseMatrix
     /**
      Sets all values in dense matrix to zero.
      */
-    void zero();
+    auto zero() -> void;
 
     /**
      Creates transpose dense matrix.
 
      @return the transpose dense matrix.
      */
-    CDenseMatrix transpose() const;
+    auto transpose() const -> CDenseMatrix;
 
     /**
      Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).
      */
-    void symmetrize();
+    auto symmetrize() -> void;
 
     /**
      Symmetrizes elements of square matrix: a_ij = a_ji = factor * (a_ij + a_ji).
 
      @param factor the factor.
      */
-    void symmetrizeAndScale(const double factor);
+    auto symmetrizeAndScale(const double factor) -> void;
 
     /**
      Gets number of rows in dense matrix.
 
      @return the number of rows.
      */
-    int32_t getNumberOfRows() const;
+    auto getNumberOfRows() const -> int32_t;
 
     /**
      Gets number of columns in dense matrix.
 
      @return the number of columns.
      */
-    int32_t getNumberOfColumns() const;
+    auto getNumberOfColumns() const -> int32_t;
 
     /**
      Gets number of elements in dense matrix.
 
      @return the number of elements.
      */
-    int32_t getNumberOfElements() const;
+    auto getNumberOfElements() const -> int32_t;
 
     /**
      Gets constant pointer to first element of dense matrix.
 
      @return the constant pointer to first element of dense matrix.
      */
-    const double* values() const;
+    auto values() const -> const double*;
 
     /**
      Gets pointer to first element of dense matrix.
 
      @return the pointer to first element of dense matrix.
      */
-    double* values();
+    auto values() -> double*;
 
     /**
      Gets constant pointer to first element of specific row in dense matrix.
 
      @return the constant pointer to first element of specific row.
      */
-    const double* row(const int32_t iRow) const;
+    auto row(const int32_t iRow) const -> const double*;
 
     /**
      Gets pointer to first element of specific row in dense matrix.
 
      @return the pointer to first element of specific row.
      */
-    double* row(const int32_t iRow);
+    auto row(const int32_t iRow) -> double*;
 };
 
 #endif /* DenseMatrix_hpp */

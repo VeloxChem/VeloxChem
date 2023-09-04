@@ -35,8 +35,8 @@
 
 namespace denblas {  // denblas namespace
 
-CDenseMatrix
-multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
+auto
+multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
 
@@ -76,8 +76,8 @@ multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
     return mat;
 }
 
-CDenseMatrix
-multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
+auto
+multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
 
@@ -117,8 +117,8 @@ multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
     return mat;
 }
 
-CDenseMatrix
-multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
+auto
+multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     // set up dimensions of matrix A
 
@@ -156,8 +156,8 @@ multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
     return mat;
 }
 
-CDenseMatrix
-multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix)
+auto
+multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix
 {
     // set up dimensions of matrix
 
@@ -200,8 +200,8 @@ multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix)
     return mat;
 }
 
-CDenseMatrix
-multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix)
+auto
+multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> CDenseMatrix
 {
     // set up dimensions of matrix
 
@@ -236,8 +236,8 @@ multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix)
     return mat;
 }
 
-CDenseMatrix
-subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
+auto
+subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 {
     errors::assertMsgCritical(matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
                               "denblas::subAB: Inconsistent sizes in matrix subtraction");
@@ -253,8 +253,8 @@ subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB)
     return mat;
 }
 
-CDenseMatrix
-addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor)
+auto
+addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double factor) -> CDenseMatrix
 {
     errors::assertMsgCritical(matrixA.getNumberOfElements() == matrixB.getNumberOfElements(),
                               "denblas::addAB: Inconsistent sizes in matrix addition");
@@ -270,16 +270,16 @@ addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double fac
     return mat;
 }
 
-double
-dot(const std::vector<double>& vectorA, const std::vector<double>& vectorB)
+auto
+dot(const std::vector<double>& vectorA, const std::vector<double>& vectorB) -> double
 {
     errors::assertMsgCritical(vectorA.size() == vectorB.size(), "denblas::dot: Inconsistent sizes in dot product of vectors");
 
     return cblas_ddot(vectorA.size(), vectorA.data(), 1, vectorB.data(), 1);
 }
 
-double
-trace(const CDenseMatrix& matrix)
+auto
+trace(const CDenseMatrix& matrix) -> double
 {
     errors::assertMsgCritical(matrix.getNumberOfColumns() == matrix.getNumberOfRows(), "denblas::trace: Expecting a square matrix");
 

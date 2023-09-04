@@ -37,8 +37,8 @@
 
 namespace coordnum {  // coordnum namespace
 
-std::vector<double>
-getCovalentRadius()
+auto
+getCovalentRadius() -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -78,16 +78,16 @@ getCovalentRadius()
     return cn;
 }
 
-std::vector<double>
-getCoordinationNumber(const CMolecule& molecule)
+auto
+getCoordinationNumber(const CMolecule& molecule) -> std::vector<double>
 {
     CDenseMatrix dcndr;
 
     return getCoordinationNumber(molecule, dcndr);
 }
 
-std::vector<double>
-getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
+auto
+getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr) -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -193,8 +193,8 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr)
     return cn;
 }
 
-std::vector<double>
-getPaulingElectronegativity()
+auto
+getPaulingElectronegativity() -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 
@@ -222,8 +222,8 @@ getPaulingElectronegativity()
     });
 }
 
-std::vector<double>
-getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
+auto
+getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr) -> std::vector<double>
 {
     // Reference: dftd4 (v2.4.0)
 

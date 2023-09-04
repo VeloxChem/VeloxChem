@@ -78,42 +78,42 @@ class CDenseDiagonalizer
 
      @param matrix the dense matrix.
      */
-    void diagonalize(const CDenseMatrix& matrix);
+    auto diagonalize(const CDenseMatrix& matrix) -> void;
 
     /**
      Gets state of dense diagonalizer object.
 
      @return true if no errors, false otherwise.
      */
-    bool getState() const;
+    auto getState() const -> bool;
 
     /**
      Gets eigenvectors of dense matrix.
 
      @return the eigenvectors of matrix.
      */
-    CDenseMatrix getEigenVectors() const;
+    auto getEigenVectors() const -> CDenseMatrix;
 
     /**
      Gets eigenvalues of dense matrix.
 
      @return the eigenvalues of matrix.
      */
-    std::vector<double> getEigenValues() const;
+    auto getEigenValues() const -> std::vector<double>;
 
     /**
      Computes A^-1/2 matrix using eigenvalues and eigenvectors of A matrix.
 
      @return the A^-1/2 matrix.
      */
-    CDenseMatrix getInvertedSqrtMatrix() const;
+    auto getInvertedSqrtMatrix() const -> CDenseMatrix;
 
     /**
      Computes A^-1 matrix using eigenvalues and eigenvectors of A matrix.
 
      @return the A^-1 matrix.
      */
-    CDenseMatrix getInvertedMatrix() const;
+    auto getInvertedMatrix() const -> CDenseMatrix;
 };
 
 #endif /* DenseDiagonalizer_hpp */
