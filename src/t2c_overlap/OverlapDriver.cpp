@@ -77,3 +77,63 @@ COverlapDriver::compute(const CMolecularBasis& basis, const CMolecule& molecule)
 
     return ovl_matrix;
 }
+
+
+auto
+COverlapDriver::compute(const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis, const CMolecule& molecule) const -> CMatrix
+{
+    auto ovl_matrix = matfunc::makeMatrix(bra_basis, ket_basis);
+
+    ovl_matrix.zero();
+    
+    const auto bra_gto_blocks = gtofunc::makeGtoBlocks(bra_basis, molecule);
+    
+    const auto ket_gto_blocks = gtofunc::makeGtoBlocks(ket_basis, molecule);
+    
+    const auto work_groups = omp::makeWorkGroup(bra_gto_blocks, ket_gto_blocks);
+    
+    // prepare pointers for OMP parallel region
+
+    auto ptr_bra_gto_blocks = bra_gto_blocks.data();
+    
+    auto ptr_ket_gto_blocks = ket_gto_blocks.data();
+
+    auto ptr_work_groups = work_groups.data();
+
+    auto ptr_ovl_matrix = &ovl_matrix;
+
+    // execute OMP tasks with static scheduling
+
+    omp::setStaticScheduler();
+
+    const auto ntasks = work_groups.size();
+    
+#pragma omp parallel num_threads(ntasks) shared(ntasks, ptr_bra_gto_blocks, ptr_ket_gto_blocks, ptr_work_groups, ptr_ovl_matrix)
+    {
+#pragma omp single nowait
+        {
+            for (size_t i = 0; i < ntasks; i++)
+            {
+#pragma omp task firstprivate(i)
+                {
+                    for (const auto& task : ptr_work_groups[i])
+                    {
+                        const auto bra_gto_block = ptr_bra_gto_blocks[task[0]];
+
+                        const auto ket_gto_block = ptr_ket_gto_blocks[task[1]];
+
+                        const auto bra_angmom = bra_gto_block.getAngularMomentum();
+
+                        const auto ket_angmom = ket_gto_block.getAngularMomentum();
+
+                        auto ptr_submatrix = ptr_ovl_matrix->getSubMatrix({bra_angmom, ket_angmom});
+
+                        ovlfunc::compute(ptr_submatrix, bra_gto_block, ket_gto_block, bra_angmom, ket_angmom, true, task[2], task[3], mat_t::gen);
+                    }
+                }
+            }
+        }
+    }
+    
+    return ovl_matrix;
+}
