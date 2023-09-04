@@ -103,6 +103,7 @@ class RespChargesDriver:
 
         # method
         self.xcfun = None
+        self.restart = True
 
         # conformers
         self.xyz_file = None
@@ -139,6 +140,7 @@ class RespChargesDriver:
         self.input_keywords = {
             'resp_charges': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'restart': ('bool', 'restart from checkpoint file'),
                 'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
@@ -357,7 +359,9 @@ class RespChargesDriver:
                     'checkpoint_file': self.filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
-                if self.method_dict is None:
+                scf_drv.restart = self.restart
+                if (self.method_dict is None or
+                        'xcfun' not in self.method_dict):
                     scf_drv.xcfun = self.xcfun
                 scf_results = scf_drv.compute(mol, bas)
 
@@ -376,7 +380,9 @@ class RespChargesDriver:
                     'checkpoint_file': filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
-                if self.method_dict is None:
+                scf_drv.restart = self.restart
+                if (self.method_dict is None or
+                        'xcfun' not in self.method_dict):
                     scf_drv.xcfun = self.xcfun
                 scf_results = scf_drv.compute(mol, bas)
                 ostream.close()
