@@ -3,7 +3,7 @@
 //         ----------------------------------------------------
 //                     An Electronic Structure Code
 //
-//  Copyright © 2018-2021 by VeloxChem developers. All rights reserved.
+//  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
 //  Contact: https://veloxchem.org/contact
 //
 //  SPDX-License-Identifier: LGPL-3.0-or-later

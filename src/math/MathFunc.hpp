@@ -21,6 +21,15 @@ auto countSignificantElements(const std::vector<int64_t>& mask) -> int64_t;
  */
 auto zero(std::vector<double>& values) -> void;
 
+/**
+ Computes Chebtshev quadrature of second kind in [-1,1] interval.
+
+ @param coordinates the vector of quadature coordinates.
+ @param weights the vector of quadrature weights.
+ @param nPoints the number of points in quadrature.
+ */
+auto quadChebyshevOfKindTwo(double* coordinates, double* weights, const int32_t nPoints) -> void;
+
 }  // namespace mathfunc
 
 #endif /* MathFunc_hpp */

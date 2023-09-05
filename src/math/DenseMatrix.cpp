@@ -83,8 +83,8 @@ CDenseMatrix::~CDenseMatrix()
 {
 }
 
-CDenseMatrix&
-CDenseMatrix::operator=(const CDenseMatrix& source)
+auto
+CDenseMatrix::operator=(const CDenseMatrix& source) -> CDenseMatrix&
 {
     if (this == &source) return *this;
 
@@ -97,8 +97,8 @@ CDenseMatrix::operator=(const CDenseMatrix& source)
     return *this;
 }
 
-CDenseMatrix&
-CDenseMatrix::operator=(CDenseMatrix&& source) noexcept
+auto
+CDenseMatrix::operator=(CDenseMatrix&& source) noexcept -> CDenseMatrix&
 {
     if (this == &source) return *this;
 
@@ -109,6 +109,24 @@ CDenseMatrix::operator=(CDenseMatrix&& source) noexcept
     _values = std::move(source._values);
 
     return *this;
+}
+
+auto
+CDenseMatrix::operator==(const CDenseMatrix& other) const -> bool
+{
+    if (_nRows != other._nRows) return false;
+
+    if (_nColumns != other._nColumns) return false;
+
+    if (_values != other._values) return false;
+
+    return true;
+}
+
+auto
+CDenseMatrix::operator!=(const CDenseMatrix& other) const -> bool
+{
+    return !(*this == other);
 }
 
 auto

@@ -100,14 +100,30 @@ class CDenseMatrix
 
      @param source the dense matrix object.
      */
-    CDenseMatrix& operator=(const CDenseMatrix& source);
+    auto operator=(const CDenseMatrix& source) -> CDenseMatrix&;
 
     /**
      Assigns a dense matrix object by moving other dense matrix object.
 
      @param source the dense matrix object.
      */
-    CDenseMatrix& operator=(CDenseMatrix&& source) noexcept;
+    auto operator=(CDenseMatrix&& source) noexcept -> CDenseMatrix&;
+
+    /**
+     Compares dense matrix object with other dense matrix object.
+
+     @param other the dense matrix object.
+     @return true if dense matrix objects are equal, false otherwise.
+     */
+    auto operator==(const CDenseMatrix& other) const -> bool;
+
+    /**
+     Compares dense matrix object with other dense matrix object.
+
+     @param other the dense matrix object.
+     @return true if dense matrix objects are not equal, false otherwise.
+     */
+    auto operator!=(const CDenseMatrix& other) const -> bool;
 
     /**
      Sets all values in dense matrix to zero.
