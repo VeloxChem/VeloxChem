@@ -126,9 +126,9 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr) -> std::ve
         errors::assertMsgCritical(dcndr.getNumberOfColumns() == natoms, err_size);
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < i; j++)
+        for (int64_t j = 0; j < i; j++)
         {
             std::vector<double> rij({xyzcoord[j][0] - xyzcoord[i][0], xyzcoord[j][1] - xyzcoord[i][1], xyzcoord[j][2] - xyzcoord[i][2]});
 
@@ -152,11 +152,11 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr) -> std::ve
 
             if (dcndr.getNumberOfElements() > 0)
             {
-                for (int32_t d = 0; d < 3; d++)
+                for (int64_t d = 0; d < 3; d++)
                 {
-                    int32_t di = d * natoms + i;
+                    auto di = d * natoms + i;
 
-                    int32_t dj = d * natoms + j;
+                    auto dj = d * natoms + j;
 
                     dcndr.values()[di * natoms + i] += dcn_val * rij[d] / r;
 
@@ -172,20 +172,20 @@ getCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcndr) -> std::ve
 
     // apply cutoff function for large coordination numbers
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
         double dcnpdcn = std::exp(cnmax) / (std::exp(cnmax) + std::exp(cn[i]));
 
         if (dcndr.getNumberOfElements() > 0)
         {
-            for (int32_t dj = 0; dj < 3 * natoms; dj++)
+            for (int64_t dj = 0; dj < 3 * natoms; dj++)
             {
                 dcndr.values()[dj * natoms + i] *= dcnpdcn;
             }
         }
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
         cn[i] = std::log(1.0 + std::exp(cnmax)) - std::log(1.0 + std::exp(cnmax - cn[i]));
     }
@@ -268,9 +268,9 @@ getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
         errors::assertMsgCritical(dcovcndr.getNumberOfColumns() == natoms, err_size);
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < i; j++)
+        for (int64_t j = 0; j < i; j++)
         {
             std::vector<double> rij({xyzcoord[j][0] - xyzcoord[i][0], xyzcoord[j][1] - xyzcoord[i][1], xyzcoord[j][2] - xyzcoord[i][2]});
 
@@ -298,11 +298,11 @@ getCovalentCoordinationNumber(const CMolecule& molecule, CDenseMatrix& dcovcndr)
 
             if (dcovcndr.getNumberOfElements() > 0)
             {
-                for (int32_t d = 0; d < 3; d++)
+                for (int64_t d = 0; d < 3; d++)
                 {
-                    int32_t di = d * natoms + i;
+                    auto di = d * natoms + i;
 
-                    int32_t dj = d * natoms + j;
+                    auto dj = d * natoms + j;
 
                     dcovcndr.values()[di * natoms + i] -= dcovcn_val * rij[d] / r;
 

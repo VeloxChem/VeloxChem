@@ -124,7 +124,7 @@ CDenseDiagonalizer::getInvertedSqrtMatrix() const -> CDenseMatrix
 
         // compute e^-1/2 vector
 
-        for (int32_t i = 0; i < ndim; i++)
+        for (size_t i = 0; i < ndim; i++)
         {
             fvals[i] = 1.0 / std::sqrt(fvals[i]);
         }
@@ -156,7 +156,7 @@ CDenseDiagonalizer::getInvertedMatrix() const -> CDenseMatrix
 
         // compute e^-1 vector
 
-        for (int32_t i = 0; i < ndim; i++)
+        for (size_t i = 0; i < ndim; i++)
         {
             fvals[i] = 1.0 / fvals[i];
         }

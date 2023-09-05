@@ -102,7 +102,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     std::vector<double> chg_xi, chg_gam, chg_kappa, chg_alpha;
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
         chg_xi.push_back(en[ids_elem[i]]);
 
@@ -115,7 +115,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     // form right-hand side vector
 
-    int32_t natoms_1 = natoms + 1;
+    auto natoms_1 = natoms + 1;
 
     CDenseMatrix Xvec(natoms_1, 1);
 
@@ -125,7 +125,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     auto cn = coordnum::getCoordinationNumber(molecule, dcndr);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
         double val = chg_kappa[i] / (std::sqrt(cn[i]) + 1.0e-14);
 
@@ -146,9 +146,9 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     auto xyzcoord = molecule.getCoordinates("bohr");
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
-        for (int32_t j = 0; j < i; j++)
+        for (int64_t j = 0; j < i; j++)
         {
             std::vector<double> rij({xyzcoord[i][0] - xyzcoord[j][0], xyzcoord[i][1] - xyzcoord[j][1], xyzcoord[i][2] - xyzcoord[j][2]});
 
@@ -166,7 +166,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
         Amat.values()[i * natoms_1 + i] = chg_gam[i] + sqrt2pi / std::sqrt(chg_alpha[i]);
     }
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
         Amat.values()[i * natoms_1 + natoms] = 1.0;
 
@@ -191,7 +191,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     std::vector<double> partialcharges(natoms);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
         partialcharges[i] = solution.values()[i];
     }
@@ -215,14 +215,14 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     CDenseMatrix Afac(3, natoms);
 
-    for (int32_t i = 0; i < natoms; i++)
+    for (int64_t i = 0; i < natoms; i++)
     {
-        for (int32_t dj = 0; dj < 3 * natoms; dj++)
+        for (int64_t dj = 0; dj < 3 * natoms; dj++)
         {
             dXvecdr.values()[dj * natoms_1 + i] = dcndr.values()[dj * natoms + i] * Xfac.values()[i];
         }
 
-        for (int32_t j = 0; j < i; j++)
+        for (int64_t j = 0; j < i; j++)
         {
             std::vector<double> rij({xyzcoord[i][0] - xyzcoord[j][0], xyzcoord[i][1] - xyzcoord[j][1], xyzcoord[i][2] - xyzcoord[j][2]});
 
@@ -234,11 +234,11 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
             double dval = 2.0 * gamij * std::exp(-arg) / (sqrtpi * r2) - Amat.values()[j * natoms_1 + i] / r2;
 
-            for (int32_t d = 0; d < 3; d++)
+            for (int64_t d = 0; d < 3; d++)
             {
-                int32_t di = d * natoms + i;
+                auto di = d * natoms + i;
 
-                int32_t dj = d * natoms + j;
+                auto dj = d * natoms + j;
 
                 Afac.values()[di] += dval * rij[d] * partialcharges[j];
 
@@ -251,11 +251,11 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
         }
     }
 
-    for (int32_t d = 0; d < 3; d++)
+    for (int64_t d = 0; d < 3; d++)
     {
-        for (int32_t i = 0; i < natoms; i++)
+        for (int64_t i = 0; i < natoms; i++)
         {
-            int32_t di = d * natoms + i;
+            auto di = d * natoms + i;
 
             dAmatdr.values()[di * natoms_1 + i] += Afac.values()[di];
         }
@@ -267,9 +267,9 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     auto prod_sum = denblas::addAB(prod_dmat, prod_dvec, 1.0);
 
-    for (int32_t dj = 0; dj < 3 * natoms; dj++)
+    for (int64_t dj = 0; dj < 3 * natoms; dj++)
     {
-        for (int32_t i = 0; i < natoms; i++)
+        for (int64_t i = 0; i < natoms; i++)
         {
             dqdr.values()[dj * natoms + i] = -prod_sum.values()[dj * natoms_1 + i];
         }

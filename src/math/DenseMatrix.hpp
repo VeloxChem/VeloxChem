@@ -39,13 +39,19 @@
 class CDenseMatrix
 {
     /**
+     The number of rows.
+     */
+    int32_t _nRows;
+
+    /**
+     The number of columns.
+     */
+    int32_t _nColumns;
+
+    /**
      The matrix element values.
      */
     std::vector<double> _values;
-
-    int32_t _nRows;
-
-    int32_t _nColumns;
 
    public:
     /**
@@ -60,7 +66,7 @@ class CDenseMatrix
      @param nRows the number of rows in matrix.
      @param nColumns the number of columns in matrix.
      */
-    CDenseMatrix(const std::vector<double>& values, const int32_t nRows, const int32_t nColumns);
+    CDenseMatrix(const std::vector<double>& values, const int64_t nRows, const int64_t nColumns);
 
     /**
      Creates a dense matrix object.
@@ -68,22 +74,39 @@ class CDenseMatrix
      @param nRows the number of rows in matrix.
      @param nColumns the number of columns in matrix.
      */
-    CDenseMatrix(const int32_t nRows, const int32_t nColumns);
+    CDenseMatrix(const int64_t nRows, const int64_t nColumns);
 
     /**
-     Creates an dense matrix object.
+     Creates a dense matrix object by copying other dense matrix object.
 
-     @param other the dense matrix to copy from.
+     @param source the dense matrix object.
      */
-    CDenseMatrix(const CDenseMatrix& other);
+    CDenseMatrix(const CDenseMatrix& source);
+
+    /**
+     Creates a dense matrix object by moving other dense matrix object.
+
+     @param source the dense matrix object.
+     */
+    CDenseMatrix(CDenseMatrix&& source) noexcept;
 
     /**
      Destroys a dense matrix object.
      */
     ~CDenseMatrix();
 
+    /**
+     Assigns a dense matrix object by copying other dense matrix object.
+
+     @param source the dense matrix object.
+     */
     CDenseMatrix& operator=(const CDenseMatrix& source);
 
+    /**
+     Assigns a dense matrix object by moving other dense matrix object.
+
+     @param source the dense matrix object.
+     */
     CDenseMatrix& operator=(CDenseMatrix&& source) noexcept;
 
     /**

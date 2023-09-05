@@ -35,37 +35,44 @@ CDenseMatrix::CDenseMatrix()
 {
 }
 
-CDenseMatrix::CDenseMatrix(const std::vector<double>& values, const int32_t nRows, const int32_t nColumns)
+CDenseMatrix::CDenseMatrix(const std::vector<double>& values, const int64_t nRows, const int64_t nColumns)
 
-    : _nRows(nRows)
+    : _nRows(static_cast<int32_t>(nRows))
 
-    , _nColumns(nColumns)
+    , _nColumns(static_cast<int32_t>(nColumns))
+
+    , _values(values)
 {
-    _values = std::vector<double>(nRows * nColumns);
-
-    std::memcpy(_values.data(), values.data(), nRows * nColumns * sizeof(double));
 }
 
-CDenseMatrix::CDenseMatrix(const int32_t nRows, const int32_t nColumns)
+CDenseMatrix::CDenseMatrix(const int64_t nRows, const int64_t nColumns)
 
-    : _nRows(nRows)
+    : _nRows(static_cast<int32_t>(nRows))
 
-    , _nColumns(nColumns)
+    , _nColumns(static_cast<int32_t>(nColumns))
+
+    , _values(std::vector<double>(static_cast<int32_t>(nRows * nColumns), 0.0))
 {
-    _values = std::vector<double>(nRows * nColumns);
-
-    zero();
 }
 
-CDenseMatrix::CDenseMatrix(const CDenseMatrix& other)
+CDenseMatrix::CDenseMatrix(const CDenseMatrix& source)
 
-    : _nRows(other.getNumberOfRows())
+    : _nRows(source._nRows)
 
-    , _nColumns(other.getNumberOfColumns())
+    , _nColumns(source._nColumns)
+
+    , _values(source._values)
 {
-    _values = std::vector<double>(other.getNumberOfElements());
+}
 
-    std::memcpy(_values.data(), other.values(), other.getNumberOfElements() * sizeof(double));
+CDenseMatrix::CDenseMatrix(CDenseMatrix&& source) noexcept
+
+    : _nRows(std::move(source._nRows))
+
+    , _nColumns(std::move(source._nColumns))
+
+    , _values(std::move(source._values))
+{
 }
 
 CDenseMatrix::~CDenseMatrix()
@@ -103,27 +110,23 @@ CDenseMatrix::operator=(CDenseMatrix&& source) noexcept
 auto
 CDenseMatrix::zero() -> void
 {
-    std::fill(values(), values() + _nRows * _nColumns, 0.0);
+    std::fill(_values.data(), _values.data() + _nRows * _nColumns, 0.0);
 }
 
 auto
 CDenseMatrix::transpose() const -> CDenseMatrix
 {
-    auto nrows = getNumberOfRows();
+    CDenseMatrix tmat(_nColumns, _nRows);
 
-    auto ncols = getNumberOfColumns();
-
-    CDenseMatrix tmat(ncols, nrows);
-
-    auto cvals = values();
+    auto cvals = _values.data();
 
     auto tvals = tmat.values();
 
-    for (int32_t i = 0; i < nrows; i++)
+    for (int32_t i = 0; i < _nRows; i++)
     {
-        for (int32_t j = 0; j < ncols; j++)
+        for (int32_t j = 0; j < _nColumns; j++)
         {
-            tvals[j * nrows + i] = cvals[i * ncols + j];
+            tvals[j * _nRows + i] = cvals[i * _nColumns + j];
         }
     }
 
@@ -133,21 +136,17 @@ CDenseMatrix::transpose() const -> CDenseMatrix
 auto
 CDenseMatrix::symmetrize() -> void
 {
-    auto nrows = getNumberOfRows();
+    auto fmat = _values.data();
 
-    auto ncols = getNumberOfColumns();
-
-    auto fmat = values();
-
-    if (nrows == ncols)
+    if (_nRows == _nColumns)
     {
-        for (int32_t i = 0; i < nrows; i++)
+        for (int32_t i = 0; i < _nRows; i++)
         {
-            for (int32_t j = i; j < nrows; j++)
+            for (int32_t j = i; j < _nRows; j++)
             {
-                auto ijoff = i * ncols + j;
+                auto ijoff = i * _nColumns + j;
 
-                auto jioff = j * ncols + i;
+                auto jioff = j * _nColumns + i;
 
                 auto fval = fmat[ijoff] + fmat[jioff];
 
@@ -162,21 +161,17 @@ CDenseMatrix::symmetrize() -> void
 auto
 CDenseMatrix::symmetrizeAndScale(const double factor) -> void
 {
-    auto nrows = getNumberOfRows();
+    auto fmat = _values.data();
 
-    auto ncols = getNumberOfColumns();
-
-    auto fmat = values();
-
-    if (nrows == ncols)
+    if (_nRows == _nColumns)
     {
-        for (int32_t i = 0; i < nrows; i++)
+        for (int32_t i = 0; i < _nRows; i++)
         {
-            for (int32_t j = i; j < nrows; j++)
+            for (int32_t j = i; j < _nRows; j++)
             {
-                auto ijoff = i * ncols + j;
+                auto ijoff = i * _nColumns + j;
 
-                auto jioff = j * ncols + i;
+                auto jioff = j * _nColumns + i;
 
                 auto fval = factor * (fmat[ijoff] + fmat[jioff]);
 
@@ -223,7 +218,7 @@ CDenseMatrix::row(const int32_t iRow) const -> const double*
 {
     if (iRow < getNumberOfRows())
     {
-        return _values.data() + iRow * getNumberOfColumns();
+        return _values.data() + iRow * _nColumns;
     }
     else
     {
@@ -236,7 +231,7 @@ CDenseMatrix::row(const int32_t iRow) -> double*
 {
     if (iRow < getNumberOfRows())
     {
-        return _values.data() + iRow * getNumberOfColumns();
+        return _values.data() + iRow * _nColumns;
     }
     else
     {
