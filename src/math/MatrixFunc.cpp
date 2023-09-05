@@ -1,6 +1,7 @@
 #include "MatrixFunc.hpp"
 
 #include "AngularMomentum.hpp"
+#include "StringFormat.hpp"
 
 namespace matfunc {  // matfunc namespace
 
@@ -77,6 +78,63 @@ makeMatrix(const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis) -
         }
     }
 
+    return matrix;
+}
+
+auto
+makeMatrix(const std::string& label, const int64_t nrows, const int64_t ncols) -> CMatrix
+{
+    // set up matrix
+
+    auto matrix = CMatrix();
+
+    matrix.setType(mat_t::gen);
+    
+    // add submatrices for LDA case
+    
+    if (fstr::upcase(label) == "LDA")
+    {
+        matrix.add({0, 0, nrows, ncols}, {0, 0});
+    }
+    
+    // add submatrices for GGA case
+    
+    if (fstr::upcase(label) == "GGA")
+    {
+        matrix.add({0, 0, nrows, ncols}, {0, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 1});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 2});
+    }
+    
+    // add submatrices for GGA case
+    
+    if (fstr::upcase(label) == "MGGA")
+    {
+        matrix.add({0, 0, nrows, ncols}, {0, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 1});
+        
+        matrix.add({0, 0, nrows, ncols}, {1, 2});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 0});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 1});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 2});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 3});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 4});
+        
+        matrix.add({0, 0, nrows, ncols}, {2, 5});
+    }
+    
     return matrix;
 }
 

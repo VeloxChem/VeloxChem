@@ -1,6 +1,9 @@
 #ifndef MatrixFunc_hpp
 #define MatrixFunc_hpp
 
+#include <cstdint>
+#include <string>
+
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 
@@ -23,6 +26,17 @@ auto makeMatrix(const CMolecularBasis& basis, const mat_t mtype) -> CMatrix;
  @return the matrix.
  */
 auto makeMatrix(const CMolecularBasis& bra_basis, const CMolecularBasis& ket_basis) -> CMatrix;
+
+
+/**
+ Creates matrix.
+
+ @param label the exchange-correlation functional type label.
+ @param nrows the number of rows in submatrix.
+ @param ncols the number of columns in submatrix.
+ @return the matrix.
+ */
+auto makeMatrix(const std::string& label, const int64_t nrows, const int64_t ncols) -> CMatrix;
 
 }  // namespace matfunc
 

@@ -9,6 +9,7 @@ target_sources(vlxobjs
     Matrix.cpp
     AngularMomentum.cpp
     SubMatrix.cpp
+    MathFunc.cpp
   )
 
 target_include_directories(vlxobjs
