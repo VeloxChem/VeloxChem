@@ -1,5 +1,7 @@
 #include "MathFunc.hpp"
 
+#include <cstdlib>
+
 namespace mathfunc {  // mathfunc namespace
 
 auto
