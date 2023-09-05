@@ -32,6 +32,10 @@
 #include <utility>
 
 CDenseMatrix::CDenseMatrix()
+
+    : _nRows(0)
+
+    , _nColumns(0)
 {
 }
 

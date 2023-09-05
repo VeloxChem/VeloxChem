@@ -203,7 +203,7 @@ getPartialCharges(const CMolecule& molecule, const double netcharge, CDenseMatri
 
     // compute derivative of partial charges
 
-    std::string err_size("PartialCharges - Mismatch in dqdr matrix size");
+    std::string err_size("parchg::getPartialCharges: Mismatch in dqdr matrix size");
 
     errors::assertMsgCritical(dqdr.getNumberOfRows() == 3 * natoms, err_size);
 
