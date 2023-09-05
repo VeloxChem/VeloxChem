@@ -26,6 +26,8 @@
 #include "DenseMatrix.hpp"
 
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <sstream>
 #include <utility>
 
@@ -34,34 +36,74 @@ CDenseMatrix::CDenseMatrix()
 }
 
 CDenseMatrix::CDenseMatrix(const std::vector<double>& values, const int32_t nRows, const int32_t nColumns)
-{
-    T4Index dim({0, 0, static_cast<int64_t>(nRows), static_cast<int64_t>(nColumns)});
 
-    _values = CSubMatrix(values, dim);
+    : _nRows(nRows)
+
+    , _nColumns(nColumns)
+{
+    _values = std::vector<double>(nRows * nColumns);
+
+    std::memcpy(_values.data(), values.data(), nRows * nColumns * sizeof(double));
 }
 
 CDenseMatrix::CDenseMatrix(const int32_t nRows, const int32_t nColumns)
 
-{
-    T4Index dim({0, 0, static_cast<int64_t>(nRows), static_cast<int64_t>(nColumns)});
+    : _nRows(nRows)
 
-    _values = CSubMatrix(dim);
+    , _nColumns(nColumns)
+{
+    _values = std::vector<double>(nRows * nColumns);
+
+    zero();
 }
 
 CDenseMatrix::CDenseMatrix(const CDenseMatrix& other)
 
-    : _values(other._values)
+    : _nRows(other.getNumberOfRows())
+
+    , _nColumns(other.getNumberOfColumns())
 {
+    _values = std::vector<double>(other.getNumberOfElements());
+
+    std::memcpy(_values.data(), other.values(), other.getNumberOfElements() * sizeof(double));
 }
 
 CDenseMatrix::~CDenseMatrix()
 {
 }
 
+CDenseMatrix&
+CDenseMatrix::operator=(const CDenseMatrix& source)
+{
+    if (this == &source) return *this;
+
+    _nRows = source._nRows;
+
+    _nColumns = source._nColumns;
+
+    _values = source._values;
+
+    return *this;
+}
+
+CDenseMatrix&
+CDenseMatrix::operator=(CDenseMatrix&& source) noexcept
+{
+    if (this == &source) return *this;
+
+    _nRows = std::move(source._nRows);
+
+    _nColumns = std::move(source._nColumns);
+
+    _values = std::move(source._values);
+
+    return *this;
+}
+
 auto
 CDenseMatrix::zero() -> void
 {
-    _values.zero();
+    std::fill(values(), values() + _nRows * _nColumns, 0.0);
 }
 
 auto
@@ -73,7 +115,7 @@ CDenseMatrix::transpose() const -> CDenseMatrix
 
     CDenseMatrix tmat(ncols, nrows);
 
-    auto cvals = _values.getData();
+    auto cvals = values();
 
     auto tvals = tmat.values();
 
@@ -95,10 +137,10 @@ CDenseMatrix::symmetrize() -> void
 
     auto ncols = getNumberOfColumns();
 
+    auto fmat = values();
+
     if (nrows == ncols)
     {
-        auto fmat = _values.getData();
-
         for (int32_t i = 0; i < nrows; i++)
         {
             for (int32_t j = i; j < nrows; j++)
@@ -124,10 +166,10 @@ CDenseMatrix::symmetrizeAndScale(const double factor) -> void
 
     auto ncols = getNumberOfColumns();
 
+    auto fmat = values();
+
     if (nrows == ncols)
     {
-        auto fmat = _values.getData();
-
         for (int32_t i = 0; i < nrows; i++)
         {
             for (int32_t j = i; j < nrows; j++)
@@ -149,31 +191,31 @@ CDenseMatrix::symmetrizeAndScale(const double factor) -> void
 auto
 CDenseMatrix::getNumberOfRows() const -> int32_t
 {
-    return static_cast<int32_t>(_values.getNumberOfRows());
+    return _nRows;
 }
 
 auto
 CDenseMatrix::getNumberOfColumns() const -> int32_t
 {
-    return static_cast<int32_t>(_values.getNumberOfColumns());
+    return _nColumns;
 }
 
 auto
 CDenseMatrix::getNumberOfElements() const -> int32_t
 {
-    return getNumberOfRows() * getNumberOfColumns();
+    return _nRows * _nColumns;
 }
 
 auto
 CDenseMatrix::values() const -> const double*
 {
-    return _values.getData();
+    return _values.data();
 }
 
 auto
 CDenseMatrix::values() -> double*
 {
-    return _values.getData();
+    return _values.data();
 }
 
 auto
@@ -181,7 +223,7 @@ CDenseMatrix::row(const int32_t iRow) const -> const double*
 {
     if (iRow < getNumberOfRows())
     {
-        return _values.getData() + iRow * getNumberOfColumns();
+        return _values.data() + iRow * getNumberOfColumns();
     }
     else
     {
@@ -194,7 +236,7 @@ CDenseMatrix::row(const int32_t iRow) -> double*
 {
     if (iRow < getNumberOfRows())
     {
-        return _values.getData() + iRow * getNumberOfColumns();
+        return _values.data() + iRow * getNumberOfColumns();
     }
     else
     {

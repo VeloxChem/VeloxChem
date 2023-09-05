@@ -809,10 +809,13 @@ class SadGuessDriver:
         TODO
         """
 
-        ovl_drv = OverlapDriver
+        ovl_drv = OverlapDriver()
 
-        S12 = ovl_drv.compute(molecule, basis_1, basis_2)
-        S22 = ovl_drv.compute(molecule, basis_2)
+        S12mat = ovl_drv.compute(molecule, basis_1, basis_2)
+        S22mat = ovl_drv.compute(molecule, basis_2)
+
+        S12 = S12mat.get_full_matrix().to_numpy()
+        S22 = S22mat.get_full_matrix().to_numpy()
 
         return self._comp_sad_guess(molecule, basis_1, basis_2, S12, S22,
                                     density_type)
@@ -825,15 +828,21 @@ class SadGuessDriver:
 
         natoms = molecule.number_of_atoms()
 
-        nao_1 = S12.number_of_rows()
-        nao_2 = S12.number_of_columns()
+        nao_1 = S12.shape[0]
+        nao_2 = S12.shape[1]
+
+        if density_type.lower() == 'restricted':
+            csad = np.zeros((nao_2, nao_1))
+
+        elif density_type.lower() == 'unrestricted':
+            csad_a = np.zeros((nao_2, nao_1))
+            csad_b = np.zeros((nao_2, nao_1))
 
         # sanity check
 
         err_ovl_size = 'SadGuessDriver._comp_sad_guess: '
         err_ovl_size += 'Mismatch between overlap matrices'
-        assert_msg_critical(nao_2 == S22.number_of_rows(), err_ovl_size)
-        assert_msg_critical(nao_2 == S22.number_of_columns(), err_ovl_size)
+        assert_msg_critical((nao_2, nao_2) == S22.shape, err_ovl_size)
 
         # AO indices for atoms
 
@@ -874,8 +883,8 @@ class SadGuessDriver:
                 len(alpha_occ[atomidx]) == naodim_1, err_ao_size)
             assert_msg_critical(len(beta_occ[atomidx]) == naodim_1, err_ao_size)
 
-            block_12 = S12[aoinds_1, aoinds_2]
-            block_22 = S22[aoinds_2, aoinds_2]
+            block_12 = S12[aoinds_1, :][:, aoinds_2]
+            block_22 = S22[aoinds_2, :][:, aoinds_2]
 
             mat_c1 = np.diag(np.ones(naodim_1))
             mat_a = np.matmul(block_12.T, mat_c1)
@@ -890,11 +899,9 @@ class SadGuessDriver:
             mat_m_invsqrt = np.linalg.multi_dot(
                 [evecs, np.diag(1.0 / np.sqrt(evals)), evecs.T])
 
-            mat_c2 = np.linalg.multidot([block_22_inv, mat_a, mat_m_invsqrt])
+            mat_c2 = np.linalg.multi_dot([block_22_inv, mat_a, mat_m_invsqrt])
 
             if density_type.lower() == 'restricted':
-
-                csad = np.zeros((nao_2, nao_1))
 
                 sqrt_occ = np.sqrt(alpha_occ[atomidx])
 
@@ -904,12 +911,7 @@ class SadGuessDriver:
                     for i in range(naodim_1):
                         csad[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_occ[i]
 
-                return np.matmul(csad, csad.T)
-
             elif density_type.lower() == 'unrestricted':
-
-                csad_a = np.zeros((nao_2, nao_1))
-                csad_b = np.zeros((nao_2, nao_1))
 
                 sqrt_a_occ = np.sqrt(alpha_occ[atomidx])
                 sqrt_b_occ = np.sqrt(beta_occ[atomidx])
@@ -922,11 +924,14 @@ class SadGuessDriver:
                         csad_a[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_a_occ[i]
                         csad_b[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_b_occ[i]
 
-                return (
-                    np.matmul(csad_a, csad_a.T),
-                    np.matmul(csad_b, csad_b.T),
-                )
+        if density_type.lower() == 'restricted':
+            return np.matmul(csad, csad.T)
 
-            else:
+        elif density_type.lower() == 'unrestricted':
+            return (
+                np.matmul(csad_a, csad_a.T),
+                np.matmul(csad_b, csad_b.T),
+            )
 
-                return np.zeros(0)
+        else:
+            return np.zeros(0)
