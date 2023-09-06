@@ -5,17 +5,77 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <vector>
+
 #include "AngularMomentum.hpp"
 #include "CantorFunc.hpp"
+#include "DenseMatrix.hpp"
+#include "ErrorHandler.hpp"
+#include "ExportGeneral.hpp"
 #include "MathConst.hpp"
 #include "Matrices.hpp"
 #include "Matrix.hpp"
 #include "MatrixFunc.hpp"
+#include "MatrixIndex.hpp"
 #include "MatrixType.hpp"
 #include "SubMatrix.hpp"
-#include "MatrixIndex.hpp"
+
+namespace py = pybind11;
+using namespace py::literals;
 
 namespace vlx_math {  // vlx_math namespace
+
+// Helper function for CDenseMatrix constructor
+
+static auto
+CDenseMatrix_from_numpy(const py::array_t<double>& arr) -> std::shared_ptr<CDenseMatrix>
+{
+    // check dimension
+
+    std::string errdim("DenseMatrix: Expecting a 2D numpy array");
+
+    errors::assertMsgCritical(arr.ndim() == 2, errdim);
+
+    if (arr.data() == nullptr || arr.size() == 0)
+    {
+        return std::make_shared<CDenseMatrix>();
+    }
+
+    // check that the numpy array is c-style contiguous
+
+    std::string errsrc("DenseMatrix: Expecting a contiguous numpy array");
+
+    auto c_style = py::detail::check_flags(arr.ptr(), py::array::c_style);
+
+    auto f_style = py::detail::check_flags(arr.ptr(), py::array::f_style);
+
+    errors::assertMsgCritical(c_style | f_style, errsrc);
+
+    // create CDenseMatrix from numpy array
+
+    std::vector<double> vec(arr.size());
+
+    if (c_style)
+    {
+        std::memcpy(vec.data(), arr.data(), arr.size() * sizeof(double));
+    }
+    else if (f_style)
+    {
+        for (py::ssize_t i = 0; i < arr.shape(0); i++)
+        {
+            for (py::ssize_t j = 0; j < arr.shape(1); j++)
+            {
+                vec.data()[i * arr.shape(1) + j] = arr.data()[j * arr.shape(0) + i];
+            }
+        }
+    }
+
+    int64_t nrows = static_cast<int64_t>(arr.shape(0));
+
+    int64_t ncols = static_cast<int64_t>(arr.shape(1));
+
+    return std::make_shared<CDenseMatrix>(vec, nrows, ncols);
+}
 
 // Exports classes/functions in src/math to python
 
@@ -29,7 +89,7 @@ export_math(py::module& m) -> void
     // exposing functions from MathConst.hpp
 
     m.def("get_pi", &mathconst::getPiValue, "Gets PI value.");
-    
+
     // exposing functions from MathIndex.hpp
 
     m.def("uplo_index", &mathfunc::uplo_index, "Gets index of upper triangular matrix.");
@@ -273,7 +333,28 @@ export_math(py::module& m) -> void
             },
             "Gets specific matrix from matrices.");
 
-    // ...
+    // CDenseMatrix class
+
+    PyClass<CDenseMatrix>(m, "DenseMatrix")
+        .def(py::init<>())
+        .def(py::init<const int64_t, const int64_t>())
+        .def(py::init<const CDenseMatrix&>())
+        .def(py::init(&CDenseMatrix_from_numpy))
+        .def("number_of_rows", &CDenseMatrix::getNumberOfRows, "Gets number of rows in dense matrix.")
+        .def("number_of_columns", &CDenseMatrix::getNumberOfColumns, "Gets number of columns in dense matrix.")
+        .def("symmetrize", &CDenseMatrix::symmetrize, "Symmetrizes elements of square matrix: a_ij = a_ji = (a_ij + a_ji).")
+        .def("slice",
+             &CDenseMatrix::slice,
+             "Creates dense matrix object by slicing columns at selected position from this dense matrix object.",
+             "i_column"_a,
+             "n_columns"_a)
+        .def(
+            "to_numpy",
+            [](const CDenseMatrix& self) -> py::array_t<double> {
+                return vlx_general::pointer_to_numpy(self.values(), std::vector<int64_t>{self.getNumberOfRows(), self.getNumberOfColumns()});
+            },
+            "Converts DenseMatrix to numpy array.")
+        .def(py::self == py::self);
 }
 
 }  // namespace vlx_math

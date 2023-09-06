@@ -39,8 +39,8 @@ CGridPartitioner::CGridPartitioner(const CGridBox& box, const int64_t numGridPoi
     _boxes.push_back(box);
 }
 
-void
-CGridPartitioner::partitionGridPoints()
+auto
+CGridPartitioner::partitionGridPoints() -> void
 {
     auto box = _boxes.begin();
 
@@ -50,7 +50,7 @@ CGridPartitioner::partitionGridPoints()
 
         if (npoints > _numberOfPointsThreshold)
         {
-            auto newboxes = divideBoxIntoTwo(*box);
+            auto newboxes = bisectBox(*box);
 
             _boxes.insert(_boxes.end(), newboxes.begin(), newboxes.end());
 
@@ -63,122 +63,8 @@ CGridPartitioner::partitionGridPoints()
     }
 }
 
-std::list<CGridBox>
-CGridPartitioner::divideBoxIntoEight(const CGridBox& box) const
-{
-    // box info
-
-    auto boxdim = box.getBoxDimension();
-
-    auto xmin = boxdim[0];
-
-    auto ymin = boxdim[1];
-
-    auto zmin = boxdim[2];
-
-    auto xmax = boxdim[3];
-
-    auto ymax = boxdim[4];
-
-    auto zmax = boxdim[5];
-
-    // grid points info
-
-    auto npoints = box.getNumberOfGridPoints();
-
-    auto xcoords = box.getCoordinatesX();
-
-    auto ycoords = box.getCoordinatesY();
-
-    auto zcoords = box.getCoordinatesZ();
-
-    auto weights = box.getWeights();
-
-    // find the center for dividing the box
-
-    auto xhalf = findCenter(xcoords, npoints);
-
-    auto yhalf = findCenter(ycoords, npoints);
-
-    auto zhalf = findCenter(zcoords, npoints);
-
-    // sub boxes and grid points
-
-    std::vector<std::array<double, 6>> subboxdims;
-
-    std::vector<CDenseMatrix> subgridpoints;
-
-    std::vector<int64_t> subnumpoints;
-
-    std::vector<std::array<double, 2>> xrange({std::array<double, 2>({xmin, xhalf}), std::array<double, 2>({xhalf, xmax})});
-
-    std::vector<std::array<double, 2>> yrange({std::array<double, 2>({ymin, yhalf}), std::array<double, 2>({yhalf, ymax})});
-
-    std::vector<std::array<double, 2>> zrange({std::array<double, 2>({zmin, zhalf}), std::array<double, 2>({zhalf, zmax})});
-
-    for (const auto& x : xrange)
-    {
-        for (const auto& y : yrange)
-        {
-            for (const auto& z : zrange)
-            {
-                subboxdims.push_back(std::array<double, 6>({x[0], y[0], z[0], x[1], y[1], z[1]}));
-
-                subgridpoints.push_back(CDenseMatrix(4, npoints));
-
-                subnumpoints.push_back(0);
-            }
-        }
-    }
-
-    for (int64_t g = 0; g < npoints; g++)
-    {
-        int64_t xval = (xcoords[g] < xhalf) ? 0 : 1;
-
-        int64_t yval = (ycoords[g] < yhalf) ? 0 : 1;
-
-        int64_t zval = (zcoords[g] < zhalf) ? 0 : 1;
-
-        // x y z  id
-        // ---------
-        // 0 0 0   0
-        // 0 0 1   1
-        // 0 1 0   2
-        // 0 1 1   3
-        // 1 0 0   4
-        // 1 0 1   5
-        // 1 1 0   6
-        // 1 1 1   7
-
-        int64_t box_id = (xval << 2) | (yval << 1) | (zval << 0);
-
-        auto count = subnumpoints[box_id];
-
-        subgridpoints[box_id].row(0)[count] = xcoords[g];
-
-        subgridpoints[box_id].row(1)[count] = ycoords[g];
-
-        subgridpoints[box_id].row(2)[count] = zcoords[g];
-
-        subgridpoints[box_id].row(3)[count] = weights[g];
-
-        subnumpoints[box_id]++;
-    }
-
-    std::list<CGridBox> newboxes;
-
-    for (int64_t box_id = 0; box_id < static_cast<int64_t>(subboxdims.size()); box_id++)
-    {
-        auto count = subnumpoints[box_id];
-
-        if (count > 0) newboxes.push_back(CGridBox(subboxdims[box_id], subgridpoints[box_id].slice(0, count)));
-    }
-
-    return newboxes;
-}
-
-std::list<CGridBox>
-CGridPartitioner::divideBoxIntoTwo(const CGridBox& box) const
+auto
+CGridPartitioner::bisectBox(const CGridBox& box) const -> std::list<CGridBox>
 {
     // box info
 
@@ -296,8 +182,8 @@ CGridPartitioner::divideBoxIntoTwo(const CGridBox& box) const
     return newboxes;
 }
 
-double
-CGridPartitioner::findCenter(const double* ptr, const int64_t num) const
+auto
+CGridPartitioner::findCenter(const double* ptr, const int64_t num) const -> double
 {
     double center = 0.0;
 
@@ -311,8 +197,8 @@ CGridPartitioner::findCenter(const double* ptr, const int64_t num) const
     return center;
 }
 
-double
-CGridPartitioner::findDividingPosition(const double* ptr, const int64_t num) const
+auto
+CGridPartitioner::findDividingPosition(const double* ptr, const int64_t num) const -> double
 {
     // Note: ptr and num are not checked
     // Assuming ptr is a valid pointer and num > 0
@@ -342,8 +228,8 @@ CGridPartitioner::findDividingPosition(const double* ptr, const int64_t num) con
     return 0.5 * (vec[num / 2 - 1] + vec[num / 2]);
 }
 
-double
-CGridPartitioner::estimateMedianP2(const double* ptr, const int64_t num) const
+auto
+CGridPartitioner::estimateMedianP2(const double* ptr, const int64_t num) const -> double
 {
     // Note: ptr and num are not checked
     // Assuming ptr is a valid pointer and num is reasonably large (e.g. > 100)
@@ -443,14 +329,14 @@ CGridPartitioner::estimateMedianP2(const double* ptr, const int64_t num) const
     return q[2];
 }
 
-int64_t
-CGridPartitioner::getNumberOfBoxes() const
+auto
+CGridPartitioner::getNumberOfBoxes() const -> int64_t
 {
     return static_cast<int64_t>(_boxes.size());
 }
 
-std::string
-CGridPartitioner::getGridInformation() const
+auto
+CGridPartitioner::getGridInformation() const -> std::string
 {
     std::stringstream ss;
 
@@ -476,8 +362,8 @@ CGridPartitioner::getGridInformation() const
     return ss.str();
 }
 
-std::string
-CGridPartitioner::getGridStatistics() const
+auto
+CGridPartitioner::getGridStatistics() const -> std::string
 {
     std::stringstream ss;
 
@@ -532,8 +418,8 @@ CGridPartitioner::getGridStatistics() const
     return ss.str();
 }
 
-int64_t
-CGridPartitioner::getTotalNumberOfGridPoints() const
+auto
+CGridPartitioner::getTotalNumberOfGridPoints() const -> int64_t
 {
     int64_t totalnpoints = 0;
 
@@ -545,8 +431,8 @@ CGridPartitioner::getTotalNumberOfGridPoints() const
     return totalnpoints;
 }
 
-CDenseMatrix
-CGridPartitioner::getAllGridPoints() const
+auto
+CGridPartitioner::getAllGridPoints() const -> CDenseMatrix
 {
     CDenseMatrix allgridpoints(4, getTotalNumberOfGridPoints());
 
@@ -578,8 +464,8 @@ CGridPartitioner::getAllGridPoints() const
     return allgridpoints;
 }
 
-std::vector<int64_t>
-CGridPartitioner::getGridPointCounts() const
+auto
+CGridPartitioner::getGridPointCounts() const -> std::vector<int64_t>
 {
     std::vector<int64_t> counts(getNumberOfBoxes());
 

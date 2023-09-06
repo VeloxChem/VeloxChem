@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 
+#include "ExportDFT.hpp"
 #include "ExportGeneral.hpp"
 #include "ExportMath.hpp"
 #include "ExportMoldata.hpp"
@@ -16,6 +17,8 @@ PYBIND11_MODULE(veloxchemlib, m)
     vlx_moldata::export_moldata(m);
 
     vlx_orbdata::export_orbdata(m);
+
+    vlx_dft::export_dft(m);
 
     vlx_t2cintegrals::export_t2cintegrals(m);
 

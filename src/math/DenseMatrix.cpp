@@ -25,6 +25,7 @@
 
 #include "DenseMatrix.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>

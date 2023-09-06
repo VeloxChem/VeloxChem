@@ -1,13 +1,16 @@
 
 #include "Molecule.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
+#include <string>
 
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
+#include "MathFunc.hpp"
 #include "StringFormat.hpp"
 
 CMolecule::CMolecule(const std::vector<int64_t>& identifiers, const std::vector<TPoint3D>& coordinates, const std::string& units)
@@ -79,7 +82,7 @@ CMolecule::addAtom(const int64_t identifier, const TPoint3D& coordinates, const 
     {
         _identifiers.push_back(identifier);
 
-        if (_isAnngstroms(units))
+        if (_isAngstroms(units))
         {
             const auto fact = 1.0 / units::getBohrValueInAngstroms();
 
@@ -205,7 +208,7 @@ CMolecule::getIdsElemental() const -> std::vector<int64_t>
 auto
 CMolecule::getCoordinates(const std::string& units) const -> std::vector<TPoint3D>
 {
-    if (_isAnngstroms(units))
+    if (_isAngstroms(units))
     {
         if (const auto natoms = getNumberOfAtoms(); natoms > 0)
         {
@@ -323,7 +326,7 @@ CMolecule::getLabel(const int64_t iatom) const -> std::string
 auto
 CMolecule::getAtomCoordinates(const int64_t iatom, const std::string& units) const -> TPoint3D
 {
-    if (_isAnngstroms(units))
+    if (_isAngstroms(units))
     {
         const auto fact = units::getBohrValueInAngstroms();
 
@@ -500,7 +503,45 @@ CMolecule::printGeometry() const -> std::string
 }
 
 auto
-CMolecule::_isAnngstroms(const std::string& units) const -> bool
+CMolecule::_isAngstroms(const std::string& units) const -> bool
 {
     return (units.length() >= 3) && (fstr::upcase(units) == std::string("ANGSTROM").substr(0, units.length()));
+}
+
+auto
+CMolecule::getMinDistances() const -> std::vector<double>
+{
+    // allocate and initialize distances
+
+    auto natoms = getNumberOfAtoms();
+
+    std::vector<double> mdists(natoms);
+
+    auto rmin = mdists.data();
+
+    std::fill(rmin, rmin + natoms, 1.0e24);
+
+    // set pointers to coordinates
+
+    auto coords = getCoordinates(std::string("BOHR"));
+
+    // determine distance to closest neighbouring atom
+
+    for (int64_t i = 0; i < natoms; i++)
+    {
+        const auto& ri = coords[i];
+
+        for (int64_t j = i + 1; j < natoms; j++)
+        {
+            const auto& rj = coords[j];
+
+            auto rab = mathfunc::distance(ri[0], ri[1], ri[2], rj[0], rj[1], rj[2]);
+
+            if (rab < rmin[i]) rmin[i] = rab;
+
+            if (rab < rmin[j]) rmin[j] = rab;
+        }
+    }
+
+    return mdists;
 }

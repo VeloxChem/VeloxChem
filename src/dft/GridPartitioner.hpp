@@ -59,15 +59,7 @@ class CGridPartitioner
     /**
      Partitions the grid points.
      */
-    void partitionGridPoints();
-
-    /**
-     Divides a grid box into eight boxes.
-
-     @param box the grid box.
-     @return a list of smaller boxes.
-     */
-    std::list<CGridBox> divideBoxIntoEight(const CGridBox& box) const;
+    auto partitionGridPoints() -> void;
 
     /**
      Divides a grid box into two boxes.
@@ -75,7 +67,7 @@ class CGridPartitioner
      @param box the grid box.
      @return a list of smaller boxes.
      */
-    std::list<CGridBox> divideBoxIntoTwo(const CGridBox& box) const;
+    auto bisectBox(const CGridBox& box) const -> std::list<CGridBox>;
 
     /**
      Finds one-dimensional center of points.
@@ -84,7 +76,7 @@ class CGridPartitioner
      @param num the number of data points.
      @return the one-dimensional center.
      */
-    double findCenter(const double* ptr, const int64_t num) const;
+    auto findCenter(const double* ptr, const int64_t num) const -> double;
 
     /**
      Finds the position for dividing the box.
@@ -93,7 +85,7 @@ class CGridPartitioner
      @param num the number of data points.
      @return the one-dimensional median.
      */
-    double findDividingPosition(const double* ptr, const int64_t num) const;
+    auto findDividingPosition(const double* ptr, const int64_t num) const -> double;
 
     /**
      Estimates one-dimensional median using the P2 algorithm.
@@ -103,56 +95,56 @@ class CGridPartitioner
      @param num the number of data points.
      @return the estimated one-dimensional median.
      */
-    double estimateMedianP2(const double* ptr, const int64_t num) const;
+    auto estimateMedianP2(const double* ptr, const int64_t num) const -> double;
 
     /**
      Gets number of boxes.
 
      @return the number of boxes.
      */
-    int64_t getNumberOfBoxes() const;
+    auto getNumberOfBoxes() const -> int64_t;
 
     /**
      Gets information about grid boxes.
 
      @return a string containing information about grid boxes.
      */
-    std::string getGridInformation() const;
+    auto getGridInformation() const -> std::string;
 
     /**
      Gets statistics about grid boxes.
 
      @return a string containing statistics about grid boxes.
      */
-    std::string getGridStatistics() const;
+    auto getGridStatistics() const -> std::string;
 
     /**
      Gets the total number of grid points.
 
      @return the total number of grid points.
      */
-    int64_t getTotalNumberOfGridPoints() const;
+    auto getTotalNumberOfGridPoints() const -> int64_t;
 
     /**
      Gets all grid points in one object.
 
      @return all grid points.
      */
-    CDenseMatrix getAllGridPoints() const;
+    auto getAllGridPoints() const -> CDenseMatrix;
 
     /**
      Gets grid point counts in the boxes.
 
      @return grid point counts.
      */
-    std::vector<int64_t> getGridPointCounts() const;
+    auto getGridPointCounts() const -> std::vector<int64_t>;
 
     /**
      Gets grid point displacements in the boxes.
 
      @return grid point displacements.
      */
-    std::vector<int64_t> getGridPointDisplacements() const;
+    auto getGridPointDisplacements() const -> std::vector<int64_t>;
 };
 
 #endif /* GridPartitioner_hpp */

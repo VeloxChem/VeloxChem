@@ -43,7 +43,7 @@ class CMolecule
      @param units the units of Cartesian coordinates of atoms.
      @return True if units are Angstroms, False otherwise.
      */
-    auto _isAnngstroms(const std::string& units) const -> bool;
+    auto _isAngstroms(const std::string& units) const -> bool;
 
    public:
     /**
@@ -246,6 +246,13 @@ class CMolecule
      @return the output string.
      */
     auto printGeometry() const -> std::string;
+
+    /**
+     Computes vector of distances to closest neighbouring atom for each atom.
+
+     @return the vector of distances.
+     */
+    auto getMinDistances() const -> std::vector<double>;
 };
 
 #endif /* Molecule_hpp */

@@ -1,5 +1,6 @@
 #include "ExportGeneral.hpp"
 
+#include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
@@ -10,6 +11,43 @@
 #include "StringFormat.hpp"
 
 namespace vlx_general {  // vlx_general namespace
+
+static auto
+get_shape_and_strides(const std::vector<int64_t>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
+{
+    std::vector<py::ssize_t> shape, strides;
+
+    for (size_t i = 0; i < dimension.size(); i++)
+    {
+        shape.push_back(static_cast<py::ssize_t>(dimension[i]));
+
+        size_t strd = 1;
+
+        for (size_t j = i + 1; j < dimension.size(); j++)
+        {
+            strd *= dimension[j];
+        }
+
+        strides.push_back(static_cast<py::ssize_t>(strd * sizeof(double)));
+    }
+
+    return {shape, strides};
+}
+
+auto
+pointer_to_numpy(const double* ptr, const std::vector<int64_t>& dimension) -> py::array_t<double>
+{
+    if ((ptr == nullptr) || (dimension.size() == 0))
+    {
+        return py::array_t<double>();
+    }
+    else
+    {
+        const auto [shape, strides] = get_shape_and_strides(dimension);
+
+        return py::array_t<double>(shape, strides, ptr);
+    }
+}
 
 // Exports classes/functions in src/general to python
 
