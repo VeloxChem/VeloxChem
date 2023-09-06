@@ -20,7 +20,7 @@ class TestKineticEnergyDriver:
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')
-        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path)
+        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path, ostream=None)
 
         return mol, bas
 

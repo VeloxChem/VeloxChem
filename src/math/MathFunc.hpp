@@ -28,7 +28,7 @@ auto zero(std::vector<double>& values) -> void;
  @param weights the vector of quadrature weights.
  @param nPoints the number of points in quadrature.
  */
-auto quadChebyshevOfKindTwo(double* coordinates, double* weights, const int32_t nPoints) -> void;
+auto quadChebyshevOfKindTwo(double* coordinates, double* weights, const int64_t nPoints) -> void;
 
 }  // namespace mathfunc
 

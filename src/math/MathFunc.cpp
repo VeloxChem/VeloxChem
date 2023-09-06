@@ -35,7 +35,7 @@ zero(std::vector<double>& values) -> void
 }
 
 auto
-quadChebyshevOfKindTwo(double* coordinates, double* weights, const int32_t nPoints) -> void
+quadChebyshevOfKindTwo(double* coordinates, double* weights, const int64_t nPoints) -> void
 {
     // prefactor
 
@@ -43,7 +43,7 @@ quadChebyshevOfKindTwo(double* coordinates, double* weights, const int32_t nPoin
 
     // loop over grid points
 
-    for (int32_t i = 1; i < nPoints + 1; i++)
+    for (int64_t i = 1; i < nPoints + 1; i++)
     {
         auto farg = static_cast<double>(i) * fstep;
 

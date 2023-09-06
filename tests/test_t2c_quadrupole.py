@@ -20,7 +20,7 @@ class TestDipoleDriver:
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')
-        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path)
+        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path, ostream=None)
 
         return mol, bas
 
@@ -43,7 +43,6 @@ class TestDipoleDriver:
         mcomps = ["XX", "XY", "XZ", "YY", "YZ", "ZZ"]
 
         for idx in range(6):
-            print("*** COMPONENT *** ", mcomps[idx])
             # load matrix for tensor component
             quad_mat = quad_mats.get_matrix(mcomps[idx])
 

@@ -27,7 +27,7 @@
 
 #include <cmath>
 
-CLebedevLaikovQuadrature::CLebedevLaikovQuadrature(const int32_t nAngularPoints)
+CLebedevLaikovQuadrature::CLebedevLaikovQuadrature(const int64_t nAngularPoints)
 
     : _nAngularPoints(nAngularPoints)
 {
@@ -502,7 +502,7 @@ CLebedevLaikovQuadrature::_generateQuadratureWith2030Points() const -> CDenseMat
 }
 
 auto
-CLebedevLaikovQuadrature::_generateCaseOne(CDenseMatrix& gridPoints, const int32_t offset, const double weight) const -> void
+CLebedevLaikovQuadrature::_generateCaseOne(CDenseMatrix& gridPoints, const int64_t offset, const double weight) const -> void
 {
     auto x = gridPoints.row(0) + offset;
 
@@ -544,7 +544,7 @@ CLebedevLaikovQuadrature::_generateCaseOne(CDenseMatrix& gridPoints, const int32
 }
 
 auto
-CLebedevLaikovQuadrature::_generateCaseTwo(CDenseMatrix& gridPoints, const int32_t offset, const double weight) const -> void
+CLebedevLaikovQuadrature::_generateCaseTwo(CDenseMatrix& gridPoints, const int64_t offset, const double weight) const -> void
 {
     auto x = gridPoints.row(0) + offset;
 
@@ -618,7 +618,7 @@ CLebedevLaikovQuadrature::_generateCaseTwo(CDenseMatrix& gridPoints, const int32
 }
 
 auto
-CLebedevLaikovQuadrature::_generateCaseThree(CDenseMatrix& gridPoints, const int32_t offset, const double weight) const -> void
+CLebedevLaikovQuadrature::_generateCaseThree(CDenseMatrix& gridPoints, const int64_t offset, const double weight) const -> void
 {
     auto x = gridPoints.row(0) + offset;
 
@@ -672,7 +672,7 @@ CLebedevLaikovQuadrature::_generateCaseThree(CDenseMatrix& gridPoints, const int
 }
 
 auto
-CLebedevLaikovQuadrature::_generateCaseFour(CDenseMatrix& gridPoints, const int32_t offset, const double factor, const double weight) const -> void
+CLebedevLaikovQuadrature::_generateCaseFour(CDenseMatrix& gridPoints, const int64_t offset, const double factor, const double weight) const -> void
 {
     auto x = gridPoints.row(0) + offset;
 
@@ -808,7 +808,7 @@ CLebedevLaikovQuadrature::_generateCaseFour(CDenseMatrix& gridPoints, const int3
 }
 
 auto
-CLebedevLaikovQuadrature::_generateCaseFive(CDenseMatrix& gridPoints, const int32_t offset, const double factor, const double weight) const -> void
+CLebedevLaikovQuadrature::_generateCaseFive(CDenseMatrix& gridPoints, const int64_t offset, const double factor, const double weight) const -> void
 {
     auto x = gridPoints.row(0) + offset;
 
@@ -945,7 +945,7 @@ CLebedevLaikovQuadrature::_generateCaseFive(CDenseMatrix& gridPoints, const int3
 
 auto
 CLebedevLaikovQuadrature::_generateCaseSix(CDenseMatrix& gridPoints,
-                                           const int32_t offset,
+                                           const int64_t offset,
                                            const double  factorA,
                                            const double  factorB,
                                            const double  weight) const -> void

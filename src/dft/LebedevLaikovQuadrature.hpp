@@ -54,7 +54,7 @@ class CLebedevLaikovQuadrature
     /**
      The number of angular points.
      */
-    int32_t _nAngularPoints;
+    int64_t _nAngularPoints;
 
     /**
      Generates angular Lebedev-Laikov quadrature with 6 points.
@@ -133,7 +133,7 @@ class CLebedevLaikovQuadrature
      @param offset the offset of grid points in quadrature points.
      @param weight the weight assigned to grid weights.
      */
-    auto _generateCaseOne(CDenseMatrix& gridPoints, const int32_t offset, const double weight) const -> void;
+    auto _generateCaseOne(CDenseMatrix& gridPoints, const int64_t offset, const double weight) const -> void;
 
     /**
      Generates 12 points term of Lebedev-Laikov quadrature.
@@ -142,7 +142,7 @@ class CLebedevLaikovQuadrature
      @param offset the offset of grid points in quadrature points.
      @param weight the weight assigned to grid weights.
      */
-    auto _generateCaseTwo(CDenseMatrix& gridPoints, const int32_t offset, const double weight) const -> void;
+    auto _generateCaseTwo(CDenseMatrix& gridPoints, const int64_t offset, const double weight) const -> void;
     /**
      Generates 8 points term of Lebedev-Laikov quadrature.
 
@@ -150,7 +150,7 @@ class CLebedevLaikovQuadrature
      @param offset the offset of grid points in quadrature points.
      @param weight the weight assigned to grid weights.
      */
-    auto _generateCaseThree(CDenseMatrix& gridPoints, const int32_t offset, const double weight) const -> void;
+    auto _generateCaseThree(CDenseMatrix& gridPoints, const int64_t offset, const double weight) const -> void;
 
     /**
      Generates first 24 points term of Lebedev-Laikov quadrature.
@@ -160,7 +160,7 @@ class CLebedevLaikovQuadrature
      @param factor the scaling factor of grid coordinates.
      @param weight the weight assigned to grid weights.
      */
-    auto _generateCaseFour(CDenseMatrix& gridPoints, const int32_t offset, const double factor, const double weight) const -> void;
+    auto _generateCaseFour(CDenseMatrix& gridPoints, const int64_t offset, const double factor, const double weight) const -> void;
 
     /**
      Generates second 24 points term of Lebedev-Laikov quadrature.
@@ -170,7 +170,7 @@ class CLebedevLaikovQuadrature
      @param factor the scaling factor of grid coordinates.
      @param weight the weight assigned to grid weights.
      */
-    auto _generateCaseFive(CDenseMatrix& gridPoints, const int32_t offset, const double factor, const double weight) const -> void;
+    auto _generateCaseFive(CDenseMatrix& gridPoints, const int64_t offset, const double factor, const double weight) const -> void;
 
     /**
      Generates 48 points term of Lebedev-Laikov quadrature.
@@ -181,7 +181,7 @@ class CLebedevLaikovQuadrature
      @param factorB the second scaling factor of grid coordinates.
      @param weight the weight assigned to grid weights.
      */
-    auto _generateCaseSix(CDenseMatrix& gridPoints, const int32_t offset, const double factorA, const double factorB, const double weight) const
+    auto _generateCaseSix(CDenseMatrix& gridPoints, const int64_t offset, const double factorA, const double factorB, const double weight) const
         -> void;
 
    public:
@@ -190,7 +190,7 @@ class CLebedevLaikovQuadrature
 
      @param nAngularPoints the number of angular points.
      */
-    CLebedevLaikovQuadrature(const int32_t nAngularPoints);
+    CLebedevLaikovQuadrature(const int64_t nAngularPoints);
 
     /**
      Destroys a Lebedev-Laikov quadrature object.

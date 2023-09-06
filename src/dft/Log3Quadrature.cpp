@@ -30,7 +30,7 @@
 #include "MathConst.hpp"
 #include "MathFunc.hpp"
 
-CLog3Quadrature::CLog3Quadrature(const int32_t nRadialPoints, const int32_t idElemental)
+CLog3Quadrature::CLog3Quadrature(const int64_t nRadialPoints, const int64_t idElemental)
 
     : _nRadialPoints(nRadialPoints)
 
@@ -64,7 +64,7 @@ CLog3Quadrature::generate() const -> CDenseMatrix
         auto fxi = _getXiFactor() / std::log(2.0);
 
 #pragma omp simd aligned(rcoords, rweights : VLX_ALIGN)
-        for (int32_t i = 0; i < _nRadialPoints; i++)
+        for (int64_t i = 0; i < _nRadialPoints; i++)
         {
             // set up parameters
 

@@ -70,15 +70,33 @@ CDenseDiagonalizer::diagonalize(const CDenseMatrix& matrix) -> void
 
     // temporary array for pivot data
 
-    std::vector<int32_t> idx(2 * ndim);
+    auto ndim_int32 = static_cast<int32_t>(ndim);
+
+    std::vector<int32_t> idx_int32(2 * ndim_int32);
 
     // initialize number of eigenvalues
 
-    int32_t nval = 0;
+    int32_t nval_int32 = 0;
 
     // diagonalize matrix
 
-    auto st = LAPACKE_dsyevr(LAPACK_ROW_MAJOR, 'V', 'A', 'U', ndim, mat, ndim, 0.0, 0.0, 0, 0, 1.0e-13, &nval, evals, evecs, ndim, idx.data());
+    auto st = LAPACKE_dsyevr(LAPACK_ROW_MAJOR,
+                             'V',
+                             'A',
+                             'U',
+                             ndim_int32,
+                             mat,
+                             ndim_int32,
+                             0.0,
+                             0.0,
+                             0,
+                             0,
+                             1.0e-13,
+                             &nval_int32,
+                             evals,
+                             evecs,
+                             ndim_int32,
+                             idx_int32.data());
 
     // update state of diagonalizer
 

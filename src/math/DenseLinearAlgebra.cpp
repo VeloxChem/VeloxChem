@@ -41,13 +41,11 @@ multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
     // set up dimensions of matrix A
 
     auto narow = matrixA.getNumberOfRows();
-
     auto nacol = matrixA.getNumberOfColumns();
 
     // set up dimensions of matrix B
 
     auto nbrow = matrixB.getNumberOfRows();
-
     auto nbcol = matrixB.getNumberOfColumns();
 
     errors::assertMsgCritical(nacol == nbrow, "denblas::multAB: Inconsistent sizes in matrix multiplication");
@@ -58,20 +56,24 @@ multAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 
     // compute matrix-matrix multiplication
 
+    auto narow_int32 = static_cast<int32_t>(narow);
+    auto nacol_int32 = static_cast<int32_t>(nacol);
+    auto nbcol_int32 = static_cast<int32_t>(nbcol);
+
     cblas_dgemm(CblasRowMajor,
                 CblasNoTrans,
                 CblasNoTrans,
-                narow,
-                nbcol,
-                nacol,
+                narow_int32,
+                nbcol_int32,
+                nacol_int32,
                 1.0,
                 matrixA.values(),
-                nacol,
+                nacol_int32,
                 matrixB.values(),
-                nbcol,
+                nbcol_int32,
                 0.0,
                 mat.values(),
-                nbcol);
+                nbcol_int32);
 
     return mat;
 }
@@ -82,13 +84,11 @@ multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatri
     // set up dimensions of matrix A
 
     auto narow = matrixA.getNumberOfRows();
-
     auto nacol = matrixA.getNumberOfColumns();
 
     // set up dimensions of matrix B
 
     auto nbrow = matrixB.getNumberOfRows();
-
     auto nbcol = matrixB.getNumberOfColumns();
 
     errors::assertMsgCritical(nacol == nbcol, "denblas::multABt: Inconsistent sizes in matrix multiplication");
@@ -99,20 +99,25 @@ multABt(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatri
 
     // compute matrix-matrix multiplcation
 
+    auto narow_int32 = static_cast<int32_t>(narow);
+    auto nbrow_int32 = static_cast<int32_t>(nbrow);
+    auto nacol_int32 = static_cast<int32_t>(nacol);
+    auto nbcol_int32 = static_cast<int32_t>(nbcol);
+
     cblas_dgemm(CblasRowMajor,
                 CblasNoTrans,
                 CblasTrans,
-                narow,
-                nbrow,
-                nacol,
+                narow_int32,
+                nbrow_int32,
+                nacol_int32,
                 1.0,
                 matrixA.values(),
-                nacol,
+                nacol_int32,
                 matrixB.values(),
-                nbcol,
+                nbcol_int32,
                 0.0,
                 mat.values(),
-                nbrow);
+                nbrow_int32);
 
     return mat;
 }
@@ -123,13 +128,11 @@ multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatri
     // set up dimensions of matrix A
 
     auto narow = matrixA.getNumberOfRows();
-
     auto nacol = matrixA.getNumberOfColumns();
 
     // set up dimensions of matrix B
 
     auto nbrow = matrixB.getNumberOfRows();
-
     auto nbcol = matrixB.getNumberOfColumns();
 
     errors::assertMsgCritical(narow == nbrow, "denblas::multAtB: Inconsistent sizes in matrix multiplication");
@@ -138,20 +141,26 @@ multAtB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatri
 
     CDenseMatrix mat(nacol, nbcol);
 
+    // compute matrix-matrix multiplication
+
+    auto narow_int32 = static_cast<int32_t>(narow);
+    auto nacol_int32 = static_cast<int32_t>(nacol);
+    auto nbcol_int32 = static_cast<int32_t>(nbcol);
+
     cblas_dgemm(CblasRowMajor,
                 CblasTrans,
                 CblasNoTrans,
-                nacol,
-                nbcol,
-                narow,
+                nacol_int32,
+                nbcol_int32,
+                narow_int32,
                 1.0,
                 matrixA.values(),
-                nacol,
+                nacol_int32,
                 matrixB.values(),
-                nbcol,
+                nbcol_int32,
                 0.0,
                 mat.values(),
-                nbcol);
+                nbcol_int32);
 
     return mat;
 }
@@ -162,7 +171,6 @@ multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> 
     // set up dimensions of matrix
 
     auto nrow = matrix.getNumberOfRows();
-
     auto ncol = matrix.getNumberOfColumns();
 
     // allocate results matrix
@@ -172,26 +180,24 @@ multDiagByA(const std::vector<double>& diagonal, const CDenseMatrix& matrix) -> 
     // set up pointers to matrices
 
     auto mval = mat.values();
-
     auto sval = matrix.values();
 
     auto dval = diagonal.data();
 
     // compute matrix multiplication
 
-    for (int32_t i = 0; i < nrow; i++)
+    for (int64_t i = 0; i < nrow; i++)
     {
         // set up local pointers to rows
 
         auto cmval = mval + i * ncol;
-
         auto csval = sval + i * ncol;
 
         // fetch value of diagonal
 
         auto f = dval[i];
 
-        for (int32_t j = 0; j < ncol; j++)
+        for (int64_t j = 0; j < ncol; j++)
         {
             cmval[j] = f * csval[j];
         }
@@ -206,7 +212,6 @@ multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix) ->
     // set up dimensions of matrix
 
     auto nrow = matrix.getNumberOfRows();
-
     auto ncol = matrix.getNumberOfColumns();
 
     // allocate results matrix
@@ -216,18 +221,17 @@ multDiagByAt(const std::vector<double>& diagonal, const CDenseMatrix& matrix) ->
     // set up pointers to matrices
 
     auto mval = mat.values();
-
     auto sval = matrix.values();
 
     auto dval = diagonal.data();
 
     // compute matrix multiplication
 
-    for (int32_t i = 0; i < ncol; i++)
+    for (int64_t i = 0; i < ncol; i++)
     {
         auto ioff = i * nrow;
 
-        for (int32_t j = 0; j < nrow; j++)
+        for (int64_t j = 0; j < nrow; j++)
         {
             mval[ioff + j] = dval[i] * sval[j * ncol + i];
         }
@@ -248,7 +252,9 @@ subAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB) -> CDenseMatrix
 
     // substract matrix
 
-    cblas_daxpy(mat.getNumberOfElements(), -1.0, matrixB.values(), 1, mat.values(), 1);
+    auto nelems_int32 = static_cast<int32_t>(mat.getNumberOfElements());
+
+    cblas_daxpy(nelems_int32, -1.0, matrixB.values(), 1, mat.values(), 1);
 
     return mat;
 }
@@ -265,7 +271,9 @@ addAB(const CDenseMatrix& matrixA, const CDenseMatrix& matrixB, const double fac
 
     // add scaled matrix
 
-    cblas_daxpy(mat.getNumberOfElements(), factor, matrixB.values(), 1, mat.values(), 1);
+    auto nelems_int32 = static_cast<int32_t>(mat.getNumberOfElements());
+
+    cblas_daxpy(nelems_int32, factor, matrixB.values(), 1, mat.values(), 1);
 
     return mat;
 }
@@ -289,7 +297,7 @@ trace(const CDenseMatrix& matrix) -> double
 
     double fsum = 0.0;
 
-    for (int32_t i = 0; i < mdim; i++)
+    for (int64_t i = 0; i < mdim; i++)
     {
         fsum += pvals[i * mdim + i];
     }

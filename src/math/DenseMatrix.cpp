@@ -41,9 +41,9 @@ CDenseMatrix::CDenseMatrix()
 
 CDenseMatrix::CDenseMatrix(const std::vector<double>& values, const int64_t nRows, const int64_t nColumns)
 
-    : _nRows(static_cast<int32_t>(nRows))
+    : _nRows(nRows)
 
-    , _nColumns(static_cast<int32_t>(nColumns))
+    , _nColumns(nColumns)
 
     , _values(values)
 {
@@ -51,11 +51,11 @@ CDenseMatrix::CDenseMatrix(const std::vector<double>& values, const int64_t nRow
 
 CDenseMatrix::CDenseMatrix(const int64_t nRows, const int64_t nColumns)
 
-    : _nRows(static_cast<int32_t>(nRows))
+    : _nRows(nRows)
 
-    , _nColumns(static_cast<int32_t>(nColumns))
+    , _nColumns(nColumns)
 
-    , _values(std::vector<double>(static_cast<int32_t>(nRows * nColumns), 0.0))
+    , _values(std::vector<double>(nRows * nColumns, 0.0))
 {
 }
 
@@ -144,9 +144,9 @@ CDenseMatrix::transpose() const -> CDenseMatrix
 
     auto tvals = tmat.values();
 
-    for (int32_t i = 0; i < _nRows; i++)
+    for (int64_t i = 0; i < _nRows; i++)
     {
-        for (int32_t j = 0; j < _nColumns; j++)
+        for (int64_t j = 0; j < _nColumns; j++)
         {
             tvals[j * _nRows + i] = cvals[i * _nColumns + j];
         }
@@ -162,9 +162,9 @@ CDenseMatrix::symmetrize() -> void
 
     if (_nRows == _nColumns)
     {
-        for (int32_t i = 0; i < _nRows; i++)
+        for (int64_t i = 0; i < _nRows; i++)
         {
-            for (int32_t j = i; j < _nRows; j++)
+            for (int64_t j = i; j < _nRows; j++)
             {
                 auto ijoff = i * _nColumns + j;
 
@@ -187,9 +187,9 @@ CDenseMatrix::symmetrizeAndScale(const double factor) -> void
 
     if (_nRows == _nColumns)
     {
-        for (int32_t i = 0; i < _nRows; i++)
+        for (int64_t i = 0; i < _nRows; i++)
         {
-            for (int32_t j = i; j < _nRows; j++)
+            for (int64_t j = i; j < _nRows; j++)
             {
                 auto ijoff = i * _nColumns + j;
 
@@ -206,19 +206,19 @@ CDenseMatrix::symmetrizeAndScale(const double factor) -> void
 }
 
 auto
-CDenseMatrix::getNumberOfRows() const -> int32_t
+CDenseMatrix::getNumberOfRows() const -> int64_t
 {
     return _nRows;
 }
 
 auto
-CDenseMatrix::getNumberOfColumns() const -> int32_t
+CDenseMatrix::getNumberOfColumns() const -> int64_t
 {
     return _nColumns;
 }
 
 auto
-CDenseMatrix::getNumberOfElements() const -> int32_t
+CDenseMatrix::getNumberOfElements() const -> int64_t
 {
     return _nRows * _nColumns;
 }
@@ -236,7 +236,7 @@ CDenseMatrix::values() -> double*
 }
 
 auto
-CDenseMatrix::row(const int32_t iRow) const -> const double*
+CDenseMatrix::row(const int64_t iRow) const -> const double*
 {
     if (iRow < getNumberOfRows())
     {
@@ -249,7 +249,7 @@ CDenseMatrix::row(const int32_t iRow) const -> const double*
 }
 
 auto
-CDenseMatrix::row(const int32_t iRow) -> double*
+CDenseMatrix::row(const int64_t iRow) -> double*
 {
     if (iRow < getNumberOfRows())
     {
@@ -259,4 +259,28 @@ CDenseMatrix::row(const int32_t iRow) -> double*
     {
         return nullptr;
     }
+}
+
+auto
+CDenseMatrix::slice(const int64_t iPosition, const int64_t nElements) const -> CDenseMatrix
+{
+    CDenseMatrix sliced_data(_nRows, nElements);
+
+    for (int64_t i = 0; i < _nRows; i++)
+    {
+        // set up pointers to data chunks
+
+        auto idata = row(i) + iPosition;
+
+        auto odata = sliced_data.row(i);
+
+        // copy elements of data chunks
+
+        for (int64_t j = 0; j < nElements; j++)
+        {
+            odata[j] = idata[j];
+        }
+    }
+
+    return sliced_data;
 }

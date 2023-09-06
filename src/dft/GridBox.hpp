@@ -126,7 +126,7 @@ class CGridBox
 
      @return the number of grid points.
      */
-    auto getNumberOfGridPoints() const -> int32_t;
+    auto getNumberOfGridPoints() const -> int64_t;
 
     /**
      Gets Cartesian X coordinates of grid points.

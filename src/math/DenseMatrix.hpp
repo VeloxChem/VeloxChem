@@ -41,12 +41,12 @@ class CDenseMatrix
     /**
      The number of rows.
      */
-    int32_t _nRows;
+    int64_t _nRows;
 
     /**
      The number of columns.
      */
-    int32_t _nColumns;
+    int64_t _nColumns;
 
     /**
      The matrix element values.
@@ -154,21 +154,21 @@ class CDenseMatrix
 
      @return the number of rows.
      */
-    auto getNumberOfRows() const -> int32_t;
+    auto getNumberOfRows() const -> int64_t;
 
     /**
      Gets number of columns in dense matrix.
 
      @return the number of columns.
      */
-    auto getNumberOfColumns() const -> int32_t;
+    auto getNumberOfColumns() const -> int64_t;
 
     /**
      Gets number of elements in dense matrix.
 
      @return the number of elements.
      */
-    auto getNumberOfElements() const -> int32_t;
+    auto getNumberOfElements() const -> int64_t;
 
     /**
      Gets constant pointer to first element of dense matrix.
@@ -189,14 +189,24 @@ class CDenseMatrix
 
      @return the constant pointer to first element of specific row.
      */
-    auto row(const int32_t iRow) const -> const double*;
+    auto row(const int64_t iRow) const -> const double*;
 
     /**
      Gets pointer to first element of specific row in dense matrix.
 
      @return the pointer to first element of specific row.
      */
-    auto row(const int32_t iRow) -> double*;
+    auto row(const int64_t iRow) -> double*;
+
+    /**
+     Creates dense matrix object by slicing part of this dense matrix
+     object.
+
+     @param iPosition the position of first column.
+     @param nElements the number of columns to be sliced.
+     @return the dense matrix object.
+     */
+    auto slice(const int64_t iPosition, const int64_t nElements) const -> CDenseMatrix;
 };
 
 #endif /* DenseMatrix_hpp */

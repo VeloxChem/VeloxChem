@@ -20,10 +20,10 @@ class TestOverlapDriver:
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')
-        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path)
+        bas = MolecularBasis.read(mol, 'def2-tzvpp', basis_path, ostream=None)
 
         return mol, bas
-        
+
     def get_bra_ket_data(self):
 
         costr = """
@@ -34,8 +34,11 @@ class TestOverlapDriver:
 
         here = Path(__file__).parent
         basis_path = str(here.parent / 'basis')
-        bra_bas = MolecularBasis.read(mol, 'def2-svp', basis_path)
-        ket_bas = MolecularBasis.read(mol, 'def2-tzvp', basis_path)
+        bra_bas = MolecularBasis.read(mol, 'def2-svp', basis_path, ostream=None)
+        ket_bas = MolecularBasis.read(mol,
+                                      'def2-tzvp',
+                                      basis_path,
+                                      ostream=None)
 
         return mol, bra_bas, ket_bas
 
@@ -77,7 +80,7 @@ class TestOverlapDriver:
         fref = SubMatrix([0, 0, 62, 62])
         fref.set_values(np.ascontiguousarray(ref_mat))
         Tester.compare_submatrices(fmat, fref)
-        
+
     def test_overlap_co_svp_tzvp(self):
 
         mol_co, bas_svp, bas_tzvp = self.get_bra_ket_data()
@@ -90,11 +93,11 @@ class TestOverlapDriver:
         here = Path(__file__).parent
         npyfile = str(here / 'data' / 'co.svp.tzvp.overlap.npy')
         ref_mat = np.load(npyfile)
-        
+
         # dimension of molecular basis
         bradims = [0, 6, 18, 28]
         ketdims = [0, 10, 28, 48, 62]
-        
+
         # check individual overlap submatrices
         for i in range(3):
             # bra side
@@ -108,10 +111,11 @@ class TestOverlapDriver:
                 cmat = ovl_mat.get_submatrix((i, j))
                 # load reference submatrix
                 rmat = SubMatrix([sbra, sket, ebra - sbra, eket - sket])
-                rmat.set_values(np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
+                rmat.set_values(
+                    np.ascontiguousarray(ref_mat[sbra:ebra, sket:eket]))
                 # compare submatrices
                 Tester.compare_submatrices(cmat, rmat)
-        
+
         # check full overlap matrix
         fmat = ovl_mat.get_full_matrix()
         fref = SubMatrix([0, 0, 28, 62])

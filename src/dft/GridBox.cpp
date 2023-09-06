@@ -110,7 +110,7 @@ CGridBox::getGridPoints() const -> CDenseMatrix
 }
 
 auto
-CGridBox::getNumberOfGridPoints() const -> int32_t
+CGridBox::getNumberOfGridPoints() const -> int64_t
 {
     return _points.getNumberOfColumns();
 }

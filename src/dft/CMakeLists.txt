@@ -3,6 +3,7 @@ target_sources(vlxobjs
     LebedevLaikovQuadrature.cpp
     Log3Quadrature.cpp
     GridBox.cpp
+    GridPartitioner.cpp
   )
 
 target_include_directories(vlxobjs
