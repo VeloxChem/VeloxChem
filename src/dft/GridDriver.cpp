@@ -255,24 +255,9 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
 
     auto idselem = idselem_data.data();
 
-    auto molcoords = molecule.getCoordinates(std::string("BOHR"));
+    auto molcoords_data = molecule.getCoordinates(std::string("BOHR"));
 
-    std::vector<double> molrx_data, molry_data, molrz_data;
-
-    for (const auto& xyz : molcoords)
-    {
-        molrx_data.push_back(xyz[0]);
-
-        molry_data.push_back(xyz[1]);
-
-        molrz_data.push_back(xyz[2]);
-    }
-
-    auto molrx = molrx_data.data();
-
-    auto molry = molry_data.data();
-
-    auto molrz = molrz_data.data();
+    auto molcoords = molcoords_data.data();
 
     auto mdist = molecule.getMinDistances();
 
@@ -292,7 +277,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
 
     // generate atomic grid for each atom in molecule
 
-#pragma omp parallel shared(rawgrid, idselem, molrx, molry, molrz, molrm, natoms, nodatm, nodoff)
+#pragma omp parallel shared(rawgrid, idselem, molcoords, molrm, natoms, nodatm, nodoff)
     {
 #pragma omp single nowait
         {
@@ -308,7 +293,7 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
 
 #pragma omp task firstprivate(ielem, iatom, minrad, gridoff)
                 {
-                    _genAtomGridPoints(rawgrid, minrad, gridoff, molrx, molry, molrz, natoms, ielem, iatom);
+                    _genAtomGridPoints(rawgrid, minrad, gridoff, molcoords, natoms, ielem, iatom);
                 }
 
                 gridoff += _getNumberOfRadialPoints(ielem) * _getNumberOfAngularPoints(ielem);
@@ -343,15 +328,13 @@ CGridDriver::_getBatchSize(const int64_t* idsElemental, const int64_t offset, co
 }
 
 auto
-CGridDriver::_genAtomGridPoints(CDenseMatrix* rawGridPoints,
-                                const double  minDistance,
-                                const int64_t gridOffset,
-                                const double* atomCoordinatesX,
-                                const double* atomCoordinatesY,
-                                const double* atomCoordinatesZ,
-                                const int64_t nAtoms,
-                                const int64_t idElemental,
-                                const int64_t idAtomic) const -> void
+CGridDriver::_genAtomGridPoints(CDenseMatrix*   rawGridPoints,
+                                const double    minDistance,
+                                const int64_t   gridOffset,
+                                const TPoint3D* atomCoordinates,
+                                const int64_t   nAtoms,
+                                const int64_t   idElemental,
+                                const int64_t   idAtomic) const -> void
 {
     // determine number of grid points
 
@@ -387,11 +370,11 @@ CGridDriver::_genAtomGridPoints(CDenseMatrix* rawGridPoints,
 
     // atom coordinates
 
-    auto atmx = atomCoordinatesX[idAtomic];
+    auto atmx = atomCoordinates[idAtomic][0];
 
-    auto atmy = atomCoordinatesY[idAtomic];
+    auto atmy = atomCoordinates[idAtomic][1];
 
-    auto atmz = atomCoordinatesZ[idAtomic];
+    auto atmz = atomCoordinates[idAtomic][2];
 
     // assemble atom grid points from quadratures
 
@@ -430,8 +413,7 @@ CGridDriver::_genAtomGridPoints(CDenseMatrix* rawGridPoints,
 
     // apply partitioning function
 
-    partfunc::ssf(
-        rawGridPoints, minDistance, gridOffset, nrpoints * napoints, atomCoordinatesX, atomCoordinatesY, atomCoordinatesZ, nAtoms, idAtomic);
+    partfunc::ssf(rawGridPoints, minDistance, gridOffset, nrpoints * napoints, atomCoordinates, nAtoms, idAtomic);
 }
 
 auto

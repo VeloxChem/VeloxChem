@@ -94,8 +94,8 @@ CMolecularGrid::~CMolecularGrid()
 {
 }
 
-CMolecularGrid&
-CMolecularGrid::operator=(const CMolecularGrid& source)
+auto
+CMolecularGrid::operator=(const CMolecularGrid& source) -> CMolecularGrid&
 {
     if (this == &source) return *this;
 
@@ -114,8 +114,8 @@ CMolecularGrid::operator=(const CMolecularGrid& source)
     return *this;
 }
 
-CMolecularGrid&
-CMolecularGrid::operator=(CMolecularGrid&& source) noexcept
+auto
+CMolecularGrid::operator=(CMolecularGrid&& source) noexcept -> CMolecularGrid&
 {
     if (this == &source) return *this;
 
@@ -134,8 +134,8 @@ CMolecularGrid::operator=(CMolecularGrid&& source) noexcept
     return *this;
 }
 
-bool
-CMolecularGrid::operator==(const CMolecularGrid& other) const
+auto
+CMolecularGrid::operator==(const CMolecularGrid& other) const -> bool
 {
     if (_isDistributed != other._isDistributed) return false;
 
@@ -152,14 +152,14 @@ CMolecularGrid::operator==(const CMolecularGrid& other) const
     return true;
 }
 
-bool
-CMolecularGrid::operator!=(const CMolecularGrid& other) const
+auto
+CMolecularGrid::operator!=(const CMolecularGrid& other) const -> bool
 {
     return !(*this == other);
 }
 
-void
-CMolecularGrid::slice(const int64_t nGridPoints)
+auto
+CMolecularGrid::slice(const int64_t nGridPoints) -> void
 {
     std::string errpartitioned("MolecularGrid.slice: Cannot slice partitioned molecular grid");
 
@@ -171,68 +171,68 @@ CMolecularGrid::slice(const int64_t nGridPoints)
     }
 }
 
-CDenseMatrix
-CMolecularGrid::getGridPoints() const
+auto
+CMolecularGrid::getGridPoints() const -> CDenseMatrix
 {
     return _gridPoints;
 }
 
-int64_t
-CMolecularGrid::getNumberOfGridPoints() const
+auto
+CMolecularGrid::getNumberOfGridPoints() const -> int64_t
 {
     return _gridPoints.getNumberOfColumns();
 }
 
-const double*
-CMolecularGrid::getCoordinatesX() const
+auto
+CMolecularGrid::getCoordinatesX() const -> const double*
 {
     return _gridPoints.row(0);
 }
 
-double*
-CMolecularGrid::getCoordinatesX()
+auto
+CMolecularGrid::getCoordinatesX() -> double*
 {
     return _gridPoints.row(0);
 }
 
-const double*
-CMolecularGrid::getCoordinatesY() const
+auto
+CMolecularGrid::getCoordinatesY() const -> const double*
 {
     return _gridPoints.row(1);
 }
 
-double*
-CMolecularGrid::getCoordinatesY()
+auto
+CMolecularGrid::getCoordinatesY() -> double*
 {
     return _gridPoints.row(1);
 }
 
-const double*
-CMolecularGrid::getCoordinatesZ() const
+auto
+CMolecularGrid::getCoordinatesZ() const -> const double*
 {
     return _gridPoints.row(2);
 }
 
-double*
-CMolecularGrid::getCoordinatesZ()
+auto
+CMolecularGrid::getCoordinatesZ() -> double*
 {
     return _gridPoints.row(2);
 }
 
-const double*
-CMolecularGrid::getWeights() const
+auto
+CMolecularGrid::getWeights() const -> const double*
 {
     return _gridPoints.row(3);
 }
 
-double*
-CMolecularGrid::getWeights()
+auto
+CMolecularGrid::getWeights() -> double*
 {
     return _gridPoints.row(3);
 }
 
-std::array<double, 6>
-CMolecularGrid::getSpatialExtent() const
+auto
+CMolecularGrid::getSpatialExtent() const -> std::array<double, 6>
 {
     // initialize min, max coordinates
 
@@ -284,8 +284,8 @@ CMolecularGrid::getSpatialExtent() const
     return rext;
 }
 
-std::string
-CMolecularGrid::partitionGridPoints()
+auto
+CMolecularGrid::partitionGridPoints() -> std::string
 {
     if (!_isPartitioned)
     {
@@ -319,26 +319,26 @@ CMolecularGrid::partitionGridPoints()
     return std::string("");
 }
 
-bool
-CMolecularGrid::isPartitioned() const
+auto
+CMolecularGrid::isPartitioned() const -> bool
 {
     return _isPartitioned;
 }
 
-std::vector<int64_t>
-CMolecularGrid::getGridPointCounts() const
+auto
+CMolecularGrid::getGridPointCounts() const -> std::vector<int64_t>
 {
     return _gridPointCounts;
 }
 
-std::vector<int64_t>
-CMolecularGrid::getGridPointDisplacements() const
+auto
+CMolecularGrid::getGridPointDisplacements() const -> std::vector<int64_t>
 {
     return _gridPointDisplacements;
 }
 
-int64_t
-CMolecularGrid::getMaxNumberOfGridPointsPerBox() const
+auto
+CMolecularGrid::getMaxNumberOfGridPointsPerBox() const -> int64_t
 {
     return _maxNumberOfGridPointsPerBox;
 }

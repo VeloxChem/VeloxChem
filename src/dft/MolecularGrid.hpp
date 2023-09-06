@@ -107,14 +107,14 @@ class CMolecularGrid
 
      @param source the molecular grid object.
      */
-    CMolecularGrid& operator=(const CMolecularGrid& source);
+    auto operator=(const CMolecularGrid& source) -> CMolecularGrid&;
 
     /**
      Assigns a molecular grid object by moving other molecular grid object.
 
      @param source the molecular grid object.
      */
-    CMolecularGrid& operator=(CMolecularGrid&& source) noexcept;
+    auto operator=(CMolecularGrid&& source) noexcept -> CMolecularGrid&;
 
     /**
      Compares molecular grid object with other molecular grid object.
@@ -122,7 +122,7 @@ class CMolecularGrid
      @param other the molecular grid object.
      @return true if molecular grid objects are equal, false otherwise.
      */
-    bool operator==(const CMolecularGrid& other) const;
+    auto operator==(const CMolecularGrid& other) const -> bool;
 
     /**
      Compares molecular grid object with other molecular grid object.
@@ -130,126 +130,126 @@ class CMolecularGrid
      @param other the molecular grid object.
      @return true if molecular grid objects are not equal, false otherwise.
      */
-    bool operator!=(const CMolecularGrid& other) const;
+    auto operator!=(const CMolecularGrid& other) const -> bool;
 
     /**
      Reduces size of molecular grid by slicing all grid points beoynd given number of grid points.
 
      @param nGridPoints the number of grid points.
      */
-    void slice(const int64_t nGridPoints);
+    auto slice(const int64_t nGridPoints) -> void;
 
     /**
      Gets grid points in molecular grid object.
 
      @return the grid points.
      */
-    CDenseMatrix getGridPoints() const;
+    auto getGridPoints() const -> CDenseMatrix;
 
     /**
      Gets number of grid points in molecular grid object.
 
      @return the number of grid points.
      */
-    int64_t getNumberOfGridPoints() const;
+    auto getNumberOfGridPoints() const -> int64_t;
 
     /**
      Gets Cartesian X coordinates of grid points in molecular grid object.
 
      @return the constant pointer to Cartesian X coordinates of grid points.
      */
-    const double* getCoordinatesX() const;
+    auto getCoordinatesX() const -> const double*;
 
     /**
      Gets Cartesian X coordinates of grid points in molecular grid object.
 
      @return the pointer to Cartesian X coordinates of grid points.
      */
-    double* getCoordinatesX();
+    auto getCoordinatesX() -> double*;
 
     /**
      Gets Cartesian Y coordinates of grid points in molecular grid object.
 
      @return the constant  pointer to Cartesian Y coordinates of grid points.
      */
-    const double* getCoordinatesY() const;
+    auto getCoordinatesY() const -> const double*;
 
     /**
      Gets Cartesian Y coordinates of grid points in molecular grid object.
 
      @return the pointer to Cartesian Y coordinates of grid points.
      */
-    double* getCoordinatesY();
+    auto getCoordinatesY() -> double*;
 
     /**
      Gets Cartesian Z coordinates of grid points in molecular grid object.
 
      @return the constant pointer to Cartesian Z coordinates of grid points.
      */
-    const double* getCoordinatesZ() const;
+    auto getCoordinatesZ() const -> const double*;
 
     /**
      Gets Cartesian Z coordinates of grid points in molecular grid object.
 
      @return the pointer to Cartesian Z coordinates of grid points.
      */
-    double* getCoordinatesZ();
+    auto getCoordinatesZ() -> double*;
 
     /**
      Gets weights of grid points in molecular grid object.
 
      @return the constant pointer to weights of grid points.
      */
-    const double* getWeights() const;
+    auto getWeights() const -> const double*;
 
     /**
      Gets weights of grid points in molecular grid object.
 
      @return the pointer to weights of grid points.
      */
-    double* getWeights();
+    auto getWeights() -> double*;
 
     /**
      Gets spatial extent of molecular grid.
 
      @return the spatial extent (min x, min y, min z, max x, max y, max z).
      */
-    std::array<double, 6> getSpatialExtent() const;
+    auto getSpatialExtent() const -> std::array<double, 6>;
 
     /**
      Partitions grid points into boxes.
 
      @return summary of grid points partitioning as a string.
      */
-    std::string partitionGridPoints();
+    auto partitionGridPoints() -> std::string;
 
     /**
      Checks whether the molecular grid has been partitioned.
 
      @return whether the molecular grid has been partitioned.
      */
-    bool isPartitioned() const;
+    auto isPartitioned() const -> bool;
 
     /**
      Gets the grid point counts.
 
      @return the grid point counts.
      */
-    std::vector<int64_t> getGridPointCounts() const;
+    auto getGridPointCounts() const -> std::vector<int64_t>;
 
     /**
      Gets the grid point displacements.
 
      @return the grid point displacements.
      */
-    std::vector<int64_t> getGridPointDisplacements() const;
+    auto getGridPointDisplacements() const -> std::vector<int64_t>;
 
     /**
      Gets the maximum number of grid points in a grid box.
 
      @return the maximum number of grid points in a grid box.
      */
-    int64_t getMaxNumberOfGridPointsPerBox() const;
+    auto getMaxNumberOfGridPointsPerBox() const -> int64_t;
 
     /**
      Converts molecular grid object to text and insert it into output text

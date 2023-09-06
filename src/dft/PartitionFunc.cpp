@@ -33,15 +33,13 @@
 namespace partfunc {  // partfunc namespace
 
 auto
-ssf(CDenseMatrix* rawGridPoints,
-    const double  minDistance,
-    const int64_t gridOffset,
-    const int64_t nGridPoints,
-    const double* atomCoordinatesX,
-    const double* atomCoordinatesY,
-    const double* atomCoordinatesZ,
-    const int64_t nAtoms,
-    const int64_t idAtomic) -> void
+ssf(CDenseMatrix*   rawGridPoints,
+    const double    minDistance,
+    const int64_t   gridOffset,
+    const int64_t   nGridPoints,
+    const TPoint3D* atomCoordinates,
+    const int64_t   nAtoms,
+    const int64_t   idAtomic) -> void
 {
     // partial weights
 
@@ -73,7 +71,7 @@ ssf(CDenseMatrix* rawGridPoints,
 
         // weights screening
 
-        auto rig = mathfunc::distance(atomCoordinatesX[idAtomic], atomCoordinatesY[idAtomic], atomCoordinatesZ[idAtomic], rgx, rgy, rgz);
+        auto rig = mathfunc::distance(atomCoordinates[idAtomic][0], atomCoordinates[idAtomic][1], atomCoordinates[idAtomic][2], rgx, rgy, rgz);
 
         // min. distance scale 0.5 * (1 - a), SSF parameter a = 0.64
 
@@ -89,11 +87,11 @@ ssf(CDenseMatrix* rawGridPoints,
         {
             // molecular coodinates
 
-            double rax = atomCoordinatesX[j];
+            double rax = atomCoordinates[j][0];
 
-            double ray = atomCoordinatesY[j];
+            double ray = atomCoordinates[j][1];
 
-            double raz = atomCoordinatesZ[j];
+            double raz = atomCoordinates[j][2];
 
             // distance from grid point to j-th atom
 
@@ -105,11 +103,11 @@ ssf(CDenseMatrix* rawGridPoints,
             {
                 // molecular coodinates
 
-                double rbx = atomCoordinatesX[k];
+                double rbx = atomCoordinates[k][0];
 
-                double rby = atomCoordinatesY[k];
+                double rby = atomCoordinates[k][1];
 
-                double rbz = atomCoordinatesZ[k];
+                double rbz = atomCoordinates[k][2];
 
                 // distance from grid point to k-th atom
 

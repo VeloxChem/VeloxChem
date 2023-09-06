@@ -30,6 +30,7 @@
 
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
+#include "Point.hpp"
 
 /**
  Class CGridDriver generates grid points data for usage in numerical
@@ -107,22 +108,18 @@ class CGridDriver
      @param rawGridPoints the raw grid points.
      @param minDistance the distance to closest neighbouring atom.
      @param gridOffset the atom grid points offset in raw grid points.
-     @param atomCoordinatesX the vector of Cartesian X coordinates of atoms.
-     @param atomCoordinatesY the vector of Cartesian Y coordinates of atoms.
-     @param atomCoordinatesZ the vector of Cartesian Z coordinates of atoms.
+     @param atomCoordinates the Cartesian coordinates of atoms.
      @param nAtoms the number of atoms.
      @param idElemental the chemical element identifier of atom.
      @param idAtomic the index of atom.
      */
-    auto _genAtomGridPoints(CDenseMatrix* rawGridPoints,
-                            const double  minDistance,
-                            const int64_t gridOffset,
-                            const double* atomCoordinatesX,
-                            const double* atomCoordinatesY,
-                            const double* atomCoordinatesZ,
-                            const int64_t nAtoms,
-                            const int64_t idElemental,
-                            const int64_t idAtomic) const -> void;
+    auto _genAtomGridPoints(CDenseMatrix*   rawGridPoints,
+                            const double    minDistance,
+                            const int64_t   gridOffset,
+                            const TPoint3D* atomCoordinates,
+                            const int64_t   nAtoms,
+                            const int64_t   idElemental,
+                            const int64_t   idAtomic) const -> void;
 
     /**
      Prunes raw grid points by screening weights and discarding all grid point

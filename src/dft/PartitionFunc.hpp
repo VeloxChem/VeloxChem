@@ -29,6 +29,7 @@
 #include <cstdint>
 
 #include "DenseMatrix.hpp"
+#include "Point.hpp"
 
 namespace partfunc {  // partfunc namespace
 
@@ -41,21 +42,17 @@ namespace partfunc {  // partfunc namespace
  @param minDistance the distance to closest neighbouring atom.
  @param gridOffset the atom grid points offset in raw grid points.
  @param nGridPoints the number of grid points.
- @param atomCoordinatesX the vector of Cartesian X coordinates of atoms.
- @param atomCoordinatesY the vector of Cartesian Y coordinates of atoms.
- @param atomCoordinatesZ the vector of Cartesian Z coordinates of atoms.
+ @param atomCoordinates the Cartesian coordinates of atoms.
  @param nAtoms the number of atoms.
  @param idAtomic the index of atom.
  */
-auto ssf(CDenseMatrix* rawGridPoints,
-         const double  minDistance,
-         const int64_t gridOffset,
-         const int64_t nGridPoints,
-         const double* atomCoordinatesX,
-         const double* atomCoordinatesY,
-         const double* atomCoordinatesZ,
-         const int64_t nAtoms,
-         const int64_t idAtomic) -> void;
+auto ssf(CDenseMatrix*   rawGridPoints,
+         const double    minDistance,
+         const int64_t   gridOffset,
+         const int64_t   nGridPoints,
+         const TPoint3D* atomCoordinates,
+         const int64_t   nAtoms,
+         const int64_t   idAtomic) -> void;
 
 /**
  Computes polynomial weight function in eliptical coordinates. See Eq. 14
