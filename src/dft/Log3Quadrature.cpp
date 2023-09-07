@@ -63,7 +63,7 @@ CLog3Quadrature::generate() const -> CDenseMatrix
 
         auto fxi = _getXiFactor() / std::log(2.0);
 
-#pragma omp simd aligned(rcoords, rweights : VLX_ALIGN)
+#pragma omp simd
         for (int64_t i = 0; i < _nRadialPoints; i++)
         {
             // set up parameters

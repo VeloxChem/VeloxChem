@@ -4,26 +4,28 @@
 #include <cstdint>
 #include <vector>
 
-#include "Matrix.hpp"
 #include "GtoBlock.hpp"
+#include "Matrix.hpp"
 
-namespace dft {  // dft namespace
+namespace gtoval {  // gtoval namespace
 
 /**
  Computes GTO values on given grid for S type GTOs.
 
  @param gto_block the GTOs block.
- @param grid_coords_x the vector of Cartesian X coordinates of grid.
- @param grid_coords_y the vector of Cartesian Y coordinates of grid.
- @param grid_coords_z the vector of Cartesian Z coordinates of grid.
+ @param n_points the number of grid points.
+ @param grid_coords_x the pointer to Cartesian X coordinates of grid.
+ @param grid_coords_y the pointer to Cartesian Y coordinates of grid.
+ @param grid_coords_z the pointer to Cartesian Z coordinates of grid.
  @param gtos_mask the mask for GTOs (1 evaluate, 0 skip).
  */
-auto getLDAValuesRecS(const CGtoBlock&            gto_block,
-                      const std::vector<double>&  grid_coords_x,
-                      const std::vector<double>&  grid_coords_y,
-                      const std::vector<double>&  grid_coords_z,
-                      const std::vector<int64_t>& gtos_mask) -> CMatrix; 
+auto getLdaValuesRecS(const CGtoBlock&            gto_block,
+                      const int64_t               n_points,
+                      const double*               grid_coords_x,
+                      const double*               grid_coords_y,
+                      const double*               grid_coords_z,
+                      const std::vector<int64_t>& gtos_mask) -> CMatrix;
 
-}  // namespace dft
+}  // namespace gtoval
 
 #endif /* GtoValuesRecS_hpp */

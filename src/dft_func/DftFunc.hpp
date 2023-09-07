@@ -6,7 +6,7 @@
 
 #include "SubMatrix.hpp"
 
-namespace dft {  // dft namespace
+namespace gtoval {  // gtoval namespace
 
 /**
  Distributes GTO values into given submatrix.
@@ -15,9 +15,7 @@ namespace dft {  // dft namespace
  @param values the vector of GTO values to distribute.
  @param irow the index of row to distribute GTO values.
 */
-auto distribute(      CSubMatrix*          matrix,
-                const std::vector<double>& values,
-                const int64_t              irow) -> void;
+auto distribute(CSubMatrix* matrix, const std::vector<double>& values, const int64_t irow) -> void;
 
 /**
  Distributes GTO values into given submatrix.
@@ -27,11 +25,8 @@ auto distribute(      CSubMatrix*          matrix,
  @param factor the scaling factor of values.
  @param irow the index of row to distribute GTO values.
 */
-auto distribute(      CSubMatrix*          matrix,
-                const std::vector<double>& values,
-                const double               factor, 
-                const int64_t              irow) -> void;
+auto distribute(CSubMatrix* matrix, const std::vector<double>& values, const double factor, const int64_t irow) -> void;
 
-}  // namespace dft
+}  // namespace gtoval
 
 #endif /* DftFunc_hpp */

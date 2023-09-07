@@ -36,6 +36,7 @@
 #include "ExportGeneral.hpp"
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
+#include "XCIntegrator.hpp"
 
 namespace py = pybind11;
 using namespace py::literals;
@@ -85,6 +86,18 @@ export_dft(py::module& m)
         .def(py::init<>())
         .def("generate", &CGridDriver::generate, "Generates molecular grid for molecule.", "molecule"_a)
         .def("set_level", &CGridDriver::setLevel, "Sets accuracy level for grid generation.", "grid_level"_a);
+
+    // CXCIntegrator class
+
+    PyClass<CXCIntegrator>(m, "XCIntegrator")
+        .def(py::init<>())
+        .def("integrate_vxc_fock",
+             &CXCIntegrator::integrateVxcFock,
+             "Integrates 1st-order exchange-correlation contribution to Kohn-Sham matrix.",
+             "molecule"_a,
+             "basis"_a,
+             "density_matrix"_a,
+             "molecular_grid"_a);
 }
 
 }  // namespace vlx_dft

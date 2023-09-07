@@ -161,25 +161,11 @@ class CMolecularGrid
     auto getCoordinatesX() const -> const double*;
 
     /**
-     Gets Cartesian X coordinates of grid points in molecular grid object.
-
-     @return the pointer to Cartesian X coordinates of grid points.
-     */
-    auto getCoordinatesX() -> double*;
-
-    /**
      Gets Cartesian Y coordinates of grid points in molecular grid object.
 
      @return the constant  pointer to Cartesian Y coordinates of grid points.
      */
     auto getCoordinatesY() const -> const double*;
-
-    /**
-     Gets Cartesian Y coordinates of grid points in molecular grid object.
-
-     @return the pointer to Cartesian Y coordinates of grid points.
-     */
-    auto getCoordinatesY() -> double*;
 
     /**
      Gets Cartesian Z coordinates of grid points in molecular grid object.
@@ -189,25 +175,11 @@ class CMolecularGrid
     auto getCoordinatesZ() const -> const double*;
 
     /**
-     Gets Cartesian Z coordinates of grid points in molecular grid object.
-
-     @return the pointer to Cartesian Z coordinates of grid points.
-     */
-    auto getCoordinatesZ() -> double*;
-
-    /**
      Gets weights of grid points in molecular grid object.
 
      @return the constant pointer to weights of grid points.
      */
     auto getWeights() const -> const double*;
-
-    /**
-     Gets weights of grid points in molecular grid object.
-
-     @return the pointer to weights of grid points.
-     */
-    auto getWeights() -> double*;
 
     /**
      Gets spatial extent of molecular grid.

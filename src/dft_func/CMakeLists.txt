@@ -1,10 +1,12 @@
 target_sources(vlxobjs
   PRIVATE
+    DftFunc.cpp 
+    GtoValues.cpp
     GtoValuesRecS.cpp
     GtoValuesRecP.cpp
     GtoValuesRecD.cpp
     GtoValuesRecF.cpp
-    DftFunc.cpp 
+    Prescreener.cpp 
   )
 
 target_include_directories(vlxobjs

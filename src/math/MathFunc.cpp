@@ -55,4 +55,29 @@ quadChebyshevOfKindTwo(double* coordinates, double* weights, const int64_t nPoin
     }
 }
 
+auto
+batch_size(const int64_t nElements, const int64_t rank, const int64_t nodes) -> int64_t
+{
+    int64_t numelem = nElements / nodes;
+
+    int64_t nremind = nElements % nodes;
+
+    if ((nremind != 0) && (rank < nremind)) numelem++;
+
+    return numelem;
+}
+
+auto
+batch_offset(const int64_t nElements, const int64_t rank, const int64_t nodes) -> int64_t
+{
+    int64_t index = 0;
+
+    for (int64_t i = 0; i < rank; i++)
+    {
+        index += mathfunc::batch_size(nElements, i, nodes);
+    }
+
+    return index;
+}
+
 }  // namespace mathfunc

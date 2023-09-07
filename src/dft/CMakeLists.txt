@@ -7,6 +7,7 @@ target_sources(vlxobjs
     GridPartitioner.cpp
     MolecularGrid.cpp
     PartitionFunc.cpp
+    XCIntegrator.cpp
   )
 
 target_include_directories(vlxobjs

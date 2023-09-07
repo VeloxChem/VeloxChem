@@ -190,19 +190,7 @@ CMolecularGrid::getCoordinatesX() const -> const double*
 }
 
 auto
-CMolecularGrid::getCoordinatesX() -> double*
-{
-    return _gridPoints.row(0);
-}
-
-auto
 CMolecularGrid::getCoordinatesY() const -> const double*
-{
-    return _gridPoints.row(1);
-}
-
-auto
-CMolecularGrid::getCoordinatesY() -> double*
 {
     return _gridPoints.row(1);
 }
@@ -214,19 +202,7 @@ CMolecularGrid::getCoordinatesZ() const -> const double*
 }
 
 auto
-CMolecularGrid::getCoordinatesZ() -> double*
-{
-    return _gridPoints.row(2);
-}
-
-auto
 CMolecularGrid::getWeights() const -> const double*
-{
-    return _gridPoints.row(3);
-}
-
-auto
-CMolecularGrid::getWeights() -> double*
 {
     return _gridPoints.row(3);
 }

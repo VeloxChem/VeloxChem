@@ -54,6 +54,26 @@ distance(const double aCoordX, const double aCoordY, const double aCoordZ, const
     return std::sqrt(rx * rx + ry * ry + rz * rz);
 }
 
+/**
+ Determines batch size.
+
+ @param nElements the size of data vector.
+ @param rank the rank of thread or process.
+ @param nodes the number of threads or processes.
+ @return the size of data batch.
+ */
+auto batch_size(const int64_t nElements, const int64_t rank, const int64_t nodes) -> int64_t;
+
+/**
+ Determines offset of batch.
+
+ @param nElements the number of elements in data vector.
+ @param rank the rank of thread or process.
+ @param nodes the number of threads or processes.
+ @return the offset of batch.
+ */
+auto batch_offset(const int64_t nElements, const int64_t rank, const int64_t nodes) -> int64_t;
+
 }  // namespace mathfunc
 
 #endif /* MathFunc_hpp */
