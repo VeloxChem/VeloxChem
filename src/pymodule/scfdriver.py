@@ -247,6 +247,7 @@ class ScfDriver:
                 'qq_type': ('str_upper', 'ERI screening scheme'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
+                'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
@@ -369,6 +370,22 @@ class ScfDriver:
         """
 
         return self._scf_tensors
+
+    @property
+    def filename(self):
+        """
+        Getter function for protected filename attribute.
+        """
+
+        return self._filename
+
+    @filename.setter
+    def filename(self, value):
+        """
+        Setter function for protected filename attribute.
+        """
+
+        self._filename = value
 
     def print_keywords(self):
         """
