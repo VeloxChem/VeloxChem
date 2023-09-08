@@ -131,12 +131,29 @@ class ForceFieldGenerator:
         self.scan_geometries = None
         self.target_dihedrals = None
         self.ffversion = 0
+
         self._workdir = None
 
         # resp settings
         self.resp_dict = None
 
         self.keep_files = True
+
+    @property
+    def workdir(self):
+        """
+        Getter function for protected workdir attribute.
+        """
+
+        return self._workdir
+
+    @workdir.setter
+    def workdir(self, value):
+        """
+        Setter function for protected workdir attribute.
+        """
+
+        self._workdir = value
 
     def update_settings(self, ffg_dict, resp_dict=None):
         """
@@ -150,6 +167,7 @@ class ForceFieldGenerator:
 
         ffg_keywords = {
             'molecule_name': 'str',
+            'workdir': 'str',
             'scan_xyz_files': 'seq_fixed_str',
             'atom_types': 'seq_fixed_str',
             'eq_param': 'bool',
@@ -253,12 +271,15 @@ class ForceFieldGenerator:
 
         self.ffversion = 0
 
-        try:
-            temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
-        except TypeError:
-            temp_dir = tempfile.TemporaryDirectory()
+        use_temp_dir = (self._workdir is None)
 
-        self._workdir = Path(temp_dir.name)
+        if use_temp_dir:
+            try:
+                temp_dir = tempfile.TemporaryDirectory(
+                    ignore_cleanup_errors=True)
+            except TypeError:
+                temp_dir = tempfile.TemporaryDirectory()
+            self._workdir = Path(temp_dir.name)
 
         if self.original_top_file is None:
             original_itp_file = self._workdir / (mol_name +
@@ -312,10 +333,12 @@ class ForceFieldGenerator:
             self.ostream.print_blank()
             self.ostream.flush()
 
-        try:
-            temp_dir.cleanup()
-        except (NotADirectoryError, PermissionError):
-            pass
+        if use_temp_dir:
+            try:
+                temp_dir.cleanup()
+            except (NotADirectoryError, PermissionError):
+                pass
+            self._workdir = None
 
     def read_qm_scan_xyz_files(self, scan_xyz_files, inp_dir=None):
         """
@@ -324,6 +347,18 @@ class ForceFieldGenerator:
         :param scan_xyz_files:
             The list of xyz files from QM scan.
         """
+
+        if self.scan_dih_angles is None:
+            self.scan_dih_angles = []
+
+        if self.scan_energies is None:
+            self.scan_energies = []
+
+        if self.scan_geometries is None:
+            self.scan_geometries = []
+
+        if self.target_dihedrals is None:
+            self.target_dihedrals = []
 
         # reading QM data
 
@@ -950,11 +985,11 @@ class ForceFieldGenerator:
 
         mol_name = Path(self.molecule_name).stem
 
+        workdir = Path('.') if self._workdir is None else self._workdir
+
         self.ffversion += 1
-        new_itp_fname = str(self._workdir /
-                            f'{mol_name}_{self.ffversion:02d}.itp')
-        new_top_fname = str(self._workdir /
-                            f'{mol_name}_{self.ffversion:02d}.top')
+        new_itp_fname = str(workdir / f'{mol_name}_{self.ffversion:02d}.itp')
+        new_top_fname = str(workdir / f'{mol_name}_{self.ffversion:02d}.top')
 
         if itp_fname != new_itp_fname:
             if self.rank == mpi_master():
@@ -973,7 +1008,7 @@ class ForceFieldGenerator:
 
         # MM scan with dihedral parameters set to zero
 
-        output_dir = self._workdir / f'{mol_name}_dih_corr' / f'{i+1}'
+        output_dir = workdir / f'{mol_name}_dih_corr' / f'{i+1}'
         zero_itp_file = output_dir / f'{mol_name}_zero.itp'
         zero_top_file = output_dir / f'{mol_name}_zero.top'
 
