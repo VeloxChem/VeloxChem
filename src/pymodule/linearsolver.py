@@ -191,6 +191,7 @@ class LinearSolver:
                 'norm_thresh': ('float', 'norm threshold for adding vector'),
                 'lindep_thresh': ('float', 'threshold for linear dependence'),
                 'restart': ('bool', 'restart from checkpoint file'),
+                'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
                 'save_solutions': ('bool', 'save solutions to file'),
                 'timing': ('bool', 'print timing information'),
@@ -255,6 +256,22 @@ class LinearSolver:
         """
 
         return self._is_converged
+
+    @property
+    def filename(self):
+        """
+        Getter function for protected filename attribute.
+        """
+
+        return self._filename
+
+    @filename.setter
+    def filename(self, value):
+        """
+        Setter function for protected filename attribute.
+        """
+
+        self._filename = value
 
     def print_keywords(self):
         """

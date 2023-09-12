@@ -97,9 +97,13 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
         double gradI = 0.5 * sig * zeta;
 
-        double dgradR_rho  = -0.5 * sig * zeta2 / density;
+        double dgradR_rho  = -0.5 * sig * delta2 /rho2 / density;
+
+        double dgradR_sigma  = 0.25 * (1.0 + delta2 / rho2);
 
         double dgradI_rho = -0.5 * sig * delta / rho2;
+
+        double dgradI_sigma   = 0.5 * zeta;
 
         double f_zeta = 0.0;
 
@@ -114,7 +118,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
         double dFg_pi = 0.0;
 
         double dFg_sigma = 0.0;
-
 
         // Real case
         if (pair_density <= 0)
@@ -137,16 +140,16 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double alpha = 1.0 + mus2r * grada2 / std::pow(rhoa, f83);
 
-            double beta = 1.0 + mus2r * gradb2 / std::pow(rhob, f83);
+            double beta = 1.0;
+
+            if (rhob > 1.0e-16)
+            {
+                beta = 1.0 + mus2r * gradb2 / std::pow(rhob, f83);
+            }
 
             double Fxc_a = R / alpha;
 
-            double Fxc_b = R;
-
-            if (rhob > 1.0e-12)
-            {
-                Fxc_b = R / beta;
-            }
+            double Fxc_b = R / beta;
 
             fg_zeta = fa * Fxc_a + fb * Fxc_b;
 
@@ -160,11 +163,18 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double dFxc_a_pref = -R / std::pow(alpha, 2.0) * mus2r / std::pow(rhoa, f83);
 
-            double dFxc_b_pref = -R / std::pow(beta, 2.0) * mus2r / std::pow(rhob, f83);
-
             double dFxc_a_rho  = dFxc_a_pref * (dgradR_rho + dgradI_rho - f43 / rhoa * grada2);
 
-            double dFxc_b_rho  = dFxc_b_pref * (dgradR_rho - dgradI_rho - f43 / rhob * gradb2);
+            double dFxc_b_pref = 0.0;
+
+            double dFxc_b_rho  = 0.0;
+
+            if (rhob > 1.0e-16)
+            {
+                dFxc_b_pref = -R / std::pow(beta, 2.0) * mus2r / std::pow(rhob, f83);
+
+                dFxc_b_rho  = dFxc_b_pref * (dgradR_rho - dgradI_rho - f43 / rhob * gradb2);
+            }
 
             dFg_rho     = (dfa_rho * Fxc_a + fa * dFxc_a_rho) + (dfb_rho * Fxc_b + fb * dFxc_b_rho);
 
@@ -184,9 +194,12 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
                 double dFxc_a_pi  = dFxc_a_pref * (dgradR_pi + dgradI_pi + f43 * grada2 / rhoa / delta);
 
-                double dFxc_b_pi  = dFxc_b_pref * (dgradR_pi - dgradI_pi - f43 * gradb2 / rhob / delta);
+                double dFxc_b_pi = 0.0;
 
-                // 2* f43 / rhoa  * 0.25 * sig /rho
+                if (rhob > 1.0e-16)
+                {
+                    dFxc_b_pi  = dFxc_b_pref * (dgradR_pi - dgradI_pi - f43 * gradb2 / rhob / delta);
+                }
 
                 dFg_pi     = (dfa_pi * Fxc_a + fa * dFxc_a_pi) + (dfb_pi * Fxc_b + fb * dFxc_b_pi);
             }
@@ -205,10 +218,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             // sigma
 
-            double dgradR_sigma  = 0.25 * (1.0 + zeta2);
-
-            double dgradI_sigma  = 0.5 * zeta;
-
             double dFxc_a_sigma  =  dFxc_a_pref * (dgradR_sigma + dgradI_sigma);
 
             double dFxc_b_sigma  =  dFxc_b_pref * (dgradR_sigma - dgradI_sigma);
@@ -223,7 +232,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double theta = 4.0 / 3.0 * std::atan(zeta);
 
-            f_zeta = 2.0 * std::pow(r, 4.0 / 3.0) * std::cos(theta);
+            f_zeta = 2.0 * std::pow(r, f43) * std::cos(theta);
 
             double f1_zeta = f83 * (zeta * std::cos(theta) - std::sin(theta)) / std::pow(r, f23) ;
 
@@ -252,15 +261,15 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double dtheta_rho = -f43 * zeta / (density * std::pow(r, 2.0));
 
-            double ddm_pref = 0.5 * std::pow(0.5 * density * r , f53);
+            double ddm_pref = f83 * 0.5 * std::pow(0.5 * density * r , f53);
 
-            double dmR_rho = f83 * ddm_pref * (r + density * dr_rho) * std::cos(2 * theta) + denom_pref * (-2 * std::sin(2 * theta)) * dtheta_rho + mus2r * dgradR_rho;
+            double dmR_rho = ddm_pref * (r + density * dr_rho) * std::cos(2 * theta) + denom_pref * (-2 * std::sin(2 * theta)) * dtheta_rho + mus2r * dgradR_rho;
 
-            double dmI_rho = f83 * ddm_pref * (r + density * dr_rho) * std::sin(2 * theta) + denom_pref * (2 * std::cos(2 * theta)) * dtheta_rho + mus2r * dgradI_rho;
+            double dmI_rho = ddm_pref * (r + density * dr_rho) * std::sin(2 * theta) + denom_pref * (2 * std::cos(2 * theta)) * dtheta_rho + mus2r * dgradI_rho;
 
             double drm_rho      = 1.0 / r_denom * (denom_R * dmR_rho + denom_I * dmI_rho);
 
-            double dtheta_m_rho = 1.0 / (std::pow(denom_R / denom_I, 2) + 1) * (dmR_rho / denom_I - denom_R / std::pow(denom_I, 2) * dmI_rho);
+            double dtheta_m_rho = (-denom_I * dmR_rho + denom_R * dmI_rho)/(std::pow(denom_R,2) + std::pow(denom_I,2));
 
             double drf_rho = std::pow(0.5, f83) * (4.0 * std::pow(r, 3.0) / r_denom * dr_rho - std::pow(r, 4.0) / std::pow(r_denom, 2) * drm_rho);
 
@@ -282,9 +291,9 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
                 double dgradI_pi = 0.5 * sig / (density * delta);
 
-                double dmR_pi    = ddm_pref * density * (f83 * std::cos(2 * theta) * dr_pi) - 2.0 * denom_pref * std::sin(2 * theta) * dtheta_pi + mus2r * dgradR_pi;
+                double dmR_pi    = ddm_pref * density * std::cos(2 * theta) * dr_pi - 2.0 * denom_pref * std::sin(2 * theta) * dtheta_pi + mus2r * dgradR_pi;
 
-                double dmI_pi    = ddm_pref * density * (f83 * std::sin(2 * theta) * dr_pi) + 2.0 * denom_pref * std::cos(2 * theta) * dtheta_pi + mus2r * dgradI_pi;
+                double dmI_pi    = ddm_pref * density * std::sin(2 * theta) * dr_pi + 2.0 * denom_pref * std::cos(2 * theta) * dtheta_pi + mus2r * dgradI_pi;
 
                 double drm_pi      = 1.0 / r_denom * (denom_R * dmR_pi + denom_I * dmI_pi);
 
@@ -310,10 +319,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
             }
 
             // sigma
-
-            double dgradR_sigma   = 0.25 * (1 + std::pow(zeta, 2));
-
-            double dgradI_sigma   = 0.5 * zeta;
 
             double dmR_sigma      = mus2r * dgradR_sigma;
 

@@ -247,6 +247,7 @@ class ScfDriver:
                 'qq_type': ('str_upper', 'ERI screening scheme'),
                 'eri_thresh': ('float', 'ERI screening threshold'),
                 'restart': ('bool', 'restart from checkpoint file'),
+                'filename': ('str', 'base name of output files'),
                 'checkpoint_file': ('str', 'name of checkpoint file'),
                 'timing': ('bool', 'print timing information'),
                 'profiling': ('bool', 'print profiling information'),
@@ -369,6 +370,22 @@ class ScfDriver:
         """
 
         return self._scf_tensors
+
+    @property
+    def filename(self):
+        """
+        Getter function for protected filename attribute.
+        """
+
+        return self._filename
+
+    @filename.setter
+    def filename(self, value):
+        """
+        Setter function for protected filename attribute.
+        """
+
+        self._filename = value
 
     def print_keywords(self):
         """
@@ -997,7 +1014,7 @@ class ScfDriver:
 
             self._print_iter_data(i)
 
-            self._check_convergence()
+            self._check_convergence(molecule, ovl_mat)
 
             if self.is_converged:
                 break
@@ -1883,10 +1900,15 @@ class ScfDriver:
 
         return nteri
 
-    def _check_convergence(self):
+    def _check_convergence(self, molecule, ovl_mat):
         """
         Sets SCF convergence flag by checking if convergence condition for
         electronic gradient is fullfiled.
+
+        :param molecule:
+            The molecule.
+        :param ovl_mat:
+            The overlap matrix.
         """
 
         self._is_converged = False
@@ -1896,7 +1918,40 @@ class ScfDriver:
             e_grad = self._iter_data['gradient_norm']
 
             if e_grad < self.conv_thresh:
-                self._is_converged = True
+                if self.restart:
+                    # Note: when restarting from checkpoint, double check that the
+                    # number of electrons are reasonable
+                    nalpha = molecule.number_of_alpha_electrons()
+                    nbeta = molecule.number_of_beta_electrons()
+                    calc_nelec = self._comp_number_of_electrons(ovl_mat)
+                    if (abs(calc_nelec[0] - nalpha) < 1.0e-3 and
+                            abs(calc_nelec[1] - nbeta) < 1.0e-3):
+                        self._is_converged = True
+                else:
+                    self._is_converged = True
+
+    def _comp_number_of_electrons(self, ovl_mat):
+        """
+        Computes number of alpha and beta electrons from density matrices and
+        overlap matrix.
+
+        :param ovl_mat:
+            The overlap matrix.
+
+        :return:
+            The number of alpha and beta electrons.
+        """
+
+        if self.rank == mpi_master():
+            D_alpha = self.density.alpha_to_numpy(0)
+            D_beta = self.density.beta_to_numpy(0)
+            S = ovl_mat.to_numpy()
+            calc_nelec = (np.sum(D_alpha * S), np.sum(D_beta * S))
+        else:
+            calc_nelec = None
+        calc_nelec = self.comm.bcast(calc_nelec, root=mpi_master())
+
+        return calc_nelec
 
     def _get_scf_range(self):
         """

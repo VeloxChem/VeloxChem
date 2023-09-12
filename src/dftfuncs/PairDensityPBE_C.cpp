@@ -127,7 +127,12 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             double dom_dzeta = omega_fact * fourthird * (std::pow(1.0+zeta, onethird)-std::pow(1.0-zeta,onethird));
 
-            double dmu_dzeta = onethird * (std::pow(1.0+zeta,-onethird)-std::pow(1.0-zeta,-onethird));
+            double dmu_dzeta = onethird * std::pow(1.0+zeta,-onethird);
+
+            if (1.0-zeta > 1.0e-16)
+            {
+                dmu_dzeta -= onethird * std::pow(1.0-zeta,-onethird);
+            }
 
             double dzeta_drho = - zeta/density;
 
@@ -135,7 +140,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             dmu_drho = dmu_dzeta * dzeta_drho;
 
-            if (pair_density < -1.0e-12)
+            if (pair_density < -1.0e-16)
             {
                 double dzeta_dpi = - 1.0 /(delta * density);
 
@@ -189,7 +194,7 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
 
             dmu_drho = dmu_dr * dr_deta * deta_drho + dmu_dtheta2 * dtheta2_deta * deta_drho;
 
-            if (pair_density > 1.0e-12)
+            if (pair_density > 1.0e-16)
             {
                 double deta_dpi = 1/(std::pow(2*pair_density,0.5)*density);
 

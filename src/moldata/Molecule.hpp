@@ -26,17 +26,17 @@
 #ifndef Molecule_hpp
 #define Molecule_hpp
 
+#include <mpi.h>
+
 #include <cstdint>
 #include <ostream>
 #include <set>
 #include <string>
 #include <vector>
 
-#include <mpi.h>
-
+#include "AtomicRadii.hpp"
 #include "MemBlock.hpp"
 #include "MemBlock2D.hpp"
-#include "AtomicRadii.hpp"
 
 /**
  Class CMolecule stores data about single molecule and provides set of methods
@@ -127,8 +127,7 @@ class CMolecule
      @param mol_1 the first molecule object.
      @param mol_2 the second molecule object.
      */
-    CMolecule(const CMolecule& mol_1,
-              const CMolecule& mol_2);
+    CMolecule(const CMolecule& mol_1, const CMolecule& mol_2);
 
     /**
      Creates a sub-molecule object by slicing the molecule object.
@@ -136,10 +135,8 @@ class CMolecule
      @param startIndex the starting index of the sub-molecule (0-based).
      @param numAtoms the number of atoms in the sub-molecule.
      */
-    CMolecule getSubMolecule(int32_t startIndex,
-                             int32_t numAtoms);
-    
-    
+    CMolecule getSubMolecule(int32_t startIndex, int32_t numAtoms);
+
     /**
      Adds atom to molecule using given atom label and coordinates.
 
@@ -148,10 +145,7 @@ class CMolecule
      @param atomCoordinateY the coordinate Y of atom.
      @param atomCoordinateZ the coordinate Z of atom.
     */
-    void addAtom(const std::string& atomLabel,
-                 const double       atomCoordinateX,
-                 const double       atomCoordinateY,
-                 const double       atomCoordinateZ);
+    void addAtom(const std::string& atomLabel, const double atomCoordinateX, const double atomCoordinateY, const double atomCoordinateZ);
 
     /**
      Assigns a molecule object by copying other molecule object.
@@ -242,9 +236,7 @@ class CMolecule
     @param idElemental the chemical element number.
     @return the number of atoms.
     */
-    int32_t getNumberOfAtoms(const int32_t iAtom,
-                             const int32_t nAtoms,
-                             const int32_t idElemental) const;
+    int32_t getNumberOfAtoms(const int32_t iAtom, const int32_t nAtoms, const int32_t idElemental) const;
 
     /**
      Gets set of unique chemical elements in molecule.
@@ -315,7 +307,7 @@ class CMolecule
      @return the vector of distances.
      */
     CMemBlock<double> getMinDistances() const;
-    
+
     /**
      Computes minimal distance from given external point (x,y,z) to closest atom
      in molecule.
@@ -325,9 +317,7 @@ class CMolecule
      @param coordinateZ the coordinate Z of external point.
      @return the minimal distance.
     */
-    double getMinDistance(const double coordinateX,
-                          const double coordinateY,
-                          const double coordinateZ) const; 
+    double getMinDistance(const double coordinateX, const double coordinateY, const double coordinateZ) const;
 
     /**
      Gets nuclear repulsion energy for molecule assuming point charge model for
@@ -352,6 +342,13 @@ class CMolecule
     std::vector<double> getMkRadii() const;
 
     /**
+     Gets CHELPG radii of the atoms.
+
+     @return the vector of CHELPG radii.
+     */
+    std::vector<double> getChelpgRadii() const;
+
+    /**
      Gets covalent radii of the atoms.
 
      @return the vector of covalent radii.
@@ -365,7 +362,7 @@ class CMolecule
      @return the label of atom.
      */
     std::string getLabel(const int32_t iAtom) const;
-    
+
     /**
      Gets indexes of atoms with given atomic label.
 
@@ -373,7 +370,7 @@ class CMolecule
      @return the vector of atom indexes.
     */
     std::vector<int32_t> getAtomIndexes(const std::string& atomLabel) const;
-    
+
     /**
      Gets vector of atom coordinates of specific atom.
 
@@ -381,7 +378,7 @@ class CMolecule
      @return the vector of atom indexes.
     */
     std::vector<double> getAtomCoordinates(const int32_t iAtom) const;
-    
+
     /**
      Gets index of nearest atom with given atom label to specific atom.
 
@@ -389,8 +386,7 @@ class CMolecule
      @return the index of nearest atom to requested atom.
     */
     int32_t getIndexOfNearestAtom(const int32_t iAtom) const;
-    
-    
+
     /**
      Gets coordination number of specific atom in molecule.
 
@@ -398,8 +394,7 @@ class CMolecule
      @param radius the effective coordination radius.
      @return the coordination number of atom.
     */
-    int32_t getCoordinationNummber(const int32_t iAtom,
-                                   const double  radius) const;
+    int32_t getCoordinationNummber(const int32_t iAtom, const double radius) const;
 
     /**
      Prints geometry of molecule as table to output stream.
@@ -433,8 +428,7 @@ class CMolecule
      @param output the output text stream.
      @param source the molecule object.
      */
-    friend std::ostream& operator<<(      std::ostream& output,
-                                    const CMolecule&    source);
+    friend std::ostream& operator<<(std::ostream& output, const CMolecule& source);
 };
 
 #endif /* Molecule_hpp */

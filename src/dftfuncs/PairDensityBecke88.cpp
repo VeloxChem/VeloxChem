@@ -107,8 +107,13 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
             double dra_dpi = dra_dzeta*dzeta_dpi;
 
             double rb = std::pow(0.5*density* (1 - zeta), f43);
-            double drb_dzeta = -f43*pow((1.0/2.0)*density*(1 - zeta), f43)/(1 - zeta);
-            double drb_drho = drb_dzeta*dzeta_drho + 2*f43*pow((1.0/2.0)*density*(1 - zeta), f43)*(1.0/2.0 - 1.0/2.0*zeta)/(density*(1 - zeta));
+            double drb_dzeta = 0.0;
+            double drb_drho = 0.0;
+            if (rb > 1.0e-16)
+            {
+                drb_dzeta = -f43*pow((1.0/2.0)*density*(1 - zeta), f43)/(1 - zeta);
+                drb_drho = drb_dzeta*dzeta_drho + 2*f43*pow((1.0/2.0)*density*(1 - zeta), f43)*(1.0/2.0 - 1.0/2.0*zeta)/(density*(1 - zeta));
+            }
             double drb_dpi = drb_dzeta*dzeta_dpi;
 
             double grada2 = gradR + gradI;
@@ -128,7 +133,11 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
             double dgrada_dsig = dgrada2_dsig*dgrada_dgrada2;
 
             double gradb = std::sqrt(gradb2);
-            double dgradb_dgradb2 = (1.0/2.0)/sqrt(gradb2);
+            double dgradb_dgradb2 = 0.0;
+            if (rb > 1.0e-16)
+            {
+                dgradb_dgradb2 = (1.0/2.0)/sqrt(gradb2);
+            }
             double dgradb_drho = dgradb2_drho*dgradb_dgradb2;
             double dgradb_dpi = dgradb2_dpi*dgradb_dgradb2;
             double dgradb_dsig = dgradb2_dsig*dgradb_dgradb2;
@@ -140,13 +149,6 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
             double dxa_dpi = dgrada_dpi*dxa_dgrada + dra_dpi*dxa_dra;
             double dxa_dsig = dgrada_dsig*dxa_dgrada;
 
-            double xb = gradb /rb;
-            double dxb_drb = -gradb/pow(rb, 2);
-            double dxb_dgradb = 1.0/rb;
-            double dxb_drho = dgradb_drho*dxb_dgradb + drb_drho*dxb_drb;
-            double dxb_dpi = dgradb_dpi*dxb_dgradb + drb_dpi*dxb_drb;
-            double dxb_dsig = dgradb_dsig*dxb_dgradb;
-
             double xa2 = grada2 / (ra*ra);
             double dxa2_dra = -2*grada2/pow(ra, 3);
             double dxa2_dgrada2 = pow(ra, -2);
@@ -154,9 +156,28 @@ compute_exc_vxc(const int32_t np, const double* rho, const double* sigma, double
             double dxa2_dpi = dgrada2_dpi*dxa2_dgrada2 + dra_dpi*dxa2_dra;
             double dxa2_dsig = dgrada2_dsig*dxa2_dgrada2;
 
-            double xb2 = gradb2 / (rb*rb);
-            double dxb2_dgradb2 = pow(rb, -2);
-            double dxb2_drb = -2*gradb2/pow(rb, 3);
+            double xb = 0.0;
+            double dxb_drb = 0.0;
+            double dxb_dgradb = 0.0;
+            if (rb > 1.0e-16)
+            {
+                xb = gradb /rb;
+                dxb_drb = -gradb/pow(rb, 2);
+                dxb_dgradb = 1.0/rb;
+            }
+            double dxb_drho = dgradb_drho*dxb_dgradb + drb_drho*dxb_drb;
+            double dxb_dpi = dgradb_dpi*dxb_dgradb + drb_dpi*dxb_drb;
+            double dxb_dsig = dgradb_dsig*dxb_dgradb;
+
+            double xb2 = 0.0;
+            double dxb2_dgradb2 = 0.0;
+            double dxb2_drb = 0.0;
+            if (rb > 1.0e-16)
+            {
+                xb2 = gradb2 / (rb*rb);
+                dxb2_dgradb2 = pow(rb, -2);
+                dxb2_drb = -2*gradb2/pow(rb, 3);
+            }
             double dxb2_drho = dgradb2_drho*dxb2_dgradb2 + drb_drho*dxb2_drb;
             double dxb2_dpi = dgradb2_dpi*dxb2_dgradb2 + drb_dpi*dxb2_drb;
             double dxb2_dsig = dgradb2_dsig*dxb2_dgradb2;

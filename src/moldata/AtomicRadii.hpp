@@ -45,6 +45,13 @@ std::vector<double> buildVdwRadii();
 std::vector<double> buildMkRadii();
 
 /**
+ Creates CHELPG radii.
+
+ @return a vector of CHELPG radii with nuclear charge as index.
+ */
+std::vector<double> buildChelpgRadii();
+
+/**
  Creates covalent radii.
 
  @return a vector of covalent radii with nuclear charge as index.

@@ -101,6 +101,10 @@ class RespChargesDriver:
         # filename
         self.filename = 'veloxchem_esp_' + get_random_string_parallel(self.comm)
 
+        # method
+        self.xcfun = None
+        self.restart = True
+
         # conformers
         self.xyz_file = None
         self.net_charge = 0.0
@@ -111,8 +115,15 @@ class RespChargesDriver:
         self.temperature = 298.15
 
         # grid information
+        self.grid_type = 'mk'
+
+        # MK grid settings (density in Angstrom^-2)
         self.number_layers = 4
         self.density = 1.0
+
+        # CHELPG grid settings (in Angstrom)
+        self.chelpg_spacing = 0.3
+        self.chelpg_margin = 2.8
 
         # esp fitting to user specified points
         self.fitting_points = None
@@ -128,9 +139,14 @@ class RespChargesDriver:
         # input keywords
         self.input_keywords = {
             'resp_charges': {
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'restart': ('bool', 'restart from checkpoint file'),
+                'grid_type': ('str_lower', 'type of grid (mk or chelpg)'),
                 'number_layers':
                     ('int', 'number of layers of scaled vdW surfaces'),
                 'density': ('float', 'density of points in each layer'),
+                'chelpg_spacing': ('float', 'step size for CHELPG grid'),
+                'chelpg_margin': ('float', 'maximum radius for CHELPG grid'),
                 'restrain_hydrogen': ('bool', 'restrain hydrogen atoms'),
                 'weak_restraint':
                     ('float', 'strength of restraint in 1st RESP stage'),
@@ -138,6 +154,7 @@ class RespChargesDriver:
                     ('float', 'strength of restraint in 2nd RESP stage'),
                 'max_iter': ('int', 'maximum iterations in RESP fit'),
                 'threshold': ('float', 'convergence threshold of RESP fit'),
+                'equal_charges': ('str', 'constraints for equal charges'),
                 'xyz_file': ('str', 'xyz file containing the conformers'),
                 'net_charge': ('float', 'net charge of the molecule'),
                 'multiplicity': ('int', 'spin multiplicity of the molecule'),
@@ -177,11 +194,6 @@ class RespChargesDriver:
         if 'filename' in resp_dict:
             self.filename = resp_dict['filename']
 
-        if 'equal_charges' in resp_dict:
-            self.equal_charges = []
-            for q in resp_dict['equal_charges'].split(','):
-                self.equal_charges.append(list(map(int, q.split('='))))
-
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
@@ -199,6 +211,18 @@ class RespChargesDriver:
         :return:
             The charges.
         """
+
+        # sanity check for equal_charges
+        if self.equal_charges is not None:
+            if isinstance(self.equal_charges, str):
+                eq_chgs = []
+                for q in self.equal_charges.split(','):
+                    if q:
+                        eq_chgs.append(list(map(int, q.split('='))))
+                self.equal_charges = eq_chgs
+            assert_msg_critical(
+                isinstance(self.equal_charges, (list, tuple)),
+                'RespChargesDriver.compute: Invalid equal_charges')
 
         molecules = []
         basis_sets = []
@@ -294,11 +318,16 @@ class RespChargesDriver:
         use_631gs_basis = all(
             [bas.get_label() in ['6-31G*', '6-31G_D_'] for bas in basis_sets])
 
-        if flag.lower() == 'resp' and not use_631gs_basis:
-            cur_str = '*** Warning: Recommended basis set 6-31G* '
-            cur_str += 'is not used!'
-            self.ostream.print_header(cur_str.ljust(40))
-            self.ostream.print_blank()
+        # sanity check for RESP
+        if flag.lower() == 'resp':
+            assert_msg_critical(
+                self.grid_type == 'mk',
+                'RespChargesDriver.compute: For RESP charges, ' +
+                'grid_type must be \'mk\'')
+            if not use_631gs_basis:
+                cur_str = 'Recommended basis set 6-31G* is not used!'
+                self.ostream.print_warning(cur_str)
+                self.ostream.print_blank()
 
         grids = []
         esp = []
@@ -330,6 +359,10 @@ class RespChargesDriver:
                     'checkpoint_file': self.filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
+                scf_drv.restart = self.restart
+                if (self.method_dict is None or
+                        'xcfun' not in self.method_dict):
+                    scf_drv.xcfun = self.xcfun
                 scf_results = scf_drv.compute(mol, bas)
 
             else:
@@ -347,6 +380,10 @@ class RespChargesDriver:
                     'checkpoint_file': filename + '.scf.h5'
                 }
                 scf_drv.update_settings(scf_dict, self.method_dict)
+                scf_drv.restart = self.restart
+                if (self.method_dict is None or
+                        'xcfun' not in self.method_dict):
+                    scf_drv.xcfun = self.xcfun
                 scf_results = scf_drv.compute(mol, bas)
                 ostream.close()
 
@@ -464,8 +501,17 @@ class RespChargesDriver:
         self.print_header(n_conf, n_points)
         self.print_esp_header()
 
+        if self.equal_charges is not None:
+            constr = [0] * molecules[0].number_of_atoms()
+            for points in self.equal_charges:
+                for i in range(len(points) - 1):
+                    constr[points[i + 1] - 1] = points[i]
+        else:
+            constr = None
+
         # generate and solve equation system (ESP fit)
-        a, b = self.generate_equation_system(molecules, grids, esp, weights)
+        a, b = self.generate_equation_system(molecules, grids, esp, weights,
+                                             None, constr)
         q = np.linalg.solve(a, b)
 
         n_atoms = molecules[0].number_of_atoms()
@@ -827,13 +873,35 @@ class RespChargesDriver:
 
     def get_grid_points(self, molecule):
         """
-        Gets grid points in the solvent-accessible region.
+        Gets grid points for (R)ESP fitting.
 
         :param molecule:
             The molecule.
 
         :return:
-            The coordinates of each grid point listed in an array.
+            The coordinates of grid points as an array.
+        """
+
+        if self.grid_type == 'mk':
+            return self.get_grid_points_mk(molecule)
+
+        elif self.grid_type == 'chelpg':
+            return self.get_grid_points_chelpg(molecule)
+
+        else:
+            assert_msg_critical(
+                False, 'RespChargesDriver.compute: Invalid grid_type ' +
+                self.grid_type)
+
+    def get_grid_points_mk(self, molecule):
+        """
+        Gets MK grid points.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The coordinates of grid points as an array.
         """
 
         grid = []
@@ -881,6 +949,101 @@ class RespChargesDriver:
                             grid.append(point)
 
         return np.array(grid)
+
+    def get_grid_points_chelpg(self, molecule):
+        """
+        Gets CHELPG grid points.
+
+        :param molecule:
+            The molecule.
+
+        :return:
+            The coordinates of grid points as an array.
+        """
+
+        chelpg_spacing_au = self.chelpg_spacing / bohr_in_angstrom()
+        chelpg_margin_au = self.chelpg_margin / bohr_in_angstrom()
+
+        coords = molecule.get_coordinates_in_bohr()
+
+        x_max = np.max(coords[:, 0] + chelpg_margin_au)
+        x_min = np.min(coords[:, 0] - chelpg_margin_au)
+
+        y_max = np.max(coords[:, 1] + chelpg_margin_au)
+        y_min = np.min(coords[:, 1] - chelpg_margin_au)
+
+        z_max = np.max(coords[:, 2] + chelpg_margin_au)
+        z_min = np.min(coords[:, 2] - chelpg_margin_au)
+
+        n_x_half_float = 0.5 * (x_max - x_min) / chelpg_spacing_au
+        n_y_half_float = 0.5 * (y_max - y_min) / chelpg_spacing_au
+        n_z_half_float = 0.5 * (z_max - z_min) / chelpg_spacing_au
+
+        n_x_half = int(n_x_half_float)
+        n_y_half = int(n_y_half_float)
+        n_z_half = int(n_z_half_float)
+
+        x_min = 0.5 * (x_min + x_max) - chelpg_spacing_au * n_x_half
+        y_min = 0.5 * (y_min + y_max) - chelpg_spacing_au * n_y_half
+        z_min = 0.5 * (z_min + z_max) - chelpg_spacing_au * n_z_half
+
+        x_max = 0.5 * (x_min + x_max) + chelpg_spacing_au * n_x_half
+        y_max = 0.5 * (y_min + y_max) + chelpg_spacing_au * n_y_half
+        z_max = 0.5 * (z_min + z_max) + chelpg_spacing_au * n_z_half
+
+        # try to fill the box with fewer grid points
+
+        if n_x_half_float - n_x_half <= 0.5:
+            x_min += 0.5 * chelpg_spacing_au
+            x_max -= 0.5 * chelpg_spacing_au
+
+        if n_y_half_float - n_y_half <= 0.5:
+            y_min += 0.5 * chelpg_spacing_au
+            y_max -= 0.5 * chelpg_spacing_au
+
+        if n_z_half_float - n_z_half <= 0.5:
+            z_min += 0.5 * chelpg_spacing_au
+            z_max -= 0.5 * chelpg_spacing_au
+
+        natoms = molecule.number_of_atoms()
+        atom_radii = molecule.chelpg_radii_to_numpy()
+
+        margin_squared = chelpg_margin_au**2
+        atom_radii_squared = atom_radii * atom_radii
+
+        grid_points = []
+
+        x_grid = np.arange(x_min, x_max + 0.01 * chelpg_spacing_au,
+                           chelpg_spacing_au)
+        y_grid = np.arange(y_min, y_max + 0.01 * chelpg_spacing_au,
+                           chelpg_spacing_au)
+        z_grid = np.arange(z_min, z_max + 0.01 * chelpg_spacing_au,
+                           chelpg_spacing_au)
+
+        for x in x_grid:
+            for y in y_grid:
+                for z in z_grid:
+
+                    # criteria for including the grid point:
+                    # 1. grid point is outside CHELPG radii
+                    # 2. grid point is inside maximum radius (margin)
+
+                    within_vdw_radii = False
+                    min_r2 = None
+
+                    for a in range(natoms):
+                        ax, ay, az = coords[a]
+                        r2 = (x - ax)**2 + (y - ay)**2 + (z - az)**2
+                        if r2 < atom_radii_squared[a]:
+                            within_vdw_radii = True
+                            break
+                        if min_r2 is None or min_r2 > r2:
+                            min_r2 = r2
+
+                    if not (within_vdw_radii or min_r2 > margin_squared):
+                        grid_points.append([x, y, z])
+
+        return np.array(grid_points)
 
     def get_electrostatic_potential(self, grid, molecule, basis, scf_results):
         """
@@ -1051,7 +1214,11 @@ class RespChargesDriver:
         """
 
         self.ostream.print_blank()
-        title = 'RESP Charges Driver Setup'
+
+        if self.grid_type == 'mk':
+            title = 'RESP Charges Driver Setup'
+        elif self.grid_type == 'chelpg':
+            title = 'ESP Charges Driver Setup'
         self.ostream.print_header(title)
         self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
@@ -1067,10 +1234,22 @@ class RespChargesDriver:
                 cur_str = '                                {:4f}'.format(
                     self.weights[i])
                 self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Number of Layers             :  ' + str(self.number_layers)
-        self.ostream.print_header(cur_str.ljust(str_width))
-        cur_str = 'Points per Square Angstrom   :  ' + str(self.density)
-        self.ostream.print_header(cur_str.ljust(str_width))
+
+        if self.grid_type == 'mk':
+            cur_str = 'Number of Layers             :  ' + str(
+                self.number_layers)
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Points per Square Angstrom   :  ' + str(self.density)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
+        elif self.grid_type == 'chelpg':
+            cur_str = 'Grid Spacing in Angstrom     :  ' + str(
+                self.chelpg_spacing)
+            self.ostream.print_header(cur_str.ljust(str_width))
+            cur_str = 'Grid Margin in Angstrom      :  ' + str(
+                self.chelpg_margin)
+            self.ostream.print_header(cur_str.ljust(str_width))
+
         cur_str = 'Total Number of Grid Points  :  ' + str(n_points)
         self.ostream.print_header(cur_str.ljust(str_width))
         if fitting_coords is not None:
@@ -1094,9 +1273,9 @@ class RespChargesDriver:
 
         if stage.lower() == 'first':
             if not self.recommended_resp_parameters():
-                cur_str = '*** Warning: Parameters for RESP fitting differ '
-                cur_str += 'from recommended choice!'
-                self.ostream.print_header(cur_str.ljust(str_width))
+                cur_str = 'Parameters for RESP fitting differ from '
+                cur_str += 'recommended choices!'
+                self.ostream.print_warning(cur_str)
             self.ostream.print_blank()
             self.ostream.print_header('First Stage Fit')
             self.ostream.print_header(17 * '-')
@@ -1127,7 +1306,12 @@ class RespChargesDriver:
         """
 
         self.ostream.print_blank()
-        self.ostream.print_header('Merz-Kollman ESP Charges')
+
+        if self.grid_type == 'mk':
+            self.ostream.print_header('Merz-Kollman ESP Charges')
+        elif self.grid_type == 'chelpg':
+            self.ostream.print_header('CHELPG ESP Charges')
+
         self.ostream.print_header(26 * '-')
         self.ostream.print_blank()
         cur_str = '{}   {}      {}'.format('No.', 'Atom', 'Charge (a.u.)')
@@ -1144,9 +1328,9 @@ class RespChargesDriver:
 
         self.ostream.print_blank()
         if n_conf > 1:
-            cur_str = '*** Warning: Multiple conformers are given, '
-            cur_str += 'but only one can be processed!'
-            self.ostream.print_header(cur_str.ljust(40))
+            cur_str = 'Multiple conformers are given, but only one '
+            cur_str += 'can be processed!'
+            self.ostream.print_warning(cur_str)
 
         self.ostream.print_blank()
         self.ostream.print_header('ESP Charges on Fitting Points')
@@ -1236,17 +1420,25 @@ class RespChargesDriver:
 
         str_width = 44
 
-        if flag.lower() == 'esp' and n_conf == 1:
-            return
-
         title = 'Reference: '
         self.ostream.print_header(title.ljust(str_width))
+
         if flag.lower() == 'resp':
             title = 'J. Phys. Chem. 1993, 97, 10269-10280.'
             self.ostream.print_header(title.ljust(str_width))
+
+        elif flag.lower() == 'esp':
+            if self.grid_type == 'mk':
+                title = 'J. Comput. Chem. 1984, 5, 129-145.'
+                self.ostream.print_header(title.ljust(str_width))
+            elif self.grid_type == 'chelpg':
+                title = 'J. Comput. Chem. 1990, 11, 361-373.'
+                self.ostream.print_header(title.ljust(str_width))
+
         if n_conf > 1:
             title = 'J. Am. Chem. Soc. 1992, 114, 9075-9079.'
             self.ostream.print_header(title.ljust(str_width))
+
         self.ostream.print_blank()
 
     def recommended_resp_parameters(self):
