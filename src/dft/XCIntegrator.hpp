@@ -84,6 +84,17 @@ class CXCIntegrator
                                   const CMolecularBasis& basis,
                                   const CDenseMatrix&    densityMatrix,
                                   const CMolecularGrid&  molecularGrid) const;
+
+    /**
+     Computes GTOs values on grid points.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param molecularGrid the molecular grid.
+     @return the GTO values on grid points.
+     */
+    auto computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) const
+        -> CDenseMatrix;
 };
 
 #endif /* XCIntegrator_hpp */

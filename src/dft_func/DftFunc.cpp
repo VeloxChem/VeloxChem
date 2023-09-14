@@ -9,7 +9,7 @@ distribute(CSubMatrix* matrix, const std::vector<double>& values, const int64_t 
 
     for (int64_t i = 0; i < ncols; i++)
     {
-        matrix->at(irow, i, false) = values[i];
+        matrix->at(irow, i, false) += values[i];
     }
 }
 
@@ -20,7 +20,7 @@ distribute(CSubMatrix* matrix, const std::vector<double>& values, const double f
 
     for (int64_t i = 0; i < ncols; i++)
     {
-        matrix->at(irow, i, false) = factor * values[i];
+        matrix->at(irow, i, false) += factor * values[i];
     }
 }
 

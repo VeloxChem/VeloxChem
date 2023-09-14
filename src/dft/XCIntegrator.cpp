@@ -172,7 +172,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
             // GTO values on grid points
 
-            #pragma omp parallel
+#pragma omp parallel
             {
                 auto thread_id = omp_get_thread_num();
 
@@ -384,4 +384,113 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
     // mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
     return mat_Vxc;
+}
+
+auto
+CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) const
+    -> CDenseMatrix
+{
+    auto nthreads = omp_get_max_threads();
+
+    // GTO blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    int64_t naos = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+
+        const auto ang = gto_block.getAngularMomentum();
+
+        naos += ncgtos * (ang * 2 + 1);
+    }
+
+    // GTO values on grid points
+
+    CDenseMatrix allgtovalues(naos, molecularGrid.getNumberOfGridPoints());
+
+    // coordinates and weights of grid points
+
+    auto xcoords = molecularGrid.getCoordinatesX();
+    auto ycoords = molecularGrid.getCoordinatesY();
+    auto zcoords = molecularGrid.getCoordinatesZ();
+
+    // counts and displacements of grid points in boxes
+
+    auto counts = molecularGrid.getGridPointCounts();
+
+    auto displacements = molecularGrid.getGridPointDisplacements();
+
+    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    {
+        // grid points in box
+
+        auto npoints = counts.data()[box_id];
+
+        auto gridblockpos = displacements.data()[box_id];
+
+        // dimension of grid box
+
+        auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
+
+        // go through GTO blocks
+
+        for (const auto& gto_block : gto_blocks)
+        {
+            // TODO: add getAtomicOrbitalsIndexes to GtoBlock
+
+            auto gto_orb_inds = gto_block.getOrbitalIndexes();
+
+            auto gto_ang = gto_block.getAngularMomentum();
+
+            // prescreen GTO block
+
+            auto [cgto_mask, ao_mask] = prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);  // 0th order GTO derivative
+
+            auto pre_aocount = mathfunc::countSignificantElements(ao_mask);
+
+            std::vector<int64_t> pre_ao_inds;
+
+            for (int64_t comp = 0, aocount = 0; comp < gto_ang * 2 + 1; comp++)
+            {
+                for (int64_t ind = 1; ind < static_cast<int64_t>(gto_orb_inds.size()); ind++, aocount++)
+                {
+                    if (ao_mask[aocount] == 1) pre_ao_inds.push_back(comp * gto_orb_inds[0] + gto_orb_inds[ind]);
+                }
+            }
+
+            // GTO values on grid points
+
+#pragma omp parallel
+            {
+                auto thread_id = omp_get_thread_num();
+
+                auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+
+                auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+                auto cmat = gtoval::getGtoValuesForLda(gto_block,
+                                                       grid_batch_size,
+                                                       xcoords + gridblockpos + grid_batch_offset,
+                                                       ycoords + gridblockpos + grid_batch_offset,
+                                                       zcoords + gridblockpos + grid_batch_offset,
+                                                       cgto_mask);
+
+                auto submat_ptr = cmat.getSubMatrix({0, 0});
+
+                auto subgaos_ptr = submat_ptr->getData();
+
+                for (int64_t nu = 0; nu < pre_aocount; nu++)
+                {
+                    std::memcpy(allgtovalues.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
+                                subgaos_ptr + nu * grid_batch_size,
+                                grid_batch_size * sizeof(double));
+                }
+            }
+        }
+    }
+
+    return allgtovalues;
 }

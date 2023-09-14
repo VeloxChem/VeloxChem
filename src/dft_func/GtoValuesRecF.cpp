@@ -34,6 +34,8 @@ getLdaValuesRecF(const CGtoBlock&            gto_block,
 
     auto submat = gto_values.getSubMatrix({0, 0});
 
+    submat->zero();
+
     // set up GTOs data
 
     const auto gto_exps = gto_block.getExponents();

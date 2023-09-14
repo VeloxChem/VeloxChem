@@ -97,7 +97,18 @@ export_dft(py::module& m)
              "molecule"_a,
              "basis"_a,
              "density_matrix"_a,
-             "molecular_grid"_a);
+             "molecular_grid"_a)
+        .def(
+            "compute_gto_values",
+            [](CXCIntegrator& self, const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
+                -> py::array_t<double> {
+                auto gtovalues = self.computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
+                return vlx_general::pointer_to_numpy(gtovalues.values(), {gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns()});
+            },
+            "Computes GTO values on grid points.",
+            "molecule"_a,
+            "basis"_a,
+            "molecularGrid"_a);
 }
 
 }  // namespace vlx_dft
