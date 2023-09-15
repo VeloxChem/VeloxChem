@@ -1,8 +1,9 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem.veloxchemlib import GridDriver
+from veloxchem.veloxchemlib import GridDriver, XCIntegrator
 from veloxchem.molecule import Molecule
+from veloxchem.molecularbasis import MolecularBasis
 
 
 class TestDftGrid:
@@ -16,6 +17,10 @@ class TestDftGrid:
         """
         mol = Molecule.read_str(molstr, 'au')
 
+        here = Path(__file__).parent
+        basis_path = str(here.parent / 'basis')
+        bas = MolecularBasis.read(mol, 'def2-svp', basis_path, ostream=None)
+
         grid_drv = GridDriver()
         grid_drv.set_level(1)
         mol_grid = grid_drv.generate(mol)
@@ -25,10 +30,16 @@ class TestDftGrid:
         gz = mol_grid.z_to_numpy()
         gw = mol_grid.w_to_numpy()
 
-        g_data = np.vstack((gx, gy, gz, gw))
+        grid_data = np.vstack((gx, gy, gz, gw))
+
+        xc_drv = XCIntegrator()
+        gto_data = xc_drv.compute_gto_values(mol, bas, mol_grid)
+        gto_data_slice = gto_data[:, 400:600]
 
         here = Path(__file__).parent
-        npyfile = str(here / 'data' / 'h2o.dftgrid.npy')
-        ref_g_data = np.load(npyfile)
+        npz_data = np.load(str(here / 'data' / 'h2o.dftgrid.npz'))
+        ref_grid_data = npz_data['grid_xyzw']
+        ref_gto_data_slice = npz_data['gtos_on_grid_400_600']
 
-        assert np.max(np.abs(g_data - ref_g_data)) < 1e-10
+        assert np.max(np.abs(grid_data - ref_grid_data)) < 1e-10
+        assert np.max(np.abs(gto_data_slice - ref_gto_data_slice)) < 1e-10
