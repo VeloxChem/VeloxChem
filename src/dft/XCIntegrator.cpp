@@ -116,6 +116,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
     auto vrho = vrho_data.data();
     */
 
+    /*
     // initial values for XC energy and number of electrons
 
     double nele = 0.0, xcene = 0.0;
@@ -292,7 +293,6 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
             std::cout << std::endl;
         }
 
-        /*
         CDenseMatrix mat_chi(aocount, npoints);
 
         for (int64_t i = 0; i < aocount; i++)
@@ -376,8 +376,8 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
         }
 
         timer.stop("XC energy");
-        */
     }
+    */
 
     // mat_Vxc.setNumberOfElectrons(nele);
 
@@ -436,6 +436,14 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
             auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
+            const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
+            const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
+            const auto grid_z_ptr = zcoords + gridblockpos + grid_batch_offset;
+
+            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + grid_batch_size);
+            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + grid_batch_size);
+            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + grid_batch_size);
+
             // go through GTO blocks
 
             for (const auto& gto_block : gto_blocks)
@@ -462,12 +470,7 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
                 // GTO values on grid points
 
-                auto cmat = gtoval::getGtoValuesForLda(gto_block,
-                                                       grid_batch_size,
-                                                       xcoords + gridblockpos + grid_batch_offset,
-                                                       ycoords + gridblockpos + grid_batch_offset,
-                                                       zcoords + gridblockpos + grid_batch_offset,
-                                                       cgto_mask);
+                auto cmat = gtoval::getGtoValuesForLda(gto_block, grid_x, grid_y, grid_z, cgto_mask);
 
                 auto submat_ptr = cmat.getSubMatrix({0, 0});
 

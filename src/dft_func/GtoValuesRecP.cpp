@@ -10,17 +10,16 @@ namespace gtoval {  // gtoval namespace
 
 auto
 getLdaValuesRecP(const CGtoBlock&            gto_block,
-                 const int64_t               n_points,
-                 const double*               grid_coords_x,
-                 const double*               grid_coords_y,
-                 const double*               grid_coords_z,
+                 const std::vector<double>&  grid_coords_x,
+                 const std::vector<double>&  grid_coords_y,
+                 const std::vector<double>&  grid_coords_z,
                  const std::vector<int64_t>& gtos_mask) -> CMatrix
 {
     // set up GTO values storage
 
     const auto nrows = mathfunc::countSignificantElements(gtos_mask);
 
-    const auto ncols = n_points;
+    const auto ncols = static_cast<int64_t>(grid_coords_x.size());
 
     auto gto_values = matfunc::makeMatrix("LDA", 3 * nrows, ncols);
 
@@ -35,6 +34,14 @@ getLdaValuesRecP(const CGtoBlock&            gto_block,
     const auto gto_norms = gto_block.getNormalizationFactors();
 
     const auto gto_coords = gto_block.getCoordinates();
+
+    // set up grid data
+
+    auto g_x = grid_coords_x.data();
+
+    auto g_y = grid_coords_y.data();
+
+    auto g_z = grid_coords_z.data();
 
     // set GTOs block dimensions
 
@@ -87,11 +94,11 @@ getLdaValuesRecP(const CGtoBlock&            gto_block,
 #pragma omp simd
                 for (int64_t k = 0; k < ncols; k++)
                 {
-                    const auto gr_x = grid_coords_x[k] - r_x;
+                    const auto gr_x = g_x[k] - r_x;
 
-                    const auto gr_y = grid_coords_y[k] - r_y;
+                    const auto gr_y = g_y[k] - r_y;
 
-                    const auto gr_z = grid_coords_z[k] - r_z;
+                    const auto gr_z = g_z[k] - r_z;
 
                     const auto fss = fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
 
