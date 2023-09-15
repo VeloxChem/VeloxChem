@@ -29,6 +29,14 @@ auto makeGtoBlocks(const CMolecularBasis& basis, const CMolecule& molecule) -> s
  */
 auto makeGtoBlocks(const CMolecularBasis& basis, const CMolecule& molecule, const std::vector<int64_t>& atoms) -> std::vector<CGtoBlock>;
 
+/**
+ Gets number of atomic orbitals from vector of contracted GTOs blocks.
+
+ @param gto_blocks the vector of contracted GTOs blocks.
+ @return the number of atomic orbitals.
+ */
+auto getNumberOfAtomicOrbitals(const std::vector<CGtoBlock>& gto_blocks) -> int64_t;
+
 }  // namespace gtofunc
 
 #endif /* GtoFunc_hpp */

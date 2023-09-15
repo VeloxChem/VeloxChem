@@ -48,4 +48,21 @@ makeGtoBlocks(const CMolecularBasis& basis, const CMolecule& molecule, const std
     }
 }
 
+auto
+getNumberOfAtomicOrbitals(const std::vector<CGtoBlock>& gto_blocks) -> int64_t
+{
+    int64_t naos = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+
+        const auto ang = gto_block.getAngularMomentum();
+
+        naos += ncgtos * (ang * 2 + 1);
+    }
+
+    return naos;
+}
+
 }  // namespace gtofunc

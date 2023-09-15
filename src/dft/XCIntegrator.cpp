@@ -396,16 +396,7 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
-    int64_t naos = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-
-        const auto ang = gto_block.getAngularMomentum();
-
-        naos += ncgtos * (ang * 2 + 1);
-    }
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
     // GTO values on grid points
 
@@ -435,41 +426,41 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
         auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
-        // go through GTO blocks
-
-        for (const auto& gto_block : gto_blocks)
-        {
-            // TODO: add getAtomicOrbitalsIndexes to GtoBlock
-
-            auto gto_orb_inds = gto_block.getOrbitalIndexes();
-
-            auto gto_ang = gto_block.getAngularMomentum();
-
-            // prescreen GTO block
-
-            auto [cgto_mask, ao_mask] = prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);  // 0th order GTO derivative
-
-            auto pre_aocount = mathfunc::countSignificantElements(ao_mask);
-
-            std::vector<int64_t> pre_ao_inds;
-
-            for (int64_t comp = 0, aocount = 0; comp < gto_ang * 2 + 1; comp++)
-            {
-                for (int64_t ind = 1; ind < static_cast<int64_t>(gto_orb_inds.size()); ind++, aocount++)
-                {
-                    if (ao_mask[aocount] == 1) pre_ao_inds.push_back(comp * gto_orb_inds[0] + gto_orb_inds[ind]);
-                }
-            }
-
-            // GTO values on grid points
+        // compute GTO values on grid points
 
 #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+            // go through GTO blocks
+
+            for (const auto& gto_block : gto_blocks)
             {
-                auto thread_id = omp_get_thread_num();
+                auto gto_orb_inds = gto_block.getOrbitalIndexes();
 
-                auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+                auto gto_ang = gto_block.getAngularMomentum();
 
-                auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+                // prescreen GTO block
+
+                auto [cgto_mask, ao_mask] =
+                    prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);  // 0th order GTO derivative
+
+                auto pre_aocount = mathfunc::countSignificantElements(ao_mask);
+
+                std::vector<int64_t> pre_ao_inds;
+
+                auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
+
+                for (int64_t i = 0; i < static_cast<int64_t>(gto_ao_inds.size()); i++)
+                {
+                    if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
+                }
+
+                // GTO values on grid points
 
                 auto cmat = gtoval::getGtoValuesForLda(gto_block,
                                                        grid_batch_size,
