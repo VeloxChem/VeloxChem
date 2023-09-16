@@ -2,6 +2,8 @@ target_sources(vlxobjs
   PRIVATE
     LebedevLaikovQuadrature.cpp
     Log3Quadrature.cpp
+    DensityGridGenerator.cpp
+    DftSubMatrix.cpp
     GridBox.cpp
     GridDriver.cpp
     GridPartitioner.cpp

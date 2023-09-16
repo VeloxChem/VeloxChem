@@ -12,14 +12,14 @@
 namespace prescr {  // prescr namespace
 
 auto
-getGridBoxDimension(const int32_t gridBlockPosition, const int32_t nGridPoints, const double* xcoords, const double* ycoords, const double* zcoords)
+getGridBoxDimension(const int64_t gridBlockPosition, const int64_t nGridPoints, const double* xcoords, const double* ycoords, const double* zcoords)
     -> std::array<double, 6>
 {
     double xmin = xcoords[gridBlockPosition], ymin = ycoords[gridBlockPosition], zmin = zcoords[gridBlockPosition];
 
     double xmax = xcoords[gridBlockPosition], ymax = ycoords[gridBlockPosition], zmax = zcoords[gridBlockPosition];
 
-    for (int32_t g = 0; g < nGridPoints; g++)
+    for (int64_t g = 0; g < nGridPoints; g++)
     {
         xmin = std::min(xmin, xcoords[gridBlockPosition + g]);
 

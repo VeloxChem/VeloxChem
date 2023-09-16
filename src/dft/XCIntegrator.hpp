@@ -58,10 +58,12 @@ class CXCIntegrator
      @param molecularGrid the molecular grid.
      @return the AO Kohn-Sham matrix.
      */
-    CDenseMatrix _integrateVxcFockForLDA(const CMolecule&       molecule,
-                                         const CMolecularBasis& basis,
-                                         const CDenseMatrix&    densityMatrix,
-                                         const CMolecularGrid&  molecularGrid) const;
+    auto _integrateVxcFockForLDA(const CMolecule&       molecule,
+                                 const CMolecularBasis& basis,
+                                 const CDenseMatrix&    densityMatrix,
+                                 const CMolecularGrid&  molecularGrid) const -> CDenseMatrix;
+
+    auto _integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho) const -> CDenseMatrix;
 
    public:
     /**
@@ -80,10 +82,10 @@ class CXCIntegrator
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the AO Kohn-Sham matrix.
      */
-    CDenseMatrix integrateVxcFock(const CMolecule&       molecule,
-                                  const CMolecularBasis& basis,
-                                  const CDenseMatrix&    densityMatrix,
-                                  const CMolecularGrid&  molecularGrid) const;
+    auto integrateVxcFock(const CMolecule&       molecule,
+                          const CMolecularBasis& basis,
+                          const CDenseMatrix&    densityMatrix,
+                          const CMolecularGrid&  molecularGrid) const -> CDenseMatrix;
 
     /**
      Computes GTOs values on grid points.

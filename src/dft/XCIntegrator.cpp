@@ -26,6 +26,7 @@
 #include "XCIntegrator.hpp"
 
 #include <omp.h>
+#include <xc.h>
 
 #include <algorithm>
 #include <cmath>
@@ -36,6 +37,8 @@
 
 #include "DenseLinearAlgebra.hpp"
 #include "DenseMatrix.hpp"
+#include "DensityGridGenerator.hpp"
+#include "DftSubMatrix.hpp"
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
@@ -70,20 +73,11 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
-    int64_t naos = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-
-        const auto ang = gto_block.getAngularMomentum();
-
-        naos += ncgtos * (ang * 2 + 1);
-    }
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
     // Kohn-Sham matrix
 
-    CDenseMatrix mat_Vxc(densityMatrix.getNumberOfRows(), densityMatrix.getNumberOfColumns());
+    CDenseMatrix mat_Vxc(naos, naos);
 
     // GTOs on grid points
 
@@ -92,10 +86,6 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
     CDenseMatrix gaos(naos, max_npoints_per_box);
 
     /*
-    // mapping between AO indices before and after screening
-
-    std::vector<int64_t> aoinds(naos);
-
     // density and functional derivatives
 
     auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
@@ -116,7 +106,20 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
     auto vrho = vrho_data.data();
     */
 
-    /*
+    std::vector<double> local_weights_data(max_npoints_per_box);
+
+    std::vector<double> rho_data(2 * max_npoints_per_box);
+
+    std::vector<double> exc_data(1 * max_npoints_per_box);
+    std::vector<double> vrho_data(2 * max_npoints_per_box);
+
+    auto local_weights = local_weights_data.data();
+
+    auto rho = rho_data.data();
+
+    auto exc  = exc_data.data();
+    auto vrho = vrho_data.data();
+
     // initial values for XC energy and number of electrons
 
     double nele = 0.0, xcene = 0.0;
@@ -135,6 +138,12 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
+    xc_func_type _func;
+
+    auto funcID = xc_functional_get_number(std::string("LDA_X").c_str());
+
+    auto xc_err = xc_func_init(&_func, funcID, XC_POLARIZED);
+
     for (int64_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
@@ -147,60 +156,81 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
         auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
-        std::vector<int64_t> post_ao_inds;
+        // prescreening
+
+        std::vector<std::vector<int64_t>> cgto_masks, ao_masks, pre_ao_inds_blocks;
 
         for (const auto& gto_block : gto_blocks)
         {
-            auto gto_orb_inds = gto_block.getOrbitalIndexes();
+            // 0th order GTO derivative
+            auto [cgto_mask, ao_mask] = prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);
 
-            auto gto_ang = gto_block.getAngularMomentum();
+            cgto_masks.push_back(cgto_mask);
 
-            // prescreen GTO block
-
-            auto [cgto_mask, ao_mask] = prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);  // 0th order GTO derivative
-
-            auto pre_aocount = mathfunc::countSignificantElements(ao_mask);
+            ao_masks.push_back(ao_mask);
 
             std::vector<int64_t> pre_ao_inds;
 
-            for (int64_t comp = 0, aocount = 0; comp < gto_ang * 2 + 1; comp++)
+            auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
+
+            for (int64_t i = 0; i < static_cast<int64_t>(gto_ao_inds.size()); i++)
             {
-                for (int64_t ind = 1; ind < static_cast<int64_t>(gto_orb_inds.size()); ind++, aocount++)
-                {
-                    if (ao_mask[aocount] == 1) pre_ao_inds.push_back(comp * gto_orb_inds[0] + gto_orb_inds[ind]);
-                }
+                if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
             }
 
-            // GTO values on grid points
+            pre_ao_inds_blocks.push_back(pre_ao_inds);
+        }
 
 #pragma omp parallel
+        {
+            auto thread_id = omp_get_thread_num();
+
+            auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+
+            auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+            const auto grid_x_ptr = xcoords + gridblockpos + grid_batch_offset;
+            const auto grid_y_ptr = ycoords + gridblockpos + grid_batch_offset;
+            const auto grid_z_ptr = zcoords + gridblockpos + grid_batch_offset;
+
+            std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + grid_batch_size);
+            std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + grid_batch_size);
+            std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + grid_batch_size);
+
+            // go through GTO blocks
+
+            for (int64_t i_block = 0; i_block < static_cast<int64_t>(gto_blocks.size()); i_block++)
             {
-                auto thread_id = omp_get_thread_num();
+                const auto& gto_block = gto_blocks[i_block];
 
-                auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+                const auto& cgto_mask = cgto_masks[i_block];
 
-                auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+                const auto& ao_mask = ao_masks[i_block];
 
-                auto cmat = gtoval::getGtoValuesForLda(gto_block,
-                                                       grid_batch_size,
-                                                       xcoords + gridblockpos + grid_batch_offset,
-                                                       ycoords + gridblockpos + grid_batch_offset,
-                                                       zcoords + gridblockpos + grid_batch_offset,
-                                                       cgto_mask);
+                const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
+
+                auto cmat = gtoval::getGtoValuesForLda(gto_block, grid_x, grid_y, grid_z, cgto_mask);
 
                 auto submat_ptr = cmat.getSubMatrix({0, 0});
 
-                auto gaos_ptr = submat_ptr->getData();
+                auto submat_data = submat_ptr->getData();
 
-                for (int64_t nu = 0; nu < pre_aocount; nu++)
+                for (int64_t nu = 0; nu < static_cast<int64_t>(pre_ao_inds.size()); nu++)
                 {
-                    std::memcpy(gaos.row(pre_ao_inds[nu]) + grid_batch_offset, gaos_ptr + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(gaos.row(pre_ao_inds[nu]) + grid_batch_offset, submat_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                 }
             }
+        }
 
-            // post-screening
+        // post-screening
 
-            for (int64_t nu = 0; nu < pre_aocount; nu++)
+        std::vector<int64_t> aoinds;
+
+        for (int64_t i_block = 0; i_block < static_cast<int64_t>(gto_blocks.size()); i_block++)
+        {
+            const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
+
+            for (int64_t nu = 0; nu < static_cast<int64_t>(pre_ao_inds.size()); nu++)
             {
                 bool skip = true;
 
@@ -215,121 +245,52 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
                     }
                 }
 
-                if (!skip) post_ao_inds.push_back(pre_ao_inds[nu]);
-            }
-
-            auto aocount = static_cast<int64_t>(post_ao_inds.size());
-
-            if (box_id == 1)
-            {
-                std::cout << "GTO block:" << std::endl;
-
-                std::cout << "  angular momentum: " << gto_ang << std::endl;
-
-                std::cout << "  n_basis_funcs: " << gto_block.getNumberOfBasisFunctions() << std::endl;
-
-                std::cout << "  orb_inds: ";
-                for (const auto& x : gto_orb_inds)
-                {
-                    std::cout << x << ", ";
-                }
-                std::cout << std::endl;
-
-                std::cout << "  cgto_mask: ";
-                for (const auto x : cgto_mask)
-                {
-                    std::cout << x << ", ";
-                }
-                std::cout << std::endl;
-
-                std::cout << "  ao_mask: ";
-                for (const auto x : ao_mask)
-                {
-                    std::cout << x << ", ";
-                }
-                std::cout << std::endl;
-
-                std::cout << "pre_ao_inds: ";
-                for (const auto x : pre_ao_inds)
-                {
-                    std::cout << x << ", ";
-                }
-                std::cout << std::endl;
-
-                std::cout << "====" << std::endl;
+                if (!skip) aoinds.push_back(pre_ao_inds[nu]);
             }
         }
 
-        std::sort(post_ao_inds.begin(), post_ao_inds.end());
+        std::sort(aoinds.begin(), aoinds.end());
 
-        auto aocount = static_cast<int64_t>(post_ao_inds.size());
-
-        if (box_id == 1)
-        {
-            std::cout << "npoints: " << npoints << std::endl;
-            std::cout << "gridblockpos: " << gridblockpos << std::endl;
-
-            std::cout << "aocount: " << aocount << std::endl;
-
-            std::cout << "post_ao_inds: ";
-            for (const auto x : post_ao_inds)
-            {
-                std::cout << x << ", ";
-            }
-            std::cout << std::endl;
-
-            std::cout << "gaos: " << std::endl;
-            for (const auto i : post_ao_inds)
-            {
-                auto gaos_i = gaos.row(i);
-
-                std::cout << "  " << std::endl;
-                for (int64_t g = 0; g < npoints; g++)
-                {
-                    std::cout << gaos_i[g] << " ";
-                }
-                std::cout << std::endl;
-            }
-            std::cout << std::endl;
-        }
+        const auto aocount = static_cast<int64_t>(aoinds.size());
 
         CDenseMatrix mat_chi(aocount, npoints);
 
         for (int64_t i = 0; i < aocount; i++)
         {
-            std::memcpy(mat_chi.row(i), gaos.data(aoinds[i]), npoints * sizeof(double));
+            std::memcpy(mat_chi.row(i), gaos.row(aoinds[i]), npoints * sizeof(double));
         }
-
-        timer.stop("GTO screening");
 
         if (aocount == 0) continue;
 
         // generate sub density matrix and density grid
 
-        if (closedshell)
-        {
-            timer.start("Density matrix slicing");
+        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(densityMatrix, aoinds);
 
-            auto sub_dens_mat = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
-
-            timer.stop("Density matrix slicing");
-
-            dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat, timer);
-        }
-        else
-        {
-            timer.start("Density matrix slicing");
-
-            auto sub_dens_mat_a = submat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds, aocount, naos);
-            auto sub_dens_mat_b = submat::getSubDensityMatrix(densityMatrix, 0, std::string("BETA"), aoinds, aocount, naos);
-
-            timer.stop("Density matrix slicing");
-
-            dengridgen::generateDensityForLDA(rho, npoints, mat_chi, sub_dens_mat_a, sub_dens_mat_b, timer);
-        }
+        dengridgen::generateDensityForLDA(rho, mat_chi, sub_dens_mat);
 
         // compute exchange-correlation functional derivative
 
+        xc_lda_exc_vxc(&_func, npoints, rho, exc, vrho);
+
+        for (int64_t g = 0; g < npoints; g++)
+        {
+            local_weights[g] = weights[gridblockpos + g];
+        }
+
+        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(local_weights, mat_chi, vrho);
+
+        dftsubmat::distributeSubMatrixToDenseMatrix(mat_Vxc, partial_mat_Vxc, aoinds);
+
+        for (int64_t g = 0; g < npoints; g++)
+        {
+            auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
+
+            nele += local_weights[g] * rho_total;
+
+            xcene += local_weights[g] * exc[g] * rho_total;
+        }
+
+        /*
         timer.start("XC functional eval.");
 
         xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
@@ -337,7 +298,9 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
         gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
 
         timer.stop("XC functional eval.");
+        */
 
+        /*
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
 
@@ -376,12 +339,60 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
         }
 
         timer.stop("XC energy");
+        */
     }
-    */
+
+    xc_func_end(&_func);
 
     // mat_Vxc.setNumberOfElectrons(nele);
 
     // mat_Vxc.setExchangeCorrelationEnergy(xcene);
+
+    std::cout << "nele: " << nele << std::endl;
+
+    std::cout << "xcene: " << xcene << std::endl;
+
+    return mat_Vxc;
+}
+
+auto
+CXCIntegrator::_integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho) const -> CDenseMatrix
+{
+    const auto npoints = gtoValues.getNumberOfColumns();
+
+    // GTO values on grid points
+
+    auto chi_val = gtoValues.values();
+
+    auto naos = gtoValues.getNumberOfRows();
+
+    CDenseMatrix mat_G(naos, npoints);
+
+    auto G_val = mat_G.values();
+
+#pragma omp parallel
+    {
+        auto thread_id = omp_get_thread_num();
+
+        auto nthreads = omp_get_max_threads();
+
+        auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
+
+        auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
+
+        for (int64_t nu = 0; nu < naos; nu++)
+        {
+            auto nu_offset = nu * npoints;
+
+#pragma omp simd
+            for (int64_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            {
+                G_val[nu_offset + g] = weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
+            }
+        }
+    }
+
+    auto mat_Vxc = denblas::multABt(gtoValues, mat_G);
 
     return mat_Vxc;
 }
@@ -390,9 +401,11 @@ auto
 CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) const
     -> CDenseMatrix
 {
+    // number of OpenMP threads
+
     auto nthreads = omp_get_max_threads();
 
-    // GTO blocks and number of AOs
+    // GTOs blocks and number of AOs
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
@@ -414,7 +427,7 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
-    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    for (int64_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 

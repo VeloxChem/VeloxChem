@@ -48,8 +48,8 @@ namespace prescr {  // prescr namespace
  @param zcoords the Z coordinates of grid points.
  @return grid box dimension as (xmin, ymin, zmin, xmax, ymax, zmax).
  */
-auto getGridBoxDimension(const int32_t gridBlockPosition,
-                         const int32_t nGridPoints,
+auto getGridBoxDimension(const int64_t gridBlockPosition,
+                         const int64_t nGridPoints,
                          const double* xcoords,
                          const double* ycoords,
                          const double* zcoords) -> std::array<double, 6>;
