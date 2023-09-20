@@ -85,6 +85,7 @@ monkey:cmake_build:
         -DCMAKE_CXX_FLAGS="-cxx=icpx"
         -DUSE_4TH_GEOM_DERIV=OFF
         -DUSE_3RD_GEOM_DERIV=OFF
+        -DUSE_2ND_GEOM_DERIV=OFF
     - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -v -d stats
   artifacts:
     paths:
@@ -101,7 +102,7 @@ monkey:pip_install:
     - CC=gcc CXX=g++ python -m pip install
         cppe
         MDAnalysis
-    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\" -DUSE_4TH_GEOM_DERIV=OFF -DUSE_3RD_GEOM_DERIV=OFF"
+    - SKBUILD_CONFIGURE_OPTIONS="-DVLX_LA_VENDOR=MKL -DCMAKE_CXX_COMPILER=mpiicpc -DCMAKE_CXX_FLAGS=\"-cxx=icpx\" -DUSE_4TH_GEOM_DERIV=OFF -DUSE_3RD_GEOM_DERIV=OFF -DUSE_2ND_GEOM_DERIV=OFF"
         python -m pip install -v .[test,qmmm]
   artifacts:
     paths:

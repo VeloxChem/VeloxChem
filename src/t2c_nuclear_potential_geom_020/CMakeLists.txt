@@ -1,3 +1,4 @@
+if(USE_2ND_GEOM_DERIV)
 target_sources(vlxobjs
   PRIVATE
     NuclearPotentialGeom020RecDD.cpp
@@ -417,6 +418,7 @@ target_sources(vlxobjs
     PrimitiveNuclearPotentialGeom020SP_0_Z.cpp
     PrimitiveNuclearPotentialGeom020SS_0_0.cpp
 )
+endif()
 
 target_include_directories(vlxobjs
  PUBLIC
