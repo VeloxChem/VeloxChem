@@ -3,6 +3,7 @@ target_sources(vlxobjs
     ErrorHandler.cpp
     StringFormat.cpp
     OpenMPFunc.cpp
+    MpiFunc.cpp
   )
 
 target_include_directories(vlxobjs
