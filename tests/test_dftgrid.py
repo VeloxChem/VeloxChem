@@ -1,3 +1,4 @@
+from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 
@@ -34,6 +35,9 @@ class TestDftGrid:
 
         xc_drv = XCIntegrator()
         gto_data = xc_drv.compute_gto_values(mol, bas, mol_grid)
+
+        comm = MPI.COMM_WORLD
+        gto_data = comm.allreduce(gto_data)
         gto_data_slice = gto_data[:, 400:600]
 
         here = Path(__file__).parent

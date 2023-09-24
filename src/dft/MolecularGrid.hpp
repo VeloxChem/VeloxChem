@@ -26,6 +26,8 @@
 #ifndef MolecularGrid_hpp
 #define MolecularGrid_hpp
 
+#include <mpi.h>
+
 #include <array>
 #include <cstdint>
 #include <ostream>
@@ -194,6 +196,22 @@ class CMolecularGrid
      @return summary of grid points partitioning as a string.
      */
     auto partitionGridPoints() -> std::string;
+
+    /**
+     Distributes grid point counts and displacements within domain of MPI
+     communacator and sets distribution flag to true.
+
+     @param comm the MPI communicator.
+     */
+    auto distributeCountsAndDisplacements(MPI_Comm comm) -> void;
+
+    /**
+     Redo distributing grid point counts and displacements within domain of MPI
+     communacator and sets distribution flag to true.
+
+     @param comm the MPI communicator.
+     */
+    auto reDistributeCountsAndDisplacements(MPI_Comm comm) -> void;
 
     /**
      Checks whether the molecular grid has been partitioned.

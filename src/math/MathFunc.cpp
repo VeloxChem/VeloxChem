@@ -56,28 +56,55 @@ quadChebyshevOfKindTwo(double* coordinates, double* weights, const int64_t nPoin
 }
 
 auto
+batch_sizes(const int64_t nElements, const int64_t nodes) -> std::vector<int64_t>
+{
+    int64_t ave = nElements / nodes;
+
+    int64_t rem = nElements % nodes;
+
+    std::vector<int64_t> counts;
+
+    for (int64_t p = 0; p < nodes; p++)
+    {
+        counts.push_back((p < rem) ? (ave + 1) : ave);
+    }
+
+    return counts;
+}
+
+auto
+batch_offsets(const int64_t nElements, const int64_t nodes) -> std::vector<int64_t>
+{
+    auto counts = mathfunc::batch_sizes(nElements, nodes);
+
+    std::vector<int64_t> displs;
+
+    int64_t index = 0;
+
+    for (int64_t p = 0; p < nodes; p++)
+    {
+        displs.push_back(index);
+
+        index += counts[p];
+    }
+
+    return displs;
+}
+
+auto
 batch_size(const int64_t nElements, const int64_t rank, const int64_t nodes) -> int64_t
 {
-    int64_t numelem = nElements / nodes;
+    auto counts = mathfunc::batch_sizes(nElements, nodes);
 
-    int64_t nremind = nElements % nodes;
-
-    if ((nremind != 0) && (rank < nremind)) numelem++;
-
-    return numelem;
+    return counts[rank];
 }
 
 auto
 batch_offset(const int64_t nElements, const int64_t rank, const int64_t nodes) -> int64_t
 {
-    int64_t index = 0;
+    auto displs = mathfunc::batch_offsets(nElements, nodes);
 
-    for (int64_t i = 0; i < rank; i++)
-    {
-        index += mathfunc::batch_size(nElements, i, nodes);
-    }
-
-    return index;
+    return displs[rank];
 }
 
 }  // namespace mathfunc

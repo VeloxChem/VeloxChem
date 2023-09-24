@@ -25,6 +25,8 @@
 
 #include "GridDriver.hpp"
 
+#include <mpi.h>
+
 #include <array>
 #include <cmath>
 #include <sstream>
@@ -33,23 +35,31 @@
 #include "LebedevLaikovQuadrature.hpp"
 #include "Log3Quadrature.hpp"
 #include "MathConst.hpp"
+#include "MathFunc.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
+#include "MpiFunc.hpp"
 #include "PartitionFunc.hpp"
 #include "StringFormat.hpp"
 
-CGridDriver::CGridDriver()
+CGridDriver::CGridDriver(MPI_Comm comm)
 
     : _gridLevel(5)
 
     , _thresholdOfWeight(1.0e-15)
 {
+    _locComm = comm;
 }
 
 auto
 CGridDriver::setLevel(const int64_t gridLevel) -> void
 {
-    if ((gridLevel > 0) && (gridLevel < 9)) _gridLevel = gridLevel;
+    if (mpi::rank(_locComm) == mpi::master())
+    {
+        if ((gridLevel > 0) && (gridLevel < 9)) _gridLevel = gridLevel;
+    }
+
+    _gridLevel = mpi::bcastScalar(_gridLevel, _locComm);
 }
 
 auto
@@ -61,7 +71,7 @@ CGridDriver::generate(const CMolecule& molecule) const -> CMolecularGrid
 
     molgrid.partitionGridPoints();
 
-    // TODO: distribute grid over MPI
+    molgrid.distributeCountsAndDisplacements(_locComm);
 
     return molgrid;
 }
@@ -263,11 +273,15 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
 
     auto molrm = mdist.data();
 
-    // determine dimensions of atoms batch (TODO: MPI)
+    // determine dimensions of atoms batch for each MPI process
 
-    auto nodatm = natoms;
+    auto rank = mpi::rank(_locComm);
 
-    int64_t nodoff = 0;
+    auto nodes = mpi::nodes(_locComm);
+
+    auto nodatm = mathfunc::batch_size(natoms, rank, nodes);
+
+    auto nodoff = mathfunc::batch_offset(natoms, rank, nodes);
 
     // allocate raw grid
 
@@ -309,7 +323,9 @@ CGridDriver::_genGridPoints(const CMolecule& molecule) const -> CMolecularGrid
 
     delete rawgrid;
 
-    return CMolecularGrid(prngrid);
+    auto gathered_prngrid = mpi::gatherDenseMatricesByColumns(prngrid, _locComm);
+
+    return CMolecularGrid(gathered_prngrid);
 }
 
 auto

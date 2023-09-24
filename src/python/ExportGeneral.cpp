@@ -1,16 +1,42 @@
 #include "ExportGeneral.hpp"
 
+#include <mpi.h>
+// see here: https://github.com/mpi4py/mpi4py/issues/19#issuecomment-768143143
+#ifdef MSMPI_VER
+#define PyMPI_HAVE_MPI_Message 1
+#endif
+#include <mpi4py/mpi4py.h>
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
+#include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include "BatchFunc.hpp"
 #include "Codata.hpp"
 #include "GtoBlock.hpp"
+#include "MpiFunc.hpp"
 #include "OpenMPFunc.hpp"
 #include "StringFormat.hpp"
 
+namespace py = pybind11;
+using namespace py::literals;
+
 namespace vlx_general {  // vlx_general namespace
+
+// Gets MPI_Comm pointer from a mpi4py communicator object
+// Not a static function; used in other files
+
+MPI_Comm*
+get_mpi_comm(py::object py_comm)
+{
+    auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
+
+    if (!comm_ptr) throw py::error_already_set();
+
+    return comm_ptr;
+}
+
+// Gets shape and strides from dimension
 
 static auto
 get_shape_and_strides(const std::vector<int64_t>& dimension) -> std::tuple<std::vector<py::ssize_t>, std::vector<py::ssize_t>>
@@ -34,6 +60,9 @@ get_shape_and_strides(const std::vector<int64_t>& dimension) -> std::tuple<std::
     return {shape, strides};
 }
 
+// Creates numpy ndarray from pointer and dimension
+// Not a static function; used in other files
+
 auto
 pointer_to_numpy(const double* ptr, const std::vector<int64_t>& dimension) -> py::array_t<double>
 {
@@ -54,6 +83,15 @@ pointer_to_numpy(const double* ptr, const std::vector<int64_t>& dimension) -> py
 auto
 export_general(py::module& m) -> void
 {
+    // initialize mpi4py's C-API
+
+    if (import_mpi4py() < 0)
+    {
+        // mpi4py calls the Python C API
+        // we let pybind11 give us the detailed traceback
+        throw py::error_already_set();
+    }
+
     // exposing enum from FmtType.hpp
 
     py::enum_<fmt_t>(m, "fmt_t").value("center", fmt_t::center).value("left", fmt_t::left).value("right", fmt_t::right);
@@ -121,6 +159,37 @@ export_general(py::module& m) -> void
         "to_angular_momentum",
         [](const std::string& label) -> int64_t { return fstr::to_AngularMomentum(label); },
         "Converts angular momentum string to integer.");
+
+    m.def("mpi_master", &mpi::master, "Returns rank of MPI master process.");
+
+    m.def(
+        "bcast_scalar",
+        [](const int64_t val, py::object py_comm) -> int64_t { return mpi::bcastScalar(val, *get_mpi_comm(py_comm)); },
+        "Broadcasts scalar.");
+
+    m.def(
+        "bcast_scalar",
+        [](const double val, py::object py_comm) -> double { return mpi::bcastScalar(val, *get_mpi_comm(py_comm)); },
+        "Broadcasts scalar.");
+
+    m.def(
+        "bcast_dense_matrix",
+        [](const CDenseMatrix& matrix, py::object py_comm) -> CDenseMatrix { return mpi::bcastDenseMatrix(matrix, *get_mpi_comm(py_comm)); },
+        "Broadcasts dense matrix.");
+
+    m.def(
+        "scatter_vector",
+        [](const std::vector<int64_t>& vec, py::object py_comm) -> std::vector<int64_t> {
+            return mpi::scatterStdVector(vec, *get_mpi_comm(py_comm));
+        },
+        "Scatters vector.");
+
+    m.def(
+        "gather_dense_matrices_by_columns",
+        [](const CDenseMatrix& matrix, py::object py_comm) -> CDenseMatrix {
+            return mpi::gatherDenseMatricesByColumns(matrix, *get_mpi_comm(py_comm));
+        },
+        "Gathers dense matrices by columns.");
 }
 
 }  // namespace vlx_general

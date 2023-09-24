@@ -34,6 +34,8 @@
 #include <string>
 #include <vector>
 
+#include "DenseMatrix.hpp"
+
 namespace mpi {
 
 /**
@@ -101,6 +103,51 @@ auto rank(MPI_Comm comm) -> int64_t;
  @return the number of MPI processes.
  */
 auto nodes(MPI_Comm comm) -> int64_t;
+
+/**
+ Broadcasts scalar.
+
+ @param val the scalar.
+ @param comm the MPI communicator.
+ @return the broadcast scalar.
+ */
+auto bcastScalar(const int64_t val, MPI_Comm comm) -> int64_t;
+
+/**
+ Broadcasts scalar.
+
+ @param val the scalar.
+ @param comm the MPI communicator.
+ @return the broadcast scalar.
+ */
+auto bcastScalar(const double val, MPI_Comm comm) -> double;
+
+/**
+ Broadcasts dense matrix.
+
+ @param matrix the dense matrix.
+ @param comm the MPI communicator.
+ @return the broadcast dense matrix.
+ */
+auto bcastDenseMatrix(const CDenseMatrix& matrix, MPI_Comm comm) -> CDenseMatrix;
+
+/**
+ Scatters std vector.
+
+ @param vec the std vector.
+ @param comm the MPI communicator.
+ @return the scattered vector.
+ */
+auto scatterStdVector(const std::vector<int64_t>& vec, MPI_Comm comm) -> std::vector<int64_t>;
+
+/**
+ Gathers a dense matrix by columns.
+
+ @param matrix the dense matrix.
+ @param comm the MPI communicator.
+ @return the gathered dense matrix.
+ */
+auto gatherDenseMatricesByColumns(const CDenseMatrix& matrix, MPI_Comm comm) -> CDenseMatrix;
 
 }  // namespace mpi
 

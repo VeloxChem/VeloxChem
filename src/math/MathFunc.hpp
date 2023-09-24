@@ -55,6 +55,24 @@ distance(const double aCoordX, const double aCoordY, const double aCoordZ, const
 }
 
 /**
+ Determines vector of batch sizes.
+
+ @param nElements the size of data vector.
+ @param nodes the number of threads or processes.
+ @return the vector of data batch sizes.
+ */
+auto batch_sizes(const int64_t nElements, const int64_t nodes) -> std::vector<int64_t>;
+
+/**
+ Determines vector of batch offsets.
+
+ @param nElements the number of elements in data vector.
+ @param nodes the number of threads or processes.
+ @return the vector of batch offsets.
+ */
+auto batch_offsets(const int64_t nElements, const int64_t nodes) -> std::vector<int64_t>;
+
+/**
  Determines batch size.
 
  @param nElements the size of data vector.
