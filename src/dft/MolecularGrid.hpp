@@ -30,7 +30,7 @@
 
 #include <array>
 #include <cstdint>
-#include <ostream>
+#include <string>
 #include <vector>
 
 #include "DenseMatrix.hpp"
@@ -240,15 +240,6 @@ class CMolecularGrid
      @return the maximum number of grid points in a grid box.
      */
     auto getMaxNumberOfGridPointsPerBox() const -> int64_t;
-
-    /**
-     Converts molecular grid object to text and insert it into output text
-     stream.
-
-     @param output the output text stream.
-     @param source the molecular grid.
-     */
-    friend std::ostream& operator<<(std::ostream& output, const CMolecularGrid& source);
 };
 
 #endif /* MolecularGrid_hpp */

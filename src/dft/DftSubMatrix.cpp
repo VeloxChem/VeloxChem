@@ -85,4 +85,31 @@ distributeSubMatrixToDenseMatrix(CDenseMatrix& matrix, const CDenseMatrix& subMa
     }
 }
 
+auto
+distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseMatrix& subMatrix, const std::vector<int64_t>& aoIndices) -> void
+{
+    const auto naos = aoKohnShamMatrix.getNumberOfRows();
+
+    const auto aocount = static_cast<int64_t>(aoIndices.size());
+
+    if (aocount <= naos)
+    {
+        for (int32_t row = 0; row < subMatrix.getNumberOfRows(); row++)
+        {
+            auto row_orig = aoIndices[row];
+
+            auto ksmat_row_orig = aoKohnShamMatrix.getPointerToAlphaValues() + row_orig * naos;
+
+            auto submat_row = subMatrix.row(row);
+
+            for (int32_t col = 0; col < subMatrix.getNumberOfColumns(); col++)
+            {
+                auto col_orig = aoIndices[col];
+
+                ksmat_row_orig[col_orig] += submat_row[col];
+            }
+        }
+    }
+}
+
 }  // namespace dftsubmat

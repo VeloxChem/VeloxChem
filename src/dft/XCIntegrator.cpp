@@ -39,31 +39,36 @@
 #include "DenseMatrix.hpp"
 #include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
+#include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
 #include "Prescreener.hpp"
+#include "StringFormat.hpp"
 
-CXCIntegrator::CXCIntegrator()
+CXCIntegrator::CXCIntegrator(MPI_Comm comm)
 
     : _screeningThresholdForGTOValues(1.0e-12)
 {
+    _locComm = comm;
 }
 
-CDenseMatrix
+auto
 CXCIntegrator::integrateVxcFock(const CMolecule&       molecule,
                                 const CMolecularBasis& basis,
                                 const CDenseMatrix&    densityMatrix,
-                                const CMolecularGrid&  molecularGrid) const
+                                const CMolecularGrid&  molecularGrid,
+                                const std::string&     flag) const -> CAOKohnShamMatrix
 {
-    return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid);
+    return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, flag);
 }
 
-CDenseMatrix
+auto
 CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
                                        const CMolecularBasis& basis,
                                        const CDenseMatrix&    densityMatrix,
-                                       const CMolecularGrid&  molecularGrid) const
+                                       const CMolecularGrid&  molecularGrid,
+                                       const std::string&     flag) const -> CAOKohnShamMatrix
 {
     // number of OpenMP threads
 
@@ -75,9 +80,15 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
 
+    std::string errnaos("XCIntegrator._integrateVxcFockForLDA: Inconsistent number of AOs");
+
+    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows()) && (naos == densityMatrix.getNumberOfColumns()), errnaos);
+
     // Kohn-Sham matrix
 
-    CDenseMatrix mat_Vxc(naos, naos);
+    bool closedshell = (fstr::upcase(flag) == std::string("CLOSEDSHELL"));
+
+    CAOKohnShamMatrix mat_Vxc(naos, naos, closedshell);
 
     // GTOs on grid points
 
@@ -199,7 +210,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
             // go through GTO blocks
 
-            for (int64_t i_block = 0; i_block < static_cast<int64_t>(gto_blocks.size()); i_block++)
+            for (size_t i_block = 0; i_block < gto_blocks.size(); i_block++)
             {
                 const auto& gto_block = gto_blocks[i_block];
 
@@ -226,15 +237,13 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
         std::vector<int64_t> aoinds;
 
-        for (int64_t i_block = 0; i_block < static_cast<int64_t>(gto_blocks.size()); i_block++)
+        for (const auto& pre_ao_inds : pre_ao_inds_blocks)
         {
-            const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
-
-            for (int64_t nu = 0; nu < static_cast<int64_t>(pre_ao_inds.size()); nu++)
+            for (const auto nu : pre_ao_inds)
             {
                 bool skip = true;
 
-                auto gaos_nu = gaos.row(pre_ao_inds[nu]);
+                auto gaos_nu = gaos.row(nu);
 
                 for (int64_t g = 0; g < npoints; g++)
                 {
@@ -245,7 +254,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
                     }
                 }
 
-                if (!skip) aoinds.push_back(pre_ao_inds[nu]);
+                if (!skip) aoinds.push_back(nu);
             }
         }
 
@@ -279,7 +288,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
         auto partial_mat_Vxc = _integratePartialVxcFockForLDA(local_weights, mat_chi, vrho);
 
-        dftsubmat::distributeSubMatrixToDenseMatrix(mat_Vxc, partial_mat_Vxc, aoinds);
+        dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds);
 
         for (int64_t g = 0; g < npoints; g++)
         {
@@ -344,13 +353,9 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
     xc_func_end(&_func);
 
-    // mat_Vxc.setNumberOfElectrons(nele);
+    mat_Vxc.setNumberOfElectrons(nele);
 
-    // mat_Vxc.setExchangeCorrelationEnergy(xcene);
-
-    std::cout << "nele: " << nele << std::endl;
-
-    std::cout << "xcene: " << xcene << std::endl;
+    mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
     return mat_Vxc;
 }

@@ -1,5 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
+    AOKohnShamMatrix.cpp
     LebedevLaikovQuadrature.cpp
     Log3Quadrature.cpp
     DensityGridGenerator.cpp

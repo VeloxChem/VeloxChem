@@ -28,6 +28,7 @@
 
 #include <vector>
 
+#include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 
 namespace dftsubmat {  // dftsubmat namespace
@@ -49,6 +50,15 @@ auto getSubDensityMatrix(const CDenseMatrix& densityMatrix, const std::vector<in
  @param aoIndices the index mapping from partial matrix to full matrix.
  */
 auto distributeSubMatrixToDenseMatrix(CDenseMatrix& matrix, const CDenseMatrix& subMatrix, const std::vector<int64_t>& aoIndices) -> void;
+
+/**
+ Distributes partial matrix to AO Kohn-Sham matrix.
+
+ @param matrix the AO Kohn-Sham matrix.
+ @param subMatrix the partial matrix.
+ @param aoIndices the index mapping from partial matrix to full matrix.
+ */
+auto distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseMatrix& subMatrix, const std::vector<int64_t>& aoIndices) -> void;
 
 }  // namespace dftsubmat
 

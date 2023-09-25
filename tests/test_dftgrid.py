@@ -2,7 +2,7 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 
-from veloxchem.veloxchemlib import GridDriver, XCIntegrator
+from veloxchem.veloxchemlib import GridDriver, XCIntegrator, DenseMatrix
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 
@@ -26,6 +26,8 @@ class TestDftGrid:
         grid_drv.set_level(1)
         mol_grid = grid_drv.generate(mol)
 
+        # test grid and GTO values
+
         gx = mol_grid.x_to_numpy()
         gy = mol_grid.y_to_numpy()
         gz = mol_grid.z_to_numpy()
@@ -47,3 +49,21 @@ class TestDftGrid:
 
         assert np.max(np.abs(grid_data - ref_grid_data)) < 1e-10
         assert np.max(np.abs(gto_data_slice - ref_gto_data_slice)) < 1e-10
+
+        # test KS matrix
+
+        dmat = DenseMatrix(np.load('dens.npz')['density'])
+        xcmat = xc_drv.integrate_vxc_fock(mol, bas, dmat, mol_grid,
+                                          'closedshell')
+
+        xcmat_np = comm.reduce(xcmat.alpha_to_numpy(), root=0)
+        xcmat_energy = comm.reduce(xcmat.get_energy(), root=0)
+        xcmat_electrons = comm.reduce(xcmat.get_electrons(), root=0)
+
+        if comm.Get_rank() == 0:
+            xcref = np.load('dens.npz')['ks']
+            energy_ref = -8.10594893202593
+            electrons_ref = 9.996583310662455
+            assert np.max(np.abs(xcmat_np - xcref)) < 1.0e-10
+            assert abs(xcmat_energy - energy_ref) < 1.0e-10
+            assert abs(xcmat_electrons - electrons_ref) < 1.0e-10

@@ -26,9 +26,12 @@
 #ifndef XCIntegrator_hpp
 #define XCIntegrator_hpp
 
+#include <mpi.h>
+
 #include <array>
 #include <string>
 
+#include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "GridBox.hpp"
 #include "GtoBlock.hpp"
@@ -49,6 +52,11 @@ class CXCIntegrator
     double _screeningThresholdForGTOValues;
 
     /**
+     The MPI communicator.
+     */
+    MPI_Comm _locComm;
+
+    /**
      Integrates first-order LDA exchange-correlation functional contribution to
      AO Kohn-Sham matrix.
 
@@ -61,15 +69,18 @@ class CXCIntegrator
     auto _integrateVxcFockForLDA(const CMolecule&       molecule,
                                  const CMolecularBasis& basis,
                                  const CDenseMatrix&    densityMatrix,
-                                 const CMolecularGrid&  molecularGrid) const -> CDenseMatrix;
+                                 const CMolecularGrid&  molecularGrid,
+                                 const std::string&     flag) const -> CAOKohnShamMatrix;
 
     auto _integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho) const -> CDenseMatrix;
 
    public:
     /**
      Creates an XC integrator object.
+
+     @param comm the MPI communicator.
      */
-    CXCIntegrator();
+    CXCIntegrator(MPI_Comm comm);
 
     /**
      Integrates first-order exchange-correlation functional contribution to AO
@@ -85,7 +96,8 @@ class CXCIntegrator
     auto integrateVxcFock(const CMolecule&       molecule,
                           const CMolecularBasis& basis,
                           const CDenseMatrix&    densityMatrix,
-                          const CMolecularGrid&  molecularGrid) const -> CDenseMatrix;
+                          const CMolecularGrid&  molecularGrid,
+                          const std::string&     flag) const -> CAOKohnShamMatrix;
 
     /**
      Computes GTOs values on grid points.

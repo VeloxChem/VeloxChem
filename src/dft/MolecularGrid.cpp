@@ -31,8 +31,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
-#include <sstream>
-#include <string>
 #include <utility>
 #include <vector>
 
@@ -391,22 +389,4 @@ auto
 CMolecularGrid::getMaxNumberOfGridPointsPerBox() const -> int64_t
 {
     return _maxNumberOfGridPointsPerBox;
-}
-
-std::ostream&
-operator<<(std::ostream& output, const CMolecularGrid& source)
-{
-    output << std::endl;
-
-    output << "[CMolecularGrid (Object):" << &source << "]" << std::endl;
-
-    output << "_isPartitioned: " << source._isPartitioned << std::endl;
-
-    output << "_isDistributed: " << source._isDistributed << std::endl;
-
-    output << "_gridPoints: " << std::endl;
-
-    output << source._gridPoints << std::endl;
-
-    return output;
 }
