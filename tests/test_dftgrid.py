@@ -52,7 +52,8 @@ class TestDftGrid:
 
         # test KS matrix
 
-        dmat = DenseMatrix(np.load('dens.npz')['density'])
+        npz_data = np.load(str(here / 'data' / 'h2o.dens.npz'))
+        dmat = DenseMatrix(npz_data['density'])
         xcmat = xc_drv.integrate_vxc_fock(mol, bas, dmat, mol_grid,
                                           'closedshell')
 
@@ -61,7 +62,7 @@ class TestDftGrid:
         xcmat_electrons = comm.reduce(xcmat.get_electrons(), root=0)
 
         if comm.Get_rank() == 0:
-            xcref = np.load('dens.npz')['ks']
+            xcref = npz_data['ks']
             energy_ref = -8.10594893202593
             electrons_ref = 9.996583310662455
             assert np.max(np.abs(xcmat_np - xcref)) < 1.0e-10
