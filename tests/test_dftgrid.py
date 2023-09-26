@@ -2,7 +2,8 @@ from mpi4py import MPI
 from pathlib import Path
 import numpy as np
 
-from veloxchem.veloxchemlib import GridDriver, XCIntegrator, DenseMatrix
+from veloxchem.veloxchemlib import GridDriver, XCIntegrator, AODensityMatrix
+from veloxchem.veloxchemlib import denmat
 from veloxchem.molecule import Molecule
 from veloxchem.molecularbasis import MolecularBasis
 
@@ -53,7 +54,7 @@ class TestDftGrid:
         # test KS matrix
 
         npz_data = np.load(str(here / 'data' / 'h2o.dens.npz'))
-        dmat = DenseMatrix(npz_data['density'])
+        dmat = AODensityMatrix([npz_data['density']], denmat.rest)
         xcmat = xc_drv.integrate_vxc_fock(mol, bas, dmat, mol_grid,
                                           'closedshell')
 

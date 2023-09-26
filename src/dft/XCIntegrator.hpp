@@ -31,6 +31,7 @@
 #include <array>
 #include <string>
 
+#include "AODensityMatrix.hpp"
 #include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "GridBox.hpp"
@@ -66,11 +67,11 @@ class CXCIntegrator
      @param molecularGrid the molecular grid.
      @return the AO Kohn-Sham matrix.
      */
-    auto _integrateVxcFockForLDA(const CMolecule&       molecule,
-                                 const CMolecularBasis& basis,
-                                 const CDenseMatrix&    densityMatrix,
-                                 const CMolecularGrid&  molecularGrid,
-                                 const std::string&     flag) const -> CAOKohnShamMatrix;
+    auto _integrateVxcFockForLDA(const CMolecule&        molecule,
+                                 const CMolecularBasis&  basis,
+                                 const CAODensityMatrix& densityMatrix,
+                                 const CMolecularGrid&   molecularGrid,
+                                 const std::string&      flag) const -> CAOKohnShamMatrix;
 
     auto _integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho) const -> CDenseMatrix;
 
@@ -93,11 +94,11 @@ class CXCIntegrator
      @param xcFuncLabel the label of exchange-correlation functional.
      @return the AO Kohn-Sham matrix.
      */
-    auto integrateVxcFock(const CMolecule&       molecule,
-                          const CMolecularBasis& basis,
-                          const CDenseMatrix&    densityMatrix,
-                          const CMolecularGrid&  molecularGrid,
-                          const std::string&     flag) const -> CAOKohnShamMatrix;
+    auto integrateVxcFock(const CMolecule&        molecule,
+                          const CMolecularBasis&  basis,
+                          const CAODensityMatrix& densityMatrix,
+                          const CMolecularGrid&   molecularGrid,
+                          const std::string&      xcFuncLabel) const -> CAOKohnShamMatrix;
 
     /**
      Computes GTOs values on grid points.

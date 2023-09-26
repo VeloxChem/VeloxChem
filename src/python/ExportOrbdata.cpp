@@ -251,6 +251,12 @@ export_orbdata(py::module &m)
 
     // CAODensityMatrix class
 
+    // clang-format off
+    py::enum_<denmat>(m, "denmat")
+        .value("rest", denmat::rest)
+        .value("unrest", denmat::unrest);
+    // clang-format on
+
     PyClass<CAODensityMatrix>(m, "AODensityMatrix")
         .def(py::init<>())
         .def(py::init<const CAODensityMatrix &>())

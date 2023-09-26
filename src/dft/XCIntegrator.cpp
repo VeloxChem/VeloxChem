@@ -54,21 +54,23 @@ CXCIntegrator::CXCIntegrator(MPI_Comm comm)
 }
 
 auto
-CXCIntegrator::integrateVxcFock(const CMolecule&       molecule,
-                                const CMolecularBasis& basis,
-                                const CDenseMatrix&    densityMatrix,
-                                const CMolecularGrid&  molecularGrid,
-                                const std::string&     flag) const -> CAOKohnShamMatrix
+CXCIntegrator::integrateVxcFock(const CMolecule&        molecule,
+                                const CMolecularBasis&  basis,
+                                const CAODensityMatrix& densityMatrix,
+                                const CMolecularGrid&   molecularGrid,
+                                const std::string&      xcFuncLabel) const -> CAOKohnShamMatrix
 {
+    auto flag = densityMatrix.isClosedShell() ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
+
     return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, flag);
 }
 
 auto
-CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
-                                       const CMolecularBasis& basis,
-                                       const CDenseMatrix&    densityMatrix,
-                                       const CMolecularGrid&  molecularGrid,
-                                       const std::string&     flag) const -> CAOKohnShamMatrix
+CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
+                                       const CMolecularBasis&  basis,
+                                       const CAODensityMatrix& densityMatrix,
+                                       const CMolecularGrid&   molecularGrid,
+                                       const std::string&      flag) const -> CAOKohnShamMatrix
 {
     // number of OpenMP threads
 
@@ -82,7 +84,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
     std::string errnaos("XCIntegrator._integrateVxcFockForLDA: Inconsistent number of AOs");
 
-    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows()) && (naos == densityMatrix.getNumberOfColumns()), errnaos);
+    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
 
     // Kohn-Sham matrix
 
@@ -273,7 +275,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&       molecule,
 
         // generate sub density matrix and density grid
 
-        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(densityMatrix, aoinds);
+        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds);
 
         dengridgen::generateDensityForLDA(rho, mat_chi, sub_dens_mat);
 
