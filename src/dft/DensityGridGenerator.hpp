@@ -42,6 +42,29 @@ namespace dengridgen {  // dengridgen namespace
  */
 auto generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix, CMultiTimer& timer) -> void;
 
+/**
+ Generates density for GGA.
+
+ @param rho the pointer to density.
+ @param rhograd the pointer to density gradient.
+ @param sigma the pointer to dot product of density gradient.
+ @param gtoValues the GTO values on grid points.
+ @param gtoValuesX the GTO X derivative values on grid points.
+ @param gtoValuesY the GTO Y derivative values on grid points.
+ @param gtoValuesZ the GTO Z derivative values on grid points.
+ @param densityMatrix the density matrix.
+ @param timer the timer.
+ */
+auto generateDensityForGGA(double*             rho,
+                           double*             rhograd,
+                           double*             sigma,
+                           const CDenseMatrix& gtoValues,
+                           const CDenseMatrix& gtoValuesX,
+                           const CDenseMatrix& gtoValuesY,
+                           const CDenseMatrix& gtoValuesZ,
+                           const CDenseMatrix& densityMatrix,
+                           CMultiTimer&        timer) -> void;
+
 }  // namespace dengridgen
 
 #endif /* DensityGridGenerator_hpp */

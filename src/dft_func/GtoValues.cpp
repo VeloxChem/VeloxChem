@@ -37,4 +37,21 @@ getGtoValuesForLda(const CGtoBlock&            gto_block,
     return CMatrix();
 }
 
+auto
+getGtoValuesForGga(const CGtoBlock&            gto_block,
+                   const std::vector<double>&  grid_coords_x,
+                   const std::vector<double>&  grid_coords_y,
+                   const std::vector<double>&  grid_coords_z,
+                   const std::vector<int64_t>& gtos_mask) -> CMatrix
+{
+    auto gto_ang = gto_block.getAngularMomentum();
+
+    if (gto_ang == 0)
+    {
+        return gtoval::getGgaValuesRecS(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
+
+    return CMatrix();
+}
+
 }  // namespace gtoval
