@@ -50,6 +50,10 @@ getGtoValuesForGga(const CGtoBlock&            gto_block,
     {
         return gtoval::getGgaValuesRecS(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
+    else if (gto_ang == 1)
+    {
+        return gtoval::getGgaValuesRecP(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+    }
 
     return CMatrix();
 }
