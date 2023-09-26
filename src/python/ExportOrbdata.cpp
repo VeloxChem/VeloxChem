@@ -263,7 +263,7 @@ export_orbdata(py::module &m)
         .def(py::init(&CAODensityMatrix_from_numpy_list))
         .def(
             "alpha_to_numpy",
-            [](const CAODensityMatrix &self, const int32_t iDensityMatrix) -> py::array_t<double> {
+            [](const CAODensityMatrix &self, const int64_t iDensityMatrix) -> py::array_t<double> {
                 auto numRows = self.getNumberOfRows(iDensityMatrix);
                 auto numCols = self.getNumberOfColumns(iDensityMatrix);
                 return vlx_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix), {numRows, numCols});
@@ -272,7 +272,7 @@ export_orbdata(py::module &m)
             "i_dens"_a)
         .def(
             "beta_to_numpy",
-            [](const CAODensityMatrix &self, const int32_t iDensityMatrix) -> py::array_t<double> {
+            [](const CAODensityMatrix &self, const int64_t iDensityMatrix) -> py::array_t<double> {
                 auto numRows = self.getNumberOfRows(iDensityMatrix);
                 auto numCols = self.getNumberOfColumns(iDensityMatrix);
                 return vlx_general::pointer_to_numpy(self.betaDensity(iDensityMatrix), {numRows, numCols});

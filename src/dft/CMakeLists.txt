@@ -8,8 +8,11 @@ target_sources(vlxobjs
     GridBox.cpp
     GridDriver.cpp
     GridPartitioner.cpp
+    GridScreener.cpp
     MolecularGrid.cpp
     PartitionFunc.cpp
+    XCComponent.cpp
+    XCFunctional.cpp
     XCIntegrator.cpp
   )
 

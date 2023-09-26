@@ -71,7 +71,7 @@ export_dft(py::module& m)
 
     PyClass<CAOKohnShamMatrix>(m, "AOKohnShamMatrix")
         .def(py::init<>())
-        .def(py::init<int32_t, int32_t, bool>(), "nrows"_a, "ncols"_a, "is_rest"_a)
+        .def(py::init<int64_t, int64_t, bool>(), "nrows"_a, "ncols"_a, "is_rest"_a)
         .def("get_alpha_matrix", &CAOKohnShamMatrix::getReferenceToAlphaKohnSham, "Gets constant reference to alpha-spin Kohn-Sham matrix.")
         .def("get_beta_matrix", &CAOKohnShamMatrix::getReferenceToBetaKohnSham, "Gets constant reference to beta-spin Kohn-Sham matrix.")
         .def(

@@ -101,7 +101,7 @@ distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseM
 
     if (aocount <= naos)
     {
-        for (int32_t row = 0; row < subMatrix.getNumberOfRows(); row++)
+        for (int64_t row = 0; row < subMatrix.getNumberOfRows(); row++)
         {
             auto row_orig = aoIndices[row];
 
@@ -109,7 +109,7 @@ distributeSubMatrixToKohnSham(CAOKohnShamMatrix& aoKohnShamMatrix, const CDenseM
 
             auto submat_row = subMatrix.row(row);
 
-            for (int32_t col = 0; col < subMatrix.getNumberOfColumns(); col++)
+            for (int64_t col = 0; col < subMatrix.getNumberOfColumns(); col++)
             {
                 auto col_orig = aoIndices[col];
 
