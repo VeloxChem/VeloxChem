@@ -23,25 +23,58 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef DensityGridGenerator_hpp
-#define DensityGridGenerator_hpp
+#ifndef MultiTimer_hpp
+#define MultiTimer_hpp
 
-#include "DenseLinearAlgebra.hpp"
-#include "DenseMatrix.hpp"
-#include "MultiTimer.hpp"
+#include <string>
+#include <vector>
 
-namespace dengridgen {  // dengridgen namespace
+#include "Timer.hpp"
 
 /**
- Generates density for LDA.
+ Class CMultiTimer implements timer with multiple timing.
 
- @param rho the pointer to density.
- @param gtoValues the GTO values on grid points.
- @param densityMatrix the density matrix.
- @param timer the timer.
+ @author X. Li
  */
-auto generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix, CMultiTimer& timer) -> void;
+class CMultiTimer
+{
+    /**
+     The lables of the timers.
+     */
+    std::vector<std::string> _labels;
 
-}  // namespace dengridgen
+    /**
+     The timers.
+     */
+    std::vector<CTimer> _timers;
 
-#endif /* DensityGridGenerator_hpp */
+   public:
+    /**
+     Creates a timer object.
+     */
+    CMultiTimer();
+
+    /**
+     Clears the multi-timer.
+     */
+    void clear();
+
+    /**
+     Starts a timer with a label.
+     */
+    void start(const std::string& label);
+
+    /**
+     Stops a timer with a label.
+     */
+    void stop(const std::string& label);
+
+    /**
+     Gets a summary of elapsed time (accumulated).
+
+     @return the summary as a string.
+     */
+    std::string getSummary() const;
+};
+
+#endif /* MultiTimer_hpp */

@@ -44,6 +44,7 @@
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
+#include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "StringFormat.hpp"
 
@@ -67,10 +68,11 @@ CXCIntegrator::integrateVxcFock(const CMolecule&        molecule,
 
     auto flag = densityMatrix.isClosedShell() ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
 
-    if (xcfuntype == xcfun::lda)
-    {
-        return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
-    }
+    if (xcfuntype == xcfun::lda) return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
+
+    std::string errxcfuntype("XCIntegrator.integrateVxcFock: Only implemented for LDA");
+
+    errors::assertMsgCritical(false, errxcfuntype);
 
     return CAOKohnShamMatrix();
 }
@@ -83,9 +85,15 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
                                        const CXCFunctional&    xcFunctional,
                                        const std::string&      flag) const -> CAOKohnShamMatrix
 {
-    // number of OpenMP threads
+    CMultiTimer timer;
+
+    timer.start("Total timing");
+
+    timer.start("Preparation");
 
     auto nthreads = omp_get_max_threads();
+
+    std::vector<CMultiTimer> omptimers(nthreads);
 
     // GTOs blocks and number of AOs
 
@@ -103,39 +111,25 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     CAOKohnShamMatrix mat_Vxc(naos, naos, closedshell);
 
+    mat_Vxc.zero();
+
     // GTOs on grid points
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
     CDenseMatrix gaos(naos, max_npoints_per_box);
 
-    /*
     // density and functional derivatives
 
     auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
-    CMemBlock<double> local_weights_data(max_npoints_per_box);
-
-    CMemBlock<double> rho_data(dim->rho * max_npoints_per_box);
-
-    CMemBlock<double> exc_data(dim->zk * max_npoints_per_box);
-    CMemBlock<double> vrho_data(dim->vrho * max_npoints_per_box);
-
-    auto local_weights = local_weights_data.data();
-
-    auto rho = rho_data.data();
-
-    auto exc  = exc_data.data();
-    auto vrho = vrho_data.data();
-    */
-
     std::vector<double> local_weights_data(max_npoints_per_box);
 
-    std::vector<double> rho_data(2 * max_npoints_per_box);
+    std::vector<double> rho_data(dim->rho * max_npoints_per_box);
 
-    std::vector<double> exc_data(1 * max_npoints_per_box);
-    std::vector<double> vrho_data(2 * max_npoints_per_box);
+    std::vector<double> exc_data(dim->zk * max_npoints_per_box);
+    std::vector<double> vrho_data(dim->vrho * max_npoints_per_box);
 
     auto local_weights = local_weights_data.data();
 
@@ -162,11 +156,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
-    xc_func_type _func;
-
-    auto funcID = xc_functional_get_number(std::string("LDA_X").c_str());
-
-    auto xc_err = xc_func_init(&_func, funcID, XC_POLARIZED);
+    timer.stop("Preparation");
 
     for (int64_t box_id = 0; box_id < counts.size(); box_id++)
     {
@@ -181,6 +171,8 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
         auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // prescreening
+
+        timer.start("GTO pre-screening");
 
         std::vector<std::vector<int64_t>> cgto_masks, ao_masks, pre_ao_inds_blocks;
 
@@ -205,9 +197,17 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
             pre_ao_inds_blocks.push_back(pre_ao_inds);
         }
 
+        timer.stop("GTO pre-screening");
+
+        // GTO values on grid points
+
+        timer.start("OMP GTO evaluation");
+
 #pragma omp parallel
         {
             auto thread_id = omp_get_thread_num();
+
+            omptimers[thread_id].start("gtoeval");
 
             auto grid_batch_size = mathfunc::batch_size(npoints, thread_id, nthreads);
 
@@ -244,9 +244,15 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
                     std::memcpy(gaos.row(pre_ao_inds[nu]) + grid_batch_offset, submat_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                 }
             }
+
+            omptimers[thread_id].stop("gtoeval");
         }
 
+        timer.stop("OMP GTO evaluation");
+
         // post-screening
+
+        timer.start("GTO screening");
 
         std::vector<int64_t> aoinds;
 
@@ -282,75 +288,61 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
             std::memcpy(mat_chi.row(i), gaos.row(aoinds[i]), npoints * sizeof(double));
         }
 
+        timer.stop("GTO screening");
+
         if (aocount == 0) continue;
 
         // generate sub density matrix and density grid
 
-        auto sub_dens_mat = dftsubmat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds);
+        if (closedshell)
+        {
+            timer.start("Density matrix slicing");
 
-        dengridgen::generateDensityForLDA(rho, mat_chi, sub_dens_mat);
+            auto sub_dens_mat = dftsubmat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds);
+
+            timer.stop("Density matrix slicing");
+
+            dengridgen::generateDensityForLDA(rho, mat_chi, sub_dens_mat, timer);
+        }
+        else
+        {
+            // TODO: openshell
+        }
 
         // compute exchange-correlation functional derivative
 
-        xc_lda_exc_vxc(&_func, npoints, rho, exc, vrho);
+        timer.start("XC functional eval.");
+
+        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
         for (int64_t g = 0; g < npoints; g++)
         {
             local_weights[g] = weights[gridblockpos + g];
         }
 
-        auto partial_mat_Vxc = _integratePartialVxcFockForLDA(local_weights, mat_chi, vrho);
-
-        dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds);
-
-        for (int64_t g = 0; g < npoints; g++)
-        {
-            auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
-
-            nele += local_weights[g] * rho_total;
-
-            xcene += local_weights[g] * exc[g] * rho_total;
-        }
-
-        /*
-        timer.start("XC functional eval.");
-
-        xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
-
-        gridscreen::copyWeights(local_weights, gridblockpos, weights, npoints);
-
         timer.stop("XC functional eval.");
-        */
 
-        /*
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
 
         if (closedshell)
         {
-            auto partial_mat_Vxc = _integratePartialVxcFockForLDA(npoints, local_weights, mat_chi, vrho, timer);
+            auto partial_mat_Vxc = _integratePartialVxcFockForLDA(local_weights, mat_chi, vrho, timer);
 
             timer.start("Vxc matrix dist.");
 
-            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds, aocount, naos);
+            dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds);
 
             timer.stop("Vxc matrix dist.");
         }
         else
         {
-            auto partial_mat_Vxc_ab = _integratePartialVxcFockForLDAOpenShell(npoints, local_weights, mat_chi, vrho, timer);
-
-            timer.start("Vxc matrix dist.");
-
-            submat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc_ab, aoinds, aocount, naos);
-
-            timer.stop("Vxc matrix dist.");
+            // TODO: openshell
         }
 
         // compute partial contribution to XC energy
 
         timer.start("XC energy");
-
         for (int64_t g = 0; g < npoints; g++)
         {
             auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
@@ -361,24 +353,36 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
         }
 
         timer.stop("XC energy");
-        */
     }
-
-    xc_func_end(&_func);
 
     mat_Vxc.setNumberOfElectrons(nele);
 
     mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
+    timer.stop("Total timing");
+
+    // std::cout << "Timing of new integrator" << std::endl;
+    // std::cout << "------------------------" << std::endl;
+    // std::cout << timer.getSummary() << std::endl;
+    // std::cout << "OpenMP timing" << std::endl;
+    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
+    // {
+    //     std::cout << "Thread " << thread_id << std::endl;
+    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
+    // }
+
     return mat_Vxc;
 }
 
 auto
-CXCIntegrator::_integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho) const -> CDenseMatrix
+CXCIntegrator::_integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer timer) const
+    -> CDenseMatrix
 {
     const auto npoints = gtoValues.getNumberOfColumns();
 
     // GTO values on grid points
+
+    timer.start("Vxc matrix G");
 
     auto chi_val = gtoValues.values();
 
@@ -410,7 +414,13 @@ CXCIntegrator::_integratePartialVxcFockForLDA(const double* weights, const CDens
         }
     }
 
+    timer.stop("Vxc matrix G");
+
+    timer.start("Vxc matrix matmul");
+
     auto mat_Vxc = denblas::multABt(gtoValues, mat_G);
+
+    timer.stop("Vxc matrix matmul");
 
     return mat_Vxc;
 }

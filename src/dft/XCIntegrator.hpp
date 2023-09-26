@@ -39,6 +39,7 @@
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
+#include "MultiTimer.hpp"
 #include "XCFunctional.hpp"
 
 /**
@@ -75,7 +76,18 @@ class CXCIntegrator
                                  const CXCFunctional&    xcFunctional,
                                  const std::string&      flag) const -> CAOKohnShamMatrix;
 
-    auto _integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho) const -> CDenseMatrix;
+    /**
+     Integrates LDA contribution to (first-order) Vxc matrix.
+
+     @param npoints the number of grid points.
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param vrho the 1st-order functional derivative wrt density.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
+    auto _integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer timer) const
+        -> CDenseMatrix;
 
    public:
     /**

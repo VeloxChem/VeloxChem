@@ -23,25 +23,61 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef DensityGridGenerator_hpp
-#define DensityGridGenerator_hpp
+#ifndef Timer_hpp
+#define Timer_hpp
 
-#include "DenseLinearAlgebra.hpp"
-#include "DenseMatrix.hpp"
-#include "MultiTimer.hpp"
-
-namespace dengridgen {  // dengridgen namespace
+#include <chrono>
+#include <string>
 
 /**
- Generates density for LDA.
+ Class CTimer implements timer.
 
- @param rho the pointer to density.
- @param gtoValues the GTO values on grid points.
- @param densityMatrix the density matrix.
- @param timer the timer.
+ @author X. Li
  */
-auto generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix, CMultiTimer& timer) -> void;
+class CTimer
+{
+    /**
+     The time duration (accumulated).
+     */
+    std::chrono::steady_clock::duration _duration;
 
-}  // namespace dengridgen
+    /**
+     Whether the timer has started.
+     */
+    bool _started;
 
-#endif /* DensityGridGenerator_hpp */
+    /**
+     The time point when the timer started.
+     */
+    std::chrono::steady_clock::time_point _startTime;
+
+   public:
+    /**
+     Creates a timer object.
+     */
+    CTimer();
+
+    /**
+     Resets the timer.
+     */
+    void reset();
+
+    /**
+     Starts the timer.
+     */
+    void start();
+
+    /**
+     Stops the timer.
+     */
+    void stop();
+
+    /**
+     Gets elapsed time (accumulated).
+
+     @return the elapsed time as a string.
+     */
+    std::string getElapsedTime() const;
+};
+
+#endif /* Timer_hpp */

@@ -23,25 +23,56 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef DensityGridGenerator_hpp
-#define DensityGridGenerator_hpp
+#include "Timer.hpp"
 
-#include "DenseLinearAlgebra.hpp"
-#include "DenseMatrix.hpp"
-#include "MultiTimer.hpp"
+#include <iomanip>
+#include <sstream>
 
-namespace dengridgen {  // dengridgen namespace
+CTimer::CTimer()
+{
+    reset();
+}
 
-/**
- Generates density for LDA.
+void
+CTimer::reset()
+{
+    auto t0 = std::chrono::steady_clock::now();
 
- @param rho the pointer to density.
- @param gtoValues the GTO values on grid points.
- @param densityMatrix the density matrix.
- @param timer the timer.
- */
-auto generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix, CMultiTimer& timer) -> void;
+    _duration = t0 - t0;
 
-}  // namespace dengridgen
+    _started = false;
+}
 
-#endif /* DensityGridGenerator_hpp */
+void
+CTimer::start()
+{
+    if (!_started)
+    {
+        _startTime = std::chrono::steady_clock::now();
+
+        _started = true;
+    }
+}
+
+void
+CTimer::stop()
+{
+    if (_started)
+    {
+        _duration += std::chrono::steady_clock::now() - _startTime;
+
+        _started = false;
+    }
+}
+
+std::string
+CTimer::getElapsedTime() const
+{
+    std::stringstream ss;
+
+    auto duration_double = std::chrono::duration_cast<std::chrono::duration<double>>(_duration);
+
+    ss << std::fixed << std::setw(15) << std::setprecision(3) << duration_double.count() << " sec";
+
+    return ss.str();
+}

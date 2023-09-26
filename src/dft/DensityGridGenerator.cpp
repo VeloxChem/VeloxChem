@@ -36,7 +36,7 @@
 namespace dengridgen {  // dengridgen namespace
 
 auto
-generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix) -> void
+generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMatrix& densityMatrix, CMultiTimer& timer) -> void
 {
     auto nthreads = omp_get_max_threads();
 
@@ -44,7 +44,13 @@ generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMa
 
     auto npoints = gtoValues.getNumberOfColumns();
 
+    timer.start("Density grid matmul");
+
     auto mat_F = denblas::multAB(densityMatrix, gtoValues);
+
+    timer.stop("Density grid matmul");
+
+    timer.start("Density grid rho");
 
     auto F_val = mat_F.values();
 
@@ -84,6 +90,8 @@ generateDensityForLDA(double* rho, const CDenseMatrix& gtoValues, const CDenseMa
             rho[2 * g + 1] = rho[2 * g + 0];
         }
     }
+
+    timer.stop("Density grid rho");
 }
 
 }  // namespace dengridgen
