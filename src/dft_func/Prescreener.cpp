@@ -208,7 +208,7 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int64_t gtoDeriv, const doubl
         }
     }
 
-    return std::make_tuple(cgto_mask, ao_mask);
+    return {cgto_mask, ao_mask};
 }
 
 }  // namespace prescr

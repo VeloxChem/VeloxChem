@@ -25,8 +25,6 @@
 
 #include "AOKohnShamMatrix.hpp"
 
-#include <mpi.h>
-
 #include <cmath>
 #include <string>
 

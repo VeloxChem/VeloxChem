@@ -84,7 +84,12 @@ export_math(py::module& m) -> void
 {
     // exposing enum from MatrixType.hpp
 
-    py::enum_<mat_t>(m, "mat_t").value("symm", mat_t::symm).value("antisymm", mat_t::antisymm).value("gen", mat_t::gen);
+    // clang-format off
+    py::enum_<mat_t>(m, "mat_t")
+        .value("symm", mat_t::symm)
+        .value("antisymm", mat_t::antisymm)
+        .value("gen", mat_t::gen);
+    // clang-format on
 
     // exposing functions from MathConst.hpp
 

@@ -1,3 +1,28 @@
+//
+//                              VELOXCHEM
+//         ----------------------------------------------------
+//                     An Electronic Structure Code
+//
+//  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
+//  Contact: https://veloxchem.org/contact
+//
+//  SPDX-License-Identifier: LGPL-3.0-or-later
+//
+//  This file is part of VeloxChem.
+//
+//  VeloxChem is free software: you can redistribute it and/or modify it under
+//  the terms of the GNU Lesser General Public License as published by the Free
+//  Software Foundation, either version 3 of the License, or (at your option)
+//  any later version.
+//
+//  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+//  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+//  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+//  License for more details.
+//
+//  You should have received a copy of the GNU Lesser General Public License
+//  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 #include "ExportGeneral.hpp"
 
 #include <mpi.h>
@@ -26,8 +51,8 @@ namespace vlx_general {  // vlx_general namespace
 // Gets MPI_Comm pointer from a mpi4py communicator object
 // Not a static function; used in other files
 
-MPI_Comm*
-get_mpi_comm(py::object py_comm)
+auto
+get_mpi_comm(py::object py_comm) -> MPI_Comm*
 {
     auto comm_ptr = PyMPIComm_Get(py_comm.ptr());
 
@@ -94,7 +119,12 @@ export_general(py::module& m) -> void
 
     // exposing enum from FmtType.hpp
 
-    py::enum_<fmt_t>(m, "fmt_t").value("center", fmt_t::center).value("left", fmt_t::left).value("right", fmt_t::right);
+    // clang-format off
+    py::enum_<fmt_t>(m, "fmt_t")
+        .value("center", fmt_t::center)
+        .value("left", fmt_t::left)
+        .value("right", fmt_t::right);
+    // clang-format on
 
     // exposing functions from Codata.hpp
 
@@ -159,6 +189,8 @@ export_general(py::module& m) -> void
         "to_angular_momentum",
         [](const std::string& label) -> int64_t { return fstr::to_AngularMomentum(label); },
         "Converts angular momentum string to integer.");
+
+    // exposing functions from MpiFunc.hpp
 
     m.def("mpi_master", &mpi::master, "Returns rank of MPI master process.");
 

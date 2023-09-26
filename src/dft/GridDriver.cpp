@@ -25,8 +25,6 @@
 
 #include "GridDriver.hpp"
 
-#include <mpi.h>
-
 #include <array>
 #include <cmath>
 #include <sstream>

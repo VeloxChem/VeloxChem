@@ -2,6 +2,7 @@
 
 #include <pybind11/numpy.h>
 #include <pybind11/operators.h>
+#include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include "AODensityMatrix.hpp"
@@ -262,7 +263,7 @@ export_orbdata(py::module &m)
                 return vlx_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix), {numRows, numCols});
             },
             "Converts alpha density matrix to numpy array.",
-            "iDensityMatrix"_a)
+            "i_dens"_a)
         .def(
             "beta_to_numpy",
             [](const CAODensityMatrix &self, const int32_t iDensityMatrix) -> py::array_t<double> {
@@ -271,7 +272,7 @@ export_orbdata(py::module &m)
                 return vlx_general::pointer_to_numpy(self.betaDensity(iDensityMatrix), {numRows, numCols});
             },
             "Converts beta density matrix to numpy array.",
-            "iDensityMatrix"_a)
+            "i_dens"_a)
         .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices, "Gets number of density matrices.")
         .def("get_density_type", &CAODensityMatrix::getDensityType, "Gets type of density matrix.")
         .def(py::self == py::self);

@@ -151,7 +151,7 @@ export_dft(py::module& m)
             "Computes GTO values on grid points.",
             "molecule"_a,
             "basis"_a,
-            "molecularGrid"_a);
+            "molecular_grid"_a);
 }
 
 }  // namespace vlx_dft

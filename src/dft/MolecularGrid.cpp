@@ -25,8 +25,6 @@
 
 #include "MolecularGrid.hpp"
 
-#include <mpi.h>
-
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
