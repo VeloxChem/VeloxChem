@@ -56,7 +56,7 @@ class TestDftGrid:
         npz_data = np.load(str(here / 'data' / 'h2o.dens.npz'))
         dmat = AODensityMatrix([npz_data['density']], denmat.rest)
         xcmat = xc_drv.integrate_vxc_fock(mol, bas, dmat, mol_grid,
-                                          'closedshell')
+                                          'slater')
 
         xcmat_np = comm.reduce(xcmat.alpha_to_numpy(), root=0)
         xcmat_energy = comm.reduce(xcmat.get_energy(), root=0)

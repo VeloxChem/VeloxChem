@@ -35,8 +35,10 @@
 
 #include "AOKohnShamMatrix.hpp"
 #include "ExportGeneral.hpp"
+#include "FunctionalParser.hpp"
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
+#include "XCComponent.hpp"
 #include "XCIntegrator.hpp"
 
 namespace py = pybind11;
@@ -152,6 +154,23 @@ export_dft(py::module& m)
             "molecule"_a,
             "basis"_a,
             "molecular_grid"_a);
+
+    // XCComponent class
+    PyClass<CXCComponent>(m, "XCComponent")
+        .def(py::init<const std::string&, const double>(), "label"_a, "coeff"_a)
+        .def(py::init<const CXCComponent&>())
+        .def("get_scaling_factor", &CXCComponent::getScalingFactor, "Gets scaling factor of XC functional component.")
+        .def("get_label", &CXCComponent::getLabel, "Gets name of XC functional component.")
+        .def(py::self == py::self);
+
+    // exposing functions
+
+    m.def("available_functionals", &vxcfuncs::getAvailableFunctionals, "Gets a list of available exchange-correlation functionals.");
+
+    m.def("parse_xc_func",
+          &vxcfuncs::getExchangeCorrelationFunctional,
+          "Converts exchange-correlation functional label to exchange-correlation functional object.",
+          "xcLabel"_a);
 }
 
 }  // namespace vlx_dft

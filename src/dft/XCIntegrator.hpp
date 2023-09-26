@@ -39,6 +39,7 @@
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
+#include "XCFunctional.hpp"
 
 /**
  Class CXCIntegrator implements XC integrator.
@@ -71,6 +72,7 @@ class CXCIntegrator
                                  const CMolecularBasis&  basis,
                                  const CAODensityMatrix& densityMatrix,
                                  const CMolecularGrid&   molecularGrid,
+                                 const CXCFunctional&    xcFunctional,
                                  const std::string&      flag) const -> CAOKohnShamMatrix;
 
     auto _integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho) const -> CDenseMatrix;

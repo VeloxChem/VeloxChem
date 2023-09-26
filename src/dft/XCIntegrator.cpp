@@ -40,6 +40,7 @@
 #include "DensityGridGenerator.hpp"
 #include "DftSubMatrix.hpp"
 #include "ErrorHandler.hpp"
+#include "FunctionalParser.hpp"
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
@@ -60,9 +61,18 @@ CXCIntegrator::integrateVxcFock(const CMolecule&        molecule,
                                 const CMolecularGrid&   molecularGrid,
                                 const std::string&      xcFuncLabel) const -> CAOKohnShamMatrix
 {
+    auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
+
+    auto xcfuntype = fvxc.getFunctionalType();
+
     auto flag = densityMatrix.isClosedShell() ? std::string("CLOSEDSHELL") : std::string("OPENSHELL");
 
-    return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, flag);
+    if (xcfuntype == xcfun::lda)
+    {
+        return _integrateVxcFockForLDA(molecule, basis, densityMatrix, molecularGrid, fvxc, flag);
+    }
+
+    return CAOKohnShamMatrix();
 }
 
 auto
@@ -70,6 +80,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
                                        const CMolecularBasis&  basis,
                                        const CAODensityMatrix& densityMatrix,
                                        const CMolecularGrid&   molecularGrid,
+                                       const CXCFunctional&    xcFunctional,
                                        const std::string&      flag) const -> CAOKohnShamMatrix
 {
     // number of OpenMP threads

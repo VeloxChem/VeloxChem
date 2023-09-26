@@ -5,6 +5,7 @@ target_sources(vlxobjs
     Log3Quadrature.cpp
     DensityGridGenerator.cpp
     DftSubMatrix.cpp
+    FunctionalParser.cpp
     GridBox.cpp
     GridDriver.cpp
     GridPartitioner.cpp
