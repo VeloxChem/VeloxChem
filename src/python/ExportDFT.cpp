@@ -77,15 +77,13 @@ export_dft(py::module& m)
         .def(
             "alpha_to_numpy",
             [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
-                auto alphaMatrix = self.getReferenceToAlphaKohnSham();
-                return vlx_general::pointer_to_numpy(alphaMatrix.values(), {alphaMatrix.getNumberOfRows(), alphaMatrix.getNumberOfColumns()});
+                return vlx_general::pointer_to_numpy(self.getPointerToAlphaValues(), {self.getNumberOfRows(), self.getNumberOfColumns()});
             },
             "Converts alpha AOKohnShamMatrix to numpy array.")
         .def(
             "beta_to_numpy",
             [](const CAOKohnShamMatrix& self) -> py::array_t<double> {
-                auto betaMatrix = self.getReferenceToBetaKohnSham();
-                return vlx_general::pointer_to_numpy(betaMatrix.values(), {betaMatrix.getNumberOfRows(), betaMatrix.getNumberOfColumns()});
+                return vlx_general::pointer_to_numpy(self.getPointerToBetaValues(), {self.getNumberOfRows(), self.getNumberOfColumns()});
             },
             "Converts beta AOKohnShamMatrix to numpy array.")
         .def("get_electrons", &CAOKohnShamMatrix::getNumberOfElectrons, "Gets number of electrons obtained by integrating Kohn-Sham matrix.")

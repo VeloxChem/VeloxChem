@@ -1,17 +1,39 @@
 #include "ExportOrbdata.hpp"
 
+#include <pybind11/numpy.h>
 #include <pybind11/operators.h>
 #include <pybind11/stl.h>
 
+#include "AODensityMatrix.hpp"
 #include "AtomBasis.hpp"
 #include "BasisFunction.hpp"
+#include "ExportGeneral.hpp"
+#include "ExportMath.hpp"
 #include "GtoBlock.hpp"
-#include "GtoPairBlock.hpp"
 #include "GtoFunc.hpp"
+#include "GtoPairBlock.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
 
+namespace py = pybind11;
+using namespace py::literals;
+
 namespace vlx_orbdata {  // vlx_orbdata namespace
+
+// Helper function for CAODensityMatrix constructor
+
+static std::shared_ptr<CAODensityMatrix>
+CAODensityMatrix_from_numpy_list(const std::vector<py::array_t<double>> &arrays, const denmat den_type)
+{
+    std::vector<CDenseMatrix> dmat;
+
+    for (size_t i = 0; i < arrays.size(); i++)
+    {
+        dmat.push_back(*vlx_math::CDenseMatrix_from_numpy(arrays[i]));
+    }
+
+    return std::make_shared<CAODensityMatrix>(dmat, den_type);
+}
 
 // Exports classes/functions in src/orbdata to python
 
@@ -200,21 +222,21 @@ export_orbdata(py::module &m)
         .def("get_angular_momentum", &CGtoBlock::getAngularMomentum, "Gets angular momentum of GTOs block.")
         .def("number_of_primitives", &CGtoBlock::getNumberOfPrimitives, "Gets number of primitive GTOs in basis function.")
         .def("number_of_basis_functions", &CGtoBlock::getNumberOfBasisFunctions, "Gets number of GTOs in basis function block.");
-    
+
     // CGtoPairBlock class
 
     PyClass<CGtoPairBlock>(m, "GtoPairBlock")
         .def(py::init<>())
-        .def(py::init<const CGtoPairBlock&>())
-        .def(py::init<const std::vector<TPairOfPoints3D>&,
-                      const std::vector<TPoint2D>&,
-                      const std::vector<TPoint2D>&,
-                      const std::vector<T2Index>&,
-                      const std::vector<T2Index>&,
-                      const T2Index&,
+        .def(py::init<const CGtoPairBlock &>())
+        .def(py::init<const std::vector<TPairOfPoints3D> &,
+                      const std::vector<TPoint2D> &,
+                      const std::vector<TPoint2D> &,
+                      const std::vector<T2Index> &,
+                      const std::vector<T2Index> &,
+                      const T2Index &,
                       const int64_t>())
-        .def(py::init<const CGtoBlock&>())
-        .def(py::init<const CGtoBlock&, const CGtoBlock&>())
+        .def(py::init<const CGtoBlock &>())
+        .def(py::init<const CGtoBlock &, const CGtoBlock &>())
         .def("get_coordinates", &CGtoPairBlock::getCoordinates, "Gets vector of atoms pair coordinates.")
         .def("get_exponents", &CGtoPairBlock::getExponents, "Gets vector of basis function exponents pairs.")
         .def("get_normalization_factors", &CGtoPairBlock::getNormalizationFactors, "Gets vector of basis function normalization factors pairs.")
@@ -222,9 +244,37 @@ export_orbdata(py::module &m)
         .def("get_atomic_indexes", &CGtoPairBlock::getAtomicIndexes, "Gets vector of atomic index pairs.")
         .def("get_angular_momentum", &CGtoPairBlock::getAngularMomentums, "Gets angular momentum of GTOs pair.")
         .def("number_of_primitives", &CGtoPairBlock::getNumberOfPrimitivePairs, "Gets number of primitive GTO pairs in GTO pair.")
-        .def("number_of_basis_functions", &CGtoPairBlock::getNumberOfContractedPairs, "Gets number of contracted GTO pairs in basis function pairs block.");
+        .def("number_of_basis_functions",
+             &CGtoPairBlock::getNumberOfContractedPairs,
+             "Gets number of contracted GTO pairs in basis function pairs block.");
 
-    // ...
+    // CAODensityMatrix class
+
+    PyClass<CAODensityMatrix>(m, "AODensityMatrix")
+        .def(py::init<>())
+        .def(py::init<const CAODensityMatrix &>())
+        .def(py::init(&CAODensityMatrix_from_numpy_list))
+        .def(
+            "alpha_to_numpy",
+            [](const CAODensityMatrix &self, const int32_t iDensityMatrix) -> py::array_t<double> {
+                auto numRows = self.getNumberOfRows(iDensityMatrix);
+                auto numCols = self.getNumberOfColumns(iDensityMatrix);
+                return vlx_general::pointer_to_numpy(self.alphaDensity(iDensityMatrix), {numRows, numCols});
+            },
+            "Converts alpha density matrix to numpy array.",
+            "iDensityMatrix"_a)
+        .def(
+            "beta_to_numpy",
+            [](const CAODensityMatrix &self, const int32_t iDensityMatrix) -> py::array_t<double> {
+                auto numRows = self.getNumberOfRows(iDensityMatrix);
+                auto numCols = self.getNumberOfColumns(iDensityMatrix);
+                return vlx_general::pointer_to_numpy(self.betaDensity(iDensityMatrix), {numRows, numCols});
+            },
+            "Converts beta density matrix to numpy array.",
+            "iDensityMatrix"_a)
+        .def("number_of_density_matrices", &CAODensityMatrix::getNumberOfDensityMatrices, "Gets number of density matrices.")
+        .def("get_density_type", &CAODensityMatrix::getDensityType, "Gets type of density matrix.")
+        .def(py::self == py::self);
 }
 
 }  // namespace vlx_orbdata

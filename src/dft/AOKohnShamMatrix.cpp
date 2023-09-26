@@ -215,9 +215,23 @@ CAOKohnShamMatrix::getReferenceToBetaKohnSham() const -> const CDenseMatrix&
 }
 
 auto
+CAOKohnShamMatrix::getPointerToAlphaValues() const -> const double*
+{
+    return _xcMatrices[0].values();
+}
+
+auto
 CAOKohnShamMatrix::getPointerToAlphaValues() -> double*
 {
     return _xcMatrices[0].values();
+}
+
+auto
+CAOKohnShamMatrix::getPointerToBetaValues() const -> const double*
+{
+    if (_xcRestricted) return _xcMatrices[0].values();
+
+    return _xcMatrices[1].values();
 }
 
 auto

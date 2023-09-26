@@ -1,5 +1,6 @@
 target_sources(vlxobjs
   PRIVATE
+    AODensityMatrix.cpp
     AtomBasis.cpp
     GtoFunc.cpp
     MolecularBasis.cpp

@@ -200,11 +200,25 @@ class CAOKohnShamMatrix
     auto getReferenceToBetaKohnSham() const -> const CDenseMatrix&;
 
     /**
+     Gets const pointer to alpha-spin Kohn-Sham matrix data.
+
+     @return the const pointer to alpha-spin Kohn-Sham matrix data.
+     */
+    auto getPointerToAlphaValues() const -> const double*;
+
+    /**
      Gets pointer to alpha-spin Kohn-Sham matrix data.
 
      @return the pointer to alpha-spin Kohn-Sham matrix data.
      */
     auto getPointerToAlphaValues() -> double*;
+
+    /**
+     Gets const pointer to beta-spin Kohn-Sham matrix data.
+
+     @return the const pointer to beta-spin Kohn-Sham matrix data.
+     */
+    auto getPointerToBetaValues() const -> const double*;
 
     /**
      Gets pointer to beta-spin Kohn-Sham matrix data.

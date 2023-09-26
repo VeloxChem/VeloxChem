@@ -27,7 +27,7 @@ namespace vlx_math {  // vlx_math namespace
 
 // Helper function for CDenseMatrix constructor
 
-static auto
+auto
 CDenseMatrix_from_numpy(const py::array_t<double>& arr) -> std::shared_ptr<CDenseMatrix>
 {
     // check dimension
