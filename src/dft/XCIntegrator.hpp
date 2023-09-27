@@ -60,6 +60,11 @@ class CXCIntegrator
     MPI_Comm _locComm;
 
     /**
+     The timing summary.
+     */
+    std::string _timingSummary;
+
+    /**
      Integrates first-order LDA exchange-correlation functional contribution to
      AO Kohn-Sham matrix.
 
@@ -76,7 +81,7 @@ class CXCIntegrator
                                  const CAODensityMatrix& densityMatrix,
                                  const CMolecularGrid&   molecularGrid,
                                  const CXCFunctional&    xcFunctional,
-                                 const std::string&      flag = std::string("closedshell")) const -> CAOKohnShamMatrix;
+                                 const std::string&      flag = std::string("closedshell")) -> CAOKohnShamMatrix;
 
     /**
      Integrates first-order GGA exchange-correlation functional contribution to
@@ -95,7 +100,7 @@ class CXCIntegrator
                                  const CAODensityMatrix& densityMatrix,
                                  const CMolecularGrid&   molecularGrid,
                                  const CXCFunctional&    xcFunctional,
-                                 const std::string&      flag = std::string("closedshell")) const -> CAOKohnShamMatrix;
+                                 const std::string&      flag = std::string("closedshell")) -> CAOKohnShamMatrix;
 
     /**
      Integrates LDA contribution to (first-order) Vxc matrix.
@@ -133,6 +138,14 @@ class CXCIntegrator
                                         const double*       vsigma,
                                         CMultiTimer&        timer) const -> CDenseMatrix;
 
+    /**
+     Writes timing summary.
+
+     @param timer the timer.
+     @param omptimers the OpenMP timers.
+     */
+    auto _writeTimingSummary(const CMultiTimer& timer, const std::vector<CMultiTimer>& omptimers) -> void;
+
    public:
     /**
      Creates an XC integrator object.
@@ -156,7 +169,7 @@ class CXCIntegrator
                           const CMolecularBasis&  basis,
                           const CAODensityMatrix& densityMatrix,
                           const CMolecularGrid&   molecularGrid,
-                          const std::string&      xcFuncLabel) const -> CAOKohnShamMatrix;
+                          const std::string&      xcFuncLabel) -> CAOKohnShamMatrix;
 
     /**
      Computes GTOs values on grid points.
@@ -168,6 +181,13 @@ class CXCIntegrator
      */
     auto computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) const
         -> CDenseMatrix;
+
+    /**
+     Gets timing summary.
+
+     @return the timing summary.
+     */
+    auto getTimingSummary() const -> std::string;
 };
 
 #endif /* XCIntegrator_hpp */

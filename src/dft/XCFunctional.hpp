@@ -68,13 +68,13 @@ class CXCFunctional
     std::array<double, 3> _rangeSeparationParameters{0.0, 0.0, 0.0};
 
     /** Highest order of available derivatives. */
-    int32_t _maxDerivOrder{0};
+    int64_t _maxDerivOrder{0};
 
     /** Family of functional. */
     xcfun _familyOfFunctional{xcfun::lda};
 
     /** Leading dimension for initial allocation of staging buffer. */
-    int32_t _ldStaging{1024};
+    int64_t _ldStaging{1024};
 
     /** Buffer to stage output results from LibXC invocations. */
     double* _stagingBuffer{nullptr};
@@ -89,7 +89,7 @@ class CXCFunctional
     void _freeStagingBuffer();
 
     /** Gets indices and counts of derivatives.  */
-    std::unordered_map<std::string, std::array<int32_t, 2>> _getIndicesAndCountsOfDerivatives() const;
+    std::unordered_map<std::string, std::array<int64_t, 2>> _getIndicesAndCountsOfDerivatives() const;
 
    public:
     /** Creates an exchange-correlation functional object.
@@ -186,7 +186,7 @@ class CXCFunctional
      * @param[in,out] vrho values of the first derivative of the
      * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
      */
-    auto compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* zk, double* vrho) const -> void;
+    auto compute_exc_vxc_for_lda(const int64_t np, const double* rho, double* zk, double* vrho) const -> void;
 
     /** Computes first derivative of LDA exchange-correlation functional on grid.
      *
@@ -195,7 +195,7 @@ class CXCFunctional
      * @param[in,out] vrho values of the first derivative of the
      * exchange-correlation kernel wrt density. Size: 2*np, order: [(0), (1)].
      */
-    auto compute_vxc_for_lda(const int32_t np, const double* rho, double* vrho) const -> void;
+    auto compute_vxc_for_lda(const int64_t np, const double* rho, double* vrho) const -> void;
 
     /** Computes second derivative of LDA exchange-correlation functional on grid.
      *
@@ -205,7 +205,7 @@ class CXCFunctional
      * exchange-correlation kernel wrt density. Size: 3*np, order:
      * [(0, 0), (0, 1), (1, 1)].
      */
-    auto compute_fxc_for_lda(const int32_t np, const double* rho, double* v2rho2) const -> void;
+    auto compute_fxc_for_lda(const int64_t np, const double* rho, double* v2rho2) const -> void;
 
     /** Computes third derivative of LDA exchange-correlation functional on grid.
      *
@@ -215,7 +215,7 @@ class CXCFunctional
      * exchange-correlation kernel wrt density. Size: 4*np, order:
      * [(0, 0, 0), (0, 0, 1), (0, 1, 1), (1, 1, 1)].
      */
-    auto compute_kxc_for_lda(const int32_t np, const double* rho, double* v3rho3) const -> void;
+    auto compute_kxc_for_lda(const int64_t np, const double* rho, double* v3rho3) const -> void;
 
     /** Computes fourth derivative of LDA exchange-correlation functional on grid.
      *
@@ -225,7 +225,7 @@ class CXCFunctional
      * exchange-correlation kernel wrt density. Size: 5*np, order:
      * [(0, 0, 0, 0), (0, 0, 0, 1), (0, 0, 1, 1), (0, 1, 1, 1), (1, 1, 1, 1)].
      */
-    auto compute_lxc_for_lda(const int32_t np, const double* rho, double* v4rho4) const -> void;
+    auto compute_lxc_for_lda(const int64_t np, const double* rho, double* v4rho4) const -> void;
 
     /** Computes values and first derivative of GGA exchange-correlation functional on grid.
      *
@@ -238,7 +238,7 @@ class CXCFunctional
      * @param[in,out] vsigma values of the first derivative of the
      * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
      */
-    auto compute_exc_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* zk, double* vrho, double* vsigma) const -> void;
+    auto compute_exc_vxc_for_gga(const int64_t np, const double* rho, const double* sigma, double* zk, double* vrho, double* vsigma) const -> void;
 
     /** Computes first derivative of GGA exchange-correlation functional on grid.
      *
@@ -250,7 +250,7 @@ class CXCFunctional
      * @param[in,out] vsigma values of the first derivative of the
      * exchange-correlation kernel wrt contracted gradients. Size: 3*np, order: [(0), (1), (2)].
      */
-    auto compute_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void;
+    auto compute_vxc_for_gga(const int64_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void;
 
     /** Computes second derivative of GGA exchange-correlation functional on grid.
      *
@@ -267,7 +267,7 @@ class CXCFunctional
      * exchange-correlation kernel wrt contracted gradients. Size: 6*np, order:
      * [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)].
      */
-    auto compute_fxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const
+    auto compute_fxc_for_gga(const int64_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2) const
         -> void;
 
     /** Computes third derivative of GGA exchange-correlation functional on grid.
@@ -291,7 +291,7 @@ class CXCFunctional
      * exchange-correlation kernel wrt contracted gradients. Size: 10*np, order:
      * [(0, 0, 0), (0, 0, 1), (0, 0, 2), (0, 1, 1), (0, 1, 2), (0, 2, 2), (1, 1, 1), (1, 1, 2), (1, 2, 2), (2, 2, 2)]
      */
-    auto compute_kxc_for_gga(const int32_t np,
+    auto compute_kxc_for_gga(const int64_t np,
                              const double* rho,
                              const double* sigma,
                              double*       v3rho3,
@@ -327,7 +327,7 @@ class CXCFunctional
      * [(0,0,0,0),(0,0,0,1),(0,0,0,2),(0,0,1,1),(0,0,1,2),(0,0,2,2),(0,1,1,1),(0,1,1,2),
      *  (0,1,2,2),(0,2,2,2),(1,1,1,1),(1,1,1,2),(1,1,2,2),(1,2,2,2),(2,2,2,2)]
      */
-    auto compute_lxc_for_gga(const int32_t np,
+    auto compute_lxc_for_gga(const int64_t np,
                              const double* rho,
                              const double* sigma,
                              double*       v4rho4,
@@ -349,7 +349,7 @@ class CXCFunctional
      * @param[in,out] vlapl values of the first derivative
      * @param[in,out] vtau alues of the first derivative
      */
-    auto compute_exc_vxc_for_mgga(const int32_t np,
+    auto compute_exc_vxc_for_mgga(const int64_t np,
                                   const double* rho,
                                   const double* sigma,
                                   const double* lapl,
@@ -372,7 +372,7 @@ class CXCFunctional
      * @param[in,out] vlapl values of the first derivative
      * @param[in,out] vtau alues of the first derivative
      */
-    auto compute_vxc_for_mgga(const int32_t np,
+    auto compute_vxc_for_mgga(const int64_t np,
                               const double* rho,
                               const double* sigma,
                               const double* lapl,
@@ -400,7 +400,7 @@ class CXCFunctional
      * @param[in,out] v2lapltau values of the second derivative
      * @param[in,out] v2tau2 values of the second derivative
      */
-    auto compute_fxc_for_mgga(const int32_t np,
+    auto compute_fxc_for_mgga(const int64_t np,
                               const double* rho,
                               const double* sigma,
                               const double* lapl,
@@ -444,7 +444,7 @@ class CXCFunctional
      * @param[in,out] v3lapltau2 values of the third derivative
      * @param[in,out] v3tau3 values of the third derivative
      */
-    auto compute_kxc_for_mgga(const int32_t np,
+    auto compute_kxc_for_mgga(const int64_t np,
                               const double* rho,
                               const double* sigma,
                               const double* lapl,
@@ -513,7 +513,7 @@ class CXCFunctional
      * @param[in,out] v4lapltau3 values of the fourth derivative
      * @param[in,out] v4tau4 values of the fourth derivative
      */
-    auto compute_lxc_for_mgga(const int32_t np,
+    auto compute_lxc_for_mgga(const int64_t np,
                               const double* rho,
                               const double* sigma,
                               const double* lapl,
@@ -576,7 +576,7 @@ class CXCFunctional
      *
      * @return dimension of derivatives.
      */
-    const int32_t getDimensionOfDerivatives() const;
+    const int64_t getDimensionOfDerivatives() const;
 };
 
 #endif /* XCFunctional_hpp */

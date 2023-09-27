@@ -153,7 +153,8 @@ export_dft(py::module& m)
             "Computes GTO values on grid points.",
             "molecule"_a,
             "basis"_a,
-            "molecular_grid"_a);
+            "molecular_grid"_a)
+        .def("get_timing_summary", &CXCIntegrator::getTimingSummary, "Gets timing summary.");
 
     // XCComponent class
     PyClass<CXCComponent>(m, "XCComponent")

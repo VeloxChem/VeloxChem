@@ -32,7 +32,6 @@
 #include <cmath>
 #include <cstring>
 #include <iomanip>
-#include <iostream>
 #include <sstream>
 
 #include "DenseLinearAlgebra.hpp"
@@ -44,6 +43,7 @@
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
 #include "MathFunc.hpp"
+#include "MpiFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "StringFormat.hpp"
@@ -60,7 +60,7 @@ CXCIntegrator::integrateVxcFock(const CMolecule&        molecule,
                                 const CMolecularBasis&  basis,
                                 const CAODensityMatrix& densityMatrix,
                                 const CMolecularGrid&   molecularGrid,
-                                const std::string&      xcFuncLabel) const -> CAOKohnShamMatrix
+                                const std::string&      xcFuncLabel) -> CAOKohnShamMatrix
 {
     auto fvxc = vxcfuncs::getExchangeCorrelationFunctional(xcFuncLabel);
 
@@ -85,7 +85,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
                                        const CAODensityMatrix& densityMatrix,
                                        const CMolecularGrid&   molecularGrid,
                                        const CXCFunctional&    xcFunctional,
-                                       const std::string&      flag) const -> CAOKohnShamMatrix
+                                       const std::string&      flag) -> CAOKohnShamMatrix
 {
     CMultiTimer timer;
 
@@ -191,7 +191,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
             auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
 
-            for (int64_t i = 0; i < static_cast<int64_t>(gto_ao_inds.size()); i++)
+            for (size_t i = 0; i < gto_ao_inds.size(); i++)
             {
                 if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
             }
@@ -360,15 +360,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    _writeTimingSummary(timer, omptimers);
 
     return mat_Vxc;
 }
@@ -379,7 +371,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
                                        const CAODensityMatrix& densityMatrix,
                                        const CMolecularGrid&   molecularGrid,
                                        const CXCFunctional&    xcFunctional,
-                                       const std::string&      flag) const -> CAOKohnShamMatrix
+                                       const std::string&      flag) -> CAOKohnShamMatrix
 {
     CMultiTimer timer;
 
@@ -464,7 +456,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int32_t box_id = 0; box_id < counts.size(); box_id++)
+    for (int64_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -495,7 +487,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
 
-            for (int64_t i = 0; i < static_cast<int64_t>(gto_ao_inds.size()); i++)
+            for (size_t i = 0; i < gto_ao_inds.size(); i++)
             {
                 if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
             }
@@ -588,12 +580,16 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
                 for (int64_t g = 0; g < npoints; g++)
                 {
-                    if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                        (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) || (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
+                    // clang-format off
+                    if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
+                        (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
+                        (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
+                        (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
                     {
                         skip = false;
                         break;
                     }
+                    // clang-format on
                 }
 
                 if (!skip) aoinds.push_back(nu);
@@ -671,7 +667,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.start("XC energy");
 
-        for (int32_t g = 0; g < npoints; g++)
+        for (int64_t g = 0; g < npoints; g++)
         {
             auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
 
@@ -689,15 +685,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     timer.stop("Total timing");
 
-    // std::cout << "Timing of new integrator" << std::endl;
-    // std::cout << "------------------------" << std::endl;
-    // std::cout << timer.getSummary() << std::endl;
-    // std::cout << "OpenMP timing" << std::endl;
-    // for (int32_t thread_id = 0; thread_id < nthreads; thread_id++)
-    // {
-    //     std::cout << "Thread " << thread_id << std::endl;
-    //     std::cout << omptimers[thread_id].getSummary() << std::endl;
-    // }
+    _writeTimingSummary(timer, omptimers);
 
     return mat_Vxc;
 }
@@ -791,12 +779,12 @@ CXCIntegrator::_integratePartialVxcFockForGGA(const double*       weights,
 
         auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
-        for (int32_t nu = 0; nu < naos; nu++)
+        for (int64_t nu = 0; nu < naos; nu++)
         {
             auto nu_offset = nu * npoints;
 
 #pragma omp simd
-            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int64_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 auto vx = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 0] + vsigma[3 * g + 1] * rhograd[6 * g + 3];
                 auto vy = 2.0 * vsigma[3 * g + 0] * rhograd[6 * g + 1] + vsigma[3 * g + 1] * rhograd[6 * g + 4];
@@ -907,7 +895,7 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
                 auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
 
-                for (int64_t i = 0; i < static_cast<int64_t>(gto_ao_inds.size()); i++)
+                for (size_t i = 0; i < gto_ao_inds.size(); i++)
                 {
                     if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
                 }
@@ -931,4 +919,31 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
     }
 
     return allgtovalues;
+}
+
+auto
+CXCIntegrator::_writeTimingSummary(const CMultiTimer& timer, const std::vector<CMultiTimer>& omptimers) -> void
+{
+    std::stringstream ss;
+
+    // clang-format off
+    ss << "MPI rank " << mpi::rank(_locComm) << "\n";
+    ss << "Timing of new integrator" << "\n";
+    ss << "------------------------" << "\n";
+    ss << timer.getSummary() << "\n";
+    ss << "OpenMP timing" << "\n";
+    for (size_t thread_id = 0; thread_id < omptimers.size(); thread_id++)
+    {
+        ss << "Thread " << thread_id << "\n";
+        ss << omptimers[thread_id].getSummary() << "\n";
+    }
+    // clang-format on
+
+    _timingSummary = std::string(ss.str());
+}
+
+auto
+CXCIntegrator::getTimingSummary() const -> std::string
+{
+    return _timingSummary;
 }

@@ -58,7 +58,7 @@ CXCFunctional::CXCFunctional(const std::string&              nameOfFunctional,
 
     bool needLaplacian = false;
 
-    for (int32_t i = 0; i < static_cast<int32_t>(labels.size()); i++)
+    for (size_t i = 0; i < labels.size(); i++)
     {
         auto label = labels[i];
 
@@ -208,31 +208,31 @@ CXCFunctional::_freeStagingBuffer()
     }
 }
 
-std::unordered_map<std::string, std::array<int32_t, 2>>
+std::unordered_map<std::string, std::array<int64_t, 2>>
 CXCFunctional::_getIndicesAndCountsOfDerivatives() const
 {
-    std::unordered_map<std::string, std::array<int32_t, 2>> indices_and_counts;
+    std::unordered_map<std::string, std::array<int64_t, 2>> indices_and_counts;
 
     if (_familyOfFunctional == xcfun::lda)
     {
         auto       ldafunc = getFunctionalPointerToLdaComponent();
         const auto dim     = &(ldafunc->dim);
 
-        int32_t n_xc_outputs = 0;
+        int64_t n_xc_outputs = 0;
 
-        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        indices_and_counts["zk"] = std::array<int64_t, 2>({n_xc_outputs, dim->zk});
         n_xc_outputs += dim->zk;
 
-        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        indices_and_counts["vrho"] = std::array<int64_t, 2>({n_xc_outputs, dim->vrho});
         n_xc_outputs += dim->vrho;
 
-        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        indices_and_counts["v2rho2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2rho2});
         n_xc_outputs += dim->v2rho2;
 
-        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        indices_and_counts["v3rho3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rho3});
         n_xc_outputs += dim->v3rho3;
 
-        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        indices_and_counts["v4rho4"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho4});
         n_xc_outputs += dim->v4rho4;
     }
     else if (_familyOfFunctional == xcfun::gga)
@@ -240,41 +240,41 @@ CXCFunctional::_getIndicesAndCountsOfDerivatives() const
         auto       ggafunc = getFunctionalPointerToGgaComponent();
         const auto dim     = &(ggafunc->dim);
 
-        int32_t n_xc_outputs = 0;
+        int64_t n_xc_outputs = 0;
 
-        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        indices_and_counts["zk"] = std::array<int64_t, 2>({n_xc_outputs, dim->zk});
         n_xc_outputs += dim->zk;
 
-        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        indices_and_counts["vrho"] = std::array<int64_t, 2>({n_xc_outputs, dim->vrho});
         n_xc_outputs += dim->vrho;
-        indices_and_counts["vsigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->vsigma});
+        indices_and_counts["vsigma"] = std::array<int64_t, 2>({n_xc_outputs, dim->vsigma});
         n_xc_outputs += dim->vsigma;
 
-        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        indices_and_counts["v2rho2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2rho2});
         n_xc_outputs += dim->v2rho2;
-        indices_and_counts["v2rhosigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhosigma});
+        indices_and_counts["v2rhosigma"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2rhosigma});
         n_xc_outputs += dim->v2rhosigma;
-        indices_and_counts["v2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigma2});
+        indices_and_counts["v2sigma2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2sigma2});
         n_xc_outputs += dim->v2sigma2;
 
-        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        indices_and_counts["v3rho3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rho3});
         n_xc_outputs += dim->v3rho3;
-        indices_and_counts["v3rho2sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2sigma});
+        indices_and_counts["v3rho2sigma"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rho2sigma});
         n_xc_outputs += dim->v3rho2sigma;
-        indices_and_counts["v3rhosigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigma2});
+        indices_and_counts["v3rhosigma2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rhosigma2});
         n_xc_outputs += dim->v3rhosigma2;
-        indices_and_counts["v3sigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma3});
+        indices_and_counts["v3sigma3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3sigma3});
         n_xc_outputs += dim->v3sigma3;
 
-        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        indices_and_counts["v4rho4"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho4});
         n_xc_outputs += dim->v4rho4;
-        indices_and_counts["v4rho3sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3sigma});
+        indices_and_counts["v4rho3sigma"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho3sigma});
         n_xc_outputs += dim->v4rho3sigma;
-        indices_and_counts["v4rho2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigma2});
+        indices_and_counts["v4rho2sigma2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho2sigma2});
         n_xc_outputs += dim->v4rho2sigma2;
-        indices_and_counts["v4rhosigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma3});
+        indices_and_counts["v4rhosigma3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rhosigma3});
         n_xc_outputs += dim->v4rhosigma3;
-        indices_and_counts["v4sigma4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma4});
+        indices_and_counts["v4sigma4"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigma4});
         n_xc_outputs += dim->v4sigma4;
     }
     else if (_familyOfFunctional == xcfun::mgga)
@@ -282,151 +282,151 @@ CXCFunctional::_getIndicesAndCountsOfDerivatives() const
         auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
         const auto dim      = &(mggafunc->dim);
 
-        int32_t n_xc_outputs = 0;
+        int64_t n_xc_outputs = 0;
 
-        indices_and_counts["zk"] = std::array<int32_t, 2>({n_xc_outputs, dim->zk});
+        indices_and_counts["zk"] = std::array<int64_t, 2>({n_xc_outputs, dim->zk});
         n_xc_outputs += dim->zk;
 
-        indices_and_counts["vrho"] = std::array<int32_t, 2>({n_xc_outputs, dim->vrho});
+        indices_and_counts["vrho"] = std::array<int64_t, 2>({n_xc_outputs, dim->vrho});
         n_xc_outputs += dim->vrho;
-        indices_and_counts["vsigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->vsigma});
+        indices_and_counts["vsigma"] = std::array<int64_t, 2>({n_xc_outputs, dim->vsigma});
         n_xc_outputs += dim->vsigma;
-        indices_and_counts["vlapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->vlapl});
+        indices_and_counts["vlapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->vlapl});
         n_xc_outputs += dim->vlapl;
-        indices_and_counts["vtau"] = std::array<int32_t, 2>({n_xc_outputs, dim->vtau});
+        indices_and_counts["vtau"] = std::array<int64_t, 2>({n_xc_outputs, dim->vtau});
         n_xc_outputs += dim->vtau;
 
-        indices_and_counts["v2rho2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rho2});
+        indices_and_counts["v2rho2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2rho2});
         n_xc_outputs += dim->v2rho2;
-        indices_and_counts["v2rhosigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhosigma});
+        indices_and_counts["v2rhosigma"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2rhosigma});
         n_xc_outputs += dim->v2rhosigma;
-        indices_and_counts["v2rholapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rholapl});
+        indices_and_counts["v2rholapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2rholapl});
         n_xc_outputs += dim->v2rholapl;
-        indices_and_counts["v2rhotau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2rhotau});
+        indices_and_counts["v2rhotau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2rhotau});
         n_xc_outputs += dim->v2rhotau;
-        indices_and_counts["v2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigma2});
+        indices_and_counts["v2sigma2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2sigma2});
         n_xc_outputs += dim->v2sigma2;
-        indices_and_counts["v2sigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigmalapl});
+        indices_and_counts["v2sigmalapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2sigmalapl});
         n_xc_outputs += dim->v2sigmalapl;
-        indices_and_counts["v2sigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2sigmatau});
+        indices_and_counts["v2sigmatau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2sigmatau});
         n_xc_outputs += dim->v2sigmatau;
-        indices_and_counts["v2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2lapl2});
+        indices_and_counts["v2lapl2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2lapl2});
         n_xc_outputs += dim->v2lapl2;
-        indices_and_counts["v2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2lapltau});
+        indices_and_counts["v2lapltau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2lapltau});
         n_xc_outputs += dim->v2lapltau;
-        indices_and_counts["v2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v2tau2});
+        indices_and_counts["v2tau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v2tau2});
         n_xc_outputs += dim->v2tau2;
 
-        indices_and_counts["v3rho3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho3});
+        indices_and_counts["v3rho3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rho3});
         n_xc_outputs += dim->v3rho3;
-        indices_and_counts["v3rho2sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2sigma});
+        indices_and_counts["v3rho2sigma"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rho2sigma});
         n_xc_outputs += dim->v3rho2sigma;
-        indices_and_counts["v3rho2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2lapl});
+        indices_and_counts["v3rho2lapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rho2lapl});
         n_xc_outputs += dim->v3rho2lapl;
-        indices_and_counts["v3rho2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rho2tau});
+        indices_and_counts["v3rho2tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rho2tau});
         n_xc_outputs += dim->v3rho2tau;
-        indices_and_counts["v3rhosigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigma2});
+        indices_and_counts["v3rhosigma2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rhosigma2});
         n_xc_outputs += dim->v3rhosigma2;
-        indices_and_counts["v3rhosigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigmalapl});
+        indices_and_counts["v3rhosigmalapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rhosigmalapl});
         n_xc_outputs += dim->v3rhosigmalapl;
-        indices_and_counts["v3rhosigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhosigmatau});
+        indices_and_counts["v3rhosigmatau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rhosigmatau});
         n_xc_outputs += dim->v3rhosigmatau;
-        indices_and_counts["v3rholapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rholapl2});
+        indices_and_counts["v3rholapl2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rholapl2});
         n_xc_outputs += dim->v3rholapl2;
-        indices_and_counts["v3rholapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rholapltau});
+        indices_and_counts["v3rholapltau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rholapltau});
         n_xc_outputs += dim->v3rholapltau;
-        indices_and_counts["v3rhotau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3rhotau2});
+        indices_and_counts["v3rhotau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3rhotau2});
         n_xc_outputs += dim->v3rhotau2;
-        indices_and_counts["v3sigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma3});
+        indices_and_counts["v3sigma3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3sigma3});
         n_xc_outputs += dim->v3sigma3;
-        indices_and_counts["v3sigma2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma2lapl});
+        indices_and_counts["v3sigma2lapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3sigma2lapl});
         n_xc_outputs += dim->v3sigma2lapl;
-        indices_and_counts["v3sigma2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigma2tau});
+        indices_and_counts["v3sigma2tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3sigma2tau});
         n_xc_outputs += dim->v3sigma2tau;
-        indices_and_counts["v3sigmalapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmalapl2});
+        indices_and_counts["v3sigmalapl2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3sigmalapl2});
         n_xc_outputs += dim->v3sigmalapl2;
-        indices_and_counts["v3sigmalapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmalapltau});
+        indices_and_counts["v3sigmalapltau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3sigmalapltau});
         n_xc_outputs += dim->v3sigmalapltau;
-        indices_and_counts["v3sigmatau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3sigmatau2});
+        indices_and_counts["v3sigmatau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3sigmatau2});
         n_xc_outputs += dim->v3sigmatau2;
-        indices_and_counts["v3lapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapl3});
+        indices_and_counts["v3lapl3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3lapl3});
         n_xc_outputs += dim->v3lapl3;
-        indices_and_counts["v3lapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapl2tau});
+        indices_and_counts["v3lapl2tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3lapl2tau});
         n_xc_outputs += dim->v3lapl2tau;
-        indices_and_counts["v3lapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3lapltau2});
+        indices_and_counts["v3lapltau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3lapltau2});
         n_xc_outputs += dim->v3lapltau2;
-        indices_and_counts["v3tau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v3tau3});
+        indices_and_counts["v3tau3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v3tau3});
         n_xc_outputs += dim->v3tau3;
 
-        indices_and_counts["v4rho4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho4});
+        indices_and_counts["v4rho4"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho4});
         n_xc_outputs += dim->v4rho4;
-        indices_and_counts["v4rho3sigma"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3sigma});
+        indices_and_counts["v4rho3sigma"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho3sigma});
         n_xc_outputs += dim->v4rho3sigma;
-        indices_and_counts["v4rho3lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3lapl});
+        indices_and_counts["v4rho3lapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho3lapl});
         n_xc_outputs += dim->v4rho3lapl;
-        indices_and_counts["v4rho3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho3tau});
+        indices_and_counts["v4rho3tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho3tau});
         n_xc_outputs += dim->v4rho3tau;
-        indices_and_counts["v4rho2sigma2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigma2});
+        indices_and_counts["v4rho2sigma2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho2sigma2});
         n_xc_outputs += dim->v4rho2sigma2;
-        indices_and_counts["v4rho2sigmalapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigmalapl});
+        indices_and_counts["v4rho2sigmalapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho2sigmalapl});
         n_xc_outputs += dim->v4rho2sigmalapl;
-        indices_and_counts["v4rho2sigmatau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2sigmatau});
+        indices_and_counts["v4rho2sigmatau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho2sigmatau});
         n_xc_outputs += dim->v4rho2sigmatau;
-        indices_and_counts["v4rho2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2lapl2});
+        indices_and_counts["v4rho2lapl2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho2lapl2});
         n_xc_outputs += dim->v4rho2lapl2;
-        indices_and_counts["v4rho2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2lapltau});
+        indices_and_counts["v4rho2lapltau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho2lapltau});
         n_xc_outputs += dim->v4rho2lapltau;
-        indices_and_counts["v4rho2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rho2tau2});
+        indices_and_counts["v4rho2tau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rho2tau2});
         n_xc_outputs += dim->v4rho2tau2;
-        indices_and_counts["v4rhosigma3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma3});
+        indices_and_counts["v4rhosigma3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rhosigma3});
         n_xc_outputs += dim->v4rhosigma3;
-        indices_and_counts["v4rhosigma2lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma2lapl});
+        indices_and_counts["v4rhosigma2lapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rhosigma2lapl});
         n_xc_outputs += dim->v4rhosigma2lapl;
-        indices_and_counts["v4rhosigma2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigma2tau});
+        indices_and_counts["v4rhosigma2tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rhosigma2tau});
         n_xc_outputs += dim->v4rhosigma2tau;
-        indices_and_counts["v4rhosigmalapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmalapl2});
+        indices_and_counts["v4rhosigmalapl2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rhosigmalapl2});
         n_xc_outputs += dim->v4rhosigmalapl2;
-        indices_and_counts["v4rhosigmalapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmalapltau});
+        indices_and_counts["v4rhosigmalapltau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rhosigmalapltau});
         n_xc_outputs += dim->v4rhosigmalapltau;
-        indices_and_counts["v4rhosigmatau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhosigmatau2});
+        indices_and_counts["v4rhosigmatau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rhosigmatau2});
         n_xc_outputs += dim->v4rhosigmatau2;
-        indices_and_counts["v4rholapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapl3});
+        indices_and_counts["v4rholapl3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rholapl3});
         n_xc_outputs += dim->v4rholapl3;
-        indices_and_counts["v4rholapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapl2tau});
+        indices_and_counts["v4rholapl2tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rholapl2tau});
         n_xc_outputs += dim->v4rholapl2tau;
-        indices_and_counts["v4rholapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rholapltau2});
+        indices_and_counts["v4rholapltau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rholapltau2});
         n_xc_outputs += dim->v4rholapltau2;
-        indices_and_counts["v4rhotau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4rhotau3});
+        indices_and_counts["v4rhotau3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4rhotau3});
         n_xc_outputs += dim->v4rhotau3;
-        indices_and_counts["v4sigma4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma4});
+        indices_and_counts["v4sigma4"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigma4});
         n_xc_outputs += dim->v4sigma4;
-        indices_and_counts["v4sigma3lapl"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma3lapl});
+        indices_and_counts["v4sigma3lapl"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigma3lapl});
         n_xc_outputs += dim->v4sigma3lapl;
-        indices_and_counts["v4sigma3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma3tau});
+        indices_and_counts["v4sigma3tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigma3tau});
         n_xc_outputs += dim->v4sigma3tau;
-        indices_and_counts["v4sigma2lapl2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2lapl2});
+        indices_and_counts["v4sigma2lapl2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigma2lapl2});
         n_xc_outputs += dim->v4sigma2lapl2;
-        indices_and_counts["v4sigma2lapltau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2lapltau});
+        indices_and_counts["v4sigma2lapltau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigma2lapltau});
         n_xc_outputs += dim->v4sigma2lapltau;
-        indices_and_counts["v4sigma2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigma2tau2});
+        indices_and_counts["v4sigma2tau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigma2tau2});
         n_xc_outputs += dim->v4sigma2tau2;
-        indices_and_counts["v4sigmalapl3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapl3});
+        indices_and_counts["v4sigmalapl3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigmalapl3});
         n_xc_outputs += dim->v4sigmalapl3;
-        indices_and_counts["v4sigmalapl2tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapl2tau});
+        indices_and_counts["v4sigmalapl2tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigmalapl2tau});
         n_xc_outputs += dim->v4sigmalapl2tau;
-        indices_and_counts["v4sigmalapltau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmalapltau2});
+        indices_and_counts["v4sigmalapltau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigmalapltau2});
         n_xc_outputs += dim->v4sigmalapltau2;
-        indices_and_counts["v4sigmatau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4sigmatau3});
+        indices_and_counts["v4sigmatau3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4sigmatau3});
         n_xc_outputs += dim->v4sigmatau3;
-        indices_and_counts["v4lapl4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl4});
+        indices_and_counts["v4lapl4"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4lapl4});
         n_xc_outputs += dim->v4lapl4;
-        indices_and_counts["v4lapl3tau"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl3tau});
+        indices_and_counts["v4lapl3tau"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4lapl3tau});
         n_xc_outputs += dim->v4lapl3tau;
-        indices_and_counts["v4lapl2tau2"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapl2tau2});
+        indices_and_counts["v4lapl2tau2"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4lapl2tau2});
         n_xc_outputs += dim->v4lapl2tau2;
-        indices_and_counts["v4lapltau3"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4lapltau3});
+        indices_and_counts["v4lapltau3"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4lapltau3});
         n_xc_outputs += dim->v4lapltau3;
-        indices_and_counts["v4tau4"] = std::array<int32_t, 2>({n_xc_outputs, dim->v4tau4});
+        indices_and_counts["v4tau4"] = std::array<int64_t, 2>({n_xc_outputs, dim->v4tau4});
         n_xc_outputs += dim->v4tau4;
     }
 
@@ -544,7 +544,7 @@ CXCFunctional::getFractionOfExactExchange() const
 }
 
 auto
-CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, double* zk, double* vrho) const -> void
+CXCFunctional::compute_exc_vxc_for_lda(const int64_t np, const double* rho, double* zk, double* vrho) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Exc and Vxc on grid");
@@ -574,7 +574,7 @@ CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, doub
     auto       ldafunc = getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->zk; ++ind)
         {
@@ -598,7 +598,7 @@ CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, doub
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_zk, stage_vrho);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->zk; ++ind)
                 {
@@ -622,7 +622,7 @@ CXCFunctional::compute_exc_vxc_for_lda(const int32_t np, const double* rho, doub
 }
 
 auto
-CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* vrho) const -> void
+CXCFunctional::compute_vxc_for_lda(const int64_t np, const double* rho, double* vrho) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
@@ -649,7 +649,7 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
     auto       ldafunc = getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->vrho; ++ind)
         {
@@ -669,7 +669,7 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
         {
             xc_lda_vxc(funcptr, np, rho, stage_vrho);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->vrho; ++ind)
                 {
@@ -688,7 +688,7 @@ CXCFunctional::compute_vxc_for_lda(const int32_t np, const double* rho, double* 
 }
 
 auto
-CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* v2rho2) const -> void
+CXCFunctional::compute_fxc_for_lda(const int64_t np, const double* rho, double* v2rho2) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 2,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Fxc on grid");
@@ -715,7 +715,7 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
     auto       ldafunc = getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v2rho2; ++ind)
         {
@@ -735,7 +735,7 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
         {
             xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v2rho2; ++ind)
                 {
@@ -754,7 +754,7 @@ CXCFunctional::compute_fxc_for_lda(const int32_t np, const double* rho, double* 
 }
 
 auto
-CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* v3rho3) const -> void
+CXCFunctional::compute_kxc_for_lda(const int64_t np, const double* rho, double* v3rho3) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 3,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Kxc on grid");
@@ -781,7 +781,7 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
     auto       ldafunc = getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v3rho3; ++ind)
         {
@@ -801,7 +801,7 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
         {
             xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v3rho3; ++ind)
                 {
@@ -820,7 +820,7 @@ CXCFunctional::compute_kxc_for_lda(const int32_t np, const double* rho, double* 
 }
 
 auto
-CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* v4rho4) const -> void
+CXCFunctional::compute_lxc_for_lda(const int64_t np, const double* rho, double* v4rho4) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 4,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Lxc on grid");
@@ -847,7 +847,7 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
     auto       ldafunc = getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v4rho4; ++ind)
         {
@@ -867,7 +867,7 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
         {
             xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v4rho4; ++ind)
                 {
@@ -886,7 +886,7 @@ CXCFunctional::compute_lxc_for_lda(const int32_t np, const double* rho, double* 
 }
 
 auto
-CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* zk, double* vrho, double* vsigma) const
+CXCFunctional::compute_exc_vxc_for_gga(const int64_t np, const double* rho, const double* sigma, double* zk, double* vrho, double* vsigma) const
     -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
@@ -920,7 +920,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
     auto       ggafunc = getFunctionalPointerToGgaComponent();
     const auto dim     = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->zk; ++ind)
         {
@@ -948,7 +948,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_zk, stage_vrho);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->zk; ++ind)
                 {
@@ -964,7 +964,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
         {
             xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_zk, stage_vrho, stage_vsigma);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->zk; ++ind)
                 {
@@ -993,7 +993,7 @@ CXCFunctional::compute_exc_vxc_for_gga(const int32_t np, const double* rho, cons
 }
 
 auto
-CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
+CXCFunctional::compute_vxc_for_gga(const int64_t np, const double* rho, const double* sigma, double* vrho, double* vsigma) const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 1,
                               std::string(__func__) + ": exchange-correlation functional does not provide evaluators for Vxc on grid");
@@ -1023,7 +1023,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
     auto       ggafunc = getFunctionalPointerToGgaComponent();
     const auto dim     = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->vrho; ++ind)
         {
@@ -1047,7 +1047,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
         {
             xc_lda_vxc(funcptr, np, rho, stage_vrho);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->vrho; ++ind)
                 {
@@ -1059,7 +1059,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
         {
             xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->vrho; ++ind)
                 {
@@ -1083,7 +1083,7 @@ CXCFunctional::compute_vxc_for_gga(const int32_t np, const double* rho, const do
 }
 
 auto
-CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2)
+CXCFunctional::compute_fxc_for_gga(const int64_t np, const double* rho, const double* sigma, double* v2rho2, double* v2rhosigma, double* v2sigma2)
     const -> void
 {
     errors::assertMsgCritical(_maxDerivOrder >= 2,
@@ -1117,7 +1117,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
     auto       ggafunc = getFunctionalPointerToGgaComponent();
     const auto dim     = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v2rho2; ++ind)
         {
@@ -1145,7 +1145,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
         {
             xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v2rho2; ++ind)
                 {
@@ -1157,7 +1157,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
         {
             xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v2rho2; ++ind)
                 {
@@ -1186,7 +1186,7 @@ CXCFunctional::compute_fxc_for_gga(const int32_t np, const double* rho, const do
 }
 
 auto
-CXCFunctional::compute_kxc_for_gga(const int32_t np,
+CXCFunctional::compute_kxc_for_gga(const int64_t np,
                                    const double* rho,
                                    const double* sigma,
                                    double*       v3rho3,
@@ -1228,7 +1228,7 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
     auto       ggafunc = getFunctionalPointerToGgaComponent();
     const auto dim     = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v3rho3; ++ind)
         {
@@ -1260,7 +1260,7 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
         {
             xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v3rho3; ++ind)
                 {
@@ -1272,7 +1272,7 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
         {
             xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v3rho3; ++ind)
                 {
@@ -1306,7 +1306,7 @@ CXCFunctional::compute_kxc_for_gga(const int32_t np,
 }
 
 auto
-CXCFunctional::compute_lxc_for_gga(const int32_t np,
+CXCFunctional::compute_lxc_for_gga(const int64_t np,
                                    const double* rho,
                                    const double* sigma,
                                    double*       v4rho4,
@@ -1352,7 +1352,7 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
     auto       ggafunc = getFunctionalPointerToGgaComponent();
     const auto dim     = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v4rho4; ++ind)
         {
@@ -1388,7 +1388,7 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
         {
             xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v4rho4; ++ind)
                 {
@@ -1400,7 +1400,7 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
         {
             xc_gga_lxc(funcptr, np, rho, sigma, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v4rho4; ++ind)
                 {
@@ -1439,7 +1439,7 @@ CXCFunctional::compute_lxc_for_gga(const int32_t np,
 }
 
 auto
-CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
+CXCFunctional::compute_exc_vxc_for_mgga(const int64_t np,
                                         const double* rho,
                                         const double* sigma,
                                         const double* lapl,
@@ -1487,7 +1487,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
     auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
     const auto dim      = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->zk; ++ind)
         {
@@ -1523,7 +1523,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
         {
             xc_lda_exc_vxc(funcptr, np, rho, stage_zk, stage_vrho);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->zk; ++ind)
                 {
@@ -1539,7 +1539,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
         {
             xc_gga_exc_vxc(funcptr, np, rho, sigma, stage_zk, stage_vrho, stage_vsigma);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->zk; ++ind)
                 {
@@ -1559,7 +1559,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
         {
             xc_mgga_exc_vxc(funcptr, np, rho, sigma, lapl, tau, stage_zk, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->zk; ++ind)
                 {
@@ -1598,7 +1598,7 @@ CXCFunctional::compute_exc_vxc_for_mgga(const int32_t np,
 }
 
 auto
-CXCFunctional::compute_vxc_for_mgga(const int32_t np,
+CXCFunctional::compute_vxc_for_mgga(const int64_t np,
                                     const double* rho,
                                     const double* sigma,
                                     const double* lapl,
@@ -1642,7 +1642,7 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
     auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
     const auto dim      = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->vrho; ++ind)
         {
@@ -1674,7 +1674,7 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
         {
             xc_lda_vxc(funcptr, np, rho, stage_vrho);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->vrho; ++ind)
                 {
@@ -1686,7 +1686,7 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
         {
             xc_gga_vxc(funcptr, np, rho, sigma, stage_vrho, stage_vsigma);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->vrho; ++ind)
                 {
@@ -1702,7 +1702,7 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
         {
             xc_mgga_vxc(funcptr, np, rho, sigma, lapl, tau, stage_vrho, stage_vsigma, stage_vlapl, stage_vtau);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->vrho; ++ind)
                 {
@@ -1736,7 +1736,7 @@ CXCFunctional::compute_vxc_for_mgga(const int32_t np,
 }
 
 auto
-CXCFunctional::compute_fxc_for_mgga(const int32_t np,
+CXCFunctional::compute_fxc_for_mgga(const int64_t np,
                                     const double* rho,
                                     const double* sigma,
                                     const double* lapl,
@@ -1804,7 +1804,7 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
     auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
     const auto dim      = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v2rho2; ++ind)
         {
@@ -1860,7 +1860,7 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
         {
             xc_lda_fxc(funcptr, np, rho, stage_v2rho2);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v2rho2; ++ind)
                 {
@@ -1872,7 +1872,7 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
         {
             xc_gga_fxc(funcptr, np, rho, sigma, stage_v2rho2, stage_v2rhosigma, stage_v2sigma2);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v2rho2; ++ind)
                 {
@@ -1907,7 +1907,7 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
                         stage_v2lapltau,
                         stage_v2tau2);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v2rho2; ++ind)
                 {
@@ -1972,7 +1972,7 @@ CXCFunctional::compute_fxc_for_mgga(const int32_t np,
 }
 
 auto
-CXCFunctional::compute_kxc_for_mgga(const int32_t np,
+CXCFunctional::compute_kxc_for_mgga(const int64_t np,
                                     const double* rho,
                                     const double* sigma,
                                     const double* lapl,
@@ -2080,7 +2080,7 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
     auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
     const auto dim      = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v3rho3; ++ind)
         {
@@ -2176,7 +2176,7 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
         {
             xc_lda_kxc(funcptr, np, rho, stage_v3rho3);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v3rho3; ++ind)
                 {
@@ -2188,7 +2188,7 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
         {
             xc_gga_kxc(funcptr, np, rho, sigma, stage_v3rho3, stage_v3rho2sigma, stage_v3rhosigma2, stage_v3sigma3);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v3rho3; ++ind)
                 {
@@ -2237,7 +2237,7 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
                         stage_v3lapltau2,
                         stage_v3tau3);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v3rho3; ++ind)
                 {
@@ -2376,7 +2376,7 @@ CXCFunctional::compute_kxc_for_mgga(const int32_t np,
 }
 
 auto
-CXCFunctional::compute_lxc_for_mgga(const int32_t np,
+CXCFunctional::compute_lxc_for_mgga(const int64_t np,
                                     const double* rho,
                                     const double* sigma,
                                     const double* lapl,
@@ -2544,7 +2544,7 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
     auto       mggafunc = getFunctionalPointerToMetaGgaComponent();
     const auto dim      = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < np; ++g)
+    for (int64_t g = 0; g < np; ++g)
     {
         for (int ind = 0; ind < dim->v4rho4; ++ind)
         {
@@ -2700,7 +2700,7 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
         {
             xc_lda_lxc(funcptr, np, rho, stage_v4rho4);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v4rho4; ++ind)
                 {
@@ -2712,7 +2712,7 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
         {
             xc_gga_lxc(funcptr, np, rho, sigma, stage_v4rho4, stage_v4rho3sigma, stage_v4rho2sigma2, stage_v4rhosigma3, stage_v4sigma4);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v4rho4; ++ind)
                 {
@@ -2780,7 +2780,7 @@ CXCFunctional::compute_lxc_for_mgga(const int32_t np,
                         stage_v4lapltau3,
                         stage_v4tau4);
 
-            for (int32_t g = 0; g < np; ++g)
+            for (int64_t g = 0; g < np; ++g)
             {
                 for (int ind = 0; ind < dim->v4rho4; ++ind)
                 {
@@ -3062,7 +3062,7 @@ CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
     return nullptr;
 }
 
-const int32_t
+const int64_t
 CXCFunctional::getDimensionOfDerivatives() const
 {
     auto indices_and_counts = _getIndicesAndCountsOfDerivatives();

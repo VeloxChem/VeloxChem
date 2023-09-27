@@ -172,7 +172,7 @@ CGridPartitioner::bisectBox(const CGridBox& box) const -> std::list<CGridBox>
 
     std::list<CGridBox> newboxes;
 
-    for (int64_t box_id = 0; box_id < static_cast<int64_t>(subboxdims.size()); box_id++)
+    for (size_t box_id = 0; box_id < subboxdims.size(); box_id++)
     {
         auto count = subnumpoints[box_id];
 
@@ -404,7 +404,7 @@ CGridPartitioner::getGridStatistics() const -> std::string
 
     ss << "-----------------\n";
 
-    for (auto i = 0; i < static_cast<int64_t>(nboxes_count.size()); i++)
+    for (size_t i = 0; i < nboxes_count.size(); i++)
     {
         ss << std::right << std::setfill(' ') << std::setw(4) << i * npoints_bin << "-";
 

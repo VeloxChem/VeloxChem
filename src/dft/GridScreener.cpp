@@ -48,7 +48,7 @@ getTauScreeningThreshold()
 }
 
 void
-screenExcVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* exc, double* vrho)
+screenExcVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int64_t npoints, const double* rho, double* exc, double* vrho)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
@@ -56,7 +56,7 @@ screenExcVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoin
 
     const auto dim = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold))
@@ -86,7 +86,7 @@ screenExcVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoin
 
 void
 screenExcVxcForGGA(const CXCFunctional* xcFunctionalPointer,
-                   const int32_t        npoints,
+                   const int64_t        npoints,
                    const double*        rho,
                    const double*        sigma,
                    double*              exc,
@@ -101,7 +101,7 @@ screenExcVxcForGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho and sigma
         if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)) ||
@@ -140,7 +140,7 @@ screenExcVxcForGGA(const CXCFunctional* xcFunctionalPointer,
 
 void
 screenExcVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
-                    const int32_t        npoints,
+                    const int64_t        npoints,
                     const double*        rho,
                     const double*        sigma,
                     const double*        lapl,
@@ -161,7 +161,7 @@ screenExcVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho, sigma and tau
         if (((std::fabs(rho[2 * g + 0]) <= densityThreshold) && (std::fabs(rho[2 * g + 1]) <= densityThreshold)) ||
@@ -218,7 +218,7 @@ screenExcVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 }
 
 void
-screenVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* vrho)
+screenVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int64_t npoints, const double* rho, double* vrho)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
@@ -226,7 +226,7 @@ screenVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
     const auto dim = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a
         if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
@@ -249,7 +249,7 @@ screenVxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 }
 
 void
-screenVxcForGGA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, const double* sigma, double* vrho, double* vsigma)
+screenVxcForGGA(const CXCFunctional* xcFunctionalPointer, const int64_t npoints, const double* rho, const double* sigma, double* vrho, double* vsigma)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
@@ -259,7 +259,7 @@ screenVxcForGGA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
     const auto dim = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
@@ -291,7 +291,7 @@ screenVxcForGGA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
 void
 screenVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
-                 const int32_t        npoints,
+                 const int64_t        npoints,
                  const double*        rho,
                  const double*        sigma,
                  const double*        lapl,
@@ -311,7 +311,7 @@ screenVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a, sigma_aa and tau_a
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
@@ -360,7 +360,7 @@ screenVxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 }
 
 void
-screenFxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v2rho2)
+screenFxcForLDA(const CXCFunctional* xcFunctionalPointer, const int64_t npoints, const double* rho, double* v2rho2)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
@@ -368,7 +368,7 @@ screenFxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
     const auto dim = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a
         if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
@@ -392,7 +392,7 @@ screenFxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
 void
 screenFxcForGGA(const CXCFunctional* xcFunctionalPointer,
-                const int32_t        npoints,
+                const int64_t        npoints,
                 const double*        rho,
                 const double*        sigma,
                 double*              v2rho2,
@@ -407,7 +407,7 @@ screenFxcForGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
@@ -447,7 +447,7 @@ screenFxcForGGA(const CXCFunctional* xcFunctionalPointer,
 
 void
 screenFxcForMGGA(const CXCFunctional* xcFunctionalPointer,
-                 const int32_t        npoints,
+                 const int64_t        npoints,
                  const double*        rho,
                  const double*        sigma,
                  const double*        lapl,
@@ -473,7 +473,7 @@ screenFxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a, sigma_aa and tau_a
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
@@ -570,7 +570,7 @@ screenFxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 }
 
 void
-screenKxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v3rho3)
+screenKxcForLDA(const CXCFunctional* xcFunctionalPointer, const int64_t npoints, const double* rho, double* v3rho3)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
@@ -578,7 +578,7 @@ screenKxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
     const auto dim = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a
         if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
@@ -602,7 +602,7 @@ screenKxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
 void
 screenKxcForGGA(const CXCFunctional* xcFunctionalPointer,
-                const int32_t        npoints,
+                const int64_t        npoints,
                 const double*        rho,
                 const double*        sigma,
                 double*              v3rho3,
@@ -618,7 +618,7 @@ screenKxcForGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
@@ -666,7 +666,7 @@ screenKxcForGGA(const CXCFunctional* xcFunctionalPointer,
 
 void
 screenKxcForMGGA(const CXCFunctional* xcFunctionalPointer,
-                 const int32_t        npoints,
+                 const int64_t        npoints,
                  const double*        rho,
                  const double*        sigma,
                  const double*        lapl,
@@ -702,7 +702,7 @@ screenKxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a, sigma_aa and tau_a
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
@@ -879,7 +879,7 @@ screenKxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 }
 
 void
-screenLxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints, const double* rho, double* v4rho4)
+screenLxcForLDA(const CXCFunctional* xcFunctionalPointer, const int64_t npoints, const double* rho, double* v4rho4)
 {
     double densityThreshold = getDensityScreeningThreshold();
 
@@ -887,7 +887,7 @@ screenLxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
     const auto dim = &(ldafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a
         if (std::fabs(rho[2 * g + 0]) <= densityThreshold)
@@ -911,7 +911,7 @@ screenLxcForLDA(const CXCFunctional* xcFunctionalPointer, const int32_t npoints,
 
 void
 screenLxcForGGA(const CXCFunctional* xcFunctionalPointer,
-                const int32_t        npoints,
+                const int64_t        npoints,
                 const double*        rho,
                 const double*        sigma,
                 double*              v4rho4,
@@ -928,7 +928,7 @@ screenLxcForGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(ggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a and sigma_aa
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold))
@@ -984,7 +984,7 @@ screenLxcForGGA(const CXCFunctional* xcFunctionalPointer,
 
 void
 screenLxcForMGGA(const CXCFunctional* xcFunctionalPointer,
-                 const int32_t        npoints,
+                 const int64_t        npoints,
                  const double*        rho,
                  const double*        sigma,
                  const double*        lapl,
@@ -1035,7 +1035,7 @@ screenLxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 
     const auto dim = &(mggafunc->dim);
 
-    for (int32_t g = 0; g < npoints; ++g)
+    for (int64_t g = 0; g < npoints; ++g)
     {
         // rho_a, sigma_aa and tau_a
         if ((std::fabs(rho[2 * g + 0]) <= densityThreshold) || (std::fabs(sigma[3 * g + 0]) <= sigmaThreshold) ||
@@ -1332,9 +1332,9 @@ screenLxcForMGGA(const CXCFunctional* xcFunctionalPointer,
 }
 
 void
-copyWeights(double* screenedWeights, const int32_t gridBlockPosition, const double* weights, const int32_t nGridPoints)
+copyWeights(double* screenedWeights, const int64_t gridBlockPosition, const double* weights, const int64_t nGridPoints)
 {
-    for (int32_t g = 0; g < nGridPoints; ++g)
+    for (int64_t g = 0; g < nGridPoints; ++g)
     {
         screenedWeights[g] = weights[gridBlockPosition + g];
     }

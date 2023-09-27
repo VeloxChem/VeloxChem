@@ -50,7 +50,7 @@ CMultiTimer::start(const std::string& label)
     {
         // found label
 
-        int32_t index = label_iter - _labels.begin();
+        int64_t index = label_iter - _labels.begin();
 
         _timers[index].start();
     }
@@ -75,7 +75,7 @@ CMultiTimer::stop(const std::string& label)
     {
         // found label
 
-        int32_t index = label_iter - _labels.begin();
+        int64_t index = label_iter - _labels.begin();
 
         _timers[index].stop();
     }
@@ -86,7 +86,7 @@ CMultiTimer::getSummary() const
 {
     std::stringstream ss;
 
-    for (int32_t timer_id = 0; timer_id < static_cast<int32_t>(_timers.size()); timer_id++)
+    for (size_t timer_id = 0; timer_id < _timers.size(); timer_id++)
     {
         const auto& label = _labels[timer_id];
 

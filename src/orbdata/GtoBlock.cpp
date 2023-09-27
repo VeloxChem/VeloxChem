@@ -158,7 +158,7 @@ CGtoBlock::getAtomicOrbitalsIndexes() const -> std::vector<int64_t>
         // because _orb_indexes[0] is the total number of CGTOs of _angmom
         // which could be larger than the number of CGTOs in this block
 
-        for (int64_t ind = 1; ind < static_cast<int64_t>(_orb_indexes.size()); ind++)
+        for (size_t ind = 1; ind < _orb_indexes.size(); ind++)
         {
             ao_inds.push_back(comp * _orb_indexes[0] + _orb_indexes[ind]);
         }
