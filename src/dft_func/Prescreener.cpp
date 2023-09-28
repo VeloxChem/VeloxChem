@@ -61,7 +61,7 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int64_t gtoDeriv, const doubl
 
     const auto npgtos = gtoBlock.getNumberOfPrimitives();
 
-    // prescreen GTO values for S type GTOs for grid box
+    // pre-screen GTOs for grid box
 
     auto gto_ang = gtoBlock.getAngularMomentum();
 
@@ -208,7 +208,18 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int64_t gtoDeriv, const doubl
         }
     }
 
-    return {cgto_mask, ao_mask};
+    // get pre-screened AO indices
+
+    std::vector<int64_t> pre_ao_inds;
+
+    auto gto_ao_inds = gtoBlock.getAtomicOrbitalsIndexes();
+
+    for (size_t i = 0; i < gto_ao_inds.size(); i++)
+    {
+        if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
+    }
+
+    return {cgto_mask, pre_ao_inds};
 }
 
 }  // namespace prescr

@@ -176,25 +176,14 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.start("GTO pre-screening");
 
-        std::vector<std::vector<int64_t>> cgto_masks, ao_masks, pre_ao_inds_blocks;
+        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
 
         for (const auto& gto_block : gto_blocks)
         {
             // 0th order GTO derivative
-            auto [cgto_mask, ao_mask] = prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);
+            auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);
 
-            cgto_masks.push_back(cgto_mask);
-
-            ao_masks.push_back(ao_mask);
-
-            std::vector<int64_t> pre_ao_inds;
-
-            auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
-
-            for (size_t i = 0; i < gto_ao_inds.size(); i++)
-            {
-                if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
-            }
+            cgto_mask_blocks.push_back(cgto_mask);
 
             pre_ao_inds_blocks.push_back(pre_ao_inds);
         }
@@ -229,9 +218,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
             {
                 const auto& gto_block = gto_blocks[i_block];
 
-                const auto& cgto_mask = cgto_masks[i_block];
-
-                const auto& ao_mask = ao_masks[i_block];
+                const auto& cgto_mask = cgto_mask_blocks[i_block];
 
                 const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
@@ -472,25 +459,14 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         timer.start("GTO pre-screening");
 
-        std::vector<std::vector<int64_t>> cgto_masks, ao_masks, pre_ao_inds_blocks;
+        std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
 
         for (const auto& gto_block : gto_blocks)
         {
             // 1st order GTO derivative
-            auto [cgto_mask, ao_mask] = prescr::preScreenGtoBlock(gto_block, 1, _screeningThresholdForGTOValues, boxdim);
+            auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 1, _screeningThresholdForGTOValues, boxdim);
 
-            cgto_masks.push_back(cgto_mask);
-
-            ao_masks.push_back(ao_mask);
-
-            std::vector<int64_t> pre_ao_inds;
-
-            auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
-
-            for (size_t i = 0; i < gto_ao_inds.size(); i++)
-            {
-                if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
-            }
+            cgto_mask_blocks.push_back(cgto_mask);
 
             pre_ao_inds_blocks.push_back(pre_ao_inds);
         }
@@ -525,9 +501,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             {
                 const auto& gto_block = gto_blocks[i_block];
 
-                const auto& cgto_mask = cgto_masks[i_block];
-
-                const auto& ao_mask = ao_masks[i_block];
+                const auto& cgto_mask = cgto_mask_blocks[i_block];
 
                 const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
@@ -886,19 +860,8 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
                 // prescreen GTO block
 
-                auto [cgto_mask, ao_mask] =
-                    prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);  // 0th order GTO derivative
-
-                auto pre_aocount = mathfunc::countSignificantElements(ao_mask);
-
-                std::vector<int64_t> pre_ao_inds;
-
-                auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
-
-                for (size_t i = 0; i < gto_ao_inds.size(); i++)
-                {
-                    if (ao_mask[i] == 1) pre_ao_inds.push_back(gto_ao_inds[i]);
-                }
+                // 0th order GTO derivative
+                auto [cgto_mask, pre_ao_inds] = prescr::preScreenGtoBlock(gto_block, 0, _screeningThresholdForGTOValues, boxdim);
 
                 // GTO values on grid points
 
@@ -908,7 +871,7 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
                 auto subgaos_ptr = submat_ptr->getData();
 
-                for (int64_t nu = 0; nu < pre_aocount; nu++)
+                for (int64_t nu = 0; nu < static_cast<int64_t>(pre_ao_inds.size()); nu++)
                 {
                     std::memcpy(allgtovalues.row(pre_ao_inds[nu]) + gridblockpos + grid_batch_offset,
                                 subgaos_ptr + nu * grid_batch_size,
