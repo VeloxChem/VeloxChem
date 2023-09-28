@@ -119,8 +119,6 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CDenseMatrix gaos(naos, max_npoints_per_box);
-
     // density and functional derivatives
 
     auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
@@ -178,6 +176,8 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
         std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
 
+        std::vector<int64_t> aoinds;
+
         for (const auto& gto_block : gto_blocks)
         {
             // 0th order GTO derivative
@@ -186,13 +186,24 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
             cgto_mask_blocks.push_back(cgto_mask);
 
             pre_ao_inds_blocks.push_back(pre_ao_inds);
+
+            for (const auto nu : pre_ao_inds)
+            {
+                aoinds.push_back(nu);
+            }
         }
 
+        const auto aocount = static_cast<int64_t>(aoinds.size());
+
         timer.stop("GTO pre-screening");
+
+        if (aocount == 0) continue;
 
         // GTO values on grid points
 
         timer.start("OMP GTO evaluation");
+
+        CDenseMatrix mat_chi(aocount, npoints);
 
 #pragma omp parallel
         {
@@ -214,7 +225,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0; i_block < gto_blocks.size(); i_block++)
+            for (size_t i_block = 0, idx = 0; i_block < gto_blocks.size(); i_block++)
             {
                 const auto& gto_block = gto_blocks[i_block];
 
@@ -228,9 +239,9 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
                 auto submat_data = submat_ptr->getData();
 
-                for (int64_t nu = 0; nu < static_cast<int64_t>(pre_ao_inds.size()); nu++)
+                for (int64_t nu = 0; nu < static_cast<int64_t>(pre_ao_inds.size()); nu++, idx++)
                 {
-                    std::memcpy(gaos.row(pre_ao_inds[nu]) + grid_batch_offset, submat_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi.row(idx) + grid_batch_offset, submat_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                 }
             }
 
@@ -238,48 +249,6 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
         }
 
         timer.stop("OMP GTO evaluation");
-
-        // post-screening
-
-        timer.start("GTO screening");
-
-        std::vector<int64_t> aoinds;
-
-        for (const auto& pre_ao_inds : pre_ao_inds_blocks)
-        {
-            for (const auto nu : pre_ao_inds)
-            {
-                bool skip = true;
-
-                auto gaos_nu = gaos.row(nu);
-
-                for (int64_t g = 0; g < npoints; g++)
-                {
-                    if (std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues)
-                    {
-                        skip = false;
-                        break;
-                    }
-                }
-
-                if (!skip) aoinds.push_back(nu);
-            }
-        }
-
-        std::sort(aoinds.begin(), aoinds.end());
-
-        const auto aocount = static_cast<int64_t>(aoinds.size());
-
-        CDenseMatrix mat_chi(aocount, npoints);
-
-        for (int64_t i = 0; i < aocount; i++)
-        {
-            std::memcpy(mat_chi.row(i), gaos.row(aoinds[i]), npoints * sizeof(double));
-        }
-
-        timer.stop("GTO screening");
-
-        if (aocount == 0) continue;
 
         // generate sub density matrix and density grid
 
@@ -392,12 +361,6 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    CDenseMatrix gaos(naos, max_npoints_per_box);
-
-    CDenseMatrix gaox(naos, max_npoints_per_box);
-    CDenseMatrix gaoy(naos, max_npoints_per_box);
-    CDenseMatrix gaoz(naos, max_npoints_per_box);
-
     // density and functional derivatives
 
     auto       ggafunc = xcFunctional.getFunctionalPointerToGgaComponent();
@@ -461,6 +424,8 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
         std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
 
+        std::vector<int64_t> aoinds;
+
         for (const auto& gto_block : gto_blocks)
         {
             // 1st order GTO derivative
@@ -469,13 +434,27 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
             cgto_mask_blocks.push_back(cgto_mask);
 
             pre_ao_inds_blocks.push_back(pre_ao_inds);
+
+            for (const auto nu : pre_ao_inds)
+            {
+                aoinds.push_back(nu);
+            }
         }
 
+        const auto aocount = static_cast<int64_t>(aoinds.size());
+
         timer.stop("GTO pre-screening");
+
+        if (aocount == 0) continue;
 
         // GTO values on grid points
 
         timer.start("OMP GTO evaluation");
+
+        CDenseMatrix mat_chi(aocount, npoints);
+        CDenseMatrix mat_chi_x(aocount, npoints);
+        CDenseMatrix mat_chi_y(aocount, npoints);
+        CDenseMatrix mat_chi_z(aocount, npoints);
 
 #pragma omp parallel
         {
@@ -497,7 +476,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
             // go through GTO blocks
 
-            for (size_t i_block = 0; i_block < gto_blocks.size(); i_block++)
+            for (size_t i_block = 0, idx = 0; i_block < gto_blocks.size(); i_block++)
             {
                 const auto& gto_block = gto_blocks[i_block];
 
@@ -517,16 +496,12 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
                 auto submat_y_data = submat_y_ptr->getData();
                 auto submat_z_data = submat_z_ptr->getData();
 
-                for (int64_t nu = 0; nu < static_cast<int64_t>(pre_ao_inds.size()); nu++)
+                for (int64_t nu = 0; nu < static_cast<int64_t>(pre_ao_inds.size()); nu++, idx++)
                 {
-                    std::memcpy(
-                        gaos.row(pre_ao_inds[nu]) + grid_batch_offset, submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(
-                        gaox.row(pre_ao_inds[nu]) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(
-                        gaoy.row(pre_ao_inds[nu]) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
-                    std::memcpy(
-                        gaoz.row(pre_ao_inds[nu]) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi.row(idx) + grid_batch_offset, submat_0_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_x.row(idx) + grid_batch_offset, submat_x_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_y.row(idx) + grid_batch_offset, submat_y_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
+                    std::memcpy(mat_chi_z.row(idx) + grid_batch_offset, submat_z_data + nu * grid_batch_size, grid_batch_size * sizeof(double));
                 }
             }
 
@@ -534,62 +509,6 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
         }
 
         timer.stop("OMP GTO evaluation");
-
-        // post-screening
-
-        timer.start("GTO screening");
-
-        std::vector<int64_t> aoinds;
-
-        for (const auto& pre_ao_inds : pre_ao_inds_blocks)
-        {
-            for (const auto nu : pre_ao_inds)
-            {
-                bool skip = true;
-
-                auto gaos_nu = gaos.row(nu);
-                auto gaox_nu = gaox.row(nu);
-                auto gaoy_nu = gaoy.row(nu);
-                auto gaoz_nu = gaoz.row(nu);
-
-                for (int64_t g = 0; g < npoints; g++)
-                {
-                    // clang-format off
-                    if ((std::fabs(gaos_nu[g]) > _screeningThresholdForGTOValues) ||
-                        (std::fabs(gaox_nu[g]) > _screeningThresholdForGTOValues) ||
-                        (std::fabs(gaoy_nu[g]) > _screeningThresholdForGTOValues) ||
-                        (std::fabs(gaoz_nu[g]) > _screeningThresholdForGTOValues))
-                    {
-                        skip = false;
-                        break;
-                    }
-                    // clang-format on
-                }
-
-                if (!skip) aoinds.push_back(nu);
-            }
-        }
-
-        std::sort(aoinds.begin(), aoinds.end());
-
-        const auto aocount = static_cast<int64_t>(aoinds.size());
-
-        CDenseMatrix mat_chi(aocount, npoints);
-        CDenseMatrix mat_chi_x(aocount, npoints);
-        CDenseMatrix mat_chi_y(aocount, npoints);
-        CDenseMatrix mat_chi_z(aocount, npoints);
-
-        for (int64_t i = 0; i < aocount; i++)
-        {
-            std::memcpy(mat_chi.row(i), gaos.row(aoinds[i]), npoints * sizeof(double));
-            std::memcpy(mat_chi_x.row(i), gaox.row(aoinds[i]), npoints * sizeof(double));
-            std::memcpy(mat_chi_y.row(i), gaoy.row(aoinds[i]), npoints * sizeof(double));
-            std::memcpy(mat_chi_z.row(i), gaoz.row(aoinds[i]), npoints * sizeof(double));
-        }
-
-        timer.stop("GTO screening");
-
-        if (aocount == 0) continue;
 
         // generate sub density matrix and density grid
 
