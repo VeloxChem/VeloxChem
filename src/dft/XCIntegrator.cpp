@@ -1157,10 +1157,6 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
             for (const auto& gto_block : gto_blocks)
             {
-                auto gto_orb_inds = gto_block.getOrbitalIndexes();
-
-                auto gto_ang = gto_block.getAngularMomentum();
-
                 // prescreen GTO block
 
                 // 0th order GTO derivative

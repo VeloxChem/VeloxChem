@@ -318,8 +318,6 @@ gatherDenseMatricesByColumns(const CDenseMatrix& matrix, MPI_Comm comm) -> CDens
 
         auto ncols = matrix.getNumberOfColumns();
 
-        auto nelems = nrows * ncols;
-
         // number of columns
 
         std::vector<int64_t> col_counts;

@@ -71,8 +71,6 @@ preScreenGtoBlock(const CGtoBlock& gtoBlock, const int64_t gtoDeriv, const doubl
 
     std::vector<int64_t> ao_mask(ncomps * ncgtos, 1);
 
-    int64_t ao_count = 0;
-
     for (int64_t i = 0; i < ncgtos; i++)
     {
         // GTO coordinates
