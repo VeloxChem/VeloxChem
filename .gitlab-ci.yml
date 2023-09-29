@@ -86,7 +86,7 @@ monkey:cmake_build:
         -DUSE_4TH_GEOM_DERIV=OFF
         -DUSE_3RD_GEOM_DERIV=OFF
         -DUSE_2ND_GEOM_DERIV=OFF
-    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -v -d stats
+    - cmake --build build --parallel "$VLX_NUM_BUILD_JOBS" --target veloxchemlib -- -d stats
   artifacts:
     paths:
       - build

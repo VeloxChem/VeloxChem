@@ -45,7 +45,7 @@ monkey:cron_deploy:
         -DCMAKE_CXX_COMPILER=mpiicpc
         -DCMAKE_CXX_FLAGS="-cxx=icpx"
         -DVLX_LA_VENDOR=MKL
-    - cmake --build build --parallel 6 -- -v -d stats
+    - cmake --build build --parallel 6 -- -d stats
     - ctest --test-dir build --output-on-failure
     # prepare tar.bz2 archive
     - git archive
