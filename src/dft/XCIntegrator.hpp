@@ -103,6 +103,25 @@ class CXCIntegrator
                                  const std::string&      flag = std::string("closedshell")) -> CAOKohnShamMatrix;
 
     /**
+     Integrates first-order meta-GGA exchange-correlation functional
+     contribution to AO Kohn-Sham matrix.
+
+     @param molecule the molecule.
+     @param basis the molecular basis.
+     @param densityMatrix the AO density matrix.
+     @param molecularGrid the molecular grid.
+     @param xcFunctional the exchange-correlation functional.
+     @param flag the flag for closed/open shell.
+     @return the AO Kohn-Sham matrix.
+     */
+    auto _integrateVxcFockForMGGA(const CMolecule&        molecule,
+                                  const CMolecularBasis&  basis,
+                                  const CAODensityMatrix& densityMatrix,
+                                  const CMolecularGrid&   molecularGrid,
+                                  const CXCFunctional&    xcFunctional,
+                                  const std::string&      flag = std::string("closedshell")) -> CAOKohnShamMatrix;
+
+    /**
      Integrates LDA contribution to (first-order) Vxc matrix.
 
      @param weights the weights of grid points.
@@ -137,6 +156,34 @@ class CXCIntegrator
                                         const double*       vrho,
                                         const double*       vsigma,
                                         CMultiTimer&        timer) const -> CDenseMatrix;
+
+    /**
+     Integrates meta-GGA contribution to AO Kohn-Sham matrix.
+
+     @param weights the weights of grid points.
+     @param gtoValues the GTO values on grid points.
+     @param gtoValuesX the GTO gradient X values on grid points.
+     @param gtoValuesY the GTO gradient Y values on grid points.
+     @param gtoValuesZ the GTO gradient Z values on grid points.
+     @param rhograd the gradient density.
+     @param vrho the 1st-order functional derivative wrt rho.
+     @param vsigma the 1st-order functional derivative wrt sigma.
+     @param vlapl the 1st-order functional derivative wrt laplacian.
+     @param vtau the 1st-order functional derivative wrt tau.
+     @param timer the timer.
+     @return the contribution as a CDenseMatrix object.
+     */
+    auto _integratePartialVxcFockForMGGA(const double*       weights,
+                                         const CDenseMatrix& gtoValues,
+                                         const CDenseMatrix& gtoValuesX,
+                                         const CDenseMatrix& gtoValuesY,
+                                         const CDenseMatrix& gtoValuesZ,
+                                         const double*       rhograd,
+                                         const double*       vrho,
+                                         const double*       vsigma,
+                                         const double*       vlapl,
+                                         const double*       vtau,
+                                         CMultiTimer&        timer) const -> CDenseMatrix;
 
     /**
      Writes timing summary.
