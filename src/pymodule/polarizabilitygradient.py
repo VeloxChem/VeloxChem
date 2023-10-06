@@ -1,4 +1,5 @@
 import numpy as np
+import time
 import sys
 from mpi4py import MPI
 
@@ -70,13 +71,14 @@ class PolarizabilityGradient():
 
         # Polarizability information
         self.frequency = 0.0
-        self.frequencies = []
+        self.frequencies = [] # TODO: change to seq_range
         self.vector_components = 'xyz'
 
         # To contain output
         self.pol_gradient = {}
         self.orbrsp_results = {}
 
+    # TODO change update_settings to look like lrsolver
     def update_settings(self, grad_dict, orbrsp_dict=None, method_dict=None):
         """
         Updates response and method settings in orbital response computation
@@ -144,15 +146,13 @@ class PolarizabilityGradient():
 
         # compute orbital response
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
+        orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
+        orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
+        all_orbrsp_results = orbrsp_drv.cphf_results
 
         for w in self.frequencies:
             self.frequency = w 
-            self.orbrsp_dict.update({'frequency': w}) 
-            orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
-            orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
-            orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
-            orbrsp_results = orbrsp_drv.cphf_results
-
+            orbrsp_results = all_orbrsp_results[w]
             if self.rank == mpi_master():
                 mo = scf_tensors['C'] # only alpha part
                 ovlp = scf_tensors['S']
