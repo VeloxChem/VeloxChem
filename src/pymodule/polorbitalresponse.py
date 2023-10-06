@@ -35,9 +35,11 @@ class PolOrbitalResponse(CphfSolver):
         super().__init__(comm, ostream)
 
         self.frequency = 0.0
+        self.frequencies = [] #TODO: change to seq_range
         self.vector_components = 'xyz'
         self.cphf_results = None
 
+    #TODO: change update_settings to look like lrsolver
     def update_settings(self, orbrsp_dict, method_dict=None):
         """
         Updates response and method settings in orbital response computation
@@ -53,6 +55,9 @@ class PolOrbitalResponse(CphfSolver):
 
         if 'frequency' in orbrsp_dict:
             self.frequency = float(orbrsp_dict['frequency'])
+
+        if 'frequencies' in orbrsp_dict:
+            self.frequencies = orbrsp_dict['frequencies']
 
         if 'vector_components' in orbrsp_dict:
             self.vector_components = orbrsp_dict['vector_components']
@@ -114,310 +119,340 @@ class PolOrbitalResponse(CphfSolver):
         # 3) Construct the initial guess => in parent class
         # 4) Run the solver => in parent class
 
-        if self.rank == mpi_master():
+        orbrsp_rhs = {}
+        for f, w in enumerate(self.frequencies):
+            self.ostream.print_info('Building RHS for w={:f}'.format(w))
+            self.ostream.flush()
+            self.frequency = w
+            if self.rank == mpi_master():
 
-            # 1) Calculate unrelaxed one-particle and transition density matrix
-            ovlp = scf_tensors['S']
-            mo = scf_tensors['C']  # only alpha part
+                # 1) Calculate unrelaxed one-particle and transition density matrix
+                ovlp = scf_tensors['S']
+                mo = scf_tensors['C']  # only alpha part
 
-            nao = mo.shape[0]
-            nocc = molecule.number_of_alpha_electrons()
-            mo_occ = mo[:, :nocc].copy()
-            mo_vir = mo[:, nocc:].copy()
-            nvir = mo_vir.shape[1]
+                nao = mo.shape[0]
+                nocc = molecule.number_of_alpha_electrons()
+                mo_occ = mo[:, :nocc].copy()
+                mo_vir = mo[:, nocc:].copy()
+                nvir = mo_vir.shape[1]
 
-            # TODO: do we keep this factor like that?
-            sqrt2 = np.sqrt(2.0)
+                # TODO: do we keep this factor like that?
+                # TODO: no, make global and invert immediately
+                sqrt2 = np.sqrt(2.0)
 
-            # Check if response vectors exist for desired frequency of gradient
-            if (self.vector_components[0],
-                    self.frequency) not in lr_results['solutions'].keys():
-                error_text = "Frequency for gradient not "
-                error_text += "found in linear response results."
-                raise ValueError(error_text)
+                # Check if response vectors exist for desired frequency of gradient
+                if (self.vector_components[0],
+                        self.frequency) not in lr_results['solutions'].keys():
+                    error_text = "Frequency for gradient not "
+                    error_text += "found in linear response results."
+                    raise ValueError(error_text)
 
-            exc_vec = 1 / sqrt2 * np.array([
-                self.get_full_solution_vector(lr_results['solutions'][
-                    x, self.frequency])[:nocc * nvir].reshape(nocc, nvir)
-                for x in self.vector_components
-            ])
-            deexc_vec = 1 / sqrt2 * np.array([
-                self.get_full_solution_vector(lr_results['solutions'][
-                    x, self.frequency])[nocc * nvir:].reshape(nocc, nvir)
-                for x in self.vector_components
-            ])
+                exc_vec = 1 / sqrt2 * np.array([
+                    self.get_full_solution_vector(lr_results['solutions'][
+                        x, self.frequency])[:nocc * nvir].reshape(nocc, nvir)
+                    for x in self.vector_components
+                ])
+                deexc_vec = 1 / sqrt2 * np.array([
+                    self.get_full_solution_vector(lr_results['solutions'][
+                        x, self.frequency])[nocc * nvir:].reshape(nocc, nvir)
+                    for x in self.vector_components
+                ])
 
-            # Number of vector components
-            dof = exc_vec.shape[0]
+                # Number of vector components
+                dof = exc_vec.shape[0]
+                #n_freqs = len(self.frequencies)
 
-            # Construct plus/minus combinations of excitation and
-            # de-excitation part
-            x_plus_y = exc_vec + deexc_vec
-            x_minus_y = exc_vec - deexc_vec
+                # array to hold multi-freq rhs
+                # TODO: this is ugly
+                #tot_rhs_mo = np.zeros((n_freqs* dof**2, nocc, nvir))
 
-            # Transform the vectors to the AO basis
-            x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
-            x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
-                                     mo_vir)
+                # Construct plus/minus combinations of excitation and
+                # de-excitation part
+                x_plus_y = exc_vec + deexc_vec
+                x_minus_y = exc_vec - deexc_vec
 
-            # Turn them into a list (for AODensityMatrix)
-            xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
+                # Transform the vectors to the AO basis
+                x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
+                x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
+                                         mo_vir)
 
-            # Calculate the symmetrized unrelaxed one-particle density matrix
-            # in MO basis
-            dm_oo = -0.25 * (np.einsum('xja,yia->xyij', x_plus_y, x_plus_y) +
-                             np.einsum('xja,yia->xyij', x_minus_y, x_minus_y) +
-                             np.einsum('yja,xia->xyij', x_plus_y, x_plus_y) +
-                             np.einsum('yja,xia->xyij', x_minus_y, x_minus_y))
+                # Turn them into a list (for AODensityMatrix)
+                xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
 
-            dm_vv = 0.25 * (np.einsum('xib,yia->xyab', x_plus_y, x_plus_y) +
-                            np.einsum('xib,yia->xyab', x_minus_y, x_minus_y) +
-                            np.einsum('yib,xia->xyab', x_plus_y, x_plus_y) +
-                            np.einsum('yib,xia->xyab', x_minus_y, x_minus_y))
+                # Calculate the symmetrized unrelaxed one-particle density matrix
+                # in MO basis
+                dm_oo = -0.25 * (np.einsum('xja,yia->xyij', x_plus_y, x_plus_y) +
+                                 np.einsum('xja,yia->xyij', x_minus_y, x_minus_y) +
+                                 np.einsum('yja,xia->xyij', x_plus_y, x_plus_y) +
+                                 np.einsum('yja,xia->xyij', x_minus_y, x_minus_y))
 
-            # Transform unrelaxed one-particle density matrix to
-            # AO basis and create a list
-            unrel_dm_ao = (
-                np.einsum('mi,xyij,nj->xymn', mo_occ, dm_oo, mo_occ) +
-                np.einsum('ma,xyab,nb->xymn', mo_vir, dm_vv, mo_vir))
-            dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
+                dm_vv = 0.25 * (np.einsum('xib,yia->xyab', x_plus_y, x_plus_y) +
+                                np.einsum('xib,yia->xyab', x_minus_y, x_minus_y) +
+                                np.einsum('yib,xia->xyab', x_plus_y, x_plus_y) +
+                                np.einsum('yib,xia->xyab', x_minus_y, x_minus_y))
 
-            # 2) Construct the right-hand side
-            dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list, denmat.rest)
+                # Transform unrelaxed one-particle density matrix to
+                # AO basis and create a list
+                unrel_dm_ao = (
+                    np.einsum('mi,xyij,nj->xymn', mo_occ, dm_oo, mo_occ) +
+                    np.einsum('ma,xyab,nb->xymn', mo_vir, dm_vv, mo_vir))
+                dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
-            if self._dft:
-                # 3) Construct density matrices for E[3] term:
-                # XCIntegrator expects a DM with real and imaginary part,
-                # so we set the imaginary part to zero.
-                # Create lists with the corresponding vector components
-                perturbed_dm_ao_list = []
-                zero_dm_ao_list = []
-                # TODO: only upper triangular matrix and transpose?
-                for x in range(dof):
-                    for y in range(dof):
-                        perturbed_dm_ao_list.extend([
-                            x_minus_y_ao[x], 0 * x_minus_y_ao[x],
-                            x_minus_y_ao[y], 0 * x_minus_y_ao[y]
-                        ])
-                        zero_dm_ao_list.extend(
-                            [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
+                # 2) Construct the right-hand side
+                dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list, denmat.rest)
 
-                perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
-                                                  denmat.rest)
+                if self._dft:
+                    # 3) Construct density matrices for E[3] term:
+                    # XCIntegrator expects a DM with real and imaginary part,
+                    # so we set the imaginary part to zero.
+                    # Create lists with the corresponding vector components
+                    perturbed_dm_ao_list = []
+                    zero_dm_ao_list = []
+                    # TODO: only upper triangular matrix and transpose?
+                    for x in range(dof):
+                        for y in range(dof):
+                            perturbed_dm_ao_list.extend([
+                                x_minus_y_ao[x], 0 * x_minus_y_ao[x],
+                                x_minus_y_ao[y], 0 * x_minus_y_ao[y]
+                            ])
+                            zero_dm_ao_list.extend(
+                                [0 * x_minus_y_ao[x], 0 * x_minus_y_ao[y]])
 
-                # corresponds to rho^{omega_b,omega_c} in quadratic response,
-                # which is zero for orbital response
-                zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
-        else:
-            dm_ao_rhs = AODensityMatrix()
-            if self._dft:
-                perturbed_dm_ao = AODensityMatrix()
-                zero_dm_ao = AODensityMatrix()
+                    perturbed_dm_ao = AODensityMatrix(perturbed_dm_ao_list,
+                                                      denmat.rest)
 
-        dm_ao_rhs.broadcast(self.rank, self.comm)
-
-        molgrid = dft_dict['molgrid']
-        gs_density = dft_dict['gs_density']
-
-        # Fock matrices with corresponding type
-        fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
-        # Set the vector-related components to general Fock matrix
-        # (not 1PDM part)
-        for ifock in range(dof**2, dof**2 + 2 * dof):
-            fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
-        if self._dft:
-            perturbed_dm_ao.broadcast(self.rank, self.comm)
-            zero_dm_ao.broadcast(self.rank, self.comm)
-            # Fock matrix for computing the DFT E[3] term g^xc
-            fock_gxc_ao = AOFockMatrix(zero_dm_ao)
-            if self.xcfun.is_hybrid():
-                fact_xc = self.xcfun.get_frac_exact_exchange()
-                for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
-                    fock_ao_rhs.set_scale_factor(fact_xc, ifock)
-                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                    fock_gxc_ao.set_scale_factor(fact_xc, ifock)
-                    fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
-                for ifock in range(dof**2):
-                    fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
-                for ifock in range(dof**2, dof**2 + 2 * dof):
-                    fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
+                    # corresponds to rho^{omega_b,omega_c} in quadratic response,
+                    # which is zero for orbital response
+                    zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
             else:
-                for ifock in range(dof**2):
-                    fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
-                for ifock in range(dof**2, dof**2 + 2 * dof):
-                    fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
-                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                    fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
-        else:
-            fock_gxc_ao = None  # None if not DFT
+                dm_ao_rhs = AODensityMatrix()
+                if self._dft:
+                    perturbed_dm_ao = AODensityMatrix()
+                    zero_dm_ao = AODensityMatrix()
 
-        if self._dft:
-            if not self.xcfun.is_hybrid():
-                for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
-                    fock_gxc_ao.scale(2.0, ifock)
-            xc_drv = XCIntegrator(self.comm)
-            xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
-                                      perturbed_dm_ao, zero_dm_ao,
-                                      gs_density, molgrid,
-                                      self.xcfun.get_func_label(), "qrf")
+            dm_ao_rhs.broadcast(self.rank, self.comm)
 
-            fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
+            molgrid = dft_dict['molgrid']
+            gs_density = dft_dict['gs_density']
 
-        self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis, eri_dict,
-                           dft_dict, pe_dict, self.profiler)
-
-        # Calculate the RHS and transform it to the MO basis
-        if self.rank == mpi_master():
-            # extract the 1PDM contributions
-            fock_ao_rhs_1dm = np.zeros((dof**2, nao, nao))
-            for i in range(dof**2):
-                fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
-
-            # Transform to MO basis
-            fock_mo_rhs_1dm = np.einsum('mi,xmn,na->xia', mo_occ,
-                                        fock_ao_rhs_1dm, mo_vir)
-
-            # extract the x_plus_y and x_minus_y contributions
-            # TODO: extract all Fock matrices at the same time?
-            fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
-            fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
-            for i in range(dof):
-                fock_ao_rhs_x_plus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 + i)
-                fock_ao_rhs_x_minus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 +
-                                                                      dof + i)
-
-            # TODO: replace np.einsum with np.linalg.multi_dot
-            # Is there a better way to do all this?
-            fock_mo_rhs_2dm = 0.25 * (
-                np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
-                          np.einsum('xmt,ymc->xytc',
-                                    fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                    x_plus_y_ao))
-                - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('xmt,ymc->xytc',
-                                      fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                      x_minus_y_ao))
-                + np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('ymt,xmc->xytc',
-                                      fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                      x_plus_y_ao))
-                - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('ymt,xmc->xytc',
-                                      fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                      x_minus_y_ao))
-                - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('xtm,ymc->xytc',
-                                      fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                      x_plus_y_ao))
-                - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('xtm,ymc->xytc',
-                                      fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                      x_minus_y_ao))
-                - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('ytm,xmc->xytc',
-                                      fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                      x_plus_y_ao))
-                - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('ytm,xmc->xytc',
-                                      fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                      x_minus_y_ao))
-                + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('xmt,ycm->xyct',
-                                      fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                      x_plus_y_ao))
-                + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('xmt,ycm->xyct',
-                                      fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                      x_minus_y_ao))
-                + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('ymt,xcm->xyct',
-                                      fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                      x_plus_y_ao))
-                + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('ymt,xcm->xyct',
-                                      fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                      x_minus_y_ao))
-                - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('xtm,ycm->xytc',
-                                      fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                      x_plus_y_ao))
-                + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('xtm,ycm->xytc',
-                                      fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                      x_minus_y_ao))
-                - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('ytm,xcm->xytc',
-                                      fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                      x_plus_y_ao))
-                + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir,
-                            np.einsum('ytm,xcm->xytc',
-                                      fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                      x_minus_y_ao))
-            ).reshape(dof**2, nocc, nvir)
-
-            # Calculate the dipole contributions to the RHS:
-            # Dipole integrals in AO basis
-            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_mats = dipole_drv.compute(molecule, basis)
-            dipole_ints_ao = np.zeros((dof, nao, nao))
-            k = 0
-            if 'x' in self.vector_components:
-                dipole_ints_ao[k] = dipole_mats.x_to_numpy()
-                k += 1
-            if 'y' in self.vector_components:
-                dipole_ints_ao[k] = dipole_mats.y_to_numpy()
-                k += 1
-            if 'z' in self.vector_components:
-                dipole_ints_ao[k] = dipole_mats.z_to_numpy()
-
-            # Transform them to MO basis (oo and vv blocks only)
-            dipole_ints_oo = np.array([
-                np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
-                for x in range(dof)
-            ])
-            dipole_ints_vv = np.array([
-                np.linalg.multi_dot([mo_vir.T, dipole_ints_ao[x], mo_vir])
-                for x in range(dof)
-            ])
-
-            # Contract with vectors to get dipole contribution to the RHS
-            rhs_dipole_contrib = 0.5 * (
-                np.einsum('xja,yji->xyia', x_minus_y, dipole_ints_oo) +
-                np.einsum('yja,xji->xyia', x_minus_y, dipole_ints_oo)).reshape(
-                    dof**2, nocc, nvir)
-
-            rhs_dipole_contrib += 0.5 * (
-                -np.einsum('xib,yab->xyia', x_minus_y, dipole_ints_vv) -
-                np.einsum('yib,xab->xyia', x_minus_y, dipole_ints_vv)).reshape(
-                    dof**2, nocc, nvir)
-
-            rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
-
-            # Add DFT E[3] contribution to the RHS:
+            # Fock matrices with corresponding type
+            fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
+            # Set the vector-related components to general Fock matrix
+            # (not 1PDM part)
+            for ifock in range(dof**2, dof**2 + 2 * dof):
+                fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
             if self._dft:
-                gxc_ao = np.zeros((dof**2, nao, nao))
+                perturbed_dm_ao.broadcast(self.rank, self.comm)
+                zero_dm_ao.broadcast(self.rank, self.comm)
+                # Fock matrix for computing the DFT E[3] term g^xc
+                fock_gxc_ao = AOFockMatrix(zero_dm_ao)
+                if self.xcfun.is_hybrid():
+                    fact_xc = self.xcfun.get_frac_exact_exchange()
+                    for ifock in range(fock_ao_rhs.number_of_fock_matrices()):
+                        fock_ao_rhs.set_scale_factor(fact_xc, ifock)
+                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                        fock_gxc_ao.set_scale_factor(fact_xc, ifock)
+                        fock_gxc_ao.set_fock_type(fockmat.rgenjkx, ifock)
+                    for ifock in range(dof**2):
+                        fock_ao_rhs.set_fock_type(fockmat.restjkx, ifock)
+                    for ifock in range(dof**2, dof**2 + 2 * dof):
+                        fock_ao_rhs.set_fock_type(fockmat.rgenjkx, ifock)
+                else:
+                    for ifock in range(dof**2):
+                        fock_ao_rhs.set_fock_type(fockmat.restj, ifock)
+                    for ifock in range(dof**2, dof**2 + 2 * dof):
+                        fock_ao_rhs.set_fock_type(fockmat.rgenj, ifock)
+                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                        fock_gxc_ao.set_fock_type(fockmat.rgenj, ifock)
+            else:
+                fock_gxc_ao = None  # None if not DFT
 
+            if self._dft:
+                if not self.xcfun.is_hybrid():
+                    for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
+                        fock_gxc_ao.scale(2.0, ifock)
+                xc_drv = XCIntegrator(self.comm)
+                xc_drv.integrate_kxc_fock(fock_gxc_ao, molecule, basis,
+                                          perturbed_dm_ao, zero_dm_ao,
+                                          gs_density, molgrid,
+                                          self.xcfun.get_func_label(), "qrf")
+
+                fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
+
+            self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis, eri_dict,
+                               dft_dict, pe_dict, self.profiler)
+
+            # Calculate the RHS and transform it to the MO basis
+            if self.rank == mpi_master():
+                # extract the 1PDM contributions
+                fock_ao_rhs_1dm = np.zeros((dof**2, nao, nao))
                 for i in range(dof**2):
-                    gxc_ao[i] = fock_gxc_ao.alpha_to_numpy(2 * i)
+                    fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
 
-                gxc_mo = np.einsum('mi,xmn,na->xia', mo_occ, gxc_ao, mo_vir)
-                # different factor compared to TDDFT orbital response
-                # because here vectors are scaled by 1/sqrt(2)
-                rhs_mo += 0.5 * gxc_mo
+                # Transform to MO basis
+                fock_mo_rhs_1dm = np.einsum('mi,xmn,na->xia', mo_occ,
+                                            fock_ao_rhs_1dm, mo_vir)
 
-        self.profiler.stop_timer('RHS')
+                # extract the x_plus_y and x_minus_y contributions
+                # TODO: extract all Fock matrices at the same time?
+                fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
+                for i in range(dof):
+                    fock_ao_rhs_x_plus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 + i)
+                    fock_ao_rhs_x_minus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 +
+                                                                          dof + i)
 
+                # TODO: replace np.einsum with np.linalg.multi_dot
+                # Is there a better way to do all this?
+                fock_mo_rhs_2dm = 0.25 * (
+                    np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
+                              np.einsum('xmt,ymc->xytc',
+                                        fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                                        x_plus_y_ao))
+                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('xmt,ymc->xytc',
+                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                                          x_minus_y_ao))
+                    + np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('ymt,xmc->xytc',
+                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                                          x_plus_y_ao))
+                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('ymt,xmc->xytc',
+                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                                          x_minus_y_ao))
+                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('xtm,ymc->xytc',
+                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                                          x_plus_y_ao))
+                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('xtm,ymc->xytc',
+                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                                          x_minus_y_ao))
+                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('ytm,xmc->xytc',
+                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                                          x_plus_y_ao))
+                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('ytm,xmc->xytc',
+                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                                          x_minus_y_ao))
+                    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('xmt,ycm->xyct',
+                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                                          x_plus_y_ao))
+                    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('xmt,ycm->xyct',
+                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                                          x_minus_y_ao))
+                    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('ymt,xcm->xyct',
+                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                                          x_plus_y_ao))
+                    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('ymt,xcm->xyct',
+                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                                          x_minus_y_ao))
+                    - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('xtm,ycm->xytc',
+                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                                          x_plus_y_ao))
+                    + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('xtm,ycm->xytc',
+                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                                          x_minus_y_ao))
+                    - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('ytm,xcm->xytc',
+                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                                          x_plus_y_ao))
+                    + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir,
+                                np.einsum('ytm,xcm->xytc',
+                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                                          x_minus_y_ao))
+                ).reshape(dof**2, nocc, nvir)
+
+                # Calculate the dipole contributions to the RHS:
+                # Dipole integrals in AO basis
+                dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+                dipole_mats = dipole_drv.compute(molecule, basis)
+                dipole_ints_ao = np.zeros((dof, nao, nao))
+                k = 0
+                if 'x' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
+                    k += 1
+                if 'y' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
+                    k += 1
+                if 'z' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
+
+                # Transform them to MO basis (oo and vv blocks only)
+                dipole_ints_oo = np.array([
+                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+                    for x in range(dof)
+                ])
+                dipole_ints_vv = np.array([
+                    np.linalg.multi_dot([mo_vir.T, dipole_ints_ao[x], mo_vir])
+                    for x in range(dof)
+                ])
+
+                # Contract with vectors to get dipole contribution to the RHS
+                rhs_dipole_contrib = 0.5 * (
+                    np.einsum('xja,yji->xyia', x_minus_y, dipole_ints_oo) +
+                    np.einsum('yja,xji->xyia', x_minus_y, dipole_ints_oo)).reshape(
+                        dof**2, nocc, nvir)
+
+                rhs_dipole_contrib += 0.5 * (
+                    -np.einsum('xib,yab->xyia', x_minus_y, dipole_ints_vv) -
+                    np.einsum('yib,xab->xyia', x_minus_y, dipole_ints_vv)).reshape(
+                        dof**2, nocc, nvir)
+
+                rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
+
+                # Add DFT E[3] contribution to the RHS:
+                if self._dft:
+                    gxc_ao = np.zeros((dof**2, nao, nao))
+
+                    for i in range(dof**2):
+                        gxc_ao[i] = fock_gxc_ao.alpha_to_numpy(2 * i)
+
+                    gxc_mo = np.einsum('mi,xmn,na->xia', mo_occ, gxc_ao, mo_vir)
+                    # different factor compared to TDDFT orbital response
+                    # because here vectors are scaled by 1/sqrt(2)
+                    rhs_mo += 0.5 * gxc_mo
+
+            self.profiler.stop_timer('RHS')
+
+            # DEBUG: timing
+            self.profiler.print_timing(self.ostream)
+            self.profiler.print_profiling_summary(self.ostream)
+
+            # TODO: final return is nested dictionary
+            #       dict below belongs to a frequency key
+            if self.rank == mpi_master():
+                #return {
+                orbrsp_rhs[(self.frequency)] = {
+                    'cphf_rhs': rhs_mo,
+                    'dm_oo': dm_oo,
+                    'dm_vv': dm_vv,
+                    'x_plus_y_ao': x_plus_y_ao,
+                    'x_minus_y_ao': x_minus_y_ao,
+                    'unrel_dm_ao': unrel_dm_ao,
+                    'fock_ao_rhs': fock_ao_rhs,
+                    'fock_gxc_ao': fock_gxc_ao, # None if not DFT
+                }
+                # TODO: beware this might be an ugly solution
+                if (f==0):
+                    tot_rhs_mo = rhs_mo
+                else:
+                    tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
+            else:
+                #return {}
+                None
+        
         if self.rank == mpi_master():
-            return {
-                'cphf_rhs': rhs_mo,
-                'dm_oo': dm_oo,
-                'dm_vv': dm_vv,
-                'x_plus_y_ao': x_plus_y_ao,
-                'x_minus_y_ao': x_minus_y_ao,
-                'unrel_dm_ao': unrel_dm_ao,
-                'fock_ao_rhs': fock_ao_rhs,
-                'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
-            }
+            orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
+            return orbrsp_rhs
         else:
             return {}
 
@@ -711,8 +746,12 @@ class PolOrbitalResponse(CphfSolver):
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = 'Frequency                       : {:.5f}'.format(
-            self.frequency)
+        #cur_str = 'Frequency                       : {:.5f}'.format(
+        #    self.frequency)
+        #self.ostream.print_header(cur_str.ljust(str_width))
+
+        cur_str = ('Number of frequencies          : ' + 
+            str(len(self.frequencies)) ) 
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'Vector components               : ' + self.vector_components
