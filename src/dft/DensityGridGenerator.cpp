@@ -262,7 +262,7 @@ generateDensityForMGGA(double*             rho,
         auto grid_batch_offset = mathfunc::batch_offset(npoints, thread_id, nthreads);
 
 #pragma omp simd
-        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int64_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
             // rho_a
             rho[2 * g + 0] = 0.0;
@@ -279,12 +279,12 @@ generateDensityForMGGA(double*             rho,
             tau[2 * g + 0] = 0.0;
         }
 
-        for (int32_t nu = 0; nu < naos; nu++)
+        for (int64_t nu = 0; nu < naos; nu++)
         {
             auto nu_offset = nu * npoints;
 
 #pragma omp simd
-            for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+            for (int64_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
             {
                 // rho_a
                 rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
@@ -305,7 +305,7 @@ generateDensityForMGGA(double*             rho,
         }
 
 #pragma omp simd
-        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int64_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
             // rho_b
             rho[2 * g + 1] = rho[2 * g + 0];
@@ -323,7 +323,7 @@ generateDensityForMGGA(double*             rho,
         }
 
 #pragma omp simd
-        for (int32_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
+        for (int64_t g = grid_batch_offset; g < grid_batch_offset + grid_batch_size; g++)
         {
             // simga_aa, sigma_ab, sigma_bb
 

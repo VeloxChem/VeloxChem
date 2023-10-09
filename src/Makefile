@@ -20,7 +20,17 @@ else
 endif 
 
 # Add includes directories
-VLX_INCLUDES := ${shell find * -not -path pymodule -type d -print}
+VLX_INCLUDES := ${shell find * \
+					-not -path pymodule \
+					-not -path t2c_nuclear_potential_geom_020 \
+					-not -path t2c_overlap_geom_101 \
+					-not -path t2c_overlap_geom_200 \
+					-not -path t2c_overlap_geom_201 \
+					-not -path t2c_overlap_geom_202 \
+					-not -path t2c_overlap_geom_300 \
+					-not -path t2c_overlap_geom_301 \
+					-not -path t2c_overlap_geom_400 \
+					-type d -print}
 
 # Update CXX flags & includes path
 CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
@@ -30,7 +40,17 @@ vpath %.hpp $(VLX_INCLUDES)
 CXXFLAGS += $(MATH_INC)
 
 # Add list of internal libraries
-VLX_LIBS_DIR := ${shell find * -not -path pymodule -type d -print}
+VLX_LIBS_DIR := ${shell find * \
+					-not -path pymodule \
+					-not -path t2c_nuclear_potential_geom_020 \
+					-not -path t2c_overlap_geom_101 \
+					-not -path t2c_overlap_geom_200 \
+					-not -path t2c_overlap_geom_201 \
+					-not -path t2c_overlap_geom_202 \
+					-not -path t2c_overlap_geom_300 \
+					-not -path t2c_overlap_geom_301 \
+					-not -path t2c_overlap_geom_400 \
+					-type d -print}
 
 # Generate all internal libraries related files
 VLX_LIBS = $(foreach d,$(VLX_LIBS_DIR),$(addsuffix .a,$(addprefix $d/,$d)))
@@ -73,4 +93,4 @@ clean:
 .PHONY: $(VLX_LIBS) $(VLX_LIBS_DIR)
 $(VLX_LIBS): $(VLX_LIBS_DIR)
 $(VLX_LIBS_DIR):
-	make --directory=$@ $(MAKECMDGOALS)
+	$(MAKE) --directory=$@ $(MAKECMDGOALS)

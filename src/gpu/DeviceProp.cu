@@ -23,34 +23,36 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <pybind11/pybind11.h>
+#include "DeviceProp.hpp"
 
-#include "ExportDFT.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportGpu.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+namespace gpu {  // gpu namespace
 
-PYBIND11_MODULE(veloxchemlib, m)
+void
+getDevicesProperty(std::vector<std::string>& namesOfDevices,
+                   std::vector<int64_t>&     globalMemoryOfDevices,
+                   std::vector<int64_t>&     computeMajorCapabilityOfDevices,
+                   std::vector<int64_t>&     computeMinorCapabilityOfDevices)
 {
-    vlx_general::export_general(m);
-
 #ifdef ENABLE_GPU
-    vlx_gpu::export_gpu(m);
+    int device_count = 0;
+
+    cudaGetDeviceCount(&device_count);
+
+    for (int i = 0; i < device_count; i++)
+    {
+        cudaDeviceProp prop;
+
+        cudaGetDeviceProperties(&prop, i);
+
+        namesOfDevices.push_back(std::string(prop.name));
+
+        globalMemoryOfDevices.push_back(static_cast<int64_t>(prop.totalGlobalMem));
+
+        computeMajorCapabilityOfDevices.push_back(static_cast<int64_t>(prop.major));
+
+        computeMinorCapabilityOfDevices.push_back(static_cast<int64_t>(prop.minor));
+    }
 #endif
-
-    vlx_math::export_math(m);
-
-    vlx_moldata::export_moldata(m);
-
-    vlx_orbdata::export_orbdata(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
 }
+
+}  // namespace gpu

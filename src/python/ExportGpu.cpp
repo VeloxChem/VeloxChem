@@ -23,34 +23,35 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include "ExportGpu.hpp"
+
 #include <pybind11/pybind11.h>
 
-#include "ExportDFT.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportGpu.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+#include "CudaDevices.hpp"
 
-PYBIND11_MODULE(veloxchemlib, m)
+namespace py = pybind11;
+
+namespace vlx_gpu {  // vlx_gpu namespace
+
+// Helper function for printing CCudaDevices
+
+static std::string
+CCudaDevices_str(const CCudaDevices& self)
 {
-    vlx_general::export_general(m);
-
-#ifdef ENABLE_GPU
-    vlx_gpu::export_gpu(m);
-#endif
-
-    vlx_math::export_math(m);
-
-    vlx_moldata::export_moldata(m);
-
-    vlx_orbdata::export_orbdata(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
+    return self.getString();
 }
+
+// Exports classes/functions in src/gpu to python
+
+void
+export_gpu(py::module& m)
+{
+    // CCudaDevices class
+
+    py::class_<CCudaDevices, std::shared_ptr<CCudaDevices>>(m, "CudaDevices")
+        .def(py::init<>())
+        .def("get_number_devices", &CCudaDevices::getNumberOfDevices)
+        .def("__str__", &CCudaDevices_str);
+}
+
+}  // namespace vlx_gpu

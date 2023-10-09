@@ -23,34 +23,20 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#ifndef ExportGpu_hpp
+#define ExportGpu_hpp
+
 #include <pybind11/pybind11.h>
 
-#include "ExportDFT.hpp"
-#include "ExportGeneral.hpp"
-#include "ExportGpu.hpp"
-#include "ExportMath.hpp"
-#include "ExportMoldata.hpp"
-#include "ExportOrbdata.hpp"
-#include "ExportT2CIntegrals.hpp"
-#include "ExportT4CIntegrals.hpp"
+namespace py = pybind11;
 
-PYBIND11_MODULE(veloxchemlib, m)
-{
-    vlx_general::export_general(m);
+namespace vlx_gpu {  // vlx_gpu namespace
 
-#ifdef ENABLE_GPU
-    vlx_gpu::export_gpu(m);
-#endif
+/**
+ Exports classes/functions in src/gpu to python.
+ */
+void export_gpu(py::module& m);
 
-    vlx_math::export_math(m);
+}  // namespace vlx_gpu
 
-    vlx_moldata::export_moldata(m);
-
-    vlx_orbdata::export_orbdata(m);
-
-    vlx_dft::export_dft(m);
-
-    vlx_t2cintegrals::export_t2cintegrals(m);
-
-    vlx_t4cintegrals::export_t4cintegrals(m);
-}
+#endif /* ExportGpu_hpp */

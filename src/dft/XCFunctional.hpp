@@ -28,6 +28,7 @@
 
 #include <xc.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
