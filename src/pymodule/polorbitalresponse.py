@@ -18,6 +18,8 @@ class PolOrbitalResponse(CphfSolver):
     Instance variables
         - frequency: The frequency for which the polarizability
             gradient is computed.
+        - frequencies: The sequence of  frequencies for which the 
+            polarizability gradient is computed.
         - vector_components: The components of the response vectors
             corresponding to the operator components in linear response.
     """
@@ -121,7 +123,7 @@ class PolOrbitalResponse(CphfSolver):
 
         orbrsp_rhs = {}
         for f, w in enumerate(self.frequencies):
-            self.ostream.print_info('Building RHS for w={:f}'.format(w))
+            self.ostream.print_info('Building RHS for w = {:f}'.format(w))
             self.ostream.flush()
             self.frequency = w
             if self.rank == mpi_master():
@@ -161,10 +163,6 @@ class PolOrbitalResponse(CphfSolver):
                 # Number of vector components
                 dof = exc_vec.shape[0]
                 #n_freqs = len(self.frequencies)
-
-                # array to hold multi-freq rhs
-                # TODO: this is ugly
-                #tot_rhs_mo = np.zeros((n_freqs* dof**2, nocc, nvir))
 
                 # Construct plus/minus combinations of excitation and
                 # de-excitation part
@@ -483,246 +481,258 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
+                
+        # TODO: temp. solution
+        n_freqs = len(self.frequencies)
 
-        if self.rank == mpi_master():
+        for f, w in enumerate(self.frequencies):
+            self.ostream.print_info('Building omega for w = {:f}'.format(w))
+            self.ostream.flush()
+            if self.rank == mpi_master():
 
-            # Get overlap, MO coefficients from scf_tensors
-            ovlp = scf_tensors['S']
-            nocc = molecule.number_of_alpha_electrons()
-            mo = scf_tensors['C']
-            mo_occ = mo[:, :nocc]
-            mo_vir = mo[:, nocc:]
-            nocc = mo_occ.shape[1]
-            nvir = mo_vir.shape[1]
-            nao = mo_occ.shape[0]
+                # Get overlap, MO coefficients from scf_tensors
+                ovlp = scf_tensors['S']
+                nocc = molecule.number_of_alpha_electrons()
+                mo = scf_tensors['C']
+                mo_occ = mo[:, :nocc]
+                mo_vir = mo[:, nocc:]
+                nocc = mo_occ.shape[1]
+                nvir = mo_vir.shape[1]
+                nao = mo_occ.shape[0]
 
-            mo_energies = scf_tensors['E']
-            eocc = mo_energies[:nocc]
-            evir = mo_energies[nocc:]
-            eo_diag = np.diag(eocc)
-            ev_diag = np.diag(evir)
+                mo_energies = scf_tensors['E']
+                eocc = mo_energies[:nocc]
+                evir = mo_energies[nocc:]
+                eo_diag = np.diag(eocc)
+                ev_diag = np.diag(evir)
 
-            # Get fock matrices from cphf_results
-            fock_ao_rhs = self.cphf_results['fock_ao_rhs']
-            fock_gxc_ao = self.cphf_results['fock_gxc_ao']
-            dm_oo = self.cphf_results['dm_oo']
-            dm_vv = self.cphf_results['dm_vv']
-            cphf_ov = self.cphf_results['cphf_ov']
+                # Get fock matrices from cphf_results
+                fock_ao_rhs = self.cphf_results[w]['fock_ao_rhs']
+                fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
+                dm_oo = self.cphf_results[w]['dm_oo']
+                dm_vv = self.cphf_results[w]['dm_vv']
+                #cphf_ov = self.cphf_results[w]['cphf_ov']
 
-            # TODO: do we keep this factor like that?
-            sqrt2 = np.sqrt(2.0)
+                # TODO: tmp workaround for splitting ov into frequencies
+                cphf_ov = self.cphf_results['cphf_ov']
+                dof = int(cphf_ov.shape[0] / n_freqs)
+                cphf_ov = cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
 
-            exc_vec = 1 / sqrt2 * np.array([
-                self.get_full_solution_vector(lr_results['solutions'][
-                    x, self.frequency])[:nocc * nvir].reshape(nocc, nvir)
-                for x in self.vector_components
-            ])
-            deexc_vec = 1 / sqrt2 * np.array([
-                self.get_full_solution_vector(lr_results['solutions'][
-                    x, self.frequency])[nocc * nvir:].reshape(nocc, nvir)
-                for x in self.vector_components
-            ])
+                # TODO: do we keep this factor like that?
+                sqrt2 = np.sqrt(2.0)
 
-            # Number of vector components
-            dof = exc_vec.shape[0]
+                exc_vec = 1 / sqrt2 * np.array([
+                    self.get_full_solution_vector(lr_results['solutions'][
+                        x, self.frequency])[:nocc * nvir].reshape(nocc, nvir)
+                    for x in self.vector_components
+                ])
+                deexc_vec = 1 / sqrt2 * np.array([
+                    self.get_full_solution_vector(lr_results['solutions'][
+                        x, self.frequency])[nocc * nvir:].reshape(nocc, nvir)
+                    for x in self.vector_components
+                ])
 
-            x_plus_y = exc_vec + deexc_vec
-            x_minus_y = exc_vec - deexc_vec
+                # Number of vector components
+                dof = exc_vec.shape[0]
 
-            # Get dipole moment integrals and transform to MO
-            dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
-            dipole_mats = dipole_drv.compute(molecule, basis)
-            dipole_ints_ao = np.zeros((dof, nao, nao))
-            k = 0
-            if 'x' in self.vector_components:
-                dipole_ints_ao[k] = dipole_mats.x_to_numpy()
-                k += 1
-            if 'y' in self.vector_components:
-                dipole_ints_ao[k] = dipole_mats.y_to_numpy()
-                k += 1
-            if 'z' in self.vector_components:
-                dipole_ints_ao[k] = dipole_mats.z_to_numpy()
+                x_plus_y = exc_vec + deexc_vec
+                x_minus_y = exc_vec - deexc_vec
 
-            # Transform them to MO basis (oo and ov blocks only)
-            dipole_ints_oo = np.array([
-                np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
-                for x in range(dof)
-            ])
-            dipole_ints_ov = np.array([
-                np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
-                for x in range(dof)
-            ])
+                # Get dipole moment integrals and transform to MO
+                dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+                dipole_mats = dipole_drv.compute(molecule, basis)
+                dipole_ints_ao = np.zeros((dof, nao, nao))
+                k = 0
+                if 'x' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
+                    k += 1
+                if 'y' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
+                    k += 1
+                if 'z' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
 
-            # Calculate the dipole moment integrals' contribution to omega
-            dipole_ints_contrib_oo = 0.5 * (
-                np.einsum('xjc,yic->xyij', x_minus_y, dipole_ints_ov) +
-                np.einsum('yjc,xic->xyij', x_minus_y, dipole_ints_ov))
-            dipole_ints_contrib_ov = 0.5 * (
-                np.einsum('xka,yki->xyia', x_minus_y, dipole_ints_oo) +
-                np.einsum('yka,xki->xyia', x_minus_y, dipole_ints_oo))
+                # Transform them to MO basis (oo and ov blocks only)
+                dipole_ints_oo = np.array([
+                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+                    for x in range(dof)
+                ])
+                dipole_ints_ov = np.array([
+                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
+                    for x in range(dof)
+                ])
 
-            dipole_ints_contrib_vv = 0.5 * (
-                np.einsum('xkb,yka->xyab', x_minus_y, dipole_ints_ov) +
-                np.einsum('ykb,xka->xyab', x_minus_y, dipole_ints_ov))
-            dipole_ints_contrib_ao = (
-                np.einsum('mi,xyij,nj->xymn', mo_occ, dipole_ints_contrib_oo,
-                          mo_occ) + np.einsum('mi,xyia,na->xymn', mo_occ,
-                                              dipole_ints_contrib_ov, mo_vir) +
-                np.einsum('mi,xyia,na->xymn', mo_occ, dipole_ints_contrib_ov,
-                          mo_vir).transpose(0, 1, 3, 2) +
-                np.einsum('ma,xyab,nb->xymn', mo_vir, dipole_ints_contrib_vv,
-                          mo_vir))
+                # Calculate the dipole moment integrals' contribution to omega
+                dipole_ints_contrib_oo = 0.5 * (
+                    np.einsum('xjc,yic->xyij', x_minus_y, dipole_ints_ov) +
+                    np.einsum('yjc,xic->xyij', x_minus_y, dipole_ints_ov))
+                dipole_ints_contrib_ov = 0.5 * (
+                    np.einsum('xka,yki->xyia', x_minus_y, dipole_ints_oo) +
+                    np.einsum('yka,xki->xyia', x_minus_y, dipole_ints_oo))
 
-            # Transform the vectors to the AO basis
-            x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
-            x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
-                                     mo_vir)
+                dipole_ints_contrib_vv = 0.5 * (
+                    np.einsum('xkb,yka->xyab', x_minus_y, dipole_ints_ov) +
+                    np.einsum('ykb,xka->xyab', x_minus_y, dipole_ints_ov))
+                dipole_ints_contrib_ao = (
+                    np.einsum('mi,xyij,nj->xymn', mo_occ, dipole_ints_contrib_oo,
+                              mo_occ) + np.einsum('mi,xyia,na->xymn', mo_occ,
+                                                  dipole_ints_contrib_ov, mo_vir) +
+                    np.einsum('mi,xyia,na->xymn', mo_occ, dipole_ints_contrib_ov,
+                              mo_vir).transpose(0, 1, 3, 2) +
+                    np.einsum('ma,xyab,nb->xymn', mo_vir, dipole_ints_contrib_vv,
+                              mo_vir))
 
-            # The density matrix; only alpha block;
-            # Only works for the restricted case
-            # (since scf_tensors['C'] only gives alpha block...)
-            D_occ = np.matmul(mo_occ, mo_occ.T)
-            D_vir = np.matmul(mo_vir, mo_vir.T)
+                # Transform the vectors to the AO basis
+                x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
+                x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
+                                         mo_vir)
 
-            # Construct fock_lambda (or fock_cphf)
-            cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_ov, mo_vir)
-            cphf_ao_list = list([cphf_ao[x] for x in range(dof**2)])
-            ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
-        else:
-            ao_density_cphf = AODensityMatrix()
+                # The density matrix; only alpha block;
+                # Only works for the restricted case
+                # (since scf_tensors['C'] only gives alpha block...)
+                D_occ = np.matmul(mo_occ, mo_occ.T)
+                D_vir = np.matmul(mo_vir, mo_vir.T)
 
-        ao_density_cphf.broadcast(self.rank, self.comm)
-        fock_cphf = AOFockMatrix(ao_density_cphf)
+                # Construct fock_lambda (or fock_cphf)
+                cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_ov, mo_vir)
+                cphf_ao_list = list([cphf_ao[x] for x in range(dof**2)])
+                ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
+            else:
+                ao_density_cphf = AODensityMatrix()
 
-        # TODO: what has to be on MPI master and what not?
-        self._comp_lr_fock(fock_cphf, ao_density_cphf, molecule, basis,
-                           eri_dict, dft_dict, pe_dict, self.profiler)
+            ao_density_cphf.broadcast(self.rank, self.comm)
+            fock_cphf = AOFockMatrix(ao_density_cphf)
 
-        # TODO: replace for-loops with np.einsum
-        # For now we:
-        # - loop over indices m and n
-        # - select component m or n in x_plus_y, x_minus_y, fock_ao_rhs and fock_lambda
-        # - symmetrize with respect to m and n (only 2PDM?)
-        # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
-        # the contraction of the 1PDMs with ERIs; dof matrices corresponding
-        # to the contraction of x_plus_y; and other dof matrices corresponding to
-        # the contraction of x_minus_y.
+            # TODO: what has to be on MPI master and what not?
+            self._comp_lr_fock(fock_cphf, ao_density_cphf, molecule, basis,
+                               eri_dict, dft_dict, pe_dict, self.profiler)
 
-        # TODO: what shape should we use: (dof**2, nao, nao)
-        #       or (dof, dof, nao, nao)?
-        omega = np.zeros((dof * dof, nao, nao))
+            # TODO: replace for-loops with np.einsum
+            # For now we:
+            # - loop over indices m and n
+            # - select component m or n in x_plus_y, x_minus_y, fock_ao_rhs and fock_lambda
+            # - symmetrize with respect to m and n (only 2PDM?)
+            # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
+            # the contraction of the 1PDMs with ERIs; dof matrices corresponding
+            # to the contraction of x_plus_y; and other dof matrices corresponding to
+            # the contraction of x_minus_y.
 
-        # Calculate omega (without for-loops, only the diagonal parts
-        # possible for now)
-        # Construct epsilon_dm_ao
-        epsilon_dm_ao = -np.einsum('mi,ii,xyij,nj->xymn', mo_occ, eo_diag,
-                                   dm_oo, mo_occ)
-        epsilon_dm_ao -= np.einsum('ma,aa,xyab,nb->xymn', mo_vir, ev_diag,
-                                   dm_vv, mo_vir)
-        epsilon_cphf_ao = np.einsum('mi,ii,xyia,na->xymn', mo_occ, eo_diag,
-                                    cphf_ov.reshape(dof, dof, nocc, nvir),
-                                    mo_vir)
-        # OV + VO
-        epsilon_dm_ao -= (epsilon_cphf_ao +
-                          epsilon_cphf_ao.transpose(0, 1, 3, 2))
+            # TODO: what shape should we use: (dof**2, nao, nao)
+            #       or (dof, dof, nao, nao)?
+            omega = np.zeros((dof * dof, nao, nao))
 
-        for m in range(dof):
-            for n in range(dof):
-                # TODO: move outside for-loop when all Fock matrices can be
-                # extracted into a numpy array at the same time.
+            # Calculate omega (without for-loops, only the diagonal parts
+            # possible for now)
+            # Construct epsilon_dm_ao
+            epsilon_dm_ao = -np.einsum('mi,ii,xyij,nj->xymn', mo_occ, eo_diag,
+                                       dm_oo, mo_occ)
+            epsilon_dm_ao -= np.einsum('ma,aa,xyab,nb->xymn', mo_vir, ev_diag,
+                                       dm_vv, mo_vir)
+            epsilon_cphf_ao = np.einsum('mi,ii,xyia,na->xymn', mo_occ, eo_diag,
+                                        cphf_ov.reshape(dof, dof, nocc, nvir),
+                                        mo_vir)
+            # OV + VO
+            epsilon_dm_ao -= (epsilon_cphf_ao +
+                              epsilon_cphf_ao.transpose(0, 1, 3, 2))
 
-                # Because the excitation vector is not symmetric,
-                # we need both the matrix (OO block in omega, and probably VO)
-                # and its transpose (VV, OV blocks)
-                # this comes from the transformation of the 2PDM contribution
-                # from MO to AO basis
-                fock_ao_rhs_1_m = fock_ao_rhs.alpha_to_numpy(dof**2 +
-                                                             m)  # x_plus_y
-                fock_ao_rhs_2_m = fock_ao_rhs.alpha_to_numpy(dof**2 + dof +
-                                                             m)  # x_minus_y
+            for m in range(dof):
+                for n in range(dof):
+                    # TODO: move outside for-loop when all Fock matrices can be
+                    # extracted into a numpy array at the same time.
 
-                fock_ao_rhs_1_n = fock_ao_rhs.alpha_to_numpy(dof**2 +
-                                                             n)  # x_plus_y
-                fock_ao_rhs_2_n = fock_ao_rhs.alpha_to_numpy(dof**2 + dof +
-                                                             n)  # x_minus_y
+                    # Because the excitation vector is not symmetric,
+                    # we need both the matrix (OO block in omega, and probably VO)
+                    # and its transpose (VV, OV blocks)
+                    # this comes from the transformation of the 2PDM contribution
+                    # from MO to AO basis
+                    fock_ao_rhs_1_m = fock_ao_rhs.alpha_to_numpy(dof**2 +
+                                                                 m)  # x_plus_y
+                    fock_ao_rhs_2_m = fock_ao_rhs.alpha_to_numpy(dof**2 + dof +
+                                                                 m)  # x_minus_y
 
-                Fp1_vv = 0.25 * (np.linalg.multi_dot([
-                    fock_ao_rhs_1_m.T, x_plus_y_ao[n], ovlp.T
-                ]) + np.linalg.multi_dot(
-                    [fock_ao_rhs_1_n.T, x_plus_y_ao[m], ovlp.T]))
+                    fock_ao_rhs_1_n = fock_ao_rhs.alpha_to_numpy(dof**2 +
+                                                                 n)  # x_plus_y
+                    fock_ao_rhs_2_n = fock_ao_rhs.alpha_to_numpy(dof**2 + dof +
+                                                                 n)  # x_minus_y
 
-                Fm1_vv = 0.25 * (np.linalg.multi_dot([
-                    fock_ao_rhs_2_m.T, x_minus_y_ao[n], ovlp.T
-                ]) + np.linalg.multi_dot(
-                    [fock_ao_rhs_2_n.T, x_minus_y_ao[m], ovlp.T]))
+                    Fp1_vv = 0.25 * (np.linalg.multi_dot([
+                        fock_ao_rhs_1_m.T, x_plus_y_ao[n], ovlp.T
+                    ]) + np.linalg.multi_dot(
+                        [fock_ao_rhs_1_n.T, x_plus_y_ao[m], ovlp.T]))
 
-                Fp2_vv = 0.25 * (np.linalg.multi_dot([
-                    fock_ao_rhs_1_m, x_plus_y_ao[n], ovlp.T
-                ]) + np.linalg.multi_dot(
-                    [fock_ao_rhs_1_n, x_plus_y_ao[m], ovlp.T]))
+                    Fm1_vv = 0.25 * (np.linalg.multi_dot([
+                        fock_ao_rhs_2_m.T, x_minus_y_ao[n], ovlp.T
+                    ]) + np.linalg.multi_dot(
+                        [fock_ao_rhs_2_n.T, x_minus_y_ao[m], ovlp.T]))
 
-                Fm2_vv = 0.25 * (np.linalg.multi_dot([
-                    fock_ao_rhs_2_m, x_minus_y_ao[n], ovlp.T
-                ]) + np.linalg.multi_dot(
-                    [fock_ao_rhs_2_n, x_minus_y_ao[m], ovlp.T]))
+                    Fp2_vv = 0.25 * (np.linalg.multi_dot([
+                        fock_ao_rhs_1_m, x_plus_y_ao[n], ovlp.T
+                    ]) + np.linalg.multi_dot(
+                        [fock_ao_rhs_1_n, x_plus_y_ao[m], ovlp.T]))
 
-                Fp1_oo = 0.25 * (np.linalg.multi_dot([
-                    fock_ao_rhs_1_m, x_plus_y_ao[n].T, ovlp.T
-                ]) + np.linalg.multi_dot(
-                    [fock_ao_rhs_1_n, x_plus_y_ao[m].T, ovlp.T]))
+                    Fm2_vv = 0.25 * (np.linalg.multi_dot([
+                        fock_ao_rhs_2_m, x_minus_y_ao[n], ovlp.T
+                    ]) + np.linalg.multi_dot(
+                        [fock_ao_rhs_2_n, x_minus_y_ao[m], ovlp.T]))
 
-                Fm1_oo = 0.25 * (np.linalg.multi_dot([
-                    fock_ao_rhs_2_m, x_minus_y_ao[n].T, ovlp.T
-                ]) + np.linalg.multi_dot(
-                    [fock_ao_rhs_2_n, x_minus_y_ao[m].T, ovlp.T]))
+                    Fp1_oo = 0.25 * (np.linalg.multi_dot([
+                        fock_ao_rhs_1_m, x_plus_y_ao[n].T, ovlp.T
+                    ]) + np.linalg.multi_dot(
+                        [fock_ao_rhs_1_n, x_plus_y_ao[m].T, ovlp.T]))
 
-                Fp2_oo = 0.25 * (np.linalg.multi_dot([
-                    fock_ao_rhs_1_m.T, x_plus_y_ao[n].T, ovlp.T
-                ]) + np.linalg.multi_dot(
-                    [fock_ao_rhs_1_n.T, x_plus_y_ao[m].T, ovlp.T]))
+                    Fm1_oo = 0.25 * (np.linalg.multi_dot([
+                        fock_ao_rhs_2_m, x_minus_y_ao[n].T, ovlp.T
+                    ]) + np.linalg.multi_dot(
+                        [fock_ao_rhs_2_n, x_minus_y_ao[m].T, ovlp.T]))
 
-                Fm2_oo = 0.25 * (np.linalg.multi_dot([
-                    fock_ao_rhs_2_m.T, x_minus_y_ao[n].T, ovlp.T
-                ]) + np.linalg.multi_dot(
-                    [fock_ao_rhs_2_n.T, x_minus_y_ao[m].T, ovlp.T]))
-                # We see that:
-                # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
-                # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
+                    Fp2_oo = 0.25 * (np.linalg.multi_dot([
+                        fock_ao_rhs_1_m.T, x_plus_y_ao[n].T, ovlp.T
+                    ]) + np.linalg.multi_dot(
+                        [fock_ao_rhs_1_n.T, x_plus_y_ao[m].T, ovlp.T]))
 
-                # Compute the contributions from the 2PDM and the relaxed 1PDM
-                # to the omega Lagrange multipliers:
-                fmat = (fock_cphf.alpha_to_numpy(m * dof + n) +
-                        fock_cphf.alpha_to_numpy(m * dof + n).T +
-                        fock_ao_rhs.alpha_to_numpy(m * dof + n))
-                # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
-                #        (2,0), (2,1), (2,2) * dof
-                # gamma_{zx} =
+                    Fm2_oo = 0.25 * (np.linalg.multi_dot([
+                        fock_ao_rhs_2_m.T, x_minus_y_ao[n].T, ovlp.T
+                    ]) + np.linalg.multi_dot(
+                        [fock_ao_rhs_2_n.T, x_minus_y_ao[m].T, ovlp.T]))
+                    # We see that:
+                    # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
+                    # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
 
-                omega_1pdm_2pdm_contribs = -(
-                    np.linalg.multi_dot(
-                        [D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]) +
-                    np.linalg.multi_dot(
-                        [D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]) +
-                    np.linalg.multi_dot(
-                        [D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]).T +
-                    np.linalg.multi_dot(
-                        [D_occ, Fp1_oo + Fm1_oo - Fp2_oo + Fm2_oo, D_occ]) +
-                    np.linalg.multi_dot([D_occ, fmat, D_occ]))
+                    # Compute the contributions from the 2PDM and the relaxed 1PDM
+                    # to the omega Lagrange multipliers:
+                    fmat = (fock_cphf.alpha_to_numpy(m * dof + n) +
+                            fock_cphf.alpha_to_numpy(m * dof + n).T +
+                            fock_ao_rhs.alpha_to_numpy(m * dof + n))
+                    # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
+                    #        (2,0), (2,1), (2,2) * dof
+                    # gamma_{zx} =
 
-                omega[m * dof + n] = (
-                    epsilon_dm_ao[m, n] + omega_1pdm_2pdm_contribs +
-                    dipole_ints_contrib_ao[m, n]
-                )
+                    omega_1pdm_2pdm_contribs = -(
+                        np.linalg.multi_dot(
+                            [D_vir, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]) +
+                        np.linalg.multi_dot(
+                            [D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]) +
+                        np.linalg.multi_dot(
+                            [D_occ, Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir]).T +
+                        np.linalg.multi_dot(
+                            [D_occ, Fp1_oo + Fm1_oo - Fp2_oo + Fm2_oo, D_occ]) +
+                        np.linalg.multi_dot([D_occ, fmat, D_occ]))
 
-                if self._dft:
-                    factor = -0.5
-                    omega[m * dof + n] += factor * np.linalg.multi_dot([
-                        D_occ,
-                        fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)), D_occ
-                    ])
+                    omega[m * dof + n] = (
+                        epsilon_dm_ao[m, n] + omega_1pdm_2pdm_contribs +
+                        dipole_ints_contrib_ao[m, n]
+                    )
 
-        # add omega multipliers in AO basis to cphf_results dictionary
-        self.cphf_results['omega_ao'] = omega
+                    if self._dft:
+                        factor = -0.5
+                        omega[m * dof + n] += factor * np.linalg.multi_dot([
+                            D_occ,
+                            fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)), D_occ
+                        ])
+
+            # add omega multipliers in AO basis to cphf_results dictionary
+            #self.cphf_results['omega_ao'] = omega
+            self.cphf_results[(w)]['omega_ao'] = omega
 
     def print_cphf_header(self, title):
         self.ostream.print_blank()
@@ -750,7 +760,7 @@ class PolOrbitalResponse(CphfSolver):
         #    self.frequency)
         #self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = ('Number of frequencies          : ' + 
+        cur_str = ('Number of frequencies           : ' + 
             str(len(self.frequencies)) ) 
         self.ostream.print_header(cur_str.ljust(str_width))
 
