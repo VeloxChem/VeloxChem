@@ -34,10 +34,7 @@
 #include "DftFunc.hpp"
 #include "GtoFunc.hpp"
 #include "GtoValues.hpp"
-#include "GtoValuesRecD.hpp"
 #include "GtoValuesRecF.hpp"
-#include "GtoValuesRecP.hpp"
-#include "GtoValuesRecS.hpp"
 #include "MathFunc.hpp"
 #include "MatrixFunc.hpp"
 #include "Prescreener.hpp"
@@ -98,7 +95,7 @@ cudaLdaValuesRecS(double*        gto_values,
 }
 
 __global__ void
-cudaLdaValuesRecP(double*        gto_values_p,
+cudaLdaValuesRecP(double*        gto_values_p3,
                   const double*  gto_info,
                   const double*  grid_xyz,
                   const uint32_t nrows,
@@ -115,9 +112,9 @@ cudaLdaValuesRecP(double*        gto_values_p,
 
         for (uint32_t i = 0, idx = 0; i < nrows; i++)
         {
-            gto_values_p[g + i * ncols]                     = 0.0;
-            gto_values_p[g + i * ncols + nrows * ncols]     = 0.0;
-            gto_values_p[g + i * ncols + nrows * ncols * 2] = 0.0;
+            gto_values_p3[g + i * ncols]                     = 0.0;
+            gto_values_p3[g + i * ncols + nrows * ncols]     = 0.0;
+            gto_values_p3[g + i * ncols + nrows * ncols * 2] = 0.0;
 
             for (uint32_t j = 0; j < npgtos; j++, idx++)
             {
@@ -133,9 +130,59 @@ cudaLdaValuesRecP(double*        gto_values_p,
 
                 const auto fss = fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
 
-                gto_values_p[g + i * ncols] += gr_x * fss;
-                gto_values_p[g + i * ncols + nrows * ncols] += gr_y * fss;
-                gto_values_p[g + i * ncols + nrows * ncols * 2] += gr_z * fss;
+                gto_values_p3[g + i * ncols] += gr_x * fss;
+                gto_values_p3[g + i * ncols + nrows * ncols] += gr_y * fss;
+                gto_values_p3[g + i * ncols + nrows * ncols * 2] += gr_z * fss;
+            }
+        }
+    }
+}
+
+__global__ void
+cudaLdaValuesRecD(double*        gto_values_d6,
+                  const double*  gto_info,
+                  const double*  grid_xyz,
+                  const uint32_t nrows,
+                  const uint32_t npgtos,
+                  const uint32_t ncols)
+{
+    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (g < ncols)
+    {
+        const auto g_x = grid_xyz[g];
+        const auto g_y = grid_xyz[g + ncols];
+        const auto g_z = grid_xyz[g + ncols * 2];
+
+        for (uint32_t i = 0, idx = 0; i < nrows; i++)
+        {
+            gto_values_d6[g + i * ncols]                     = 0.0;
+            gto_values_d6[g + i * ncols + nrows * ncols]     = 0.0;
+            gto_values_d6[g + i * ncols + nrows * ncols * 2] = 0.0;
+            gto_values_d6[g + i * ncols + nrows * ncols * 3] = 0.0;
+            gto_values_d6[g + i * ncols + nrows * ncols * 4] = 0.0;
+            gto_values_d6[g + i * ncols + nrows * ncols * 5] = 0.0;
+
+            for (uint32_t j = 0; j < npgtos; j++, idx++)
+            {
+                const auto fexp  = gto_info[idx * 5 + 0];
+                const auto fnorm = gto_info[idx * 5 + 1];
+                const auto r_x   = gto_info[idx * 5 + 2];
+                const auto r_y   = gto_info[idx * 5 + 3];
+                const auto r_z   = gto_info[idx * 5 + 4];
+
+                const auto gr_x = g_x - r_x;
+                const auto gr_y = g_y - r_y;
+                const auto gr_z = g_z - r_z;
+
+                const auto fss = fnorm * std::exp(-fexp * (gr_x * gr_x + gr_y * gr_y + gr_z * gr_z));
+
+                gto_values_d6[g + i * ncols] += gr_x * gr_x * fss;
+                gto_values_d6[g + i * ncols + nrows * ncols] += gr_x * gr_y * fss;
+                gto_values_d6[g + i * ncols + nrows * ncols * 2] += gr_x * gr_z * fss;
+                gto_values_d6[g + i * ncols + nrows * ncols * 3] += gr_y * gr_y * fss;
+                gto_values_d6[g + i * ncols + nrows * ncols * 4] += gr_y * gr_z * fss;
+                gto_values_d6[g + i * ncols + nrows * ncols * 5] += gr_z * gr_z * fss;
             }
         }
     }
@@ -240,7 +287,7 @@ getLdaValuesRecS(const CGtoBlock&            gto_block,
     {
         for (int64_t k = 0; k < ncols; k++)
         {
-            submat->at(irow, k, false) = gto_values_h[irow * ncols + k];
+            submat->at(irow, k, false) += gto_values_h[k + irow * ncols];
         }
     }
 
@@ -354,13 +401,147 @@ getLdaValuesRecP(const CGtoBlock&            gto_block,
     {
         for (int64_t k = 0; k < ncols; k++)
         {
-            // buffer_x: 2 * nrows + irow
-            // buffer_y: irow
-            // buffer_z: nrows + irow
+            // buffer_x, 2 * nrows + irow
+            // buffer_y,             irow
+            // buffer_z,     nrows + irow
 
-            submat->at(irow + nrows * 2, k, false) = gto_values_h[k + irow * ncols];
-            submat->at(irow, k, false) = gto_values_h[k + irow * ncols + nrows * ncols];
-            submat->at(irow + nrows, k, false) = gto_values_h[k + irow * ncols + nrows * ncols * 2];
+            submat->at(irow + nrows * 2, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 0];
+            submat->at(irow + nrows * 0, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 1];
+            submat->at(irow + nrows * 1, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 2];
+        }
+    }
+
+    cudaSafe(cudaFreeHost(gto_values_h));
+    cudaSafe(cudaFreeHost(gto_info_h));
+    cudaSafe(cudaFreeHost(grid_xyz_h));
+
+    cudaSafe(cudaFree(gto_values_d));
+    cudaSafe(cudaFree(gto_info_d));
+    cudaSafe(cudaFree(grid_xyz_d));
+
+    return gto_values;
+}
+
+auto
+getLdaValuesRecD(const CGtoBlock&            gto_block,
+                 const std::vector<double>&  grid_coords_x,
+                 const std::vector<double>&  grid_coords_y,
+                 const std::vector<double>&  grid_coords_z,
+                 const std::vector<int64_t>& gtos_mask) -> CMatrix
+{
+    // spherical transformation factors
+
+    const double f2_3 = 2.0 * std::sqrt(3.0);
+
+    // set up GTO values storage
+
+    const auto nrows = mathfunc::countSignificantElements(gtos_mask);
+
+    const auto ncols = static_cast<int64_t>(grid_coords_x.size());
+
+    auto gto_values = matfunc::makeMatrix("LDA", 5 * nrows, ncols);
+
+    auto submat = gto_values.getSubMatrix({0, 0});
+
+    submat->zero();
+
+    // set up GTOs data
+
+    const auto gto_exps = gto_block.getExponents();
+
+    const auto gto_norms = gto_block.getNormalizationFactors();
+
+    const auto gto_coords = gto_block.getCoordinates();
+
+    // set up grid data
+
+    auto g_x = grid_coords_x.data();
+
+    auto g_y = grid_coords_y.data();
+
+    auto g_z = grid_coords_z.data();
+
+    // set GTOs block dimensions
+
+    const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+
+    const auto npgtos = gto_block.getNumberOfPrimitives();
+
+    // set up data on host and device
+
+    double *gto_values_h, *gto_info_h, *grid_xyz_h;
+
+    cudaSafe(cudaMallocHost(&gto_values_h, 6 * nrows * ncols * sizeof(double)));
+    cudaSafe(cudaMallocHost(&gto_info_h, 5 * nrows * npgtos * sizeof(double)));
+    cudaSafe(cudaMallocHost(&grid_xyz_h, 3 * ncols * sizeof(double)));
+
+    double *gto_values_d, *gto_info_d, *grid_xyz_d;
+
+    cudaSafe(cudaMalloc(&gto_values_d, 6 * nrows * ncols * sizeof(double)));
+    cudaSafe(cudaMalloc(&gto_info_d, 5 * nrows * npgtos * sizeof(double)));
+    cudaSafe(cudaMalloc(&grid_xyz_d, 3 * ncols * sizeof(double)));
+
+    for (int64_t i = 0, idx = 0; i < ncgtos; i++)
+    {
+        if (gtos_mask[i] == 1)
+        {
+            const auto r_x = gto_coords[i][0];
+            const auto r_y = gto_coords[i][1];
+            const auto r_z = gto_coords[i][2];
+
+            for (int64_t j = 0; j < npgtos; j++, idx++)
+            {
+                const auto fexp  = gto_exps[j * ncgtos + i];
+                const auto fnorm = gto_norms[j * ncgtos + i];
+
+                gto_info_h[idx * 5 + 0] = fexp;
+                gto_info_h[idx * 5 + 1] = fnorm;
+                gto_info_h[idx * 5 + 2] = r_x;
+                gto_info_h[idx * 5 + 3] = r_y;
+                gto_info_h[idx * 5 + 4] = r_z;
+            }
+        }
+    }
+
+    for (int64_t k = 0; k < ncols; k++)
+    {
+        grid_xyz_h[k]             = g_x[k];
+        grid_xyz_h[k + ncols]     = g_y[k];
+        grid_xyz_h[k + ncols * 2] = g_z[k];
+    }
+
+    cudaSafe(cudaMemcpy(gto_info_d, gto_info_h, 5 * nrows * npgtos * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(grid_xyz_d, grid_xyz_h, 3 * ncols * sizeof(double), cudaMemcpyHostToDevice));
+
+    dim3 threads_per_block(256);
+    dim3 nblocks((ncols + 255) / 256);
+
+    gpu::cudaLdaValuesRecD<<<nblocks, threads_per_block>>>(
+        gto_values_d, gto_info_d, grid_xyz_d, static_cast<uint32_t>(nrows), static_cast<uint32_t>(npgtos), static_cast<uint32_t>(ncols));
+
+    cudaSafe(cudaMemcpy(gto_values_h, gto_values_d, 6 * nrows * ncols * sizeof(double), cudaMemcpyDeviceToHost));
+
+    for (int64_t irow = 0; irow < nrows; irow++)
+    {
+        for (int64_t k = 0; k < ncols; k++)
+        {
+            // buffer_xx, -1.0,        2 * nrows + irow
+            // buffer_xx, 0.5 * f2_3,  4 * nrows + irow
+            // buffer_xy, f2_3,                    irow
+            // buffer_xz, f2_3,        3 * nrows + irow
+            // buffer_yy, -1.0,        2 * nrows + irow
+            // buffer_yy, -0.5 * f2_3, 4 * nrows + irow
+            // buffer_yz, f2_3,            nrows + irow
+            // buffer_zz, 2.0,         2 * nrows + irow
+
+            submat->at(irow + nrows * 2, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 0] * (-1.0);
+            submat->at(irow + nrows * 4, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 0] * 0.5 * f2_3;
+            submat->at(irow + nrows * 0, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 1] * f2_3;
+            submat->at(irow + nrows * 3, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 2] * f2_3;
+            submat->at(irow + nrows * 2, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 3] * (-1.0);
+            submat->at(irow + nrows * 4, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 3] * (-0.5) * f2_3;
+            submat->at(irow + nrows * 1, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 4] * f2_3;
+            submat->at(irow + nrows * 2, k, false) += gto_values_h[k + irow * ncols + nrows * ncols * 5] * 2.0;
         }
     }
 
@@ -394,7 +575,7 @@ getGtoValuesForLda(const CGtoBlock&            gto_block,
     }
     else if (gto_ang == 2)
     {
-        return gtoval::getLdaValuesRecD(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
+        return gpu::getLdaValuesRecD(gto_block, grid_coords_x, grid_coords_y, grid_coords_z, gtos_mask);
     }
     else if (gto_ang == 3)
     {
