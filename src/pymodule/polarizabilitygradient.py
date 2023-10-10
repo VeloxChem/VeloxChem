@@ -149,14 +149,15 @@ class PolarizabilityGradient():
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
         all_orbrsp_results = orbrsp_drv.cphf_results
-        self.ostream.print_info('Finished orbital response')
+        self.ostream.print_info('Finished orbital response calculations')
         self.ostream.print_blank()
         self.ostream.flush()
 
         n_freqs = len(self.frequencies)
         for f, w in enumerate(self.frequencies):
-            self.ostream.print_info('Building gradient for w = {:f}'.format(w))
-            self.ostream.flush()
+            #self.ostream.print_blank()
+            #self.ostream.print_info('Building gradient for w = {:f}'.format(w))
+            
             self.frequency = w 
             orbrsp_results = all_orbrsp_results[w]
             if self.rank == mpi_master():
