@@ -488,6 +488,7 @@ class PolOrbitalResponse(CphfSolver):
         for f, w in enumerate(self.frequencies):
             self.ostream.print_info('Building omega for w = {:f}'.format(w))
             self.ostream.flush()
+            self.frequency = w
             if self.rank == mpi_master():
 
                 # Get overlap, MO coefficients from scf_tensors
@@ -514,9 +515,10 @@ class PolOrbitalResponse(CphfSolver):
                 #cphf_ov = self.cphf_results[w]['cphf_ov']
 
                 # TODO: tmp workaround for splitting ov into frequencies
-                cphf_ov = self.cphf_results['cphf_ov']
-                dof = int(cphf_ov.shape[0] / n_freqs)
-                cphf_ov = cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
+                all_cphf_ov = self.cphf_results['cphf_ov']
+                dof = int(all_cphf_ov.shape[0] / n_freqs)
+                cphf_ov = all_cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
+                print(cphf_ov)
 
                 # TODO: do we keep this factor like that?
                 sqrt2 = np.sqrt(2.0)
