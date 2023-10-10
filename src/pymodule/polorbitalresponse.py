@@ -123,8 +123,8 @@ class PolOrbitalResponse(CphfSolver):
 
         orbrsp_rhs = {}
         for f, w in enumerate(self.frequencies):
-            self.ostream.print_info('Building RHS for w = {:f}'.format(w))
-            self.ostream.flush()
+            #self.ostream.print_info('Building RHS for w = {:f}'.format(w))
+            #self.ostream.flush()
             self.frequency = w
             if self.rank == mpi_master():
 
@@ -486,8 +486,9 @@ class PolOrbitalResponse(CphfSolver):
         n_freqs = len(self.frequencies)
 
         for f, w in enumerate(self.frequencies):
-            self.ostream.print_info('Building omega for w = {:f}'.format(w))
-            self.ostream.flush()
+            #self.ostream.print_blank()
+            #self.ostream.print_info('Building omega for w = {:f}'.format(w))
+            
             self.frequency = w
             if self.rank == mpi_master():
 
@@ -518,7 +519,6 @@ class PolOrbitalResponse(CphfSolver):
                 all_cphf_ov = self.cphf_results['cphf_ov']
                 dof = int(all_cphf_ov.shape[0] / n_freqs)
                 cphf_ov = all_cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
-                print(cphf_ov)
 
                 # TODO: do we keep this factor like that?
                 sqrt2 = np.sqrt(2.0)
