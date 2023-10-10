@@ -43,12 +43,6 @@ auto getGtoValuesForLda(const CGtoBlock&            gto_block,
                         const std::vector<double>&  grid_coords_z,
                         const std::vector<int64_t>& gtos_mask) -> CMatrix;
 
-auto getLdaValuesRecS(const CGtoBlock&            gto_block,
-                      const std::vector<double>&  grid_coords_x,
-                      const std::vector<double>&  grid_coords_y,
-                      const std::vector<double>&  grid_coords_z,
-                      const std::vector<int64_t>& gtos_mask) -> CMatrix;
-
 }  // namespace gpu
 
 #endif
