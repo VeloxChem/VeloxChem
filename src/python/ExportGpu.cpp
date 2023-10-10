@@ -25,21 +25,16 @@
 
 #include "ExportGpu.hpp"
 
+#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 
 #include "CudaDevices.hpp"
+#include "ExportGeneral.hpp"
+#include "XCIntegratorGPU.hpp"
 
 namespace py = pybind11;
 
 namespace vlx_gpu {  // vlx_gpu namespace
-
-// Helper function for printing CCudaDevices
-
-static std::string
-CCudaDevices_str(const CCudaDevices& self)
-{
-    return self.getString();
-}
 
 // Exports classes/functions in src/gpu to python
 
@@ -51,7 +46,15 @@ export_gpu(py::module& m)
     py::class_<CCudaDevices, std::shared_ptr<CCudaDevices>>(m, "CudaDevices")
         .def(py::init<>())
         .def("get_number_devices", &CCudaDevices::getNumberOfDevices)
-        .def("__str__", &CCudaDevices_str);
+        .def("__str__", &CCudaDevices::getString);
+
+    m.def(
+        "compute_gto_values",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> py::array_t<double> {
+            auto gtovalues = gpu::computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
+            return vlx_general::pointer_to_numpy(gtovalues.values(), {gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns()});
+        },
+        "gpu test");
 }
 
 }  // namespace vlx_gpu
