@@ -70,24 +70,31 @@ class PolarizabilityGradient():
         self.xcfun = None
 
         # Polarizability information
-        self.frequency = 0.0
         self.frequencies = [] # TODO: change to seq_range
         self.vector_components = 'xyz'
 
-        # To contain output
-        self.pol_gradient = {}
-        self.orbrsp_results = {}
+        self._input_keywords = {
+            'gradient': {
+                'vector_components': ('str_lower', 'Cartesian components of operator'),
+                'frequencies': ('seq_range', 'frequencies'),
+            },
+            'method': {
+                '_dft': ('bool', 'do DFT calculation, otherwise HF'), #UNCERTAIN    
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+            }
+        }
 
     # TODO change update_settings to look like lrsolver
     def update_settings(self, grad_dict, orbrsp_dict=None, method_dict=None):
         """
-        Updates response and method settings in orbital response computation
-        driver.
+        Updates response and method settings in polarizability gradient
+        computation driver.
 
         :param grad_dict:
-            The input dictionary of gradient settings group.
+            The input dictionary of gradient input.
         :param orbrsp_dict:
-            The dictionary of orbital response settings.
+            The dictionary of orbital response input.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -139,6 +146,12 @@ class PolarizabilityGradient():
             The tensors from the converged SCF calculation.
         :param lr_results:
             The results of the linear response calculation.
+
+        :return:
+            A dictionary containing the polarizability gradient
+            with the input frequencies as keys.
+            A dictionary containing the results from the orbital
+            response calculations.
         """
 
         # orbital response driver
@@ -153,12 +166,14 @@ class PolarizabilityGradient():
         self.ostream.print_blank()
         self.ostream.flush()
 
+        polgrad_results ={}
         n_freqs = len(self.frequencies)
         for f, w in enumerate(self.frequencies):
-            #self.ostream.print_blank()
-            #self.ostream.print_info('Building gradient for w = {:f}'.format(w))
+            self.ostream.print_info(
+                'Building gradient for frequency = {:f}'.format(w)
+                )
+            self.ostream.flush()
             
-            self.frequency = w 
             orbrsp_results = all_orbrsp_results[w]
             if self.rank == mpi_master():
                 mo = scf_tensors['C'] # only alpha part
@@ -285,8 +300,9 @@ class PolarizabilityGradient():
                         if self.rank == mpi_master():
                             pol_gradient[i,i] += polgrad_xcgrad
 
-                self.pol_gradient[(w)] = pol_gradient.reshape(dof, dof, 3 * natm)
-                self.orbrsp_results[(w)] = dict(orbrsp_results)
+                polgrad_results[(w)] = pol_gradient.reshape(dof, dof, 3 * natm)
+
+        return polgrad_results, all_orbrsp_results
 
     def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, x_minus_y_den,
                               gs_density, xcfun_label):

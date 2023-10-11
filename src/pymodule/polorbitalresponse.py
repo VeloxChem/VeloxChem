@@ -16,8 +16,6 @@ class PolOrbitalResponse(CphfSolver):
     for the polarizability gradient.
 
     Instance variables
-        - frequency: The frequency for which the polarizability
-            gradient is computed.
         - frequencies: The sequence of  frequencies for which the 
             polarizability gradient is computed.
         - vector_components: The components of the response vectors
@@ -36,7 +34,6 @@ class PolOrbitalResponse(CphfSolver):
 
         super().__init__(comm, ostream)
 
-        self.frequency = 0.0
         self.frequencies = [] #TODO: change to seq_range
         self.vector_components = 'xyz'
         self.cphf_results = None
@@ -54,9 +51,6 @@ class PolOrbitalResponse(CphfSolver):
         """
 
         super().update_settings(orbrsp_dict, method_dict)
-
-        if 'frequency' in orbrsp_dict:
-            self.frequency = float(orbrsp_dict['frequency'])
 
         if 'frequencies' in orbrsp_dict:
             self.frequencies = orbrsp_dict['frequencies']
@@ -123,9 +117,8 @@ class PolOrbitalResponse(CphfSolver):
 
         orbrsp_rhs = {}
         for f, w in enumerate(self.frequencies):
-            #self.ostream.print_info('Building RHS for w = {:f}'.format(w))
-            #self.ostream.flush()
-            self.frequency = w
+            self.ostream.print_info('Building RHS for w = {:f}'.format(w))
+            
             if self.rank == mpi_master():
 
                 # 1) Calculate unrelaxed one-particle and transition density matrix
@@ -143,26 +136,24 @@ class PolOrbitalResponse(CphfSolver):
                 sqrt2 = np.sqrt(2.0)
 
                 # Check if response vectors exist for desired frequency of gradient
-                if (self.vector_components[0],
-                        self.frequency) not in lr_results['solutions'].keys():
+                if (self.vector_components[0], w) not in lr_results['solutions'].keys():
                     error_text = "Frequency for gradient not "
                     error_text += "found in linear response results."
                     raise ValueError(error_text)
 
                 exc_vec = 1 / sqrt2 * np.array([
                     self.get_full_solution_vector(lr_results['solutions'][
-                        x, self.frequency])[:nocc * nvir].reshape(nocc, nvir)
+                        x, w])[:nocc * nvir].reshape(nocc, nvir)
                     for x in self.vector_components
                 ])
                 deexc_vec = 1 / sqrt2 * np.array([
                     self.get_full_solution_vector(lr_results['solutions'][
-                        x, self.frequency])[nocc * nvir:].reshape(nocc, nvir)
+                        x, w])[nocc * nvir:].reshape(nocc, nvir)
                     for x in self.vector_components
                 ])
 
                 # Number of vector components
                 dof = exc_vec.shape[0]
-                #n_freqs = len(self.frequencies)
 
                 # Construct plus/minus combinations of excitation and
                 # de-excitation part
@@ -425,11 +416,8 @@ class PolOrbitalResponse(CphfSolver):
             self.profiler.print_timing(self.ostream)
             self.profiler.print_profiling_summary(self.ostream)
 
-            # TODO: final return is nested dictionary
-            #       dict below belongs to a frequency key
             if self.rank == mpi_master():
-                #return {
-                orbrsp_rhs[(self.frequency)] = {
+                orbrsp_rhs[(w)] = {
                     'cphf_rhs': rhs_mo,
                     'dm_oo': dm_oo,
                     'dm_vv': dm_vv,
@@ -486,10 +474,8 @@ class PolOrbitalResponse(CphfSolver):
         n_freqs = len(self.frequencies)
 
         for f, w in enumerate(self.frequencies):
-            #self.ostream.print_blank()
-            #self.ostream.print_info('Building omega for w = {:f}'.format(w))
+            self.ostream.print_info('Building omega for w = {:f}'.format(w))
             
-            self.frequency = w
             if self.rank == mpi_master():
 
                 # Get overlap, MO coefficients from scf_tensors
@@ -525,12 +511,12 @@ class PolOrbitalResponse(CphfSolver):
 
                 exc_vec = 1 / sqrt2 * np.array([
                     self.get_full_solution_vector(lr_results['solutions'][
-                        x, self.frequency])[:nocc * nvir].reshape(nocc, nvir)
+                        x, w])[:nocc * nvir].reshape(nocc, nvir)
                     for x in self.vector_components
                 ])
                 deexc_vec = 1 / sqrt2 * np.array([
                     self.get_full_solution_vector(lr_results['solutions'][
-                        x, self.frequency])[nocc * nvir:].reshape(nocc, nvir)
+                        x, w])[nocc * nvir:].reshape(nocc, nvir)
                     for x in self.vector_components
                 ])
 
@@ -757,10 +743,6 @@ class PolOrbitalResponse(CphfSolver):
         cur_str = 'Convergence Threshold           : {:.1e}'.format(
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
-
-        #cur_str = 'Frequency                       : {:.5f}'.format(
-        #    self.frequency)
-        #self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = ('Number of frequencies           : ' + 
             str(len(self.frequencies)) ) 
