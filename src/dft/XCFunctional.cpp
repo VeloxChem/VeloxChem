@@ -3062,7 +3062,7 @@ CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
     return nullptr;
 }
 
-const int64_t
+int64_t
 CXCFunctional::getDimensionOfDerivatives() const
 {
     auto indices_and_counts = _getIndicesAndCountsOfDerivatives();

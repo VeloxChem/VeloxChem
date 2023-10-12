@@ -55,6 +55,8 @@ export_gpu(py::module& m)
             return vlx_general::pointer_to_numpy(gtovalues.values(), {gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns()});
         },
         "gpu test");
+
+    m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "gpu test");
 }
 
 }  // namespace vlx_gpu

@@ -26,22 +26,25 @@
 #ifndef XCIntegratorGPU_hpp
 #define XCIntegratorGPU_hpp
 
+#include "AODensityMatrix.hpp"
+#include "AOKohnShamMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "GtoBlock.hpp"
 #include "Matrix.hpp"
 #include "MolecularBasis.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
+#include "XCFunctional.hpp"
 
 namespace gpu {
 
 auto computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> CDenseMatrix;
 
-auto getGtoValuesForLda(const CGtoBlock&            gto_block,
-                        const std::vector<double>&  grid_coords_x,
-                        const std::vector<double>&  grid_coords_y,
-                        const std::vector<double>&  grid_coords_z,
-                        const std::vector<int64_t>& gtos_mask) -> CMatrix;
+auto integrateVxcFock(const CMolecule&        molecule,
+                      const CMolecularBasis&  basis,
+                      const CAODensityMatrix& densityMatrix,
+                      const CMolecularGrid&   molecularGrid,
+                      const std::string&      xcFuncLabel) -> CAOKohnShamMatrix;
 
 }  // namespace gpu
 

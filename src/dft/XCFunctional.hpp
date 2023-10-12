@@ -577,7 +577,7 @@ class CXCFunctional
      *
      * @return dimension of derivatives.
      */
-    const int64_t getDimensionOfDerivatives() const;
+    int64_t getDimensionOfDerivatives() const;
 };
 
 #endif /* XCFunctional_hpp */
