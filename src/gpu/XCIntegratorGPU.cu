@@ -23,6 +23,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -218,21 +219,11 @@ cudaLdaValuesDirectRecD(double*        gto_values_d5,
 }
 
 static auto
-getLdaValuesDirectRecS(double*                     d_gto_values,
-                       const int64_t               row_offset,
-                       const CGtoBlock&            gto_block,
-                       const double*               d_grid_x,
-                       const double*               d_grid_y,
-                       const double*               d_grid_z,
-                       const int64_t               grid_offset,
-                       const int64_t               n_grid_points,
-                       const std::vector<int64_t>& gtos_mask) -> void
+getGtoInfo(const CGtoBlock gto_block, const std::vector<int64_t>& gtos_mask) -> std::vector<double>
 {
     // set up GTO values storage
 
     const auto nrows = mathfunc::countSignificantElements(gtos_mask);
-
-    const auto ncols = n_grid_points;
 
     // set up GTOs data
 
@@ -250,13 +241,9 @@ getLdaValuesDirectRecS(double*                     d_gto_values,
 
     // set up data on host and device
 
-    double* h_gto_info;
+    std::vector<double> gto_info(5 * nrows * npgtos);
 
-    cudaSafe(cudaMallocHost(&h_gto_info, 5 * nrows * npgtos * sizeof(double)));
-
-    double* d_gto_info;
-
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * nrows * npgtos * sizeof(double)));
+    auto gto_info_ptr = gto_info.data();
 
     for (int64_t i = 0, irow = 0; i < ncgtos; i++)
     {
@@ -271,218 +258,24 @@ getLdaValuesDirectRecS(double*                     d_gto_values,
                 const auto fexp  = gto_exps[j * ncgtos + i];
                 const auto fnorm = gto_norms[j * ncgtos + i];
 
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 0] = fexp;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 1] = fnorm;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 2] = r_x;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 3] = r_y;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 4] = r_z;
+                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 0] = fexp;
+                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 1] = fnorm;
+                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 2] = r_x;
+                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 3] = r_y;
+                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 4] = r_z;
             }
 
             irow++;
         }
     }
 
-    cudaSafe(cudaMemcpy(d_gto_info, h_gto_info, 5 * nrows * npgtos * sizeof(double), cudaMemcpyHostToDevice));
-
-    dim3 threads_per_block(8, 32);
-    dim3 num_blocks((nrows + threads_per_block.x - 1) / threads_per_block.x, (ncols + threads_per_block.y - 1) / threads_per_block.y);
-
-    gpu::cudaLdaValuesDirectRecS<<<num_blocks, threads_per_block>>>(d_gto_values,
-                                                                    static_cast<uint32_t>(row_offset),
-                                                                    d_gto_info,
-                                                                    d_grid_x,
-                                                                    d_grid_y,
-                                                                    d_grid_z,
-                                                                    static_cast<uint32_t>(grid_offset),
-                                                                    static_cast<uint32_t>(nrows),
-                                                                    static_cast<uint32_t>(npgtos),
-                                                                    static_cast<uint32_t>(ncols));
-
-    cudaSafe(cudaFreeHost(h_gto_info));
-
-    cudaSafe(cudaFree(d_gto_info));
+    return gto_info;
 }
 
 static auto
-getLdaValuesDirectRecP(double*                     d_gto_values,
-                       const int64_t               row_offset,
-                       const CGtoBlock&            gto_block,
-                       const double*               d_grid_x,
-                       const double*               d_grid_y,
-                       const double*               d_grid_z,
-                       const int64_t               grid_offset,
-                       const int64_t               n_grid_points,
-                       const std::vector<int64_t>& gtos_mask) -> void
-{
-    // set up GTO values storage
-
-    const auto nrows = mathfunc::countSignificantElements(gtos_mask);
-
-    const auto ncols = n_grid_points;
-
-    // set up GTOs data
-
-    const auto gto_exps = gto_block.getExponents();
-
-    const auto gto_norms = gto_block.getNormalizationFactors();
-
-    const auto gto_coords = gto_block.getCoordinates();
-
-    // set GTOs block dimensions
-
-    const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-
-    const auto npgtos = gto_block.getNumberOfPrimitives();
-
-    // set up data on host and device
-
-    double* h_gto_info;
-
-    cudaSafe(cudaMallocHost(&h_gto_info, 5 * nrows * npgtos * sizeof(double)));
-
-    double* d_gto_info;
-
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * nrows * npgtos * sizeof(double)));
-
-    for (int64_t i = 0, irow = 0; i < ncgtos; i++)
-    {
-        if (gtos_mask[i] == 1)
-        {
-            const auto r_x = gto_coords[i][0];
-            const auto r_y = gto_coords[i][1];
-            const auto r_z = gto_coords[i][2];
-
-            for (int64_t j = 0; j < npgtos; j++)
-            {
-                const auto fexp  = gto_exps[j * ncgtos + i];
-                const auto fnorm = gto_norms[j * ncgtos + i];
-
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 0] = fexp;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 1] = fnorm;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 2] = r_x;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 3] = r_y;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 4] = r_z;
-            }
-
-            irow++;
-        }
-    }
-
-    cudaSafe(cudaMemcpy(d_gto_info, h_gto_info, 5 * nrows * npgtos * sizeof(double), cudaMemcpyHostToDevice));
-
-    dim3 threads_per_block(8, 32);
-    dim3 num_blocks((nrows + threads_per_block.x - 1) / threads_per_block.x, (ncols + threads_per_block.y - 1) / threads_per_block.y);
-
-    gpu::cudaLdaValuesDirectRecP<<<num_blocks, threads_per_block>>>(d_gto_values,
-                                                                    static_cast<uint32_t>(row_offset),
-                                                                    d_gto_info,
-                                                                    d_grid_x,
-                                                                    d_grid_y,
-                                                                    d_grid_z,
-                                                                    static_cast<uint32_t>(grid_offset),
-                                                                    static_cast<uint32_t>(nrows),
-                                                                    static_cast<uint32_t>(npgtos),
-                                                                    static_cast<uint32_t>(ncols));
-
-    cudaSafe(cudaFreeHost(h_gto_info));
-
-    cudaSafe(cudaFree(d_gto_info));
-}
-
-static auto
-getLdaValuesDirectRecD(double*                     d_gto_values,
-                       const int64_t               row_offset,
-                       const CGtoBlock&            gto_block,
-                       const double*               d_grid_x,
-                       const double*               d_grid_y,
-                       const double*               d_grid_z,
-                       const int64_t               grid_offset,
-                       const int64_t               n_grid_points,
-                       const std::vector<int64_t>& gtos_mask) -> void
-{
-    // spherical transformation factors
-
-    const double f2_3 = 2.0 * std::sqrt(3.0);
-
-    // set up GTO values storage
-
-    const auto nrows = mathfunc::countSignificantElements(gtos_mask);
-
-    const auto ncols = n_grid_points;
-
-    // set up GTOs data
-
-    const auto gto_exps = gto_block.getExponents();
-
-    const auto gto_norms = gto_block.getNormalizationFactors();
-
-    const auto gto_coords = gto_block.getCoordinates();
-
-    // set GTOs block dimensions
-
-    const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-
-    const auto npgtos = gto_block.getNumberOfPrimitives();
-
-    // set up data on host and device
-
-    double* h_gto_info;
-
-    cudaSafe(cudaMallocHost(&h_gto_info, 5 * nrows * npgtos * sizeof(double)));
-
-    double* d_gto_info;
-
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * nrows * npgtos * sizeof(double)));
-
-    for (int64_t i = 0, irow = 0; i < ncgtos; i++)
-    {
-        if (gtos_mask[i] == 1)
-        {
-            const auto r_x = gto_coords[i][0];
-            const auto r_y = gto_coords[i][1];
-            const auto r_z = gto_coords[i][2];
-
-            for (int64_t j = 0; j < npgtos; j++)
-            {
-                const auto fexp  = gto_exps[j * ncgtos + i];
-                const auto fnorm = gto_norms[j * ncgtos + i];
-
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 0] = fexp;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 1] = fnorm;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 2] = r_x;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 3] = r_y;
-                h_gto_info[irow + j * ncgtos + npgtos * ncgtos * 4] = r_z;
-            }
-
-            irow++;
-        }
-    }
-
-    cudaSafe(cudaMemcpy(d_gto_info, h_gto_info, 5 * nrows * npgtos * sizeof(double), cudaMemcpyHostToDevice));
-
-    dim3 threads_per_block(8, 32);
-    dim3 num_blocks((nrows + threads_per_block.x - 1) / threads_per_block.x, (ncols + threads_per_block.y - 1) / threads_per_block.y);
-
-    gpu::cudaLdaValuesDirectRecD<<<num_blocks, threads_per_block>>>(d_gto_values,
-                                                                    static_cast<uint32_t>(row_offset),
-                                                                    f2_3,
-                                                                    d_gto_info,
-                                                                    d_grid_x,
-                                                                    d_grid_y,
-                                                                    d_grid_z,
-                                                                    static_cast<uint32_t>(grid_offset),
-                                                                    static_cast<uint32_t>(nrows),
-                                                                    static_cast<uint32_t>(npgtos),
-                                                                    static_cast<uint32_t>(ncols));
-
-    cudaSafe(cudaFreeHost(h_gto_info));
-
-    cudaSafe(cudaFree(d_gto_info));
-}
-
-static auto
-getGtoValuesForLdaDirect(double*                     d_mat_chi,
+getGtoValuesForLdaDirect(double*                     d_gto_values,
                          const int64_t               row_offset,
+                         double*                     d_gto_info,
                          const CGtoBlock&            gto_block,
                          const double*               d_grid_x,
                          const double*               d_grid_y,
@@ -491,19 +284,73 @@ getGtoValuesForLdaDirect(double*                     d_mat_chi,
                          const int64_t               n_grid_points,
                          const std::vector<int64_t>& gtos_mask) -> void
 {
+    // number of useful CGTOs
+
+    const auto nrows = mathfunc::countSignificantElements(gtos_mask);
+
+    // number of primitives per CGTO
+
+    const auto npgtos = gto_block.getNumberOfPrimitives();
+
+    // number of grid points
+
+    const auto ncols = n_grid_points;
+
+    // prepare GTO information
+
+    auto gto_info = gpu::getGtoInfo(gto_block, gtos_mask);
+
+    cudaSafe(cudaMemcpy(d_gto_info, gto_info.data(), 5 * nrows * npgtos * sizeof(double), cudaMemcpyHostToDevice));
+
+    // evaluate GTO values on grid points
+
+    dim3 threads_per_block(8, 32);
+
+    dim3 num_blocks((nrows + threads_per_block.x - 1) / threads_per_block.x, (ncols + threads_per_block.y - 1) / threads_per_block.y);
+
     auto gto_ang = gto_block.getAngularMomentum();
 
     if (gto_ang == 0)
     {
-        gpu::getLdaValuesDirectRecS(d_mat_chi, row_offset, gto_block, d_grid_x, d_grid_y, d_grid_z, grid_offset, n_grid_points, gtos_mask);
+        gpu::cudaLdaValuesDirectRecS<<<num_blocks, threads_per_block>>>(d_gto_values,
+                                                                        static_cast<uint32_t>(row_offset),
+                                                                        d_gto_info,
+                                                                        d_grid_x,
+                                                                        d_grid_y,
+                                                                        d_grid_z,
+                                                                        static_cast<uint32_t>(grid_offset),
+                                                                        static_cast<uint32_t>(nrows),
+                                                                        static_cast<uint32_t>(npgtos),
+                                                                        static_cast<uint32_t>(ncols));
     }
     else if (gto_ang == 1)
     {
-        gpu::getLdaValuesDirectRecP(d_mat_chi, row_offset, gto_block, d_grid_x, d_grid_y, d_grid_z, grid_offset, n_grid_points, gtos_mask);
+        gpu::cudaLdaValuesDirectRecP<<<num_blocks, threads_per_block>>>(d_gto_values,
+                                                                        static_cast<uint32_t>(row_offset),
+                                                                        d_gto_info,
+                                                                        d_grid_x,
+                                                                        d_grid_y,
+                                                                        d_grid_z,
+                                                                        static_cast<uint32_t>(grid_offset),
+                                                                        static_cast<uint32_t>(nrows),
+                                                                        static_cast<uint32_t>(npgtos),
+                                                                        static_cast<uint32_t>(ncols));
     }
     else if (gto_ang == 2)
     {
-        gpu::getLdaValuesDirectRecD(d_mat_chi, row_offset, gto_block, d_grid_x, d_grid_y, d_grid_z, grid_offset, n_grid_points, gtos_mask);
+        const double f2_3 = 2.0 * std::sqrt(3.0);
+
+        gpu::cudaLdaValuesDirectRecD<<<num_blocks, threads_per_block>>>(d_gto_values,
+                                                                        static_cast<uint32_t>(row_offset),
+                                                                        f2_3,
+                                                                        d_gto_info,
+                                                                        d_grid_x,
+                                                                        d_grid_y,
+                                                                        d_grid_z,
+                                                                        static_cast<uint32_t>(grid_offset),
+                                                                        static_cast<uint32_t>(nrows),
+                                                                        static_cast<uint32_t>(npgtos),
+                                                                        static_cast<uint32_t>(ncols));
     }
     else
     {
@@ -521,6 +368,21 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    int64_t max_ncgtos = 0, max_npgtos = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        max_ncgtos = std::max(ncgtos, max_ncgtos);
+        max_npgtos = std::max(npgtos, max_npgtos);
+    }
+
+    double* d_gto_info;
+
+    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     // GTO values on grid points
 
@@ -618,7 +480,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
             const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
-            gpu::getGtoValuesForLdaDirect(d_gaos, row_offset, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
+            gpu::getGtoValuesForLdaDirect(d_gaos, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -631,8 +493,8 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
         }
     }
 
+    cudaSafe(cudaFree(d_gto_info));
     cudaSafe(cudaFree(d_gaos));
-
     cudaSafe(cudaFree(d_grid_x));
     cudaSafe(cudaFree(d_grid_y));
     cudaSafe(cudaFree(d_grid_z));
@@ -703,6 +565,21 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     std::string errnaos("gpu::integrateVxcFockForLDA: Inconsistent number of AOs");
 
     errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
+
+    int64_t max_ncgtos = 0, max_npgtos = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        max_ncgtos = std::max(ncgtos, max_ncgtos);
+        max_npgtos = std::max(npgtos, max_npgtos);
+    }
+
+    double* d_gto_info;
+
+    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     // Kohn-Sham matrix
 
@@ -843,7 +720,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
             const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
-            gpu::getGtoValuesForLdaDirect(d_gaos, row_offset, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
+            gpu::getGtoValuesForLdaDirect(d_gaos, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
@@ -913,8 +790,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         timer.stop("XC energy");
     }
 
+    cudaSafe(cudaFree(d_gto_info));
     cudaSafe(cudaFree(d_gaos));
-
     cudaSafe(cudaFree(d_grid_x));
     cudaSafe(cudaFree(d_grid_y));
     cudaSafe(cudaFree(d_grid_z));
