@@ -584,40 +584,73 @@ generateDensityForLDA(double*       rho,
     cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
 }
 
-static auto
-integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer timer) -> CDenseMatrix
+__global__ void
+cudaGetMatrixG(double*        d_mat_G,
+               const double*  d_grid_w,
+               const uint32_t grid_offset,
+               const uint32_t npoints,
+               const double*  d_gto_values,
+               const uint32_t aocount,
+               const double*  d_vrho)
 {
-    const auto npoints = gtoValues.getNumberOfColumns();
+    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
 
-    // GTO values on grid points
-
-    timer.start("Vxc matrix G");
-
-    auto chi_val = gtoValues.values();
-
-    auto naos = gtoValues.getNumberOfRows();
-
-    CDenseMatrix mat_G(naos, npoints);
-
-    auto G_val = mat_G.values();
-
+    if (g < npoints)
     {
-        for (int64_t nu = 0; nu < naos; nu++)
+        for (int64_t nu = 0; nu < aocount; nu++)
         {
-            auto nu_offset = nu * npoints;
-
-            for (int64_t g = 0; g < npoints; g++)
-            {
-                G_val[nu_offset + g] = weights[g] * vrho[2 * g + 0] * chi_val[nu_offset + g];
-            }
+            d_mat_G[g + nu * npoints] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_gto_values[g + nu * npoints];
         }
     }
+}
 
-    timer.stop("Vxc matrix G");
+static auto
+integratePartialVxcFockForLDA(double*       d_mat_G,
+                              double*       d_mat_Vxc,
+                              const double* d_grid_w,
+                              const int64_t grid_offset,
+                              const int64_t npoints,
+                              const double* d_gto_values,
+                              const int64_t aocount,
+                              const double* d_vrho,
+                              CMultiTimer   timer) -> CDenseMatrix
+{
+    dim3 threads_per_block(256);
+
+    dim3 num_blocks((npoints + threads_per_block.x - 1) / threads_per_block.x);
+
+    gpu::cudaGetMatrixG<<<num_blocks, threads_per_block>>>(
+        d_mat_G, d_grid_w, static_cast<uint32_t>(grid_offset), static_cast<uint32_t>(npoints), d_gto_values, static_cast<uint32_t>(aocount), d_vrho);
 
     timer.start("Vxc matrix matmul");
 
-    auto mat_Vxc = denblas::multABt(gtoValues, mat_G);
+    // GTO values: nao x npoints
+    auto narow = static_cast<uint32_t>(aocount);
+    auto nacol = static_cast<uint32_t>(npoints);
+
+    // matrix G:   nao x npoints
+    // matrix G^T: npoints x nao
+    auto nbrow = static_cast<uint32_t>(aocount);
+    // auto nbcol = static_cast<uint32_t>(npoints);
+
+    auto m = narow, k = nacol, n = nbrow;
+
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    // TODO: double check transpose of d_mat_G
+
+    // we want row-major C = A * B^T but cublas is column-major.
+    // so we do C^T = B * A^T instead.
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, n, m, k, &alpha, d_mat_G, k, d_gto_values, k, &beta, d_mat_Vxc, n));
+
+    cublasDestroy(handle);
+
+    CDenseMatrix mat_Vxc(aocount, aocount);
+
+    cudaSafe(cudaMemcpy(mat_Vxc.values(), d_mat_Vxc, aocount * aocount * sizeof(double), cudaMemcpyDeviceToHost));
 
     timer.stop("Vxc matrix matmul");
 
@@ -700,9 +733,11 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     auto exc  = exc_data.data();
     auto vrho = vrho_data.data();
 
-    double* d_rho;
+    double *d_rho, *d_exc, *d_vrho;
 
     cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
 
     // initial values for XC energy and number of electrons
 
@@ -843,6 +878,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
+        cudaSafe(cudaMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        cudaSafe(cudaMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), cudaMemcpyHostToDevice));
+
         std::memcpy(local_weights, weights + gridblockpos, npoints * sizeof(double));
 
         timer.stop("XC functional eval.");
@@ -852,7 +890,13 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         if (closedshell)
         {
-            auto partial_mat_Vxc = gpu::integratePartialVxcFockForLDA(local_weights, mat_chi, vrho, timer);
+            // reuse d_den_mat and d_mat_F as working space
+
+            auto d_mat_G   = d_mat_F;
+            auto d_mat_Vxc = d_den_mat;
+
+            auto partial_mat_Vxc = gpu::integratePartialVxcFockForLDA(
+                d_mat_G, d_mat_Vxc, d_grid_w, gridblockpos, npoints, d_gto_values, aocount, d_vrho, timer);
 
             timer.start("Vxc matrix dist.");
 
@@ -887,6 +931,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     cudaSafe(cudaFree(d_mat_F));
 
     cudaSafe(cudaFree(d_rho));
+    cudaSafe(cudaFree(d_exc));
+    cudaSafe(cudaFree(d_vrho));
 
     cudaSafe(cudaFree(d_grid_x));
     cudaSafe(cudaFree(d_grid_y));
