@@ -516,14 +516,34 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
     return allgtovalues;
 }
 
+__global__ void
+cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_values, const uint32_t aocount, const uint32_t npoints)
+{
+    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (g < npoints)
+    {
+        double rho_a = 0.0;
+
+        for (uint32_t nu = 0; nu < aocount; nu++)
+        {
+            rho_a += d_mat_F[g + nu * npoints] * d_gto_values[g + nu * npoints];
+        }
+
+        d_rho[2 * g + 0] = rho_a;
+        d_rho[2 * g + 1] = rho_a;
+    }
+}
+
 static auto
-generateDensityForLDA(double*             rho,
-                      const CDenseMatrix& densityMatrix,
-                      const CDenseMatrix& gtoValues,
-                      const double*       d_gto_values,
-                      const int64_t       aocount,
-                      const int64_t       npoints,
-                      CMultiTimer&        timer) -> void
+generateDensityForLDA(double*       rho,
+                      double*       d_rho,
+                      double*       d_mat_F,
+                      const double* d_den_mat,
+                      const double* d_gto_values,
+                      const int64_t aocount,
+                      const int64_t npoints,
+                      CMultiTimer&  timer) -> void
 {
     timer.start("Density grid matmul");
 
@@ -534,15 +554,6 @@ generateDensityForLDA(double*             rho,
     // GTO values: nao x npoints
     // auto nbrow = static_cast<uint32_t>(aocount);
     auto nbcol = static_cast<uint32_t>(npoints);
-
-    // prepare matrices
-
-    double *d_den_mat, *d_mat_F;
-
-    cudaSafe(cudaMalloc(&d_den_mat, narow * nacol * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F, narow * nbcol * sizeof(double)));
-
-    cudaSafe(cudaMemcpy(d_den_mat, densityMatrix.values(), narow * nacol * sizeof(double), cudaMemcpyHostToDevice));
 
     // use cublas to get multAB(densityMatrix, gtoValues)
 
@@ -559,43 +570,18 @@ generateDensityForLDA(double*             rho,
 
     cublasDestroy(handle);
 
-    CDenseMatrix mat_F(narow, nbcol);
-
-    cudaSafe(cudaMemcpy(mat_F.values(), d_mat_F, narow * nbcol * sizeof(double), cudaMemcpyDeviceToHost));
-
-    cudaSafe(cudaFree(d_den_mat));
-    cudaSafe(cudaFree(d_mat_F));
-
     timer.stop("Density grid matmul");
 
     timer.start("Density grid rho");
 
-    auto F_val = mat_F.values();
+    dim3 threads_per_block(256);
 
-    auto chi_val = gtoValues.values();
+    dim3 num_blocks((npoints + threads_per_block.x - 1) / threads_per_block.x);
 
-    for (int64_t g = 0; g < npoints; g++)
-    {
-        // rho_alpha
-        rho[2 * g + 0] = 0.0;
-    }
+    gpu::cudaDensityOnGrids<<<num_blocks, threads_per_block>>>(
+        d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
-    for (int64_t nu = 0; nu < aocount; nu++)
-    {
-        auto nu_offset = nu * npoints;
-
-        for (int64_t g = 0; g < npoints; g++)
-        {
-            // rho_alpha
-            rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
-        }
-    }
-
-    for (int64_t g = 0; g < npoints; g++)
-    {
-        // rho_beta
-        rho[2 * g + 1] = rho[2 * g + 0];
-    }
+    cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
 }
 
 static auto
@@ -689,9 +675,11 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    double* d_gaos;
+    double *d_den_mat, *d_gto_values, *d_mat_F;
 
-    cudaSafe(cudaMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
 
     // density and functional derivatives
 
@@ -711,6 +699,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto exc  = exc_data.data();
     auto vrho = vrho_data.data();
+
+    double* d_rho;
+
+    cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
 
     // initial values for XC energy and number of electrons
 
@@ -816,12 +808,13 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
             const auto& pre_ao_inds = pre_ao_inds_blocks[i_block];
 
-            gpu::getGtoValuesForLdaDirect(d_gaos, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
+            gpu::getGtoValuesForLdaDirect(
+                d_gto_values, row_offset, d_gto_info, gto_block, d_grid_x, d_grid_y, d_grid_z, gridblockpos, npoints, cgto_mask);
 
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        cudaSafe(cudaMemcpy(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaSafe(cudaMemcpy(mat_chi.values(), d_gto_values, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
 
         timer.stop("OMP GTO evaluation");
 
@@ -833,9 +826,11 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
             auto sub_dens_mat = dftsubmat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds);
 
+            cudaSafe(cudaMemcpy(d_den_mat, sub_dens_mat.values(), aocount * aocount * sizeof(double), cudaMemcpyHostToDevice));
+
             timer.stop("Density matrix slicing");
 
-            gpu::generateDensityForLDA(rho, sub_dens_mat, mat_chi, d_gaos, aocount, npoints, timer);
+            gpu::generateDensityForLDA(rho, d_rho, d_mat_F, d_den_mat, d_gto_values, aocount, npoints, timer);
         }
         else
         {
@@ -887,7 +882,12 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     }
 
     cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_gaos));
+    cudaSafe(cudaFree(d_den_mat));
+    cudaSafe(cudaFree(d_gto_values));
+    cudaSafe(cudaFree(d_mat_F));
+
+    cudaSafe(cudaFree(d_rho));
+
     cudaSafe(cudaFree(d_grid_x));
     cudaSafe(cudaFree(d_grid_y));
     cudaSafe(cudaFree(d_grid_z));
