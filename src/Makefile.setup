@@ -57,7 +57,7 @@ PYTHON_INC += -I/home/xinli/miniconda3/envs/vlxenv/lib/python3.11/site-packages/
 NVCC := nvcc -gencode arch=compute_89,code=sm_89
 NVCC_REL_FLG := --compiler-options "-fopenmp"
 NVCC_DEB_FLG := --compiler-options "-fopenmp"
-CUDA_LIB := -L/home/xinli/miniconda3/envs/vlxenv/lib -lcudart
+CUDA_LIB := -L/home/xinli/miniconda3/envs/vlxenv/lib -lcudart -lcublas
 
 MACLIBS := 
 

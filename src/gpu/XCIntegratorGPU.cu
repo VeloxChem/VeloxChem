@@ -23,6 +23,9 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+#include <cublas_v2.h>
+#include <cuda_runtime.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -46,13 +49,24 @@
 #include "StringFormat.hpp"
 #include "XCIntegratorGPU.hpp"
 
-#define cudaSafe(err)                                                                                                     \
+#define cudaSafe(e)                                                                                                       \
     {                                                                                                                     \
+        cudaError_t err = (e);                                                                                            \
         if (err != cudaSuccess)                                                                                           \
         {                                                                                                                 \
             std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << cudaGetErrorString(err) << std::endl; \
             std::exit(EXIT_FAILURE);                                                                                      \
         }                                                                                                                 \
+    }
+
+#define cublasSafe(e)                                                                            \
+    {                                                                                            \
+        cublasStatus_t err = (e);                                                                \
+        if (err != CUBLAS_STATUS_SUCCESS)                                                        \
+        {                                                                                        \
+            std::cerr << "cuBLAS error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
+            std::exit(EXIT_FAILURE);                                                             \
+        }                                                                                        \
     }
 
 namespace gpu {  // gpu namespace
@@ -503,6 +517,88 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 }
 
 static auto
+generateDensityForLDA(double*             rho,
+                      const CDenseMatrix& densityMatrix,
+                      const CDenseMatrix& gtoValues,
+                      const double*       d_gto_values,
+                      const int64_t       aocount,
+                      const int64_t       npoints,
+                      CMultiTimer&        timer) -> void
+{
+    timer.start("Density grid matmul");
+
+    // density matrix: nao x nao
+    auto narow = static_cast<uint32_t>(aocount);
+    auto nacol = static_cast<uint32_t>(aocount);
+
+    // GTO values: nao x npoints
+    // auto nbrow = static_cast<uint32_t>(aocount);
+    auto nbcol = static_cast<uint32_t>(npoints);
+
+    // prepare matrices
+
+    double *d_den_mat, *d_mat_F;
+
+    cudaSafe(cudaMalloc(&d_den_mat, narow * nacol * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_F, narow * nbcol * sizeof(double)));
+
+    cudaSafe(cudaMemcpy(d_den_mat, densityMatrix.values(), narow * nacol * sizeof(double), cudaMemcpyHostToDevice));
+
+    // use cublas to get multAB(densityMatrix, gtoValues)
+
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto m = narow, k = nacol, n = nbcol;
+
+    // we want row-major C = A * B but cublas is column-major.
+    // so we do C^T = B^T * A^T instead.
+    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, d_gto_values, n, d_den_mat, k, &beta, d_mat_F, n));
+
+    cublasDestroy(handle);
+
+    CDenseMatrix mat_F(narow, nbcol);
+
+    cudaSafe(cudaMemcpy(mat_F.values(), d_mat_F, narow * nbcol * sizeof(double), cudaMemcpyDeviceToHost));
+
+    cudaSafe(cudaFree(d_den_mat));
+    cudaSafe(cudaFree(d_mat_F));
+
+    timer.stop("Density grid matmul");
+
+    timer.start("Density grid rho");
+
+    auto F_val = mat_F.values();
+
+    auto chi_val = gtoValues.values();
+
+    for (int64_t g = 0; g < npoints; g++)
+    {
+        // rho_alpha
+        rho[2 * g + 0] = 0.0;
+    }
+
+    for (int64_t nu = 0; nu < aocount; nu++)
+    {
+        auto nu_offset = nu * npoints;
+
+        for (int64_t g = 0; g < npoints; g++)
+        {
+            // rho_alpha
+            rho[2 * g + 0] += F_val[nu_offset + g] * chi_val[nu_offset + g];
+        }
+    }
+
+    for (int64_t g = 0; g < npoints; g++)
+    {
+        // rho_beta
+        rho[2 * g + 1] = rho[2 * g + 0];
+    }
+}
+
+static auto
 integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer timer) -> CDenseMatrix
 {
     const auto npoints = gtoValues.getNumberOfColumns();
@@ -739,7 +835,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
             timer.stop("Density matrix slicing");
 
-            dengridgen::generateDensityForLDA(rho, mat_chi, sub_dens_mat, timer);
+            gpu::generateDensityForLDA(rho, sub_dens_mat, mat_chi, d_gaos, aocount, npoints, timer);
         }
         else
         {

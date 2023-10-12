@@ -196,7 +196,7 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         if not os.path.isdir(cuda_dir):
             cuda_dir = os.path.join(cuda_root, 'lib')
         check_dir(Path(cuda_dir), 'cuda lib')
-        cuda_lib = '-L{} -lcudart'.format(cuda_dir)
+        cuda_lib = '-L{} -lcudart -lcublas'.format(cuda_dir)
 
     # ==> openmp flags <==
 
