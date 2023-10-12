@@ -570,6 +570,8 @@ generateDensityForLDA(double*       rho,
 
     cublasDestroy(handle);
 
+    cudaDeviceSynchronize();  // TODO: remove this
+
     timer.stop("Density grid matmul");
 
     timer.start("Density grid rho");
@@ -582,6 +584,8 @@ generateDensityForLDA(double*       rho,
         d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
     cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+
+    timer.stop("Density grid rho");
 }
 
 __global__ void
@@ -615,12 +619,18 @@ integratePartialVxcFockForLDA(double*       d_mat_G,
                               const double* d_vrho,
                               CMultiTimer   timer) -> CDenseMatrix
 {
+    timer.start("Vxc matrix G");
+
     dim3 threads_per_block(256);
 
     dim3 num_blocks((npoints + threads_per_block.x - 1) / threads_per_block.x);
 
     gpu::cudaGetMatrixG<<<num_blocks, threads_per_block>>>(
         d_mat_G, d_grid_w, static_cast<uint32_t>(grid_offset), static_cast<uint32_t>(npoints), d_gto_values, static_cast<uint32_t>(aocount), d_vrho);
+
+    cudaDeviceSynchronize();  // TODO: remove this
+
+    timer.stop("Vxc matrix G");
 
     timer.start("Vxc matrix matmul");
 
@@ -719,14 +729,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     auto       ldafunc = xcFunctional.getFunctionalPointerToLdaComponent();
     const auto dim     = &(ldafunc->dim);
 
-    std::vector<double> local_weights_data(max_npoints_per_box);
-
     std::vector<double> rho_data(dim->rho * max_npoints_per_box);
 
     std::vector<double> exc_data(dim->zk * max_npoints_per_box);
     std::vector<double> vrho_data(dim->vrho * max_npoints_per_box);
-
-    auto local_weights = local_weights_data.data();
 
     auto rho = rho_data.data();
 
@@ -819,19 +825,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         // GTO values on grid points
 
-        timer.start("OMP GTO evaluation");
-
-        CDenseMatrix mat_chi(aocount, npoints);
-
-        const auto grid_x_ptr = xcoords + gridblockpos;
-        const auto grid_y_ptr = ycoords + gridblockpos;
-        const auto grid_z_ptr = zcoords + gridblockpos;
-
-        std::vector<double> grid_x(grid_x_ptr, grid_x_ptr + npoints);
-        std::vector<double> grid_y(grid_y_ptr, grid_y_ptr + npoints);
-        std::vector<double> grid_z(grid_z_ptr, grid_z_ptr + npoints);
-
-        // go through GTO blocks
+        timer.start("GTO evaluation");
 
         int64_t row_offset = 0;
 
@@ -849,9 +843,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        cudaSafe(cudaMemcpy(mat_chi.values(), d_gto_values, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        cudaDeviceSynchronize();  // TODO: remove this
 
-        timer.stop("OMP GTO evaluation");
+        timer.stop("GTO evaluation");
 
         // generate sub density matrix and density grid
 
@@ -881,8 +875,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         cudaSafe(cudaMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), cudaMemcpyHostToDevice));
         cudaSafe(cudaMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), cudaMemcpyHostToDevice));
 
-        std::memcpy(local_weights, weights + gridblockpos, npoints * sizeof(double));
-
         timer.stop("XC functional eval.");
 
         // compute partial contribution to Vxc matrix and distribute partial
@@ -895,8 +887,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
             auto d_mat_G   = d_mat_F;
             auto d_mat_Vxc = d_den_mat;
 
-            auto partial_mat_Vxc = gpu::integratePartialVxcFockForLDA(
-                d_mat_G, d_mat_Vxc, d_grid_w, gridblockpos, npoints, d_gto_values, aocount, d_vrho, timer);
+            auto partial_mat_Vxc =
+                gpu::integratePartialVxcFockForLDA(d_mat_G, d_mat_Vxc, d_grid_w, gridblockpos, npoints, d_gto_values, aocount, d_vrho, timer);
 
             timer.start("Vxc matrix dist.");
 
@@ -917,9 +909,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         {
             auto rho_total = rho[2 * g + 0] + rho[2 * g + 1];
 
-            nele += local_weights[g] * rho_total;
+            nele += weights[g + gridblockpos] * rho_total;
 
-            xcene += local_weights[g] * exc[g] * rho_total;
+            xcene += weights[g + gridblockpos] * exc[g] * rho_total;
         }
 
         timer.stop("XC energy");
@@ -944,6 +936,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     mat_Vxc.setExchangeCorrelationEnergy(xcene);
 
     timer.stop("Total timing");
+
+    std::cout << "\nTiming of GPU integrator\n";
+    std::cout << "------------------------\n";
+    std::cout << timer.getSummary() << std::endl;
 
     return mat_Vxc;
 }

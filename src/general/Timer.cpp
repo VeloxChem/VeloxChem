@@ -72,7 +72,7 @@ CTimer::getElapsedTime() const
 
     auto duration_double = std::chrono::duration_cast<std::chrono::duration<double>>(_duration);
 
-    ss << std::fixed << std::setw(15) << std::setprecision(3) << duration_double.count() << " sec";
+    ss << std::fixed << std::setw(15) << std::setprecision(6) << duration_double.count() << " sec";
 
     return ss.str();
 }
