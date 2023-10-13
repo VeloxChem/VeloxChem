@@ -116,11 +116,6 @@ class PolarizabilityGradient():
             assert_msg_critical(not self.xcfun.is_undefined(),
                             'PolarizabilityGradient: Undefined XC functional')
 
-        if 'frequency' in grad_dict:
-            self.frequency = float(grad_dict['frequency'])
-            if 'frequency' not in orbrsp_dict:
-                orbrsp_dict['frequency'] = grad_dict['frequency']
-
         if 'frequencies' in grad_dict:
             self.frequencies = grad_dict['frequencies']
             if 'frequencies' not in orbrsp_dict:
