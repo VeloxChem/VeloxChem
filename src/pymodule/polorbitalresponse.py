@@ -7,6 +7,7 @@ from .veloxchemlib import mpi_master
 from .veloxchemlib import denmat
 from .veloxchemlib import fockmat
 from .veloxchemlib import XCIntegrator
+from .inputparser import parse_input
 from .cphfsolver import CphfSolver
 
 
@@ -34,11 +35,15 @@ class PolOrbitalResponse(CphfSolver):
 
         super().__init__(comm, ostream)
 
-        self.frequencies = [] #TODO: change to seq_range
+        self.frequencies = (0,)
         self.vector_components = 'xyz'
         self.cphf_results = None
 
-    #TODO: change update_settings to look like lrsolver
+        self._input_keywords['orbitalresponse'] = {
+                'vector_components': ('str_lower', 'Cartesian components of operator'),
+                'frequencies': ('seq_range', 'frequencies'),
+            }
+
     def update_settings(self, orbrsp_dict, method_dict=None):
         """
         Updates response and method settings in orbital response computation
@@ -52,11 +57,11 @@ class PolOrbitalResponse(CphfSolver):
 
         super().update_settings(orbrsp_dict, method_dict)
 
-        if 'frequencies' in orbrsp_dict:
-            self.frequencies = orbrsp_dict['frequencies']
+        orbrsp_keywords = {
+            key: val[0] for key, val in self._input_keywords['orbitalresponse'].items()
+        }
 
-        if 'vector_components' in orbrsp_dict:
-            self.vector_components = orbrsp_dict['vector_components']
+        parse_input(self, orbrsp_keywords, orbrsp_dict)
 
     @staticmethod
     def get_full_solution_vector(solution):
@@ -118,6 +123,7 @@ class PolOrbitalResponse(CphfSolver):
         orbrsp_rhs = {}
         for f, w in enumerate(self.frequencies):
             self.ostream.print_info('Building RHS for w = {:f}'.format(w))
+            self.ostream.flush()
             
             if self.rank == mpi_master():
 
@@ -433,7 +439,6 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
             else:
-                #return {}
                 None
         
         if self.rank == mpi_master():
@@ -475,6 +480,7 @@ class PolOrbitalResponse(CphfSolver):
 
         for f, w in enumerate(self.frequencies):
             self.ostream.print_info('Building omega for w = {:f}'.format(w))
+            self.ostream.flush()
             
             if self.rank == mpi_master():
 

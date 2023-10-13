@@ -19,6 +19,8 @@ from .polorbitalresponse import PolOrbitalResponse
 from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
+from .sanitychecks import dft_sanity_check
+from .inputparser import (parse_input, print_keywords, print_attributes)
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -50,19 +52,12 @@ class PolarizabilityGradient():
 
         if ostream is None:
             ostream = OutputStream(sys.stdout)
+        self.ostream = ostream
 
         # MPI information
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
-
-        self.ostream = ostream
-
-        self.gradient = None
-        self.flag = "Polarizability Gradient"
-        # self.numerical = False
-        # # flag for two-point or four-point approximation
-        # self.do_four_point = False
 
         # DFT information
         self._dft = False
@@ -70,7 +65,7 @@ class PolarizabilityGradient():
         self.xcfun = None
 
         # Polarizability information
-        self.frequencies = [] # TODO: change to seq_range
+        self.frequencies = (0,)
         self.vector_components = 'xyz'
 
         self._input_keywords = {
@@ -78,14 +73,12 @@ class PolarizabilityGradient():
                 'vector_components': ('str_lower', 'Cartesian components of operator'),
                 'frequencies': ('seq_range', 'frequencies'),
             },
-            'method': {
-                '_dft': ('bool', 'do DFT calculation, otherwise HF'), #UNCERTAIN    
+            'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
                 'grid_level': ('int', 'accuracy level of DFT grid'),
             }
         }
 
-    # TODO change update_settings to look like lrsolver
     def update_settings(self, grad_dict, orbrsp_dict=None, method_dict=None):
         """
         Updates response and method settings in polarizability gradient
@@ -104,27 +97,23 @@ class PolarizabilityGradient():
         if orbrsp_dict is None:
             orbrsp_dict = {}
 
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self._dft = (key in ['yes', 'y'])
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self._dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                            'PolarizabilityGradient: Undefined XC functional')
+        grad_keywords = {
+            key: val[0] for key, val in self._input_keywords['gradient'].items()
+        }
 
-        if 'frequencies' in grad_dict:
-            self.frequencies = grad_dict['frequencies']
-            if 'frequencies' not in orbrsp_dict:
-                orbrsp_dict['frequencies'] = self.frequencies
+        parse_input(self, grad_keywords, grad_dict)
 
-        if 'vector_components' in grad_dict:
-            self.vector_components = grad_dict['vector_components']
-            if 'vector_components' not in orbrsp_dict:
-                orbrsp_dict['vector_components'] = grad_dict['vector_components']
+        method_keywords = {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
+        
+        parse_input(self, method_keywords, method_dict)
+
+        dft_sanity_check(self, 'update_settings')
+        
+        if 'frequencies' not in orbrsp_dict:
+            orbrsp_dict['frequencies'] = self.frequencies
 
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
@@ -157,8 +146,8 @@ class PolarizabilityGradient():
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
         all_orbrsp_results = orbrsp_drv.cphf_results
-        self.ostream.print_info('Finished orbital response calculations')
         self.ostream.print_blank()
+        self.ostream.print_info('Finished orbital response calculations')
         self.ostream.flush()
 
         polgrad_results ={}
