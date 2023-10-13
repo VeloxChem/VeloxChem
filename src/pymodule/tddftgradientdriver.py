@@ -38,7 +38,8 @@ from .lrsolver import LinearResponseSolver
 from .gradientdriver import GradientDriver
 from .scfgradientdriver import ScfGradientDriver
 from .errorhandler import assert_msg_critical
-from .inputparser import parse_seq_fixed
+from .inputparser import (parse_input, parse_seq_fixed)
+from .sanitychecks import dft_sanity_check
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -73,31 +74,27 @@ class TddftGradientDriver(GradientDriver):
 
         super().__init__(comm, ostream)
 
-        self.rank = self.comm.Get_rank()
-
         self.flag = 'RPA Gradient Driver'
-        self.gradient = None
 
         # flag on whether RPA or TDA is calculated
         self.tamm_dancoff = False
 
-        # excited state information;
-        # if it is set to None, all available states
-        # will be calculated.
+        # excited state information; if it is set to None, 
+        # all available states will be calculated.
         self.state_deriv_index = None
 
-        # flag on whether to print excited-state properties
         self.do_first_order_prop = False
         self.relaxed_dipole_moment = None
 
-        # for numerical gradient
-        self.delta_h = 0.001
+        self._input_keywords['gradient'].update({
+            'tamm_dancoff': ('bool', 'whether RPA or TDA is calculated'),
+            'state_deriv_index': ('seq_fixed_int', 'excited state information'),
+            'do_first_order_prop': ('bool', 'do first-order property'),
+            'relaxed_dipole_moment': ( 'float','relaxed excited-state dipole moment'),
+            }
+        )
 
-    def update_settings(self,
-                        grad_dict,
-                        rsp_dict,
-                        orbrsp_dict=None,
-                        method_dict=None):
+    def update_settings(self, grad_dict, rsp_dict, orbrsp_dict=None, method_dict=None):
         """
         Updates settings in gradient driver.
 
@@ -117,37 +114,23 @@ class TddftGradientDriver(GradientDriver):
         if orbrsp_dict is None:
             orbrsp_dict = {}
 
-        # basic settings from parent class
         super().update_settings(grad_dict, method_dict)
 
-        if 'tamm_dancoff' in rsp_dict:
-            key = rsp_dict['tamm_dancoff'].lower()
-            self.tamm_dancoff = True if key in ['yes', 'y'] else False
-
-        if self.tamm_dancoff:
-            self.flag = 'TDA Gradient Driver'
-        else:
-            self.flag = 'RPA Gradient Driver'
-
-        if 'do_first_order_prop' in grad_dict:
-            key = grad_dict['do_first_order_prop'].lower()
-            self.do_first_order_prop = True if key in ['yes', 'y'] else False
-            orbrsp_dict['do_first_order_prop'] = (
-                                        grad_dict['do_first_order_prop'] )
-
         # Excited states of interest
-        # NOTE: this is a tuple;
-        # the indexing starts at 1.
-        if 'state_deriv_index' in grad_dict:
-            self.state_deriv_index = parse_seq_fixed(
-                    grad_dict['state_deriv_index'], flag='int')
-            orbrsp_dict['state_deriv_index'] = grad_dict['state_deriv_index']
+        # NOTE: this is a tuple; the indexing starts at 1.
+        grad_keywords = {
+            key: val[0] for key, val in self._input_keywords['gradient'].items()
+        }
+
+        parse_input(self, grad_keywords, grad_dict)
+
+        if self.state_deriv_index is not None:
+            orbrsp_dict['state_deriv_index'] = self.state_deriv_index
 
         self.grad_dict = dict(grad_dict)
         self.rsp_dict = dict(rsp_dict)
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
-
 
     def compute(self, molecule, basis, scf_drv, rsp_drv, rsp_results):
         """
@@ -163,7 +146,9 @@ class TddftGradientDriver(GradientDriver):
             The results from the RPA or TDA calculation.
         """
 
-        # sanity check
+        # sanity checks
+        dft_sanity_check(self, 'compute')
+
         if self.rank == mpi_master():
             all_states = list(np.arange(1, len(rsp_results['eigenvalues'])+1))
             if self.state_deriv_index is not None:
@@ -182,9 +167,7 @@ class TddftGradientDriver(GradientDriver):
 
         start_time = tm.time()
 
-        # compute gradient
-        # NOTE: the numerical gradient is calculated for
-        # the first state only.
+        # NOTE: the numerical gradient is calculated for the first state only.
         if self.numerical:
             scf_drv.ostream.mute()
             self.compute_numerical(molecule, basis, scf_drv, rsp_drv, rsp_results)
@@ -192,7 +175,6 @@ class TddftGradientDriver(GradientDriver):
         else:
             self.compute_analytical(molecule, basis, scf_drv, rsp_results)
 
-        # print gradient
         if self.rank == mpi_master():
             self.print_geometry(molecule)
             if self.numerical:
@@ -326,7 +308,7 @@ class TddftGradientDriver(GradientDriver):
                                     + ' computed in'
                                     + ' {:.2f} sec.'.format(t4 - t3))
                 self.ostream.flush()
-                if self.dft:
+                if self._dft:
                     if self.xcfun.is_hybrid():
                         frac_K = self.xcfun.get_frac_exact_exchange()
                     else:
@@ -364,7 +346,7 @@ class TddftGradientDriver(GradientDriver):
                 self.ostream.flush()
 
         # TODO: enable multiple DMs for DFT to avoid for-loops.
-        if self.dft:
+        if self._dft:
             xcfun_label = scf_drv.xcfun.get_func_label()
 
             for s in range(dof):

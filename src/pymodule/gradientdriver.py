@@ -34,6 +34,8 @@ from .outputstream import OutputStream
 from .molecule import Molecule
 from .dftutils import get_default_grid_level
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
+from .sanitychecks import dft_sanity_check
 
 
 class GradientDriver:
@@ -78,15 +80,28 @@ class GradientDriver:
 
         self.gradient = None
         self.flag = None
+        self.delta_h = 0.001
 
         self.numerical = False
         self.do_four_point = False
 
-        self.dft = False
+        self._dft = False
         self.grid_level = None
         self.xcfun = None
 
         self.checkpoint_file = None
+
+        self._input_keywords = {
+            'gradient': {
+                'numerical': ('bool', 'do numerical integration'),
+                'do_four_point': ('bool', 'do four-point numerical integration'),
+                'delta_h': ('float', 'the displacement for finite difference'),
+            },
+            'method_settings': {
+                'xcfun': ('str_upper', 'exchange-correlation functional'),
+                'grid_level': ('int', 'accuracy level of DFT grid'),
+            }
+        }
 
     def update_settings(self, grad_dict, method_dict):
         """
@@ -98,32 +113,24 @@ class GradientDriver:
             The input dicitonary of method settings group.
         """
 
-        if 'do_four_point' in grad_dict:
-            key = grad_dict['do_four_point'].lower()
-            self.do_four_point = (key in ['yes', 'y'])
-            if self.do_four_point:
-                self.numerical = True
+        grad_keywords = {
+            key: val[0] for key, val in self._input_keywords['gradient'].items()
+        }
 
-        if 'numerical' in grad_dict:
-            key = grad_dict['numerical'].lower()
-            self.numerical = (key in ['yes', 'y'])
+        parse_input(self, grad_keywords, grad_dict)
+        
+        # sanity check
+        if (self.do_four_point and not self.numerical):
+            self.numerical = True
 
-        # TODO: use parse_input and _dft_sanity_check
+        method_keywords = {
+            key: val[0]
+            for key, val in self._input_keywords['method_settings'].items()
+        }
 
-        if 'dft' in method_dict:
-            key = method_dict['dft'].lower()
-            self.dft = (key in ['yes', 'y'])
-        if 'grid_level' in method_dict:
-            self.grid_level = int(method_dict['grid_level'])
-        if 'xcfun' in method_dict:
-            if 'dft' not in method_dict:
-                self.dft = True
-            self.xcfun = parse_xc_func(method_dict['xcfun'].upper())
-            assert_msg_critical(not self.xcfun.is_undefined(),
-                                'Gradient driver: Undefined XC functional')
+        parse_input(self, method_keywords, method_dict)
 
-        if 'delta_h' in grad_dict:
-            self.delta_h = float(grad_dict['delta_h'])
+        dft_sanity_check(self, 'update_settings')
 
     def compute(self, molecule, *args):
         """
@@ -134,6 +141,8 @@ class GradientDriver:
         :param args:
             The arguments.
         """
+
+        dft_sanity_check(self, 'compute')
 
         return
 
@@ -508,15 +517,13 @@ class GradientDriver:
         else:
             cur_str += 'Analytical'
 
-        # Not sure why we have this if-statement...
-        #if self.numerical or state_deriv_index is not None:
         self.ostream.print_blank()
         self.ostream.print_header(cur_str.ljust(str_width))
         if self.numerical:
             self.ostream.print_header(cur_str2.ljust(str_width))
             self.ostream.print_header(cur_str3.ljust(str_width))
 
-        if self.dft:
+        if self._dft:
             cur_str = 'Exchange-Correlation Functional : '
             cur_str += self.xcfun.get_func_label().upper()
             self.ostream.print_header(cur_str.ljust(str_width))

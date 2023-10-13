@@ -33,6 +33,7 @@ from .veloxchemlib import mpi_master
 from .outputstream import OutputStream
 from .gradientdriver import GradientDriver
 from .errorhandler import assert_msg_critical
+from .sanitychecks import dft_sanity_check
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -63,10 +64,6 @@ class ScfGradientDriver(GradientDriver):
 
         self.flag = 'SCF Gradient Driver'
 
-        # for numerical gradient
-        self.delta_h = 0.001
-
-
     def compute(self, molecule, ao_basis, scf_drv):
         """
         Computes the analytical or numerical nuclear gradient.
@@ -78,6 +75,8 @@ class ScfGradientDriver(GradientDriver):
         :param scf_drv:
             The SCF driver.
         """
+
+        dft_sanity_check(self, 'compute')
 
         if self.rank == mpi_master():
             self.print_header()
@@ -151,7 +150,7 @@ class ScfGradientDriver(GradientDriver):
                                     + ' derivative contribution computed in'
                                     + ' {:.2f} sec.'.format(t2 - t1))
                 self.ostream.flush()
-                if self.dft:
+                if self._dft:
                     if self.xcfun.is_hybrid():
                         frac_K = self.xcfun.get_frac_exact_exchange()
                     else:
@@ -170,7 +169,7 @@ class ScfGradientDriver(GradientDriver):
                 self.ostream.print_blank()
                 self.ostream.flush()
         # Add the xc contribution
-        if self.dft:
+        if self._dft:
             density = scf_drv.density
             xcfun_label = scf_drv.xcfun.get_func_label()
 
