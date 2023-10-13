@@ -272,11 +272,11 @@ getGtoInfo(const CGtoBlock gto_block, const std::vector<int64_t>& gtos_mask) -> 
                 const auto fexp  = gto_exps[j * ncgtos + i];
                 const auto fnorm = gto_norms[j * ncgtos + i];
 
-                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 0] = fexp;
-                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 1] = fnorm;
-                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 2] = r_x;
-                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 3] = r_y;
-                gto_info_ptr[irow + j * ncgtos + npgtos * ncgtos * 4] = r_z;
+                gto_info_ptr[irow + j * nrows + npgtos * nrows * 0] = fexp;
+                gto_info_ptr[irow + j * nrows + npgtos * nrows * 1] = fnorm;
+                gto_info_ptr[irow + j * nrows + npgtos * nrows * 2] = r_x;
+                gto_info_ptr[irow + j * nrows + npgtos * nrows * 3] = r_y;
+                gto_info_ptr[irow + j * nrows + npgtos * nrows * 4] = r_z;
             }
 
             irow++;
@@ -314,7 +314,7 @@ getGtoValuesForLdaDirect(double*                     d_gto_values,
 
     auto gto_info = gpu::getGtoInfo(gto_block, gtos_mask);
 
-    cudaSafe(cudaMemcpy(d_gto_info, gto_info.data(), 5 * nrows * npgtos * sizeof(double), cudaMemcpyHostToDevice));
+    cudaSafe(cudaMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), cudaMemcpyHostToDevice));
 
     // evaluate GTO values on grid points
 
@@ -617,7 +617,7 @@ integratePartialVxcFockForLDA(double*       d_mat_G,
                               const double* d_gto_values,
                               const int64_t aocount,
                               const double* d_vrho,
-                              CMultiTimer   timer) -> CDenseMatrix
+                              CMultiTimer&  timer) -> CDenseMatrix
 {
     timer.start("Vxc matrix G");
 
