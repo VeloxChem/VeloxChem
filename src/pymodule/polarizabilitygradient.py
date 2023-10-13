@@ -19,8 +19,8 @@ from .polorbitalresponse import PolOrbitalResponse
 from .outputstream import OutputStream
 from .qqscheme import get_qq_scheme
 from .errorhandler import assert_msg_critical
+from .inputparser import parse_input
 from .sanitychecks import dft_sanity_check
-from .inputparser import (parse_input, print_keywords, print_attributes)
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -65,6 +65,7 @@ class PolarizabilityGradient():
         self.xcfun = None
 
         # Polarizability information
+        self.flag = 'Polarizability gradient'
         self.frequencies = (0,)
         self.vector_components = 'xyz'
 
