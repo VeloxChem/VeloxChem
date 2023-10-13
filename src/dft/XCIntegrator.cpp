@@ -164,7 +164,7 @@ CXCIntegrator::_integrateVxcFockForLDA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int64_t box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -412,7 +412,7 @@ CXCIntegrator::_integrateVxcFockForGGA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int64_t box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -682,7 +682,7 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 
     timer.stop("Preparation");
 
-    for (int64_t box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
@@ -860,7 +860,7 @@ CXCIntegrator::_integrateVxcFockForMGGA(const CMolecule&        molecule,
 }
 
 auto
-CXCIntegrator::_integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer timer) const
+CXCIntegrator::_integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer& timer) const
     -> CDenseMatrix
 {
     const auto npoints = gtoValues.getNumberOfColumns();
@@ -1123,7 +1123,7 @@ CXCIntegrator::computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMo
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
-    for (int64_t box_id = 0; box_id < counts.size(); box_id++)
+    for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
         // grid points in box
 
