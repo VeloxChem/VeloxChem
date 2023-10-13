@@ -130,7 +130,7 @@ class CXCIntegrator
      @param timer the timer.
      @return the contribution as a CDenseMatrix object.
      */
-    auto _integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer timer) const
+    auto _integratePartialVxcFockForLDA(const double* weights, const CDenseMatrix& gtoValues, const double* vrho, CMultiTimer& timer) const
         -> CDenseMatrix;
 
     /**
