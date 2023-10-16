@@ -83,8 +83,8 @@ cudaLdaValuesDirectRecS(double*        gto_values,
                         const uint32_t npgtos,
                         const uint32_t ncols)
 {
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t g = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;
 
     if ((i < nrows) && (g < ncols))
     {
@@ -125,8 +125,8 @@ cudaLdaValuesDirectRecP(double*        gto_values_p3,
                         const uint32_t npgtos,
                         const uint32_t ncols)
 {
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t g = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;
 
     if ((i < nrows) && (g < ncols))
     {
@@ -180,8 +180,8 @@ cudaLdaValuesDirectRecD(double*        gto_values_d5,
                         const uint32_t npgtos,
                         const uint32_t ncols)
 {
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t g = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((i < nrows) && (g < ncols))
     {
@@ -235,8 +235,8 @@ cudaLdaValuesDirectRecD(double*        gto_values_d5,
 __global__ void
 getSubDensityMatrix(double* d_den_mat, const double* d_den_mat_full, const uint32_t naos, const uint32_t* d_ao_inds, const uint32_t aocount)
 {
-    const uint32_t row = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t col = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t row = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t col = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((row < aocount) && (col < aocount))
     {
@@ -250,8 +250,8 @@ getSubDensityMatrix(double* d_den_mat, const double* d_den_mat_full, const uint3
 __global__ void
 zeroKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos)
 {
-    const uint32_t row = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t col = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t row = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t col = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((row < naos) && (col < naos))
     {
@@ -262,8 +262,8 @@ zeroKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos)
 __global__ void
 distributeSubKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos, const double* d_mat_Vxc, const uint32_t* d_ao_inds, const uint32_t aocount)
 {
-    const uint32_t row = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t col = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t row = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t col = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((row < aocount) && (col < aocount))
     {
@@ -294,10 +294,10 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
 }
 
 __global__ void
-matmulAB(double* C, const double* A, const double* B, const uint32_t aocount, const uint32_t npoints)
+matmulAtB(double* C, const double* A, const double* B, const uint32_t aocount, const uint32_t npoints)
 {
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t g = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((i < aocount) && (g < npoints))
     {
@@ -305,7 +305,7 @@ matmulAB(double* C, const double* A, const double* B, const uint32_t aocount, co
 
         for (uint32_t k = 0; k < aocount; k++)
         {
-            val += A[i * aocount + k] * B[k * npoints + g];
+            val += A[k * aocount + i] * B[k * npoints + g];
         }
 
         C[i * npoints + g] = val;
@@ -417,9 +417,9 @@ getGtoValuesForLdaDirect(double*                     d_gto_values,
 
     // evaluate GTO values on grid points
 
-    dim3 threads_per_block(8, 32);
+    dim3 threads_per_block(16, 16);
 
-    dim3 num_blocks((nrows + threads_per_block.x - 1) / threads_per_block.x, (ncols + threads_per_block.y - 1) / threads_per_block.y);
+    dim3 num_blocks((ncols + threads_per_block.x - 1) / threads_per_block.x, (nrows + threads_per_block.y - 1) / threads_per_block.y);
 
     auto gto_ang = gto_block.getAngularMomentum();
 
@@ -648,15 +648,18 @@ generateDensityForLDA(double*                     rho,
     gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
         d_den_mat, d_den_mat_full, static_cast<uint32_t>(naos), d_ao_inds, static_cast<uint32_t>(aocount));
 
+    cudaDeviceSynchronize();  // TODO: remove this
+
     timer.stop("Density matrix slicing");
 
     timer.start("Density grid matmul");
 
-    threads_per_block = dim3(8, 32);
+    threads_per_block = dim3(16, 16);
 
-    num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (npoints + threads_per_block.y - 1) / threads_per_block.y);
+    num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-    gpu::matmulAB<<<num_blocks, threads_per_block>>>(
+    // Note: we should use A * B here but since A is symmetric we can also use A^T * B
+    gpu::matmulAtB<<<num_blocks, threads_per_block>>>(
         d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
     /*
