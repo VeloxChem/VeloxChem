@@ -240,10 +240,37 @@ getSubDensityMatrix(double* d_den_mat, const double* d_den_mat_full, const uint3
 
     if ((row < aocount) && (col < aocount))
     {
-        auto row_orig = d_ao_inds[row];
-        auto col_orig = d_ao_inds[col];
+        const auto row_orig = d_ao_inds[row];
+        const auto col_orig = d_ao_inds[col];
 
         d_den_mat[row * aocount + col] = d_den_mat_full[row_orig * naos + col_orig];
+    }
+}
+
+__global__ void
+zeroKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos)
+{
+    const uint32_t row = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t col = blockDim.y * blockIdx.y + threadIdx.y;
+
+    if ((row < naos) && (col < naos))
+    {
+        d_mat_Vxc_full[row * naos + col] = 0.0;
+    }
+}
+
+__global__ void
+distributeSubKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos, const double* d_mat_Vxc, const uint32_t* d_ao_inds, const uint32_t aocount)
+{
+    const uint32_t row = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t col = blockDim.y * blockIdx.y + threadIdx.y;
+
+    if ((row < aocount) && (col < aocount))
+    {
+        const auto row_orig = d_ao_inds[row];
+        const auto col_orig = d_ao_inds[col];
+
+        d_mat_Vxc_full[row_orig * naos + col_orig] += d_mat_Vxc[row * aocount + col];
     }
 }
 
@@ -649,15 +676,18 @@ cudaGetMatrixG(double*        d_mat_G,
 }
 
 static auto
-integratePartialVxcFockForLDA(double*       d_mat_G,
-                              double*       d_mat_Vxc,
-                              const double* d_grid_w,
-                              const int64_t grid_offset,
-                              const int64_t npoints,
-                              const double* d_gto_values,
-                              const int64_t aocount,
-                              const double* d_vrho,
-                              CMultiTimer&  timer) -> CDenseMatrix
+integratePartialVxcFockForLDA(double*         d_mat_G,
+                              double*         d_mat_Vxc,
+                              double*         d_mat_Vxc_full,
+                              const int64_t   naos,
+                              const double*   d_grid_w,
+                              const int64_t   grid_offset,
+                              const int64_t   npoints,
+                              const uint32_t* d_ao_inds,
+                              const double*   d_gto_values,
+                              const int64_t   aocount,
+                              const double*   d_vrho,
+                              CMultiTimer&    timer) -> void
 {
     timer.start("Vxc matrix G");
 
@@ -698,13 +728,20 @@ integratePartialVxcFockForLDA(double*       d_mat_G,
 
     cublasDestroy(handle);
 
-    CDenseMatrix mat_Vxc(aocount, aocount);
-
-    cudaSafe(cudaMemcpy(mat_Vxc.values(), d_mat_Vxc, aocount * aocount * sizeof(double), cudaMemcpyDeviceToHost));
-
     timer.stop("Vxc matrix matmul");
 
-    return mat_Vxc;
+    timer.start("Vxc matrix dist.");
+
+    threads_per_block = dim3(16, 16);
+
+    num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+    gpu::distributeSubKohnShamMatrix<<<num_blocks, threads_per_block>>>(
+        d_mat_Vxc_full, static_cast<uint32_t>(naos), d_mat_Vxc, d_ao_inds, static_cast<uint32_t>(aocount));
+
+    cudaDeviceSynchronize();  // TODO: remove this
+
+    timer.stop("Vxc matrix dist.");
 }
 
 static auto
@@ -762,14 +799,21 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    double *d_den_mat_full, *d_den_mat, *d_gto_values, *d_mat_F;
+    double *d_mat_Vxc_full, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_mat_F;
 
     cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
     cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
     cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
     cudaSafe(cudaMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
 
     cudaSafe(cudaMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
+
+    dim3 threads_per_block(16, 16);
+
+    dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
+
+    gpu::zeroKohnShamMatrix<<<num_blocks, threads_per_block>>>(d_mat_Vxc_full, static_cast<uint32_t>(naos));
 
     // density and functional derivatives
 
@@ -926,14 +970,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
             auto d_mat_G   = d_mat_F;
             auto d_mat_Vxc = d_den_mat;
 
-            auto partial_mat_Vxc =
-                gpu::integratePartialVxcFockForLDA(d_mat_G, d_mat_Vxc, d_grid_w, gridblockpos, npoints, d_gto_values, aocount, d_vrho, timer);
-
-            timer.start("Vxc matrix dist.");
-
-            dftsubmat::distributeSubMatrixToKohnSham(mat_Vxc, partial_mat_Vxc, aoinds);
-
-            timer.stop("Vxc matrix dist.");
+            gpu::integratePartialVxcFockForLDA(
+                d_mat_G, d_mat_Vxc, d_mat_Vxc_full, naos, d_grid_w, gridblockpos, npoints, d_ao_inds, d_gto_values, aocount, d_vrho, timer);
         }
         else
         {
@@ -955,6 +993,8 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         timer.stop("XC energy");
     }
+
+    cudaSafe(cudaMemcpy(mat_Vxc.getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), cudaMemcpyDeviceToHost));
 
     cudaSafe(cudaFree(d_gto_info));
     cudaSafe(cudaFree(d_ao_inds));
