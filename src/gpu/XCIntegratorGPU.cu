@@ -232,6 +232,21 @@ cudaLdaValuesDirectRecD(double*        gto_values_d5,
     }
 }
 
+__global__ void
+getSubDensityMatrix(double* d_den_mat, const double* d_den_mat_full, const uint32_t naos, const uint32_t* d_ao_inds, const uint32_t aocount)
+{
+    const uint32_t row = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t col = blockDim.y * blockIdx.y + threadIdx.y;
+
+    if ((row < aocount) && (col < aocount))
+    {
+        auto row_orig = d_ao_inds[row];
+        auto col_orig = d_ao_inds[col];
+
+        d_den_mat[row * aocount + col] = d_den_mat_full[row_orig * naos + col_orig];
+    }
+}
+
 static auto
 getGtoInfo(const CGtoBlock gto_block, const std::vector<int64_t>& gtos_mask) -> std::vector<double>
 {
@@ -536,15 +551,40 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
 }
 
 static auto
-generateDensityForLDA(double*       rho,
-                      double*       d_rho,
-                      double*       d_mat_F,
-                      const double* d_den_mat,
-                      const double* d_gto_values,
-                      const int64_t aocount,
-                      const int64_t npoints,
-                      CMultiTimer&  timer) -> void
+generateDensityForLDA(double*                     rho,
+                      double*                     d_rho,
+                      double*                     d_mat_F,
+                      double*                     d_den_mat,
+                      uint32_t*                   d_ao_inds,
+                      const double*               d_den_mat_full,
+                      const int64_t               naos,
+                      const std::vector<int64_t>& ao_inds,
+                      const double*               d_gto_values,
+                      const int64_t               npoints,
+                      CMultiTimer&                timer) -> void
 {
+    timer.start("Density matrix slicing");
+
+    const auto aocount = static_cast<int64_t>(ao_inds.size());
+
+    std::vector<uint32_t> ao_inds_int32(aocount);
+
+    for (int64_t ind = 0; ind < aocount; ind++)
+    {
+        ao_inds_int32[ind] = static_cast<uint32_t>(ao_inds[ind]);
+    }
+
+    cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+
+    dim3 threads_per_block(16, 16);
+
+    dim3 num_blocks((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+    gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
+        d_den_mat, d_den_mat_full, static_cast<uint32_t>(naos), d_ao_inds, static_cast<uint32_t>(aocount));
+
+    timer.stop("Density matrix slicing");
+
     timer.start("Density grid matmul");
 
     // density matrix: nao x nao
@@ -576,9 +616,9 @@ generateDensityForLDA(double*       rho,
 
     timer.start("Density grid rho");
 
-    dim3 threads_per_block(256);
+    threads_per_block = dim3(256);
 
-    dim3 num_blocks((npoints + threads_per_block.x - 1) / threads_per_block.x);
+    num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
 
     gpu::cudaDensityOnGrids<<<num_blocks, threads_per_block>>>(
         d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
@@ -706,6 +746,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
+    uint32_t* d_ao_inds;
+
+    cudaSafe(cudaMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+
     // Kohn-Sham matrix
 
     bool closedshell = (fstr::upcase(flag) == std::string("CLOSEDSHELL"));
@@ -718,11 +762,14 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto max_npoints_per_box = molecularGrid.getMaxNumberOfGridPointsPerBox();
 
-    double *d_den_mat, *d_gto_values, *d_mat_F;
+    double *d_den_mat_full, *d_den_mat, *d_gto_values, *d_mat_F;
 
     cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
     cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
     cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    cudaSafe(cudaMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
+
+    cudaSafe(cudaMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
 
     // density and functional derivatives
 
@@ -851,15 +898,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         if (closedshell)
         {
-            timer.start("Density matrix slicing");
-
-            auto sub_dens_mat = dftsubmat::getSubDensityMatrix(densityMatrix, 0, std::string("ALPHA"), aoinds);
-
-            cudaSafe(cudaMemcpy(d_den_mat, sub_dens_mat.values(), aocount * aocount * sizeof(double), cudaMemcpyHostToDevice));
-
-            timer.stop("Density matrix slicing");
-
-            gpu::generateDensityForLDA(rho, d_rho, d_mat_F, d_den_mat, d_gto_values, aocount, npoints, timer);
+            gpu::generateDensityForLDA(rho, d_rho, d_mat_F, d_den_mat, d_ao_inds, d_den_mat_full, naos, aoinds, d_gto_values, npoints, timer);
         }
         else
         {
@@ -918,7 +957,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     }
 
     cudaSafe(cudaFree(d_gto_info));
+    cudaSafe(cudaFree(d_ao_inds));
+
     cudaSafe(cudaFree(d_den_mat));
+    cudaSafe(cudaFree(d_den_mat_full));
     cudaSafe(cudaFree(d_gto_values));
     cudaSafe(cudaFree(d_mat_F));
 
