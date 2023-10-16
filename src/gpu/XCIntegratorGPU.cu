@@ -274,6 +274,63 @@ distributeSubKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos, const d
     }
 }
 
+__global__ void
+cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_values, const uint32_t aocount, const uint32_t npoints)
+{
+    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (g < npoints)
+    {
+        double rho_a = 0.0;
+
+        for (uint32_t nu = 0; nu < aocount; nu++)
+        {
+            rho_a += d_mat_F[g + nu * npoints] * d_gto_values[g + nu * npoints];
+        }
+
+        d_rho[2 * g + 0] = rho_a;
+        d_rho[2 * g + 1] = rho_a;
+    }
+}
+
+__global__ void
+matmulAB(double* C, const double* A, const double* B, const uint32_t aocount, const uint32_t npoints)
+{
+    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t g = blockDim.y * blockIdx.y + threadIdx.y;
+
+    if ((i < aocount) && (g < npoints))
+    {
+        double val = 0.0;
+
+        for (uint32_t k = 0; k < aocount; k++)
+        {
+            val += A[i * aocount + k] * B[k * npoints + g];
+        }
+
+        C[i * npoints + g] = val;
+    }
+}
+
+__global__ void
+matmulABt(double* C, const double* A, const double* B, const uint32_t aocount, const uint32_t npoints)
+{
+    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
+    const uint32_t j = blockDim.y * blockIdx.y + threadIdx.y;
+
+    if ((i < aocount) && (j < aocount))
+    {
+        double val = 0.0;
+
+        for (uint32_t g = 0; g < npoints; g++)
+        {
+            val += A[i * npoints + g] * B[j * npoints + g];
+        }
+
+        C[i * aocount + j] = val;
+    }
+}
+
 static auto
 getGtoInfo(const CGtoBlock gto_block, const std::vector<int64_t>& gtos_mask) -> std::vector<double>
 {
@@ -558,25 +615,6 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
     return allgtovalues;
 }
 
-__global__ void
-cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_values, const uint32_t aocount, const uint32_t npoints)
-{
-    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (g < npoints)
-    {
-        double rho_a = 0.0;
-
-        for (uint32_t nu = 0; nu < aocount; nu++)
-        {
-            rho_a += d_mat_F[g + nu * npoints] * d_gto_values[g + nu * npoints];
-        }
-
-        d_rho[2 * g + 0] = rho_a;
-        d_rho[2 * g + 1] = rho_a;
-    }
-}
-
 static auto
 generateDensityForLDA(double*                     rho,
                       double*                     d_rho,
@@ -614,6 +652,14 @@ generateDensityForLDA(double*                     rho,
 
     timer.start("Density grid matmul");
 
+    threads_per_block = dim3(8, 32);
+
+    num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (npoints + threads_per_block.y - 1) / threads_per_block.y);
+
+    gpu::matmulAB<<<num_blocks, threads_per_block>>>(
+        d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
+
+    /*
     // density matrix: nao x nao
     auto narow = static_cast<uint32_t>(aocount);
     auto nacol = static_cast<uint32_t>(aocount);
@@ -636,6 +682,7 @@ generateDensityForLDA(double*                     rho,
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, d_gto_values, n, d_den_mat, k, &beta, d_mat_F, n));
 
     cublasDestroy(handle);
+    */
 
     cudaDeviceSynchronize();  // TODO: remove this
 
@@ -704,6 +751,14 @@ integratePartialVxcFockForLDA(double*         d_mat_G,
 
     timer.start("Vxc matrix matmul");
 
+    threads_per_block = dim3(16, 16);
+
+    num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+    gpu::matmulABt<<<num_blocks, threads_per_block>>>(
+        d_mat_Vxc, d_gto_values, d_mat_G, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
+
+    /*
     // GTO values: nao x npoints
     auto narow = static_cast<uint32_t>(aocount);
     auto nacol = static_cast<uint32_t>(npoints);
@@ -727,6 +782,9 @@ integratePartialVxcFockForLDA(double*         d_mat_G,
     cublasSafe(cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, n, m, k, &alpha, d_mat_G, k, d_gto_values, k, &beta, d_mat_Vxc, n));
 
     cublasDestroy(handle);
+    */
+
+    cudaDeviceSynchronize();  // TODO: remove this
 
     timer.stop("Vxc matrix matmul");
 
