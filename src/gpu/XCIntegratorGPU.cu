@@ -293,44 +293,6 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
     }
 }
 
-__global__ void
-matmulAtB(double* C, const double* A, const double* B, const uint32_t aocount, const uint32_t npoints)
-{
-    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;
-    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if ((i < aocount) && (g < npoints))
-    {
-        double val = 0.0;
-
-        for (uint32_t k = 0; k < aocount; k++)
-        {
-            val += A[k * aocount + i] * B[k * npoints + g];
-        }
-
-        C[i * npoints + g] = val;
-    }
-}
-
-__global__ void
-matmulABt(double* C, const double* A, const double* B, const uint32_t aocount, const uint32_t npoints)
-{
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t j = blockDim.y * blockIdx.y + threadIdx.y;
-
-    if ((i < aocount) && (j < aocount))
-    {
-        double val = 0.0;
-
-        for (uint32_t g = 0; g < npoints; g++)
-        {
-            val += A[i * npoints + g] * B[j * npoints + g];
-        }
-
-        C[i * aocount + j] = val;
-    }
-}
-
 static auto
 getGtoInfo(const CGtoBlock gto_block, const std::vector<int64_t>& gtos_mask) -> std::vector<double>
 {
@@ -615,96 +577,6 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
     return allgtovalues;
 }
 
-static auto
-generateDensityForLDA(double*                     rho,
-                      double*                     d_rho,
-                      double*                     d_mat_F,
-                      double*                     d_den_mat,
-                      uint32_t*                   d_ao_inds,
-                      const double*               d_den_mat_full,
-                      const int64_t               naos,
-                      const std::vector<int64_t>& ao_inds,
-                      const double*               d_gto_values,
-                      const int64_t               npoints,
-                      CMultiTimer&                timer) -> void
-{
-    timer.start("Density matrix slicing");
-
-    const auto aocount = static_cast<int64_t>(ao_inds.size());
-
-    std::vector<uint32_t> ao_inds_int32(aocount);
-
-    for (int64_t ind = 0; ind < aocount; ind++)
-    {
-        ao_inds_int32[ind] = static_cast<uint32_t>(ao_inds[ind]);
-    }
-
-    cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
-
-    dim3 threads_per_block(16, 16);
-
-    dim3 num_blocks((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
-
-    gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
-        d_den_mat, d_den_mat_full, static_cast<uint32_t>(naos), d_ao_inds, static_cast<uint32_t>(aocount));
-
-    cudaDeviceSynchronize();  // TODO: remove this
-
-    timer.stop("Density matrix slicing");
-
-    timer.start("Density grid matmul");
-
-    threads_per_block = dim3(16, 16);
-
-    num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
-
-    // Note: we should use A * B here but since A is symmetric we can also use A^T * B
-    gpu::matmulAtB<<<num_blocks, threads_per_block>>>(
-        d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
-
-    /*
-    // density matrix: nao x nao
-    auto narow = static_cast<uint32_t>(aocount);
-    auto nacol = static_cast<uint32_t>(aocount);
-
-    // GTO values: nao x npoints
-    // auto nbrow = static_cast<uint32_t>(aocount);
-    auto nbcol = static_cast<uint32_t>(npoints);
-
-    // use cublas to get multAB(densityMatrix, gtoValues)
-
-    cublasHandle_t handle;
-    cublasSafe(cublasCreate(&handle));
-
-    double alpha = 1.0, beta = 0.0;
-
-    auto m = narow, k = nacol, n = nbcol;
-
-    // we want row-major C = A * B but cublas is column-major.
-    // so we do C^T = B^T * A^T instead.
-    cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, d_gto_values, n, d_den_mat, k, &beta, d_mat_F, n));
-
-    cublasDestroy(handle);
-    */
-
-    cudaDeviceSynchronize();  // TODO: remove this
-
-    timer.stop("Density grid matmul");
-
-    timer.start("Density grid rho");
-
-    threads_per_block = dim3(256);
-
-    num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
-
-    gpu::cudaDensityOnGrids<<<num_blocks, threads_per_block>>>(
-        d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
-
-    cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
-
-    timer.stop("Density grid rho");
-}
-
 __global__ void
 cudaGetMatrixG(double*        d_mat_G,
                const double*  d_grid_w,
@@ -726,86 +598,6 @@ cudaGetMatrixG(double*        d_mat_G,
 }
 
 static auto
-integratePartialVxcFockForLDA(double*         d_mat_G,
-                              double*         d_mat_Vxc,
-                              double*         d_mat_Vxc_full,
-                              const int64_t   naos,
-                              const double*   d_grid_w,
-                              const int64_t   grid_offset,
-                              const int64_t   npoints,
-                              const uint32_t* d_ao_inds,
-                              const double*   d_gto_values,
-                              const int64_t   aocount,
-                              const double*   d_vrho,
-                              CMultiTimer&    timer) -> void
-{
-    timer.start("Vxc matrix G");
-
-    dim3 threads_per_block(256);
-
-    dim3 num_blocks((npoints + threads_per_block.x - 1) / threads_per_block.x);
-
-    gpu::cudaGetMatrixG<<<num_blocks, threads_per_block>>>(
-        d_mat_G, d_grid_w, static_cast<uint32_t>(grid_offset), static_cast<uint32_t>(npoints), d_gto_values, static_cast<uint32_t>(aocount), d_vrho);
-
-    cudaDeviceSynchronize();  // TODO: remove this
-
-    timer.stop("Vxc matrix G");
-
-    timer.start("Vxc matrix matmul");
-
-    threads_per_block = dim3(16, 16);
-
-    num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
-
-    gpu::matmulABt<<<num_blocks, threads_per_block>>>(
-        d_mat_Vxc, d_gto_values, d_mat_G, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
-
-    /*
-    // GTO values: nao x npoints
-    auto narow = static_cast<uint32_t>(aocount);
-    auto nacol = static_cast<uint32_t>(npoints);
-
-    // matrix G:   nao x npoints
-    // matrix G^T: npoints x nao
-    auto nbrow = static_cast<uint32_t>(aocount);
-    // auto nbcol = static_cast<uint32_t>(npoints);
-
-    auto m = narow, k = nacol, n = nbrow;
-
-    cublasHandle_t handle;
-    cublasSafe(cublasCreate(&handle));
-
-    double alpha = 1.0, beta = 0.0;
-
-    // TODO: double check transpose of d_mat_G
-
-    // we want row-major C = A * B^T but cublas is column-major.
-    // so we do C^T = B * A^T instead.
-    cublasSafe(cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, n, m, k, &alpha, d_mat_G, k, d_gto_values, k, &beta, d_mat_Vxc, n));
-
-    cublasDestroy(handle);
-    */
-
-    cudaDeviceSynchronize();  // TODO: remove this
-
-    timer.stop("Vxc matrix matmul");
-
-    timer.start("Vxc matrix dist.");
-
-    threads_per_block = dim3(16, 16);
-
-    num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
-
-    gpu::distributeSubKohnShamMatrix<<<num_blocks, threads_per_block>>>(
-        d_mat_Vxc_full, static_cast<uint32_t>(naos), d_mat_Vxc, d_ao_inds, static_cast<uint32_t>(aocount));
-
-    cudaDeviceSynchronize();  // TODO: remove this
-
-    timer.stop("Vxc matrix dist.");
-}
-
-static auto
 integrateVxcFockForLDA(const CMolecule&        molecule,
                        const CMolecularBasis&  basis,
                        const CAODensityMatrix& densityMatrix,
@@ -816,8 +608,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     CMultiTimer timer;
 
     timer.start("Total timing");
-
-    timer.start("Preparation");
 
     // GTOs blocks and number of AOs
 
@@ -929,7 +719,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     auto displacements = molecularGrid.getGridPointDisplacements();
 
-    timer.stop("Preparation");
+    // use cublas to get multAB(densityMatrix, gtoValues)
+
+    cublasHandle_t handle;
+    cublasSafe(cublasCreate(&handle));
 
     for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
@@ -944,8 +737,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         auto boxdim = prescr::getGridBoxDimension(gridblockpos, npoints, xcoords, ycoords, zcoords);
 
         // prescreening
-
-        timer.start("GTO pre-screening");
 
         std::vector<std::vector<int64_t>> cgto_mask_blocks, pre_ao_inds_blocks;
 
@@ -971,13 +762,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         const auto aocount = static_cast<int64_t>(aoinds.size());
 
-        timer.stop("GTO pre-screening");
-
         if (aocount == 0) continue;
 
         // GTO values on grid points
-
-        timer.start("GTO evaluation");
 
         int64_t row_offset = 0;
 
@@ -995,53 +782,122 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        cudaDeviceSynchronize();  // TODO: remove this
-
-        timer.stop("GTO evaluation");
-
         // generate sub density matrix and density grid
 
-        if (closedshell)
+        std::vector<uint32_t> ao_inds_int32(aocount);
+
+        for (int64_t ind = 0; ind < aocount; ind++)
         {
-            gpu::generateDensityForLDA(rho, d_rho, d_mat_F, d_den_mat, d_ao_inds, d_den_mat_full, naos, aoinds, d_gto_values, npoints, timer);
-        }
-        else
-        {
-            // TODO: openshell
+            ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        // compute exchange-correlation functional derivative
+        cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-        timer.start("XC functional eval.");
+        threads_per_block = dim3(16, 16);
+
+        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
+            d_den_mat, d_den_mat_full, static_cast<uint32_t>(naos), d_ao_inds, static_cast<uint32_t>(aocount));
+
+        threads_per_block = dim3(16, 16);
+
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        /*
+        // Note: we should use A * B here but since A is symmetric we can also use A^T * B
+        gpu::matmulAtB<<<num_blocks, threads_per_block>>>(
+            d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
+        */
+
+        // density matrix: nao x nao
+        auto narow = static_cast<uint32_t>(aocount);
+        auto nacol = static_cast<uint32_t>(aocount);
+
+        // GTO values: nao x npoints
+        // auto nbrow = static_cast<uint32_t>(aocount);
+        auto nbcol = static_cast<uint32_t>(npoints);
+
+        double alpha = 1.0, beta = 0.0;
+
+        auto m = narow, k = nacol, n = nbcol;
+
+        // we want row-major C = A * B but cublas is column-major.
+        // so we do C^T = B^T * A^T instead.
+        cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, d_gto_values, n, d_den_mat, k, &beta, d_mat_F, n));
+
+        threads_per_block = dim3(256);
+
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::cudaDensityOnGrids<<<num_blocks, threads_per_block>>>(
+            d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
+
+        cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
 
         xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
         cudaSafe(cudaMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), cudaMemcpyHostToDevice));
         cudaSafe(cudaMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), cudaMemcpyHostToDevice));
 
-        timer.stop("XC functional eval.");
-
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
 
-        if (closedshell)
-        {
-            // reuse d_den_mat and d_mat_F as working space
+        // reuse d_den_mat and d_mat_F as working space
+        auto d_mat_G   = d_mat_F;
+        auto d_mat_Vxc = d_den_mat;
 
-            auto d_mat_G   = d_mat_F;
-            auto d_mat_Vxc = d_den_mat;
+        threads_per_block = dim3(256);
 
-            gpu::integratePartialVxcFockForLDA(
-                d_mat_G, d_mat_Vxc, d_mat_Vxc_full, naos, d_grid_w, gridblockpos, npoints, d_ao_inds, d_gto_values, aocount, d_vrho, timer);
-        }
-        else
-        {
-            // TODO: openshell
-        }
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
+
+        gpu::cudaGetMatrixG<<<num_blocks, threads_per_block>>>(d_mat_G,
+                                                               d_grid_w,
+                                                               static_cast<uint32_t>(gridblockpos),
+                                                               static_cast<uint32_t>(npoints),
+                                                               d_gto_values,
+                                                               static_cast<uint32_t>(aocount),
+                                                               d_vrho);
+
+        threads_per_block = dim3(16, 16);
+
+        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        /*
+        gpu::matmulABt<<<num_blocks, threads_per_block>>>(
+            d_mat_Vxc, d_gto_values, d_mat_G, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
+        */
+
+        // GTO values: nao x npoints
+        narow = static_cast<uint32_t>(aocount);
+        nacol = static_cast<uint32_t>(npoints);
+
+        // matrix G:   nao x npoints
+        // matrix G^T: npoints x nao
+        auto nbrow = static_cast<uint32_t>(aocount);
+        // auto nbcol = static_cast<uint32_t>(npoints);
+
+        m = narow;
+        k = nacol;
+        n = nbrow;
+
+        alpha = 1.0;
+        beta  = 0.0;
+
+        // TODO: double check transpose of d_mat_G
+
+        // we want row-major C = A * B^T but cublas is column-major.
+        // so we do C^T = B * A^T instead.
+        cublasSafe(cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, n, m, k, &alpha, d_mat_G, k, d_gto_values, k, &beta, d_mat_Vxc, n));
+
+        threads_per_block = dim3(16, 16);
+
+        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
+
+        gpu::distributeSubKohnShamMatrix<<<num_blocks, threads_per_block>>>(
+            d_mat_Vxc_full, static_cast<uint32_t>(naos), d_mat_Vxc, d_ao_inds, static_cast<uint32_t>(aocount));
 
         // compute partial contribution to XC energy
-
-        timer.start("XC energy");
 
         for (int64_t g = 0; g < npoints; g++)
         {
@@ -1051,9 +907,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
             xcene += weights[g + gridblockpos] * exc[g] * rho_total;
         }
-
-        timer.stop("XC energy");
     }
+
+    cublasDestroy(handle);
 
     cudaSafe(cudaMemcpy(mat_Vxc.getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), cudaMemcpyDeviceToHost));
 
