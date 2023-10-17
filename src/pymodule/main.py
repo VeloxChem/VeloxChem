@@ -44,6 +44,7 @@ from .loprop import LoPropDriver
 from .trajectorydriver import TrajectoryDriver
 from .scfgradientdriver import ScfGradientDriver
 from .tddftgradientdriver import TddftGradientDriver
+from .tddftorbitalresponse import TddftOrbitalResponse
 from .scfhessiandriver import ScfHessianDriver
 from .optimizationdriver import OptimizationDriver
 from .pulsedrsp import PulsedResponse
@@ -56,6 +57,7 @@ from .rspshg import SHG
 from .rsptpatransition import TpaTransition
 from .rsptpa import TPA
 from .tdhfhessiandriver import TdhfHessianDriver
+from .polarizabilitygradient import PolarizabilityGradient
 from .cphfsolver import CphfSolver
 from .rspcustomproperty import CustomProperty
 from .visualizationdriver import VisualizationDriver
@@ -314,7 +316,7 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'hessian',
         'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'frequencies', 'freq', 'cphf'
+        'frequencies', 'freq', 'cphf', 'polarizabilitygradient'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -506,6 +508,33 @@ def main():
         cphf_drv = CphfSolver(task.mpi_comm, task.ostream)
         cphf_drv.update_settings(cphf_dict, method_dict)
         cphf_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors) 
+
+
+    # Polarizability gradient
+
+    if task_type in ['polarizabilitygradient']:
+        #DEBUG
+        task.ostream.print_info('POLARIZABILITY GRADIENT')
+
+        polgrad_dict = (task.input_dict['polarizability_gradient']
+                     if 'polarizability_gradient' in task.input_dict else {})
+        orbrsp_dict = (task.input_dict['orbital_response']
+                       if 'orbital_response' in task.input_dict else {})
+
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
+        rsp_dict['program_end_time'] = program_end_time
+        rsp_dict['filename'] = task.input_dict['filename']
+        rsp_dict = updated_dict_with_eri_settings(rsp_dict, scf_drv)
+
+        rsp_prop = select_rsp_property(task, mol_orbs, rsp_dict, method_dict)
+        rsp_prop.init_driver(task.mpi_comm, task.ostream)
+        rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
+        
+        polgrad_drv = PolarizabilityGradient()
+        polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
+        polgrad_drv.compute(task.molecule, task.ao_basis, 
+                            scf_drv.scf_tensors, rsp_prop._rsp_property)
     
 
     # Response
@@ -531,7 +560,7 @@ def main():
         else:
             prop_type = None
 
-        if prop_type in ['absorption', 'uv-vis', 'ecd']: 
+        if prop_type in ['absorption', 'uv-vis', 'ecd', 'polarizability_gradient']: 
 
             if 'orbital_response' in task.input_dict:
                 orbrsp_dict = task.input_dict['orbital_response']
@@ -586,7 +615,8 @@ def main():
             task.ostream.print_blank()
             info_msg = 'The excited state derivatives '
             info_msg += 'can only be computed if the response '
-            info_msg += 'property is "absorption", "uv-vis", or "ecd".'
+            info_msg += 'property is "absorption", "uv-vis", "ecd",'
+            info_msg += 'or "polarizability gradient"'
             task.ostream.print_info(info_msg)
             info_msg = 'Computation of gradient/Hessian will be skipped.'
             task.ostream.print_info(info_msg)
