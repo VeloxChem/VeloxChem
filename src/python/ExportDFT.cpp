@@ -96,6 +96,7 @@ export_dft(py::module& m)
 
     PyClass<CMolecularGrid>(m, "MolecularGrid")
         .def(py::init<>())
+        .def(py::init<const CDenseMatrix&>())
         .def(py::init<const CMolecularGrid&>())
         .def("number_of_points", &CMolecularGrid::getNumberOfGridPoints)
         .def(
@@ -122,6 +123,14 @@ export_dft(py::module& m)
                 return vlx_general::pointer_to_numpy(self.getWeights(), std::vector<int64_t>{self.getNumberOfGridPoints()});
             },
             "Gets weights of grid as numpy array.")
+        .def(
+            "re_distribute_counts_and_displacements",
+            [](CMolecularGrid& self, py::object py_comm) -> void {
+                auto comm = vlx_general::get_mpi_comm(py_comm);
+                self.reDistributeCountsAndDisplacements(*comm);
+            },
+            "Redo distributing MolecularGrid counts and displacements.",
+            "py_comm"_a)
         .def(py::self == py::self);
 
     // CGridDriver class
