@@ -139,10 +139,22 @@ class PolarizabilityGradient():
             response calculations.
         """
 
-        # orbital response driver
-        orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
+        # DEBUG
+        if self.rank == mpi_master():
+            self.ostream.print_info('GRAD DICT FREQS: {}'.format(self.frequencies))
+            self.ostream.print_info('ORBRSP DICT FREQS: {}'.format(
+                self.orbrsp_dict['frequencies']
+            ))
 
+        # convert sequence of frequencies to list []
+        frequencylist = []
+        for w in self.frequencies:
+            frequencylist.append(w)
+        self.frequencies = frequencylist
+        self.orbrsp_dict['frequencies'] = frequencylist
+        
         # compute orbital response
+        orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
@@ -155,7 +167,7 @@ class PolarizabilityGradient():
         n_freqs = len(self.frequencies)
         for f, w in enumerate(self.frequencies):
             self.ostream.print_info(
-                'Building gradient for frequency = {:f}'.format(w)
+                'Building gradient for frequency = {:4.3f}'.format(w)
                 )
             self.ostream.flush()
             
@@ -172,8 +184,7 @@ class PolarizabilityGradient():
 
                 # only alpha part:
                 gs_dm = scf_tensors['D_alpha']
-                #lambda_mo = orbrsp_results['cphf_ov']
-                # TODO: tmp workaround for splitting ov into frequencies
+                # TODO: MPI should this be done before loop over freqs?
                 cphf_ov = all_orbrsp_results['cphf_ov']
                 dof = int(cphf_ov.shape[0] / n_freqs)
                 lambda_mo = cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
@@ -287,7 +298,12 @@ class PolarizabilityGradient():
 
                 polgrad_results[(w)] = pol_gradient.reshape(dof, dof, 3 * natm)
 
-        return polgrad_results, all_orbrsp_results
+        self.ostream.print_blank()
+        self.ostream.print_info(
+            'Finished calculation of polarizability gradient'
+            )
+        self.ostream.flush()
+        #return polgrad_results, all_orbrsp_results
 
     def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, x_minus_y_den,
                               gs_density, xcfun_label):

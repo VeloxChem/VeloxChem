@@ -122,10 +122,10 @@ class PolOrbitalResponse(CphfSolver):
 
         orbrsp_rhs = {}
         for f, w in enumerate(self.frequencies):
-            self.ostream.print_info('Building RHS for w = {:f}'.format(w))
-            self.ostream.flush()
             
             if self.rank == mpi_master():
+                self.ostream.print_info('Building RHS for w = {:4.3f}'.format(w))
+                self.ostream.flush()
 
                 # 1) Calculate unrelaxed one-particle and transition density matrix
                 ovlp = scf_tensors['S']
@@ -138,7 +138,6 @@ class PolOrbitalResponse(CphfSolver):
                 nvir = mo_vir.shape[1]
 
                 # TODO: do we keep this factor like that?
-                # TODO: no, make global and invert immediately
                 sqrt2 = np.sqrt(2.0)
 
                 # Check if response vectors exist for desired frequency of gradient
@@ -422,6 +421,7 @@ class PolOrbitalResponse(CphfSolver):
             self.profiler.print_timing(self.ostream)
             self.profiler.print_profiling_summary(self.ostream)
 
+            self.ostream.print_info('WRITING RHS TO LIST IF MASTER')
             if self.rank == mpi_master():
                 orbrsp_rhs[(w)] = {
                     'cphf_rhs': rhs_mo,
@@ -433,13 +433,12 @@ class PolOrbitalResponse(CphfSolver):
                     'fock_ao_rhs': fock_ao_rhs,
                     'fock_gxc_ao': fock_gxc_ao, # None if not DFT
                 }
-                # TODO: beware this might be an ugly solution
                 if (f==0):
                     tot_rhs_mo = rhs_mo
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
-            else:
-                None
+#            else:
+#                None
         
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
@@ -475,11 +474,10 @@ class PolOrbitalResponse(CphfSolver):
         # PE information
         pe_dict = self._init_pe(molecule, basis)
                 
-        # TODO: temp. solution
         n_freqs = len(self.frequencies)
 
         for f, w in enumerate(self.frequencies):
-            self.ostream.print_info('Building omega for w = {:f}'.format(w))
+            self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
             self.ostream.flush()
             
             if self.rank == mpi_master():
@@ -505,9 +503,8 @@ class PolOrbitalResponse(CphfSolver):
                 fock_gxc_ao = self.cphf_results[w]['fock_gxc_ao']
                 dm_oo = self.cphf_results[w]['dm_oo']
                 dm_vv = self.cphf_results[w]['dm_vv']
-                #cphf_ov = self.cphf_results[w]['cphf_ov']
 
-                # TODO: tmp workaround for splitting ov into frequencies
+                # TODO: MPI should this be done before loop over freqs?
                 all_cphf_ov = self.cphf_results['cphf_ov']
                 dof = int(all_cphf_ov.shape[0] / n_freqs)
                 cphf_ov = all_cphf_ov.reshape(n_freqs, dof, nocc, nvir)[f]
