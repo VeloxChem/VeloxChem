@@ -194,6 +194,8 @@ class PolOrbitalResponse(CphfSolver):
 
                 # 2) Construct the right-hand side
                 dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list, denmat.rest)
+                #DEBUG
+                #print(dm_ao_rhs)
 
                 if self._dft:
                     # 3) Construct density matrices for E[3] term:
@@ -218,13 +220,27 @@ class PolOrbitalResponse(CphfSolver):
                     # corresponds to rho^{omega_b,omega_c} in quadratic response,
                     # which is zero for orbital response
                     zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
+                    self.ostream.print_info('end of first master, rank {}'.format(self.rank))
+                    self.ostream.flush()
             else:
                 dm_ao_rhs = AODensityMatrix()
                 if self._dft:
                     perturbed_dm_ao = AODensityMatrix()
                     zero_dm_ao = AODensityMatrix()
 
+            #DEBUG
+            self.ostream.print_info(
+                'polorbitalresponse.py compute_rhs(): rank {} before first broadcast'.format(
+                    self.rank
+                )
+                )
+            self.ostream.flush()
             dm_ao_rhs.broadcast(self.rank, self.comm)
+            #DEBUG
+            self.ostream.print_info(
+                'polorbitalresponse.py compute_rhs(): after first broadcast'
+                )
+            self.ostream.flush()
 
             molgrid = dft_dict['molgrid']
             gs_density = dft_dict['gs_density']
@@ -276,6 +292,10 @@ class PolOrbitalResponse(CphfSolver):
             self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis, eri_dict,
                                dft_dict, pe_dict, self.profiler)
 
+            self.ostream.print_info(
+                'polorbitalresponse.py compute_rhs(): after mpi run'
+                )
+            self.ostream.flush()
             # Calculate the RHS and transform it to the MO basis
             if self.rank == mpi_master():
                 # extract the 1PDM contributions
@@ -414,6 +434,11 @@ class PolOrbitalResponse(CphfSolver):
                     # different factor compared to TDDFT orbital response
                     # because here vectors are scaled by 1/sqrt(2)
                     rhs_mo += 0.5 * gxc_mo
+            # DEBUG
+            self.ostream.print_info(
+                'polorbitalresponse.py compute_rhs(): after second mpi_master'
+                )
+            self.ostream.flush()
 
             self.profiler.stop_timer('RHS')
 
