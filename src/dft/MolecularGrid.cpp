@@ -306,7 +306,7 @@ CMolecularGrid::distributeCountsAndDisplacements(MPI_Comm comm) -> void
     {
         _isDistributed = true;
 
-        auto numboxes = _gridPointCounts.size();
+        auto numboxes = static_cast<int64_t>(_gridPointCounts.size());
 
         // sort before distribute
 
