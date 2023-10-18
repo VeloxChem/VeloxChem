@@ -52,12 +52,15 @@ class PolarizabilityGradient():
 
         if ostream is None:
             ostream = OutputStream(sys.stdout)
-        self.ostream = ostream
 
         # MPI information
         self.comm = comm
         self.rank = self.comm.Get_rank()
         self.nodes = self.comm.Get_size()
+
+        self.ostream = ostream
+
+        self.polgradient = None
 
         # DFT information
         self._dft = False
@@ -303,6 +306,7 @@ class PolarizabilityGradient():
             'Finished calculation of polarizability gradient'
             )
         self.ostream.flush()
+        self.polgradient = dict(polgrad_results)
         #return polgrad_results, all_orbrsp_results
 
     def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, x_minus_y_den,
