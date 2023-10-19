@@ -260,21 +260,6 @@ zeroKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos)
 }
 
 __global__ void
-distributeSubKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos, const double* d_mat_Vxc, const uint32_t* d_ao_inds, const uint32_t aocount)
-{
-    const uint32_t row = blockDim.y * blockIdx.y + threadIdx.y;
-    const uint32_t col = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if ((row < aocount) && (col < aocount))
-    {
-        const auto row_orig = d_ao_inds[row];
-        const auto col_orig = d_ao_inds[col];
-
-        d_mat_Vxc_full[row_orig * naos + col_orig] += d_mat_Vxc[row * aocount + col];
-    }
-}
-
-__global__ void
 cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_values, const uint32_t aocount, const uint32_t npoints)
 {
     const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
@@ -313,10 +298,16 @@ matmulAtB(double* C, const double* A, const double* B, const uint32_t aocount, c
 }
 
 __global__ void
-matmulABt(double* C, const double* A, const double* B, const uint32_t aocount, const uint32_t npoints)
+matmulABtKohnShamMatrix(double*         d_mat_Vxc_full,
+                        const uint32_t  naos,
+                        const double*   A,
+                        const double*   B,
+                        const uint32_t* d_ao_inds,
+                        const uint32_t  aocount,
+                        const uint32_t  npoints)
 {
-    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
-    const uint32_t j = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;
+    const uint32_t j = blockDim.x * blockIdx.x + threadIdx.x;
 
     if ((i < aocount) && (j < aocount))
     {
@@ -327,7 +318,10 @@ matmulABt(double* C, const double* A, const double* B, const uint32_t aocount, c
             val += A[i * npoints + g] * B[j * npoints + g];
         }
 
-        C[i * aocount + j] = val;
+        const auto i_orig = d_ao_inds[i];
+        const auto j_orig = d_ao_inds[j];
+
+        d_mat_Vxc_full[i_orig * naos + j_orig] += val;
     }
 }
 
@@ -885,7 +879,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         // reuse d_den_mat and d_mat_F as working space
         auto d_mat_G   = d_mat_F;
-        auto d_mat_Vxc = d_den_mat;
 
         threads_per_block = dim3(256);
 
@@ -903,39 +896,13 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::matmulABt<<<num_blocks, threads_per_block>>>(
-            d_mat_Vxc, d_gto_values, d_mat_G, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
-
-        /*
-        // GTO values: nao x npoints
-        narow = static_cast<uint32_t>(aocount);
-        nacol = static_cast<uint32_t>(npoints);
-
-        // matrix G:   nao x npoints
-        // matrix G^T: npoints x nao
-        auto nbrow = static_cast<uint32_t>(aocount);
-        // auto nbcol = static_cast<uint32_t>(npoints);
-
-        m = narow;
-        k = nacol;
-        n = nbrow;
-
-        alpha = 1.0;
-        beta  = 0.0;
-
-        // TODO: double check transpose of d_mat_G
-
-        // we want row-major C = A * B^T but cublas is column-major.
-        // so we do C^T = B * A^T instead.
-        cublasSafe(cublasDgemm(handle, CUBLAS_OP_T, CUBLAS_OP_N, n, m, k, &alpha, d_mat_G, k, d_gto_values, k, &beta, d_mat_Vxc, n));
-        */
-
-        threads_per_block = dim3(16, 16);
-
-        num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
-
-        gpu::distributeSubKohnShamMatrix<<<num_blocks, threads_per_block>>>(
-            d_mat_Vxc_full, static_cast<uint32_t>(naos), d_mat_Vxc, d_ao_inds, static_cast<uint32_t>(aocount));
+        gpu::matmulABtKohnShamMatrix<<<num_blocks, threads_per_block>>>(d_mat_Vxc_full,
+                                                                        static_cast<uint32_t>(naos),
+                                                                        d_gto_values,
+                                                                        d_mat_G,
+                                                                        d_ao_inds,
+                                                                        static_cast<uint32_t>(aocount),
+                                                                        static_cast<uint32_t>(npoints));
 
         // compute partial contribution to XC energy
 
