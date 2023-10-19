@@ -347,127 +347,6 @@ class PolarizabilityGradient():
 
         self.polgradient = dict(polgrad_results)
 
-    def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, x_minus_y_den,
-                              gs_density, xcfun_label):
-        """
-        Calculates exchange-correlation contribution to polarizability gradient.
-
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param rhow_den:
-            The perturbed density.
-        :param x_minus_y_den:
-            The X-Y density.
-        :param gs_density:
-            The ground state density.
-        :param xcfun_label:
-            The label of the xc functional.
-
-        :return:
-            The exchange-correlation contribution to polarizability gradient.
-        """
-
-        grid_drv = GridDriver(self.comm)
-        grid_drv.set_level(self.grid_level)
-        mol_grid = grid_drv.generate(molecule)
-
-        xcgrad_drv = XCMolecularGradient(self.comm)
-        polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
-            molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
-        polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
-            molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
-            xcfun_label)
-        polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
-            molecule, ao_basis, x_minus_y_den, x_minus_y_den, gs_density, mol_grid,
-            xcfun_label)
-        polgrad_xcgrad += xcgrad_drv.integrate_kxc_gradient(
-            molecule, ao_basis, x_minus_y_den, x_minus_y_den, gs_density, mol_grid,
-            xcfun_label)
-        #polgrad_xcgrad = xcgrad_drv.integrate_tddft_gradient(
-        #    rhow_den, x_minus_y_den, gs_density, molecule, ao_basis, mol_grid,
-        #    xcfun_label)
-        polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
-
-        return polgrad_xcgrad
-
-    def _init_dft(self, molecule, scf_tensors):
-        """
-        Initializes DFT.
-
-        :param molecule:
-            The molecule.
-        :param scf_tensors:
-            The dictionary of tensors from converged SCF wavefunction.
-
-        :return:
-            The dictionary of DFT information.
-        """
-
-        # generate integration grid
-        if self._dft:
-            grid_drv = GridDriver(self.comm)
-            grid_drv.set_level(self.grid_level)
-
-            grid_t0 = tm.time()
-            molgrid = grid_drv.generate(molecule)
-
-            n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
-
-            if self.rank == mpi_master():
-                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
-                                             denmat.rest)
-            else:
-                gs_density = AODensityMatrix()
-            gs_density.broadcast(self.rank, self.comm)
-            #molgrid.broadcast(self.rank, self.comm) # TODO duble check
-
-            dft_func_label = self.xcfun.get_func_label().upper()
-        else:
-            molgrid = MolecularGrid()
-            gs_density = AODensityMatrix()
-            dft_func_label = 'HF'
-
-        return {
-            'molgrid': molgrid,
-            'gs_density': gs_density,
-            'dft_func_label': dft_func_label,
-        }
-
-    # TODO: setup print of polarizability gradient
-    def print_polarizability_gradient(self, molecule):
-        """
-        Prints the polarizability gradient.
-
-        :param molecule:
-            The molecule.
-        """
-
-        labels = molecule.get_labels()
-
-        if self.numerical:
-            title = 'Numerical '
-        else:
-            title = 'Analytical '
-
-        return None
-
-    def print_geometry(self, molecule):
-        """
-        Prints the geometry.
-
-        :param molecule:
-            The molecule.
-        """
-
-        self.ostream.print_block(molecule.get_string())
-
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
         Performs calculation of numerical nuclear gradient
@@ -594,3 +473,249 @@ class PolarizabilityGradient():
                 self.polgradient[w] = num_polgradient[f]
 
         scf_drv.ostream.unmute()
+        lr_drv.ostream.state = True
+
+    def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, x_minus_y_den,
+                              gs_density, xcfun_label):
+        """
+        Calculates exchange-correlation contribution to polarizability gradient.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param rhow_den:
+            The perturbed density.
+        :param x_minus_y_den:
+            The X-Y density.
+        :param gs_density:
+            The ground state density.
+        :param xcfun_label:
+            The label of the xc functional.
+
+        :return:
+            The exchange-correlation contribution to polarizability gradient.
+        """
+
+        grid_drv = GridDriver(self.comm)
+        grid_drv.set_level(self.grid_level)
+        mol_grid = grid_drv.generate(molecule)
+
+        xcgrad_drv = XCMolecularGradient(self.comm)
+        polgrad_xcgrad = xcgrad_drv.integrate_vxc_gradient(
+            molecule, ao_basis, rhow_den, gs_density, mol_grid, xcfun_label)
+        polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
+            molecule, ao_basis, rhow_den, gs_density, gs_density, mol_grid,
+            xcfun_label)
+        polgrad_xcgrad += xcgrad_drv.integrate_fxc_gradient(
+            molecule, ao_basis, x_minus_y_den, x_minus_y_den, gs_density, mol_grid,
+            xcfun_label)
+        polgrad_xcgrad += xcgrad_drv.integrate_kxc_gradient(
+            molecule, ao_basis, x_minus_y_den, x_minus_y_den, gs_density, mol_grid,
+            xcfun_label)
+        #polgrad_xcgrad = xcgrad_drv.integrate_tddft_gradient(
+        #    rhow_den, x_minus_y_den, gs_density, molecule, ao_basis, mol_grid,
+        #    xcfun_label)
+        polgrad_xcgrad = self.comm.reduce(polgrad_xcgrad, root=mpi_master())
+
+        return polgrad_xcgrad
+
+    def _init_dft(self, molecule, scf_tensors):
+        """
+        Initializes DFT.
+
+        :param molecule:
+            The molecule.
+        :param scf_tensors:
+            The dictionary of tensors from converged SCF wavefunction.
+
+        :return:
+            The dictionary of DFT information.
+        """
+
+        # generate integration grid
+        if self._dft:
+            grid_drv = GridDriver(self.comm)
+            grid_drv.set_level(self.grid_level)
+
+            grid_t0 = tm.time()
+            molgrid = grid_drv.generate(molecule)
+
+            n_grid_points = molgrid.number_of_points()
+            self.ostream.print_info(
+                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
+                format(n_grid_points,
+                       tm.time() - grid_t0))
+            self.ostream.print_blank()
+
+            if self.rank == mpi_master():
+                gs_density = AODensityMatrix([scf_tensors['D_alpha']],
+                                             denmat.rest)
+            else:
+                gs_density = AODensityMatrix()
+            gs_density.broadcast(self.rank, self.comm)
+            #molgrid.broadcast(self.rank, self.comm) # TODO duble check
+
+            dft_func_label = self.xcfun.get_func_label().upper()
+        else:
+            molgrid = MolecularGrid()
+            gs_density = AODensityMatrix()
+            dft_func_label = 'HF'
+
+        return {
+            'molgrid': molgrid,
+            'gs_density': gs_density,
+            'dft_func_label': dft_func_label,
+        }
+
+    # TODO: setup print of polarizability gradient
+    def print_polarizability_gradient(self, molecule):
+        """
+        Prints the polarizability gradient.
+
+        :param molecule:
+            The molecule.
+        """
+
+        labels = molecule.get_labels()
+
+        if self.numerical:
+            title = 'Numerical '
+        else:
+            title = 'Analytical '
+
+        return None
+
+    def print_geometry(self, molecule):
+        """
+        Prints the geometry.
+
+        :param molecule:
+            The molecule.
+        """
+
+        self.ostream.print_block(molecule.get_string())
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
