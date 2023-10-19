@@ -475,109 +475,106 @@ class TddftGradientDriver(GradientDriver):
 
         return dipole_moment
 
-    def compute_polarizability_grad(self, molecule, ao_basis, scf_drv):
-        """
-        Performs calculation of numerical nuclear gradient
-        of the electric dipole polarizability.
 
-        :param molecule:
-            The molecule.
-        :param ao_basis:
-            The AO basis set.
-        :param scf_drv:
-            The SCF driver.
-        """
 
-        scf_drv.ostream.mute()
 
-        # number of atoms
-        natm = molecule.number_of_atoms()
 
-        # atom labels
-        labels = molecule.get_labels()
 
-        # atom coordinates (nx3)
-        coords = molecule.get_coordinates()
 
-        # linear response driver for polarizability calculation
-        lr_drv = LinearResponseSolver(self.comm, self.ostream)
-        lr_drv.ostream.state = False
 
-        # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
-        # polarizability gradient: dictionary goes through 3 coordinates
-        # x 3 coordinates, each entry having values for
-        # no. atoms x 3 coordinates
-        self.pol_grad = np.zeros((3, 3, 3 * natm))
 
-        if not self.do_four_point:
-            for i in range(natm):
-                for d in range(3):
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    lr_drv._is_converged = False
-                    lr_results_p = lr_drv.compute(new_mol, ao_basis,
-                                                  scf_drv.scf_tensors)
 
-                    coords[i, d] -= 2.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    lr_drv._is_converged = False
-                    lr_results_m = lr_drv.compute(new_mol, ao_basis,
-                                                  scf_drv.scf_tensors)
 
-                    coords[i, d] += self.delta_h
-                    for aop, acomp in enumerate('xyz'):
-                        for bop, bcomp in enumerate('xyz'):
-                            key = (acomp, bcomp, 0.0)
-                            self.pol_grad[aop, bop, 3 * i + d] = (
-                                (lr_results_p['response_functions'][key] -
-                                 lr_results_m['response_functions'][key]) /
-                                (2.0 * self.delta_h))
 
-        # four-point approximation for debugging of analytical gradient
-        else:
-            for i in range(natm):
-                for d in range(3):
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    lr_drv._is_converged = False
-                    lr_results_p1 = lr_drv.compute(new_mol, ao_basis,
-                                                   scf_drv.scf_tensors)
 
-                    coords[i, d] += self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    lr_drv._is_converged = False
-                    lr_results_p2 = lr_drv.compute(new_mol, ao_basis,
-                                                   scf_drv.scf_tensors)
 
-                    coords[i, d] -= 3.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    lr_drv._is_converged = False
-                    lr_results_m1 = lr_drv.compute(new_mol, ao_basis,
-                                                   scf_drv.scf_tensors)
 
-                    coords[i, d] -= 1.0 * self.delta_h
-                    new_mol = Molecule(labels, coords, units='au')
-                    scf_drv.compute(new_mol, ao_basis)
-                    lr_drv._is_converged = False
-                    lr_results_m2 = lr_drv.compute(new_mol, ao_basis,
-                                                   scf_drv.scf_tensors)
 
-                    coords[i, d] += 2.0 * self.delta_h
-                    for aop, acomp in enumerate('xyz'):
-                        for bop, bcomp in enumerate('xyz'):
-                            # f'(x) ~ [ f(x - 2h) - 8 f(x - h)
-                            # + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-                            key = (acomp, bcomp, 0.0)
-                            self.pol_grad[aop, bop, 3 * i + d] = ((
-                                lr_results_m2['response_functions'][key] -
-                                8.0 * lr_results_m1['response_functions'][key] +
-                                8.0 * lr_results_p1['response_functions'][key] -
-                                lr_results_p2['response_functions'][key]) / (
-                                    12.0 * self.delta_h))
 
-        scf_drv.ostream.unmute()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
