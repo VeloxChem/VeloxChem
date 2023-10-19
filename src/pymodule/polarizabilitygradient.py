@@ -151,12 +151,20 @@ class PolarizabilityGradient():
         start_time = tm.time()
 
         if self.numerical:
+            valstr = '*** Calculating numerical polarizability gradient ***'
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
             if self.scf_drv is None: 
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
                 raise ValueError(error_message)
             self.compute_numerical(molecule, basis, self.scf_drv)
         else:
+            valstr = '*** Calculating analytical polarizability gradient ***'
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
             self.compute_analytical(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():
@@ -337,11 +345,6 @@ class PolarizabilityGradient():
 
                 polgrad_results[(w)] = pol_gradient.reshape(dof, dof, 3 * natm)
 
-        self.ostream.print_blank()
-        self.ostream.print_info(
-            'Finished calculation of polarizability gradient'
-            )
-        self.ostream.flush()
         self.polgradient = dict(polgrad_results)
 
     def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, x_minus_y_den,
@@ -480,7 +483,7 @@ class PolarizabilityGradient():
             The SCF driver.
         """
 
-        #scf_drv.ostream.mute()
+        scf_drv.ostream.mute()
 
         # number of atoms
         natm = molecule.number_of_atoms()
@@ -491,6 +494,9 @@ class PolarizabilityGradient():
         # atom coordinates (nx3)
         coords = molecule.get_coordinates()
 
+        # number of frequencies
+        n_freqs = len(self.frequencies)
+
         # linear response driver for polarizability calculation
         lr_drv = LinearResponseSolver(self.comm, self.ostream)
         lr_drv.ostream.state = False
@@ -500,9 +506,13 @@ class PolarizabilityGradient():
         # polarizability gradient: dictionary goes through 3 coordinates
         # x 3 coordinates, each entry having values for
         # no. atoms x 3 coordinates
-        self.pol_grad = np.zeros((3, 3, 3 * natm))
+        num_polgradient = np.zeros((n_freqs, 3, 3, 3 * natm))
 
         if not self.do_four_point:
+            self.ostream.print_blank()
+            self.ostream.print_info('do_four_point: False')
+            self.ostream.flush()
+
             for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
@@ -520,18 +530,23 @@ class PolarizabilityGradient():
                                                   scf_drv.scf_tensors)
 
                     coords[i, d] += self.delta_h
-                    for w in list(self.frequencies):
+                    for f, w in enumerate(self.frequencies):
+                        self.ostream.print_info('{}'.format(w))
+                        self.ostream.flush()
                         for aop, acomp in enumerate('xyz'):
                             for bop, bcomp in enumerate('xyz'):
-                                #key = (acomp, bcomp, 0.0)
                                 key = (acomp, bcomp, w)
-                                self.pol_grad[aop, bop, 3 * i + d] = (
+                                num_polgradient[f, aop, bop, 3 * i + d] = (
                                     (lr_results_p['response_functions'][key] -
                                      lr_results_m['response_functions'][key]) /
                                     (2.0 * self.delta_h))
+            for f, w in enumerate(self.frequencies):
+                self.polgradient[w] = num_polgradient[f]
 
         # four-point approximation for debugging of analytical gradient
         else:
+            self.ostream.print_info('do_four_point: True')
+            self.ostream.flush()
             for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
@@ -563,20 +578,19 @@ class PolarizabilityGradient():
                                                    scf_drv.scf_tensors)
 
                     coords[i, d] += 2.0 * self.delta_h
-                    for w in list(self.frequencies):
+                    for f, w in enumerate(self.frequencies):
                         for aop, acomp in enumerate('xyz'):
                             for bop, bcomp in enumerate('xyz'):
                                 # f'(x) ~ [ f(x - 2h) - 8 f(x - h)
                                 # + 8 f(x + h) - f(x + 2h) ] / ( 12h )
-                                #key = (acomp, bcomp, 0.0)
                                 key = (acomp, bcomp, w)
-                                self.pol_grad[aop, bop, 3 * i + d] = ((
+                                num_polgradient[f, aop, bop, 3 * i + d] = ((
                                     lr_results_m2['response_functions'][key] -
                                     8.0 * lr_results_m1['response_functions'][key] +
                                     8.0 * lr_results_p1['response_functions'][key] -
                                     lr_results_p2['response_functions'][key]) / (
                                         12.0 * self.delta_h))
+            for f, w in enumerate(self.frequencies):
+                self.polgradient[w] = num_polgradient[f]
 
-        self.ostream.print_info('Finished numerical polarizability gradient calculation')
-        self.ostream.flush()
-        #scf_drv.ostream.unmute()
+        scf_drv.ostream.unmute()
