@@ -134,8 +134,6 @@ class PolOrbitalResponse(CphfSolver):
                 error_text = "Frequency for gradient not "
                 error_text += "found in linear response results."
                 raise ValueError(error_text)
-        else:
-            pass
 
         full_vec = ([self.get_full_solution_vector(lr_results['solutions'][
                    x, self.frequency]) for x in self.vector_components])

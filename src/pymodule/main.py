@@ -316,7 +316,7 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'hessian',
         'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'frequencies', 'freq', 'cphf', 'polarizabilitygradient'
+        'frequencies', 'freq', 'cphf', 'polarizability_gradient'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -512,7 +512,7 @@ def main():
 
     # Polarizability gradient
 
-    if task_type in ['polarizabilitygradient']:
+    if task_type in ['polarizability_gradient']:
         #DEBUG
         task.ostream.print_info('POLARIZABILITY GRADIENT')
 
@@ -531,7 +531,7 @@ def main():
         rsp_prop.init_driver(task.mpi_comm, task.ostream)
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
         
-        polgrad_drv = PolarizabilityGradient()
+        polgrad_drv = PolarizabilityGradient(task.mpi_comm, task.ostream)
         polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
         polgrad_drv.compute(task.molecule, task.ao_basis, 
                             scf_drv.scf_tensors, rsp_prop._rsp_property)
