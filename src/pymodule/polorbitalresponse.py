@@ -1,4 +1,5 @@
 import numpy as np
+import time as tm
 
 from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import AODensityMatrix
@@ -120,6 +121,8 @@ class PolOrbitalResponse(CphfSolver):
         # 3) Construct the initial guess => in parent class
         # 4) Run the solver => in parent class
 
+        loop_start_time = tm.time()
+
         orbrsp_rhs = {}
         for f, w in enumerate(self.frequencies):
             
@@ -165,13 +168,23 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
+                einsum_start_time = tm.time()
+                
                 # Transform the vectors to the AO basis
                 x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
                 x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
                                          mo_vir)
 
+                valstr = ' * comput_rhs() > Time spent on einsum #0: '
+                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
                 # Turn them into a list (for AODensityMatrix)
                 xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
+
+                einsum_start_time = tm.time()
 
                 # Calculate the symmetrized unrelaxed one-particle density matrix
                 # in MO basis
@@ -185,6 +198,14 @@ class PolOrbitalResponse(CphfSolver):
                                 np.einsum('yib,xia->xyab', x_plus_y, x_plus_y) +
                                 np.einsum('yib,xia->xyab', x_minus_y, x_minus_y))
 
+                valstr = ' * comput_rhs() > Time spent on einsum #1: '
+                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+                einsum_start_time = tm.time()
+
                 # Transform unrelaxed one-particle density matrix to
                 # AO basis and create a list
                 unrel_dm_ao = (
@@ -192,10 +213,14 @@ class PolOrbitalResponse(CphfSolver):
                     np.einsum('ma,xyab,nb->xymn', mo_vir, dm_vv, mo_vir))
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
+                valstr = ' * comput_rhs() > Time spent on einsum #2: '
+                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
                 # 2) Construct the right-hand side
                 dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list, denmat.rest)
-                #DEBUG
-                #print(dm_ao_rhs)
 
                 if self._dft:
                     # 3) Construct density matrices for E[3] term:
@@ -220,27 +245,13 @@ class PolOrbitalResponse(CphfSolver):
                     # corresponds to rho^{omega_b,omega_c} in quadratic response,
                     # which is zero for orbital response
                     zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
-                    self.ostream.print_info('end of first master, rank {}'.format(self.rank))
-                    self.ostream.flush()
             else:
                 dm_ao_rhs = AODensityMatrix()
                 if self._dft:
                     perturbed_dm_ao = AODensityMatrix()
                     zero_dm_ao = AODensityMatrix()
 
-            #DEBUG
-            self.ostream.print_info(
-                'polorbitalresponse.py compute_rhs(): rank {} before first broadcast'.format(
-                    self.rank
-                )
-                )
-            self.ostream.flush()
             dm_ao_rhs.broadcast(self.rank, self.comm)
-            #DEBUG
-            self.ostream.print_info(
-                'polorbitalresponse.py compute_rhs(): after first broadcast'
-                )
-            self.ostream.flush()
 
             molgrid = dft_dict['molgrid']
             gs_density = dft_dict['gs_density']
@@ -292,10 +303,6 @@ class PolOrbitalResponse(CphfSolver):
             self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis, eri_dict,
                                dft_dict, pe_dict, self.profiler)
 
-            self.ostream.print_info(
-                'polorbitalresponse.py compute_rhs(): after mpi run'
-                )
-            self.ostream.flush()
             # Calculate the RHS and transform it to the MO basis
             if self.rank == mpi_master():
                 # extract the 1PDM contributions
@@ -315,6 +322,8 @@ class PolOrbitalResponse(CphfSolver):
                     fock_ao_rhs_x_plus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 + i)
                     fock_ao_rhs_x_minus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 +
                                                                           dof + i)
+
+                einsum_start_time = tm.time()
 
                 # TODO: replace np.einsum with np.linalg.multi_dot
                 # Is there a better way to do all this?
@@ -385,6 +394,12 @@ class PolOrbitalResponse(CphfSolver):
                                           x_minus_y_ao))
                 ).reshape(dof**2, nocc, nvir)
 
+                valstr = ' * comput_rhs() > Time spent on einsum #3: '
+                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
                 # Calculate the dipole contributions to the RHS:
                 # Dipole integrals in AO basis
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -410,6 +425,8 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(dof)
                 ])
 
+                einsum_start_time = tm.time()
+
                 # Contract with vectors to get dipole contribution to the RHS
                 rhs_dipole_contrib = 0.5 * (
                     np.einsum('xja,yji->xyia', x_minus_y, dipole_ints_oo) +
@@ -420,6 +437,12 @@ class PolOrbitalResponse(CphfSolver):
                     -np.einsum('xib,yab->xyia', x_minus_y, dipole_ints_vv) -
                     np.einsum('yib,xab->xyia', x_minus_y, dipole_ints_vv)).reshape(
                         dof**2, nocc, nvir)
+
+                valstr = ' * comput_rhs() > Time spent on einsum #4: '
+                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
 
                 rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
 
@@ -434,19 +457,9 @@ class PolOrbitalResponse(CphfSolver):
                     # different factor compared to TDDFT orbital response
                     # because here vectors are scaled by 1/sqrt(2)
                     rhs_mo += 0.5 * gxc_mo
-            # DEBUG
-            self.ostream.print_info(
-                'polorbitalresponse.py compute_rhs(): after second mpi_master'
-                )
-            self.ostream.flush()
 
             self.profiler.stop_timer('RHS')
 
-            # DEBUG: timing
-            self.profiler.print_timing(self.ostream)
-            self.profiler.print_profiling_summary(self.ostream)
-
-            self.ostream.print_info('WRITING RHS TO LIST IF MASTER')
             if self.rank == mpi_master():
                 orbrsp_rhs[(w)] = {
                     'cphf_rhs': rhs_mo,
@@ -470,6 +483,12 @@ class PolOrbitalResponse(CphfSolver):
             return orbrsp_rhs
         else:
             return {}
+
+        valstr = '** Time spent on constructing the orbrsp RHS for {} frequencies: '.format(n_freqs)
+        valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     # NOTES:
     #   - epsilon_dm_ao not returned from cphfsolver,
@@ -500,6 +519,8 @@ class PolOrbitalResponse(CphfSolver):
         pe_dict = self._init_pe(molecule, basis)
                 
         n_freqs = len(self.frequencies)
+
+        loop_start_time = tm.time()
 
         for f, w in enumerate(self.frequencies):
             self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
@@ -578,6 +599,8 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(dof)
                 ])
 
+                einsum_start_time = tm.time()
+
                 # Calculate the dipole moment integrals' contribution to omega
                 dipole_ints_contrib_oo = 0.5 * (
                     np.einsum('xjc,yic->xyij', x_minus_y, dipole_ints_ov) +
@@ -598,10 +621,24 @@ class PolOrbitalResponse(CphfSolver):
                     np.einsum('ma,xyab,nb->xymn', mo_vir, dipole_ints_contrib_vv,
                               mo_vir))
 
+                valstr = ' * comput_omega() > Time spent on einsum #1: '
+                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
+
+                einsum_start_time = tm.time()
+
                 # Transform the vectors to the AO basis
                 x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
                 x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
                                          mo_vir)
+
+                valstr = ' * comput_omega() > Time spent on einsum #2: '
+                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
 
                 # The density matrix; only alpha block;
                 # Only works for the restricted case
@@ -637,6 +674,8 @@ class PolOrbitalResponse(CphfSolver):
             #       or (dof, dof, nao, nao)?
             omega = np.zeros((dof * dof, nao, nao))
 
+            einsum_start_time = tm.time()
+
             # Calculate omega (without for-loops, only the diagonal parts
             # possible for now)
             # Construct epsilon_dm_ao
@@ -647,6 +686,11 @@ class PolOrbitalResponse(CphfSolver):
             epsilon_cphf_ao = np.einsum('mi,ii,xyia,na->xymn', mo_occ, eo_diag,
                                         cphf_ov.reshape(dof, dof, nocc, nvir),
                                         mo_vir)
+            valstr = ' * compute_omega() > Time spent on einsum #3: '
+            valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
             # OV + VO
             epsilon_dm_ao -= (epsilon_cphf_ao +
                               epsilon_cphf_ao.transpose(0, 1, 3, 2))
@@ -747,8 +791,13 @@ class PolOrbitalResponse(CphfSolver):
                         ])
 
             # add omega multipliers in AO basis to cphf_results dictionary
-            #self.cphf_results['omega_ao'] = omega
             self.cphf_results[(w)]['omega_ao'] = omega
+        valstr = '** Time spent on constructing omega multipliers for {} frequencies: '.format(
+            n_freqs)
+        valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def print_cphf_header(self, title):
         self.ostream.print_blank()

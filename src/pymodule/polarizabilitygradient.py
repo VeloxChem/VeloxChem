@@ -201,22 +201,32 @@ class PolarizabilityGradient():
         self.orbrsp_dict['frequencies'] = frequencylist
         
         # compute orbital response
+        orbrsp_start_time = tm.time()
+
         orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
         orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
         orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
         all_orbrsp_results = orbrsp_drv.cphf_results
+
+        valstr = '** Time spent on orbital response for {} frequencies: '.format(
+            len(self.frequencies))
+        valstr += '{:.2f} sec **'.format(tm.time() - orbrsp_start_time)
+        self.ostream.print_header(valstr)
         self.ostream.print_blank()
-        self.ostream.print_info('Finished orbital response calculations')
         self.ostream.flush()
 
         polgrad_results ={}
         n_freqs = len(self.frequencies)
+
+        loop_start_time = tm.time()
+        
         for f, w in enumerate(self.frequencies):
             self.ostream.print_info(
                 'Building gradient for frequency = {:4.3f}'.format(w)
                 )
             self.ostream.flush()
+            self.ostream.print_blank()
             
             orbrsp_results = all_orbrsp_results[w]
             if self.rank == mpi_master():
@@ -249,8 +259,8 @@ class PolarizabilityGradient():
                 lambda_ao += lambda_ao.transpose(0,1,3,2) # vir-occ
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao 
 
-                # analytical polarizability gradient
                 pol_gradient = np.zeros((dof, dof, natm, 3))
+
                 # dictionary to translate from numbers to operator components 'xyz'
                 component_dict = {0: 'x', 1: 'y', 2: 'z'}
 
@@ -262,16 +272,26 @@ class PolarizabilityGradient():
                 else:
                     frac_K = 1.0
 
-
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
                 for i in range(natm):
-                    # taking integral derivatives from pyscf
+                    
+                    integral_start_time = tm.time()
+
+                    # importing integral derivatives from pyscf
                     d_ovlp = overlap_deriv(molecule, basis, i)
                     d_hcore = hcore_deriv(molecule, basis, i)
                     d_eri = eri_deriv(molecule, basis, i)
                     d_dipole = dipole_deriv(molecule, basis, i)
+
+                    valstr = ' * Time spent importing integrals for atom #{}: '.format(i+1)
+                    valstr += '{:.2f} sec * '.format(tm.time() - integral_start_time)
+                    self.ostream.print_header(valstr)
+                    self.ostream.print_blank()
+                    self.ostream.flush()
+
+                    gradient_start_time = tm.time()
 
                     # Calculate the analytic polarizability gradient
                     pol_gradient[:, :, i] += ( np.einsum('xymn,amn->xya',
@@ -300,6 +320,12 @@ class PolarizabilityGradient():
                         - 2.0 * np.einsum('xmn,yamn->xya', x_minus_y, d_dipole)
                         - 2.0 * np.einsum('xmn,yamn->yxa', x_minus_y, d_dipole)
                                     )
+
+                    valstr = ' * Time spent calculating pol. gradient: '
+                    valstr += '{:.2f} sec * '.format(tm.time() - gradient_start_time)
+                    self.ostream.print_header(valstr)
+                    self.ostream.print_blank()
+                    self.ostream.flush()
 
                 # Add exchange-correlation contributions to the gradient
                 # for now by looping over each component of the polarizability
@@ -346,6 +372,12 @@ class PolarizabilityGradient():
                 polgrad_results[(w)] = pol_gradient.reshape(dof, dof, 3 * natm)
 
         self.polgradient = dict(polgrad_results)
+
+        valstr = '** Time spent on constructing the gradient for {} frequencies: '.format(n_freqs)
+        valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
 
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
