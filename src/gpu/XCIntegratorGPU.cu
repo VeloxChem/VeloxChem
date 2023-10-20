@@ -23,7 +23,6 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <cublas_v2.h>
 #include <cuda_runtime.h>
 
 #include <algorithm>
@@ -49,6 +48,8 @@
 #include "StringFormat.hpp"
 #include "XCIntegratorGPU.hpp"
 
+#define TILE_DIM 16
+
 #define cudaSafe(e)                                                                                                       \
     {                                                                                                                     \
         cudaError_t err = (e);                                                                                            \
@@ -57,16 +58,6 @@
             std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << cudaGetErrorString(err) << std::endl; \
             std::exit(EXIT_FAILURE);                                                                                      \
         }                                                                                                                 \
-    }
-
-#define cublasSafe(e)                                                                            \
-    {                                                                                            \
-        cublasStatus_t err = (e);                                                                \
-        if (err != CUBLAS_STATUS_SUCCESS)                                                        \
-        {                                                                                        \
-            std::cerr << "cuBLAS error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
-            std::exit(EXIT_FAILURE);                                                             \
-        }                                                                                        \
     }
 
 namespace gpu {  // gpu namespace
@@ -279,20 +270,50 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
 }
 
 __global__ void
-matmulAtB(double* C, const double* A, const double* B, const uint32_t aocount, const uint32_t npoints)
+matmulAtB(double* C, double* A, double* B, uint32_t aocount, uint32_t npoints)
 {
-    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;
-    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
+    __shared__ double As[TILE_DIM][TILE_DIM];
+    __shared__ double Bs[TILE_DIM][TILE_DIM];
+
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
+
+    double val = 0.0;
+
+    for (uint32_t k = 0; k < (aocount + TILE_DIM - 1) / TILE_DIM; k++)
+    {
+        if ((i < aocount) && (k * TILE_DIM + threadIdx.x < aocount))
+        {
+            // note: transpose of A
+            As[threadIdx.x][threadIdx.y] = A[(k * TILE_DIM + threadIdx.x) * aocount + i];
+        }
+        else
+        {
+            As[threadIdx.x][threadIdx.y] = 0.0;
+        }
+
+        if ((k * TILE_DIM + threadIdx.y < aocount) && (g < npoints))
+        {
+            Bs[threadIdx.y][threadIdx.x] = B[(k * TILE_DIM + threadIdx.y) * npoints + g];
+        }
+        else
+        {
+            Bs[threadIdx.y][threadIdx.x] = 0.0;
+        }
+
+        __syncthreads();
+
+        for (uint32_t m = 0; m < TILE_DIM; m++)
+        {
+            // note: transpose of A
+            val += As[m][threadIdx.y] * Bs[m][threadIdx.x];
+        }
+
+        __syncthreads();
+    }
 
     if ((i < aocount) && (g < npoints))
     {
-        double val = 0.0;
-
-        for (uint32_t k = 0; k < aocount; k++)
-        {
-            val += A[k * aocount + i] * B[k * npoints + g];
-        }
-
         C[i * npoints + g] = val;
     }
 }
@@ -306,22 +327,49 @@ matmulABtKohnShamMatrix(double*         d_mat_Vxc_full,
                         const uint32_t  aocount,
                         const uint32_t  npoints)
 {
-    const uint32_t i = blockDim.y * blockIdx.y + threadIdx.y;
-    const uint32_t j = blockDim.x * blockIdx.x + threadIdx.x;
+    __shared__ double As[TILE_DIM][TILE_DIM];
+    __shared__ double Bs[TILE_DIM][TILE_DIM];
+
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    double val = 0.0;
+
+    for (uint32_t k = 0; k < (npoints + TILE_DIM - 1) / TILE_DIM; k++)
+    {
+        if ((i < aocount) && (k * TILE_DIM + threadIdx.x < npoints))
+        {
+            As[threadIdx.y][threadIdx.x] = A[i * npoints + (k * TILE_DIM + threadIdx.x)];
+        }
+        else
+        {
+            As[threadIdx.y][threadIdx.x] = 0.0;
+        }
+
+        if ((k * TILE_DIM + threadIdx.y < npoints) && (j < aocount))
+        {
+            // note: transpose of B
+            Bs[threadIdx.x][threadIdx.y] = B[j * npoints + (k * TILE_DIM + threadIdx.y)];
+        }
+        else
+        {
+            Bs[threadIdx.x][threadIdx.y] = 0.0;
+        }
+
+        __syncthreads();
+
+        for (uint32_t m = 0; m < TILE_DIM; m++)
+        {
+            // note: transpose of B
+            val += As[threadIdx.y][m] * Bs[threadIdx.x][m];
+        }
+
+        __syncthreads();
+    }
 
     if ((i < aocount) && (j < aocount))
     {
-        double val = 0.0;
-
-        for (uint32_t g = 0; g < npoints; g++)
-        {
-            val += A[i * npoints + g] * B[j * npoints + g];
-        }
-
-        const auto i_orig = d_ao_inds[i];
-        const auto j_orig = d_ao_inds[j];
-
-        d_mat_Vxc_full[i_orig * naos + j_orig] += val;
+        d_mat_Vxc_full[d_ao_inds[i] * naos + d_ao_inds[j]] += val;
     }
 }
 
@@ -411,7 +459,7 @@ getGtoValuesForLdaDirect(double*                     d_gto_values,
 
     // evaluate GTO values on grid points
 
-    dim3 threads_per_block(16, 16);
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
     dim3 num_blocks((ncols + threads_per_block.x - 1) / threads_per_block.x, (nrows + threads_per_block.y - 1) / threads_per_block.y);
 
@@ -692,7 +740,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     cudaSafe(cudaMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
 
-    dim3 threads_per_block(16, 16);
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
     dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
 
@@ -750,13 +798,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     auto counts = molecularGrid.getGridPointCounts();
 
     auto displacements = molecularGrid.getGridPointDisplacements();
-
-    /*
-    // use cublas to get multAB(densityMatrix, gtoValues)
-
-    cublasHandle_t handle;
-    cublasSafe(cublasCreate(&handle));
-    */
 
     for (size_t box_id = 0; box_id < counts.size(); box_id++)
     {
@@ -827,14 +868,14 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
-        threads_per_block = dim3(16, 16);
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
         gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
             d_den_mat, d_den_mat_full, static_cast<uint32_t>(naos), d_ao_inds, static_cast<uint32_t>(aocount));
 
-        threads_per_block = dim3(16, 16);
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
@@ -842,25 +883,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         gpu::matmulAtB<<<num_blocks, threads_per_block>>>(
             d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
-        /*
-        // density matrix: nao x nao
-        auto narow = static_cast<uint32_t>(aocount);
-        auto nacol = static_cast<uint32_t>(aocount);
-
-        // GTO values: nao x npoints
-        // auto nbrow = static_cast<uint32_t>(aocount);
-        auto nbcol = static_cast<uint32_t>(npoints);
-
-        double alpha = 1.0, beta = 0.0;
-
-        auto m = narow, k = nacol, n = nbcol;
-
-        // we want row-major C = A * B but cublas is column-major.
-        // so we do C^T = B^T * A^T instead.
-        cublasSafe(cublasDgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, n, m, k, &alpha, d_gto_values, n, d_den_mat, k, &beta, d_mat_F, n));
-        */
-
-        threads_per_block = dim3(256);
+        threads_per_block = dim3(TILE_DIM * TILE_DIM);
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
 
@@ -878,9 +901,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         // Vxc to full Kohn-Sham matrix
 
         // reuse d_den_mat and d_mat_F as working space
-        auto d_mat_G   = d_mat_F;
+        auto d_mat_G = d_mat_F;
 
-        threads_per_block = dim3(256);
+        threads_per_block = dim3(TILE_DIM * TILE_DIM);
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
 
@@ -892,7 +915,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
                                                                static_cast<uint32_t>(aocount),
                                                                d_vrho);
 
-        threads_per_block = dim3(16, 16);
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
@@ -915,10 +938,6 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
             xcene += weights[g + gridblockpos] * exc[g] * rho_total;
         }
     }
-
-    /*
-    cublasDestroy(handle);
-    */
 
     cudaSafe(cudaMemcpy(mat_Vxc.getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), cudaMemcpyDeviceToHost));
 
