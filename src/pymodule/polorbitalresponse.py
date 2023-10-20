@@ -18,7 +18,7 @@ class PolOrbitalResponse(CphfSolver):
     for the polarizability gradient.
 
     Instance variables
-        - frequencies: The sequence of  frequencies for which the 
+        - frequencies: The sequence of  frequencies for which the
             polarizability gradient is computed.
         - vector_components: The components of the response vectors
             corresponding to the operator components in linear response.
@@ -41,9 +41,9 @@ class PolOrbitalResponse(CphfSolver):
         self.cphf_results = None
 
         self._input_keywords['orbitalresponse'] = {
-                'vector_components': ('str_lower', 'Cartesian components of operator'),
-                'frequencies': ('seq_range', 'frequencies'),
-            }
+            'vector_components': ('str_lower', 'Cartesian components of operator'),
+            'frequencies': ('seq_range', 'frequencies')
+        }
 
     def update_settings(self, orbrsp_dict, method_dict=None):
         """
@@ -125,7 +125,7 @@ class PolOrbitalResponse(CphfSolver):
 
         orbrsp_rhs = {}
         for f, w in enumerate(self.frequencies):
-            
+
             if self.rank == mpi_master():
                 self.ostream.print_info('Building RHS for w = {:4.3f}'.format(w))
                 self.ostream.flush()
@@ -160,10 +160,10 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Extract the excitation and de-excitation components
                 # from the full solution vector.
-                exc_vec = (1 / sqrt2 * 
-                    np.array(full_vec)[:, :nocc * nvir].reshape(dof, nocc, nvir))
-                deexc_vec = (1 / sqrt2 * 
-                    np.array(full_vec)[:, nocc * nvir:].reshape(dof, nocc, nvir))
+                exc_vec = (1 / sqrt2 *
+                        np.array(full_vec)[:, :nocc * nvir].reshape(dof, nocc, nvir))
+                deexc_vec = (1 / sqrt2 *
+                        np.array(full_vec)[:, nocc * nvir:].reshape(dof, nocc, nvir))
 
                 # Construct plus/minus combinations of excitation and
                 # de-excitation part
@@ -171,7 +171,7 @@ class PolOrbitalResponse(CphfSolver):
                 x_minus_y = exc_vec - deexc_vec
 
                 einsum_start_time = tm.time()
-                
+
                 # Transform the vectors to the AO basis
                 x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
                 x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
@@ -474,22 +474,21 @@ class PolOrbitalResponse(CphfSolver):
                     'x_minus_y_ao': x_minus_y_ao,
                     'unrel_dm_ao': unrel_dm_ao,
                     'fock_ao_rhs': fock_ao_rhs,
-                    'fock_gxc_ao': fock_gxc_ao, # None if not DFT
+                    'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
                 }
-                if (f==0):
+                if (f == 0):
                     tot_rhs_mo = rhs_mo
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
-#            else:
-#                None
-        
+
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
             return orbrsp_rhs
         else:
             return {}
 
-        valstr = '** Time spent on constructing the orbrsp RHS for {} frequencies: '.format(n_freqs)
+        valstr = '** Time spent on constructing the orbrsp RHS '
+        valstr += 'for {} frequencies: '.format(len(self.frequencies))
         valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
@@ -522,7 +521,7 @@ class PolOrbitalResponse(CphfSolver):
         dft_dict = self._init_dft(molecule, scf_tensors)
         # PE information
         pe_dict = self._init_pe(molecule, basis)
-                
+
         n_freqs = len(self.frequencies)
 
         loop_start_time = tm.time()
@@ -530,7 +529,7 @@ class PolOrbitalResponse(CphfSolver):
         for f, w in enumerate(self.frequencies):
             self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
             self.ostream.flush()
-            
+
             if self.rank == mpi_master():
 
                 # Get overlap, MO coefficients from scf_tensors
@@ -574,11 +573,10 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Extract the excitation and de-excitation components
                 # from the full solution vector.
-                exc_vec = (1 / sqrt2 * 
-                    np.array(full_vec)[:, :nocc * nvir].reshape(dof, nocc, nvir))
-                deexc_vec = (1 / sqrt2 * 
-                    np.array(full_vec)[:, nocc * nvir:].reshape(dof, nocc, nvir))
-
+                exc_vec = (1 / sqrt2 *
+                        np.array(full_vec)[:, :nocc * nvir].reshape(dof, nocc, nvir))
+                deexc_vec = (1 / sqrt2 *
+                        np.array(full_vec)[:, nocc * nvir:].reshape(dof, nocc, nvir))
 
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
@@ -673,7 +671,8 @@ class PolOrbitalResponse(CphfSolver):
             # TODO: replace for-loops with np.einsum
             # For now we:
             # - loop over indices m and n
-            # - select component m or n in x_plus_y, x_minus_y, fock_ao_rhs and fock_lambda
+            # - select component m or n in x_plus_y, x_minus_y,
+            # fock_ao_rhs and fock_lambda
             # - symmetrize with respect to m and n (only 2PDM?)
             # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
             # the contraction of the 1PDMs with ERIs; dof matrices corresponding
@@ -805,8 +804,8 @@ class PolOrbitalResponse(CphfSolver):
                 self.cphf_results[(w)]['omega_ao'] = omega
 
         if self.rank == mpi_master():
-            valstr = '** Time spent on constructing omega multipliers for {} frequencies: '.format(
-                n_freqs)
+            valstr = '** Time spent on constructing omega multipliers '
+            valstr += 'for {} frequencies: '.format(n_freqs)
             valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
@@ -834,8 +833,8 @@ class PolOrbitalResponse(CphfSolver):
             self.conv_thresh)
         self.ostream.print_header(cur_str.ljust(str_width))
 
-        cur_str = ('Number of frequencies           : ' + 
-            str(len(self.frequencies)) ) 
+        cur_str = ('Number of frequencies           : ' +
+                   str(len(self.frequencies)))
         self.ostream.print_header(cur_str.ljust(str_width))
 
         cur_str = 'Vector components               : ' + self.vector_components
