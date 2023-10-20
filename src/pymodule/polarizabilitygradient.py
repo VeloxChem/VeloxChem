@@ -253,8 +253,14 @@ class PolarizabilityGradient():
 
                 # transform lambda multipliers to AO basis and
                 # calculate relaxed density matrix
-                lambda_ao = np.einsum('mi,xia,na->xmn', mo_occ, lambda_mo,
-                                      mo_vir).reshape(dof, dof, nao, nao)  # occ-vir
+#                lambda_ao = np.einsum('mi,xia,na->xmn', mo_occ, lambda_mo,
+#                                      mo_vir).reshape(dof, dof, nao, nao)  # occ-vir
+                # WIP: multi_dot
+                lambda_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, lambda_mo[x], mo_vir.T])
+                    for x in range(dof**2)                    
+                ]).reshape(dof, dof, nao, nao)
+                
                 lambda_ao += lambda_ao.transpose(0,1,3,2)  # vir-occ
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
 
