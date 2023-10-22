@@ -14,10 +14,10 @@ LOCAL_OBJ := $(subst .cpp,.o,$(LOCAL_SCR))
 LOCAL_DEP := $(subst .cpp,.d,$(LOCAL_SCR))
 LOCAL_OPT := $(subst .cpp,.optrpt,$(LOCAL_SCR))
 
-LOCAL_CU_SCR := $(wildcard *.cu)
-LOCAL_CU_OBJ := $(subst .cu,.o,$(LOCAL_CU_SCR))
-LOCAL_CU_DEP := $(subst .cu,.d,$(LOCAL_CU_SCR))
-LOCAL_CU_OPT := $(subst .cu,.optrpt,$(LOCAL_CU_SCR))
+LOCAL_CU_SCR := $(wildcard *.hip)
+LOCAL_CU_OBJ := $(subst .hip,.o,$(LOCAL_CU_SCR))
+LOCAL_CU_DEP := $(subst .hip,.d,$(LOCAL_CU_SCR))
+LOCAL_CU_OPT := $(subst .hip,.optrpt,$(LOCAL_CU_SCR))
 
 # Read in compilers & shell commands info
 include ../Makefile.setup
@@ -79,12 +79,12 @@ ifneq "$(MAKECMDGOALS)" "clean"
 endif
 
 # Default rule for compiling cu files
-%.o: %.cu
+%.o: %.hip
 	@echo ====== Compiling $@...
 	$(NVCC) -c $(NVCCFLAGS) $(CPPFLAGS) $(LIB_INC) -o $@ $<
 
 # Default rule for generating dependencies
-%.d: %.cu
+%.d: %.hip
 	@echo ====== Updating dependencies for $@
 	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -M $< > $@
 

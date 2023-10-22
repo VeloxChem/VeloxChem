@@ -52,13 +52,13 @@
 #define TILE_DIM 16
 
 #define hipSafe(e)                                                                                                       \
-    {                                                                                                                     \
+    {                                                                                                                    \
         hipError_t err = (e);                                                                                            \
         if (err != hipSuccess)                                                                                           \
-        {                                                                                                                 \
+        {                                                                                                                \
             std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                                      \
-        }                                                                                                                 \
+            std::exit(EXIT_FAILURE);                                                                                     \
+        }                                                                                                                \
     }
 
 namespace gpu {  // gpu namespace
@@ -261,7 +261,7 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
 
     if (g < npoints)
     {
-        for (uint32_t nu = 0; nu < aocount; nu+=16)
+        for (uint32_t nu = 0; nu < aocount; nu += 16)
         {
             // nu + 0
             A[0] = d_mat_F[g + nu * npoints];
@@ -447,17 +447,8 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
                 B[15] = 0.0;
             }
 
-            rho_a += A[0] * B[0] + A[1] * B[1] + A[2] * B[2] + A[3] * B[3]
-                  +  A[4] * B[4] + A[5] * B[5] + A[6] * B[6] + A[7] * B[7]
-            + A[8] * B[8]
-            + A[9] * B[9]
-            + A[10] * B[10]
-            + A[11] * B[11]
-            + A[12] * B[12]
-            + A[13] * B[13]
-            + A[14] * B[14]
-            + A[15] * B[15]
-            ;
+            rho_a += A[0] * B[0] + A[1] * B[1] + A[2] * B[2] + A[3] * B[3] + A[4] * B[4] + A[5] * B[5] + A[6] * B[6] + A[7] * B[7] + A[8] * B[8] +
+                     A[9] * B[9] + A[10] * B[10] + A[11] * B[11] + A[12] * B[12] + A[13] * B[13] + A[14] * B[14] + A[15] * B[15];
         }
 
         d_rho[2 * g + 0] = rho_a;
@@ -483,12 +474,11 @@ cudaGetMatrixG(double*        d_mat_G,
     }
 }
 
-
 __global__ void
 matmulAtB(double* C, double* A, double* B, uint32_t aocount, uint32_t npoints)
 {
-    __shared__ double As[TILE_DIM][TILE_DIM+1];
-    __shared__ double Bs[TILE_DIM][TILE_DIM+1];
+    __shared__ double As[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
 
     const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
@@ -542,8 +532,8 @@ matmulABtKohnShamMatrix(double*         d_mat_Vxc_full,
                         const uint32_t  aocount,
                         const uint32_t  npoints)
 {
-    __shared__ double As[TILE_DIM][TILE_DIM+1];
-    __shared__ double Bs[TILE_DIM][TILE_DIM+1];
+    __shared__ double As[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
 
     const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -682,45 +672,60 @@ getGtoValuesForLdaDirect(double*                     d_gto_values,
 
     if (gto_ang == 0)
     {
-        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecS, num_blocks, threads_per_block, 0, 0, d_gto_values,
-                                                                        static_cast<uint32_t>(row_offset),
-                                                                        d_gto_info,
-                                                                        d_grid_x,
-                                                                        d_grid_y,
-                                                                        d_grid_z,
-                                                                        static_cast<uint32_t>(grid_offset),
-                                                                        static_cast<uint32_t>(nrows),
-                                                                        static_cast<uint32_t>(npgtos),
-                                                                        static_cast<uint32_t>(ncols));
+        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecS,
+                           num_blocks,
+                           threads_per_block,
+                           0,
+                           0,
+                           d_gto_values,
+                           static_cast<uint32_t>(row_offset),
+                           d_gto_info,
+                           d_grid_x,
+                           d_grid_y,
+                           d_grid_z,
+                           static_cast<uint32_t>(grid_offset),
+                           static_cast<uint32_t>(nrows),
+                           static_cast<uint32_t>(npgtos),
+                           static_cast<uint32_t>(ncols));
     }
     else if (gto_ang == 1)
     {
-        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecP, num_blocks, threads_per_block, 0, 0, d_gto_values,
-                                                                        static_cast<uint32_t>(row_offset),
-                                                                        d_gto_info,
-                                                                        d_grid_x,
-                                                                        d_grid_y,
-                                                                        d_grid_z,
-                                                                        static_cast<uint32_t>(grid_offset),
-                                                                        static_cast<uint32_t>(nrows),
-                                                                        static_cast<uint32_t>(npgtos),
-                                                                        static_cast<uint32_t>(ncols));
+        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecP,
+                           num_blocks,
+                           threads_per_block,
+                           0,
+                           0,
+                           d_gto_values,
+                           static_cast<uint32_t>(row_offset),
+                           d_gto_info,
+                           d_grid_x,
+                           d_grid_y,
+                           d_grid_z,
+                           static_cast<uint32_t>(grid_offset),
+                           static_cast<uint32_t>(nrows),
+                           static_cast<uint32_t>(npgtos),
+                           static_cast<uint32_t>(ncols));
     }
     else if (gto_ang == 2)
     {
         const double f2_3 = 2.0 * std::sqrt(3.0);
 
-        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecD, num_blocks, threads_per_block, 0, 0, d_gto_values,
-                                                                        static_cast<uint32_t>(row_offset),
-                                                                        f2_3,
-                                                                        d_gto_info,
-                                                                        d_grid_x,
-                                                                        d_grid_y,
-                                                                        d_grid_z,
-                                                                        static_cast<uint32_t>(grid_offset),
-                                                                        static_cast<uint32_t>(nrows),
-                                                                        static_cast<uint32_t>(npgtos),
-                                                                        static_cast<uint32_t>(ncols));
+        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecD,
+                           num_blocks,
+                           threads_per_block,
+                           0,
+                           0,
+                           d_gto_values,
+                           static_cast<uint32_t>(row_offset),
+                           f2_3,
+                           d_gto_info,
+                           d_grid_x,
+                           d_grid_y,
+                           d_grid_z,
+                           static_cast<uint32_t>(grid_offset),
+                           static_cast<uint32_t>(nrows),
+                           static_cast<uint32_t>(npgtos),
+                           static_cast<uint32_t>(ncols));
     }
     else
     {
@@ -1078,23 +1083,47 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::getSubDensityMatrix, num_blocks, threads_per_block, 0, 0, 
-            d_den_mat, d_den_mat_full, static_cast<uint32_t>(naos), d_ao_inds, static_cast<uint32_t>(aocount));
+        hipLaunchKernelGGL(gpu::getSubDensityMatrix,
+                           num_blocks,
+                           threads_per_block,
+                           0,
+                           0,
+                           d_den_mat,
+                           d_den_mat_full,
+                           static_cast<uint32_t>(naos),
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount));
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
         // Note: we should use A * B here but since A is symmetric we can also use A^T * B
-        hipLaunchKernelGGL(gpu::matmulAtB, num_blocks, threads_per_block, 0, 0, 
-            d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
+        hipLaunchKernelGGL(gpu::matmulAtB,
+                           num_blocks,
+                           threads_per_block,
+                           0,
+                           0,
+                           d_mat_F,
+                           d_den_mat,
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
 
         threads_per_block = dim3(64);
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(gpu::cudaDensityOnGrids, num_blocks, threads_per_block, 0, 0, 
-            d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
+        hipLaunchKernelGGL(gpu::cudaDensityOnGrids,
+                           num_blocks,
+                           threads_per_block,
+                           0,
+                           0,
+                           d_rho,
+                           d_mat_F,
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
 
         hipSafe(hipMemcpy(rho, d_rho, 2 * npoints * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -1113,25 +1142,35 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::cudaGetMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
-                                                               d_grid_w,
-                                                               static_cast<uint32_t>(gridblockpos),
-                                                               static_cast<uint32_t>(npoints),
-                                                               d_gto_values,
-                                                               static_cast<uint32_t>(aocount),
-                                                               d_vrho);
+        hipLaunchKernelGGL(gpu::cudaGetMatrixG,
+                           num_blocks,
+                           threads_per_block,
+                           0,
+                           0,
+                           d_mat_G,
+                           d_grid_w,
+                           static_cast<uint32_t>(gridblockpos),
+                           static_cast<uint32_t>(npoints),
+                           d_gto_values,
+                           static_cast<uint32_t>(aocount),
+                           d_vrho);
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::matmulABtKohnShamMatrix, num_blocks, threads_per_block, 0, 0, d_mat_Vxc_full,
-                                                                        static_cast<uint32_t>(naos),
-                                                                        d_gto_values,
-                                                                        d_mat_G,
-                                                                        d_ao_inds,
-                                                                        static_cast<uint32_t>(aocount),
-                                                                        static_cast<uint32_t>(npoints));
+        hipLaunchKernelGGL(gpu::matmulABtKohnShamMatrix,
+                           num_blocks,
+                           threads_per_block,
+                           0,
+                           0,
+                           d_mat_Vxc_full,
+                           static_cast<uint32_t>(naos),
+                           d_gto_values,
+                           d_mat_G,
+                           d_ao_inds,
+                           static_cast<uint32_t>(aocount),
+                           static_cast<uint32_t>(npoints));
 
         // compute partial contribution to XC energy
 

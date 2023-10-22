@@ -23,9 +23,9 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "DeviceProp.hpp"
-
 #include <hip/hip_runtime.h>
+
+#include "DeviceProp.hpp"
 
 namespace gpu {  // gpu namespace
 
