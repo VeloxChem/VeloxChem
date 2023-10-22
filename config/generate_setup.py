@@ -179,24 +179,24 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
         print(f"***        use_clang = {use_clang}")
         sys.exit(1)
 
-    # ==> cuda info <==
+    # ==> gpu info <==
 
     # TODO: add hipcc
 
-    print('*** Checking CUDA compiler... ', end='')
-    nvcc, nvcc_path = find_exe(['nvcc'])
-    print(nvcc)
+    print('*** Checking HIP compiler... ', end='')
+    hipcc, hipcc_path = find_exe(['hipcc'])
+    print(hipcc)
 
-    use_gpu = (nvcc is not None)
+    use_gpu = (hipcc is not None)
 
     if use_gpu:
         # TODO: use pathlib
-        cuda_root = os.path.split(nvcc_path)[0]
-        cuda_dir = os.path.join(cuda_root, 'lib64')
-        if not os.path.isdir(cuda_dir):
-            cuda_dir = os.path.join(cuda_root, 'lib')
-        check_dir(Path(cuda_dir), 'cuda lib')
-        cuda_lib = '-L{} -lcudart -lcublas'.format(cuda_dir)
+        hip_root = os.path.split(hipcc_path)[0]
+        hip_dir = os.path.join(hip_root, 'lib64')
+        if not os.path.isdir(hip_dir):
+            hip_dir = os.path.join(hip_root, 'lib')
+        check_dir(Path(hip_dir), 'hip lib')
+        hip_lib = ''
 
     # ==> openmp flags <==
 
@@ -498,10 +498,10 @@ def generate_setup(template_file, setup_file, build_lib=Path("build", "lib")):
 
                 # gpu
                 if use_gpu:
-                    print('NVCC :=', nvcc, file=f_mkfile)
+                    print('NVCC :=', hipcc, file=f_mkfile)
                     print('NVCC_REL_FLG :=', nvcc_flags, file=f_mkfile)
                     print('NVCC_DEB_FLG :=', nvcc_flags, file=f_mkfile)
-                    print('CUDA_LIB :=', cuda_lib, file=f_mkfile)
+                    print('CUDA_LIB :=', hip_lib, file=f_mkfile)
                     print('', file=f_mkfile)
 
                 # additional settings

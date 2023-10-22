@@ -28,45 +28,39 @@
 USE_MPI := true
 USE_GPU := true
 USE_MKL := false
-USE_XTB := true
+USE_XTB := false
 
-BUILD_LIB := /home/xinli/gitlab/VeloxChemMP.newcore/build/lib/veloxchem
-VLX_TARGET := $(BUILD_LIB)/veloxchemlib.cpython-311-x86_64-linux-gnu.so
+BUILD_LIB := /cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/build/lib/veloxchem
+VLX_TARGET := $(BUILD_LIB)/veloxchemlib.cpython-39-x86_64-linux-gnu.so
 
-CXX := mpicxx
+CXX := CC
 
-CXX_REL_FLG := -fopenmp
-CXX_DEB_FLG := -fopenmp
+CXX_REL_FLG := -fopenmp=libomp -std=c++17
+CXX_DEB_FLG := -fopenmp=libomp -std=c++17
 
-MATH_INC := -I/home/xinli/miniconda3/envs/vlxenv/include
-MATH_LIB := -L/home/xinli/miniconda3/envs/vlxenv/lib
-MATH_LIB += -Wl,-rpath,/home/xinli/miniconda3/envs/vlxenv/lib
-MATH_LIB += -lopenblas -lgomp -lpthread -lm -ldl
+MATH_INC := 
+#MATH_LIB := -lomp -lpthread -lm -ldl
+MATH_LIB := 
 
-XC_INC := -I/home/xinli/miniconda3/envs/vlxenv/include
-XC_LIB := -L/home/xinli/miniconda3/envs/vlxenv/lib
-XC_LIB += -Wl,-rpath,/home/xinli/miniconda3/envs/vlxenv/lib -lxc
+XC_INC := -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/include
+XC_LIB := -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/lib
+XC_LIB += -Wl,-rpath,/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/lib -lxc
 
-PYTHON := python3.11
+PYTHON := python3.9
 
-PYTHON_INC := -I/home/xinli/miniconda3/envs/vlxenv/include/python3.11
-PYTHON_INC += -I/home/xinli/miniconda3/envs/vlxenv/lib/python3.11/site-packages/mpi4py/include
-PYTHON_INC += -I/home/xinli/miniconda3/envs/vlxenv/lib/python3.11/site-packages/numpy/core/include
-PYTHON_INC += -I/home/xinli/miniconda3/envs/vlxenv/lib/python3.11/site-packages/pybind11/include
+PYTHON_INC := -I/opt/cray/pe/python/3.9.12.1/include/python3.9
+PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/mpi4py/include
+PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/numpy/core/include
+PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/pybind11/include
 
-NVCC := nvcc -gencode arch=compute_89,code=sm_89
-NVCC_REL_FLG := --compiler-options "-fopenmp"
-NVCC_DEB_FLG := --compiler-options "-fopenmp"
-CUDA_LIB := -L/home/xinli/miniconda3/envs/vlxenv/lib -lcudart -lcublas
+NVCC := hipcc --offload-arch=gfx90a -fopenmp=libomp -std=c++17
+NVCC_REL_FLG := $(XC_INC) -fPIC 
+NVCC_DEB_FLG := $(XC_INC) -fPIC
+CUDA_LIB := 
 
 MACLIBS := 
 
-LTOFLAG := -fno-lto
-
-XTB_INC := -I/home/xinli/miniconda3/envs/vlxenv/include
-XTB_LIB := -L/home/xinli/miniconda3/envs/vlxenv/lib
-XTB_LIB += -Wl,-rpath,/home/xinli/miniconda3/envs/vlxenv/lib -lxtb
-XTB_PATH := /home/xinli/miniconda3/envs/vlxenv/share/xtb
+LTOFLAG := 
 
 # Generic settings
 
@@ -117,11 +111,13 @@ CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
 # Cuda flags
 
-ifeq ($(USE_GPU),true)
-  NVCC_REL_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-fPIC" $(PYTHON_INC)
-  NVCC_DEB_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-fPIC" $(PYTHON_INC) --compiler-options "-g"
-  LIB_LIST += $(CUDA_LIB)
-endif
+#ifeq ($(USE_GPU),true)
+#  NVCC_REL_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-fPIC" $(PYTHON_INC)
+#  NVCC_DEB_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-fPIC" $(PYTHON_INC) --compiler-options "-g"
+#  LIB_LIST += $(CUDA_LIB)
+#endif
+
+#LIB_LIST += -lhipblas
 
 # XTB interface (optional)
 

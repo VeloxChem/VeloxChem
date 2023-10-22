@@ -25,6 +25,8 @@
 
 #include "DeviceProp.hpp"
 
+#include <hip/hip_runtime.h>
+
 namespace gpu {  // gpu namespace
 
 void
@@ -36,13 +38,13 @@ getDevicesProperty(std::vector<std::string>& namesOfDevices,
 #ifdef ENABLE_GPU
     int device_count = 0;
 
-    cudaGetDeviceCount(&device_count);
+    hipGetDeviceCount(&device_count);
 
     for (int i = 0; i < device_count; i++)
     {
-        cudaDeviceProp prop;
+        hipDeviceProp_t prop;
 
-        cudaGetDeviceProperties(&prop, i);
+        hipGetDeviceProperties(&prop, i);
 
         namesOfDevices.push_back(std::string(prop.name));
 

@@ -6,7 +6,6 @@
 #include "DipoleDriver.hpp"
 #include "KineticEnergyDriver.hpp"
 #include "NuclearPotentialDriver.hpp"
-#include "OctupoleDriver.hpp"
 #include "OverlapDriver.hpp"
 #include "Point.hpp"
 #include "QuadrupoleDriver.hpp"
@@ -80,16 +79,6 @@ export_t2cintegrals(py::module& m)
             [](const CQuadrupoleDriver& quad_drv, const CMolecule& molecule, const CMolecularBasis& basis, const TPoint3D& point)
                 -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(quad_drv.compute(basis, molecule, point)); },
             "Computes quadrupole matrix for given molecule, basis and origin.");
-
-    // COctupoleDriver class
-
-    PyClass<COctupoleDriver>(m, "OctupoleDriver")
-        .def(py::init<>())
-        .def(
-            "compute",
-            [](const COctupoleDriver& octu_drv, const CMolecule& molecule, const CMolecularBasis& basis, const TPoint3D& point)
-                -> std::shared_ptr<CMatrices> { return std::make_shared<CMatrices>(octu_drv.compute(basis, molecule, point)); },
-            "Computes octupole matrix for given molecule, basis and origin.");
 
     // ...
 }

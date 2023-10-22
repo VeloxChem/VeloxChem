@@ -23,7 +23,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -43,6 +43,7 @@
 #include "GtoValuesRecF.hpp"
 #include "MathFunc.hpp"
 #include "MatrixFunc.hpp"
+#include "MpiFunc.hpp"
 #include "MultiTimer.hpp"
 #include "Prescreener.hpp"
 #include "StringFormat.hpp"
@@ -50,12 +51,12 @@
 
 #define TILE_DIM 16
 
-#define cudaSafe(e)                                                                                                       \
+#define hipSafe(e)                                                                                                       \
     {                                                                                                                     \
-        cudaError_t err = (e);                                                                                            \
-        if (err != cudaSuccess)                                                                                           \
+        hipError_t err = (e);                                                                                            \
+        if (err != hipSuccess)                                                                                           \
         {                                                                                                                 \
-            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << cudaGetErrorString(err) << std::endl; \
+            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
             std::exit(EXIT_FAILURE);                                                                                      \
         }                                                                                                                 \
     }
@@ -255,13 +256,208 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
 {
     const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
 
+    double rho_a = 0.0;
+    double A[16], B[16];
+
     if (g < npoints)
     {
-        double rho_a = 0.0;
-
-        for (uint32_t nu = 0; nu < aocount; nu++)
+        for (uint32_t nu = 0; nu < aocount; nu+=16)
         {
-            rho_a += d_mat_F[g + nu * npoints] * d_gto_values[g + nu * npoints];
+            // nu + 0
+            A[0] = d_mat_F[g + nu * npoints];
+            B[0] = d_gto_values[g + nu * npoints];
+
+            // nu + 1
+            if (nu + 1 < aocount)
+            {
+                A[1] = d_mat_F[g + (nu + 1) * npoints];
+                B[1] = d_gto_values[g + (nu + 1) * npoints];
+            }
+            else
+            {
+                A[1] = 0.0;
+                B[1] = 0.0;
+            }
+
+            // nu + 2
+            if (nu + 2 < aocount)
+            {
+                A[2] = d_mat_F[g + (nu + 2) * npoints];
+                B[2] = d_gto_values[g + (nu + 2) * npoints];
+            }
+            else
+            {
+                A[2] = 0.0;
+                B[2] = 0.0;
+            }
+
+            // nu + 3
+            if (nu + 3 < aocount)
+            {
+                A[3] = d_mat_F[g + (nu + 3) * npoints];
+                B[3] = d_gto_values[g + (nu + 3) * npoints];
+            }
+            else
+            {
+                A[3] = 0.0;
+                B[3] = 0.0;
+            }
+
+            // nu + 4
+            if (nu + 4 < aocount)
+            {
+                A[4] = d_mat_F[g + (nu + 4) * npoints];
+                B[4] = d_gto_values[g + (nu + 4) * npoints];
+            }
+            else
+            {
+                A[4] = 0.0;
+                B[4] = 0.0;
+            }
+
+            // nu + 5
+            if (nu + 5 < aocount)
+            {
+                A[5] = d_mat_F[g + (nu + 5) * npoints];
+                B[5] = d_gto_values[g + (nu + 5) * npoints];
+            }
+            else
+            {
+                A[5] = 0.0;
+                B[5] = 0.0;
+            }
+
+            // nu + 6
+            if (nu + 6 < aocount)
+            {
+                A[6] = d_mat_F[g + (nu + 6) * npoints];
+                B[6] = d_gto_values[g + (nu + 6) * npoints];
+            }
+            else
+            {
+                A[6] = 0.0;
+                B[6] = 0.0;
+            }
+
+            // nu + 7
+            if (nu + 7 < aocount)
+            {
+                A[7] = d_mat_F[g + (nu + 7) * npoints];
+                B[7] = d_gto_values[g + (nu + 7) * npoints];
+            }
+            else
+            {
+                A[7] = 0.0;
+                B[7] = 0.0;
+            }
+
+            // nu + 8
+            if (nu + 8 < aocount)
+            {
+                A[8] = d_mat_F[g + (nu + 8) * npoints];
+                B[8] = d_gto_values[g + (nu + 8) * npoints];
+            }
+            else
+            {
+                A[8] = 0.0;
+                B[8] = 0.0;
+            }
+
+            // nu + 9
+            if (nu + 9 < aocount)
+            {
+                A[9] = d_mat_F[g + (nu + 9) * npoints];
+                B[9] = d_gto_values[g + (nu + 9) * npoints];
+            }
+            else
+            {
+                A[9] = 0.0;
+                B[9] = 0.0;
+            }
+
+            // nu + 10
+            if (nu + 10 < aocount)
+            {
+                A[10] = d_mat_F[g + (nu + 10) * npoints];
+                B[10] = d_gto_values[g + (nu + 10) * npoints];
+            }
+            else
+            {
+                A[10] = 0.0;
+                B[10] = 0.0;
+            }
+
+            // nu + 11
+            if (nu + 11 < aocount)
+            {
+                A[11] = d_mat_F[g + (nu + 11) * npoints];
+                B[11] = d_gto_values[g + (nu + 11) * npoints];
+            }
+            else
+            {
+                A[11] = 0.0;
+                B[11] = 0.0;
+            }
+
+            // nu + 12
+            if (nu + 12 < aocount)
+            {
+                A[12] = d_mat_F[g + (nu + 12) * npoints];
+                B[12] = d_gto_values[g + (nu + 12) * npoints];
+            }
+            else
+            {
+                A[12] = 0.0;
+                B[12] = 0.0;
+            }
+
+            // nu + 13
+            if (nu + 13 < aocount)
+            {
+                A[13] = d_mat_F[g + (nu + 13) * npoints];
+                B[13] = d_gto_values[g + (nu + 13) * npoints];
+            }
+            else
+            {
+                A[13] = 0.0;
+                B[13] = 0.0;
+            }
+
+            // nu + 14
+            if (nu + 14 < aocount)
+            {
+                A[14] = d_mat_F[g + (nu + 14) * npoints];
+                B[14] = d_gto_values[g + (nu + 14) * npoints];
+            }
+            else
+            {
+                A[14] = 0.0;
+                B[14] = 0.0;
+            }
+
+            // nu + 15
+            if (nu + 15 < aocount)
+            {
+                A[15] = d_mat_F[g + (nu + 15) * npoints];
+                B[15] = d_gto_values[g + (nu + 15) * npoints];
+            }
+            else
+            {
+                A[15] = 0.0;
+                B[15] = 0.0;
+            }
+
+            rho_a += A[0] * B[0] + A[1] * B[1] + A[2] * B[2] + A[3] * B[3]
+                  +  A[4] * B[4] + A[5] * B[5] + A[6] * B[6] + A[7] * B[7]
+            + A[8] * B[8]
+            + A[9] * B[9]
+            + A[10] * B[10]
+            + A[11] * B[11]
+            + A[12] * B[12]
+            + A[13] * B[13]
+            + A[14] * B[14]
+            + A[15] * B[15]
+            ;
         }
 
         d_rho[2 * g + 0] = rho_a;
@@ -270,10 +466,29 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
 }
 
 __global__ void
+cudaGetMatrixG(double*        d_mat_G,
+               const double*  d_grid_w,
+               const uint32_t grid_offset,
+               const uint32_t npoints,
+               const double*  d_gto_values,
+               const uint32_t aocount,
+               const double*  d_vrho)
+{
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if ((i < aocount) && (g < npoints))
+    {
+        d_mat_G[g + i * npoints] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_gto_values[g + i * npoints];
+    }
+}
+
+
+__global__ void
 matmulAtB(double* C, double* A, double* B, uint32_t aocount, uint32_t npoints)
 {
-    __shared__ double As[TILE_DIM][TILE_DIM];
-    __shared__ double Bs[TILE_DIM][TILE_DIM];
+    __shared__ double As[TILE_DIM][TILE_DIM+1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM+1];
 
     const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
@@ -327,8 +542,8 @@ matmulABtKohnShamMatrix(double*         d_mat_Vxc_full,
                         const uint32_t  aocount,
                         const uint32_t  npoints)
 {
-    __shared__ double As[TILE_DIM][TILE_DIM];
-    __shared__ double Bs[TILE_DIM][TILE_DIM];
+    __shared__ double As[TILE_DIM][TILE_DIM+1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM+1];
 
     const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t j = blockIdx.x * blockDim.x + threadIdx.x;
@@ -455,7 +670,7 @@ getGtoValuesForLdaDirect(double*                     d_gto_values,
 
     auto gto_info = gpu::getGtoInfo(gto_block, gtos_mask);
 
-    cudaSafe(cudaMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), cudaMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), hipMemcpyHostToDevice));
 
     // evaluate GTO values on grid points
 
@@ -467,7 +682,7 @@ getGtoValuesForLdaDirect(double*                     d_gto_values,
 
     if (gto_ang == 0)
     {
-        gpu::cudaLdaValuesDirectRecS<<<num_blocks, threads_per_block>>>(d_gto_values,
+        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecS, num_blocks, threads_per_block, 0, 0, d_gto_values,
                                                                         static_cast<uint32_t>(row_offset),
                                                                         d_gto_info,
                                                                         d_grid_x,
@@ -480,7 +695,7 @@ getGtoValuesForLdaDirect(double*                     d_gto_values,
     }
     else if (gto_ang == 1)
     {
-        gpu::cudaLdaValuesDirectRecP<<<num_blocks, threads_per_block>>>(d_gto_values,
+        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecP, num_blocks, threads_per_block, 0, 0, d_gto_values,
                                                                         static_cast<uint32_t>(row_offset),
                                                                         d_gto_info,
                                                                         d_grid_x,
@@ -495,7 +710,7 @@ getGtoValuesForLdaDirect(double*                     d_gto_values,
     {
         const double f2_3 = 2.0 * std::sqrt(3.0);
 
-        gpu::cudaLdaValuesDirectRecD<<<num_blocks, threads_per_block>>>(d_gto_values,
+        hipLaunchKernelGGL(gpu::cudaLdaValuesDirectRecD, num_blocks, threads_per_block, 0, 0, d_gto_values,
                                                                         static_cast<uint32_t>(row_offset),
                                                                         f2_3,
                                                                         d_gto_info,
@@ -537,7 +752,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     // GTO values on grid points
 
@@ -547,7 +762,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double* d_gaos;
 
-    cudaSafe(cudaMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_gaos, naos * max_npoints_per_box * sizeof(double)));
 
     // coordinates of grid points
 
@@ -559,13 +774,13 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
 
     double *d_grid_x, *d_grid_y, *d_grid_z;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
 
     // counts and displacements of grid points in boxes
 
@@ -640,7 +855,7 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
             row_offset += static_cast<int64_t>(pre_ao_inds.size());
         }
 
-        cudaSafe(cudaMemcpy(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_chi.values(), d_gaos, aocount * npoints * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t nu = 0; nu < aocount; nu++)
         {
@@ -648,33 +863,13 @@ computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& b
         }
     }
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_gaos));
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
+    hipSafe(hipFree(d_gto_info));
+    hipSafe(hipFree(d_gaos));
+    hipSafe(hipFree(d_grid_x));
+    hipSafe(hipFree(d_grid_y));
+    hipSafe(hipFree(d_grid_z));
 
     return allgtovalues;
-}
-
-__global__ void
-cudaGetMatrixG(double*        d_mat_G,
-               const double*  d_grid_w,
-               const uint32_t grid_offset,
-               const uint32_t npoints,
-               const double*  d_gto_values,
-               const uint32_t aocount,
-               const double*  d_vrho)
-{
-    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
-
-    if (g < npoints)
-    {
-        for (int64_t nu = 0; nu < aocount; nu++)
-        {
-            d_mat_G[g + nu * npoints] = d_grid_w[g + grid_offset] * d_vrho[2 * g + 0] * d_gto_values[g + nu * npoints];
-        }
-    }
 }
 
 static auto
@@ -685,6 +880,17 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
                        const CXCFunctional&    xcFunctional,
                        const std::string&      flag) -> CAOKohnShamMatrix
 {
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    if (rank == 0) hipSafe(hipSetDevice(4));
+    if (rank == 1) hipSafe(hipSetDevice(5));
+    if (rank == 2) hipSafe(hipSetDevice(2));
+    if (rank == 3) hipSafe(hipSetDevice(3));
+    if (rank == 4) hipSafe(hipSetDevice(6));
+    if (rank == 5) hipSafe(hipSetDevice(7));
+    if (rank == 6) hipSafe(hipSetDevice(0));
+    if (rank == 7) hipSafe(hipSetDevice(1));
+
     CMultiTimer timer;
 
     timer.start("Total timing");
@@ -712,11 +918,11 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     double* d_gto_info;
 
-    cudaSafe(cudaMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
 
     uint32_t* d_ao_inds;
 
-    cudaSafe(cudaMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ao_inds, naos * sizeof(uint32_t)));
 
     // Kohn-Sham matrix
 
@@ -732,19 +938,19 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     double *d_mat_Vxc_full, *d_den_mat_full, *d_den_mat, *d_gto_values, *d_mat_F;
 
-    cudaSafe(cudaMalloc(&d_den_mat, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_den_mat, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_gto_values, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_F, naos * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_den_mat_full, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Vxc_full, naos * naos * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), cudaMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_den_mat_full, densityMatrix.alphaDensity(0), naos * naos * sizeof(double), hipMemcpyHostToDevice));
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
     dim3 num_blocks((naos + threads_per_block.x - 1) / threads_per_block.x, (naos + threads_per_block.y - 1) / threads_per_block.y);
 
-    gpu::zeroKohnShamMatrix<<<num_blocks, threads_per_block>>>(d_mat_Vxc_full, static_cast<uint32_t>(naos));
+    hipLaunchKernelGGL(gpu::zeroKohnShamMatrix, num_blocks, threads_per_block, 0, 0, d_mat_Vxc_full, static_cast<uint32_t>(naos));
 
     // density and functional derivatives
 
@@ -763,9 +969,9 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     double *d_rho, *d_exc, *d_vrho;
 
-    cudaSafe(cudaMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_rho, dim->rho * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_exc, dim->zk * max_npoints_per_box * sizeof(double)));
+    hipSafe(hipMalloc(&d_vrho, dim->vrho * max_npoints_per_box * sizeof(double)));
 
     // initial values for XC energy and number of electrons
 
@@ -783,15 +989,15 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
     double *d_grid_x, *d_grid_y, *d_grid_z, *d_grid_w;
 
-    cudaSafe(cudaMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
-    cudaSafe(cudaMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_x, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_y, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_z, n_total_grid_points * sizeof(double)));
+    hipSafe(hipMalloc(&d_grid_w, n_total_grid_points * sizeof(double)));
 
-    cudaSafe(cudaMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
-    cudaSafe(cudaMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), cudaMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_x, xcoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_y, ycoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_z, zcoords, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_grid_w, weights, n_total_grid_points * sizeof(double), hipMemcpyHostToDevice));
 
     // counts and displacements of grid points in boxes
 
@@ -866,13 +1072,13 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
             ao_inds_int32[ind] = static_cast<uint32_t>(aoinds[ind]);
         }
 
-        cudaSafe(cudaMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), cudaMemcpyHostToDevice));
+        hipSafe(hipMemcpy(d_ao_inds, ao_inds_int32.data(), aocount * sizeof(uint32_t), hipMemcpyHostToDevice));
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::getSubDensityMatrix<<<num_blocks, threads_per_block>>>(
+        hipLaunchKernelGGL(gpu::getSubDensityMatrix, num_blocks, threads_per_block, 0, 0, 
             d_den_mat, d_den_mat_full, static_cast<uint32_t>(naos), d_ao_inds, static_cast<uint32_t>(aocount));
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
@@ -880,22 +1086,22 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
         // Note: we should use A * B here but since A is symmetric we can also use A^T * B
-        gpu::matmulAtB<<<num_blocks, threads_per_block>>>(
+        hipLaunchKernelGGL(gpu::matmulAtB, num_blocks, threads_per_block, 0, 0, 
             d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
-        threads_per_block = dim3(TILE_DIM * TILE_DIM);
+        threads_per_block = dim3(64);
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
 
-        gpu::cudaDensityOnGrids<<<num_blocks, threads_per_block>>>(
+        hipLaunchKernelGGL(gpu::cudaDensityOnGrids, num_blocks, threads_per_block, 0, 0, 
             d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
-        cudaSafe(cudaMemcpy(rho, d_rho, 2 * npoints * sizeof(double), cudaMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(rho, d_rho, 2 * npoints * sizeof(double), hipMemcpyDeviceToHost));
 
         xcFunctional.compute_exc_vxc_for_lda(npoints, rho, exc, vrho);
 
-        cudaSafe(cudaMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), cudaMemcpyHostToDevice));
-        cudaSafe(cudaMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), cudaMemcpyHostToDevice));
+        hipSafe(hipMemcpy(d_exc, exc, dim->zk * npoints * sizeof(double), hipMemcpyHostToDevice));
+        hipSafe(hipMemcpy(d_vrho, vrho, dim->vrho * npoints * sizeof(double), hipMemcpyHostToDevice));
 
         // compute partial contribution to Vxc matrix and distribute partial
         // Vxc to full Kohn-Sham matrix
@@ -903,11 +1109,11 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         // reuse d_den_mat and d_mat_F as working space
         auto d_mat_G = d_mat_F;
 
-        threads_per_block = dim3(TILE_DIM * TILE_DIM);
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::cudaGetMatrixG<<<num_blocks, threads_per_block>>>(d_mat_G,
+        hipLaunchKernelGGL(gpu::cudaGetMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
                                                                d_grid_w,
                                                                static_cast<uint32_t>(gridblockpos),
                                                                static_cast<uint32_t>(npoints),
@@ -919,7 +1125,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         num_blocks = dim3((aocount + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        gpu::matmulABtKohnShamMatrix<<<num_blocks, threads_per_block>>>(d_mat_Vxc_full,
+        hipLaunchKernelGGL(gpu::matmulABtKohnShamMatrix, num_blocks, threads_per_block, 0, 0, d_mat_Vxc_full,
                                                                         static_cast<uint32_t>(naos),
                                                                         d_gto_values,
                                                                         d_mat_G,
@@ -939,24 +1145,24 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         }
     }
 
-    cudaSafe(cudaMemcpy(mat_Vxc.getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), cudaMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(mat_Vxc.getPointerToAlphaValues(), d_mat_Vxc_full, naos * naos * sizeof(double), hipMemcpyDeviceToHost));
 
-    cudaSafe(cudaFree(d_gto_info));
-    cudaSafe(cudaFree(d_ao_inds));
+    hipSafe(hipFree(d_gto_info));
+    hipSafe(hipFree(d_ao_inds));
 
-    cudaSafe(cudaFree(d_den_mat));
-    cudaSafe(cudaFree(d_den_mat_full));
-    cudaSafe(cudaFree(d_gto_values));
-    cudaSafe(cudaFree(d_mat_F));
+    hipSafe(hipFree(d_den_mat));
+    hipSafe(hipFree(d_den_mat_full));
+    hipSafe(hipFree(d_gto_values));
+    hipSafe(hipFree(d_mat_F));
 
-    cudaSafe(cudaFree(d_rho));
-    cudaSafe(cudaFree(d_exc));
-    cudaSafe(cudaFree(d_vrho));
+    hipSafe(hipFree(d_rho));
+    hipSafe(hipFree(d_exc));
+    hipSafe(hipFree(d_vrho));
 
-    cudaSafe(cudaFree(d_grid_x));
-    cudaSafe(cudaFree(d_grid_y));
-    cudaSafe(cudaFree(d_grid_z));
-    cudaSafe(cudaFree(d_grid_w));
+    hipSafe(hipFree(d_grid_x));
+    hipSafe(hipFree(d_grid_y));
+    hipSafe(hipFree(d_grid_z));
+    hipSafe(hipFree(d_grid_w));
 
     mat_Vxc.setNumberOfElectrons(nele);
 
