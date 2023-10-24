@@ -314,29 +314,18 @@ cudaDensityAndSigmaOnGrids(double*        d_rho,
     double rho_a_y = 0.0;
     double rho_a_z = 0.0;
 
-    double A[16], B[16], B_x[16], B_y[16], B_z[16];
+    double A[8], B[8], B_x[8], B_y[8], B_z[8];
 
     if (g < npoints)
     {
-        for (uint32_t nu = 0; nu < aocount; nu += 16)
+        for (uint32_t nu = 0; nu < aocount; nu += 8)
         {
             // nu + 0
-            if (nu + 0 < aocount)
-            {
-                A[0]   = d_mat_F[g + (nu + 0) * npoints];
-                B[0]   = d_gto_values[g + (nu + 0) * npoints];
-                B_x[0] = d_gto_values_x[g + (nu + 0) * npoints];
-                B_y[0] = d_gto_values_y[g + (nu + 0) * npoints];
-                B_z[0] = d_gto_values_z[g + (nu + 0) * npoints];
-            }
-            else
-            {
-                A[0]   = 0.0;
-                B[0]   = 0.0;
-                B_x[0] = 0.0;
-                B_y[0] = 0.0;
-                B_z[0] = 0.0;
-            }
+            A[0]   = d_mat_F[g + (nu + 0) * npoints];
+            B[0]   = d_gto_values[g + (nu + 0) * npoints];
+            B_x[0] = d_gto_values_x[g + (nu + 0) * npoints];
+            B_y[0] = d_gto_values_y[g + (nu + 0) * npoints];
+            B_z[0] = d_gto_values_z[g + (nu + 0) * npoints];
 
             // nu + 1
             if (nu + 1 < aocount)
@@ -464,164 +453,16 @@ cudaDensityAndSigmaOnGrids(double*        d_rho,
                 B_z[7] = 0.0;
             }
 
-            // nu + 8
-            if (nu + 8 < aocount)
-            {
-                A[8]   = d_mat_F[g + (nu + 8) * npoints];
-                B[8]   = d_gto_values[g + (nu + 8) * npoints];
-                B_x[8] = d_gto_values_x[g + (nu + 8) * npoints];
-                B_y[8] = d_gto_values_y[g + (nu + 8) * npoints];
-                B_z[8] = d_gto_values_z[g + (nu + 8) * npoints];
-            }
-            else
-            {
-                A[8]   = 0.0;
-                B[8]   = 0.0;
-                B_x[8] = 0.0;
-                B_y[8] = 0.0;
-                B_z[8] = 0.0;
-            }
-
-            // nu + 9
-            if (nu + 9 < aocount)
-            {
-                A[9]   = d_mat_F[g + (nu + 9) * npoints];
-                B[9]   = d_gto_values[g + (nu + 9) * npoints];
-                B_x[9] = d_gto_values_x[g + (nu + 9) * npoints];
-                B_y[9] = d_gto_values_y[g + (nu + 9) * npoints];
-                B_z[9] = d_gto_values_z[g + (nu + 9) * npoints];
-            }
-            else
-            {
-                A[9]   = 0.0;
-                B[9]   = 0.0;
-                B_x[9] = 0.0;
-                B_y[9] = 0.0;
-                B_z[9] = 0.0;
-            }
-
-            // nu + 10
-            if (nu + 10 < aocount)
-            {
-                A[10]   = d_mat_F[g + (nu + 10) * npoints];
-                B[10]   = d_gto_values[g + (nu + 10) * npoints];
-                B_x[10] = d_gto_values_x[g + (nu + 10) * npoints];
-                B_y[10] = d_gto_values_y[g + (nu + 10) * npoints];
-                B_z[10] = d_gto_values_z[g + (nu + 10) * npoints];
-            }
-            else
-            {
-                A[10]   = 0.0;
-                B[10]   = 0.0;
-                B_x[10] = 0.0;
-                B_y[10] = 0.0;
-                B_z[10] = 0.0;
-            }
-
-            // nu + 11
-            if (nu + 11 < aocount)
-            {
-                A[11]   = d_mat_F[g + (nu + 11) * npoints];
-                B[11]   = d_gto_values[g + (nu + 11) * npoints];
-                B_x[11] = d_gto_values_x[g + (nu + 11) * npoints];
-                B_y[11] = d_gto_values_y[g + (nu + 11) * npoints];
-                B_z[11] = d_gto_values_z[g + (nu + 11) * npoints];
-            }
-            else
-            {
-                A[11]   = 0.0;
-                B[11]   = 0.0;
-                B_x[11] = 0.0;
-                B_y[11] = 0.0;
-                B_z[11] = 0.0;
-            }
-
-            // nu + 12
-            if (nu + 12 < aocount)
-            {
-                A[12]   = d_mat_F[g + (nu + 12) * npoints];
-                B[12]   = d_gto_values[g + (nu + 12) * npoints];
-                B_x[12] = d_gto_values_x[g + (nu + 12) * npoints];
-                B_y[12] = d_gto_values_y[g + (nu + 12) * npoints];
-                B_z[12] = d_gto_values_z[g + (nu + 12) * npoints];
-            }
-            else
-            {
-                A[12]   = 0.0;
-                B[12]   = 0.0;
-                B_x[12] = 0.0;
-                B_y[12] = 0.0;
-                B_z[12] = 0.0;
-            }
-
-            // nu + 13
-            if (nu + 13 < aocount)
-            {
-                A[13]   = d_mat_F[g + (nu + 13) * npoints];
-                B[13]   = d_gto_values[g + (nu + 13) * npoints];
-                B_x[13] = d_gto_values_x[g + (nu + 13) * npoints];
-                B_y[13] = d_gto_values_y[g + (nu + 13) * npoints];
-                B_z[13] = d_gto_values_z[g + (nu + 13) * npoints];
-            }
-            else
-            {
-                A[13]   = 0.0;
-                B[13]   = 0.0;
-                B_x[13] = 0.0;
-                B_y[13] = 0.0;
-                B_z[13] = 0.0;
-            }
-
-            // nu + 14
-            if (nu + 14 < aocount)
-            {
-                A[14]   = d_mat_F[g + (nu + 14) * npoints];
-                B[14]   = d_gto_values[g + (nu + 14) * npoints];
-                B_x[14] = d_gto_values_x[g + (nu + 14) * npoints];
-                B_y[14] = d_gto_values_y[g + (nu + 14) * npoints];
-                B_z[14] = d_gto_values_z[g + (nu + 14) * npoints];
-            }
-            else
-            {
-                A[14]   = 0.0;
-                B[14]   = 0.0;
-                B_x[14] = 0.0;
-                B_y[14] = 0.0;
-                B_z[14] = 0.0;
-            }
-
-            // nu + 15
-            if (nu + 15 < aocount)
-            {
-                A[15]   = d_mat_F[g + (nu + 15) * npoints];
-                B[15]   = d_gto_values[g + (nu + 15) * npoints];
-                B_x[15] = d_gto_values_x[g + (nu + 15) * npoints];
-                B_y[15] = d_gto_values_y[g + (nu + 15) * npoints];
-                B_z[15] = d_gto_values_z[g + (nu + 15) * npoints];
-            }
-            else
-            {
-                A[15]   = 0.0;
-                B[15]   = 0.0;
-                B_x[15] = 0.0;
-                B_y[15] = 0.0;
-                B_z[15] = 0.0;
-            }
-
-            rho_a += A[0] * B[0] + A[1] * B[1] + A[2] * B[2] + A[3] * B[3] + A[4] * B[4] + A[5] * B[5] + A[6] * B[6] + A[7] * B[7] + A[8] * B[8] +
-                     A[9] * B[9] + A[10] * B[10] + A[11] * B[11] + A[12] * B[12] + A[13] * B[13] + A[14] * B[14] + A[15] * B[15];
+            rho_a += A[0] * B[0] + A[1] * B[1] + A[2] * B[2] + A[3] * B[3] + A[4] * B[4] + A[5] * B[5] + A[6] * B[6] + A[7] * B[7];
 
             rho_a_x += 2.0 * (+A[0] * B_x[0] + A[1] * B_x[1] + A[2] * B_x[2] + A[3] * B_x[3] + A[4] * B_x[4] + A[5] * B_x[5] + A[6] * B_x[6] +
-                              A[7] * B_x[7] + A[8] * B_x[8] + A[9] * B_x[9] + A[10] * B_x[10] + A[11] * B_x[11] + A[12] * B_x[12] + A[13] * B_x[13] +
-                              A[14] * B_x[14] + A[15] * B_x[15]);
+                              A[7] * B_x[7]);
 
             rho_a_y += 2.0 * (+A[0] * B_y[0] + A[1] * B_y[1] + A[2] * B_y[2] + A[3] * B_y[3] + A[4] * B_y[4] + A[5] * B_y[5] + A[6] * B_y[6] +
-                              A[7] * B_y[7] + A[8] * B_y[8] + A[9] * B_y[9] + A[10] * B_y[10] + A[11] * B_y[11] + A[12] * B_y[12] + A[13] * B_y[13] +
-                              A[14] * B_y[14] + A[15] * B_y[15]);
+                              A[7] * B_y[7]);
 
             rho_a_z += 2.0 * (+A[0] * B_z[0] + A[1] * B_z[1] + A[2] * B_z[2] + A[3] * B_z[3] + A[4] * B_z[4] + A[5] * B_z[5] + A[6] * B_z[6] +
-                              A[7] * B_z[7] + A[8] * B_z[8] + A[9] * B_z[9] + A[10] * B_z[10] + A[11] * B_z[11] + A[12] * B_z[12] + A[13] * B_z[13] +
-                              A[14] * B_z[14] + A[15] * B_z[15]);
+                              A[7] * B_z[7]);
         }
 
         d_rho[2 * g + 0] = rho_a;
