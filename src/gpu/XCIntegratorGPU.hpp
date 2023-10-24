@@ -40,6 +40,9 @@ namespace gpu {
 
 auto computeGtoValuesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> CDenseMatrix;
 
+auto computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid)
+    -> std::vector<CDenseMatrix>;
+
 auto integrateVxcFock(const CMolecule&        molecule,
                       const CMolecularBasis&  basis,
                       const CAODensityMatrix& densityMatrix,

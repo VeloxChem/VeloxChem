@@ -130,6 +130,11 @@ class CAOKohnShamMatrix
     auto zero() -> void;
 
     /**
+     Symmetrizes and scales AO Kohn-Sham matrix.
+     */
+    auto symmetrizeAndScale(const double factor) -> void;
+
+    /**
      Sets number of electron obtained by integrating Kohn-Sham matrix.
 
      @param xcElectrons the number of electrons.
