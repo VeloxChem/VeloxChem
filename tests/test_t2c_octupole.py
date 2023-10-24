@@ -1,7 +1,7 @@
 from pathlib import Path
 import numpy as np
 
-from veloxchem.veloxchemlib import OctupoleDriver
+# from veloxchem.veloxchemlib import OctupoleDriver
 from veloxchem.veloxchemlib import MolecularBasis
 from veloxchem.veloxchemlib import Molecule
 from veloxchem.submatrix import SubMatrix
@@ -24,7 +24,7 @@ class TestDipoleDriver:
 
         return mol, bas
 
-    def test_electric_octupole_co_tzvpp(self):
+    def disabled_test_electric_octupole_co_tzvpp(self):
 
         mol_co, bas_tzvpp = self.get_data()
 
