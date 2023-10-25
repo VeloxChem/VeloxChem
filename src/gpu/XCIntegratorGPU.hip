@@ -1187,14 +1187,14 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
-    if (rank == 0) hipSafe(hipSetDevice(4));
-    if (rank == 1) hipSafe(hipSetDevice(5));
-    if (rank == 2) hipSafe(hipSetDevice(2));
-    if (rank == 3) hipSafe(hipSetDevice(3));
-    if (rank == 4) hipSafe(hipSetDevice(6));
-    if (rank == 5) hipSafe(hipSetDevice(7));
-    if (rank == 6) hipSafe(hipSetDevice(0));
-    if (rank == 7) hipSafe(hipSetDevice(1));
+    if (rank % 8 == 0) hipSafe(hipSetDevice(4));
+    if (rank % 8 == 1) hipSafe(hipSetDevice(5));
+    if (rank % 8 == 2) hipSafe(hipSetDevice(2));
+    if (rank % 8 == 3) hipSafe(hipSetDevice(3));
+    if (rank % 8 == 4) hipSafe(hipSetDevice(6));
+    if (rank % 8 == 5) hipSafe(hipSetDevice(7));
+    if (rank % 8 == 6) hipSafe(hipSetDevice(0));
+    if (rank % 8 == 7) hipSafe(hipSetDevice(1));
 
     CMultiTimer timer;
 
@@ -1491,14 +1491,14 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
-    if (rank == 0) hipSafe(hipSetDevice(4));
-    if (rank == 1) hipSafe(hipSetDevice(5));
-    if (rank == 2) hipSafe(hipSetDevice(2));
-    if (rank == 3) hipSafe(hipSetDevice(3));
-    if (rank == 4) hipSafe(hipSetDevice(6));
-    if (rank == 5) hipSafe(hipSetDevice(7));
-    if (rank == 6) hipSafe(hipSetDevice(0));
-    if (rank == 7) hipSafe(hipSetDevice(1));
+    if (rank % 8 == 0) hipSafe(hipSetDevice(4));
+    if (rank % 8 == 1) hipSafe(hipSetDevice(5));
+    if (rank % 8 == 2) hipSafe(hipSetDevice(2));
+    if (rank % 8 == 3) hipSafe(hipSetDevice(3));
+    if (rank % 8 == 4) hipSafe(hipSetDevice(6));
+    if (rank % 8 == 5) hipSafe(hipSetDevice(7));
+    if (rank % 8 == 6) hipSafe(hipSetDevice(0));
+    if (rank % 8 == 7) hipSafe(hipSetDevice(1));
 
     CMultiTimer timer;
 

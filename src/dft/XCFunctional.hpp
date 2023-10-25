@@ -75,7 +75,7 @@ class CXCFunctional
     xcfun _familyOfFunctional{xcfun::lda};
 
     /** Leading dimension for initial allocation of staging buffer. */
-    int64_t _ldStaging{1024};
+    int64_t _ldStaging{2048};
 
     /** Buffer to stage output results from LibXC invocations. */
     double* _stagingBuffer{nullptr};
