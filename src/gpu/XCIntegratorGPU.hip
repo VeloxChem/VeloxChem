@@ -93,378 +93,108 @@ zeroKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos)
 __global__ void
 cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_values, const uint32_t aocount, const uint32_t npoints)
 {
-    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
+    __shared__ double As[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
+
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
 
     double rho_a = 0.0;
-    double A[16], B[16];
 
-    if (g < npoints)
+    for (uint32_t k = 0; k < (aocount + TILE_DIM - 1) / TILE_DIM; k++)
     {
-        for (uint32_t nu = 0; nu < aocount; nu += 16)
+        if ((k * TILE_DIM + threadIdx.y < aocount) && (g < npoints))
         {
-            // nu + 0
-            A[0] = d_mat_F[g + nu * npoints];
-            B[0] = d_gto_values[g + nu * npoints];
-
-            // nu + 1
-            if (nu + 1 < aocount)
-            {
-                A[1] = d_mat_F[g + (nu + 1) * npoints];
-                B[1] = d_gto_values[g + (nu + 1) * npoints];
-            }
-            else
-            {
-                A[1] = 0.0;
-                B[1] = 0.0;
-            }
-
-            // nu + 2
-            if (nu + 2 < aocount)
-            {
-                A[2] = d_mat_F[g + (nu + 2) * npoints];
-                B[2] = d_gto_values[g + (nu + 2) * npoints];
-            }
-            else
-            {
-                A[2] = 0.0;
-                B[2] = 0.0;
-            }
-
-            // nu + 3
-            if (nu + 3 < aocount)
-            {
-                A[3] = d_mat_F[g + (nu + 3) * npoints];
-                B[3] = d_gto_values[g + (nu + 3) * npoints];
-            }
-            else
-            {
-                A[3] = 0.0;
-                B[3] = 0.0;
-            }
-
-            // nu + 4
-            if (nu + 4 < aocount)
-            {
-                A[4] = d_mat_F[g + (nu + 4) * npoints];
-                B[4] = d_gto_values[g + (nu + 4) * npoints];
-            }
-            else
-            {
-                A[4] = 0.0;
-                B[4] = 0.0;
-            }
-
-            // nu + 5
-            if (nu + 5 < aocount)
-            {
-                A[5] = d_mat_F[g + (nu + 5) * npoints];
-                B[5] = d_gto_values[g + (nu + 5) * npoints];
-            }
-            else
-            {
-                A[5] = 0.0;
-                B[5] = 0.0;
-            }
-
-            // nu + 6
-            if (nu + 6 < aocount)
-            {
-                A[6] = d_mat_F[g + (nu + 6) * npoints];
-                B[6] = d_gto_values[g + (nu + 6) * npoints];
-            }
-            else
-            {
-                A[6] = 0.0;
-                B[6] = 0.0;
-            }
-
-            // nu + 7
-            if (nu + 7 < aocount)
-            {
-                A[7] = d_mat_F[g + (nu + 7) * npoints];
-                B[7] = d_gto_values[g + (nu + 7) * npoints];
-            }
-            else
-            {
-                A[7] = 0.0;
-                B[7] = 0.0;
-            }
-
-            // nu + 8
-            if (nu + 8 < aocount)
-            {
-                A[8] = d_mat_F[g + (nu + 8) * npoints];
-                B[8] = d_gto_values[g + (nu + 8) * npoints];
-            }
-            else
-            {
-                A[8] = 0.0;
-                B[8] = 0.0;
-            }
-
-            // nu + 9
-            if (nu + 9 < aocount)
-            {
-                A[9] = d_mat_F[g + (nu + 9) * npoints];
-                B[9] = d_gto_values[g + (nu + 9) * npoints];
-            }
-            else
-            {
-                A[9] = 0.0;
-                B[9] = 0.0;
-            }
-
-            // nu + 10
-            if (nu + 10 < aocount)
-            {
-                A[10] = d_mat_F[g + (nu + 10) * npoints];
-                B[10] = d_gto_values[g + (nu + 10) * npoints];
-            }
-            else
-            {
-                A[10] = 0.0;
-                B[10] = 0.0;
-            }
-
-            // nu + 11
-            if (nu + 11 < aocount)
-            {
-                A[11] = d_mat_F[g + (nu + 11) * npoints];
-                B[11] = d_gto_values[g + (nu + 11) * npoints];
-            }
-            else
-            {
-                A[11] = 0.0;
-                B[11] = 0.0;
-            }
-
-            // nu + 12
-            if (nu + 12 < aocount)
-            {
-                A[12] = d_mat_F[g + (nu + 12) * npoints];
-                B[12] = d_gto_values[g + (nu + 12) * npoints];
-            }
-            else
-            {
-                A[12] = 0.0;
-                B[12] = 0.0;
-            }
-
-            // nu + 13
-            if (nu + 13 < aocount)
-            {
-                A[13] = d_mat_F[g + (nu + 13) * npoints];
-                B[13] = d_gto_values[g + (nu + 13) * npoints];
-            }
-            else
-            {
-                A[13] = 0.0;
-                B[13] = 0.0;
-            }
-
-            // nu + 14
-            if (nu + 14 < aocount)
-            {
-                A[14] = d_mat_F[g + (nu + 14) * npoints];
-                B[14] = d_gto_values[g + (nu + 14) * npoints];
-            }
-            else
-            {
-                A[14] = 0.0;
-                B[14] = 0.0;
-            }
-
-            // nu + 15
-            if (nu + 15 < aocount)
-            {
-                A[15] = d_mat_F[g + (nu + 15) * npoints];
-                B[15] = d_gto_values[g + (nu + 15) * npoints];
-            }
-            else
-            {
-                A[15] = 0.0;
-                B[15] = 0.0;
-            }
-
-            rho_a += A[0] * B[0] + A[1] * B[1] + A[2] * B[2] + A[3] * B[3] + A[4] * B[4] + A[5] * B[5] + A[6] * B[6] + A[7] * B[7] + A[8] * B[8] +
-                     A[9] * B[9] + A[10] * B[10] + A[11] * B[11] + A[12] * B[12] + A[13] * B[13] + A[14] * B[14] + A[15] * B[15];
+            As[threadIdx.y][threadIdx.x] = d_mat_F[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs[threadIdx.y][threadIdx.x] = d_gto_values[(k * TILE_DIM + threadIdx.y) * npoints + g];
+        }
+        else
+        {
+            As[threadIdx.y][threadIdx.x] = 0.0;
+            Bs[threadIdx.y][threadIdx.x] = 0.0;
         }
 
+        __syncthreads();
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t m = 0; m < TILE_DIM; m++)
+            {
+                rho_a += As[m][threadIdx.x] * Bs[m][threadIdx.x];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (g < npoints))
+    {
         d_rho[2 * g + 0] = rho_a;
         d_rho[2 * g + 1] = rho_a;
     }
 }
 
 __global__ void
-cudaDensityAndSigmaOnGrids(double*        d_rho,
-                           double*        d_rhograd,
-                           double*        d_sigma,
-                           const double*  d_mat_F,
-                           const double*  d_gto_values,
-                           const double*  d_gto_values_x,
-                           const double*  d_gto_values_y,
-                           const double*  d_gto_values_z,
-                           const uint32_t aocount,
-                           const uint32_t npoints)
+cudaDensitySigmaOnGrids(double*        d_rho,
+                        double*        d_rhograd,
+                        double*        d_sigma,
+                        const double*  d_mat_F,
+                        const double*  d_gto_values,
+                        const double*  d_gto_values_x,
+                        const double*  d_gto_values_y,
+                        const double*  d_gto_values_z,
+                        const uint32_t aocount,
+                        const uint32_t npoints)
 {
-    const uint32_t g = blockDim.x * blockIdx.x + threadIdx.x;
+    __shared__ double As[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs_x[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs_y[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs_z[TILE_DIM][TILE_DIM + 1];
 
-    double rho_a   = 0.0;
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
+
+    double rho_a = 0.0;
     double rho_a_x = 0.0;
     double rho_a_y = 0.0;
     double rho_a_z = 0.0;
 
-    double A[8], B[8], B_x[8], B_y[8], B_z[8];
-
-    if (g < npoints)
+    for (uint32_t k = 0; k < (aocount + TILE_DIM - 1) / TILE_DIM; k++)
     {
-        for (uint32_t nu = 0; nu < aocount; nu += 8)
+        if ((k * TILE_DIM + threadIdx.y < aocount) && (g < npoints))
         {
-            // nu + 0
-            A[0]   = d_mat_F[g + (nu + 0) * npoints];
-            B[0]   = d_gto_values[g + (nu + 0) * npoints];
-            B_x[0] = d_gto_values_x[g + (nu + 0) * npoints];
-            B_y[0] = d_gto_values_y[g + (nu + 0) * npoints];
-            B_z[0] = d_gto_values_z[g + (nu + 0) * npoints];
-
-            // nu + 1
-            if (nu + 1 < aocount)
-            {
-                A[1]   = d_mat_F[g + (nu + 1) * npoints];
-                B[1]   = d_gto_values[g + (nu + 1) * npoints];
-                B_x[1] = d_gto_values_x[g + (nu + 1) * npoints];
-                B_y[1] = d_gto_values_y[g + (nu + 1) * npoints];
-                B_z[1] = d_gto_values_z[g + (nu + 1) * npoints];
-            }
-            else
-            {
-                A[1]   = 0.0;
-                B[1]   = 0.0;
-                B_x[1] = 0.0;
-                B_y[1] = 0.0;
-                B_z[1] = 0.0;
-            }
-
-            // nu + 2
-            if (nu + 2 < aocount)
-            {
-                A[2]   = d_mat_F[g + (nu + 2) * npoints];
-                B[2]   = d_gto_values[g + (nu + 2) * npoints];
-                B_x[2] = d_gto_values_x[g + (nu + 2) * npoints];
-                B_y[2] = d_gto_values_y[g + (nu + 2) * npoints];
-                B_z[2] = d_gto_values_z[g + (nu + 2) * npoints];
-            }
-            else
-            {
-                A[2]   = 0.0;
-                B[2]   = 0.0;
-                B_x[2] = 0.0;
-                B_y[2] = 0.0;
-                B_z[2] = 0.0;
-            }
-
-            // nu + 3
-            if (nu + 3 < aocount)
-            {
-                A[3]   = d_mat_F[g + (nu + 3) * npoints];
-                B[3]   = d_gto_values[g + (nu + 3) * npoints];
-                B_x[3] = d_gto_values_x[g + (nu + 3) * npoints];
-                B_y[3] = d_gto_values_y[g + (nu + 3) * npoints];
-                B_z[3] = d_gto_values_z[g + (nu + 3) * npoints];
-            }
-            else
-            {
-                A[3]   = 0.0;
-                B[3]   = 0.0;
-                B_x[3] = 0.0;
-                B_y[3] = 0.0;
-                B_z[3] = 0.0;
-            }
-
-            // nu + 4
-            if (nu + 4 < aocount)
-            {
-                A[4]   = d_mat_F[g + (nu + 4) * npoints];
-                B[4]   = d_gto_values[g + (nu + 4) * npoints];
-                B_x[4] = d_gto_values_x[g + (nu + 4) * npoints];
-                B_y[4] = d_gto_values_y[g + (nu + 4) * npoints];
-                B_z[4] = d_gto_values_z[g + (nu + 4) * npoints];
-            }
-            else
-            {
-                A[4]   = 0.0;
-                B[4]   = 0.0;
-                B_x[4] = 0.0;
-                B_y[4] = 0.0;
-                B_z[4] = 0.0;
-            }
-
-            // nu + 5
-            if (nu + 5 < aocount)
-            {
-                A[5]   = d_mat_F[g + (nu + 5) * npoints];
-                B[5]   = d_gto_values[g + (nu + 5) * npoints];
-                B_x[5] = d_gto_values_x[g + (nu + 5) * npoints];
-                B_y[5] = d_gto_values_y[g + (nu + 5) * npoints];
-                B_z[5] = d_gto_values_z[g + (nu + 5) * npoints];
-            }
-            else
-            {
-                A[5]   = 0.0;
-                B[5]   = 0.0;
-                B_x[5] = 0.0;
-                B_y[5] = 0.0;
-                B_z[5] = 0.0;
-            }
-
-            // nu + 6
-            if (nu + 6 < aocount)
-            {
-                A[6]   = d_mat_F[g + (nu + 6) * npoints];
-                B[6]   = d_gto_values[g + (nu + 6) * npoints];
-                B_x[6] = d_gto_values_x[g + (nu + 6) * npoints];
-                B_y[6] = d_gto_values_y[g + (nu + 6) * npoints];
-                B_z[6] = d_gto_values_z[g + (nu + 6) * npoints];
-            }
-            else
-            {
-                A[6]   = 0.0;
-                B[6]   = 0.0;
-                B_x[6] = 0.0;
-                B_y[6] = 0.0;
-                B_z[6] = 0.0;
-            }
-
-            // nu + 7
-            if (nu + 7 < aocount)
-            {
-                A[7]   = d_mat_F[g + (nu + 7) * npoints];
-                B[7]   = d_gto_values[g + (nu + 7) * npoints];
-                B_x[7] = d_gto_values_x[g + (nu + 7) * npoints];
-                B_y[7] = d_gto_values_y[g + (nu + 7) * npoints];
-                B_z[7] = d_gto_values_z[g + (nu + 7) * npoints];
-            }
-            else
-            {
-                A[7]   = 0.0;
-                B[7]   = 0.0;
-                B_x[7] = 0.0;
-                B_y[7] = 0.0;
-                B_z[7] = 0.0;
-            }
-
-            rho_a += A[0] * B[0] + A[1] * B[1] + A[2] * B[2] + A[3] * B[3] + A[4] * B[4] + A[5] * B[5] + A[6] * B[6] + A[7] * B[7];
-
-            rho_a_x += 2.0 * (+A[0] * B_x[0] + A[1] * B_x[1] + A[2] * B_x[2] + A[3] * B_x[3] + A[4] * B_x[4] + A[5] * B_x[5] + A[6] * B_x[6] +
-                              A[7] * B_x[7]);
-
-            rho_a_y += 2.0 * (+A[0] * B_y[0] + A[1] * B_y[1] + A[2] * B_y[2] + A[3] * B_y[3] + A[4] * B_y[4] + A[5] * B_y[5] + A[6] * B_y[6] +
-                              A[7] * B_y[7]);
-
-            rho_a_z += 2.0 * (+A[0] * B_z[0] + A[1] * B_z[1] + A[2] * B_z[2] + A[3] * B_z[3] + A[4] * B_z[4] + A[5] * B_z[5] + A[6] * B_z[6] +
-                              A[7] * B_z[7]);
+            As[threadIdx.y][threadIdx.x] = d_mat_F[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs[threadIdx.y][threadIdx.x] = d_gto_values[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs_x[threadIdx.y][threadIdx.x] = d_gto_values_x[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs_y[threadIdx.y][threadIdx.x] = d_gto_values_y[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs_z[threadIdx.y][threadIdx.x] = d_gto_values_z[(k * TILE_DIM + threadIdx.y) * npoints + g];
+        }
+        else
+        {
+            As[threadIdx.y][threadIdx.x] = 0.0;
+            Bs[threadIdx.y][threadIdx.x] = 0.0;
+            Bs_x[threadIdx.y][threadIdx.x] = 0.0;
+            Bs_y[threadIdx.y][threadIdx.x] = 0.0;
+            Bs_z[threadIdx.y][threadIdx.x] = 0.0;
         }
 
+        __syncthreads();
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t m = 0; m < TILE_DIM; m++)
+            {
+                rho_a += As[m][threadIdx.x] * Bs[m][threadIdx.x];
+                rho_a_x += 2.0 * (As[m][threadIdx.x] * Bs_x[m][threadIdx.x]);
+                rho_a_y += 2.0 * (As[m][threadIdx.x] * Bs_y[m][threadIdx.x]);
+                rho_a_z += 2.0 * (As[m][threadIdx.x] * Bs_z[m][threadIdx.x]);
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (g < npoints))
+    {
         d_rho[2 * g + 0] = rho_a;
         d_rho[2 * g + 1] = rho_a;
 
@@ -1393,9 +1123,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         hipLaunchKernelGGL(gpu::matmulAtB, num_blocks, threads_per_block, 0, 0, 
             d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
-        threads_per_block = dim3(64);
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
+        // Note: one block in y dimension
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(gpu::cudaDensityOnGrids, num_blocks, threads_per_block, 0, 0, 
             d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
@@ -1722,11 +1453,12 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         hipLaunchKernelGGL(gpu::matmulAtB, num_blocks, threads_per_block, 0, 0, 
             d_mat_F, d_den_mat, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
-        threads_per_block = dim3(64);
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x);
+        // Note: one block in y dimension
+        num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        hipLaunchKernelGGL(gpu::cudaDensityAndSigmaOnGrids, num_blocks, threads_per_block, 0, 0, d_rho,
+        hipLaunchKernelGGL(gpu::cudaDensitySigmaOnGrids, num_blocks, threads_per_block, 0, 0, d_rho,
                                                                            d_rhograd,
                                                                            d_sigma,
                                                                            d_mat_F,
