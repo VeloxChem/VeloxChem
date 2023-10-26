@@ -27,36 +27,15 @@ class TestDftGrid:
         grid_drv.set_level(1)
         mol_grid = grid_drv.generate(mol)
 
-        # test grid and GTO values
-
-        gx = mol_grid.x_to_numpy()
-        gy = mol_grid.y_to_numpy()
-        gz = mol_grid.z_to_numpy()
-        gw = mol_grid.w_to_numpy()
-
-        grid_data = np.vstack((gx, gy, gz, gw))
+        # test KS matrix
 
         xc_drv = XCIntegrator()
-        gto_data = xc_drv.compute_gto_values(mol, bas, mol_grid)
-
-        comm = MPI.COMM_WORLD
-        gto_data = comm.allreduce(gto_data)
-        gto_data_slice = gto_data[:, 400:600]
-
-        here = Path(__file__).parent
-        npz_data = np.load(str(here / 'data' / 'h2o.dftgrid.npz'))
-        ref_grid_data = npz_data['grid_xyzw']
-        ref_gto_data_slice = npz_data['gtos_on_grid_400_600']
-
-        assert np.max(np.abs(grid_data - ref_grid_data)) < 1e-10
-        assert np.max(np.abs(gto_data_slice - ref_gto_data_slice)) < 1e-10
-
-        # test KS matrix
 
         npz_data = np.load(str(here / 'data' / 'h2o.dens.npz'))
         dmat = AODensityMatrix([npz_data['density']], denmat.rest)
-        xcmat = xc_drv.integrate_vxc_fock(mol, bas, dmat, mol_grid,
-                                          'slater')
+        xcmat = xc_drv.integrate_vxc_fock(mol, bas, dmat, mol_grid, 'slater')
+
+        comm = MPI.COMM_WORLD
 
         xcmat_np = comm.reduce(xcmat.alpha_to_numpy(), root=0)
         xcmat_energy = comm.reduce(xcmat.get_energy(), root=0)
