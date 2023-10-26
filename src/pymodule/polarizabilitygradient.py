@@ -265,6 +265,8 @@ class PolarizabilityGradient():
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
 
                 pol_gradient = np.zeros((dof, dof, natm, 3))
+                # WIP
+                tmp_grad = np.zeros((dof, dof, natm, 3))
 
                 # dictionary to translate from numbers to operator components 'xyz'
                 # component_dict = {0: 'x', 1: 'y', 2: 'z'}
@@ -323,7 +325,81 @@ class PolarizabilityGradient():
                                             x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
                             - 2.0 * np.einsum('xmn,yamn->xya', x_minus_y, d_dipole)
                             - 2.0 * np.einsum('xmn,yamn->yxa', x_minus_y, d_dipole))
-
+                    # WIP: multi_dot
+                    for x in range(dof):
+                        for y in range(dof):
+                            for a in range(3):
+                                tmp_grad[x, y, i, a]  = (np.linalg.multi_dot([
+                                    2.0 * rel_dm_ao[x,y].reshape(nao**2),
+                                    d_hcore[a].reshape(nao**2)])
+                                + 1.0 * np.linalg.multi_dot([
+                                    2.0 * omega_ao[x,y].reshape(nao**2),
+                                    d_ovlp[a].reshape(nao*nao)])
+                                # WORKS: above two lines
+                                + 2.0 * np.linalg.multi_dot([
+                                     gs_dm.reshape(nao**2),
+                                     d_eri[a].reshape(nao**2,nao**2),
+                                     2.0 * rel_dm_ao[x,y].reshape(nao**2)])
+                                # WORKS: above
+                                - 1.0 * frac_K * np.linalg.multi_dot([gs_dm.reshape(nao**2), 
+                                                    #(np.transpose(d_eri[a], [0,3,1,2])
+                                                    # ).reshape(nao**2, nao**2),
+                                                    d_eri[a].transpose(0,3,1,2).reshape(nao**2, nao**2),
+                                                    2.0 * rel_dm_ao[x,y].reshape(nao**2)])
+                                # WORKS: above
+                                + np.linalg.multi_dot([
+                                    x_plus_y[x].reshape(nao**2),
+                                    d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2),
+                                    (x_plus_y[y] - x_plus_y[y].transpose()).reshape(nao**2)])
+                                # WORKS: above
+                                - 0.5 * frac_K * np.linalg.multi_dot([
+                                    x_plus_y[x].reshape(nao**2),
+                                    d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2)])
+                                # WORKS: above
+                                + 1.0 * np.linalg.multi_dot([
+                                    x_minus_y[x].reshape(nao**2),
+                                    d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2),
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2)
+                                ])
+                                - 0.5 * frac_K * np.linalg.multi_dot([
+                                    x_minus_y[x].reshape(nao**2),
+                                    d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2)
+                                ])
+                                # WORKS: above
+                                #+ 1.0 * np.linalg.multi_dot([
+                                #    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2),
+                                #    d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2),
+                                #    x_plus_y[x].reshape(nao**2)
+                                #])
+                                #+ 0.5 * frac_K * np.linalg.multi_dot([
+                                #    x_plus_y[y].reshape(nao**2),
+                                #    d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2),
+                                #    (x_plus_y[x] - x_plus_y[x].T).reshape(nao**2)
+                                #])
+                                )
+                    #DEBUG
+                    print(tmp_grad[:,:,i])
+                    print('einsum: \n', np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_hcore)
+                            + 1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
+                            + 2.0 * np.einsum('mt,xynp,amtnp->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
+                            - 1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya',
+                                              gs_dm, 2.0 * rel_dm_ao, d_eri)
+                            + 1.0 * np.einsum('xmn,ypt,atpmn->xya',
+                                              x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
+                            - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya',
+                                              x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
+                            + 1.0 * np.einsum('xmn,ypt,atpmn->xya',
+                                            x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
+                            - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya',
+                                            x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
+                            #
+                            #+ 1.0 * np.einsum('xmn,ypt,atpmn->yxa',
+                            #                x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
+                            #- 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa',
+                            #                x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
+                        )
                     valstr = ' * Time spent calculating pol. gradient: '
                     valstr += '{:.2f} sec * '.format(tm.time() - gradient_start_time)
                     self.ostream.print_header(valstr)
