@@ -39,6 +39,7 @@
 #include "ErrorHandler.hpp"
 #include "FunctionalParser.hpp"
 #include "GtoFunc.hpp"
+#include "GtoInfo.hpp"
 #include "GtoValuesGgaGPU.hpp"
 #include "GtoValuesLdaGPU.hpp"
 #include "MathFunc.hpp"
@@ -362,60 +363,6 @@ matmulABtKohnShamMatrix(double*         d_mat_Vxc_full,
     {
         d_mat_Vxc_full[d_ao_inds[i] * naos + d_ao_inds[j]] += val;
     }
-}
-
-static auto
-getGtoInfo(const CGtoBlock gto_block, const std::vector<int64_t>& gtos_mask) -> std::vector<double>
-{
-    // set up GTO values storage
-
-    const auto nrows = mathfunc::countSignificantElements(gtos_mask);
-
-    // set up GTOs data
-
-    const auto gto_exps = gto_block.getExponents();
-
-    const auto gto_norms = gto_block.getNormalizationFactors();
-
-    const auto gto_coords = gto_block.getCoordinates();
-
-    // set GTOs block dimensions
-
-    const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-
-    const auto npgtos = gto_block.getNumberOfPrimitives();
-
-    // set up data on host and device
-
-    std::vector<double> gto_info(5 * nrows * npgtos);
-
-    auto gto_info_ptr = gto_info.data();
-
-    for (int64_t i = 0, irow = 0; i < ncgtos; i++)
-    {
-        if (gtos_mask[i] == 1)
-        {
-            const auto r_x = gto_coords[i][0];
-            const auto r_y = gto_coords[i][1];
-            const auto r_z = gto_coords[i][2];
-
-            for (int64_t j = 0; j < npgtos; j++)
-            {
-                const auto fexp  = gto_exps[j * ncgtos + i];
-                const auto fnorm = gto_norms[j * ncgtos + i];
-
-                gto_info_ptr[irow + j * nrows + npgtos * nrows * 0] = fexp;
-                gto_info_ptr[irow + j * nrows + npgtos * nrows * 1] = fnorm;
-                gto_info_ptr[irow + j * nrows + npgtos * nrows * 2] = r_x;
-                gto_info_ptr[irow + j * nrows + npgtos * nrows * 3] = r_y;
-                gto_info_ptr[irow + j * nrows + npgtos * nrows * 4] = r_z;
-            }
-
-            irow++;
-        }
-    }
-
-    return gto_info;
 }
 
 static auto

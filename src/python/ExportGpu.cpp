@@ -29,6 +29,7 @@
 #include <pybind11/pybind11.h>
 
 #include "CudaDevices.hpp"
+#include "EriSSSS.hpp"
 #include "ExportGeneral.hpp"
 #include "XCIntegratorGPU.hpp"
 
@@ -54,9 +55,25 @@ export_gpu(py::module& m)
             auto gtovalues = gpu::computeGtoValuesOnGridPoints(molecule, basis, molecularGrid);
             return vlx_general::pointer_to_numpy(gtovalues.values(), {gtovalues.getNumberOfRows(), gtovalues.getNumberOfColumns()});
         },
-        "gpu test");
+        "Computes GTO values on grid points using GPU.");
 
-    m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "gpu test");
+    m.def(
+        "compute_gto_values_and_derivatives",
+        [](const CMolecule& molecule, const CMolecularBasis& basis, const CMolecularGrid& molecularGrid) -> py::list {
+            auto     gto_values_derivs = gpu::computeGtoValuesAndDerivativesOnGridPoints(molecule, basis, molecularGrid);
+            py::list ret;
+            for (size_t i = 0; i < gto_values_derivs.size(); i++)
+            {
+                ret.append(vlx_general::pointer_to_numpy(gto_values_derivs[i].values(),
+                                                         {gto_values_derivs[i].getNumberOfRows(), gto_values_derivs[i].getNumberOfColumns()}));
+            }
+            return ret;
+        },
+        "Computes GTO values and derivatives on grid points using GPU.");
+
+    m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
+
+    m.def("compute_eri_ssss", &gpu::computeEriSSSS, "Computes (SS|SS) contribution to Fock matrix using GPU.");
 }
 
 }  // namespace vlx_gpu
