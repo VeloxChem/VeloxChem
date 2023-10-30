@@ -261,10 +261,6 @@ class PolarizabilityGradient():
                 lambda_ao += lambda_ao.transpose(0,1,3,2)  # vir-occ
                 rel_dm_ao = orbrsp_results['unrel_dm_ao'] + lambda_ao
 
-                pol_gradient = np.zeros((dof, dof, natm, 3))
-                # WIP
-                tmp_grad = np.zeros((dof, dof, natm, 3))
-
                 if self._dft:
                     if self.xcfun.is_hybrid():
                         frac_K = self.xcfun.get_frac_exact_exchange()
@@ -273,6 +269,7 @@ class PolarizabilityGradient():
                 else:
                     frac_K = 1.0
 
+                pol_gradient = np.zeros((dof, dof, natm, 3))
                 # loop over atoms and contract integral derivatives
                 # with density matrices
                 # add the corresponding contribution to the gradient
