@@ -253,9 +253,6 @@ class PolarizabilityGradient():
 
                 # transform lambda multipliers to AO basis and
                 # calculate relaxed density matrix
-#                lambda_ao = np.einsum('mi,xia,na->xmn', mo_occ, lambda_mo,
-#                                      mo_vir).reshape(dof, dof, nao, nao)  # occ-vir
-                # WIP: multi_dot
                 lambda_ao = np.array([
                     np.linalg.multi_dot([mo_occ, lambda_mo[x], mo_vir.T])
                     for x in range(dof**2)                    
@@ -267,9 +264,6 @@ class PolarizabilityGradient():
                 pol_gradient = np.zeros((dof, dof, natm, 3))
                 # WIP
                 tmp_grad = np.zeros((dof, dof, natm, 3))
-
-                # dictionary to translate from numbers to operator components 'xyz'
-                # component_dict = {0: 'x', 1: 'y', 2: 'z'}
 
                 if self._dft:
                     if self.xcfun.is_hybrid():
@@ -299,150 +293,59 @@ class PolarizabilityGradient():
                     self.ostream.flush()
 
                     gradient_start_time = tm.time()
-
                     # Calculate the analytic polarizability gradient
-                    time_einsum = tm.time()
-                    pol_gradient[:, :, i] += (
-                            np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_hcore)
-                            + 1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
-                            + 2.0 * np.einsum('mt,xynp,amtnp->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
-                            - 1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya',
-                                              gs_dm, 2.0 * rel_dm_ao, d_eri)
-                            + 1.0 * np.einsum('xmn,ypt,atpmn->xya',
-                                              x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
-                            - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya',
-                                              x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
-                            + 1.0 * np.einsum('xmn,ypt,atpmn->xya',
-                                            x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
-                            - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya',
-                                            x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
-                            + 1.0 * np.einsum('xmn,ypt,atpmn->yxa',
-                                            x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
-                            - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa',
-                                            x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
-                            + 1.0 * np.einsum('xmn,ypt,atpmn->yxa',
-                                            x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
-                            - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa',
-                                            x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
-                            - 2.0 * np.einsum('xmn,yamn->xya', x_minus_y, d_dipole)
-                            - 2.0 * np.einsum('xmn,yamn->yxa', x_minus_y, d_dipole))
-                    print('TIMING einsum: ', tm.time()-time_einsum)
-                    # WIP: multi_dot
-                    mdotA = np.zeros((dof, dof, 3))
-                    mdotB = np.zeros((dof, dof, 3))
-                    mdotC = np.zeros((dof, dof, 3))
-                    mdotD = np.zeros((dof, dof, 3))
-                    mdotE = np.zeros((dof, dof, 3))
-                    mdotF = np.zeros((dof, dof, 3))
-                    mdotG = np.zeros((dof, dof, 3))
-                    mdotH = np.zeros((dof, dof, 3))
-                    mdotI = np.zeros((dof, dof, 3))
-                    mdotJ = np.zeros((dof, dof, 3))
-                    mdotK = np.zeros((dof, dof, 3))
-                    mdotL = np.zeros((dof, dof, 3))
-                    mdotM = np.zeros((dof, dof, 3))
-                    mdotN = np.zeros((dof, dof, 3))
-                    time_mdot = tm.time()
                     for x in range(dof):
                         for y in range(dof):
                             for a in range(3):
-                                mdotA[x,y,a] = np.linalg.multi_dot([
+                                pol_gradient[x, y, i, a] += (
+                                np.linalg.multi_dot([
                                     2.0 * rel_dm_ao[x,y].reshape(nao**2), d_hcore[a].reshape(nao**2)
                                 ])
-                                mdotB[x,y,a] = 1.0 * np.linalg.multi_dot([
+                                + 1.0 * np.linalg.multi_dot([
                                     2.0 * omega_ao[x,y].reshape(nao**2), d_ovlp[a].reshape(nao*nao)
                                 ])
-                                mdotC[x,y,a] = 2.0 * np.linalg.multi_dot([
+                                + 2.0 * np.linalg.multi_dot([
                                     gs_dm.reshape(nao**2), d_eri[a].reshape(nao**2,nao**2), 2.0 * rel_dm_ao[x,y].reshape(nao**2)
                                 ])
-                                mdotD[x,y,a] = - 1.0 * frac_K * np.linalg.multi_dot([
+                                - 1.0 * frac_K * np.linalg.multi_dot([
                                     gs_dm.reshape(nao**2), d_eri[a].transpose(0,3,1,2).reshape(nao**2, nao**2), 2.0 * rel_dm_ao[x,y].reshape(nao**2)
                                 ])
-                                mdotE[x,y,a] = 1.0* np.linalg.multi_dot([
+                                + 1.0* np.linalg.multi_dot([
                                     x_plus_y[x].reshape(nao**2), d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2), (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2)
                                 ])
-                                mdotF[x,y,a] = - 0.5 * frac_K * np.linalg.multi_dot([
+                                - 0.5 * frac_K * np.linalg.multi_dot([
                                     x_plus_y[x].reshape(nao**2), d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2), (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2)
                                 ])
-                                mdotG[x,y,a] = + 1.0 * np.linalg.multi_dot([
+                                + 1.0 * np.linalg.multi_dot([
                                     x_minus_y[x].reshape(nao**2), d_eri[a].transpose(2,3,1,0).reshape(nao**2,nao**2), (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2)
                                 ])
-                                mdotH[x,y,a] = - 0.5 * frac_K * np.linalg.multi_dot([
+                                - 0.5 * frac_K * np.linalg.multi_dot([
                                     x_minus_y[x].reshape(nao**2), d_eri[a].transpose(2,1,3,0).reshape(nao**2,nao**2), (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2)
                                 ])
-                                mdotI[y,x,a] = 1.0 * np.linalg.multi_dot([
-                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2), d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
-                                ])
-                                mdotJ[y,x,a] = - 0.5 * frac_K * np.linalg.multi_dot([
-                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2), d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
-                                ])
-                                mdotK[y,x,a] = 1.0 * np.linalg.multi_dot([
-                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2), d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
-                                ])
-                                mdotL[y,x,a] = - 0.5 * frac_K * np.linalg.multi_dot([
-                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2), d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
-                                ])
-                                mdotM[x,y,a] = - 2.0 * np.linalg.multi_dot([
+                                - 2.0 * np.linalg.multi_dot([
                                     x_minus_y[x].reshape(nao**2), d_dipole[y,a].reshape(nao**2)
                                 ])
-                                mdotN[y,x,a] = - 2.0 * np.linalg.multi_dot([
-                                    d_dipole[y,a].reshape(nao**2), x_minus_y[x].reshape(nao**2)
+                                )
+
+                                pol_gradient[y, x, i, a] += (
+                                1.0 * np.linalg.multi_dot([
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2), d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
                                 ])
+                                - 0.5 * frac_K * np.linalg.multi_dot([
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2), d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
+                                ])
+                                + 1.0 * np.linalg.multi_dot([
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2), d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
+                                ])
+                                - 0.5 * frac_K * np.linalg.multi_dot([
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2), d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
+                                ])
+                                - 2.0 * np.linalg.multi_dot([
+                                d_dipole[y,a].reshape(nao**2), x_minus_y[x].reshape(nao**2)
+                                ])
+                                )
+                    print(pol_gradient[:,:,i])
 
-                                tmp_grad[x, y, i, a] += mdotA[x,y,a]+mdotB[x,y,a]+mdotC[x,y,a]+mdotM[x,y,a]+mdotD[x,y,a]+mdotE[x,y,a]+mdotF[x,y,a] +mdotG[x,y,a]+mdotH[x,y,a]
-                                tmp_grad[y, x, i, a] += mdotN[y,x,a] +mdotI[y,x,a]+mdotJ[y,x,a]+mdotK[y,x,a]+mdotL[y,x,a]
-                    print('TIMING multi_dot: ', tm.time()-time_mdot)
-                    #DEBUG
-                    #print('multi_dot \n', tmp_grad[:,:,i])
-                    #print('pol_gradient \n', pol_gradient[:,:,i])
-
-                    #time_einsum = tm.time()
-                    #einA = np.einsum('xymn,amn->xya', 2.0 * rel_dm_ao, d_hcore)
-                    #einB = 1.0 * np.einsum('xymn,amn->xya', 2.0 * omega_ao, d_ovlp)
-                    #einC = 2.0 * np.einsum('mt,xynp,amtnp->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
-                    #einD = - 1.0 * frac_K * np.einsum('mt,xynp,amnpt->xya', gs_dm, 2.0 * rel_dm_ao, d_eri)
-                    #einE = 1.0 * np.einsum('xmn,ypt,atpmn->xya', x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
-                    #einF = - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya', x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
-                    #einG = 1.0 * np.einsum('xmn,ypt,atpmn->xya', x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
-                    #einH = - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->xya', x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
-                    #einI = 1.0 * np.einsum('xmn,ypt,atpmn->yxa', x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
-                    #einJ = - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa', x_plus_y, x_plus_y - x_plus_y.transpose(0,2,1), d_eri)
-                    #einK = 1.0 * np.einsum('xmn,ypt,atpmn->yxa', x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
-                    #einL = - 0.5 * frac_K * np.einsum('xmn,ypt,atnmp->yxa', x_minus_y, x_minus_y + x_minus_y.transpose(0,2,1), d_eri)
-                    #einM = - 2.0 * np.einsum('xmn,yamn->xya', x_minus_y, d_dipole)
-                    #einN = - 2.0 * np.einsum('xmn,yamn->yxa', x_minus_y, d_dipole)
-                    #print('TIMING einsum: ', tm.time()-time_einsum)
-
-                    #print('\n A \n',
-                    #      einA, '\n' , mdotA,
-                    #      '\n B \n',
-                    #      einB, '\n' , mdotB,
-                    #      '\n C \n',
-                    #      einC, '\n' , mdotC,
-                    #      '\n D \n',
-                    #      einD, '\n' , mdotD,
-                    #      '\n E \n',
-                    #      einE, '\n' , mdotE,
-                    #      '\n F \n',
-                    #      einF, '\n' , mdotF,
-                    #      '\n G \n',
-                    #      einG, '\n' , mdotG,
-                    #      '\n H \n',
-                    #      einH, '\n' , mdotH,
-                    #      '\n I \n',
-                    #      einI, '\n' , mdotI,
-                    #      '\n J \n',
-                    #      einJ, '\n' , mdotJ,
-                    #      '\n K \n',
-                    #      einK, '\n' , mdotK,
-                    #      '\n L \n',
-                    #      einL, '\n' , mdotL,
-                    #      '\n M \n',
-                    #      einM, '\n' , mdotM,
-                    #      '\n N',
-                    #      einN, '\n' , mdotN,
-                    #      )
-                    
                     valstr = ' * Time spent calculating pol. gradient: '
                     valstr += '{:.2f} sec * '.format(tm.time() - gradient_start_time)
                     self.ostream.print_header(valstr)
