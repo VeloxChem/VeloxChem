@@ -170,15 +170,24 @@ class PolOrbitalResponse(CphfSolver):
                 x_plus_y = exc_vec + deexc_vec
                 x_minus_y = exc_vec - deexc_vec
 
-                einsum_start_time = tm.time()
+                mdot_start_time = tm.time()
 
                 # Transform the vectors to the AO basis
-                x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
-                x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
-                                         mo_vir)
+                #x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
+                #x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
+                #                         mo_vir)
+                # WIP: multi_dot
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T]) 
+                    for x in range(x_plus_y.shape[0])
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T]) 
+                    for x in range(x_minus_y.shape[0])
+                ])
 
-                valstr = ' * comput_rhs() > Time spent on einsum #0: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr = ' * comput_rhs() > Time spent on mdot #0: '
+                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -186,37 +195,93 @@ class PolOrbitalResponse(CphfSolver):
                 # Turn them into a list (for AODensityMatrix)
                 xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
 
-                einsum_start_time = tm.time()
+                mdot_start_time = tm.time()
 
                 # Calculate the symmetrized unrelaxed one-particle density matrix
                 # in MO basis
-                dm_oo = -0.25 * (np.einsum('xja,yia->xyij', x_plus_y, x_plus_y) +
-                                 np.einsum('xja,yia->xyij', x_minus_y, x_minus_y) +
-                                 np.einsum('yja,xia->xyij', x_plus_y, x_plus_y) +
-                                 np.einsum('yja,xia->xyij', x_minus_y, x_minus_y))
+                #dm_oo = -0.25 * (np.einsum('xja,yia->xyij', x_plus_y, x_plus_y) +
+                #                 np.einsum('xja,yia->xyij', x_minus_y, x_minus_y) +
+                #                 np.einsum('yja,xia->xyij', x_plus_y, x_plus_y) +
+                #                 np.einsum('yja,xia->xyij', x_minus_y, x_minus_y))
 
-                dm_vv = 0.25 * (np.einsum('xib,yia->xyab', x_plus_y, x_plus_y) +
-                                np.einsum('xib,yia->xyab', x_minus_y, x_minus_y) +
-                                np.einsum('yib,xia->xyab', x_plus_y, x_plus_y) +
-                                np.einsum('yib,xia->xyab', x_minus_y, x_minus_y))
+                #dm_vv = 0.25 * (np.einsum('xib,yia->xyab', x_plus_y, x_plus_y) +
+                #                np.einsum('xib,yia->xyab', x_minus_y, x_minus_y) +
+                #                np.einsum('yib,xia->xyab', x_plus_y, x_plus_y) +
+                #                np.einsum('yib,xia->xyab', x_minus_y, x_minus_y))
 
-                valstr = ' * comput_rhs() > Time spent on einsum #1: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                #WIP
+                tmp_dof = x_plus_y.shape[0]
+                tmp_dm_oo = np.zeros((tmp_dof, tmp_dof, nocc, nocc))
+                tmp_dm_vv = np.zeros((tmp_dof, tmp_dof, nvir, nvir))
+                for x in range(tmp_dof):
+                    for y in range(tmp_dof):
+                        tmp_dm_vv[x,y] = 0.25 * (np.linalg.multi_dot([
+                                x_plus_y[x].T,
+                                x_plus_y[y]
+                            ]).T
+                            + np.linalg.multi_dot([
+                                x_minus_y[x].T,
+                                x_minus_y[y]
+                            ]).T
+                            + np.linalg.multi_dot([
+                                x_plus_y[x].T,
+                                x_plus_y[y]
+                            ])
+                            + np.linalg.multi_dot([
+                                x_minus_y[x].T,
+                                x_minus_y[y]
+                            ])
+                        )
+                        tmp_dm_oo[x,y] = -0.25 * (
+                            np.linalg.multi_dot([
+                                x_plus_y[x],
+                                x_plus_y[y].T
+                            ])
+                            + np.linalg.multi_dot([
+                                x_minus_y[x],
+                                x_minus_y[y].T
+                            ])
+                            + np.linalg.multi_dot([
+                                x_plus_y[x],
+                                x_plus_y[y].T
+                            ]).T
+                            + np.linalg.multi_dot([
+                                x_minus_y[x],
+                                x_minus_y[y].T
+                            ]).T
+                        )
+                dm_oo = tmp_dm_oo
+                dm_vv = tmp_dm_vv
+                        
+                valstr = ' * comput_rhs() > Time spent on mdot #1: '
+                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                einsum_start_time = tm.time()
+                mdot_start_time = tm.time()
 
                 # Transform unrelaxed one-particle density matrix to
                 # AO basis and create a list
-                unrel_dm_ao = (
-                    np.einsum('mi,xyij,nj->xymn', mo_occ, dm_oo, mo_occ) +
-                    np.einsum('ma,xyab,nb->xymn', mo_vir, dm_vv, mo_vir))
+                #unrel_dm_ao = (
+                #    np.einsum('mi,xyij,nj->xymn', mo_occ, dm_oo, mo_occ) +
+                #    np.einsum('ma,xyab,nb->xymn', mo_vir, dm_vv, mo_vir))
+
+                # WIP multi_dot
+                tmp_dm = np.zeros((tmp_dof, tmp_dof, nao, nao))
+                for x in range(tmp_dof):
+                    for y in range(tmp_dof):
+                        tmp_dm[x,y] = (np.linalg.multi_dot([ mo_occ, dm_oo[x,y], mo_occ.T ])
+                        + np.linalg.multi_dot([ mo_vir, dm_vv[x,y], mo_vir.T ])
+                        )
+                #print('\n unrel_dm_ao: \n', unrel_dm_ao)
+                #print('\n tmp_dm: \n', tmp_dm)
+                unrel_dm_ao = tmp_dm
+                    
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
-                valstr = ' * comput_rhs() > Time spent on einsum #2: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr = ' * comput_rhs() > Time spent on mdot #2: '
+                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -316,8 +381,13 @@ class PolOrbitalResponse(CphfSolver):
                     fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
 
                 # Transform to MO basis
-                fock_mo_rhs_1dm = np.einsum('mi,xmn,na->xia', mo_occ,
-                                            fock_ao_rhs_1dm, mo_vir)
+                #fock_mo_rhs_1dm = np.einsum('mi,xmn,na->xia', mo_occ,
+                #                            fock_ao_rhs_1dm, mo_vir)
+                #WIP multi_dot
+                fock_mo_rhs_1dm = np.array([
+                   np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
+                   for x in range(fock_ao_rhs_1dm.shape[0]) 
+                ])
 
                 # extract the x_plus_y and x_minus_y contributions
                 # TODO: extract all Fock matrices at the same time?
