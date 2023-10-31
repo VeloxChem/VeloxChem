@@ -60,14 +60,14 @@ namespace gpu {  // gpu namespace
 
 __global__ void
 cudaFockJ(double*         mat_J,
-          const double*   gto_info,
-          const uint32_t  n_primitives,
+          const double*   s_prim_info,
+          const uint32_t  s_prim_count,
           const double    max_D,
           const double*   mat_D,
           const double*   mat_Q,
           const uint32_t* first_inds,
           const uint32_t* second_inds,
-          const uint32_t  n_prim_pairs)
+          const uint32_t  ss_prim_pair_count)
 {
     // each thread block scans over [ij|??] and sum up to a primitive J matrix element
 
@@ -79,13 +79,13 @@ cudaFockJ(double*         mat_J,
 
     double J_ij = 0.0;
 
-    for (uint32_t m = 0; m < (n_prim_pairs + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
         // TODO: add D_kl into ket side
 
-        if ((kl < n_prim_pairs) && (ij < n_prim_pairs) && (mat_Q[ij] * mat_Q[kl] * max_D > 1.0e-15))
+        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count) && (mat_Q[ij] * mat_Q[kl] * max_D > 1.0e-15))
         {
             const auto i = first_inds[ij];
             const auto j = second_inds[ij];
@@ -93,29 +93,29 @@ cudaFockJ(double*         mat_J,
             const auto k = first_inds[kl];
             const auto l = second_inds[kl];
 
-            const auto a_i = gto_info[i + n_primitives * 0];
-            const auto c_i = gto_info[i + n_primitives * 1];
-            const auto x_i = gto_info[i + n_primitives * 2];
-            const auto y_i = gto_info[i + n_primitives * 3];
-            const auto z_i = gto_info[i + n_primitives * 4];
+            const auto a_i = s_prim_info[i + s_prim_count * 0];
+            const auto c_i = s_prim_info[i + s_prim_count * 1];
+            const auto x_i = s_prim_info[i + s_prim_count * 2];
+            const auto y_i = s_prim_info[i + s_prim_count * 3];
+            const auto z_i = s_prim_info[i + s_prim_count * 4];
 
-            const auto a_j = gto_info[j + n_primitives * 0];
-            const auto c_j = gto_info[j + n_primitives * 1];
-            const auto x_j = gto_info[j + n_primitives * 2];
-            const auto y_j = gto_info[j + n_primitives * 3];
-            const auto z_j = gto_info[j + n_primitives * 4];
+            const auto a_j = s_prim_info[j + s_prim_count * 0];
+            const auto c_j = s_prim_info[j + s_prim_count * 1];
+            const auto x_j = s_prim_info[j + s_prim_count * 2];
+            const auto y_j = s_prim_info[j + s_prim_count * 3];
+            const auto z_j = s_prim_info[j + s_prim_count * 4];
 
-            const auto a_k = gto_info[k + n_primitives * 0];
-            const auto c_k = gto_info[k + n_primitives * 1];
-            const auto x_k = gto_info[k + n_primitives * 2];
-            const auto y_k = gto_info[k + n_primitives * 3];
-            const auto z_k = gto_info[k + n_primitives * 4];
+            const auto a_k = s_prim_info[k + s_prim_count * 0];
+            const auto c_k = s_prim_info[k + s_prim_count * 1];
+            const auto x_k = s_prim_info[k + s_prim_count * 2];
+            const auto y_k = s_prim_info[k + s_prim_count * 3];
+            const auto z_k = s_prim_info[k + s_prim_count * 4];
 
-            const auto a_l = gto_info[l + n_primitives * 0];
-            const auto c_l = gto_info[l + n_primitives * 1];
-            const auto x_l = gto_info[l + n_primitives * 2];
-            const auto y_l = gto_info[l + n_primitives * 3];
-            const auto z_l = gto_info[l + n_primitives * 4];
+            const auto a_l = s_prim_info[l + s_prim_count * 0];
+            const auto c_l = s_prim_info[l + s_prim_count * 1];
+            const auto x_l = s_prim_info[l + s_prim_count * 2];
+            const auto y_l = s_prim_info[l + s_prim_count * 3];
+            const auto z_l = s_prim_info[l + s_prim_count * 4];
 
             const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
             const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
@@ -163,7 +163,7 @@ cudaFockJ(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < n_prim_pairs))
+    if ((threadIdx.y == 0) && (ij < ss_prim_pair_count))
     {
         mat_J[ij] = J_ij;
     }
@@ -173,15 +173,15 @@ __global__ void
 cudaFockK(double*         mat_K,
           const uint32_t* pari_inds_i,
           const uint32_t* pari_inds_k,
-          const double*   gto_info,
-          const uint32_t  n_primitives,
+          const double*   s_prim_info,
+          const uint32_t* s_prim_aoinds,
+          const uint32_t  s_prim_count,
           const double    max_D,
           const double*   mat_D_full,
           const double*   mat_Q_for_K,
           const uint32_t* first_inds_for_K,
           const uint32_t* second_inds_for_K,
-          const uint32_t  n_prim_pairs,
-          const uint32_t  ncgtos,
+          const uint32_t  ss_prim_pair_count,
           const uint32_t  naos)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
@@ -194,50 +194,53 @@ cudaFockK(double*         mat_K,
 
     double K_ik = 0.0;
 
-    for (uint32_t m = 0; m < (n_primitives + TILE_DIM - 1) / TILE_DIM; m++)
+    for (uint32_t m = 0; m < (s_prim_count + TILE_DIM - 1) / TILE_DIM; m++)
     {
         const uint32_t j = m * TILE_DIM + threadIdx.y;
 
-        for (uint32_t n = 0; n < (n_primitives + TILE_DIM - 1) / TILE_DIM; n++)
+        for (uint32_t n = 0; n < (s_prim_count + TILE_DIM - 1) / TILE_DIM; n++)
         {
             const uint32_t l = n * TILE_DIM + threadIdx.x;
 
-            if ((ik < n_prim_pairs) && (j < n_primitives) && (l < n_primitives))
+            if ((ik < ss_prim_pair_count) && (j < s_prim_count) && (l < s_prim_count))
             {
                 const auto i = pari_inds_i[ik];
                 const auto k = pari_inds_k[ik];
 
-                const auto Q_ij = mat_Q_for_K[i * n_primitives + j];
-                const auto Q_kl = mat_Q_for_K[k * n_primitives + l];
+                const auto Q_ij = mat_Q_for_K[i * s_prim_count + j];
+                const auto Q_kl = mat_Q_for_K[k * s_prim_count + l];
 
                 if (Q_ij * Q_kl * max_D > 1.0e-15)
                 {
-                    auto j_prim = second_inds_for_K[i * n_primitives + j];
-                    auto l_prim = second_inds_for_K[k * n_primitives + l];
+                    auto j_prim = second_inds_for_K[i * s_prim_count + j];
+                    auto l_prim = second_inds_for_K[k * s_prim_count + l];
 
-                    const auto a_i = gto_info[i + n_primitives * 0];
-                    const auto c_i = gto_info[i + n_primitives * 1];
-                    const auto x_i = gto_info[i + n_primitives * 2];
-                    const auto y_i = gto_info[i + n_primitives * 3];
-                    const auto z_i = gto_info[i + n_primitives * 4];
+                    auto j_cgto = s_prim_aoinds[j_prim];
+                    auto l_cgto = s_prim_aoinds[l_prim];
 
-                    const auto a_j = gto_info[j_prim + n_primitives * 0];
-                    const auto c_j = gto_info[j_prim + n_primitives * 1];
-                    const auto x_j = gto_info[j_prim + n_primitives * 2];
-                    const auto y_j = gto_info[j_prim + n_primitives * 3];
-                    const auto z_j = gto_info[j_prim + n_primitives * 4];
+                    const auto a_i = s_prim_info[i + s_prim_count * 0];
+                    const auto c_i = s_prim_info[i + s_prim_count * 1];
+                    const auto x_i = s_prim_info[i + s_prim_count * 2];
+                    const auto y_i = s_prim_info[i + s_prim_count * 3];
+                    const auto z_i = s_prim_info[i + s_prim_count * 4];
 
-                    const auto a_k = gto_info[k + n_primitives * 0];
-                    const auto c_k = gto_info[k + n_primitives * 1];
-                    const auto x_k = gto_info[k + n_primitives * 2];
-                    const auto y_k = gto_info[k + n_primitives * 3];
-                    const auto z_k = gto_info[k + n_primitives * 4];
+                    const auto a_j = s_prim_info[j_prim + s_prim_count * 0];
+                    const auto c_j = s_prim_info[j_prim + s_prim_count * 1];
+                    const auto x_j = s_prim_info[j_prim + s_prim_count * 2];
+                    const auto y_j = s_prim_info[j_prim + s_prim_count * 3];
+                    const auto z_j = s_prim_info[j_prim + s_prim_count * 4];
 
-                    const auto a_l = gto_info[l_prim + n_primitives * 0];
-                    const auto c_l = gto_info[l_prim + n_primitives * 1];
-                    const auto x_l = gto_info[l_prim + n_primitives * 2];
-                    const auto y_l = gto_info[l_prim + n_primitives * 3];
-                    const auto z_l = gto_info[l_prim + n_primitives * 4];
+                    const auto a_k = s_prim_info[k + s_prim_count * 0];
+                    const auto c_k = s_prim_info[k + s_prim_count * 1];
+                    const auto x_k = s_prim_info[k + s_prim_count * 2];
+                    const auto y_k = s_prim_info[k + s_prim_count * 3];
+                    const auto z_k = s_prim_info[k + s_prim_count * 4];
+
+                    const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
+                    const auto c_l = s_prim_info[l_prim + s_prim_count * 1];
+                    const auto x_l = s_prim_info[l_prim + s_prim_count * 2];
+                    const auto y_l = s_prim_info[l_prim + s_prim_count * 3];
+                    const auto z_l = s_prim_info[l_prim + s_prim_count * 4];
 
                     const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
                     const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
@@ -261,7 +264,7 @@ cudaFockK(double*         mat_K,
                     const auto S_ij = c_i * c_j * std::pow(m_pi / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl = c_k * c_l * std::pow(m_pi / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
-                    ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij * S_kl * F0_t * mat_D_full[(j_prim % ncgtos) * naos + (l_prim % ncgtos)];
+                    ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij * S_kl * F0_t * mat_D_full[j_cgto * naos + l_cgto];
                 }
                 else
                 {
@@ -293,7 +296,7 @@ cudaFockK(double*         mat_K,
         }
     }
 
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < n_prim_pairs))
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < ss_prim_pair_count))
     {
         mat_K[ik] = K_ik;
     }
@@ -331,70 +334,99 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
 
-    // GTO info on device
+    // S gto block
 
-    int64_t max_ncgtos = 0, max_npgtos = 0;
+    int64_t s_prim_count = 0;
 
     for (const auto& gto_block : gto_blocks)
     {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-        const auto npgtos = gto_block.getNumberOfPrimitives();
+        if (gto_block.getAngularMomentum() == 0)
+        {
+            const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+            const auto npgtos = gto_block.getNumberOfPrimitives();
 
-        max_ncgtos = std::max(ncgtos, max_ncgtos);
-        max_npgtos = std::max(npgtos, max_npgtos);
+            s_prim_count += npgtos * ncgtos;
+        }
     }
 
-    double* d_gto_info;
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
 
-    hipSafe(hipMalloc(&d_gto_info, 5 * max_ncgtos * max_npgtos * sizeof(double)));
+    int64_t s_prim_offset = 0;
 
-    // For now, only process one GTO block
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
 
-    // TODO: take care of more GTO blocks
+        if (gto_ang == 0)
+        {
+            const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+            const auto npgtos = gto_block.getNumberOfPrimitives();
 
-    auto gto_info = gpu::getGtoInfo(gto_blocks[0]);
+            const auto gto_exps   = gto_block.getExponents();
+            const auto gto_norms  = gto_block.getNormalizationFactors();
+            const auto gto_coords = gto_block.getCoordinates();
 
-    hipSafe(hipMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), hipMemcpyHostToDevice));
+            const auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
 
-    auto ncgtos = gto_blocks[0].getNumberOfBasisFunctions();
+            for (int64_t j = 0; j < npgtos; j++)
+            {
+                for (int64_t i = 0; i < ncgtos; i++)
+                {
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 0] = gto_exps[i + j * ncgtos];
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 1] = gto_norms[i + j * ncgtos];
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 2] = gto_coords[i][0];
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 3] = gto_coords[i][1];
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 4] = gto_coords[i][2];
 
-    auto npgtos = gto_blocks[0].getNumberOfPrimitives();
+                    s_prim_aoinds[s_prim_offset + i + j * ncgtos + s_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds[i]);
+                }
+            }
 
-    auto n_primitives = npgtos * ncgtos;
+            s_prim_offset += npgtos * ncgtos;
+        }
+    }
 
-    auto n_prim_pairs = n_primitives * (n_primitives + 1) / 2;
+    double*   d_s_prim_info;
+    uint32_t* d_s_prim_aoinds;
 
-    CDenseMatrix mat_Q_orig(n_primitives, n_primitives);
+    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_s_prim_aoinds, s_prim_aoinds.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // For now, only process S gto block
+
+    // TODO: higher angular momentum
+
+    auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
+
+    CDenseMatrix mat_Q_orig(s_prim_count, s_prim_count);
 
     std::vector<std::tuple<double, int64_t, int64_t, double>> mat_Q_D_sorted;
 
     auto dens_ptr = densityMatrix.alphaDensity(0);
 
-    // For now, only process s-orbitals
-
-    // TODO: go through spherical harmonics components
-
-    for (int64_t i = 0, ij = 0; i < n_primitives; i++)
+    for (int64_t i = 0, ij = 0; i < s_prim_count; i++)
     {
-        const auto a_i = gto_info[i + n_primitives * 0];
-        const auto c_i = gto_info[i + n_primitives * 1];
-        const auto x_i = gto_info[i + n_primitives * 2];
-        const auto y_i = gto_info[i + n_primitives * 3];
-        const auto z_i = gto_info[i + n_primitives * 4];
+        const auto a_i = s_prim_info[i + s_prim_count * 0];
+        const auto c_i = s_prim_info[i + s_prim_count * 1];
+        const auto x_i = s_prim_info[i + s_prim_count * 2];
+        const auto y_i = s_prim_info[i + s_prim_count * 3];
+        const auto z_i = s_prim_info[i + s_prim_count * 4];
 
-        // const auto i_pgto = i / ncgtos;
-        const auto i_cgto = i % ncgtos;
+        const auto i_cgto = s_prim_aoinds[i];
 
-        for (int64_t j = i; j < n_primitives; j++, ij++)
+        for (int64_t j = i; j < s_prim_count; j++, ij++)
         {
-            const auto a_j = gto_info[j + n_primitives * 0];
-            const auto c_j = gto_info[j + n_primitives * 1];
-            const auto x_j = gto_info[j + n_primitives * 2];
-            const auto y_j = gto_info[j + n_primitives * 3];
-            const auto z_j = gto_info[j + n_primitives * 4];
+            const auto a_j = s_prim_info[j + s_prim_count * 0];
+            const auto c_j = s_prim_info[j + s_prim_count * 1];
+            const auto x_j = s_prim_info[j + s_prim_count * 2];
+            const auto y_j = s_prim_info[j + s_prim_count * 3];
+            const auto z_j = s_prim_info[j + s_prim_count * 4];
 
-            // const auto j_pgto = j / ncgtos;
-            const auto j_cgto = j % ncgtos;
+            const auto j_cgto = s_prim_aoinds[j];
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
@@ -424,19 +456,19 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     // K preparation
 
-    std::vector<double>   mat_Q_for_K(n_primitives * n_primitives);
-    std::vector<uint32_t> first_inds_for_K(n_primitives * n_primitives);
-    std::vector<uint32_t> second_inds_for_K(n_primitives * n_primitives);
+    std::vector<double>   mat_Q_for_K(s_prim_count * s_prim_count);
+    std::vector<uint32_t> first_inds_for_K(s_prim_count * s_prim_count);
+    std::vector<uint32_t> second_inds_for_K(s_prim_count * s_prim_count);
 
     // TODO: use uplo_index
 
-    for (int64_t i = 0; i < n_primitives; i++)
+    for (int64_t i = 0; i < s_prim_count; i++)
     {
         std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
 
         const auto Q_i = mat_Q_orig.row(i);
 
-        for (int64_t j = 0; j < n_primitives; j++)
+        for (int64_t j = 0; j < s_prim_count; j++)
         {
             Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
         }
@@ -444,7 +476,7 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
         std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
         std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
 
-        for (int64_t j = 0; j < n_primitives; j++)
+        for (int64_t j = 0; j < s_prim_count; j++)
         {
             const auto& q_ij = Q_vec_sorted[j];
 
@@ -452,18 +484,18 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
             auto i_idx = std::get<1>(q_ij);
             auto j_idx = std::get<2>(q_ij);
 
-            mat_Q_for_K[i * n_primitives + j]       = q_val;
-            first_inds_for_K[i * n_primitives + j]  = static_cast<uint32_t>(i_idx);
-            second_inds_for_K[i * n_primitives + j] = static_cast<uint32_t>(j_idx);
+            mat_Q_for_K[i * s_prim_count + j]       = q_val;
+            first_inds_for_K[i * s_prim_count + j]  = static_cast<uint32_t>(i_idx);
+            second_inds_for_K[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
         }
     }
 
-    std::vector<uint32_t> pair_inds_i(n_prim_pairs);
-    std::vector<uint32_t> pair_inds_k(n_prim_pairs);
+    std::vector<uint32_t> pair_inds_i(ss_prim_pair_count);
+    std::vector<uint32_t> pair_inds_k(ss_prim_pair_count);
 
-    for (int64_t i = 0, ik = 0; i < n_primitives; i++)
+    for (int64_t i = 0, ik = 0; i < s_prim_count; i++)
     {
-        for (int64_t k = i; k < n_primitives; k++, ik++)
+        for (int64_t k = i; k < s_prim_count; k++, ik++)
         {
             pair_inds_i[ik] = i;
             pair_inds_k[ik] = k;
@@ -472,14 +504,14 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     // sorted Q, D, and indices on host
 
-    std::vector<double> mat_Q(n_prim_pairs);
-    std::vector<double> mat_D(n_prim_pairs);
-    std::vector<double> mat_J(n_prim_pairs);
+    std::vector<double> mat_Q(ss_prim_pair_count);
+    std::vector<double> mat_D(ss_prim_pair_count);
+    std::vector<double> mat_J(ss_prim_pair_count);
 
-    std::vector<uint32_t> first_inds(n_prim_pairs);
-    std::vector<uint32_t> second_inds(n_prim_pairs);
+    std::vector<uint32_t> first_inds(ss_prim_pair_count);
+    std::vector<uint32_t> second_inds(ss_prim_pair_count);
 
-    for (int64_t ij = 0; ij < n_prim_pairs; ij++)
+    for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto& q_ij = mat_Q_D_sorted[ij];
 
@@ -502,44 +534,44 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
     double *  d_mat_J, *d_mat_D, *d_mat_Q;
     uint32_t *d_first_inds, *d_second_inds;
 
-    hipSafe(hipMalloc(&d_mat_Q, n_prim_pairs * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_D, n_prim_pairs * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_J, n_prim_pairs * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q, ss_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_D, ss_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_J, ss_prim_pair_count * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_first_inds, n_prim_pairs * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_second_inds, n_prim_pairs * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_first_inds, ss_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_second_inds, ss_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_mat_D, mat_D.data(), n_prim_pairs * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_mat_Q, mat_Q.data(), n_prim_pairs * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_D, mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q, mat_Q.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_first_inds, first_inds.data(), n_prim_pairs * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_second_inds, second_inds.data(), n_prim_pairs * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_first_inds, first_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_second_inds, second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     double*   d_mat_K;
     uint32_t *d_pair_inds_i, *d_pair_inds_k;
 
-    hipSafe(hipMalloc(&d_mat_K, n_prim_pairs * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_K, ss_prim_pair_count * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_pair_inds_i, n_prim_pairs * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k, n_prim_pairs * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_i, ss_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k, ss_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_pair_inds_i, pair_inds_i.data(), n_prim_pairs * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k, pair_inds_k.data(), n_prim_pairs * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_i, pair_inds_i.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k, pair_inds_k.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     double *  d_mat_Q_for_K, *d_mat_D_full;
     uint32_t *d_first_inds_for_K, *d_second_inds_for_K;
 
     hipSafe(hipMalloc(&d_mat_D_full, naos * naos * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_Q_for_K, n_primitives * n_primitives * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q_for_K, s_prim_count * s_prim_count * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_first_inds_for_K, n_primitives * n_primitives * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_second_inds_for_K, n_primitives * n_primitives * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_first_inds_for_K, s_prim_count * s_prim_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_second_inds_for_K, s_prim_count * s_prim_count * sizeof(uint32_t)));
 
     hipSafe(hipMemcpy(d_mat_D_full, dens_ptr, naos * naos * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_mat_Q_for_K, mat_Q_for_K.data(), n_primitives * n_primitives * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q_for_K, mat_Q_for_K.data(), s_prim_count * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_first_inds_for_K, first_inds_for_K.data(), n_primitives * n_primitives * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_second_inds_for_K, second_inds_for_K.data(), n_primitives * n_primitives * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_first_inds_for_K, first_inds_for_K.data(), s_prim_count * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_second_inds_for_K, second_inds_for_K.data(), s_prim_count * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     timer.stop("Preparation");
 
@@ -549,19 +581,19 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-    dim3 num_blocks((n_prim_pairs + threads_per_block.x - 1) / threads_per_block.x, 1);
+    dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
 
     hipLaunchKernelGGL(cudaFockJ, num_blocks, threads_per_block, 0, 0, d_mat_J,
-                                                 d_gto_info,
-                                                 static_cast<uint32_t>(n_primitives),
+                                                 d_s_prim_info,
+                                                 static_cast<uint32_t>(s_prim_count),
                                                  *max_D_ptr,
                                                  d_mat_D,
                                                  d_mat_Q,
                                                  d_first_inds,
                                                  d_second_inds,
-                                                 static_cast<uint32_t>(n_prim_pairs));
+                                                 static_cast<uint32_t>(ss_prim_pair_count));
 
-    hipSafe(hipMemcpy(mat_J.data(), d_mat_J, n_prim_pairs * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
     timer.stop("J computation");
 
@@ -569,25 +601,25 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
-    num_blocks = dim3(n_prim_pairs, 1);
+    num_blocks = dim3(ss_prim_pair_count, 1);
 
     hipLaunchKernelGGL(cudaFockK, num_blocks, threads_per_block, 0, 0, d_mat_K,
                                                  d_pair_inds_i,
                                                  d_pair_inds_k,
-                                                 d_gto_info,
-                                                 static_cast<uint32_t>(n_primitives),
+                                                 d_s_prim_info,
+                                                 d_s_prim_aoinds,
+                                                 static_cast<uint32_t>(s_prim_count),
                                                  *max_D_ptr,
                                                  d_mat_D_full,
                                                  d_mat_Q_for_K,
                                                  d_first_inds_for_K,
                                                  d_second_inds_for_K,
-                                                 static_cast<uint32_t>(n_prim_pairs),
-                                                 static_cast<uint32_t>(ncgtos),
+                                                 static_cast<uint32_t>(ss_prim_pair_count),
                                                  static_cast<uint32_t>(naos));
 
-    std::vector<double> mat_K(n_prim_pairs);
+    std::vector<double> mat_K(ss_prim_pair_count);
 
-    hipSafe(hipMemcpy(mat_K.data(), d_mat_K, n_prim_pairs * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(mat_K.data(), d_mat_K, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
     timer.stop("K computation");
 
@@ -599,26 +631,26 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     mat_Fock.zero();
 
-    for (int64_t ij = 0; ij < n_prim_pairs; ij++)
+    for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto i = first_inds[ij];
         const auto j = second_inds[ij];
 
-        const auto i_cgto = i % ncgtos;
-        const auto j_cgto = j % ncgtos;
+        const auto i_cgto = s_prim_aoinds[i];
+        const auto j_cgto = s_prim_aoinds[j];
 
         mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
 
         if (i != j) mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
     }
 
-    for (int64_t ik = 0; ik < n_prim_pairs; ik++)
+    for (int64_t ik = 0; ik < ss_prim_pair_count; ik++)
     {
         const auto i = pair_inds_i[ik];
         const auto k = pair_inds_k[ik];
 
-        const auto i_cgto = i % ncgtos;
-        const auto k_cgto = k % ncgtos;
+        const auto i_cgto = s_prim_aoinds[i];
+        const auto k_cgto = s_prim_aoinds[k];
 
         mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
@@ -627,7 +659,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     timer.stop("J/K to Fock");
 
-    hipSafe(hipFree(d_gto_info));
+    hipSafe(hipFree(d_s_prim_info));
+    hipSafe(hipFree(d_s_prim_aoinds));
 
     hipSafe(hipFree(d_mat_Q));
     hipSafe(hipFree(d_mat_D));
@@ -641,6 +674,7 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
     hipSafe(hipFree(d_pair_inds_i));
     hipSafe(hipFree(d_pair_inds_k));
 
+    hipSafe(hipFree(d_mat_D_full));
     hipSafe(hipFree(d_mat_Q_for_K));
 
     hipSafe(hipFree(d_first_inds_for_K));

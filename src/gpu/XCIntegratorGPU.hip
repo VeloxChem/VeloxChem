@@ -154,7 +154,7 @@ cudaDensitySigmaOnGrids(double*        d_rho,
 
     const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
 
-    double rho_a = 0.0;
+    double rho_a   = 0.0;
     double rho_a_x = 0.0;
     double rho_a_y = 0.0;
     double rho_a_z = 0.0;
@@ -163,16 +163,16 @@ cudaDensitySigmaOnGrids(double*        d_rho,
     {
         if ((k * TILE_DIM + threadIdx.y < aocount) && (g < npoints))
         {
-            As[threadIdx.y][threadIdx.x] = d_mat_F[(k * TILE_DIM + threadIdx.y) * npoints + g];
-            Bs[threadIdx.y][threadIdx.x] = d_gto_values[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            As[threadIdx.y][threadIdx.x]   = d_mat_F[(k * TILE_DIM + threadIdx.y) * npoints + g];
+            Bs[threadIdx.y][threadIdx.x]   = d_gto_values[(k * TILE_DIM + threadIdx.y) * npoints + g];
             Bs_x[threadIdx.y][threadIdx.x] = d_gto_values_x[(k * TILE_DIM + threadIdx.y) * npoints + g];
             Bs_y[threadIdx.y][threadIdx.x] = d_gto_values_y[(k * TILE_DIM + threadIdx.y) * npoints + g];
             Bs_z[threadIdx.y][threadIdx.x] = d_gto_values_z[(k * TILE_DIM + threadIdx.y) * npoints + g];
         }
         else
         {
-            As[threadIdx.y][threadIdx.x] = 0.0;
-            Bs[threadIdx.y][threadIdx.x] = 0.0;
+            As[threadIdx.y][threadIdx.x]   = 0.0;
+            Bs[threadIdx.y][threadIdx.x]   = 0.0;
             Bs_x[threadIdx.y][threadIdx.x] = 0.0;
             Bs_y[threadIdx.y][threadIdx.x] = 0.0;
             Bs_z[threadIdx.y][threadIdx.x] = 0.0;
@@ -847,6 +847,9 @@ computeGtoValuesAndDerivativesOnGridPoints(const CMolecule& molecule, const CMol
 
     hipSafe(hipFree(d_gto_info));
     hipSafe(hipFree(d_gaos));
+    hipSafe(hipFree(d_gaox));
+    hipSafe(hipFree(d_gaoy));
+    hipSafe(hipFree(d_gaoz));
     hipSafe(hipFree(d_grid_x));
     hipSafe(hipFree(d_grid_y));
     hipSafe(hipFree(d_grid_z));
@@ -1133,9 +1136,10 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
     hipSafe(hipFree(d_ao_inds));
 
     hipSafe(hipFree(d_den_mat));
-    hipSafe(hipFree(d_den_mat_full));
     hipSafe(hipFree(d_gto_values));
     hipSafe(hipFree(d_mat_F));
+    hipSafe(hipFree(d_den_mat_full));
+    hipSafe(hipFree(d_mat_Vxc_full));
 
     hipSafe(hipFree(d_rho));
     hipSafe(hipFree(d_exc));
@@ -1406,15 +1410,15 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(gpu::cudaDensitySigmaOnGrids, num_blocks, threads_per_block, 0, 0, d_rho,
-                                                                           d_rhograd,
-                                                                           d_sigma,
-                                                                           d_mat_F,
-                                                                           d_gto_values,
-                                                                           d_gto_values_x,
-                                                                           d_gto_values_y,
-                                                                           d_gto_values_z,
-                                                                           static_cast<uint32_t>(aocount),
-                                                                           static_cast<uint32_t>(npoints));
+                                                                        d_rhograd,
+                                                                        d_sigma,
+                                                                        d_mat_F,
+                                                                        d_gto_values,
+                                                                        d_gto_values_x,
+                                                                        d_gto_values_y,
+                                                                        d_gto_values_z,
+                                                                        static_cast<uint32_t>(aocount),
+                                                                        static_cast<uint32_t>(npoints));
 
         hipSafe(hipMemcpy(rho, d_rho, dim->rho * npoints * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(rhograd, d_rhograd, dim->rho * 3 * npoints * sizeof(double), hipMemcpyDeviceToHost));
@@ -1483,13 +1487,20 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
     hipSafe(hipFree(d_ao_inds));
 
     hipSafe(hipFree(d_den_mat));
-    hipSafe(hipFree(d_den_mat_full));
     hipSafe(hipFree(d_gto_values));
+    hipSafe(hipFree(d_gto_values_x));
+    hipSafe(hipFree(d_gto_values_y));
+    hipSafe(hipFree(d_gto_values_z));
     hipSafe(hipFree(d_mat_F));
+    hipSafe(hipFree(d_den_mat_full));
+    hipSafe(hipFree(d_mat_Vxc_full));
 
     hipSafe(hipFree(d_rho));
+    hipSafe(hipFree(d_rhograd));
+    hipSafe(hipFree(d_sigma));
     hipSafe(hipFree(d_exc));
     hipSafe(hipFree(d_vrho));
+    hipSafe(hipFree(d_vsigma));
 
     hipSafe(hipFree(d_grid_x));
     hipSafe(hipFree(d_grid_y));
