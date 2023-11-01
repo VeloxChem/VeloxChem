@@ -567,7 +567,19 @@ class CXCFunctional
      *
      * @return dimension of derivatives.
      */
-    const int32_t getDimensionOfDerivatives() const;
+    int32_t getDimensionOfDerivatives() const;
+
+    /** Gets Libxc reference.
+     *
+     * @return Libxc reference.
+     */
+    std::string getLibxcReference() const;
+
+    /** Gets functional reference(s).
+     *
+     * @return functional reference(s).
+     */
+    std::vector<std::string> getFunctionalReference() const;
 };
 
 #endif /* XCFunctional_hpp */
