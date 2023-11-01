@@ -846,7 +846,7 @@ class PolOrbitalResponse(CphfSolver):
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                einsum_start_time = tm.time()
+                mdot_start_time = tm.time()
 
                 # Transform the vectors to the AO basis
                 #x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
@@ -862,8 +862,8 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(dof)
                 ])
 
-                valstr = ' * comput_omega() > Time spent on einsum #2: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr = ' * comput_omega() > Time spent on mdot #2: '
+                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -875,7 +875,12 @@ class PolOrbitalResponse(CphfSolver):
                 D_vir = np.matmul(mo_vir, mo_vir.T)
 
                 # Construct fock_lambda (or fock_cphf)
-                cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_ov, mo_vir)
+                #cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_ov, mo_vir)
+                # WIP multi_dot
+                cphf_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
+                    for x in range(dof**2)
+                ])
                 cphf_ao_list = list([cphf_ao[x] for x in range(dof**2)])
                 ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
             else:
@@ -890,7 +895,6 @@ class PolOrbitalResponse(CphfSolver):
             self._comp_lr_fock(fock_cphf, ao_density_cphf, molecule, basis,
                                eri_dict, dft_dict, pe_dict, self.profiler)
 
-            # TODO: replace for-loops with np.einsum
             # For now we:
             # - loop over indices m and n
             # - select component m or n in x_plus_y, x_minus_y,
@@ -934,8 +938,8 @@ class PolOrbitalResponse(CphfSolver):
                             mo_vir.T
                         ])
                 # DEBUG
-                print('\n epsilon_dm_ao: \n', epsilon_dm_ao)
-                print('\n epsilon_cphf_ao: \n', epsilon_cphf_ao)
+                #print('\n epsilon_dm_ao: \n', epsilon_dm_ao)
+                #print('\n epsilon_cphf_ao: \n', epsilon_cphf_ao)
 
                 valstr = ' * compute_omega() > Time spent on mdot #3: '
                 valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
