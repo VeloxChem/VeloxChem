@@ -790,26 +790,55 @@ class PolOrbitalResponse(CphfSolver):
 
                 einsum_start_time = tm.time()
 
-                # TODO: multi_dot
                 # Calculate the dipole moment integrals' contribution to omega
-                dipole_ints_contrib_oo = 0.5 * (
-                    np.einsum('xjc,yic->xyij', x_minus_y, dipole_ints_ov) +
-                    np.einsum('yjc,xic->xyij', x_minus_y, dipole_ints_ov))
-                dipole_ints_contrib_ov = 0.5 * (
-                    np.einsum('xka,yki->xyia', x_minus_y, dipole_ints_oo) +
-                    np.einsum('yka,xki->xyia', x_minus_y, dipole_ints_oo))
+                #dipole_ints_contrib_oo = 0.5 * (
+                #    np.einsum('xjc,yic->xyij', x_minus_y, dipole_ints_ov) +
+                #    np.einsum('yjc,xic->xyij', x_minus_y, dipole_ints_ov))
+                #dipole_ints_contrib_ov = 0.5 * (
+                #    np.einsum('xka,yki->xyia', x_minus_y, dipole_ints_oo) +
+                #    np.einsum('yka,xki->xyia', x_minus_y, dipole_ints_oo))
 
-                dipole_ints_contrib_vv = 0.5 * (
-                    np.einsum('xkb,yka->xyab', x_minus_y, dipole_ints_ov) +
-                    np.einsum('ykb,xka->xyab', x_minus_y, dipole_ints_ov))
-                dipole_ints_contrib_ao = (
-                    np.einsum('mi,xyij,nj->xymn', mo_occ, dipole_ints_contrib_oo,
-                              mo_occ) + np.einsum('mi,xyia,na->xymn', mo_occ,
-                                                  dipole_ints_contrib_ov, mo_vir) +
-                    np.einsum('mi,xyia,na->xymn', mo_occ, dipole_ints_contrib_ov,
-                              mo_vir).transpose(0, 1, 3, 2) +
-                    np.einsum('ma,xyab,nb->xymn', mo_vir, dipole_ints_contrib_vv,
-                              mo_vir))
+                #dipole_ints_contrib_vv = 0.5 * (
+                #    np.einsum('xkb,yka->xyab', x_minus_y, dipole_ints_ov) +
+                #    np.einsum('ykb,xka->xyab', x_minus_y, dipole_ints_ov))
+                #dipole_ints_contrib_ao = (
+                #    np.einsum('mi,xyij,nj->xymn', mo_occ, dipole_ints_contrib_oo,
+                #              mo_occ) + np.einsum('mi,xyia,na->xymn', mo_occ,
+                #                                  dipole_ints_contrib_ov, mo_vir) +
+                #    np.einsum('mi,xyia,na->xymn', mo_occ, dipole_ints_contrib_ov,
+                #              mo_vir).transpose(0, 1, 3, 2) +
+                #    np.einsum('ma,xyab,nb->xymn', mo_vir, dipole_ints_contrib_vv,
+                #              mo_vir))
+
+                # WIP multi_dot
+                #tmp_dipole_ints_contrib_oo = np.zeros((dof, dof, nocc, nocc))
+                #tmp_dipole_ints_contrib_ov = np.zeros((dof, dof, nvir, nvir))
+                #tmp_dipole_ints_contrib_vv = np.zeros((dof, dof, nvir, nvir))
+                dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao))
+                for x in range(dof):
+                    for y in range(dof):
+                        tmp_oo = 0.5 * (
+                            np.linalg.multi_dot([x_minus_y[x], dipole_ints_ov[y].T ]).T
+                            + np.linalg.multi_dot([dipole_ints_ov[x], x_minus_y[y].T
+                            ]))
+                        tmp_ov = 0.5 * (
+                            np.linalg.multi_dot([x_minus_y[x].T, dipole_ints_oo[y]
+                            ]).T
+                            + np.linalg.multi_dot([dipole_ints_oo[x].T, x_minus_y[y]
+                            ]))
+                        tmp_vv = 0.5 * (
+                            np.linalg.multi_dot([x_minus_y[x].T, dipole_ints_ov[y]
+                            ]).T
+                            + np.linalg.multi_dot([dipole_ints_ov[x].T, x_minus_y[y]
+                            ]))
+                        dipole_ints_contrib_ao[x,y] = (
+                            np.linalg.multi_dot([mo_occ, tmp_oo,mo_occ.T])
+                            + np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T])
+                            + np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T
+                            + np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T])
+                        )
+                #DEBUG
+                #print('\n dipole_ints_contrib_ao: \n', dipole_ints_contrib_ao)
 
                 valstr = ' * comput_omega() > Time spent on einsum #1: '
                 valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
