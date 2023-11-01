@@ -788,7 +788,7 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(dof)
                 ])
 
-                einsum_start_time = tm.time()
+                mdot_start_time = tm.time()
 
                 # Calculate the dipole moment integrals' contribution to omega
                 #dipole_ints_contrib_oo = 0.5 * (
@@ -840,19 +840,27 @@ class PolOrbitalResponse(CphfSolver):
                 #DEBUG
                 #print('\n dipole_ints_contrib_ao: \n', dipole_ints_contrib_ao)
 
-                valstr = ' * comput_omega() > Time spent on einsum #1: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr = ' * comput_omega() > Time spent on mdot #1: '
+                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
                 einsum_start_time = tm.time()
 
-                # TODO: multi_dot
                 # Transform the vectors to the AO basis
-                x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
-                x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
-                                         mo_vir)
+                #x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
+                #x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
+                #                         mo_vir)
+                # WIP multi_dot
+                x_plus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
+                    for x in range(dof)
+                ])
+                x_minus_y_ao = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T])
+                    for x in range(dof)
+                ])
 
                 valstr = ' * comput_omega() > Time spent on einsum #2: '
                 valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
@@ -898,21 +906,39 @@ class PolOrbitalResponse(CphfSolver):
                 #       or (dof, dof, nao, nao)?
                 omega = np.zeros((dof * dof, nao, nao))
 
-                einsum_start_time = tm.time()
+                mdot_start_time = tm.time()
 
-                # TODO: multi_dot
                 # Calculate omega (without for-loops, only the diagonal parts
                 # possible for now)
                 # Construct epsilon_dm_ao
-                epsilon_dm_ao = -np.einsum('mi,ii,xyij,nj->xymn', mo_occ, eo_diag,
-                                           dm_oo, mo_occ)
-                epsilon_dm_ao -= np.einsum('ma,aa,xyab,nb->xymn', mo_vir, ev_diag,
-                                           dm_vv, mo_vir)
-                epsilon_cphf_ao = np.einsum('mi,ii,xyia,na->xymn', mo_occ, eo_diag,
-                                            cphf_ov.reshape(dof, dof, nocc, nvir),
-                                            mo_vir)
-                valstr = ' * compute_omega() > Time spent on einsum #3: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                #epsilon_dm_ao = -np.einsum('mi,ii,xyij,nj->xymn', mo_occ, eo_diag,
+                #                           dm_oo, mo_occ)
+                #epsilon_dm_ao -= np.einsum('ma,aa,xyab,nb->xymn', mo_vir, ev_diag,
+                #                           dm_vv, mo_vir)
+                #epsilon_cphf_ao = np.einsum('mi,ii,xyia,na->xymn', mo_occ, eo_diag,
+                #                            cphf_ov.reshape(dof, dof, nocc, nvir),
+                #                            mo_vir)
+                # WIP multi_dot
+                epsilon_dm_ao = np.zeros((dof, dof, nao, nao))
+                epsilon_cphf_ao = np.zeros((dof, dof, nao, nao))
+                for x in range(dof):
+                    for y in range(dof):
+                        epsilon_dm_ao[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ, eo_diag, dm_oo[x,y], mo_occ.T
+                        ])
+                        epsilon_dm_ao[x,y] -= np.linalg.multi_dot([
+                            mo_vir, ev_diag, dm_vv[x,y], mo_vir.T
+                        ])
+                        epsilon_cphf_ao[x,y] = np.linalg.multi_dot([
+                            mo_occ, eo_diag, cphf_ov.reshape(dof, dof, nocc, nvir)[x,y], 
+                            mo_vir.T
+                        ])
+                # DEBUG
+                print('\n epsilon_dm_ao: \n', epsilon_dm_ao)
+                print('\n epsilon_cphf_ao: \n', epsilon_cphf_ao)
+
+                valstr = ' * compute_omega() > Time spent on mdot #3: '
+                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
