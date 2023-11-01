@@ -398,79 +398,77 @@ class PolOrbitalResponse(CphfSolver):
                     fock_ao_rhs_x_minus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 +
                                                                           dof + i)
 
-                einsum_start_time = tm.time()
+                mdot_start_time = tm.time()
 
-                # TODO: replace np.einsum with np.linalg.multi_dot
                 # Is there a better way to do all this?
-                fock_mo_rhs_2dm = 0.25 * (
-                    np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,  # A
-                              np.einsum('xmt,ymc->xytc',
-                                        fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                        x_plus_y_ao))
-                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # B
-                                np.einsum('xmt,ymc->xytc',
-                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                          x_minus_y_ao))
-                    + np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # C
-                                np.einsum('ymt,xmc->xytc',
-                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                          x_plus_y_ao))
-                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # D
-                                np.einsum('ymt,xmc->xytc',
-                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                          x_minus_y_ao))
-                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # E
-                                np.einsum('xtm,ymc->xytc',
-                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                          x_plus_y_ao))
-                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # F
-                                np.einsum('xtm,ymc->xytc',
-                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                          x_minus_y_ao))
-                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # G
-                                np.einsum('ytm,xmc->xytc',
-                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                          x_plus_y_ao))
-                    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # H
-                                np.einsum('ytm,xmc->xytc',
-                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                          x_minus_y_ao))
-                    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # I
-                                np.einsum('xmt,ycm->xyct',
-                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                          x_plus_y_ao))
-                    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # J
-                                np.einsum('xmt,ycm->xyct',
-                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                          x_minus_y_ao))
-                    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # K
-                                np.einsum('ymt,xcm->xyct',
-                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                          x_plus_y_ao))
-                    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # L
-                                np.einsum('ymt,xcm->xyct',
-                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                          x_minus_y_ao))
-                    - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # M
-                                np.einsum('xtm,ycm->xytc',
-                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                          x_plus_y_ao))
-                    + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # N
-                                np.einsum('xtm,ycm->xytc',
-                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                          x_minus_y_ao))
-                    - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # O
-                                np.einsum('ytm,xcm->xytc',
-                                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                          x_plus_y_ao))
-                    + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # P
-                                np.einsum('ytm,xcm->xytc',
-                                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                          x_minus_y_ao))
-                ).reshape(dof**2, nocc, nvir)
+                #fock_mo_rhs_2dm = 0.25 * (
+                #    np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,  # A
+                #              np.einsum('xmt,ymc->xytc',
+                #                        fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                #                        x_plus_y_ao))
+                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # B
+                #                np.einsum('xmt,ymc->xytc',
+                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                #                          x_minus_y_ao))
+                #    + np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # C
+                #                np.einsum('ymt,xmc->xytc',
+                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                #                          x_plus_y_ao))
+                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # D
+                #                np.einsum('ymt,xmc->xytc',
+                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                #                          x_minus_y_ao))
+                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # E
+                #                np.einsum('xtm,ymc->xytc',
+                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                #                          x_plus_y_ao))
+                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # F
+                #                np.einsum('xtm,ymc->xytc',
+                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                #                          x_minus_y_ao))
+                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # G
+                #                np.einsum('ytm,xmc->xytc',
+                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                #                          x_plus_y_ao))
+                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # H
+                #                np.einsum('ytm,xmc->xytc',
+                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                #                          x_minus_y_ao))
+                #    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # I
+                #                np.einsum('xmt,ycm->xyct',
+                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                #                          x_plus_y_ao))
+                #    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # J
+                #                np.einsum('xmt,ycm->xyct',
+                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                #                          x_minus_y_ao))
+                #    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # K
+                #                np.einsum('ymt,xcm->xyct',
+                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                #                          x_plus_y_ao))
+                #    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # L
+                #                np.einsum('ymt,xcm->xyct',
+                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                #                          x_minus_y_ao))
+                #    - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # M
+                #                np.einsum('xtm,ycm->xytc',
+                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                #                          x_plus_y_ao))
+                #    + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # N
+                #                np.einsum('xtm,ycm->xytc',
+                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                #                          x_minus_y_ao))
+                #    - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # O
+                #                np.einsum('ytm,xcm->xytc',
+                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
+                #                          x_plus_y_ao))
+                #    + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # P
+                #                np.einsum('ytm,xcm->xytc',
+                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
+                #                          x_minus_y_ao))
+                #).reshape(dof**2, nocc, nvir)
 
                 # WIP multi_dot
-                #tmp_fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir))
                 mdotA = np.zeros((dof, dof, nocc, nvir))
                 mdotB = np.zeros((dof, dof, nocc, nvir))
                 mdotC = np.zeros((dof, dof, nocc, nvir))
@@ -553,93 +551,12 @@ class PolOrbitalResponse(CphfSolver):
                         mdotP[x,y] = np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp.T, mo_vir 
                         ])
-                tmp_fock_mo_rhs_2dm = 0.25 * (mdotA + mdotB + mdotC + mdotD + mdotE + mdotF 
+                fock_mo_rhs_2dm = 0.25 * (mdotA + mdotB + mdotC + mdotD + mdotE + mdotF 
                                           + mdotG + mdotH + mdotI + mdotJ + mdotK + mdotL
                                           + mdotM + mdotN + mdotO + mdotP).reshape(dof**2, nocc, nvir)
-                # DEBUG
-                print('\n fock_mo_rhs_2dm: \n', fock_mo_rhs_2dm)
-                print('\n tmp_fock_mo_rhs_2dm: \n', tmp_fock_mo_rhs_2dm)
-                # DEBUG einsum individual
-                einsumA = np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,  # A
-                                np.einsum('xmt,ymc->xytc', fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                x_plus_y_ao))
-                einsumB = - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # B
-                                np.einsum('xmt,ymc->xytc', fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                x_minus_y_ao))
-                einsumC = np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # C
-                                np.einsum('ymt,xmc->xytc', fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                x_plus_y_ao))
-                einsumD = - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # D
-                                np.einsum('ymt,xmc->xytc', fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                x_minus_y_ao))
-                einsumE = - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # E
-                                np.einsum('xtm,ymc->xytc', fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                x_plus_y_ao))
-                einsumF = - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # F
-                                np.einsum('xtm,ymc->xytc', fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                x_minus_y_ao))
-                einsumG = - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # G
-                                np.einsum('ytm,xmc->xytc', fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                x_plus_y_ao))
-                einsumH = - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # H
-                                np.einsum('ytm,xmc->xytc', fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                x_minus_y_ao))
-                einsumI = np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # I
-                                np.einsum('xmt,ycm->xyct', fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                x_plus_y_ao))
-                einsumJ = np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # J
-                                np.einsum('xmt,ycm->xyct', fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                x_minus_y_ao))
-                einsumK = np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # K
-                                np.einsum('ymt,xcm->xyct', fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                x_plus_y_ao))
-                einsumL = np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # L
-                                np.einsum('ymt,xcm->xyct', fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                x_minus_y_ao))
-                einsumM = - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # M
-                                np.einsum('xtm,ycm->xytc', fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                x_plus_y_ao))
-                einsumN = np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # N
-                                np.einsum('xtm,ycm->xytc', fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                x_minus_y_ao))
-                einsumO = - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # O
-                                np.einsum('ytm,xcm->xytc', fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                                x_plus_y_ao))
-                einsumP = + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # P
-                                np.einsum('ytm,xcm->xytc', fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                                x_minus_y_ao))
-                # DEBUG
-                #print('\n einsumC: \n', einsumC)
-                #print('\n mdotC: \n', mdotC)
-                #print('\n einsumD: \n', einsumD)
-                #print('\n mdotD: \n', mdotD)
-                #print('\n einsumE: \n', einsumE)
-                #print('\n mdotE: \n', mdotE)
-                #print('\n einsumF: \n', einsumF)
-                #print('\n mdotF: \n', mdotF)
-                #print('\n einsumG: \n', einsumG)
-                #print('\n mdotG: \n', mdotG)
-                #print('\n einsumH: \n', einsumH)
-                #print('\n mdotH: \n', mdotH)
-                #print('\n einsumI: \n', einsumI)
-                #print('\n mdotI: \n', mdotI)
-                #print('\n einsumJ: \n', einsumJ)
-                #print('\n mdotJ: \n', mdotJ)
-                #print('\n einsumK: \n', einsumK)
-                #print('\n mdotK: \n', mdotK)
-                #print('\n einsumL: \n', einsumL)
-                #print('\n mdotL: \n', mdotL)
-                #print('\n einsumM: \n', einsumM)
-                #print('\n mdotM: \n', mdotM)
-                #print('\n einsumN: \n', einsumN)
-                #print('\n mdotN: \n', mdotN)
-                #print('\n einsumO: \n', einsumO)
-                #print('\n mdotO: \n', mdotO)
-                #print('\n einsumP: \n', einsumP)
-                #print('\n mdotP: \n', mdotP)
 
-                valstr = ' * comput_rhs() > Time spent on einsum #3: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr = ' * comput_rhs() > Time spent on mdot #3: '
+                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
