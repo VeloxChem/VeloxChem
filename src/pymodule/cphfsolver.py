@@ -71,8 +71,6 @@ class CphfSolver(LinearSolver):
         """
         Initializes CPHF solver to default setup.
 
-        TODO: scfdrv should be removed as an argument
-              once vxc derivative elements are working in vlx.
         """
 
         if comm is None:
@@ -87,6 +85,11 @@ class CphfSolver(LinearSolver):
         self.print_residuals = False
         self.max_iter = 25
 
+        self._input_keywords['orbitalresponse'] = {
+            'use_subspace_solver': ('bool', 'subspace or conjugate algorithm'),
+            'print_residuals': ('bool', 'print iteration to output'),
+            'max_iter': ('int', 'maximum number of iterations')
+        }
 
     def update_settings(self, cphf_dict, method_dict=None):
         """
@@ -98,18 +101,21 @@ class CphfSolver(LinearSolver):
             The dictionary of method settings.
         """
 
-        if method_dict is None:
-            method_dict = {}
-
         super().update_settings(cphf_dict, method_dict)
 
-        if 'use_subspace_solver' in cphf_dict:
-            key = cphf_dict['use_subspace_solver'].lower()
-            self.use_subspace_solver = True if key in ['yes', 'y'] else False
+        cphf_keywords = {
+            key: val[0] for key, val in self._input_keywords['orbitalresponse'].items()
+        }
 
-        if 'print_residuals' in cphf_dict:
-            key = cphf_dict['print_residuals'].lower()
-            self.print_residuals = True if key in ['yes', 'y'] else False
+        parse_input(self, cphf_keywords, cphf_dict)
+
+        #if 'use_subspace_solver' in cphf_dict:
+        #    key = cphf_dict['use_subspace_solver'].lower()
+        #    self.use_subspace_solver = True if key in ['yes', 'y'] else False
+
+        #if 'print_residuals' in cphf_dict:
+        #    key = cphf_dict['print_residuals'].lower()
+        #    self.print_residuals = True if key in ['yes', 'y'] else False
 
         self.profiler = Profiler({
             'timing': self.timing,
