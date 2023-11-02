@@ -771,8 +771,12 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             # Create AODensityMatrix object from CPHF guess in AO
             cphf_ao = np.zeros((dof, nao, nao))
-            for i in range(dof):
-                cphf_ao[i] = np.linalg.multi_dot([mo_occ, cphf_guess[i], mo_vir.T])
+            #for i in range(dof):
+            #    cphf_ao[i] = np.linalg.multi_dot([mo_occ, cphf_guess[i], mo_vir.T])
+            cphf_ao = np.array([
+                np.linalg.multi_dot([mo_occ, cphf_guess[x], mo_vir.T])
+                for x in range(dof)
+            ])
 
             #cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_guess, mo_vir)
             cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
@@ -954,6 +958,7 @@ class CphfSolver(LinearSolver):
             self.ostream.flush()
             self.profiler.stop_timer('derivs')
 
+            # TODO multi_dot
             # transform integral derivatives to MO basis
             ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ,
                                       ovlp_deriv_ao, mo_vir)
@@ -966,6 +971,7 @@ class CphfSolver(LinearSolver):
             # the oo part of the CPHF coefficients in AO basis,
             # transforming the oo overlap derivative back to AO basis
             # (not equal to the initial one)
+            # TODO multi_dot
             uij_ao = np.einsum('mi,axij,nj->axmn', mo_occ,
                        -0.5 * ovlp_deriv_oo, mo_occ).reshape((3*natm, nao, nao))
             uij_ao_list = list([uij_ao[x] for x in range(natm * 3)])
@@ -1014,6 +1020,7 @@ class CphfSolver(LinearSolver):
                 for x in range(3):
                     fock_uij_numpy[i,x] = fock_uij.to_numpy(3*i + x)
 
+            # TODO multi_dot
             # transform to MO basis
             fock_uij_mo = np.einsum('mi,axmn,nb->axib', mo_occ,
                                     fock_uij_numpy, mo_vir)
