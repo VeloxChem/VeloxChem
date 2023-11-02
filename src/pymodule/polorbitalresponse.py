@@ -187,7 +187,7 @@ class PolOrbitalResponse(CphfSolver):
                 ])
 
                 valstr = ' * comput_rhs() > Time spent on mdot #0: '
-                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -254,7 +254,7 @@ class PolOrbitalResponse(CphfSolver):
                 dm_vv = tmp_dm_vv
                         
                 valstr = ' * comput_rhs() > Time spent on mdot #1: '
-                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -281,7 +281,7 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
                 valstr = ' * comput_rhs() > Time spent on mdot #2: '
-                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -556,7 +556,7 @@ class PolOrbitalResponse(CphfSolver):
                                           + mdotM + mdotN + mdotO + mdotP).reshape(dof**2, nocc, nvir)
 
                 valstr = ' * comput_rhs() > Time spent on mdot #3: '
-                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -621,7 +621,7 @@ class PolOrbitalResponse(CphfSolver):
                         
 
                 valstr = ' * comput_rhs() > Time spent on mdot #4: '
-                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -664,18 +664,18 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
 
+        valstr = '** Time spent on constructing the orbrsp RHS '
+        valstr += 'for {} frequencies: '.format(len(self.frequencies))
+        valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
             return orbrsp_rhs
         else:
             return {}
-
-        valstr = '** Time spent on constructing the orbrsp RHS '
-        valstr += 'for {} frequencies: '.format(len(self.frequencies))
-        valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     # NOTES:
     #   - epsilon_dm_ao not returned from cphfsolver,
@@ -841,7 +841,7 @@ class PolOrbitalResponse(CphfSolver):
                 #print('\n dipole_ints_contrib_ao: \n', dipole_ints_contrib_ao)
 
                 valstr = ' * comput_omega() > Time spent on mdot #1: '
-                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -863,7 +863,7 @@ class PolOrbitalResponse(CphfSolver):
                 ])
 
                 valstr = ' * comput_omega() > Time spent on mdot #2: '
-                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -942,7 +942,7 @@ class PolOrbitalResponse(CphfSolver):
                 #print('\n epsilon_cphf_ao: \n', epsilon_cphf_ao)
 
                 valstr = ' * compute_omega() > Time spent on mdot #3: '
-                valstr += '{:.2f} sec * '.format(tm.time() - mdot_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -1051,7 +1051,7 @@ class PolOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers '
             valstr += 'for {} frequencies: '.format(n_freqs)
-            valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
+            valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()

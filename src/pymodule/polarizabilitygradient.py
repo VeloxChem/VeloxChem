@@ -174,7 +174,7 @@ class PolarizabilityGradient():
             else:
                 self.print_polarizability_gradient(molecule)
             valstr = '*** Time spent in polarizability gradient calculation: '
-            valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+            valstr += '{:.6f} sec ***'.format(tm.time() - start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
@@ -211,7 +211,7 @@ class PolarizabilityGradient():
 
         valstr = '** Time spent on orbital response for {} frequencies: '.format(
             len(self.frequencies))
-        valstr += '{:.2f} sec **'.format(tm.time() - orbrsp_start_time)
+        valstr += '{:.6f} sec **'.format(tm.time() - orbrsp_start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
         self.ostream.flush()
@@ -283,7 +283,7 @@ class PolarizabilityGradient():
                     d_eri = eri_deriv(molecule, basis, i)
                     d_dipole = dipole_deriv(molecule, basis, i)
 
-                    valstr = ' * Time spent importing integrals for atom #{:d}: {:.2f} sec * '.format(
+                    valstr = ' * Time spent importing integrals for atom #{:d}: {:.6f} sec * '.format(
                         (i + 1), tm.time() - integral_start_time)
                     self.ostream.print_header(valstr)
                     self.ostream.print_blank()
@@ -341,10 +341,12 @@ class PolarizabilityGradient():
                                 d_dipole[y,a].reshape(nao**2), x_minus_y[x].reshape(nao**2)
                                 ])
                                 )
-                    print(pol_gradient[:,:,i])
+                   # DEBUG
+                   # print(pol_gradient[:,:,i])
 
-                    valstr = ' * Time spent calculating pol. gradient: '
-                    valstr += '{:.2f} sec * '.format(tm.time() - gradient_start_time)
+                    valstr = ' * Time spent calculating pol. gradient for '
+                    valstr += 'atom #{:d}: {:.6f} sec * '.format(
+                        (i + 1), tm.time() - gradient_start_time)
                     self.ostream.print_header(valstr)
                     self.ostream.print_blank()
                     self.ostream.flush()
@@ -396,7 +398,7 @@ class PolarizabilityGradient():
         self.polgradient = dict(polgrad_results)
 
         valstr = '** Time spent on constructing the gradient for '
-        valstr += '{:d} frequencies: {:.2f} sec **'.format(
+        valstr += '{:d} frequencies: {:.6f} sec **'.format(
             n_freqs, tm.time() - loop_start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
