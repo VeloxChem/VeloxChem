@@ -40,10 +40,10 @@ class PolOrbitalResponse(CphfSolver):
         self.vector_components = 'xyz'
         self.cphf_results = None
 
-        self._input_keywords['orbitalresponse'] = {
+        self._input_keywords['orbitalresponse'].update({
                 'vector_components': ('str_lower', 'Cartesian components of operator'),
                 'frequencies': ('seq_range', 'frequencies'),
-            }
+            })
 
     def update_settings(self, orbrsp_dict, method_dict=None):
         """
@@ -178,7 +178,7 @@ class PolOrbitalResponse(CphfSolver):
                                          mo_vir)
 
                 valstr = ' * comput_rhs() > Time spent on einsum #0: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - einsum_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -201,7 +201,7 @@ class PolOrbitalResponse(CphfSolver):
                                 np.einsum('yib,xia->xyab', x_minus_y, x_minus_y))
 
                 valstr = ' * comput_rhs() > Time spent on einsum #1: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - einsum_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -216,7 +216,7 @@ class PolOrbitalResponse(CphfSolver):
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
                 valstr = ' * comput_rhs() > Time spent on einsum #2: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - einsum_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -400,7 +400,7 @@ class PolOrbitalResponse(CphfSolver):
                 ).reshape(dof**2, nocc, nvir)
 
                 valstr = ' * comput_rhs() > Time spent on einsum #3: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - einsum_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -444,7 +444,7 @@ class PolOrbitalResponse(CphfSolver):
                         dof**2, nocc, nvir)
 
                 valstr = ' * comput_rhs() > Time spent on einsum #4: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - einsum_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -482,18 +482,19 @@ class PolOrbitalResponse(CphfSolver):
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
 #            else:
 #                None
+
+        valstr = '** Time spent on constructing the orbrsp RHS for '
+        valstr += '{} frequencies: '.format(len(self.frequencies))
+        valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
+        self.ostream.print_header(valstr)
+        self.ostream.print_blank()
+        self.ostream.flush()
         
         if self.rank == mpi_master():
             orbrsp_rhs['cphf_rhs'] = tot_rhs_mo
             return orbrsp_rhs
         else:
             return {}
-
-        valstr = '** Time spent on constructing the orbrsp RHS for {} frequencies: '.format(n_freqs)
-        valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.flush()
 
     # NOTES:
     #   - epsilon_dm_ao not returned from cphfsolver,
@@ -630,7 +631,7 @@ class PolOrbitalResponse(CphfSolver):
                               mo_vir))
 
                 valstr = ' * comput_omega() > Time spent on einsum #1: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - einsum_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -643,7 +644,7 @@ class PolOrbitalResponse(CphfSolver):
                                          mo_vir)
 
                 valstr = ' * comput_omega() > Time spent on einsum #2: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - einsum_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -698,7 +699,7 @@ class PolOrbitalResponse(CphfSolver):
                                             cphf_ov.reshape(dof, dof, nocc, nvir),
                                             mo_vir)
                 valstr = ' * compute_omega() > Time spent on einsum #3: '
-                valstr += '{:.2f} sec * '.format(tm.time() - einsum_start_time)
+                valstr += '{:.6f} sec * '.format(tm.time() - einsum_start_time)
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
@@ -807,7 +808,7 @@ class PolOrbitalResponse(CphfSolver):
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers for {} frequencies: '.format(
                 n_freqs)
-            valstr += '{:.2f} sec **'.format(tm.time() - loop_start_time)
+            valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
             self.ostream.print_header(valstr)
             self.ostream.print_blank()
             self.ostream.flush()
