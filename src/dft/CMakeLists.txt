@@ -10,7 +10,7 @@ target_sources(vlxobjs
     GridScreener.cpp
     GtoEvaluator.cpp
     LebedevLaikovQuadrature.cpp
-    Log3Quadrature.cpp
+    M4T2Quadrature.cpp
     MolecularGrid.cpp
     PartitionFunc.cpp
     SubMatrix.cpp

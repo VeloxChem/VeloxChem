@@ -23,17 +23,17 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef Log3QuadratureTest_hpp
-#define Log3QuadratureTest_hpp
+#ifndef M4T2QuadratureTest_hpp
+#define M4T2QuadratureTest_hpp
 
 #include "gtest/gtest.h"
 
-class CLog3QuadratureTest : public ::testing::Test
+class CM4T2QuadratureTest : public ::testing::Test
 {
    protected:
-    CLog3QuadratureTest(){};
+    CM4T2QuadratureTest(){};
 
-    virtual ~CLog3QuadratureTest(){};
+    virtual ~CM4T2QuadratureTest(){};
 };
 
-#endif /* Log3QuadratureTest_hpp */
+#endif /* M4T2QuadratureTest_hpp */
