@@ -114,19 +114,18 @@ def print_libxc_reference(xcfun_label, ostream):
         xcfun = parse_xc_func(xcfun_label)
         ostream.print_blank()
 
-        valstr = 'The Libxc library was used in DFT calculation. Reference:'
+        valstr = f'The Libxc library (version {xcfun.get_libxc_version()})'
+        valstr += ' was used in DFT calculation. Reference:'
         ostream.print_header(valstr.ljust(100))
         valstr = xcfun.get_libxc_reference()
         ostream.print_header(valstr.ljust(100))
         ostream.print_blank()
 
-        xcfun_label = xcfun.get_func_label()
-        valstr = f'The {xcfun_label} functional was used in DFT calculation.'
-        valstr += ' Reference(s):'
+        valstr = f'The {xcfun.get_func_label()} functional was used in DFT'
+        valstr += ' calculation. Reference(s):'
         ostream.print_header(valstr.ljust(100))
-        func_refs = xcfun.get_functional_reference()
         printed_refs = []
-        for ref in func_refs:
+        for ref in xcfun.get_functional_reference():
             if ref not in printed_refs:
                 ostream.print_header(ref.ljust(100))
                 printed_refs.append(ref)

@@ -569,6 +569,12 @@ class CXCFunctional
      */
     int32_t getDimensionOfDerivatives() const;
 
+    /** Gets Libxc version.
+     *
+     * @return Libxc version.
+     */
+    std::string getLibxcVersion() const;
+
     /** Gets Libxc reference.
      *
      * @return Libxc reference.

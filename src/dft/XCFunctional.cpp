@@ -3096,6 +3096,16 @@ CXCFunctional::getDimensionOfDerivatives() const
 }
 
 std::string
+CXCFunctional::getLibxcVersion() const
+{
+    std::stringstream ss;
+
+    ss << xc_version_string();
+
+    return ss.str();
+}
+
+std::string
 CXCFunctional::getLibxcReference() const
 {
     std::stringstream ss;
