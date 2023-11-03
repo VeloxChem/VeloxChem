@@ -123,9 +123,8 @@ class TestFunctionalExcVxc:
 
         func_ref = XCFunctional(
             'b3lyp',
-            ['LDA_X', 'GGA_X_B88', 'LDA_C_VWN_RPA', 'GGA_C_LYP'],
-            [0.08, 0.72, 0.19, 0.81],
-            0.2,
+            ['HYB_GGA_XC_B3LYP'],
+            [1.0],
         )
         assert func == func_ref
 

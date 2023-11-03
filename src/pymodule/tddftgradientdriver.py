@@ -86,6 +86,7 @@ class TddftGradientDriver(GradientDriver):
         self.do_first_order_prop = False
         self.relaxed_dipole_moment = None
 
+        # TODO: remove relaxed_dipole_moment (not input variable)
         self._input_keywords['gradient'].update({
             'tamm_dancoff': ('bool', 'whether RPA or TDA is calculated'),
             'state_deriv_index': ('seq_fixed_int', 'excited state information'),
@@ -116,16 +117,22 @@ class TddftGradientDriver(GradientDriver):
 
         super().update_settings(grad_dict, method_dict)
 
-        # Excited states of interest
-        # NOTE: this is a tuple; the indexing starts at 1.
         grad_keywords = {
             key: val[0] for key, val in self._input_keywords['gradient'].items()
         }
 
         grad_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
 
+        # TODO: decide what to do with this keyword: directly in 
+        # orbrsp dictionary? not needed in response dict
+        if 'tamm_dancoff' in rsp_dict.keys():
+            grad_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+
         parse_input(self, grad_keywords, grad_dict)
 
+        if self.tamm_dancoff:
+            self.flag = 'TDA Gradient Driver'
+        
         if self.state_deriv_index is not None:
             orbrsp_dict['state_deriv_index'] = self.state_deriv_index
 
@@ -204,6 +211,7 @@ class TddftGradientDriver(GradientDriver):
             The results of the RPA or TDA calculation.
         """
 
+        # TODO: these are not used??
         # select orbital response driver
         if self.tamm_dancoff:
             method = 'TDA'

@@ -75,7 +75,7 @@ class PolarizabilityGradient():
         self.vector_components = 'xyz'
 
         self._input_keywords = {
-            'gradient': {
+            'polarizabilitygradient': {
                 'vector_components': ('str_lower', 'Cartesian components of operator'),
                 'frequencies': ('seq_range', 'frequencies'),
                 'numerical': ('bool', 'do numerical integration'),
@@ -110,7 +110,8 @@ class PolarizabilityGradient():
             orbrsp_dict = {}
 
         grad_keywords = {
-            key: val[0] for key, val in self._input_keywords['gradient'].items()
+            key: val[0] for key, val in 
+            self._input_keywords['polarizabilitygradient'].items()
         }
 
         parse_input(self, grad_keywords, grad_dict)
@@ -283,8 +284,8 @@ class PolarizabilityGradient():
                     d_eri = eri_deriv(molecule, basis, i)
                     d_dipole = dipole_deriv(molecule, basis, i)
 
-                    valstr = ' * Time spent importing integrals for atom #{:d}: {:.6f} sec * '.format(
-                        (i + 1), tm.time() - integral_start_time)
+                    valstr = ' * Time spent importing integrals for atom #{}: '.format(i+1)
+                    valstr += '{:.6f} sec * '.format(tm.time() - integral_start_time)
                     self.ostream.print_header(valstr)
                     self.ostream.print_blank()
                     self.ostream.flush()
@@ -341,16 +342,20 @@ class PolarizabilityGradient():
 
                                 pol_gradient[y, x, i, a] += (
                                 1.0 * np.linalg.multi_dot([
-                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2), d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2),
+                                    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
                                 ])
                                 - 0.5 * frac_K * np.linalg.multi_dot([
-                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2), d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
+                                    (x_plus_y[y] - x_plus_y[y].T).reshape(nao**2),
+                                    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_plus_y[x].reshape(nao**2)
                                 ])
                                 + 1.0 * np.linalg.multi_dot([
-                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2), d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2),
+                                    d_eri[a].transpose(1,0,2,3).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
                                 ])
                                 - 0.5 * frac_K * np.linalg.multi_dot([
-                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2), d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
+                                    (x_minus_y[y] + x_minus_y[y].T).reshape(nao**2),
+                                    d_eri[a].transpose(3,0,2,1).reshape(nao**2,nao**2), x_minus_y[x].reshape(nao**2)
                                 ])
                                 - 2.0 * np.linalg.multi_dot([
                                 d_dipole[y,a].reshape(nao**2), x_minus_y[x].reshape(nao**2)

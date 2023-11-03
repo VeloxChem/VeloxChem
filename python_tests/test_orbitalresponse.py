@@ -25,6 +25,10 @@ class TestOrbitalResponse(unittest.TestCase):
         task.input_dict['scf']['checkpoint_file'] = None
         # use a smaller basis for lambda test
 
+        rsp_dict = {'nstates': 3}
+        orbrsp_dict = dict(rsp_dict)
+        orbrsp_dict['state_deriv_index'] = '1'
+
         if potfile is not None:
             task.input_dict['method_settings']['potfile'] = potfile
 
@@ -40,13 +44,13 @@ class TestOrbitalResponse(unittest.TestCase):
 
         if is_tda:
             tda_solver = TdaEigenSolver(task.mpi_comm, task.ostream)
-            tda_solver.update_settings({'nstates': 3},
+            tda_solver.update_settings(rsp_dict,
                                        task.input_dict['method_settings'])
             rsp_results = tda_solver.compute(task.molecule, task.ao_basis,
                                              scf_drv.scf_tensors)
 
             orb_resp = TddftOrbitalResponse(task.mpi_comm, task.ostream)
-            orb_resp.tamm_dancoff = True
+            orbrsp_dict['tamm_dancoff'] = 'yes'
             lambda_ref = 'lambda_tda'
             omega_ref = 'omega_tda'
         else:
@@ -60,10 +64,9 @@ class TestOrbitalResponse(unittest.TestCase):
             lambda_ref = 'lambda_rpa'
             omega_ref = 'omega_rpa'
 
-        orb_resp.update_settings({
-            'nstates': 3,
-            'state_deriv_index': '1'
-        }, task.input_dict['method_settings'])
+        orb_resp.update_settings(orbrsp_dict, rsp_dict,
+            task.input_dict['method_settings'])
+
         orb_resp.compute(task.molecule, task.ao_basis,
                          scf_drv.scf_tensors, rsp_results)
         orb_resp_results = orb_resp.cphf_results

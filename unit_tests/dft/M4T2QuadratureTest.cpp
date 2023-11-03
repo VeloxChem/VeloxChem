@@ -23,14 +23,14 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "Log3QuadratureTest.hpp"
+#include "M4T2QuadratureTest.hpp"
 
 #include "CheckFunctions.hpp"
-#include "Log3Quadrature.hpp"
+#include "M4T2Quadrature.hpp"
 
-TEST_F(CLog3QuadratureTest, ConstructorWith5Points)
+TEST_F(CM4T2QuadratureTest, ConstructorWith5Points)
 {
-    CLog3Quadrature rquad(5, 1);
+    CM4T2Quadrature rquad(5, 1);
 
     auto qpoints = rquad.generate();
 

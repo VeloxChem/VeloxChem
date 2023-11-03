@@ -60,10 +60,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (fstr::upcase(xcLabel) == "BLYP") return CXCFunctional("BLYP", {"GGA_X_B88", "GGA_C_LYP"}, {1.0, 1.0});
 
-        if (fstr::upcase(xcLabel) == "B3LYP")
-        {
-            return CXCFunctional("B3LYP", {"LDA_X", "GGA_X_B88", "LDA_C_VWN_RPA", "GGA_C_LYP"}, {0.08, 0.72, 0.19, 0.81}, 0.2);
-        }
+        if (fstr::upcase(xcLabel) == "B3LYP") return CXCFunctional("B3LYP", {"HYB_GGA_XC_B3LYP"}, {1.0});
 
         if (fstr::upcase(xcLabel) == "BHANDH") return CXCFunctional("BHANDH", {"LDA_X", "GGA_C_LYP"}, {0.5, 1.0}, 0.5);
 
@@ -85,11 +82,7 @@ getExchangeCorrelationFunctional(const std::string &xcLabel)
 
         if (fstr::upcase(xcLabel) == "O3LYP") return CXCFunctional("O3LYP", {"HYB_GGA_XC_O3LYP"}, {1.0});
 
-        if (fstr::upcase(xcLabel) == "X3LYP")
-        {
-            return CXCFunctional(
-                "X3LYP", {"LDA_X", "GGA_X_B88", "LDA_C_VWN_RPA", "GGA_C_LYP", "GGA_X_PW91_MOD"}, {0.073, 0.542, 0.129, 0.871, 0.167}, 0.218);
-        }
+        if (fstr::upcase(xcLabel) == "X3LYP") return CXCFunctional("X3LYP", {"HYB_GGA_XC_X3LYP"}, {1.0});
 
         if (fstr::upcase(xcLabel) == "B97") return CXCFunctional("B97", {"HYB_GGA_XC_B97"}, {1.0});
 

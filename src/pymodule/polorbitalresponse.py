@@ -40,10 +40,10 @@ class PolOrbitalResponse(CphfSolver):
         self.vector_components = 'xyz'
         self.cphf_results = None
 
-        self._input_keywords['orbitalresponse'] = {
-            'vector_components': ('str_lower', 'Cartesian components of operator'),
-            'frequencies': ('seq_range', 'frequencies')
-        }
+        self._input_keywords['orbitalresponse'].update({
+                'vector_components': ('str_lower', 'Cartesian components of operator'),
+                'frequencies': ('seq_range', 'frequencies'),
+            })
 
     def update_settings(self, orbrsp_dict, method_dict=None):
         """
@@ -664,8 +664,8 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
 
-        valstr = '** Time spent on constructing the orbrsp RHS '
-        valstr += 'for {} frequencies: '.format(len(self.frequencies))
+        valstr = '** Time spent on constructing the orbrsp RHS for '
+        valstr += '{} frequencies: '.format(len(self.frequencies))
         valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
         self.ostream.print_header(valstr)
         self.ostream.print_blank()
