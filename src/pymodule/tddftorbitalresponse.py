@@ -9,7 +9,7 @@ from .veloxchemlib import fockmat
 from .veloxchemlib import XCIntegrator
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
-from .inputparser import parse_seq_fixed
+from .inputparser import parse_seq_fixed, parse_input
 from .visualizationdriver import VisualizationDriver
 
 class TddftOrbitalResponse(CphfSolver):
@@ -63,9 +63,9 @@ class TddftOrbitalResponse(CphfSolver):
             key: val[0] for key, val in self._input_keywords['orbitalresponse'].items()
         }
 
-        parse_input(self, orbrsp_keywords, orbrsp_dict)
-
         orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+
+        parse_input(self, orbrsp_keywords, orbrsp_dict)
 
         # Excited states of interest
         # NOTE: this is a tuple; the indexing starts at 1.
