@@ -122,6 +122,8 @@ class TddftGradientDriver(GradientDriver):
             key: val[0] for key, val in self._input_keywords['gradient'].items()
         }
 
+        grad_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+
         parse_input(self, grad_keywords, grad_dict)
 
         if self.state_deriv_index is not None:
@@ -188,7 +190,6 @@ class TddftGradientDriver(GradientDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
-    # TODO: replace all np.einsum with multidot!
     def compute_analytical(self, molecule, basis, scf_drv, rsp_results):
         """
         Performs calculation of analytical gradient.
@@ -243,13 +244,13 @@ class TddftGradientDriver(GradientDriver):
             # CPHF/CPKS coefficients (lambda Lagrange multipliers)
             cphf_ov = orbrsp_results['cphf_ov']
             unrelaxed_density_ao = orbrsp_results['unrelaxed_density_ao']
-            #cphf_ao = np.einsum('mi,sia,na->smn', mo_occ, cphf_ov, mo_vir)
+            cphf_ao = np.einsum('mi,sia,na->smn', mo_occ, cphf_ov, mo_vir)
             # WIP multi_dot
             dof = x_plus_y_ao.shape[0]
-            cphf_ao = np.array([
-                np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
-                for x in range(dof)
-            ])
+            #cphf_ao = np.array([
+            #    np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
+            #    for x in range(dof)
+            #])
             relaxed_density_ao = ( unrelaxed_density_ao + 2.0 * cphf_ao
                         + 2.0 * cphf_ao.transpose(0,2,1) )
         else:
@@ -296,15 +297,15 @@ class TddftGradientDriver(GradientDriver):
 #                        + ' took {:.2f} sec.'.format(t2 - t0)
 #                    )
 #                self.ostream.flush()
-                #self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
-                #        relaxed_density_ao, d_hcore)
+                self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
+                        relaxed_density_ao, d_hcore)
 #                t3 = tm.time()
 #                self.ostream.print_info('Core Hamiltonian derivative'
 #                        + ' contribution computed in {:.2f} sec.'.format(t3 - t2)
 #                    )
 #                self.ostream.flush()
-                #self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
-                #                    2.0 * omega_ao, d_ovlp)
+                self.gradient[:,i] += 1.0 * np.einsum('smn,xmn->sx',
+                                    2.0 * omega_ao, d_ovlp)
 #                t4 = tm.time()
 #                self.ostream.print_info("Overlap derivative contribution "
 #                        + ' computed in {:.2f} sec.'.format(t4 - t3)
@@ -318,25 +319,25 @@ class TddftGradientDriver(GradientDriver):
                 else:
                     frac_K = 1.0
 
-                #self.gradient[:,i] += 2.0 * np.einsum('mt,snp,xmtnp->sx', gs_dm,
-                #                    relaxed_density_ao, d_eri)
-                #self.gradient[:,i] += -1.0 * frac_K * np.einsum('mt,snp,xmnpt->sx',
-                #                    gs_dm, relaxed_density_ao, d_eri)
-                #self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx',
-                #                    x_plus_y_ao,
-                #                    x_plus_y_ao - x_plus_y_ao.transpose(0,2,1),
-                #                    d_eri)
-                #self.gradient[:,i] += -0.5 * frac_K * np.einsum(
-                #                    'smn,spt,xtnmp->sx', x_plus_y_ao,
-                #                    x_plus_y_ao - x_plus_y_ao.transpose(0,2,1),
-                #                    d_eri)
-                #self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx',
-                #                  x_minus_y_ao,
-                #                  x_minus_y_ao + x_minus_y_ao.transpose(0,2,1),
-                #                  d_eri)
-                #self.gradient[:,i] += -0.5 * frac_K * np.einsum('smn,spt,xtnmp->sx',
-                #                x_minus_y_ao, x_minus_y_ao + x_minus_y_ao.transpose(0,2,1),
-                #                d_eri)
+                self.gradient[:,i] += 2.0 * np.einsum('mt,snp,xmtnp->sx', gs_dm,
+                                    relaxed_density_ao, d_eri)
+                self.gradient[:,i] += -1.0 * frac_K * np.einsum('mt,snp,xmnpt->sx',
+                                    gs_dm, relaxed_density_ao, d_eri)
+                self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx',
+                                    x_plus_y_ao,
+                                    x_plus_y_ao - x_plus_y_ao.transpose(0,2,1),
+                                    d_eri)
+                self.gradient[:,i] += -0.5 * frac_K * np.einsum(
+                                    'smn,spt,xtnmp->sx', x_plus_y_ao,
+                                    x_plus_y_ao - x_plus_y_ao.transpose(0,2,1),
+                                    d_eri)
+                self.gradient[:,i] += 1.0 * np.einsum('smn,spt,xtpmn->sx',
+                                  x_minus_y_ao,
+                                  x_minus_y_ao + x_minus_y_ao.transpose(0,2,1),
+                                  d_eri)
+                self.gradient[:,i] += -0.5 * frac_K * np.einsum('smn,spt,xtnmp->sx',
+                                x_minus_y_ao, x_minus_y_ao + x_minus_y_ao.transpose(0,2,1),
+                                d_eri)
 #                t5 = tm.time()
 #                self.ostream.print_info('Two electron integral derivatives'
 #                                    + ' computed in {:.2f} sec.'.format(t5 - t4))
@@ -344,46 +345,46 @@ class TddftGradientDriver(GradientDriver):
 #                self.ostream.flush()
 
                 # WIP: multi_dot
-                for s in range(dof):
-                    for x in range(3):
-                        self.gradient[s,i,x] += np.linalg.multi_dot([
-                            relaxed_density_ao[s].reshape(nao**2),
-                            (d_hcore[x].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += np.linalg.multi_dot([
-                            2.0 * omega_ao[s].reshape(nao**2),
-                            (d_ovlp[x].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += 2.0 * np.linalg.multi_dot([
-                            gs_dm.reshape(nao**2),
-                            d_eri[x].transpose(1,0,3,2).reshape(nao**2,nao**2),
-                            relaxed_density_ao[s].reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += - frac_K * np.linalg.multi_dot([
-                           gs_dm.reshape(nao**2),
-                           d_eri[x].transpose(3,0,2,1).reshape(nao**2,nao**2),
-                           relaxed_density_ao[s].reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += np.linalg.multi_dot([
-                            x_plus_y_ao[s].reshape(nao**2),
-                            d_eri[x].transpose(3,2,0,1).reshape(nao**2,nao**2),
-                            (x_plus_y_ao[s] - x_plus_y_ao[s].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += - 0.5 * frac_K * np.linalg.multi_dot([
-                            x_plus_y_ao[s].reshape(nao**2),
-                            d_eri[x].transpose(1,2,0,3).reshape(nao**2,nao**2),
-                            (x_plus_y_ao[s] - x_plus_y_ao[s].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] += np.linalg.multi_dot([
-                            x_minus_y_ao[s].reshape(nao**2),
-                            d_eri[x].transpose(3,2,0,1).reshape(nao**2,nao**2),
-                            (x_minus_y_ao[s] + x_minus_y_ao[s].T).reshape(nao**2)
-                        ])
-                        self.gradient[s,i,x] -= 0.5 * frac_K * np.linalg.multi_dot([
-                            x_minus_y_ao[s].reshape(nao**2),
-                            d_eri[x].transpose(1,2,0,3).reshape(nao**2,nao**2),
-                            (x_minus_y_ao[s] + x_minus_y_ao[s].T).reshape(nao**2)
-                        ])
+                #for s in range(dof):
+                #    for x in range(3):
+                #        self.gradient[s,i,x] += np.linalg.multi_dot([
+                #            relaxed_density_ao[s].reshape(nao**2),
+                #            (d_hcore[x].T).reshape(nao**2)
+                #        ])
+                #        self.gradient[s,i,x] += np.linalg.multi_dot([
+                #            2.0 * omega_ao[s].reshape(nao**2),
+                #            (d_ovlp[x].T).reshape(nao**2)
+                #        ])
+                #        self.gradient[s,i,x] += 2.0 * np.linalg.multi_dot([
+                #            gs_dm.reshape(nao**2),
+                #            d_eri[x].transpose(1,0,3,2).reshape(nao**2,nao**2),
+                #            relaxed_density_ao[s].reshape(nao**2)
+                #        ])
+                #        self.gradient[s,i,x] += - frac_K * np.linalg.multi_dot([
+                #           gs_dm.reshape(nao**2),
+                #           d_eri[x].transpose(3,0,2,1).reshape(nao**2,nao**2),
+                #           relaxed_density_ao[s].reshape(nao**2)
+                #        ])
+                #        self.gradient[s,i,x] += np.linalg.multi_dot([
+                #            x_plus_y_ao[s].reshape(nao**2),
+                #            d_eri[x].transpose(3,2,0,1).reshape(nao**2,nao**2),
+                #            (x_plus_y_ao[s] - x_plus_y_ao[s].T).reshape(nao**2)
+                #        ])
+                #        self.gradient[s,i,x] += - 0.5 * frac_K * np.linalg.multi_dot([
+                #            x_plus_y_ao[s].reshape(nao**2),
+                #            d_eri[x].transpose(1,2,0,3).reshape(nao**2,nao**2),
+                #            (x_plus_y_ao[s] - x_plus_y_ao[s].T).reshape(nao**2)
+                #        ])
+                #        self.gradient[s,i,x] += np.linalg.multi_dot([
+                #            x_minus_y_ao[s].reshape(nao**2),
+                #            d_eri[x].transpose(3,2,0,1).reshape(nao**2,nao**2),
+                #            (x_minus_y_ao[s] + x_minus_y_ao[s].T).reshape(nao**2)
+                #        ])
+                #        self.gradient[s,i,x] -= 0.5 * frac_K * np.linalg.multi_dot([
+                #            x_minus_y_ao[s].reshape(nao**2),
+                #            d_eri[x].transpose(1,2,0,3).reshape(nao**2,nao**2),
+                #            (x_minus_y_ao[s] + x_minus_y_ao[s].T).reshape(nao**2)
+                #        ])
                         
 
         # TODO: enable multiple DMs for DFT to avoid for-loops.

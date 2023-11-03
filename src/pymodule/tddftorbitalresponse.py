@@ -105,6 +105,11 @@ class TddftOrbitalResponse(CphfSolver):
                 unrel_dm_ao = orbrsp_results['unrelaxed_density_ao']
                 lambda_ao = np.einsum('mi,sia,na->smn',
                         mo_occ, lambda_ov, mo_vir)
+                # WIP multi_dot
+                #lambda_ao = np.array([
+                #    np.linalg.multi_dot([mo_occ, lambda_ov[s], mo_vir.T])
+                #    for s in range(lambda_ov.shape[0])
+                #])
                 rel_dm_ao = ( unrel_dm_ao + 2.0 * lambda_ao
                                 + 2.0 * lambda_ao.transpose(0,2,1) )
 
@@ -518,6 +523,40 @@ class TddftOrbitalResponse(CphfSolver):
                                       fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
             Fm2_oo = 0.5 * np.einsum('snm,stn,pt->smp',
                                       fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
+            # WIP multi_dot
+            Fp1_vv = np.zeros((dof, nao, nao))
+            Fm1_vv = np.zeros((dof, nao, nao))
+            Fp2_vv = np.zeros((dof, nao, nao))
+            Fm2_vv = np.zeros((dof, nao, nao))
+            Fp1_oo = np.zeros((dof, nao, nao))
+            Fm1_oo = np.zeros((dof, nao, nao))
+            Fp2_oo = np.zeros((dof, nao, nao))
+            Fm2_oo = np.zeros((dof, nao, nao))
+            #for s in range(dof):
+                #Fp1_vv[s] = 0.5 * np.linalg.multi_dot([
+                #    fock_ao_rhs_x_plus_y[s].T, x_plus_y_ao[s], ovlp.T
+                #])
+                #Fm1_vv[s] = 0.5 * np.linalg.multi_dot([
+                #    fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s], ovlp.T
+                #])
+                #Fp2_vv[s] = 0.5 * np.linalg.multi_dot([
+                #    fock_ao_rhs_x_plus_y[s], x_plus_y_ao[s], ovlp.T
+                #])
+                #Fm2_vv[s] = 0.5 * np.linalg.multi_dot([
+                #    fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s], ovlp.T
+                #])
+                #Fp1_oo[s] = 0.5 * np.linalg.multi_dot([
+                #    fock_ao_rhs_x_plus_y[s], x_plus_y_ao[s].T, ovlp.T
+                #])
+                #Fm1_oo[s] = 0.5 * np.linalg.multi_dot([
+                #    fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s].T, ovlp.T
+                #])
+                #Fp2_oo[s] = 0.5 * np.linalg.multi_dot([
+                #    fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T
+                #])
+                #Fm2_oo[s] = 0.5 * np.linalg.multi_dot([
+                #    fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T
+                #])
 
             # Construct fock_lambda (the lambda multipliers/cphf coefficients
             # contracted with the two-electron integrals)
