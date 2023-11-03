@@ -9,7 +9,7 @@ from .veloxchemlib import fockmat
 from .veloxchemlib import XCIntegrator
 from .cphfsolver import CphfSolver
 from .firstorderprop import FirstOrderProperties
-from .inputparser import parse_seq_fixed, parse_input
+from .inputparser import (parse_input, parse_seq_fixed)
 from .visualizationdriver import VisualizationDriver
 
 class TddftOrbitalResponse(CphfSolver):
