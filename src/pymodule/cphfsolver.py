@@ -117,13 +117,6 @@ class CphfSolver(LinearSolver):
         #    key = cphf_dict['print_residuals'].lower()
         #    self.print_residuals = True if key in ['yes', 'y'] else False
 
-        self.profiler = Profiler({
-            'timing': self.timing,
-            'profiling': self.profiling,
-            'memory_profiling': self.memory_profiling,
-            'memory_tracing': self.memory_tracing,
-        })
-
 
     def compute(self, molecule, basis, scf_tensors, *args):
         """
@@ -145,6 +138,13 @@ class CphfSolver(LinearSolver):
             and an auxiliary Fock matrix (oo block of the CPHF coefficients
             contracted with the two-electron integrals).
         """
+
+        self.profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6

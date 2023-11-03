@@ -123,7 +123,8 @@ class TddftGradientDriver(GradientDriver):
 
         # TODO: decide what to do with this keyword: directly in 
         # orbrsp dictionary? not needed in response dict
-        grad_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+        if 'tamm_dancoff' in rsp_dict.keys():
+            grad_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
 
         parse_input(self, grad_keywords, grad_dict)
 

@@ -63,7 +63,8 @@ class TddftOrbitalResponse(CphfSolver):
             key: val[0] for key, val in self._input_keywords['orbitalresponse'].items()
         }
 
-        orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+        if 'tamm_dancoff' in rsp_dict.keys():
+            orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
 
         parse_input(self, orbrsp_keywords, orbrsp_dict)
 
