@@ -23,26 +23,19 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef GtoInfo_hpp
-#define GtoInfo_hpp
+#ifndef BoysFuncTable_hpp
+#define BoysFuncTable_hpp
 
+#include <array>
 #include <cstdint>
 #include <vector>
 
-#include "GtoBlock.hpp"
+namespace boysfunc {
 
-namespace gtoinfo {
+auto getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>;
 
-auto updatePrimitiveInfoForS(double* s_prim_info, uint32_t* s_prim_aoinds, const int64_t s_prim_count, const std::vector<CGtoBlock>& gto_blocks)
-    -> void;
+auto getBoysFunction(const double fa, const uint32_t N, const double* bf_table, const double* ft) -> std::vector<double>;
 
-auto updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int64_t p_prim_count, const std::vector<CGtoBlock>& gto_blocks)
-    -> void;
+}  // namespace boysfunc
 
-auto getGtoInfo(const CGtoBlock gto_block) -> std::vector<double>;
-
-auto getGtoInfo(const CGtoBlock gto_block, const std::vector<int64_t>& gtos_mask) -> std::vector<double>;
-
-}  // namespace gtoinfo
-
-#endif
+#endif /* BoysFuncTable_hpp */

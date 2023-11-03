@@ -33,6 +33,7 @@
 #include <tuple>
 #include <vector>
 
+#include "BoysFuncTable.hpp"
 #include "EriSSSS.hpp"
 #include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
@@ -46,6 +47,8 @@
 
 #define TILE_DIM 16
 
+#define MATH_CONST_PI 3.14159265358979323846
+
 #define hipSafe(e)                                                                                                       \
     {                                                                                                                     \
         hipError_t err = (e);                                                                                            \
@@ -58,6 +61,78 @@
 
 namespace gpu {  // gpu namespace
 
+__device__ void
+computeBoysFunction(double* values, const double fa, const uint32_t N, const double* bf_table, const double* ft)
+{
+    // Note: 847 = 121 * 7
+    const double* bf_data = bf_table + N * 847;
+
+    const double fpi = 0.5 * std::sqrt(MATH_CONST_PI);
+
+    int64_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<int64_t>(10.0 * fa + 0.5);
+
+    if (pnt < 121)
+    {
+        const double w = fa - 0.1 * pnt;
+
+        const double w2 = w * w;
+
+        const double w4 = w2 * w2;
+
+        values[N] = bf_data[pnt * 7 + 0] + bf_data[pnt * 7 + 1] * w + bf_data[pnt * 7 + 2] * w2 + bf_data[pnt * 7 + 3] * w2 * w
+
+                    + bf_data[pnt * 7 + 4] * w4 + bf_data[pnt * 7 + 5] * w4 * w + bf_data[pnt * 7 + 6] * w4 * w2;
+
+        const double f2a = fa + fa;
+
+        const double fx = std::exp(-fa);
+
+        for (int64_t j = 0; j < N; j++)
+        {
+            values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j] + fx);
+        }
+    }
+    else
+    {
+        const double fia = 1.0 / fa;
+
+        double pf = 0.5 * fia;
+
+        values[0] = fpi * std::sqrt(fia);
+
+        if (pnt < 921)
+        {
+            const double fia2 = fia * fia;
+
+            const double f = 0.4999489092 * fia - 0.2473631686 * fia2
+
+                             + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+
+            const double fx = std::exp(-fa);
+
+            values[0] -= f * fx;
+
+            const double rterm = pf * fx;
+
+            for (int64_t j = 1; j <= N; j++)
+            {
+                values[j] = pf * values[j - 1] - rterm;
+
+                pf += fia;
+            }
+        }
+        else
+        {
+            for (int64_t j = 1; j <= N; j++)
+            {
+                values[j] = pf * values[j - 1];
+
+                pf += fia;
+            }
+        }
+    }
+}
+
 __global__ void
 cudaFockJ(double*         mat_J,
           const double*   s_prim_info,
@@ -67,15 +142,15 @@ cudaFockJ(double*         mat_J,
           const double*   mat_Q,
           const uint32_t* first_inds,
           const uint32_t* second_inds,
-          const uint32_t  ss_prim_pair_count)
+          const uint32_t  ss_prim_pair_count,
+          const double*   boys_func_table,
+          const double*   boys_func_ft)
 {
     // each thread block scans over [ij|??] and sum up to a primitive J matrix element
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    const double m_pi = 3.14159265358979323846;
 
     double J_ij = 0.0;
 
@@ -85,7 +160,7 @@ cudaFockJ(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count) && (mat_Q[ij] * mat_Q[kl] * max_D > 1.0e-15))
+        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count) && (mat_Q[ij] * mat_Q[kl] * max_D > 1.0e-12))
         {
             const auto i = first_inds[ij];
             const auto j = second_inds[ij];
@@ -128,16 +203,16 @@ cudaFockJ(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (m_pi * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             const auto t = (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ;
 
-            // TODO: higher order Boys function
+            double F0_t;
 
-            const double F0_t = (t == 0.0 ? 1.0 : std::sqrt(m_pi / (4.0 * t)) * std::erf(std::sqrt(t)));
+            gpu::computeBoysFunction(&F0_t, t, 0, boys_func_table, boys_func_ft);
 
-            const auto S_ij = c_i * c_j * std::pow(m_pi / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-            const auto S_kl = c_k * c_l * std::pow(m_pi / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_ij = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_kl = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij * S_kl * F0_t * mat_D[kl] * (k == l ? 1.0 : 2.0);
@@ -190,8 +265,6 @@ cudaFockK(double*         mat_K,
 
     const uint32_t ik = blockIdx.x;
 
-    const double m_pi = 3.14159265358979323846;
-
     double K_ik = 0.0;
 
     for (uint32_t m = 0; m < (s_prim_count + TILE_DIM - 1) / TILE_DIM; m++)
@@ -210,7 +283,7 @@ cudaFockK(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K[i * s_prim_count + j];
                 const auto Q_kl = mat_Q_for_K[k * s_prim_count + l];
 
-                if (Q_ij * Q_kl * max_D > 1.0e-15)
+                if (Q_ij * Q_kl * max_D > 1.0e-12)
                 {
                     auto j_prim = second_inds_for_K[i * s_prim_count + j];
                     auto l_prim = second_inds_for_K[k * s_prim_count + l];
@@ -253,16 +326,16 @@ cudaFockK(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (m_pi * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     const auto t = (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ;
 
                     // TODO: higher order Boys function
 
-                    const double F0_t = (t == 0.0 ? 1.0 : std::sqrt(m_pi / (4.0 * t)) * std::erf(std::sqrt(t)));
+                    const double F0_t = (t == 0.0 ? 1.0 : std::sqrt(MATH_CONST_PI / (4.0 * t)) * std::erf(std::sqrt(t)));
 
-                    const auto S_ij = c_i * c_j * std::pow(m_pi / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl = c_k * c_l * std::pow(m_pi / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij * S_kl * F0_t * mat_D_full[j_cgto * naos + l_cgto];
                 }
@@ -305,8 +378,6 @@ cudaFockK(double*         mat_K,
 auto
 computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix
 {
-    const auto m_pi = mathconst::getPiValue();
-
     auto rank = mpi::rank(MPI_COMM_WORLD);
 
     if (rank % 8 == 0) hipSafe(hipSetDevice(4));
@@ -334,58 +405,64 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
 
-    // S gto block
+    // Boys function (tabulated for order 0-28)
+
+    std::vector<double> boys_func_table((28 + 1) * 121 * 7);
+
+    for (int64_t bf_order = 0; bf_order <= 28; bf_order++)
+    {
+        const auto bf_table = boysfunc::getBoysFuncTable(bf_order);
+
+        auto bf_data = boys_func_table.data() + bf_order * 121 * 7;
+
+        for (int64_t r = 0; r < 121; r++)
+        {
+            for (int64_t c = 0; c < 7; c++)
+            {
+                bf_data[r * 7 + c] = bf_table[r][c];
+            }
+        }
+    }
+
+    double* d_boys_func_table;
+
+    hipSafe(hipMalloc(&d_boys_func_table, boys_func_table.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_boys_func_table, boys_func_table.data(), boys_func_table.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    std::vector<double> boys_func_ft{1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0,
+                                     1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0,
+                                     1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
+                                     1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0};
+
+    double* d_boys_func_ft;
+
+    hipSafe(hipMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    // gto blocks
 
     int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
 
     for (const auto& gto_block : gto_blocks)
     {
-        if (gto_block.getAngularMomentum() == 0)
-        {
-            const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-            const auto npgtos = gto_block.getNumberOfPrimitives();
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
 
-            s_prim_count += npgtos * ncgtos;
-        }
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
     }
+
+    // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
     std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
 
-    int64_t s_prim_offset = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto gto_ang = gto_block.getAngularMomentum();
-
-        if (gto_ang == 0)
-        {
-            const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-            const auto npgtos = gto_block.getNumberOfPrimitives();
-
-            const auto gto_exps   = gto_block.getExponents();
-            const auto gto_norms  = gto_block.getNormalizationFactors();
-            const auto gto_coords = gto_block.getCoordinates();
-
-            const auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
-
-            for (int64_t j = 0; j < npgtos; j++)
-            {
-                for (int64_t i = 0; i < ncgtos; i++)
-                {
-                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 0] = gto_exps[i + j * ncgtos];
-                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 1] = gto_norms[i + j * ncgtos];
-                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 2] = gto_coords[i][0];
-                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 3] = gto_coords[i][1];
-                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 4] = gto_coords[i][2];
-
-                    s_prim_aoinds[s_prim_offset + i + j * ncgtos + s_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds[i]);
-                }
-            }
-
-            s_prim_offset += npgtos * ncgtos;
-        }
-    }
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
     double*   d_s_prim_info;
     uint32_t* d_s_prim_aoinds;
@@ -396,15 +473,32 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
     hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    // For now, only process S gto block
+    // P gto block
 
-    // TODO: higher angular momentum
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    double*   d_p_prim_info;
+    uint32_t* d_p_prim_aoinds;
+
+    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_p_prim_aoinds, p_prim_aoinds.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // S-S gto block pair and S-P gto block pair
 
     auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
+    auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
 
-    CDenseMatrix mat_Q_orig(s_prim_count, s_prim_count);
+    CDenseMatrix ss_mat_Q_orig(s_prim_count, s_prim_count);
+    CDenseMatrix sp_mat_Q_orig(s_prim_count, p_prim_count * 3);
 
-    std::vector<std::tuple<double, int64_t, int64_t, double>> mat_Q_D_sorted;
+    std::vector<std::tuple<double, int64_t, int64_t, double>> ss_mat_Q_D_sorted;
+    std::vector<std::tuple<double, int64_t, int64_t, double>> sp_mat_Q_D_sorted;
 
     auto dens_ptr = densityMatrix.alphaDensity(0);
 
@@ -417,6 +511,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
         const auto z_i = s_prim_info[i + s_prim_count * 4];
 
         const auto i_cgto = s_prim_aoinds[i];
+
+        // S-S gto block pair
 
         for (int64_t j = i; j < s_prim_count; j++, ij++)
         {
@@ -434,25 +530,90 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
             const auto a_ij = a_i + a_j;
 
-            const auto S_ij = c_i * c_j * std::pow(m_pi / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
+            const auto S_ij = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
 
-            // Note: t = 0.0 and F0_t = 1.0
-            const auto eri_ijij = S_ij * S_ij * std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / m_pi);
+            const auto F0_t = boysfunc::getBoysFunction(0.0, 0, boys_func_table.data(), boys_func_ft.data());
+
+            const auto eri_ijij = F0_t[0] * S_ij * S_ij * std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
 
             const auto sqrt_ijij = std::sqrt(eri_ijij);
 
             const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
 
-            mat_Q_orig.row(i)[j] = sqrt_ijij;
+            ss_mat_Q_orig.row(i)[j] = sqrt_ijij;
 
-            if (i != j) mat_Q_orig.row(j)[i] = sqrt_ijij;
+            if (i != j) ss_mat_Q_orig.row(j)[i] = sqrt_ijij;
 
-            mat_Q_D_sorted.push_back(std::make_tuple(sqrt_ijij, i, j, D_ij));
+            ss_mat_Q_D_sorted.push_back(std::make_tuple(sqrt_ijij, i, j, D_ij));
+        }
+
+        // S-P gto block pair
+
+        for (int64_t j = 0; j < p_prim_count; j++, ij++)
+        {
+            const auto a_j = p_prim_info[j + p_prim_count * 0];
+            const auto c_j = p_prim_info[j + p_prim_count * 1];
+            const auto x_j = p_prim_info[j + p_prim_count * 2];
+            const auto y_j = p_prim_info[j + p_prim_count * 3];
+            const auto z_j = p_prim_info[j + p_prim_count * 4];
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+            const auto a_ij = a_i + a_j;
+
+            const auto S_ij_0 = c_i * c_j * std::pow(MATH_CONST_PI / a_ij, 1.5) * std::exp(-a_i * a_j / a_ij * r2_ij);
+
+            const auto Lambda = std::sqrt(4.0 * a_ij * a_ij / (a_ij + a_ij) / MATH_CONST_PI);
+
+            for (int64_t s = 0; s < 3; s++)
+            {
+                const auto j_cgto = p_prim_aoinds[j + p_prim_count * s];
+
+                // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+
+                // p-1: py
+                // p_0: pz
+                // p+1: px
+
+                double S_ij_1;
+
+                if (s == 0) S_ij_1 = -(a_i / a_ij) * (y_j - y_i) * S_ij_0;
+                if (s == 1) S_ij_1 = -(a_i / a_ij) * (z_j - z_i) * S_ij_0;
+                if (s == 2) S_ij_1 = -(a_i / a_ij) * (x_j - x_i) * S_ij_0;
+
+                const auto F1_t = boysfunc::getBoysFunction(0.0, 1, boys_func_table.data(), boys_func_ft.data());
+
+                const double eri_ijij = Lambda * (S_ij_1 * S_ij_1 * F1_t[0] + S_ij_0 * S_ij_0 * F1_t[1] / (2.0 * (a_ij + a_ij)));
+
+                const auto sqrt_ijij = std::sqrt(eri_ijij);
+
+                const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
+                sp_mat_Q_orig.row(i)[j * 3 + s] = sqrt_ijij;
+
+                sp_mat_Q_D_sorted.push_back(std::make_tuple(sqrt_ijij, i, j * 3 + s, D_ij));
+            }
         }
     }
 
-    std::sort(mat_Q_D_sorted.begin(), mat_Q_D_sorted.end());
-    std::reverse(mat_Q_D_sorted.begin(), mat_Q_D_sorted.end());
+    std::sort(ss_mat_Q_D_sorted.begin(), ss_mat_Q_D_sorted.end());
+    std::reverse(ss_mat_Q_D_sorted.begin(), ss_mat_Q_D_sorted.end());
+
+    std::sort(sp_mat_Q_D_sorted.begin(), sp_mat_Q_D_sorted.end());
+    std::reverse(sp_mat_Q_D_sorted.begin(), sp_mat_Q_D_sorted.end());
+
+    printf(" %ld  %ld \n\n", sp_prim_pair_count, sp_mat_Q_D_sorted.size());
+
+    for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
+    {
+        const auto& q_ij = sp_mat_Q_D_sorted[ij];
+
+        auto q_val = std::get<0>(q_ij);
+        auto i_idx = std::get<1>(q_ij);
+        auto j_idx = std::get<2>(q_ij);
+
+        printf(" %3ld  %3ld    %22.10f\n", i_idx, j_idx, q_val);
+    }
 
     // K preparation
 
@@ -466,7 +627,7 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
     {
         std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
 
-        const auto Q_i = mat_Q_orig.row(i);
+        const auto Q_i = ss_mat_Q_orig.row(i);
 
         for (int64_t j = 0; j < s_prim_count; j++)
         {
@@ -504,48 +665,82 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     // sorted Q, D, and indices on host
 
-    std::vector<double> mat_Q(ss_prim_pair_count);
-    std::vector<double> mat_D(ss_prim_pair_count);
-    std::vector<double> mat_J(ss_prim_pair_count);
+    std::vector<double> ss_mat_Q(ss_prim_pair_count);
+    std::vector<double> ss_mat_D(ss_prim_pair_count);
+    std::vector<double> ss_mat_J(ss_prim_pair_count);
 
-    std::vector<uint32_t> first_inds(ss_prim_pair_count);
-    std::vector<uint32_t> second_inds(ss_prim_pair_count);
+    std::vector<uint32_t> ss_first_inds(ss_prim_pair_count);
+    std::vector<uint32_t> ss_second_inds(ss_prim_pair_count);
 
     for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
-        const auto& q_ij = mat_Q_D_sorted[ij];
+        const auto& q_ij = ss_mat_Q_D_sorted[ij];
 
         auto sqrt_ijij = std::get<0>(q_ij);
         auto i         = std::get<1>(q_ij);
         auto j         = std::get<2>(q_ij);
         auto D_ij      = std::get<3>(q_ij);
 
-        mat_Q[ij] = sqrt_ijij;
-        mat_D[ij] = D_ij;
+        ss_mat_Q[ij] = sqrt_ijij;
+        ss_mat_D[ij] = D_ij;
 
-        first_inds[ij]  = static_cast<uint32_t>(i);
-        second_inds[ij] = static_cast<uint32_t>(j);
+        ss_first_inds[ij]  = static_cast<uint32_t>(i);
+        ss_second_inds[ij] = static_cast<uint32_t>(j);
     }
 
-    auto max_D_ptr = std::max_element(mat_D.begin(), mat_D.end());
+    auto ss_max_D_ptr = std::max_element(ss_mat_D.begin(), ss_mat_D.end());
+
+    std::vector<double> sp_mat_Q(sp_prim_pair_count);
+    std::vector<double> sp_mat_D(sp_prim_pair_count);
+    std::vector<double> sp_mat_J(sp_prim_pair_count);
+
+    std::vector<uint32_t> sp_first_inds(sp_prim_pair_count);
+    std::vector<uint32_t> sp_second_inds(sp_prim_pair_count);
+
+    for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
+    {
+        const auto& q_ij = sp_mat_Q_D_sorted[ij];
+
+        auto sqrt_ijij = std::get<0>(q_ij);
+        auto i         = std::get<1>(q_ij);
+        auto j         = std::get<2>(q_ij);
+        auto D_ij      = std::get<3>(q_ij);
+
+        sp_mat_Q[ij] = sqrt_ijij;
+        sp_mat_D[ij] = D_ij;
+
+        sp_first_inds[ij]  = static_cast<uint32_t>(i);
+        sp_second_inds[ij] = static_cast<uint32_t>(j);
+    }
+
+    auto sp_max_D_ptr = std::max_element(sp_mat_D.begin(), sp_mat_D.end());
 
     // sorted Q, D, and indices on device
 
     double *  d_mat_J, *d_mat_D, *d_mat_Q;
-    uint32_t *d_first_inds, *d_second_inds;
+    uint32_t *d_ss_first_inds, *d_ss_second_inds;
+    uint32_t *d_sp_first_inds, *d_sp_second_inds;
 
-    hipSafe(hipMalloc(&d_mat_Q, ss_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_D, ss_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_J, ss_prim_pair_count * sizeof(double)));
+    auto max_prim_pair_count = std::max(ss_prim_pair_count, sp_prim_pair_count);
 
-    hipSafe(hipMalloc(&d_first_inds, ss_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_second_inds, ss_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_mat_Q, max_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_D, max_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_J, max_prim_pair_count * sizeof(double)));
 
-    hipSafe(hipMemcpy(d_mat_D, mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_mat_Q, mat_Q.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMalloc(&d_ss_first_inds, ss_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds, ss_prim_pair_count * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_first_inds, first_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_second_inds, second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMalloc(&d_sp_first_inds, sp_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds, sp_prim_pair_count * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q, ss_mat_Q.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_first_inds, ss_first_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds, ss_second_inds.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds, sp_first_inds.data(), sp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds, sp_second_inds.data(), sp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     double*   d_mat_K;
     uint32_t *d_pair_inds_i, *d_pair_inds_k;
@@ -586,14 +781,16 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
     hipLaunchKernelGGL(cudaFockJ, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                  d_s_prim_info,
                                                  static_cast<uint32_t>(s_prim_count),
-                                                 *max_D_ptr,
+                                                 *ss_max_D_ptr,
                                                  d_mat_D,
                                                  d_mat_Q,
-                                                 d_first_inds,
-                                                 d_second_inds,
-                                                 static_cast<uint32_t>(ss_prim_pair_count));
+                                                 d_ss_first_inds,
+                                                 d_ss_second_inds,
+                                                 static_cast<uint32_t>(ss_prim_pair_count),
+                                                 d_boys_func_table,
+                                                 d_boys_func_ft);
 
-    hipSafe(hipMemcpy(mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
     timer.stop("J computation");
 
@@ -609,7 +806,7 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
                                                  d_s_prim_info,
                                                  d_s_prim_aoinds,
                                                  static_cast<uint32_t>(s_prim_count),
-                                                 *max_D_ptr,
+                                                 *ss_max_D_ptr,
                                                  d_mat_D_full,
                                                  d_mat_Q_for_K,
                                                  d_first_inds_for_K,
@@ -633,15 +830,15 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
-        const auto i = first_inds[ij];
-        const auto j = second_inds[ij];
+        const auto i = ss_first_inds[ij];
+        const auto j = ss_second_inds[ij];
 
         const auto i_cgto = s_prim_aoinds[i];
         const auto j_cgto = s_prim_aoinds[j];
 
-        mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+        mat_Fock.row(i_cgto)[j_cgto] += ss_mat_J[ij] * 2.0;
 
-        if (i != j) mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+        if (i != j) mat_Fock.row(j_cgto)[i_cgto] += ss_mat_J[ij] * 2.0;
     }
 
     for (int64_t ik = 0; ik < ss_prim_pair_count; ik++)
@@ -659,15 +856,24 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     timer.stop("J/K to Fock");
 
+    hipSafe(hipFree(d_boys_func_table));
+    hipSafe(hipFree(d_boys_func_ft));
+
     hipSafe(hipFree(d_s_prim_info));
     hipSafe(hipFree(d_s_prim_aoinds));
+
+    hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_p_prim_aoinds));
 
     hipSafe(hipFree(d_mat_Q));
     hipSafe(hipFree(d_mat_D));
     hipSafe(hipFree(d_mat_J));
 
-    hipSafe(hipFree(d_first_inds));
-    hipSafe(hipFree(d_second_inds));
+    hipSafe(hipFree(d_ss_first_inds));
+    hipSafe(hipFree(d_ss_second_inds));
+
+    hipSafe(hipFree(d_sp_first_inds));
+    hipSafe(hipFree(d_sp_second_inds));
 
     hipSafe(hipFree(d_mat_K));
 

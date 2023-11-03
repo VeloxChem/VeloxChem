@@ -391,7 +391,7 @@ getGtoValuesForLda(double*                     d_gto_values,
 
     // prepare GTO information
 
-    auto gto_info = gpu::getGtoInfo(gto_block, gtos_mask);
+    auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
     hipSafe(hipMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), hipMemcpyHostToDevice));
 
@@ -482,7 +482,7 @@ getGtoValuesForGga(double*                     d_gto_values_0,
 
     // prepare GTO information
 
-    auto gto_info = gpu::getGtoInfo(gto_block, gtos_mask);
+    auto gto_info = gtoinfo::getGtoInfo(gto_block, gtos_mask);
 
     hipSafe(hipMemcpy(d_gto_info, gto_info.data(), gto_info.size() * sizeof(double), hipMemcpyHostToDevice));
 

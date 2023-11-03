@@ -27,7 +27,87 @@
 
 #include "MathFunc.hpp"
 
-namespace gpu {  // gpu namespace
+namespace gtoinfo {  // gtoinfo namespace
+
+auto
+updatePrimitiveInfoForS(double* s_prim_info, uint32_t* s_prim_aoinds, const int64_t s_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
+{
+    int64_t s_prim_offset = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0)
+        {
+            const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+            const auto npgtos = gto_block.getNumberOfPrimitives();
+
+            const auto gto_exps   = gto_block.getExponents();
+            const auto gto_norms  = gto_block.getNormalizationFactors();
+            const auto gto_coords = gto_block.getCoordinates();
+
+            const auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
+
+            for (int64_t j = 0; j < npgtos; j++)
+            {
+                for (int64_t i = 0; i < ncgtos; i++)
+                {
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 0] = gto_exps[i + j * ncgtos];
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 1] = gto_norms[i + j * ncgtos];
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 2] = gto_coords[i][0];
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 3] = gto_coords[i][1];
+                    s_prim_info[s_prim_offset + i + j * ncgtos + s_prim_count * 4] = gto_coords[i][2];
+
+                    s_prim_aoinds[s_prim_offset + i + j * ncgtos + s_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds[i]);
+                }
+            }
+
+            s_prim_offset += npgtos * ncgtos;
+        }
+    }
+}
+
+auto
+updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int64_t p_prim_count, const std::vector<CGtoBlock>& gto_blocks) -> void
+{
+    int64_t p_prim_offset = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+            const auto npgtos = gto_block.getNumberOfPrimitives();
+
+            const auto gto_exps   = gto_block.getExponents();
+            const auto gto_norms  = gto_block.getNormalizationFactors();
+            const auto gto_coords = gto_block.getCoordinates();
+
+            const auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
+
+            for (int64_t j = 0; j < npgtos; j++)
+            {
+                for (int64_t i = 0; i < ncgtos; i++)
+                {
+                    p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 0] = gto_exps[i + j * ncgtos];
+                    p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 1] = gto_norms[i + j * ncgtos];
+                    p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 2] = gto_coords[i][0];
+                    p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 3] = gto_coords[i][1];
+                    p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 4] = gto_coords[i][2];
+
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds[i + ncgtos * 0]);
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 1] = static_cast<uint32_t>(gto_ao_inds[i + ncgtos * 1]);
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 2] = static_cast<uint32_t>(gto_ao_inds[i + ncgtos * 2]);
+                }
+            }
+
+            p_prim_offset += npgtos * ncgtos;
+        }
+    }
+}
 
 auto
 getGtoInfo(const CGtoBlock gto_block) -> std::vector<double>
@@ -128,4 +208,4 @@ getGtoInfo(const CGtoBlock gto_block, const std::vector<int64_t>& gtos_mask) -> 
     return gto_info;
 }
 
-}  // namespace gpu
+}  // namespace gtoinfo
