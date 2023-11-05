@@ -49,12 +49,14 @@
 
 #define MATH_CONST_PI 3.14159265358979323846
 
-#define hipSafe(e)                                                                                                       \
+#define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
+
+#define hipSafe(e)                                                                                                        \
     {                                                                                                                     \
-        hipError_t err = (e);                                                                                            \
-        if (err != hipSuccess)                                                                                           \
+        hipError_t err = (e);                                                                                             \
+        if (err != hipSuccess)                                                                                            \
         {                                                                                                                 \
-            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
+            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl;  \
             std::exit(EXIT_FAILURE);                                                                                      \
         }                                                                                                                 \
     }
@@ -67,9 +69,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
     // Note: 847 = 121 * 7
     const double* bf_data = bf_table + N * 847;
 
-    const double fpi = 0.5 * std::sqrt(MATH_CONST_PI);
-
-    int64_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<int64_t>(10.0 * fa + 0.5);
+    uint32_t pnt = (fa > 1.0e5) ? 1000000 : static_cast<uint32_t>(10.0 * fa + 0.5);
 
     if (pnt < 121)
     {
@@ -87,7 +87,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         const double fx = std::exp(-fa);
 
-        for (int64_t j = 0; j < N; j++)
+        for (uint32_t j = 0; j < N; j++)
         {
             values[N - j - 1] = ft[N - j - 1] * (f2a * values[N - j] + fx);
         }
@@ -98,15 +98,13 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         double pf = 0.5 * fia;
 
-        values[0] = fpi * std::sqrt(fia);
+        values[0] = MATH_CONST_HALF_SQRT_PI * std::sqrt(fia);
 
         if (pnt < 921)
         {
             const double fia2 = fia * fia;
 
-            const double f = 0.4999489092 * fia - 0.2473631686 * fia2
-
-                             + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
+            const double f = 0.4999489092 * fia - 0.2473631686 * fia2 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
             const double fx = std::exp(-fa);
 
@@ -114,7 +112,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
             const double rterm = pf * fx;
 
-            for (int64_t j = 1; j <= N; j++)
+            for (uint32_t j = 1; j <= N; j++)
             {
                 values[j] = pf * values[j - 1] - rterm;
 
@@ -123,7 +121,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
         }
         else
         {
-            for (int64_t j = 1; j <= N; j++)
+            for (uint32_t j = 1; j <= N; j++)
             {
                 values[j] = pf * values[j - 1];
 
@@ -557,6 +555,150 @@ computeCoulombFockSSPP(double*         mat_J,
     }
 
     if ((threadIdx.y == 0) && (ij < ss_prim_pair_count))
+    {
+        mat_J[ij] = J_ij;
+    }
+}
+
+__global__ void
+computeCoulombFockSPSS(double*         mat_J,
+                       const double*   s_prim_info,
+                       const uint32_t  s_prim_count,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double    max_D,
+                       const double*   ss_mat_D,
+                       const double*   ss_mat_Q,
+                       const double*   sp_mat_Q,
+                       const uint32_t* ss_first_inds,
+                       const uint32_t* ss_second_inds,
+                       const uint32_t  ss_prim_pair_count,
+                       const uint32_t* sp_first_inds,
+                       const uint32_t* sp_second_inds,
+                       const uint32_t  sp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft)
+{
+    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+
+    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ uint32_t skip_thread_block;
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    double J_ij = 0.0;
+
+    skip_thread_block = 0;
+
+    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        // TODO: add D_kl into ket side
+
+        if ((kl < ss_prim_pair_count) && (ij < sp_prim_pair_count) && (std::fabs(sp_mat_Q[ij] * ss_mat_Q[kl] * max_D) > 1.0e-12))
+        {
+            const auto i = sp_first_inds[ij];
+            const auto j = sp_second_inds[ij];
+
+            const auto k = ss_first_inds[kl];
+            const auto l = ss_second_inds[kl];
+
+            const auto a_i = s_prim_info[i + s_prim_count * 0];
+            const auto c_i = s_prim_info[i + s_prim_count * 1];
+            const auto x_i = s_prim_info[i + s_prim_count * 2];
+            const auto y_i = s_prim_info[i + s_prim_count * 3];
+            const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+            const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+            const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+            const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+            const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+            const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
+            const auto a_k = s_prim_info[k + s_prim_count * 0];
+            const auto c_k = s_prim_info[k + s_prim_count * 1];
+            const auto x_k = s_prim_info[k + s_prim_count * 2];
+            const auto y_k = s_prim_info[k + s_prim_count * 3];
+            const auto z_k = s_prim_info[k + s_prim_count * 4];
+
+            const auto a_l = s_prim_info[l + s_prim_count * 0];
+            const auto c_l = s_prim_info[l + s_prim_count * 1];
+            const auto x_l = s_prim_info[l + s_prim_count * 2];
+            const auto y_l = s_prim_info[l + s_prim_count * 3];
+            const auto z_l = s_prim_info[l + s_prim_count * 4];
+
+            const auto j_cart = j % 3;
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+            const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
+
+            // p-1: py
+            // p_0: pz
+            // p+1: px
+
+            const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                   (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+
+            const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+
+            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+
+            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+
+            double F1_t[2];
+
+            gpu::computeBoysFunction(F1_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 1, boys_func_table, boys_func_ft);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+
+            // p-1: py
+            // p_0: pz
+            // p+1: px
+
+            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+
+            const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+
+            const double eri_ijkl = Lambda * (
+
+                    S_ij_01 * S_kl_00 * F1_t[0] +
+
+                    S_ij_00 * S_kl_00 * ((a_k + a_l) / (a_i + a_j + a_k + a_l)) * rPQ[j_cart] * F1_t[1]
+
+                    );
+
+            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * ss_mat_D[kl] * (k == l ? 1.0 : 2.0);
+        }
+        else
+        {
+            ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+            // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
+            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
+        }
+
+        __syncthreads();
+
+        // early exit for thread block
+        if (skip_thread_block == 1) break;
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t n = 0; n < TILE_DIM; n++)
+            {
+                J_ij += ERIs[n][threadIdx.x];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (ij < sp_prim_pair_count))
     {
         mat_J[ij] = J_ij;
     }
@@ -1248,6 +1390,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     // compute J
 
+    // J: (SS|SS)
+
     hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
@@ -1283,6 +1427,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     if (sp_prim_pair_count > 0)
     {
+        // J: (SS|SP)
+
         hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
@@ -1321,7 +1467,53 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
             if (i != j) mat_Fock.row(j_cgto)[i_cgto] += ss_mat_J[ij] * 2.0;
         }
+
+        // J: (SP|SS)
+
+        hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        hipLaunchKernelGGL(computeCoulombFockSPSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
+                                                     d_s_prim_info,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_p_prim_info,
+                                                     static_cast<uint32_t>(p_prim_count),
+                                                     ss_max_D,
+                                                     d_mat_D,
+                                                     d_ss_mat_Q,
+                                                     d_sp_mat_Q,
+                                                     d_ss_first_inds,
+                                                     d_ss_second_inds,
+                                                     static_cast<uint32_t>(ss_prim_pair_count),
+                                                     d_sp_first_inds,
+                                                     d_sp_second_inds,
+                                                     static_cast<uint32_t>(sp_prim_pair_count),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
+
+        hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
+        {
+            const auto i = sp_first_inds[ij];
+            const auto j = sp_second_inds[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            mat_Fock.row(i_cgto)[j_cgto] += sp_mat_J[ij] * 2.0;
+            mat_Fock.row(j_cgto)[i_cgto] += sp_mat_J[ij] * 2.0;
+
+            if (std::fabs(sp_mat_J[ij]) > 1e-10) printf(" %3d  %3d  %3d  %3d    %22.10f\n", i, j, i_cgto, j_cgto, sp_mat_J[ij]);
+        }
     }
+
+    // J: (SS|PP)
 
     if (pp_prim_pair_count > 0)
     {
