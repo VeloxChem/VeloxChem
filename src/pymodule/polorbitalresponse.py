@@ -10,6 +10,7 @@ from .veloxchemlib import fockmat
 from .veloxchemlib import XCIntegrator
 from .inputparser import parse_input
 from .cphfsolver import CphfSolver
+from .sanitychecks import polgrad_sanity_check
 
 
 class PolOrbitalResponse(CphfSolver):
@@ -36,6 +37,8 @@ class PolOrbitalResponse(CphfSolver):
 
         super().__init__(comm, ostream)
 
+        self.flag = 'Polarizability Orbital Response'
+        
         self.frequencies = (0,)
         self.vector_components = 'xyz'
         self.cphf_results = None
@@ -144,10 +147,11 @@ class PolOrbitalResponse(CphfSolver):
                 sqrt2 = np.sqrt(2.0)
 
                 # Check if response vectors exist for desired frequency of gradient
-                if (self.vector_components[0], w) not in lr_results['solutions'].keys():
-                    error_text = "Frequency for gradient not "
-                    error_text += "found in linear response results."
-                    raise ValueError(error_text)
+                polgrad_sanity_check(self, self.flag, lr_results)
+                #if (self.vector_components[0], w) not in lr_results['solutions'].keys():
+                #    error_text = "Frequency for gradient not "
+                #    error_text += "found in linear response results."
+                #    raise ValueError(error_text)
 
             # TODO: make get_full_solution_vector directly available from the
             # parent class (i.e. lrsolver)?
