@@ -37,22 +37,18 @@ class TddftOrbitalResponse(CphfSolver):
 
         self._input_keywords['orbitalresponse'].update({
             'tamm_dancoff': ('bool', 'whether RPA or TDA is calculated'),
-            'state_deriv_index': ('seq_fixed_int', 'excited state information'),
+            'state_deriv_index': ('seq_fixed_int', 'excited state of interest'),
             'do_first_order_prop': ('bool', 'do first-order property'),
             }
         )
 
-    # TODO: are both orbrsp_dict and rsp_dict necessary?
-    # NOTE: not if we use tamm_dancoff keyword in orbrsp_dict
-    def update_settings(self, orbrsp_dict, rsp_dict, method_dict=None):
+    def update_settings(self, orbrsp_dict, method_dict=None):
         """
         Updates response and method settings in orbital response computation
         driver.
 
         :param orbrsp_dict:
             The dictionary of orbital response settings.
-        :param rsp_dict:
-            The dictionary of response settings.
         :param method_dict:
             The dictionary of method settings.
         """
@@ -63,26 +59,7 @@ class TddftOrbitalResponse(CphfSolver):
             key: val[0] for key, val in self._input_keywords['orbitalresponse'].items()
         }
 
-        if 'tamm_dancoff' in rsp_dict.keys():
-            orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
-
         parse_input(self, orbrsp_keywords, orbrsp_dict)
-
-        # Excited states of interest
-        # NOTE: this is a tuple; the indexing starts at 1.
-        #if 'state_deriv_index' in orbrsp_dict:
-        #    self.state_deriv_index = parse_seq_fixed(
-        #            orbrsp_dict['state_deriv_index'], flag='int')
-
-        ## Use TDA or not
-        #if 'tamm_dancoff' in rsp_dict:
-        #    key = rsp_dict['tamm_dancoff'].lower()
-        #    self.tamm_dancoff = True if key in ['yes', 'y'] else False
-
-        ## First Order Properties
-        #if 'do_first_order_prop' in orbrsp_dict:
-        #    key = orbrsp_dict['do_first_order_prop'].lower()
-        #    self.do_first_order_prop = True if key in ['yes', 'y'] else False
 
     def compute(self, molecule, basis, scf_tensors, rsp_results):
         """ Computes the lambda orbital response multipliers and
