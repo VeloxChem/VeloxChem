@@ -121,10 +121,9 @@ class TddftGradientDriver(GradientDriver):
             key: val[0] for key, val in self._input_keywords['gradient'].items()
         }
 
-        # TODO: decide what to do with this keyword: directly in 
-        # orbrsp dictionary? not needed in response dict
         if 'tamm_dancoff' in rsp_dict.keys():
             grad_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+            orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff'] 
 
         parse_input(self, grad_keywords, grad_dict)
 
@@ -210,20 +209,12 @@ class TddftGradientDriver(GradientDriver):
             The results of the RPA or TDA calculation.
         """
 
-        # TODO: these are not used??
-        # select orbital response driver
-        if self.tamm_dancoff:
-            method = 'TDA'
-        else:
-            method = 'RPA'
-
         # SCF results
         scf_tensors = scf_drv.scf_tensors
 
         # compute orbital response
         orbrsp_drv = TddftOrbitalResponse(self.comm, self.ostream)
-        orbrsp_drv.update_settings(self.orbrsp_dict, self.rsp_dict,
-                                   self.method_dict)
+        orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
         orbrsp_drv.compute(molecule, basis, scf_tensors,
                            rsp_results)
 
