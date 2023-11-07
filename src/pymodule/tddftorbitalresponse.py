@@ -119,9 +119,6 @@ class TddftOrbitalResponse(CphfSolver):
 
                 lambda_ov = orbrsp_results['cphf_ov']
                 unrel_dm_ao = orbrsp_results['unrelaxed_density_ao']
-                #lambda_ao = np.einsum('mi,sia,na->smn',
-                #        mo_occ, lambda_ov, mo_vir)
-                # WIP multi_dot WORKS
                 lambda_ao = np.array([
                     np.linalg.multi_dot([mo_occ, lambda_ov[s], mo_vir.T])
                     for s in range(lambda_ov.shape[0])
@@ -523,23 +520,6 @@ class TddftOrbitalResponse(CphfSolver):
                 fock_ao_rhs_x_minus_y[ifock] = (
                         fock_ao_rhs.alpha_to_numpy(ifock+2*dof) )
 
-            #Fp1_vv = 0.5 * np.einsum('smn,smt,pt->snp',
-            #                          fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
-            #Fm1_vv = 0.5 * np.einsum('smn,smt,pt->snp',
-            #                          fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
-            #Fp2_vv = 0.5 * np.einsum('smn,snt,pt->smp',
-            #                          fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
-            #Fm2_vv = 0.5 * np.einsum('smn,snt,pt->smp',
-            #                          fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
-            #Fp1_oo = 0.5 * np.einsum('smn,stn,pt->smp',
-            #                          fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
-            #Fm1_oo = 0.5 * np.einsum('smn,stn,pt->smp',
-            #                          fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
-            #Fp2_oo = 0.5 * np.einsum('snm,stn,pt->smp',
-            #                          fock_ao_rhs_x_plus_y, x_plus_y_ao, ovlp)
-            #Fm2_oo = 0.5 * np.einsum('snm,stn,pt->smp',
-            #                         fock_ao_rhs_x_minus_y, x_minus_y_ao, ovlp)
-            # WIP multi_dot
             Fp1_vv = np.zeros((dof, nao, nao))
             Fm1_vv = np.zeros((dof, nao, nao))
             Fp2_vv = np.zeros((dof, nao, nao))
@@ -551,37 +531,36 @@ class TddftOrbitalResponse(CphfSolver):
             for s in range(dof):
                 Fp1_vv[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_plus_y[s].T, x_plus_y_ao[s], ovlp.T
-                ]) # WORKS
+                ])
                 Fm1_vv[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s], ovlp.T
-                ]) # WORKS
+                ])
                 Fp2_vv[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_plus_y[s], x_plus_y_ao[s], ovlp.T
-                ]) # WORKS
+                ])
                 Fm2_vv[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s], ovlp.T
-                ]) # WORKS
+                ])
                 Fp1_oo[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_plus_y[s], x_plus_y_ao[s].T, ovlp.T
-                ]) # WORKS
+                ])
                 Fm1_oo[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s].T, ovlp.T
-                ]) # WORKS
+                ])
                 Fp2_oo[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T
-                ]) # WORKS
+                ])
                 Fm2_oo[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T
-                ]) # WORKS
+                ])
 
             # Construct fock_lambda (the lambda multipliers/cphf coefficients
             # contracted with the two-electron integrals)
             cphf_ov = self.cphf_results['cphf_ov']
-            #lambda_ao = np.einsum('mi,sia,na->smn', mo_occ, cphf_ov, mo_vir)
             lambda_ao = np.array([
                 np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
                 for x in range(dof)
-            ]) # WORKS
+            ])
             lambda_ao_list = list([lambda_ao[s] for s in range(dof)])
             ao_density_lambda = AODensityMatrix(lambda_ao_list, denmat.rest)
         else:
@@ -602,23 +581,9 @@ class TddftOrbitalResponse(CphfSolver):
                 fock_ao_lambda_np[ifock] = fock_lambda.alpha_to_numpy(ifock)
                 fock_ao_rhs_1pdm[ifock] = fock_ao_rhs.alpha_to_numpy(ifock)
 
-            fmat = (  fock_ao_lambda_np
-                    + fock_ao_lambda_np.transpose(0,2,1)
-                    + 0.5 * fock_ao_rhs_1pdm
-                    )
+            fmat = (fock_ao_lambda_np + fock_ao_lambda_np.transpose(0,2,1)
+                    + 0.5 * fock_ao_rhs_1pdm)
 
-            #omega_1pdm_2pdm_contribs = 0.5 * (
-            #        np.einsum('mn,snt,tp->smp', D_vir,
-            #                    Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir)
-            #      + np.einsum('mn,snt,tp->smp', D_occ,
-            #                   Fp1_vv + Fm1_vv - Fp2_vv + Fm2_vv, D_vir)
-            #      + np.einsum('mn,snt,tp->smp', D_occ, Fp1_vv + Fm1_vv - Fp2_vv
-            #                  + Fm2_vv, D_vir).transpose(0,2,1)
-            #      + np.einsum('mn,snt,tp->smp', D_occ,
-            #                   Fp1_oo + Fm1_oo - Fp2_oo + Fm2_oo, D_occ)
-            #      + 2.0 * np.einsum('mn,snt,tp->smp', D_occ, fmat, D_occ)
-            #                                   )
-            # WIP multi_dot  WORKS
             omega_1pdm_2pdm_contribs = np.zeros((dof, nao, nao))
             for s in range(dof):
                 omega_1pdm_2pdm_contribs[s] = 0.5 * (
@@ -650,16 +615,7 @@ class TddftOrbitalResponse(CphfSolver):
             # Construct the energy-weighted one particle density matrix
             dm_oo = 0.5 * self.cphf_results['density_occ_occ']
             dm_vv = 0.5 * self.cphf_results['density_vir_vir']
-            #epsilon_dm_ao = np.einsum('mi,ii,sij,nj->smn', mo_occ,
-            #                           eo_diag, dm_oo, mo_occ)
-            #epsilon_dm_ao += np.einsum('ma,aa,sab,nb->smn', mo_vir,
-            #                            ev_diag, dm_vv, mo_vir)
-            #epsilon_lambda_ao = np.einsum('mi,ii,sia,na->smn', mo_occ,
-            #                               eo_diag, cphf_ov, mo_vir)
-            #epsilon_dm_ao += ( epsilon_lambda_ao # OV
-            #                 + epsilon_lambda_ao.transpose(0,2,1) ) # VO
 
-            # WIP multi_dot WORKS
             epsilon_dm_ao = np.zeros((dof, nao, nao))
             epsilon_lambda_ao = np.zeros((dof, nao, nao))
             for s in range(dof):
@@ -682,12 +638,6 @@ class TddftOrbitalResponse(CphfSolver):
 
             if fock_gxc_ao is not None:
                 factor = -0.25
-                #fock_gxc_ao_np = np.zeros((dof, nao, nao))
-                #for ifock in range(dof):
-                #    fock_gxc_ao_np[ifock] = fock_gxc_ao.alpha_to_numpy(2*ifock)
-                #omega += factor * np.einsum('mn,snt,tp->smp', D_occ,
-                #                             fock_gxc_ao_np, D_occ)
-                # WIP multi_dot WORKS
                 for ifock in range(dof):
                     fock_gxc_ao_np = fock_gxc_ao.alpha_to_numpy(2*ifock)
                     omega[ifock] += factor * np.linalg.multi_dot([
@@ -697,4 +647,3 @@ class TddftOrbitalResponse(CphfSolver):
             return omega
         else:
             return None
-
