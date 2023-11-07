@@ -173,10 +173,6 @@ class PolOrbitalResponse(CphfSolver):
                 mdot_start_time = tm.time()
 
                 # Transform the vectors to the AO basis
-                #x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
-                #x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
-                #                         mo_vir)
-                # WIP: multi_dot
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T]) 
                     for x in range(x_plus_y.shape[0])
@@ -199,23 +195,11 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Calculate the symmetrized unrelaxed one-particle density matrix
                 # in MO basis
-                #dm_oo = -0.25 * (np.einsum('xja,yia->xyij', x_plus_y, x_plus_y) +
-                #                 np.einsum('xja,yia->xyij', x_minus_y, x_minus_y) +
-                #                 np.einsum('yja,xia->xyij', x_plus_y, x_plus_y) +
-                #                 np.einsum('yja,xia->xyij', x_minus_y, x_minus_y))
-
-                #dm_vv = 0.25 * (np.einsum('xib,yia->xyab', x_plus_y, x_plus_y) +
-                #                np.einsum('xib,yia->xyab', x_minus_y, x_minus_y) +
-                #                np.einsum('yib,xia->xyab', x_plus_y, x_plus_y) +
-                #                np.einsum('yib,xia->xyab', x_minus_y, x_minus_y))
-
-                #WIP
-                tmp_dof = x_plus_y.shape[0]
-                tmp_dm_oo = np.zeros((tmp_dof, tmp_dof, nocc, nocc))
-                tmp_dm_vv = np.zeros((tmp_dof, tmp_dof, nvir, nvir))
-                for x in range(tmp_dof):
-                    for y in range(tmp_dof):
-                        tmp_dm_vv[x,y] = 0.25 * (np.linalg.multi_dot([
+                dm_oo = np.zeros((dof, dof, nocc, nocc))
+                dm_vv = np.zeros((dof, dof, nvir, nvir))
+                for x in range(dof):
+                    for y in range(dof):
+                        dm_vv[x,y] = 0.25 * (np.linalg.multi_dot([
                                 x_plus_y[x].T,
                                 x_plus_y[y]
                             ]).T
@@ -232,7 +216,7 @@ class PolOrbitalResponse(CphfSolver):
                                 x_minus_y[y]
                             ])
                         )
-                        tmp_dm_oo[x,y] = -0.25 * (
+                        dm_oo[x,y] = -0.25 * (
                             np.linalg.multi_dot([
                                 x_plus_y[x],
                                 x_plus_y[y].T
@@ -250,8 +234,6 @@ class PolOrbitalResponse(CphfSolver):
                                 x_minus_y[y].T
                             ]).T
                         )
-                dm_oo = tmp_dm_oo
-                dm_vv = tmp_dm_vv
                         
                 valstr = ' * comput_rhs() > Time spent on mdot #1: '
                 valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
@@ -263,21 +245,12 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Transform unrelaxed one-particle density matrix to
                 # AO basis and create a list
-                #unrel_dm_ao = (
-                #    np.einsum('mi,xyij,nj->xymn', mo_occ, dm_oo, mo_occ) +
-                #    np.einsum('ma,xyab,nb->xymn', mo_vir, dm_vv, mo_vir))
-
-                # WIP multi_dot
-                tmp_dm = np.zeros((tmp_dof, tmp_dof, nao, nao))
-                for x in range(tmp_dof):
-                    for y in range(tmp_dof):
-                        tmp_dm[x,y] = (np.linalg.multi_dot([ mo_occ, dm_oo[x,y], mo_occ.T ])
+                unrel_dm_ao = np.zeros((dof, dof, nao, nao))
+                for x in range(dof):
+                    for y in range(dof):
+                        unrel_dm_ao[x,y] = (np.linalg.multi_dot([ mo_occ, dm_oo[x,y], mo_occ.T ])
                         + np.linalg.multi_dot([ mo_vir, dm_vv[x,y], mo_vir.T ])
                         )
-                #print('\n unrel_dm_ao: \n', unrel_dm_ao)
-                #print('\n tmp_dm: \n', tmp_dm)
-                unrel_dm_ao = tmp_dm
-                    
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
                 valstr = ' * comput_rhs() > Time spent on mdot #2: '
@@ -381,9 +354,6 @@ class PolOrbitalResponse(CphfSolver):
                     fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
 
                 # Transform to MO basis
-                #fock_mo_rhs_1dm = np.einsum('mi,xmn,na->xia', mo_occ,
-                #                            fock_ao_rhs_1dm, mo_vir)
-                #WIP multi_dot
                 fock_mo_rhs_1dm = np.array([
                    np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
                    for x in range(dof**2)
@@ -400,160 +370,74 @@ class PolOrbitalResponse(CphfSolver):
 
                 mdot_start_time = tm.time()
 
-                # Is there a better way to do all this?
-                #fock_mo_rhs_2dm = 0.25 * (
-                #    np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir,  # A
-                #              np.einsum('xmt,ymc->xytc',
-                #                        fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                #                        x_plus_y_ao))
-                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # B
-                #                np.einsum('xmt,ymc->xytc',
-                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                #                          x_minus_y_ao))
-                #    + np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # C
-                #                np.einsum('ymt,xmc->xytc',
-                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                #                          x_plus_y_ao))
-                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # D
-                #                np.einsum('ymt,xmc->xytc',
-                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                #                          x_minus_y_ao))
-                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # E
-                #                np.einsum('xtm,ymc->xytc',
-                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                #                          x_plus_y_ao))
-                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # F
-                #                np.einsum('xtm,ymc->xytc',
-                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                #                          x_minus_y_ao))
-                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # G
-                #                np.einsum('ytm,xmc->xytc',
-                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                #                          x_plus_y_ao))
-                #    - np.einsum('cl,ti,la,xytc->xyia', ovlp, mo_occ, mo_vir, # H
-                #                np.einsum('ytm,xmc->xytc',
-                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                #                          x_minus_y_ao))
-                #    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # I
-                #                np.einsum('xmt,ycm->xyct',
-                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                #                          x_plus_y_ao))
-                #    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # J
-                #                np.einsum('xmt,ycm->xyct',
-                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                #                          x_minus_y_ao))
-                #    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # K
-                #                np.einsum('ymt,xcm->xyct',
-                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                #                          x_plus_y_ao))
-                #    + np.einsum('cl,li,ta,xyct->xyia', ovlp, mo_occ, mo_vir, # L
-                #                np.einsum('ymt,xcm->xyct',
-                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                #                          x_minus_y_ao))
-                #    - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # M
-                #                np.einsum('xtm,ycm->xytc',
-                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                #                          x_plus_y_ao))
-                #    + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # N
-                #                np.einsum('xtm,ycm->xytc',
-                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                #                          x_minus_y_ao))
-                #    - np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # O
-                #                np.einsum('ytm,xcm->xytc',
-                #                          fock_ao_rhs_x_plus_y.transpose(0,2,1),
-                #                          x_plus_y_ao))
-                #    + np.einsum('cl,li,ta,xytc->xyia', ovlp, mo_occ, mo_vir, # P
-                #                np.einsum('ytm,xcm->xytc',
-                #                          fock_ao_rhs_x_minus_y.transpose(0,2,1),
-                #                          x_minus_y_ao))
-                #).reshape(dof**2, nocc, nvir)
-
-                # WIP multi_dot
-                mdotA = np.zeros((dof, dof, nocc, nvir))
-                mdotB = np.zeros((dof, dof, nocc, nvir))
-                mdotC = np.zeros((dof, dof, nocc, nvir))
-                mdotD = np.zeros((dof, dof, nocc, nvir))
-                mdotE = np.zeros((dof, dof, nocc, nvir))
-                mdotF = np.zeros((dof, dof, nocc, nvir))
-                mdotG = np.zeros((dof, dof, nocc, nvir))
-                mdotH = np.zeros((dof, dof, nocc, nvir))
-                mdotI = np.zeros((dof, dof, nocc, nvir))
-                mdotJ = np.zeros((dof, dof, nocc, nvir))
-                mdotK = np.zeros((dof, dof, nocc, nvir))
-                mdotL = np.zeros((dof, dof, nocc, nvir))
-                mdotM = np.zeros((dof, dof, nocc, nvir))
-                mdotN = np.zeros((dof, dof, nocc, nvir))
-                mdotO = np.zeros((dof, dof, nocc, nvir))
-                mdotP = np.zeros((dof, dof, nocc, nvir))
+                fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir))
                 for x in range(dof):
                     for y in range(dof):
                         tmp = np.linalg.multi_dot([fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
-                        mdotA[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
                            mo_occ.T, tmp, ovlp, mo_vir 
                         ])
                         tmp = np.linalg.multi_dot([fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
-                        mdotB[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp, ovlp, mo_vir
                         ])
                         tmp = np.linalg.multi_dot([x_plus_y_ao[x].T, fock_ao_rhs_x_plus_y[y].T])
-                        mdotC[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
                             mo_occ.T, tmp, ovlp, mo_vir
                         ])
                         tmp = np.linalg.multi_dot([x_minus_y_ao[x].T, fock_ao_rhs_x_minus_y[y].T])
-                        mdotD[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp, ovlp, mo_vir
                         ])
                         tmp = np.linalg.multi_dot([fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
-                        mdotE[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp, ovlp, mo_vir
                         ])
                         tmp = np.linalg.multi_dot([fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
-                        mdotF[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp, ovlp, mo_vir
                         ])
                         tmp = np.linalg.multi_dot([x_plus_y_ao[x].T, fock_ao_rhs_x_plus_y[y]])
-                        mdotG[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp, ovlp, mo_vir
                         ])
                         tmp = np.linalg.multi_dot([x_minus_y_ao[x].T, fock_ao_rhs_x_minus_y[y]])
-                        mdotH[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
                             mo_occ.T, tmp, ovlp, mo_vir
                         ])
                         tmp = np.linalg.multi_dot([fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y].T]).T
-                        mdotI[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp, mo_vir 
                         ])
                         tmp = np.linalg.multi_dot([fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y].T]).T
-                        mdotJ[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp, mo_vir 
                         ])
                         tmp = np.linalg.multi_dot([x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])
-                        mdotK[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp, mo_vir 
                         ])
                         tmp = np.linalg.multi_dot([x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])
-                        mdotL[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp, mo_vir 
                         ])
                         tmp = np.linalg.multi_dot([fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y].T])
-                        mdotM[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp.T, mo_vir 
                         ])
                         tmp = np.linalg.multi_dot([fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y].T])
-                        mdotN[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp.T, mo_vir 
                         ])
                         tmp = np.linalg.multi_dot([x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T
-                        mdotO[x,y] = -1.0 * np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp.T, mo_vir 
                         ])
                         tmp = np.linalg.multi_dot([x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
-                        mdotP[x,y] = np.linalg.multi_dot([
+                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
                             mo_occ.T, ovlp.T, tmp.T, mo_vir 
                         ])
-                fock_mo_rhs_2dm = 0.25 * (mdotA + mdotB + mdotC + mdotD + mdotE + mdotF 
-                                          + mdotG + mdotH + mdotI + mdotJ + mdotK + mdotL
-                                          + mdotM + mdotN + mdotO + mdotP).reshape(dof**2, nocc, nvir)
+                fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(dof**2, nocc, nvir)
 
                 valstr = ' * comput_rhs() > Time spent on mdot #3: '
                 valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
@@ -589,22 +473,9 @@ class PolOrbitalResponse(CphfSolver):
                 mdot_start_time = tm.time()
 
                 # Contract with vectors to get dipole contribution to the RHS
-                #rhs_dipole_contrib = 0.5 * (
-                #    np.einsum('xja,yji->xyia', x_minus_y, dipole_ints_oo) +
-                #    np.einsum('yja,xji->xyia', x_minus_y, dipole_ints_oo)).reshape(
-                #        dof**2, nocc, nvir)
-
-                #rhs_dipole_contrib += 0.5 * (
-                #    -np.einsum('xib,yab->xyia', x_minus_y, dipole_ints_vv) -
-                #    np.einsum('yib,xab->xyia', x_minus_y, dipole_ints_vv)).reshape(
-                #        dof**2, nocc, nvir)
-
-                # WIP multi_dot
-                #tmp_dof = x_minus_y.shape[0]
-                #tmp_rhs_dipole_contrib = np.zeros((tmp_dof, tmp_dof, nocc, nvir))
                 rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir))
-                for x in range(tmp_dof):
-                    for y in range(tmp_dof):
+                for x in range(dof):
+                    for y in range(dof):
                         rhs_dipole_contrib[x,y] = ( 
                             0.5 * ( np.linalg.multi_dot([x_minus_y[x].T, dipole_ints_oo[y]]).T
                             + np.linalg.multi_dot([dipole_ints_oo[x], x_minus_y[y]]))
@@ -613,12 +484,7 @@ class PolOrbitalResponse(CphfSolver):
                             + np.linalg.multi_dot([dipole_ints_vv[x], x_minus_y[y].T]).T
                             ) 
                         )
-                #tmp_rhs_dipole_contrib.reshape(dof**2, nocc, nvir)
                 rhs_dipole_contrib = rhs_dipole_contrib.reshape(dof**2, nocc, nvir)
-                # DEBUG
-                #print('\n rhs_dipole_contrib:\n', rhs_dipole_contrib)
-                #print('\n tmp_rhs_dipole_contrib:\n', tmp_rhs_dipole_contrib)
-                        
 
                 valstr = ' * comput_rhs() > Time spent on mdot #4: '
                 valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
@@ -635,9 +501,6 @@ class PolOrbitalResponse(CphfSolver):
                     for i in range(dof**2):
                         gxc_ao[i] = fock_gxc_ao.alpha_to_numpy(2 * i)
 
-                    #gxc_mo = np.einsum('mi,xmn,na->xia', mo_occ, gxc_ao, mo_vir)
-
-                    # WIP multi_dot
                     gxc_mo = np.array([
                         np.linalg.multi_dot([mo_occ.T, gxc_ao[x], mo_vir]) 
                         for x in range(dof**2)
@@ -791,29 +654,6 @@ class PolOrbitalResponse(CphfSolver):
                 mdot_start_time = tm.time()
 
                 # Calculate the dipole moment integrals' contribution to omega
-                #dipole_ints_contrib_oo = 0.5 * (
-                #    np.einsum('xjc,yic->xyij', x_minus_y, dipole_ints_ov) +
-                #    np.einsum('yjc,xic->xyij', x_minus_y, dipole_ints_ov))
-                #dipole_ints_contrib_ov = 0.5 * (
-                #    np.einsum('xka,yki->xyia', x_minus_y, dipole_ints_oo) +
-                #    np.einsum('yka,xki->xyia', x_minus_y, dipole_ints_oo))
-
-                #dipole_ints_contrib_vv = 0.5 * (
-                #    np.einsum('xkb,yka->xyab', x_minus_y, dipole_ints_ov) +
-                #    np.einsum('ykb,xka->xyab', x_minus_y, dipole_ints_ov))
-                #dipole_ints_contrib_ao = (
-                #    np.einsum('mi,xyij,nj->xymn', mo_occ, dipole_ints_contrib_oo,
-                #              mo_occ) + np.einsum('mi,xyia,na->xymn', mo_occ,
-                #                                  dipole_ints_contrib_ov, mo_vir) +
-                #    np.einsum('mi,xyia,na->xymn', mo_occ, dipole_ints_contrib_ov,
-                #              mo_vir).transpose(0, 1, 3, 2) +
-                #    np.einsum('ma,xyab,nb->xymn', mo_vir, dipole_ints_contrib_vv,
-                #              mo_vir))
-
-                # WIP multi_dot
-                #tmp_dipole_ints_contrib_oo = np.zeros((dof, dof, nocc, nocc))
-                #tmp_dipole_ints_contrib_ov = np.zeros((dof, dof, nvir, nvir))
-                #tmp_dipole_ints_contrib_vv = np.zeros((dof, dof, nvir, nvir))
                 dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao))
                 for x in range(dof):
                     for y in range(dof):
@@ -832,13 +672,10 @@ class PolOrbitalResponse(CphfSolver):
                             + np.linalg.multi_dot([dipole_ints_ov[x].T, x_minus_y[y]
                             ]))
                         dipole_ints_contrib_ao[x,y] = (
-                            np.linalg.multi_dot([mo_occ, tmp_oo,mo_occ.T])
+                            np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T])
                             + np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T])
                             + np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T
-                            + np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T])
-                        )
-                #DEBUG
-                #print('\n dipole_ints_contrib_ao: \n', dipole_ints_contrib_ao)
+                            + np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
 
                 valstr = ' * comput_omega() > Time spent on mdot #1: '
                 valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
@@ -849,10 +686,6 @@ class PolOrbitalResponse(CphfSolver):
                 mdot_start_time = tm.time()
 
                 # Transform the vectors to the AO basis
-                #x_plus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_plus_y, mo_vir)
-                #x_minus_y_ao = np.einsum('mi,xia,na->xmn', mo_occ, x_minus_y,
-                #                         mo_vir)
-                # WIP multi_dot
                 x_plus_y_ao = np.array([
                     np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T])
                     for x in range(dof)
@@ -875,8 +708,6 @@ class PolOrbitalResponse(CphfSolver):
                 D_vir = np.matmul(mo_vir, mo_vir.T)
 
                 # Construct fock_lambda (or fock_cphf)
-                #cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_ov, mo_vir)
-                # WIP multi_dot
                 cphf_ao = np.array([
                     np.linalg.multi_dot([mo_occ, cphf_ov[x], mo_vir.T])
                     for x in range(dof**2)
@@ -915,14 +746,6 @@ class PolOrbitalResponse(CphfSolver):
                 # Calculate omega (without for-loops, only the diagonal parts
                 # possible for now)
                 # Construct epsilon_dm_ao
-                #epsilon_dm_ao = -np.einsum('mi,ii,xyij,nj->xymn', mo_occ, eo_diag,
-                #                           dm_oo, mo_occ)
-                #epsilon_dm_ao -= np.einsum('ma,aa,xyab,nb->xymn', mo_vir, ev_diag,
-                #                           dm_vv, mo_vir)
-                #epsilon_cphf_ao = np.einsum('mi,ii,xyia,na->xymn', mo_occ, eo_diag,
-                #                            cphf_ov.reshape(dof, dof, nocc, nvir),
-                #                            mo_vir)
-                # WIP multi_dot
                 epsilon_dm_ao = np.zeros((dof, dof, nao, nao))
                 epsilon_cphf_ao = np.zeros((dof, dof, nao, nao))
                 for x in range(dof):
@@ -937,9 +760,6 @@ class PolOrbitalResponse(CphfSolver):
                             mo_occ, eo_diag, cphf_ov.reshape(dof, dof, nocc, nvir)[x,y], 
                             mo_vir.T
                         ])
-                # DEBUG
-                #print('\n epsilon_dm_ao: \n', epsilon_dm_ao)
-                #print('\n epsilon_cphf_ao: \n', epsilon_cphf_ao)
 
                 valstr = ' * compute_omega() > Time spent on mdot #3: '
                 valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
