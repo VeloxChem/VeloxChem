@@ -855,6 +855,202 @@ computeCoulombFockSPSP(double*         mat_J,
 }
 
 __global__ void
+computeCoulombFockSPPP(double*         mat_J,
+                       const double*   s_prim_info,
+                       const uint32_t  s_prim_count,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double    max_D,
+                       const double*   pp_mat_D,
+                       const double*   sp_mat_Q,
+                       const double*   pp_mat_Q,
+                       const uint32_t* sp_first_inds,
+                       const uint32_t* sp_second_inds,
+                       const uint32_t  sp_prim_pair_count,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft)
+{
+    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+
+    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ uint32_t skip_thread_block;
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    double J_ij = 0.0;
+
+    skip_thread_block = 0;
+
+    for (uint32_t m = 0; m < (pp_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        // TODO: add D_kl into ket side
+
+        // TODO: screening for SPPP
+
+        //if ((kl < pp_prim_pair_count) && (ij < sp_prim_pair_count) && (std::fabs(sp_mat_Q[ij] * pp_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < sp_prim_pair_count))
+        {
+            const auto i = sp_first_inds[ij];
+            const auto j = sp_second_inds[ij];
+
+            const auto k = pp_first_inds[kl];
+            const auto l = pp_second_inds[kl];
+
+            const auto a_i = s_prim_info[i + s_prim_count * 0];
+            const auto c_i = s_prim_info[i + s_prim_count * 1];
+            const auto x_i = s_prim_info[i + s_prim_count * 2];
+            const auto y_i = s_prim_info[i + s_prim_count * 3];
+            const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+            const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+            const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+            const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+            const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+            const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
+            const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+            const auto c_k = p_prim_info[k / 3 + p_prim_count * 1];
+            const auto x_k = p_prim_info[k / 3 + p_prim_count * 2];
+            const auto y_k = p_prim_info[k / 3 + p_prim_count * 3];
+            const auto z_k = p_prim_info[k / 3 + p_prim_count * 4];
+
+            const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+            const auto c_l = p_prim_info[l / 3 + p_prim_count * 1];
+            const auto x_l = p_prim_info[l / 3 + p_prim_count * 2];
+            const auto y_l = p_prim_info[l / 3 + p_prim_count * 3];
+            const auto z_l = p_prim_info[l / 3 + p_prim_count * 4];
+
+            const auto j_cart = j % 3;
+            const auto k_cart = k % 3;
+            const auto l_cart = l % 3;
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+            const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
+
+            // p-1: py
+            // p_0: pz
+            // p+1: px
+
+            const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                   (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+
+            const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+
+            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+
+            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+
+            double F3_t[4];
+
+            gpu::computeBoysFunction(F3_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 3, boys_func_table, boys_func_ft);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+
+            // p-1: py
+            // p_0: pz
+            // p+1: px
+
+            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+
+            const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+
+            const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
+            const auto S_kl_01 = -(a_k / (a_k + a_l)) * rkl[l_cart] * S_kl_00;
+
+            const auto S_kl_11 = (
+
+                    (k_cart == l_cart ? 1.0 : 0.0) * (0.5 / (a_k + a_l)) +
+
+                    (a_k * a_l / ((a_k + a_l) * (a_k + a_l))) * (-rkl[k_cart]) * rkl[l_cart]
+
+                    ) * S_kl_00;
+
+            const double eri_ijkl = Lambda * (
+
+                    S_ij_01 * S_kl_11 * F3_t[0] +
+
+                    S_ij_00 * S_kl_11 * ((a_k + a_l) / (a_i + a_j + a_k + a_l)) * rPQ[j_cart] * F3_t[1] +
+
+                    S_ij_01 * S_kl_01 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[k_cart] * F3_t[1] +
+
+                    S_ij_00 * S_kl_01 / (a_i + a_j + a_k + a_l) * (
+
+                        (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[j_cart]) * rPQ[k_cart] * F3_t[2] +
+
+                        (j_cart == k_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+
+                    ) +
+
+                    S_ij_01 * S_kl_10 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[l_cart] * F3_t[1] +
+
+                    S_ij_00 * S_kl_10 / (a_i + a_j + a_k + a_l) * (
+
+                        (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[j_cart]) * rPQ[l_cart] * F3_t[2] +
+
+                        (j_cart == l_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+
+                    ) +
+
+                    S_ij_01 * S_kl_00 * (a_i + a_j) / (a_i + a_j + a_k + a_l) * (
+
+                        (a_i + a_j) / (a_i + a_j + a_k + a_l) * rPQ[k_cart] * rPQ[l_cart] * F3_t[2] -
+
+                        (k_cart == l_cart ? 1.0 : 0.0) * 0.5 / (a_k + a_l) * F3_t[1]
+
+                    ) +
+
+                    S_ij_00 * S_kl_00 * (-(a_i + a_j)) / ((a_i + a_j + a_k + a_l) * (a_i + a_j + a_k + a_l)) * (
+
+                        (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[j_cart]) * rPQ[k_cart] * rPQ[l_cart] * F3_t[3] -
+
+                        ((j_cart == k_cart ? 1.0 : 0.0) * (-rPQ[l_cart]) + 
+                         (j_cart == l_cart ? 1.0 : 0.0) * (-rPQ[k_cart]) +
+                         (k_cart == l_cart ? 1.0 : 0.0) * (-rPQ[j_cart])) * 0.5 * F3_t[2]
+
+                    ));
+
+            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pp_mat_D[kl] * (k == l ? 1.0 : 2.0);
+        }
+        else
+        {
+            ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+            // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
+            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
+        }
+
+        __syncthreads();
+
+        // early exit for thread block
+        if (skip_thread_block == 1) break;
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t n = 0; n < TILE_DIM; n++)
+            {
+                J_ij += ERIs[n][threadIdx.x];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (ij < sp_prim_pair_count))
+    {
+        mat_J[ij] = J_ij;
+    }
+}
+
+__global__ void
 cudaFockK(double*         mat_K,
           const uint32_t* pari_inds_i,
           const uint32_t* pari_inds_k,
@@ -1696,10 +1892,210 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
             mat_Fock.row(i_cgto)[j_cgto] += sp_mat_J[ij] * 2.0;
             mat_Fock.row(j_cgto)[i_cgto] += sp_mat_J[ij] * 2.0;
-
-            if (std::fabs(sp_mat_J[ij]) > 1e-10) printf(" %3d  %3d    %22.10f\n", i, j, sp_mat_J[ij]);
         }
-    
+
+        // J: (SP|PP)
+
+        if (pp_prim_pair_count > 0)
+        {
+            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+            num_blocks = dim3((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+            hipLaunchKernelGGL(computeCoulombFockSPPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
+                                                         d_s_prim_info,
+                                                         static_cast<uint32_t>(s_prim_count),
+                                                         d_p_prim_info,
+                                                         static_cast<uint32_t>(p_prim_count),
+                                                         pp_max_D,
+                                                         d_mat_D,
+                                                         d_sp_mat_Q,
+                                                         d_pp_mat_Q,
+                                                         d_sp_first_inds,
+                                                         d_sp_second_inds,
+                                                         static_cast<uint32_t>(sp_prim_pair_count),
+                                                         d_pp_first_inds,
+                                                         d_pp_second_inds,
+                                                         static_cast<uint32_t>(pp_prim_pair_count),
+                                                         d_boys_func_table,
+                                                         d_boys_func_ft);
+
+            hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+
+            for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
+            {
+                const auto i = sp_first_inds[ij];
+                const auto j = sp_second_inds[ij];
+
+                const auto i_cgto = s_prim_aoinds[i];
+
+                // TODO: think about the ordering of cartesian components
+                const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+                mat_Fock.row(i_cgto)[j_cgto] += sp_mat_J[ij] * 2.0;
+                mat_Fock.row(j_cgto)[i_cgto] += sp_mat_J[ij] * 2.0;
+
+                if (std::fabs(sp_mat_J[ij]) > 1e-10) printf(" %3d  %3d    %22.10f\n", i, j, sp_mat_J[ij]);
+            }
+
+
+
+            /*
+            // test SPPP
+
+            for (uint32_t ij = 0; ij < sp_prim_pair_count; ij++)
+            {
+                for (uint32_t kl = 0; kl < pp_prim_pair_count; kl++)
+                {
+                    const auto i = sp_first_inds[ij];
+                    const auto j = sp_second_inds[ij];
+
+                    const auto k = pp_first_inds[kl];
+                    const auto l = pp_second_inds[kl];
+
+                    const auto a_i = s_prim_info[i + s_prim_count * 0];
+                    const auto c_i = s_prim_info[i + s_prim_count * 1];
+                    const auto x_i = s_prim_info[i + s_prim_count * 2];
+                    const auto y_i = s_prim_info[i + s_prim_count * 3];
+                    const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+                    const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+                    const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+                    const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+                    const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+                    const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
+                    const auto a_k = p_prim_info[k / 3 + p_prim_count * 0];
+                    const auto c_k = p_prim_info[k / 3 + p_prim_count * 1];
+                    const auto x_k = p_prim_info[k / 3 + p_prim_count * 2];
+                    const auto y_k = p_prim_info[k / 3 + p_prim_count * 3];
+                    const auto z_k = p_prim_info[k / 3 + p_prim_count * 4];
+
+                    const auto a_l = p_prim_info[l / 3 + p_prim_count * 0];
+                    const auto c_l = p_prim_info[l / 3 + p_prim_count * 1];
+                    const auto x_l = p_prim_info[l / 3 + p_prim_count * 2];
+                    const auto y_l = p_prim_info[l / 3 + p_prim_count * 3];
+                    const auto z_l = p_prim_info[l / 3 + p_prim_count * 4];
+
+                    const auto j_cart = j % 3;
+                    const auto k_cart = k % 3;
+                    const auto l_cart = l % 3;
+
+                    const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+                    const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
+
+                    // p-1: py
+                    // p_0: pz
+                    // p+1: px
+
+                    const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                           (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                           (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+
+                    const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+
+                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+
+                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+
+                    const auto F3_t = boysfunc::getBoysFunction((a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 3, boys_func_table.data(), boys_func_ft.data());
+
+                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+
+                    // p-1: py
+                    // p_0: pz
+                    // p+1: px
+
+                    const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+                    const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+
+                    const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+
+                    const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
+                    const auto S_kl_01 = -(a_k / (a_k + a_l)) * rkl[l_cart] * S_kl_00;
+
+                    const auto S_kl_11 = (
+
+                            (k_cart == l_cart ? 1.0 : 0.0) * (0.5 / (a_k + a_l)) +
+
+                            (a_k * a_l / ((a_k + a_l) * (a_k + a_l))) * (-rkl[k_cart]) * rkl[l_cart]
+
+                            ) * S_kl_00;
+
+                    const double eri_ijkl = Lambda * (
+
+                            S_ij_01 * S_kl_11 * F3_t[0] +
+
+                            S_ij_00 * S_kl_11 * ((a_k + a_l) / (a_i + a_j + a_k + a_l)) * rPQ[j_cart] * F3_t[1] +
+
+                            S_ij_01 * S_kl_01 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[k_cart] * F3_t[1] +
+
+                            S_ij_01 * S_kl_10 * (-(a_i + a_j) / (a_i + a_j + a_k + a_l)) * rPQ[l_cart] * F3_t[1] +
+
+                            S_ij_00 * S_kl_01 / (a_i + a_j + a_k + a_l) * (
+
+                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[j_cart]) * rPQ[k_cart] * F3_t[2] +
+
+                                (j_cart == k_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+
+                            ) +
+
+                            S_ij_00 * S_kl_10 / (a_i + a_j + a_k + a_l) * (
+
+                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[j_cart]) * rPQ[l_cart] * F3_t[2] +
+
+                                (j_cart == l_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+
+                            ) +
+
+                            S_ij_01 * S_kl_00 * (a_i + a_j) / (a_i + a_j + a_k + a_l) * (
+
+                                (a_i + a_j) / (a_i + a_j + a_k + a_l) * rPQ[k_cart] * rPQ[l_cart] * F3_t[2] -
+
+                                (k_cart == l_cart ? 1.0 : 0.0) * 0.5 / (a_k + a_l) * F3_t[1]     // == - (1.0 / 2.0) * fti_cd_0 * rpb_x
+
+                            ) +
+
+                            S_ij_00 * S_kl_00 * (-(a_i + a_j)) / ((a_i + a_j + a_k + a_l) * (a_i + a_j + a_k + a_l)) * (
+
+                                (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * (-rPQ[j_cart]) * rPQ[k_cart] * rPQ[l_cart] * F3_t[3]
+
+                                -
+
+                                ((j_cart == k_cart ? 1.0 : 0.0) * (-rPQ[l_cart]) + 
+                                 (j_cart == l_cart ? 1.0 : 0.0) * (-rPQ[k_cart]) +
+                                 (k_cart == l_cart ? 1.0 : 0.0) * (-rPQ[j_cart])) * 0.5 * F3_t[2]
+
+                            )
+
+                            );
+
+
+
+
+
+
+
+                    // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+                    //ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * pp_mat_D[kl] * (k == l ? 1.0 : 2.0);
+                    if (std::fabs(eri_ijkl) > 1e-10 && j_cart == 2 && k_cart == 2 && l_cart == 2) printf(" %3d %3d %3d %3d    %22.12f\n",i,j,k,l,eri_ijkl);
+                }
+            }
+            */
+
+
+
+
+
+
+
+
+
+
+        }
     }
 
     // J: (SS|PP)
