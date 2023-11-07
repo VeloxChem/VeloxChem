@@ -683,9 +683,9 @@ computeCoulombFockPPSS(double*         mat_J,
 
                     S_kl_00 * S_ij_11 * F2_t[0] +
 
-                    S_kl_00 * S_ij_10 * (-(a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[j_cart] * F2_t[1] +
+                    S_kl_00 * S_ij_10 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[j_cart] * F2_t[1] +
 
-                    S_kl_00 * S_ij_01 * (-(a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * F2_t[1] +
+                    S_kl_00 * S_ij_01 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * F2_t[1] +
 
                     S_kl_00 * S_ij_00 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * (
 
@@ -1335,42 +1335,31 @@ computeCoulombFockPPSP(double*         mat_J,
 
                     ) * S_ij_00;
 
-            //const auto S_kl_10 = (a_l / (a_k + a_l)) * rkl[k_cart] * S_kl_00;
             const auto S_kl_01 = -(a_k / (a_k + a_l)) * rkl[l_cart] * S_kl_00;
-
-            /*
-            const auto S_kl_11 = (
-
-                    (k_cart == l_cart ? 1.0 : 0.0) * (0.5 / (a_k + a_l)) +
-
-                    (a_k * a_l / ((a_k + a_l) * (a_k + a_l))) * (-rkl[k_cart]) * rkl[l_cart]
-
-                    ) * S_kl_00;
-            */
 
             const double eri_ijkl = Lambda * (
 
                     S_kl_01 * S_ij_11 * F3_t[0] +
 
-                    S_kl_00 * S_ij_11 * ((a_i + a_j) / (a_k + a_l + a_i + a_j)) * rPQ[l_cart] * F3_t[1] +
+                    S_kl_00 * S_ij_11 * (-(a_i + a_j) / (a_k + a_l + a_i + a_j)) * rPQ[l_cart] * F3_t[1] +
 
-                    S_kl_01 * S_ij_01 * (-(a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * F3_t[1] +
-
-                    S_kl_00 * S_ij_01 / (a_k + a_l + a_i + a_j) * (
-
-                        (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * (-rPQ[l_cart]) * rPQ[i_cart] * F3_t[2] +
-
-                        (l_cart == i_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
-
-                    ) +
-
-                    S_kl_01 * S_ij_10 * (-(a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[j_cart] * F3_t[1] +
+                    S_kl_01 * S_ij_10 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[j_cart] * F3_t[1] +
 
                     S_kl_00 * S_ij_10 / (a_k + a_l + a_i + a_j) * (
 
-                        (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * (-rPQ[l_cart]) * rPQ[j_cart] * F3_t[2] +
+                        (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * (-rPQ[j_cart]) * rPQ[l_cart] * F3_t[2] +
 
-                        (l_cart == j_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+                        (j_cart == l_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
+
+                    ) +
+
+                    S_kl_01 * S_ij_01 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * F3_t[1] +
+
+                    S_kl_00 * S_ij_01 / (a_k + a_l + a_i + a_j) * (
+
+                        (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * (-rPQ[i_cart]) * rPQ[l_cart] * F3_t[2] +
+
+                        (i_cart == l_cart ? 1.0 : 0.0) * 0.5 * F3_t[1]
 
                     ) +
 
@@ -1384,7 +1373,7 @@ computeCoulombFockPPSP(double*         mat_J,
 
                     S_kl_00 * S_ij_00 * (-(a_k + a_l)) / ((a_k + a_l + a_i + a_j) * (a_k + a_l + a_i + a_j)) * (
 
-                        (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * (-rPQ[l_cart]) * rPQ[i_cart] * rPQ[j_cart] * F3_t[3] -
+                        (a_k + a_l) * (a_i + a_j) / (a_k + a_l + a_i + a_j) * rPQ[i_cart] * rPQ[j_cart] * rPQ[l_cart] * F3_t[3] +
 
                         ((l_cart == i_cart ? 1.0 : 0.0) * (-rPQ[j_cart]) + 
                          (l_cart == j_cart ? 1.0 : 0.0) * (-rPQ[i_cart]) +
@@ -2675,8 +2664,6 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
             mat_Fock.row(i_cgto)[j_cgto] += pp_mat_J[ij] * 2.0;
 
             if (i != j) mat_Fock.row(j_cgto)[i_cgto] += pp_mat_J[ij] * 2.0;
-
-            if (std::fabs(pp_mat_J[ij]) > 1e-10) printf(" %3d  %3d    %22.10f\n", i, j, pp_mat_J[ij]);
         }
 
         if (sp_prim_pair_count > 0)
@@ -2721,6 +2708,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
                 mat_Fock.row(i_cgto)[j_cgto] += pp_mat_J[ij] * 2.0;
 
                 if (i != j) mat_Fock.row(j_cgto)[i_cgto] += pp_mat_J[ij] * 2.0;
+
+                if (std::fabs(pp_mat_J[ij]) > 1e-10) printf(" %3d  %3d    %22.10f\n", i, j, pp_mat_J[ij]);
             }
         }
 
