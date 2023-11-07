@@ -777,14 +777,11 @@ class CphfSolver(LinearSolver):
         if self.rank == mpi_master():
             # Create AODensityMatrix object from CPHF guess in AO
             cphf_ao = np.zeros((dof, nao, nao))
-            #for i in range(dof):
-            #    cphf_ao[i] = np.linalg.multi_dot([mo_occ, cphf_guess[i], mo_vir.T])
             cphf_ao = np.array([
                 np.linalg.multi_dot([mo_occ, cphf_guess[x], mo_vir.T])
                 for x in range(dof)
             ])
 
-            #cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ, cphf_guess, mo_vir)
             cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
             # create AODensityMatrix object
             ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
@@ -808,14 +805,11 @@ class CphfSolver(LinearSolver):
 
             # Create AODensityMatrix object from lambda in AO
             if self.rank == mpi_master():
-                # WIP multi_dot WORKS
                 cphf_ao = np.zeros((dof, nao, nao))
                 for i in range(dof):
                     cphf_ao[i] = np.linalg.multi_dot([
                         mo_occ, v.reshape(dof,nocc,nvir)[i], mo_vir.T
                         ])
-                #cphf_ao = np.einsum('mi,xia,na->xmn', mo_occ,
-                #                   v.reshape(dof, nocc, nvir), mo_vir)
                 cphf_ao_list = list([cphf_ao[x] for x in range(dof)])
                 ao_density_cphf = AODensityMatrix(cphf_ao_list, denmat.rest)
             else:
@@ -828,7 +822,6 @@ class CphfSolver(LinearSolver):
             # Transform to MO basis (symmetrized w.r.t. occ. and virt.)
             # and add diagonal part
             if self.rank == mpi_master():
-                #fock_cphf_numpy = np.zeros((dof,nao,nao))
                 cphf_mo = np.zeros((dof, nocc, nvir))
                 for i in range(dof):
                     fock_cphf_numpy = fock_cphf.to_numpy(i)
@@ -840,11 +833,6 @@ class CphfSolver(LinearSolver):
                                                         mo_occ]).T
                                     )
                 cphf_mo +=  v.reshape(dof, nocc, nvir) * eov
-                #cphf_mo = (-np.einsum('mi,xmn,na->xia', mo_occ,
-                #                      fock_cphf_numpy, mo_vir)
-                #          - np.einsum('ma,xmn,ni->xia', mo_vir,
-                #                      fock_cphf_numpy, mo_occ)
-                #          + v.reshape(dof, nocc, nvir) * eov)
             else:
                 cphf_mo = None
 
@@ -966,15 +954,6 @@ class CphfSolver(LinearSolver):
             self.profiler.stop_timer('derivs')
 
             # transform integral derivatives to MO basis
-#            ovlp_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ,
-#                                      ovlp_deriv_ao, mo_vir)
-#            ovlp_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
-#                                      ovlp_deriv_ao, mo_occ)
-#            fock_deriv_ov = np.einsum('mi,xymn,na->xyia', mo_occ,
-#                                      fock_deriv_ao, mo_vir)
-            #orben_ovlp_deriv_ov = np.einsum('i,xyia->xyia', eocc, ovlp_deriv_ov)
-
-            # WIP multi_dot WORKS
             ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
             ovlp_deriv_oo = np.zeros((natm, 3, nocc, nocc))
             fock_deriv_ov = np.zeros((natm, 3, nocc, nvir))
@@ -998,10 +977,6 @@ class CphfSolver(LinearSolver):
             # the oo part of the CPHF coefficients in AO basis,
             # transforming the oo overlap derivative back to AO basis
             # (not equal to the initial one)
-#            uij_ao = np.einsum('mi,axij,nj->axmn', mo_occ,
-#                       -0.5 * ovlp_deriv_oo, mo_occ).reshape((3*natm, nao, nao))
-
-            # WIP multi_dot WORKS
             uij_ao = np.zeros((natm, 3, nao, nao))
             for a in range(natm):
                 for x in range(3):
@@ -1057,10 +1032,6 @@ class CphfSolver(LinearSolver):
                     fock_uij_numpy[i,x] = fock_uij.to_numpy(3*i + x)
 
             # transform to MO basis
-#            fock_uij_mo = np.einsum('mi,axmn,nb->axib', mo_occ,
-#                                    fock_uij_numpy, mo_vir)
-
-            # WIP multi_dot WORKS
             fock_uij_mo = np.zeros((natm, 3, nocc, nvir))
             for a in range(natm):
                 for x in range(3):
