@@ -64,7 +64,7 @@ class TestOrbitalResponse(unittest.TestCase):
             lambda_ref = 'lambda_rpa'
             omega_ref = 'omega_rpa'
 
-        orb_resp.update_settings(orbrsp_dict, rsp_dict,
+        orb_resp.update_settings(orbrsp_dict,
             task.input_dict['method_settings'])
 
         orb_resp.compute(task.molecule, task.ao_basis,
