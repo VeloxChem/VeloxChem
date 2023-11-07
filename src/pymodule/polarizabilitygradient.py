@@ -22,7 +22,7 @@ from .outputstream import OutputStream
 # from .qqscheme import get_qq_scheme
 # from .errorhandler import assert_msg_critical
 from .inputparser import parse_input
-from .sanitychecks import dft_sanity_check
+from .sanitychecks import dft_sanity_check, polgrad_sanity_check
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
@@ -70,7 +70,7 @@ class PolarizabilityGradient():
         self.grid_level = 4
         self.xcfun = None
 
-        self.flag = 'Polarizability gradient'
+        self.flag = 'Polarizability Gradient'
         self.frequencies = (0,)
         self.vector_components = 'xyz'
 
@@ -148,6 +148,7 @@ class PolarizabilityGradient():
 
         # sanity checks
         dft_sanity_check(self, 'compute')
+        polgrad_sanity_check(self, self.flag, lr_results)
 
         start_time = tm.time()
 

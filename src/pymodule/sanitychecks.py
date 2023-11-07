@@ -149,3 +149,24 @@ def dft_sanity_check(obj, method_flag='compute', response_flag='none'):
         err_msg_scan += 'SCAN family of functional is not supported'
         assert_msg_critical('scan' not in obj.xcfun.get_func_label().lower(),
                             err_msg_scan)
+
+def polgrad_sanity_check(obj, method_flag, lr_results):
+    """
+    Checks settings for polarizability gradient and polarizability
+    orbital response against linear response results.
+
+    :param obj:
+        The object (polarizability gradient or orbital response driver).
+    :param method_flag:
+        The flag indicating the method in which the sanity check is
+        called.
+    :param lr_results:
+        A dictionary containing linear response results.
+    """
+
+    response_results = lr_results.get('solutions', None)
+    for frequency in obj.frequencies:
+        if frequency not in response_results.keys():
+            error_text = 'Frequency {:2.3f} in '.format(frequency)
+            error_text += method_flag + ' not found in linear response results.' 
+            raise ValueError(error_text)
