@@ -83,17 +83,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     timer.start("Total timing");
 
-    timer.start("Preparation");
-
-    // GTOs blocks and number of AOs
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
-
-    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    std::string errnaos("gpu::computeCoulombFock: Inconsistent number of AOs");
-
-    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
+    timer.start("Boys func. prep.");
 
     // Boys function (tabulated for order 0-28)
 
@@ -130,6 +120,20 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     hipSafe(hipMalloc(&d_boys_func_ft, boys_func_ft.size() * sizeof(double)));
 
     hipSafe(hipMemcpy(d_boys_func_ft, boys_func_ft.data(), boys_func_ft.size() * sizeof(double), hipMemcpyHostToDevice));
+
+    timer.stop("Boys func. prep.");
+
+    timer.start("GTO block prep.");
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    std::string errnaos("gpu::computeCoulombFock: Inconsistent number of AOs");
+
+    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
 
     // gto blocks
 
@@ -178,6 +182,10 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    timer.stop("GTO block prep.");
+
+    timer.start("GTO block pair prep.");
 
     // S-S gto block pair and S-P gto block pair
 
@@ -400,53 +408,9 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     std::sort(pp_mat_Q_D_sorted.begin(), pp_mat_Q_D_sorted.end());
     std::reverse(pp_mat_Q_D_sorted.begin(), pp_mat_Q_D_sorted.end());
 
-    // K preparation
+    timer.stop("GTO block pair prep.");
 
-    std::vector<double>   mat_Q_for_K(s_prim_count * s_prim_count);
-    std::vector<uint32_t> first_inds_for_K(s_prim_count * s_prim_count);
-    std::vector<uint32_t> second_inds_for_K(s_prim_count * s_prim_count);
-
-    // TODO: use uplo_index
-
-    for (int64_t i = 0; i < s_prim_count; i++)
-    {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
-
-        const auto Q_i = ss_mat_Q_orig.row(i);
-
-        for (int64_t j = 0; j < s_prim_count; j++)
-        {
-            Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
-        }
-
-        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
-        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
-
-        for (int64_t j = 0; j < s_prim_count; j++)
-        {
-            const auto& q_ij = Q_vec_sorted[j];
-
-            auto q_val = std::get<0>(q_ij);
-            auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
-
-            mat_Q_for_K[i * s_prim_count + j]       = q_val;
-            first_inds_for_K[i * s_prim_count + j]  = static_cast<uint32_t>(i_idx);
-            second_inds_for_K[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
-        }
-    }
-
-    std::vector<uint32_t> pair_inds_i(ss_prim_pair_count);
-    std::vector<uint32_t> pair_inds_k(ss_prim_pair_count);
-
-    for (int64_t i = 0, ik = 0; i < s_prim_count; i++)
-    {
-        for (int64_t k = i; k < s_prim_count; k++, ik++)
-        {
-            pair_inds_i[ik] = i;
-            pair_inds_k[ik] = k;
-        }
-    }
+    timer.start("Coulomb prep.");
 
     // sorted Q, D, and indices on host
 
@@ -569,33 +533,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     hipSafe(hipMemcpy(d_pp_first_inds, pp_first_inds.data(), pp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    double*   d_mat_K;
-    uint32_t *d_pair_inds_i, *d_pair_inds_k;
-
-    hipSafe(hipMalloc(&d_mat_K, ss_prim_pair_count * sizeof(double)));
-
-    hipSafe(hipMalloc(&d_pair_inds_i, ss_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k, ss_prim_pair_count * sizeof(uint32_t)));
-
-    hipSafe(hipMemcpy(d_pair_inds_i, pair_inds_i.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k, pair_inds_k.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-
-    double *  d_mat_Q_for_K, *d_mat_D_full;
-    uint32_t *d_first_inds_for_K, *d_second_inds_for_K;
-
-    hipSafe(hipMalloc(&d_mat_D_full, naos * naos * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_Q_for_K, s_prim_count * s_prim_count * sizeof(double)));
-
-    hipSafe(hipMalloc(&d_first_inds_for_K, s_prim_count * s_prim_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_second_inds_for_K, s_prim_count * s_prim_count * sizeof(uint32_t)));
-
-    hipSafe(hipMemcpy(d_mat_D_full, dens_ptr, naos * naos * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_mat_Q_for_K, mat_Q_for_K.data(), s_prim_count * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
-
-    hipSafe(hipMemcpy(d_first_inds_for_K, first_inds_for_K.data(), s_prim_count * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_second_inds_for_K, second_inds_for_K.data(), s_prim_count * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-
-    timer.stop("Preparation");
+    timer.stop("Coulomb prep.");
 
     CDenseMatrix mat_Fock(naos, naos);
 
@@ -607,54 +545,57 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     // J: (SS|SS)
 
-    hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-
-    timer.start("J kernel SSSS");
-
-    dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-    dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
-
-    hipLaunchKernelGGL(computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
-                                                 d_s_prim_info,
-                                                 static_cast<uint32_t>(s_prim_count),
-                                                 ss_max_D,
-                                                 d_mat_D,
-                                                 d_ss_mat_Q,
-                                                 d_ss_first_inds,
-                                                 d_ss_second_inds,
-                                                 static_cast<uint32_t>(ss_prim_pair_count),
-                                                 d_boys_func_table,
-                                                 d_boys_func_ft);
-
-    hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
-
-    timer.stop("J kernel SSSS");
-
-    for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
+    if (ss_prim_pair_count > 0)
     {
-        const auto i = ss_first_inds[ij];
-        const auto j = ss_second_inds[ij];
+        hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-        const auto i_cgto = s_prim_aoinds[i];
-        const auto j_cgto = s_prim_aoinds[j];
+        timer.start("J kernel SSSS");
 
-        mat_Fock.row(i_cgto)[j_cgto] += ss_mat_J[ij] * 2.0;
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        if (i != j) mat_Fock.row(j_cgto)[i_cgto] += ss_mat_J[ij] * 2.0;
+        dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        hipLaunchKernelGGL(computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
+                                                     d_s_prim_info,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     ss_max_D,
+                                                     d_mat_D,
+                                                     d_ss_mat_Q,
+                                                     d_ss_first_inds,
+                                                     d_ss_second_inds,
+                                                     static_cast<uint32_t>(ss_prim_pair_count),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
+
+        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("J kernel SSSS");
+
+        for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
+        {
+            const auto i = ss_first_inds[ij];
+            const auto j = ss_second_inds[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto j_cgto = s_prim_aoinds[j];
+
+            mat_Fock.row(i_cgto)[j_cgto] += ss_mat_J[ij] * 2.0;
+
+            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += ss_mat_J[ij] * 2.0;
+        }
     }
 
-    if (sp_prim_pair_count > 0)
-    {
-        // J: (SS|SP)
+    // J: (SS|SP)
 
+    if (ss_prim_pair_count > 0 && sp_prim_pair_count > 0)
+    {
         hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
         timer.start("J kernel SSSP");
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSSSP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -690,16 +631,67 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
             if (i != j) mat_Fock.row(j_cgto)[i_cgto] += ss_mat_J[ij] * 2.0;
         }
+    }
 
-        // J: (SP|SS)
+    // J: (SS|PP)
 
+    if (ss_prim_pair_count > 0 && pp_prim_pair_count > 0)
+    {
+        hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+        timer.start("J kernel SSPP");
+
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        hipLaunchKernelGGL(computeCoulombFockSSPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
+                                                     d_s_prim_info,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_p_prim_info,
+                                                     static_cast<uint32_t>(p_prim_count),
+                                                     pp_max_D,
+                                                     d_mat_D,
+                                                     d_ss_mat_Q,
+                                                     d_pp_mat_Q,
+                                                     d_ss_first_inds,
+                                                     d_ss_second_inds,
+                                                     static_cast<uint32_t>(ss_prim_pair_count),
+                                                     d_pp_first_inds,
+                                                     d_pp_second_inds,
+                                                     static_cast<uint32_t>(pp_prim_pair_count),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
+
+        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("J kernel SSPP");
+
+        for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
+        {
+            const auto i = ss_first_inds[ij];
+            const auto j = ss_second_inds[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto j_cgto = s_prim_aoinds[j];
+
+            mat_Fock.row(i_cgto)[j_cgto] += ss_mat_J[ij] * 2.0;
+
+            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += ss_mat_J[ij] * 2.0;
+        }
+    }
+
+    // J: (SP|SS)
+
+    if (ss_prim_pair_count > 0 && sp_prim_pair_count > 0)
+    {
         hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
         timer.start("J kernel SPSS");
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSPSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -736,16 +728,19 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             mat_Fock.row(i_cgto)[j_cgto] += sp_mat_J[ij] * 2.0;
             mat_Fock.row(j_cgto)[i_cgto] += sp_mat_J[ij] * 2.0;
         }
+    }
 
-        // J: (SP|SP)
+    // J: (SP|SP)
 
+    if (sp_prim_pair_count > 0)
+    {
         hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
         timer.start("J kernel SPSP");
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSPSP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -778,113 +773,68 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             mat_Fock.row(i_cgto)[j_cgto] += sp_mat_J[ij] * 2.0;
             mat_Fock.row(j_cgto)[i_cgto] += sp_mat_J[ij] * 2.0;
         }
-
-        // J: (SP|PP)
-
-        if (pp_prim_pair_count > 0)
-        {
-            hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
-
-            timer.start("J kernel SPPP");
-
-            threads_per_block = dim3(TILE_DIM, TILE_DIM);
-
-            num_blocks = dim3((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
-
-            hipLaunchKernelGGL(computeCoulombFockSPPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
-                                                         d_s_prim_info,
-                                                         static_cast<uint32_t>(s_prim_count),
-                                                         d_p_prim_info,
-                                                         static_cast<uint32_t>(p_prim_count),
-                                                         pp_max_D,
-                                                         d_mat_D,
-                                                         d_sp_mat_Q,
-                                                         d_pp_mat_Q,
-                                                         d_sp_first_inds,
-                                                         d_sp_second_inds,
-                                                         static_cast<uint32_t>(sp_prim_pair_count),
-                                                         d_pp_first_inds,
-                                                         d_pp_second_inds,
-                                                         static_cast<uint32_t>(pp_prim_pair_count),
-                                                         d_boys_func_table,
-                                                         d_boys_func_ft);
-
-            hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
-
-            timer.stop("J kernel SPPP");
-
-            for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
-            {
-                const auto i = sp_first_inds[ij];
-                const auto j = sp_second_inds[ij];
-
-                const auto i_cgto = s_prim_aoinds[i];
-
-                // TODO: think about the ordering of cartesian components
-                const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
-
-                mat_Fock.row(i_cgto)[j_cgto] += sp_mat_J[ij] * 2.0;
-                mat_Fock.row(j_cgto)[i_cgto] += sp_mat_J[ij] * 2.0;
-            }
-        }
     }
 
-    if (pp_prim_pair_count > 0)
-    {
-        // J: (SS|PP)
+    // J: (SP|PP)
 
+    if (sp_prim_pair_count > 0 && pp_prim_pair_count > 0)
+    {
         hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
-        timer.start("J kernel SSPP");
+        timer.start("J kernel SPPP");
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        hipLaunchKernelGGL(computeCoulombFockSSPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
+        hipLaunchKernelGGL(computeCoulombFockSPPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
                                                      pp_max_D,
                                                      d_mat_D,
-                                                     d_ss_mat_Q,
+                                                     d_sp_mat_Q,
                                                      d_pp_mat_Q,
-                                                     d_ss_first_inds,
-                                                     d_ss_second_inds,
-                                                     static_cast<uint32_t>(ss_prim_pair_count),
+                                                     d_sp_first_inds,
+                                                     d_sp_second_inds,
+                                                     static_cast<uint32_t>(sp_prim_pair_count),
                                                      d_pp_first_inds,
                                                      d_pp_second_inds,
                                                      static_cast<uint32_t>(pp_prim_pair_count),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
-        timer.stop("J kernel SSPP");
+        timer.stop("J kernel SPPP");
 
-        for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
         {
-            const auto i = ss_first_inds[ij];
-            const auto j = ss_second_inds[ij];
+            const auto i = sp_first_inds[ij];
+            const auto j = sp_second_inds[ij];
 
             const auto i_cgto = s_prim_aoinds[i];
-            const auto j_cgto = s_prim_aoinds[j];
 
-            mat_Fock.row(i_cgto)[j_cgto] += ss_mat_J[ij] * 2.0;
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += ss_mat_J[ij] * 2.0;
+            mat_Fock.row(i_cgto)[j_cgto] += sp_mat_J[ij] * 2.0;
+            mat_Fock.row(j_cgto)[i_cgto] += sp_mat_J[ij] * 2.0;
         }
+    }
 
-        // J: (PP|SS)
+    // J: (PP|SS)
 
+    if (ss_prim_pair_count > 0 && pp_prim_pair_count > 0)
+    {
         hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
         timer.start("J kernel PPSS");
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockPPSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -921,65 +871,68 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
             if (i != j) mat_Fock.row(j_cgto)[i_cgto] += pp_mat_J[ij] * 2.0;
         }
+    }
 
-        if (sp_prim_pair_count > 0)
+    // J: (PP|SP)
+
+    if (sp_prim_pair_count > 0 && pp_prim_pair_count > 0)
+    {
+        hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+        timer.start("J kernel PPSP");
+
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+
+        hipLaunchKernelGGL(computeCoulombFockPPSP, num_blocks, threads_per_block, 0, 0, d_mat_J,
+                                                     d_s_prim_info,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_p_prim_info,
+                                                     static_cast<uint32_t>(p_prim_count),
+                                                     sp_max_D,
+                                                     d_mat_D,
+                                                     d_sp_mat_Q,
+                                                     d_pp_mat_Q,
+                                                     d_sp_first_inds,
+                                                     d_sp_second_inds,
+                                                     static_cast<uint32_t>(sp_prim_pair_count),
+                                                     d_pp_first_inds,
+                                                     d_pp_second_inds,
+                                                     static_cast<uint32_t>(pp_prim_pair_count),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
+
+        hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("J kernel PPSP");
+
+        for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
         {
-            // J: (PP|SP)
+            const auto i = pp_first_inds[ij];
+            const auto j = pp_second_inds[ij];
 
-            hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            timer.start("J kernel PPSP");
+            mat_Fock.row(i_cgto)[j_cgto] += pp_mat_J[ij] * 2.0;
 
-            threads_per_block = dim3(TILE_DIM, TILE_DIM);
-
-            num_blocks = dim3((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
-
-            hipLaunchKernelGGL(computeCoulombFockPPSP, num_blocks, threads_per_block, 0, 0, d_mat_J,
-                                                         d_s_prim_info,
-                                                         static_cast<uint32_t>(s_prim_count),
-                                                         d_p_prim_info,
-                                                         static_cast<uint32_t>(p_prim_count),
-                                                         sp_max_D,
-                                                         d_mat_D,
-                                                         d_sp_mat_Q,
-                                                         d_pp_mat_Q,
-                                                         d_sp_first_inds,
-                                                         d_sp_second_inds,
-                                                         static_cast<uint32_t>(sp_prim_pair_count),
-                                                         d_pp_first_inds,
-                                                         d_pp_second_inds,
-                                                         static_cast<uint32_t>(pp_prim_pair_count),
-                                                         d_boys_func_table,
-                                                         d_boys_func_ft);
-
-            hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
-
-            timer.stop("J kernel PPSP");
-
-            for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
-            {
-                const auto i = pp_first_inds[ij];
-                const auto j = pp_second_inds[ij];
-
-                // TODO: think about the ordering of cartesian components
-                const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
-                const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
-
-                mat_Fock.row(i_cgto)[j_cgto] += pp_mat_J[ij] * 2.0;
-
-                if (i != j) mat_Fock.row(j_cgto)[i_cgto] += pp_mat_J[ij] * 2.0;
-            }
+            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += pp_mat_J[ij] * 2.0;
         }
+    }
 
-        // J: (PP|PP)
+    // J: (PP|PP)
 
+    if (pp_prim_pair_count > 0)
+    {
         hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
         timer.start("J kernel PPPP");
 
-        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        num_blocks = dim3((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockPPPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_p_prim_info,
@@ -1010,57 +963,131 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
             if (i != j) mat_Fock.row(j_cgto)[i_cgto] += pp_mat_J[ij] * 2.0;
         }
-    
     }
 
     timer.stop("J computation");
 
-    timer.start("K computation");
+    timer.start("Exchange prep.");
 
-    threads_per_block = dim3(TILE_DIM, TILE_DIM);
+    // K preparation
 
-    num_blocks = dim3(ss_prim_pair_count, 1);
+    std::vector<double>   mat_Q_for_K(s_prim_count * s_prim_count);
+    std::vector<uint32_t> first_inds_for_K(s_prim_count * s_prim_count);
+    std::vector<uint32_t> second_inds_for_K(s_prim_count * s_prim_count);
 
-    hipLaunchKernelGGL(cudaFockK, num_blocks, threads_per_block, 0, 0, d_mat_K,
-                                                 d_pair_inds_i,
-                                                 d_pair_inds_k,
-                                                 d_s_prim_info,
-                                                 d_s_prim_aoinds,
-                                                 static_cast<uint32_t>(s_prim_count),
-                                                 ss_max_D,
-                                                 d_mat_D_full,
-                                                 d_mat_Q_for_K,
-                                                 d_first_inds_for_K,
-                                                 d_second_inds_for_K,
-                                                 static_cast<uint32_t>(ss_prim_pair_count),
-                                                 static_cast<uint32_t>(naos));
+    // TODO: use uplo_index
 
-    std::vector<double> mat_K(ss_prim_pair_count);
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
 
-    hipSafe(hipMemcpy(mat_K.data(), d_mat_K, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        const auto Q_i = ss_mat_Q_orig.row(i);
 
-    timer.stop("K computation");
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
+        }
 
-    timer.start("J/K to Fock");
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
 
-    // put K back to Fock
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            auto i_idx = std::get<1>(q_ij);
+            auto j_idx = std::get<2>(q_ij);
+
+            mat_Q_for_K[i * s_prim_count + j]       = q_val;
+            first_inds_for_K[i * s_prim_count + j]  = static_cast<uint32_t>(i_idx);
+            second_inds_for_K[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
+        }
+    }
+
+    std::vector<uint32_t> pair_inds_i(ss_prim_pair_count);
+    std::vector<uint32_t> pair_inds_k(ss_prim_pair_count);
+
+    for (int64_t i = 0, ik = 0; i < s_prim_count; i++)
+    {
+        for (int64_t k = i; k < s_prim_count; k++, ik++)
+        {
+            pair_inds_i[ik] = i;
+            pair_inds_k[ik] = k;
+        }
+    }
+
+    double*   d_mat_K;
+    uint32_t *d_pair_inds_i, *d_pair_inds_k;
+
+    hipSafe(hipMalloc(&d_mat_K, ss_prim_pair_count * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_pair_inds_i, ss_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k, ss_prim_pair_count * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_pair_inds_i, pair_inds_i.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k, pair_inds_k.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    double *  d_mat_Q_for_K, *d_mat_D_full;
+    uint32_t *d_first_inds_for_K, *d_second_inds_for_K;
+
+    hipSafe(hipMalloc(&d_mat_D_full, naos * naos * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q_for_K, s_prim_count * s_prim_count * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_first_inds_for_K, s_prim_count * s_prim_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_second_inds_for_K, s_prim_count * s_prim_count * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_mat_D_full, dens_ptr, naos * naos * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q_for_K, mat_Q_for_K.data(), s_prim_count * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_first_inds_for_K, first_inds_for_K.data(), s_prim_count * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_second_inds_for_K, second_inds_for_K.data(), s_prim_count * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    timer.stop("Exchange prep.");
 
     /*
-    for (int64_t ik = 0; ik < ss_prim_pair_count; ik++)
+    timer.start("K computation");
+
+    if (ss_prim_pair_count > 0)
     {
-        const auto i = pair_inds_i[ik];
-        const auto k = pair_inds_k[ik];
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        const auto i_cgto = s_prim_aoinds[i];
-        const auto k_cgto = s_prim_aoinds[k];
+        dim3 num_blocks(ss_prim_pair_count, 1);
 
-        mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+        hipLaunchKernelGGL(cudaFockK, num_blocks, threads_per_block, 0, 0, d_mat_K,
+                                                     d_pair_inds_i,
+                                                     d_pair_inds_k,
+                                                     d_s_prim_info,
+                                                     d_s_prim_aoinds,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     ss_max_D,
+                                                     d_mat_D_full,
+                                                     d_mat_Q_for_K,
+                                                     d_first_inds_for_K,
+                                                     d_second_inds_for_K,
+                                                     static_cast<uint32_t>(ss_prim_pair_count),
+                                                     static_cast<uint32_t>(naos));
 
-        if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+        std::vector<double> mat_K(ss_prim_pair_count);
+
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ik = 0; ik < ss_prim_pair_count; ik++)
+        {
+            const auto i = pair_inds_i[ik];
+            const auto k = pair_inds_k[ik];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto k_cgto = s_prim_aoinds[k];
+
+            //mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+
+            //if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+        }
     }
-    */
 
-    timer.stop("J/K to Fock");
+    timer.stop("K computation");
+    */
 
     hipSafe(hipFree(d_boys_func_table));
     hipSafe(hipFree(d_boys_func_ft));
