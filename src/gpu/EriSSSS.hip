@@ -1936,6 +1936,10 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
     auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
     auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
 
+    printf("ss_prim_pair_count: %ld\n", ss_prim_pair_count);
+    printf("sp_prim_pair_count: %ld\n", sp_prim_pair_count);
+    printf("pp_prim_pair_count: %ld\n", pp_prim_pair_count);
+
     CDenseMatrix ss_mat_Q_orig(s_prim_count, s_prim_count);
     CDenseMatrix sp_mat_Q_orig(s_prim_count, p_prim_count * 3);
     CDenseMatrix pp_mat_Q_orig(p_prim_count * 3, p_prim_count * 3);
@@ -2356,6 +2360,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
     hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
+    timer.start("J kernel SSSS");
+
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
     dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
@@ -2373,6 +2379,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
                                                  d_boys_func_ft);
 
     hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+
+    timer.stop("J kernel SSSS");
 
     for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
@@ -2392,6 +2400,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
         // J: (SS|SP)
 
         hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+        timer.start("J kernel SSSP");
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -2417,6 +2427,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
         hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
+        timer.stop("J kernel SSSP");
+
         for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
         {
             const auto i = ss_first_inds[ij];
@@ -2433,6 +2445,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
         // J: (SP|SS)
 
         hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+        timer.start("J kernel SPSS");
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -2458,6 +2472,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
         hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
+        timer.stop("J kernel SPSS");
+
         for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
         {
             const auto i = sp_first_inds[ij];
@@ -2475,6 +2491,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
         // J: (SP|SP)
 
         hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+        timer.start("J kernel SPSP");
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -2496,6 +2514,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
         hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
+        timer.stop("J kernel SPSP");
+
         for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
         {
             const auto i = sp_first_inds[ij];
@@ -2515,6 +2535,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
         if (pp_prim_pair_count > 0)
         {
             hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            timer.start("J kernel SPPP");
 
             threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -2540,6 +2562,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
             hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
+            timer.stop("J kernel SPPP");
+
             for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
             {
                 const auto i = sp_first_inds[ij];
@@ -2561,6 +2585,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
         // J: (SS|PP)
 
         hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+        timer.start("J kernel SSPP");
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -2586,6 +2612,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
         hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
+        timer.stop("J kernel SSPP");
+
         for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
         {
             const auto i = ss_first_inds[ij];
@@ -2602,6 +2630,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
         // J: (PP|SS)
 
         hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+        timer.start("J kernel PPSS");
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -2627,6 +2657,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
         hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
+        timer.stop("J kernel PPSS");
+
         for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
         {
             const auto i = pp_first_inds[ij];
@@ -2646,6 +2678,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
             // J: (PP|SP)
 
             hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
+
+            timer.start("J kernel PPSP");
 
             threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -2671,6 +2705,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
             hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
 
+            timer.stop("J kernel PPSP");
+
             for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
             {
                 const auto i = pp_first_inds[ij];
@@ -2690,6 +2726,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
 
         hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
+        timer.start("J kernel PPPP");
+
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
@@ -2707,6 +2745,8 @@ computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CA
                                                      d_boys_func_ft);
 
         hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("J kernel PPPP");
 
         for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
         {
