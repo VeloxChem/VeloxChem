@@ -23,17 +23,26 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef CoulombDriverGPU_hpp
-#define CoulombDriverGPU_hpp
+#ifndef EriExchangeFock_hpp
+#define EriExchangeFock_hpp
 
-#include "AODensityMatrix.hpp"
-#include "DenseMatrix.hpp"
-#include "MolecularBasis.hpp"
-#include "Molecule.hpp"
+#include <cstdint>
 
-namespace gpu {
+namespace gpu {  // gpu namespace
 
-auto computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
+__global__ void cudaFockK(double*         mat_K,
+                          const uint32_t* pari_inds_i,
+                          const uint32_t* pari_inds_k,
+                          const double*   s_prim_info,
+                          const uint32_t* s_prim_aoinds,
+                          const uint32_t  s_prim_count,
+                          const double    max_D,
+                          const double*   mat_D_full,
+                          const double*   mat_Q_for_K,
+                          const uint32_t* first_inds_for_K,
+                          const uint32_t* second_inds_for_K,
+                          const uint32_t  ss_prim_pair_count,
+                          const uint32_t  naos);
 
 }  // namespace gpu
 

@@ -34,8 +34,9 @@
 #include <vector>
 
 #include "BoysFuncTable.hpp"
-#include "CoulombDriverGPU.hpp"
+#include "FockDriverGPU.hpp"
 #include "EriCoulombFock.hpp"
+#include "EriExchangeFock.hpp"
 #include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
@@ -1075,12 +1076,16 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     hipSafe(hipFree(d_ss_mat_Q));
     hipSafe(hipFree(d_sp_mat_Q));
+    hipSafe(hipFree(d_pp_mat_Q));
 
     hipSafe(hipFree(d_ss_first_inds));
     hipSafe(hipFree(d_ss_second_inds));
 
     hipSafe(hipFree(d_sp_first_inds));
     hipSafe(hipFree(d_sp_second_inds));
+
+    hipSafe(hipFree(d_pp_first_inds));
+    hipSafe(hipFree(d_pp_second_inds));
 
     hipSafe(hipFree(d_mat_K));
 

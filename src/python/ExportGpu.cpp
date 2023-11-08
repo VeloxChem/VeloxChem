@@ -29,7 +29,7 @@
 #include <pybind11/pybind11.h>
 
 #include "CudaDevices.hpp"
-#include "CoulombDriverGPU.hpp"
+#include "FockDriverGPU.hpp"
 #include "ExportGeneral.hpp"
 #include "XCIntegratorGPU.hpp"
 

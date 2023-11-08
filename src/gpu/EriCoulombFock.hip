@@ -558,171 +558,6 @@ computeCoulombFockSSPP(double*         mat_J,
 }
 
 __global__ void
-computeCoulombFockPPSS(double*         mat_J,
-                       const double*   s_prim_info,
-                       const uint32_t  s_prim_count,
-                       const double*   p_prim_info,
-                       const uint32_t  p_prim_count,
-                       const double    max_D,
-                       const double*   ss_mat_D,
-                       const double*   ss_mat_Q,
-                       const double*   pp_mat_Q,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
-                       const uint32_t  ss_prim_pair_count,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const uint32_t  pp_prim_pair_count,
-                       const double*   boys_func_table,
-                       const double*   boys_func_ft)
-{
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
-
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t skip_thread_block;
-
-    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
-
-    double J_ij = 0.0;
-
-    skip_thread_block = 0;
-
-    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t kl = m * TILE_DIM + threadIdx.y;
-
-        // TODO: add D_kl into ket side
-
-        if ((kl < ss_prim_pair_count) && (ij < pp_prim_pair_count) && (std::fabs(pp_mat_Q[ij] * ss_mat_Q[kl] * max_D) > 1.0e-12))
-        {
-            const auto i = pp_first_inds[ij];
-            const auto j = pp_second_inds[ij];
-
-            const auto k = ss_first_inds[kl];
-            const auto l = ss_second_inds[kl];
-
-            const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
-            const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
-            const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
-            const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
-            const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
-
-            const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
-            const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
-            const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
-            const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
-            const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
-
-            const auto a_k = s_prim_info[k + s_prim_count * 0];
-            const auto c_k = s_prim_info[k + s_prim_count * 1];
-            const auto x_k = s_prim_info[k + s_prim_count * 2];
-            const auto y_k = s_prim_info[k + s_prim_count * 3];
-            const auto z_k = s_prim_info[k + s_prim_count * 4];
-
-            const auto a_l = s_prim_info[l + s_prim_count * 0];
-            const auto c_l = s_prim_info[l + s_prim_count * 1];
-            const auto x_l = s_prim_info[l + s_prim_count * 2];
-            const auto y_l = s_prim_info[l + s_prim_count * 3];
-            const auto z_l = s_prim_info[l + s_prim_count * 4];
-
-            const auto i_cart = i % 3;
-            const auto j_cart = j % 3;
-
-            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-            const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
-
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                   (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
-
-            const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
-
-            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
-
-            double F2_t[3];
-
-            gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
-
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
-
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
-
-            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
-
-            const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
-
-            const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
-
-            const auto S_ij_11 = (
-
-                    (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
-
-                    (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
-
-                    ) * S_ij_00;
-
-            const double eri_ijkl = Lambda * (
-
-                    S_kl_00 * S_ij_11 * F2_t[0] +
-
-                    S_kl_00 * S_ij_10 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[j_cart] * F2_t[1] +
-
-                    S_kl_00 * S_ij_01 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * F2_t[1] +
-
-                    S_kl_00 * S_ij_00 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * (
-
-                        ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * rPQ[j_cart] * F2_t[2] -
-
-                        (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) * F2_t[1]
-
-                    ));
-
-            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
-            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * ss_mat_D[kl] * (k == l ? 1.0 : 2.0);
-        }
-        else
-        {
-            ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-            // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
-            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
-        }
-
-        __syncthreads();
-
-        // early exit for thread block
-        if (skip_thread_block == 1) break;
-
-        if (threadIdx.y == 0)
-        {
-            for (uint32_t n = 0; n < TILE_DIM; n++)
-            {
-                J_ij += ERIs[n][threadIdx.x];
-            }
-        }
-
-        __syncthreads();
-    }
-
-    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count))
-    {
-        mat_J[ij] = J_ij;
-    }
-}
-
-__global__ void
 computeCoulombFockSPSS(double*         mat_J,
                        const double*   s_prim_info,
                        const uint32_t  s_prim_count,
@@ -1210,6 +1045,171 @@ computeCoulombFockSPPP(double*         mat_J,
 }
 
 __global__ void
+computeCoulombFockPPSS(double*         mat_J,
+                       const double*   s_prim_info,
+                       const uint32_t  s_prim_count,
+                       const double*   p_prim_info,
+                       const uint32_t  p_prim_count,
+                       const double    max_D,
+                       const double*   ss_mat_D,
+                       const double*   ss_mat_Q,
+                       const double*   pp_mat_Q,
+                       const uint32_t* ss_first_inds,
+                       const uint32_t* ss_second_inds,
+                       const uint32_t  ss_prim_pair_count,
+                       const uint32_t* pp_first_inds,
+                       const uint32_t* pp_second_inds,
+                       const uint32_t  pp_prim_pair_count,
+                       const double*   boys_func_table,
+                       const double*   boys_func_ft)
+{
+    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+
+    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
+    __shared__ uint32_t skip_thread_block;
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    double J_ij = 0.0;
+
+    skip_thread_block = 0;
+
+    for (uint32_t m = 0; m < (ss_prim_pair_count + TILE_DIM - 1) / TILE_DIM; m++)
+    {
+        const uint32_t kl = m * TILE_DIM + threadIdx.y;
+
+        // TODO: add D_kl into ket side
+
+        if ((kl < ss_prim_pair_count) && (ij < pp_prim_pair_count) && (std::fabs(pp_mat_Q[ij] * ss_mat_Q[kl] * max_D) > 1.0e-12))
+        {
+            const auto i = pp_first_inds[ij];
+            const auto j = pp_second_inds[ij];
+
+            const auto k = ss_first_inds[kl];
+            const auto l = ss_second_inds[kl];
+
+            const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+            const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+            const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+            const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+            const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+            const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+            const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+            const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+            const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+            const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
+            const auto a_k = s_prim_info[k + s_prim_count * 0];
+            const auto c_k = s_prim_info[k + s_prim_count * 1];
+            const auto x_k = s_prim_info[k + s_prim_count * 2];
+            const auto y_k = s_prim_info[k + s_prim_count * 3];
+            const auto z_k = s_prim_info[k + s_prim_count * 4];
+
+            const auto a_l = s_prim_info[l + s_prim_count * 0];
+            const auto c_l = s_prim_info[l + s_prim_count * 1];
+            const auto x_l = s_prim_info[l + s_prim_count * 2];
+            const auto y_l = s_prim_info[l + s_prim_count * 3];
+            const auto z_l = s_prim_info[l + s_prim_count * 4];
+
+            const auto i_cart = i % 3;
+            const auto j_cart = j % 3;
+
+            const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+            const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
+
+            // p-1: py
+            // p_0: pz
+            // p+1: px
+
+            const double rPQ[3] = {(a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                   (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+
+            const auto r2_PQ = rPQ[0] * rPQ[0] + rPQ[1] * rPQ[1] + rPQ[2] * rPQ[2];
+
+            // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+
+            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+
+            double F2_t[3];
+
+            gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
+
+            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+
+            // p-1: py
+            // p_0: pz
+            // p+1: px
+
+            const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+
+            const double rkl[3] = {y_l - y_k, z_l - z_k, x_l - x_k};
+
+            const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
+
+            const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+
+            const auto S_ij_11 = (
+
+                    (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
+
+                    (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
+
+                    ) * S_ij_00;
+
+            const double eri_ijkl = Lambda * (
+
+                    S_kl_00 * S_ij_11 * F2_t[0] +
+
+                    S_kl_00 * S_ij_10 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[j_cart] * F2_t[1] +
+
+                    S_kl_00 * S_ij_01 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * F2_t[1] +
+
+                    S_kl_00 * S_ij_00 * ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * (
+
+                        ((a_k + a_l) / (a_k + a_l + a_i + a_j)) * rPQ[i_cart] * rPQ[j_cart] * F2_t[2] -
+
+                        (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) * F2_t[1]
+
+                    ));
+
+            // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
+            ERIs[threadIdx.y][threadIdx.x] = eri_ijkl * ss_mat_D[kl] * (k == l ? 1.0 : 2.0);
+        }
+        else
+        {
+            ERIs[threadIdx.y][threadIdx.x] = 0.0;
+
+            // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
+            if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
+        }
+
+        __syncthreads();
+
+        // early exit for thread block
+        if (skip_thread_block == 1) break;
+
+        if (threadIdx.y == 0)
+        {
+            for (uint32_t n = 0; n < TILE_DIM; n++)
+            {
+                J_ij += ERIs[n][threadIdx.x];
+            }
+        }
+
+        __syncthreads();
+    }
+
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count))
+    {
+        mat_J[ij] = J_ij;
+    }
+}
+
+__global__ void
 computeCoulombFockPPSP(double*         mat_J,
                        const double*   s_prim_info,
                        const uint32_t  s_prim_count,
@@ -1673,146 +1673,6 @@ computeCoulombFockPPPP(double*         mat_J,
     if ((threadIdx.y == 0) && (ij < pp_prim_pair_count))
     {
         mat_J[ij] = J_ij;
-    }
-}
-
-__global__ void
-cudaFockK(double*         mat_K,
-          const uint32_t* pari_inds_i,
-          const uint32_t* pari_inds_k,
-          const double*   s_prim_info,
-          const uint32_t* s_prim_aoinds,
-          const uint32_t  s_prim_count,
-          const double    max_D,
-          const double*   mat_D_full,
-          const double*   mat_Q_for_K,
-          const uint32_t* first_inds_for_K,
-          const uint32_t* second_inds_for_K,
-          const uint32_t  ss_prim_pair_count,
-          const uint32_t  naos)
-{
-    // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
-
-    __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
-    __shared__ uint32_t skip_thread_block;
-
-    const uint32_t ik = blockIdx.x;
-
-    double K_ik = 0.0;
-
-    for (uint32_t m = 0; m < (s_prim_count + TILE_DIM - 1) / TILE_DIM; m++)
-    {
-        const uint32_t j = m * TILE_DIM + threadIdx.y;
-
-        skip_thread_block = 0;
-
-        for (uint32_t n = 0; n < (s_prim_count + TILE_DIM - 1) / TILE_DIM; n++)
-        {
-            const uint32_t l = n * TILE_DIM + threadIdx.x;
-
-            if ((ik < ss_prim_pair_count) && (j < s_prim_count) && (l < s_prim_count))
-            {
-                const auto i = pari_inds_i[ik];
-                const auto k = pari_inds_k[ik];
-
-                const auto Q_ij = mat_Q_for_K[i * s_prim_count + j];
-                const auto Q_kl = mat_Q_for_K[k * s_prim_count + l];
-
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
-                {
-                    auto j_prim = second_inds_for_K[i * s_prim_count + j];
-                    auto l_prim = second_inds_for_K[k * s_prim_count + l];
-
-                    auto j_cgto = s_prim_aoinds[j_prim];
-                    auto l_cgto = s_prim_aoinds[l_prim];
-
-                    const auto a_i = s_prim_info[i + s_prim_count * 0];
-                    const auto c_i = s_prim_info[i + s_prim_count * 1];
-                    const auto x_i = s_prim_info[i + s_prim_count * 2];
-                    const auto y_i = s_prim_info[i + s_prim_count * 3];
-                    const auto z_i = s_prim_info[i + s_prim_count * 4];
-
-                    const auto a_j = s_prim_info[j_prim + s_prim_count * 0];
-                    const auto c_j = s_prim_info[j_prim + s_prim_count * 1];
-                    const auto x_j = s_prim_info[j_prim + s_prim_count * 2];
-                    const auto y_j = s_prim_info[j_prim + s_prim_count * 3];
-                    const auto z_j = s_prim_info[j_prim + s_prim_count * 4];
-
-                    const auto a_k = s_prim_info[k + s_prim_count * 0];
-                    const auto c_k = s_prim_info[k + s_prim_count * 1];
-                    const auto x_k = s_prim_info[k + s_prim_count * 2];
-                    const auto y_k = s_prim_info[k + s_prim_count * 3];
-                    const auto z_k = s_prim_info[k + s_prim_count * 4];
-
-                    const auto a_l = s_prim_info[l_prim + s_prim_count * 0];
-                    const auto c_l = s_prim_info[l_prim + s_prim_count * 1];
-                    const auto x_l = s_prim_info[l_prim + s_prim_count * 2];
-                    const auto y_l = s_prim_info[l_prim + s_prim_count * 3];
-                    const auto z_l = s_prim_info[l_prim + s_prim_count * 4];
-
-                    const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
-                    const auto r2_kl = (x_l - x_k) * (x_l - x_k) + (y_l - y_k) * (y_l - y_k) + (z_l - z_k) * (z_l - z_k);
-
-                    const auto x_PQ = (a_k * x_k + a_l * x_l) / (a_k + a_l) - (a_i * x_i + a_j * x_j) / (a_i + a_j);
-                    const auto y_PQ = (a_k * y_k + a_l * y_l) / (a_k + a_l) - (a_i * y_i + a_j * y_j) / (a_i + a_j);
-                    const auto z_PQ = (a_k * z_k + a_l * z_l) / (a_k + a_l) - (a_i * z_i + a_j * z_j) / (a_i + a_j);
-
-                    const auto r2_PQ = x_PQ * x_PQ + y_PQ * y_PQ + z_PQ * z_PQ;
-
-                    // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
-
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
-
-                    const auto t = (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ;
-
-                    // TODO: higher order Boys function
-
-                    const double F0_t = (t == 0.0 ? 1.0 : std::sqrt(MATH_CONST_PI / (4.0 * t)) * std::erf(std::sqrt(t)));
-
-                    const auto S_ij = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
-
-                    ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij * S_kl * F0_t * mat_D_full[j_cgto * naos + l_cgto];
-                }
-                else
-                {
-                    ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-                    // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
-                    if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
-                }
-            }
-            else
-            {
-                ERIs[threadIdx.y][threadIdx.x] = 0.0;
-
-                // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
-            }
-
-            __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == 1) break;
-
-            if ((threadIdx.y == 0) && (threadIdx.x == 0))
-            {
-                for (uint32_t y = 0; y < TILE_DIM; y++)
-                {
-                    for (uint32_t x = 0; x < TILE_DIM; x++)
-                    {
-                        K_ik += ERIs[y][x];
-                    }
-                }
-            }
-
-            __syncthreads();
-        }
-    }
-
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < ss_prim_pair_count))
-    {
-        mat_K[ik] = K_ik;
     }
 }
 
