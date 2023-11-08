@@ -29,7 +29,7 @@
 #include <pybind11/pybind11.h>
 
 #include "CudaDevices.hpp"
-#include "EriSSSS.hpp"
+#include "CoulombDriverGPU.hpp"
 #include "ExportGeneral.hpp"
 #include "XCIntegratorGPU.hpp"
 
@@ -73,7 +73,7 @@ export_gpu(py::module& m)
 
     m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 
-    m.def("compute_eri_ssss", &gpu::computeEriSSSS, "Computes (SS|SS) contribution to Fock matrix using GPU.");
+    m.def("compute_coulomb_fock", &gpu::computeCoulombFock, "Computes Coulomb contribution to Fock matrix using GPU.");
 }
 
 }  // namespace vlx_gpu

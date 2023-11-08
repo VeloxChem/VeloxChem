@@ -23,8 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef EriSSSS_hpp
-#define EriSSSS_hpp
+#ifndef CoulombDriverGPU_hpp
+#define CoulombDriverGPU_hpp
 
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
@@ -33,7 +33,7 @@
 
 namespace gpu {
 
-auto computeEriSSSS(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
+auto computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
 
 }  // namespace gpu
 
