@@ -58,7 +58,7 @@ class TestCrfFD:
         crf_result = crf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            gamma = -crf_result[('gamma', wb, wc, wd)]
+            gamma = -crf_result[('crf', wb, wc, wd)]
 
         # permutation test
 
@@ -76,7 +76,7 @@ class TestCrfFD:
         crf_result = crf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            gamma_perm = -crf_result[('gamma', wb, wd, wc)]
+            gamma_perm = -crf_result[('crf', wb, wd, wc)]
             assert abs(gamma.real - gamma_perm.real) < 1.0e-6
             assert abs(gamma.imag - gamma_perm.imag) < 1.0e-6
 
@@ -96,7 +96,7 @@ class TestCrfFD:
         crf_result = crf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            gamma_conj = -crf_result[('gamma', -wb, -wc, -wd)]
+            gamma_conj = -crf_result[('crf', -wb, -wc, -wd)]
             assert abs(gamma.real - gamma_conj.real) < 1.0e-6
             assert abs(gamma.imag + gamma_conj.imag) < 1.0e-6
 
@@ -117,8 +117,8 @@ class TestCrfFD:
         crf_result = crf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            gamma_0 = -crf_result[('gamma', wb, wc, 0)].real
-            assert abs(-crf_result[('gamma', wb, wc, 0)].imag) < 1.0e-6
+            gamma_0 = -crf_result[('crf', wb, wc, 0)].real
+            assert abs(-crf_result[('crf', wb, wc, 0)].imag) < 1.0e-6
 
         qrf_settings = {
             'conv_thresh': rsp_conv_thresh,

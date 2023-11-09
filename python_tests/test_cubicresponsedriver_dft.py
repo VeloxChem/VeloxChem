@@ -71,13 +71,6 @@ class TestCrf:
 
     def test_crf(self):
 
-        ref_result = {
-            'E3': 103.05625002,
-            'T4': 58.87171313,
-            'X2': -505.15455288,
-            'X3': 133.84194721,
-            'A2': -505.15455288,
-            'A3': 44.61398240,
-        }
+        ref_result = {'crf': -669.925212988134}
 
         self.run_crf(ref_result)

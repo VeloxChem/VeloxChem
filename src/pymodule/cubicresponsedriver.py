@@ -182,20 +182,16 @@ class CubicResponseDriver(NonlinearSolver):
 
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.a_component,
+        a_grad = linear_solver.get_complex_prop_grad(operator, self.a_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        b_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.b_component,
+        b_grad = linear_solver.get_complex_prop_grad(operator, self.b_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        c_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.c_component,
+        c_grad = linear_solver.get_complex_prop_grad(operator, self.c_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        d_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.d_component,
+        d_grad = linear_solver.get_complex_prop_grad(operator, self.d_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
 
@@ -502,27 +498,14 @@ class CubicResponseDriver(NonlinearSolver):
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
 
-                title = '{:<9s} {:>20s} {:>21s}'.format('Component', 'Real',
-                                                        'Imaginary')
+                title = '{:<9s} {:>20s} {:>21s}'.format('', 'Real', 'Imaginary')
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component('E3', val_E3, width)
-                self._print_component('T4', val_T4, width)
-                self._print_component('X2', val_X2, width)
-                self._print_component('X3', val_X3, width)
-                self._print_component('A2', val_A2, width)
-                self._print_component('A3', val_A3, width)
-                self._print_component('gamma', gamma, width)
+                self._print_component('CRF', gamma, width)
                 self.ostream.print_blank()
 
-                result[('E3', wb, wc, wd)] = val_E3
-                result[('T4', wb, wc, wd)] = val_T4
-                result[('X3', wb, wc, wd)] = val_X3
-                result[('X2', wb, wc, wd)] = val_X2
-                result[('A3', wb, wc, wd)] = val_A3
-                result[('A2', wb, wc, wd)] = val_A2
-                result[('gamma', wb, wc, wd)] = gamma
+                result[('crf', wb, wc, wd)] = gamma
 
         profiler.check_memory_usage('End of CRF')
 
