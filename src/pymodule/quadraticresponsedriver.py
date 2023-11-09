@@ -59,9 +59,9 @@ class QuadraticResponseDriver(NonlinearSolver):
         - damping: The damping parameter.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - a_components: Cartesian components of the A operator.
-        - b_components: Cartesian components of the B operator.
-        - c_components: Cartesian components of the C operator.
+        - a_component: Cartesian component of the A operator.
+        - b_component: Cartesian component of the B operator.
+        - c_component: Cartesian component of the C operator.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -86,18 +86,18 @@ class QuadraticResponseDriver(NonlinearSolver):
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumber()
 
-        self.a_components = 'z'
-        self.b_components = 'z'
-        self.c_components = 'z'
+        self.a_component = 'z'
+        self.b_component = 'z'
+        self.c_component = 'z'
 
         # input keywords
         self._input_keywords['response'].update({
             'b_frequencies': ('seq_range', 'B frequencies'),
             'c_frequencies': ('seq_range', 'C frequencies'),
             'damping': ('float', 'damping parameter'),
-            'a_components': ('str_lower', 'Cartesian components of A operator'),
-            'b_components': ('str_lower', 'Cartesian components of B operator'),
-            'c_components': ('str_lower', 'Cartesian components of C operator'),
+            'a_component': ('str_lower', 'Cartesian component of A operator'),
+            'b_component': ('str_lower', 'Cartesian component of B operator'),
+            'c_component': ('str_lower', 'Cartesian component of C operator'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -181,16 +181,13 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.a_components,
+        a_grad = linear_solver.get_complex_prop_grad(operator, self.a_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        b_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.b_components,
+        b_grad = linear_solver.get_complex_prop_grad(operator, self.b_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        c_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.c_components,
+        c_grad = linear_solver.get_complex_prop_grad(operator, self.c_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
 
@@ -349,9 +346,9 @@ class QuadraticResponseDriver(NonlinearSolver):
 
             if self.rank == mpi_master():
 
-                op_a = X[self.a_components]
-                op_b = X[self.b_components]
-                op_c = X[self.c_components]
+                op_a = X[self.a_component]
+                op_b = X[self.b_component]
+                op_c = X[self.c_component]
 
                 kb = self.complex_lrvec2mat(Nb, nocc, norb)
                 kc = self.complex_lrvec2mat(Nc, nocc, norb)
@@ -376,7 +373,7 @@ class QuadraticResponseDriver(NonlinearSolver):
                 self.ostream.print_blank()
                 w_str = 'Quadratic response function: '
                 w_str += '<< {};{},{} >>  ({},{})'.format(
-                    self.a_components, self.b_components, self.c_components,
+                    self.a_component, self.b_component, self.c_component,
                     str(wb), str(wc))
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))

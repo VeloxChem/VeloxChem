@@ -46,9 +46,9 @@ class TestQrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
             'b_frequencies': [wb],
             'c_frequencies': [wc],
         }
@@ -62,9 +62,9 @@ class TestQrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': c,
-            'c_components': b,
+            'a_component': a,
+            'b_component': c,
+            'c_component': b,
             'b_frequencies': [wc],
             'c_frequencies': [wb],
         }
@@ -80,9 +80,9 @@ class TestQrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
             'b_frequencies': [-wb],
             'c_frequencies': [-wc],
         }
@@ -98,9 +98,9 @@ class TestQrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
             'b_frequencies': [wb],
             'c_frequencies': [0],
             'damping': 0,

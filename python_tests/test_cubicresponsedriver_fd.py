@@ -122,9 +122,9 @@ class TestCrfFD:
 
         qrf_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
             'b_frequencies': [wb],
             'c_frequencies': [wc],
             'damping': 0,

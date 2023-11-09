@@ -43,9 +43,9 @@ class TestQrf:
             'b_frequencies': [-0.1],
             'c_frequencies': [0.3],
             'damping': 0.1,
-            'a_components': 'x',
-            'b_components': 'x',
-            'c_components': 'z'
+            'a_component': 'x',
+            'b_component': 'x',
+            'c_component': 'z'
         }
         qrf_drv.update_settings(rsp_settings, method_settings)
         qrf_result_xxz = qrf_drv.compute(molecule, basis, scf_results)
@@ -55,9 +55,9 @@ class TestQrf:
             'b_frequencies': [-0.1],
             'c_frequencies': [0.3],
             'damping': 0.1,
-            'a_components': 'y',
-            'b_components': 'z',
-            'c_components': 'y'
+            'a_component': 'y',
+            'b_component': 'z',
+            'c_component': 'y'
         }
         qrf_drv.update_settings(rsp_settings, method_settings)
         qrf_result_yzy = qrf_drv.compute(molecule, basis, scf_results)
@@ -67,9 +67,9 @@ class TestQrf:
             'b_frequencies': [-0.1],
             'c_frequencies': [0.3],
             'damping': 0.1,
-            'a_components': 'z',
-            'b_components': 'z',
-            'c_components': 'z'
+            'a_component': 'z',
+            'b_component': 'z',
+            'c_component': 'z'
         }
         qrf_drv.update_settings(rsp_settings, method_settings)
         qrf_result_zzz = qrf_drv.compute(molecule, basis, scf_results)
