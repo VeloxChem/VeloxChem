@@ -56,10 +56,10 @@ class TestTpaFromCrf:
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
                     'd_frequencies': [w3],
-                    'a_components': a,
-                    'b_components': a,
-                    'c_components': b,
-                    'd_components': b,
+                    'a_component': a,
+                    'b_component': a,
+                    'c_component': b,
+                    'd_component': b,
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)
@@ -80,10 +80,10 @@ class TestTpaFromCrf:
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
                     'd_frequencies': [w3],
-                    'a_components': a,
-                    'b_components': b,
-                    'c_components': a,
-                    'd_components': b,
+                    'a_component': a,
+                    'b_component': b,
+                    'c_component': a,
+                    'd_component': b,
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)
@@ -104,10 +104,10 @@ class TestTpaFromCrf:
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
                     'd_frequencies': [w3],
-                    'a_components': a,
-                    'b_components': b,
-                    'c_components': b,
-                    'd_components': a,
+                    'a_component': a,
+                    'b_component': b,
+                    'c_component': b,
+                    'd_component': a,
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)

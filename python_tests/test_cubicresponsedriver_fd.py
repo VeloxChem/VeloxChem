@@ -46,10 +46,10 @@ class TestCrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
-            'd_components': d,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
+            'd_component': d,
             'b_frequencies': [wb],
             'c_frequencies': [wc],
             'd_frequencies': [wd],
@@ -64,10 +64,10 @@ class TestCrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': d,
-            'd_components': c,
+            'a_component': a,
+            'b_component': b,
+            'c_component': d,
+            'd_component': c,
             'b_frequencies': [wb],
             'c_frequencies': [wd],
             'd_frequencies': [wc],
@@ -84,10 +84,10 @@ class TestCrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
-            'd_components': d,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
+            'd_component': d,
             'b_frequencies': [-wb],
             'c_frequencies': [-wc],
             'd_frequencies': [-wd],
@@ -104,10 +104,10 @@ class TestCrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
-            'd_components': d,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
+            'd_component': d,
             'b_frequencies': [wb],
             'c_frequencies': [wc],
             'd_frequencies': [0],

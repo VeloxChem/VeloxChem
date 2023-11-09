@@ -49,10 +49,10 @@ class TestCrf:
             'b_frequencies': [wb],
             'c_frequencies': [wc],
             'd_frequencies': [wd],
-            'a_components': 'y',
-            'b_components': 'y',
-            'c_components': 'z',
-            'd_components': 'z',
+            'a_component': 'y',
+            'b_component': 'y',
+            'c_component': 'z',
+            'd_component': 'z',
             'damping': 0.1
         }
 

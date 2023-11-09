@@ -84,10 +84,10 @@ class CubicResponseDriver(NonlinearSolver):
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumber()
 
-        self.a_components = 'z'
-        self.b_components = 'z'
-        self.c_components = 'z'
-        self.d_components = 'z'
+        self.a_component = 'z'
+        self.b_component = 'z'
+        self.c_component = 'z'
+        self.d_component = 'z'
 
         # input keywords
         self._input_keywords['response'].update({
@@ -95,10 +95,10 @@ class CubicResponseDriver(NonlinearSolver):
             'c_frequencies': ('seq_range', 'C frequencies'),
             'd_frequencies': ('seq_range', 'D frequencies'),
             'damping': ('float', 'damping parameter'),
-            'a_components': ('str_lower', 'Cartesian components of A operator'),
-            'b_components': ('str_lower', 'Cartesian components of B operator'),
-            'c_components': ('str_lower', 'Cartesian components of C operator'),
-            'd_components': ('str_lower', 'Cartesian components of D operator'),
+            'a_component': ('str_lower', 'Cartesian component of A operator'),
+            'b_component': ('str_lower', 'Cartesian component of B operator'),
+            'c_component': ('str_lower', 'Cartesian component of C operator'),
+            'd_component': ('str_lower', 'Cartesian component of D operator'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -183,19 +183,19 @@ class CubicResponseDriver(NonlinearSolver):
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
         a_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.a_components,
+                                                     self.a_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
         b_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.b_components,
+                                                     self.b_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
         c_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.c_components,
+                                                     self.c_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
         d_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.d_components,
+                                                     self.d_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
 
@@ -408,10 +408,10 @@ class CubicResponseDriver(NonlinearSolver):
 
             if self.rank == mpi_master():
 
-                A = X[self.a_components]
-                B = X[self.b_components]
-                C = X[self.c_components]
-                D = X[self.d_components]
+                A = X[self.a_component]
+                B = X[self.b_component]
+                C = X[self.c_component]
+                D = X[self.d_component]
 
                 kb = self.complex_lrvec2mat(Nb, nocc, norb)
                 kc = self.complex_lrvec2mat(Nc, nocc, norb)
@@ -496,8 +496,8 @@ class CubicResponseDriver(NonlinearSolver):
 
                 self.ostream.print_blank()
                 w_str = 'Cubic response function: << {};{},{},{} >>  ({},{},{})'.format(
-                    self.a_components, self.b_components, self.c_components,
-                    self.d_components, str(wb), str(wc), str(wd))
+                    self.a_component, self.b_component, self.c_component,
+                    self.d_component, str(wb), str(wc), str(wd))
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
@@ -1233,9 +1233,9 @@ class CubicResponseDriver(NonlinearSolver):
             kc = (self.complex_lrvec2mat(Nc, nocc, norb)).T
             kd = (self.complex_lrvec2mat(Nd, nocc, norb)).T
 
-            B = X[self.b_components]
-            C = X[self.c_components]
-            D = X[self.d_components]
+            B = X[self.b_component]
+            C = X[self.c_component]
+            D = X[self.d_component]
 
             # BC
 
