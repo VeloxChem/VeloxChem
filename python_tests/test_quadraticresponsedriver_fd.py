@@ -56,7 +56,7 @@ class TestQrfFD:
         quad_result = qrf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            beta = -quad_result[(wb, wc)]
+            beta = -quad_result[('qrf', wb, wc)]
 
         # permutation test
 
@@ -72,7 +72,7 @@ class TestQrfFD:
         quad_result = qrf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            beta_perm = -quad_result[(wc, wb)]
+            beta_perm = -quad_result[('qrf', wc, wb)]
             assert abs(beta.real - beta_perm.real) < 1.0e-6
             assert abs(beta.imag - beta_perm.imag) < 1.0e-6
 
@@ -90,7 +90,7 @@ class TestQrfFD:
         quad_result = qrf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            beta_conj = -quad_result[(-wb, -wc)]
+            beta_conj = -quad_result[('qrf', -wb, -wc)]
             assert abs(beta.real - beta_conj.real) < 1.0e-6
             assert abs(beta.imag + beta_conj.imag) < 1.0e-6
 
@@ -109,8 +109,8 @@ class TestQrfFD:
         qrf_result = qrf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            beta_0 = -qrf_result[(wb, 0)].real
-            assert abs(-qrf_result[(wb, 0)].imag) < 1.0e-6
+            beta_0 = -qrf_result[('qrf', wb, 0)].real
+            assert abs(-qrf_result[('qrf', wb, 0)].imag) < 1.0e-6
 
         cpp_settings = {
             'conv_thresh': rsp_conv_thresh,

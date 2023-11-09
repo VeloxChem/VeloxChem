@@ -379,19 +379,15 @@ class QuadraticResponseDriver(NonlinearSolver):
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
 
-                title = '{:<9s} {:>20s} {:>21s}'.format('Component', 'Real',
-                                                        'Imaginary')
+                title = '{:<9s} {:>20s} {:>21s}'.format('', 'Real', 'Imaginary')
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component('X2', val_X2, width)
-                self._print_component('A2', val_A2, width)
-                self._print_component('E3', val_E3, width)
-                self._print_component('beta', beta, width)
+                self._print_component('QRF', beta, width)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                result[(wb, wc)] = beta
+                result[('qrf', wb, wc)] = beta
 
         profiler.check_memory_usage('End of QRF')
 

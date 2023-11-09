@@ -78,21 +78,21 @@ class TestQrf:
             thresh = 1.0e-4
 
             # x-component
-            assert abs(qrf_result_xxz[(-0.1, 0.3)].real -
+            assert abs(qrf_result_xxz[('qrf', -0.1, 0.3)].real -
                        ref_result['xxz'].real) < thresh
-            assert abs(qrf_result_xxz[(-0.1, 0.3)].imag -
+            assert abs(qrf_result_xxz[('qrf', -0.1, 0.3)].imag -
                        ref_result['xxz'].imag) < thresh
 
             # y-component
-            assert abs(qrf_result_yzy[(-0.1, 0.3)].real -
+            assert abs(qrf_result_yzy[('qrf', -0.1, 0.3)].real -
                        ref_result['yzy'].real) < thresh
-            assert abs(qrf_result_yzy[(-0.1, 0.3)].imag -
+            assert abs(qrf_result_yzy[('qrf', -0.1, 0.3)].imag -
                        ref_result['yzy'].imag) < thresh
 
             # z-component
-            assert abs(qrf_result_zzz[(-0.1, 0.3)].real -
+            assert abs(qrf_result_zzz[('qrf', -0.1, 0.3)].real -
                        ref_result['zzz'].real) < thresh
-            assert abs(qrf_result_zzz[(-0.1, 0.3)].imag -
+            assert abs(qrf_result_zzz[('qrf', -0.1, 0.3)].imag -
                        ref_result['zzz'].imag) < thresh
 
     def test_qrf(self):

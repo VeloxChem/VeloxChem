@@ -59,7 +59,7 @@ class TestShgFromQrf:
                 qrf.update_settings(rsp_settings, method_settings)
                 qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_shg_results[ind] += qrf_results[(w1, w2)]
+                    ref_shg_results[ind] += qrf_results[('qrf', w1, w2)]
 
             for b in components:
                 rsp_settings.update({
@@ -73,7 +73,7 @@ class TestShgFromQrf:
                 qrf.update_settings(rsp_settings, method_settings)
                 qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_shg_results[ind] += qrf_results[(w1, w2)]
+                    ref_shg_results[ind] += qrf_results[('qrf', w1, w2)]
 
             for b in components:
                 rsp_settings.update({
@@ -87,7 +87,7 @@ class TestShgFromQrf:
                 qrf.update_settings(rsp_settings, method_settings)
                 qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_shg_results[ind] += qrf_results[(w1, w2)]
+                    ref_shg_results[ind] += qrf_results[('qrf', w1, w2)]
 
         rsp_settings = {
             'frequencies': [w1],
