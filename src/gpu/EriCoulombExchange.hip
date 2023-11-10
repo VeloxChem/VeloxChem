@@ -1694,8 +1694,8 @@ computeCoulombFockPPPP(double*         mat_J,
 
 __global__ void
 cudaFockK(double*         mat_K,
-          const uint32_t* pari_inds_i,
-          const uint32_t* pari_inds_k,
+          const uint32_t* pair_inds_i,
+          const uint32_t* pair_inds_k,
           const double*   s_prim_info,
           const uint32_t* s_prim_aoinds,
           const uint32_t  s_prim_count,
@@ -1704,7 +1704,7 @@ cudaFockK(double*         mat_K,
           const double*   mat_Q_for_K,
           const uint32_t* first_inds_for_K,
           const uint32_t* second_inds_for_K,
-          const uint32_t  ss_prim_pair_count,
+          const uint32_t  pair_inds_count,
           const uint32_t  naos,
           const double*   boys_func_table,
           const double*   boys_func_ft)
@@ -1722,6 +1722,9 @@ cudaFockK(double*         mat_K,
     {
         const uint32_t j = m * TILE_DIM + threadIdx.y;
 
+        // to avoid memory hazard
+        __syncthreads();
+
         if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 0;
 
         __syncthreads();
@@ -1730,10 +1733,10 @@ cudaFockK(double*         mat_K,
         {
             const uint32_t l = n * TILE_DIM + threadIdx.x;
 
-            if ((ik < ss_prim_pair_count) && (j < s_prim_count) && (l < s_prim_count))
+            if ((ik < pair_inds_count) && (j < s_prim_count) && (l < s_prim_count))
             {
-                const auto i = pari_inds_i[ik];
-                const auto k = pari_inds_k[ik];
+                const auto i = pair_inds_i[ik];
+                const auto k = pair_inds_k[ik];
 
                 const auto Q_ij = mat_Q_for_K[i * s_prim_count + j];
                 const auto Q_kl = mat_Q_for_K[k * s_prim_count + l];
@@ -1789,8 +1792,6 @@ cudaFockK(double*         mat_K,
 
                     gpu::computeBoysFunction(F0_t, t, 0, boys_func_table, boys_func_ft);
 
-                    //const double F0_t = (t == 0.0 ? 1.0 : std::sqrt(MATH_CONST_PI / (4.0 * t)) * std::erf(std::sqrt(t)));
-
                     const auto S_ij = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
                     const auto S_kl = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
@@ -1801,7 +1802,7 @@ cudaFockK(double*         mat_K,
                     ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
                     // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
-                    if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
+                    if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
                 }
             }
             else
@@ -1809,10 +1810,13 @@ cudaFockK(double*         mat_K,
                 ERIs[threadIdx.y][threadIdx.x] = 0.0;
 
                 // indicator for early exit for thread block (ERIs[0][0] has the largest upper bound)
-                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = 1;
+                if ((threadIdx.y == 0) && (threadIdx.x == 0)) skip_thread_block = m + 1;
             }
 
             __syncthreads();
+
+            // early exit for thread block
+            if (skip_thread_block == m + 1) break;
 
             if ((threadIdx.y == 0) && (threadIdx.x == 0))
             {
@@ -1826,13 +1830,10 @@ cudaFockK(double*         mat_K,
             }
 
             __syncthreads();
-
-            // early exit for thread block
-            if (skip_thread_block == 1) break;
         }
     }
 
-    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < ss_prim_pair_count))
+    if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count))
     {
         mat_K[ik] = K_ik;
     }

@@ -981,6 +981,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     timer.stop("J computation");
 
+    /*
     // preLinK test
 
     CDenseMatrix mat_Q_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
@@ -1018,7 +1019,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     auto Q_prime = denblas::multAB(mat_Q_full, denblas::multAB(mat_D_full, mat_Q_full));
 
-    int64_t count_all = 0, count_4 = 0, count_6 = 0, count_8 = 0, count_10 = 0, count_7=0, count_5=0;
+    int64_t count_all = 0, count_4 = 0, count_6 = 0, count_8 = 0, count_10 = 0;
 
     for (int64_t i = 0; i < s_prim_count + p_prim_count * 3; i++)
     {
@@ -1029,19 +1030,16 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             count_all++;
             if (std::fabs(val) > 1.0e-10) count_10++;
             if (std::fabs(val) > 1.0e-8) count_8++;
-            if (std::fabs(val) > 1.0e-7) count_7++;
             if (std::fabs(val) > 1.0e-6) count_6++;
-            if (std::fabs(val) > 1.0e-5) count_5++;
             if (std::fabs(val) > 1.0e-4) count_4++;
         }
     }
 
     printf("count_10 : %12.5f\n", 1.0-static_cast<double>(count_10) / static_cast<double>(count_all));
     printf("count_8  : %12.5f\n", 1.0-static_cast<double>(count_8 ) / static_cast<double>(count_all));
-    printf("count_7  : %12.5f\n", 1.0-static_cast<double>(count_7 ) / static_cast<double>(count_all));
     printf("count_6  : %12.5f\n", 1.0-static_cast<double>(count_6 ) / static_cast<double>(count_all));
-    printf("count_5  : %12.5f\n", 1.0-static_cast<double>(count_5 ) / static_cast<double>(count_all));
     printf("count_4  : %12.5f\n", 1.0-static_cast<double>(count_4 ) / static_cast<double>(count_all));
+    */
 
     timer.start("Exchange prep.");
 
@@ -1081,28 +1079,35 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         }
     }
 
-    std::vector<uint32_t> pair_inds_i(ss_prim_pair_count);
-    std::vector<uint32_t> pair_inds_k(ss_prim_pair_count);
+    std::vector<uint32_t> pair_inds_i;
+    std::vector<uint32_t> pair_inds_k;
 
     for (int64_t i = 0, ik = 0; i < s_prim_count; i++)
     {
         for (int64_t k = i; k < s_prim_count; k++, ik++)
         {
-            pair_inds_i[ik] = i;
-            pair_inds_k[ik] = k;
+            //auto val = Q_prime.row(i)[k];
+
+            //if (std::fabs(val) > 1.0e-8)
+            {
+                pair_inds_i.push_back(i);
+                pair_inds_k.push_back(k);
+            }
         }
     }
+
+    auto pair_inds_count = static_cast<uint32_t>(pair_inds_i.size());
 
     double*   d_mat_K;
     uint32_t *d_pair_inds_i, *d_pair_inds_k;
 
-    hipSafe(hipMalloc(&d_mat_K, ss_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_K, pair_inds_count * sizeof(double)));
 
-    hipSafe(hipMalloc(&d_pair_inds_i, ss_prim_pair_count * sizeof(uint32_t)));
-    hipSafe(hipMalloc(&d_pair_inds_k, ss_prim_pair_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_i, pair_inds_count * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pair_inds_k, pair_inds_count * sizeof(uint32_t)));
 
-    hipSafe(hipMemcpy(d_pair_inds_i, pair_inds_i.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_pair_inds_k, pair_inds_k.data(), ss_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_i, pair_inds_i.data(), pair_inds_count * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pair_inds_k, pair_inds_k.data(), pair_inds_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     double *  d_mat_Q_for_K, *d_mat_D_full;
     uint32_t *d_first_inds_for_K, *d_second_inds_for_K;
@@ -1127,7 +1132,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks(ss_prim_pair_count, 1);
+        dim3 num_blocks(pair_inds_count, 1);
 
         hipLaunchKernelGGL(cudaFockK, num_blocks, threads_per_block, 0, 0, d_mat_K,
                                                      d_pair_inds_i,
@@ -1140,16 +1145,16 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      d_mat_Q_for_K,
                                                      d_first_inds_for_K,
                                                      d_second_inds_for_K,
-                                                     static_cast<uint32_t>(ss_prim_pair_count),
+                                                     static_cast<uint32_t>(pair_inds_count),
                                                      static_cast<uint32_t>(naos),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        std::vector<double> mat_K(ss_prim_pair_count);
+        std::vector<double> mat_K(pair_inds_count);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count * sizeof(double), hipMemcpyDeviceToHost));
 
-        for (int64_t ik = 0; ik < ss_prim_pair_count; ik++)
+        for (int64_t ik = 0; ik < pair_inds_count; ik++)
         {
             const auto i = pair_inds_i[ik];
             const auto k = pair_inds_k[ik];
