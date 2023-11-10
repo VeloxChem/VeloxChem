@@ -34,9 +34,9 @@
 #include <vector>
 
 #include "BoysFuncTable.hpp"
+#include "DenseLinearAlgebra.hpp"
 #include "FockDriverGPU.hpp"
-#include "EriCoulombFock.hpp"
-#include "EriExchangeFock.hpp"
+#include "EriCoulombExchange.hpp"
 #include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
@@ -201,6 +201,10 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     CDenseMatrix sp_mat_Q_orig(s_prim_count, p_prim_count * 3);
     CDenseMatrix pp_mat_Q_orig(p_prim_count * 3, p_prim_count * 3);
 
+    CDenseMatrix ss_mat_D_orig(s_prim_count, s_prim_count);
+    CDenseMatrix sp_mat_D_orig(s_prim_count, p_prim_count * 3);
+    CDenseMatrix pp_mat_D_orig(p_prim_count * 3, p_prim_count * 3);
+
     std::vector<std::tuple<double, int64_t, int64_t, double>> ss_mat_Q_D_sorted;
     std::vector<std::tuple<double, int64_t, int64_t, double>> sp_mat_Q_D_sorted;
     std::vector<std::tuple<double, int64_t, int64_t, double>> pp_mat_Q_D_sorted;
@@ -248,6 +252,10 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             ss_mat_Q_orig.row(i)[j] = sqrt_ijij;
 
             if (i != j) ss_mat_Q_orig.row(j)[i] = sqrt_ijij;
+
+            ss_mat_D_orig.row(i)[j] = D_ij;
+
+            if (i != j) ss_mat_D_orig.row(j)[i] = D_ij;
 
             ss_mat_Q_D_sorted.push_back(std::make_tuple(sqrt_ijij, i, j, D_ij));
         }
@@ -297,6 +305,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                 // TODO: think about the ordering of cartesian components
 
                 sp_mat_Q_orig.row(i)[j * 3 + s] = sqrt_ijij;
+
+                sp_mat_D_orig.row(i)[j * 3 + s] = D_ij;
 
                 sp_mat_Q_D_sorted.push_back(std::make_tuple(sqrt_ijij, i, j * 3 + s, D_ij));
             }
@@ -385,13 +395,17 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
                     const auto sqrt_ijij = std::sqrt(eri_ijij);
 
+                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
                     // TODO: think about the ordering of cartesian components
 
                     pp_mat_Q_orig.row(i * 3 + i_cart)[j * 3 + j_cart] = sqrt_ijij;
 
                     if (i * 3 + i_cart != j * 3 + j_cart) pp_mat_Q_orig.row(j * 3 + j_cart)[i * 3 + i_cart] = sqrt_ijij;
 
-                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+                    pp_mat_D_orig.row(i * 3 + i_cart)[j * 3 + j_cart] = D_ij;
+
+                    if (i * 3 + i_cart != j * 3 + j_cart) pp_mat_D_orig.row(j * 3 + j_cart)[i * 3 + i_cart] = D_ij;
 
                     pp_mat_Q_D_sorted.push_back(std::make_tuple(sqrt_ijij, i * 3 + i_cart, j * 3 + j_cart, D_ij));
                 }
@@ -967,6 +981,68 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     timer.stop("J computation");
 
+    // preLinK test
+
+    CDenseMatrix mat_Q_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
+    CDenseMatrix mat_D_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            mat_Q_full.row(i)[j] = ss_mat_Q_orig.row(i)[j];
+            mat_D_full.row(i)[j] = ss_mat_D_orig.row(i)[j];
+        }
+    }
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            mat_Q_full.row(i)[s_prim_count + j] = sp_mat_Q_orig.row(i)[j];
+            mat_D_full.row(i)[s_prim_count + j] = sp_mat_D_orig.row(i)[j];
+
+            mat_Q_full.row(s_prim_count + j)[i] = sp_mat_Q_orig.row(i)[j];
+            mat_D_full.row(s_prim_count + j)[i] = sp_mat_D_orig.row(i)[j];
+        }
+    }
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            mat_Q_full.row(s_prim_count + i)[s_prim_count + j] = pp_mat_Q_orig.row(i)[j];
+            mat_D_full.row(s_prim_count + i)[s_prim_count + j] = pp_mat_D_orig.row(i)[j];
+        }
+    }
+
+    auto Q_prime = denblas::multAB(mat_Q_full, denblas::multAB(mat_D_full, mat_Q_full));
+
+    int64_t count_all = 0, count_4 = 0, count_6 = 0, count_8 = 0, count_10 = 0, count_7=0, count_5=0;
+
+    for (int64_t i = 0; i < s_prim_count + p_prim_count * 3; i++)
+    {
+        for (int64_t j = 0; j < s_prim_count + p_prim_count * 3; j++)
+        {
+            auto val = Q_prime.row(i)[j];
+
+            count_all++;
+            if (std::fabs(val) > 1.0e-10) count_10++;
+            if (std::fabs(val) > 1.0e-8) count_8++;
+            if (std::fabs(val) > 1.0e-7) count_7++;
+            if (std::fabs(val) > 1.0e-6) count_6++;
+            if (std::fabs(val) > 1.0e-5) count_5++;
+            if (std::fabs(val) > 1.0e-4) count_4++;
+        }
+    }
+
+    printf("count_10 : %12.5f\n", 1.0-static_cast<double>(count_10) / static_cast<double>(count_all));
+    printf("count_8  : %12.5f\n", 1.0-static_cast<double>(count_8 ) / static_cast<double>(count_all));
+    printf("count_7  : %12.5f\n", 1.0-static_cast<double>(count_7 ) / static_cast<double>(count_all));
+    printf("count_6  : %12.5f\n", 1.0-static_cast<double>(count_6 ) / static_cast<double>(count_all));
+    printf("count_5  : %12.5f\n", 1.0-static_cast<double>(count_5 ) / static_cast<double>(count_all));
+    printf("count_4  : %12.5f\n", 1.0-static_cast<double>(count_4 ) / static_cast<double>(count_all));
+
     timer.start("Exchange prep.");
 
     // K preparation
@@ -1045,7 +1121,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     timer.stop("Exchange prep.");
 
-    /*
     timer.start("K computation");
 
     if (ss_prim_pair_count > 0)
@@ -1066,7 +1141,9 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      d_first_inds_for_K,
                                                      d_second_inds_for_K,
                                                      static_cast<uint32_t>(ss_prim_pair_count),
-                                                     static_cast<uint32_t>(naos));
+                                                     static_cast<uint32_t>(naos),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
 
         std::vector<double> mat_K(ss_prim_pair_count);
 
@@ -1080,14 +1157,13 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             const auto i_cgto = s_prim_aoinds[i];
             const auto k_cgto = s_prim_aoinds[k];
 
-            //mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            //if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
     timer.stop("K computation");
-    */
 
     hipSafe(hipFree(d_boys_func_table));
     hipSafe(hipFree(d_boys_func_ft));

@@ -23,8 +23,8 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef EriCoulombFock_hpp
-#define EriCoulombFock_hpp
+#ifndef EriCoulombExchange_hpp
+#define EriCoulombExchange_hpp
 
 #include <cstdint>
 
@@ -175,6 +175,22 @@ __global__ void computeCoulombFockPPPP(double*         mat_J,
                                        const uint32_t  pp_prim_pair_count,
                                        const double*   boys_func_table,
                                        const double*   boys_func_ft);
+
+__global__ void cudaFockK(double*         mat_K,
+                          const uint32_t* pari_inds_i,
+                          const uint32_t* pari_inds_k,
+                          const double*   s_prim_info,
+                          const uint32_t* s_prim_aoinds,
+                          const uint32_t  s_prim_count,
+                          const double    max_D,
+                          const double*   mat_D_full,
+                          const double*   mat_Q_for_K,
+                          const uint32_t* first_inds_for_K,
+                          const uint32_t* second_inds_for_K,
+                          const uint32_t  ss_prim_pair_count,
+                          const uint32_t  naos,
+                          const double*   boys_func_table,
+                          const double*   boys_func_ft);
 
 }  // namespace gpu
 
