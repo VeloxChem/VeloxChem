@@ -1276,6 +1276,53 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
             if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+        }
+    }
+
+    // K: (SP|SS)
+    //     *  *
+
+    if ((ss_prim_pair_count > 0) && (sp_prim_pair_count > 0))
+    {
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+        dim3 num_blocks(pair_inds_count_for_K_ss, 1);
+
+        hipLaunchKernelGGL(computeExchangeFockSPSS, num_blocks, threads_per_block, 0, 0, d_mat_K,
+                                                     d_pair_inds_i_for_K_ss,
+                                                     d_pair_inds_k_for_K_ss,
+                                                     static_cast<uint32_t>(pair_inds_count_for_K_ss),
+                                                     d_s_prim_info,
+                                                     d_s_prim_aoinds,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_p_prim_info,
+                                                     d_p_prim_aoinds,
+                                                     static_cast<uint32_t>(p_prim_count),
+                                                     sp_max_D,
+                                                     d_mat_D_full_AO,
+                                                     d_mat_Q_for_K_ss,
+                                                     d_mat_Q_for_K_sp,
+                                                     d_density_inds_for_K_ss,
+                                                     d_density_inds_for_K_sp,
+                                                     static_cast<uint32_t>(naos),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
+
+        std::vector<double> mat_K(pair_inds_count_for_K_ss);
+
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
+        {
+            const auto i = pair_inds_i_for_K_ss[ik];
+            const auto k = pair_inds_k_for_K_ss[ik];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto k_cgto = s_prim_aoinds[k];
+
+            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+
+            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
 
             if (std::fabs(mat_K[ik]) > 1e-10) printf(" %3d  %3d      %22.12f\n", i, k, mat_K[ik]);
         }
