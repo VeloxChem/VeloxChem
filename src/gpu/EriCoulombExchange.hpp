@@ -176,21 +176,20 @@ __global__ void computeCoulombFockPPPP(double*         mat_J,
                                        const double*   boys_func_table,
                                        const double*   boys_func_ft);
 
-__global__ void cudaFockK(double*         mat_K,
-                          const uint32_t* pair_inds_i,
-                          const uint32_t* pair_inds_k,
-                          const double*   s_prim_info,
-                          const uint32_t* s_prim_aoinds,
-                          const uint32_t  s_prim_count,
-                          const double    max_D,
-                          const double*   mat_D_full,
-                          const double*   mat_Q_for_K,
-                          const uint32_t* first_inds_for_K,
-                          const uint32_t* second_inds_for_K,
-                          const uint32_t  pair_inds_count,
-                          const uint32_t  naos,
-                          const double*   boys_func_table,
-                          const double*   boys_func_ft);
+__global__ void computeExchangeFockSSSS(double*         mat_K,
+                                        const uint32_t* pair_inds_i,
+                                        const uint32_t* pair_inds_k,
+                                        const double*   s_prim_info,
+                                        const uint32_t* s_prim_aoinds,
+                                        const uint32_t  s_prim_count,
+                                        const double    max_D,
+                                        const double*   mat_D_full,
+                                        const double*   mat_Q_for_K,
+                                        const uint32_t* density_inds_for_K,
+                                        const uint32_t  pair_inds_count,
+                                        const uint32_t  naos,
+                                        const double*   boys_func_table,
+                                        const double*   boys_func_ft);
 
 }  // namespace gpu
 

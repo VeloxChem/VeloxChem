@@ -1693,21 +1693,20 @@ computeCoulombFockPPPP(double*         mat_J,
 }
 
 __global__ void
-cudaFockK(double*         mat_K,
-          const uint32_t* pair_inds_i,
-          const uint32_t* pair_inds_k,
-          const double*   s_prim_info,
-          const uint32_t* s_prim_aoinds,
-          const uint32_t  s_prim_count,
-          const double    max_D,
-          const double*   mat_D_full,
-          const double*   mat_Q_for_K,
-          const uint32_t* first_inds_for_K,
-          const uint32_t* second_inds_for_K,
-          const uint32_t  pair_inds_count,
-          const uint32_t  naos,
-          const double*   boys_func_table,
-          const double*   boys_func_ft)
+computeExchangeFockSSSS(double*         mat_K,
+                        const uint32_t* pair_inds_i,
+                        const uint32_t* pair_inds_k,
+                        const double*   s_prim_info,
+                        const uint32_t* s_prim_aoinds,
+                        const uint32_t  s_prim_count,
+                        const double    max_D,
+                        const double*   mat_D_full,
+                        const double*   mat_Q_for_K_ss,
+                        const uint32_t* density_inds_for_K_ss,
+                        const uint32_t  pair_inds_count,
+                        const uint32_t  naos,
+                        const double*   boys_func_table,
+                        const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
 
@@ -1738,13 +1737,13 @@ cudaFockK(double*         mat_K,
                 const auto i = pair_inds_i[ik];
                 const auto k = pair_inds_k[ik];
 
-                const auto Q_ij = mat_Q_for_K[i * s_prim_count + j];
-                const auto Q_kl = mat_Q_for_K[k * s_prim_count + l];
+                const auto Q_ij = mat_Q_for_K_ss[i * s_prim_count + j];
+                const auto Q_kl = mat_Q_for_K_ss[k * s_prim_count + l];
 
                 if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
-                    auto j_prim = second_inds_for_K[i * s_prim_count + j];
-                    auto l_prim = second_inds_for_K[k * s_prim_count + l];
+                    auto j_prim = density_inds_for_K_ss[i * s_prim_count + j];
+                    auto l_prim = density_inds_for_K_ss[k * s_prim_count + l];
 
                     auto j_cgto = s_prim_aoinds[j_prim];
                     auto l_cgto = s_prim_aoinds[l_prim];
