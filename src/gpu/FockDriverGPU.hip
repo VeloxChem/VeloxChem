@@ -1155,9 +1155,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     std::vector<double> mat_K(max_pair_inds_count);
 
-    // TODO: remove ss_mat_K
-    std::vector<double> ss_mat_K(pair_inds_count_for_K_ss, 0.0);
-
     hipSafe(hipMalloc(&d_mat_K, max_pair_inds_count * sizeof(double)));
 
     hipSafe(hipMalloc(&d_pair_inds_i_for_K_ss, pair_inds_count_for_K_ss * sizeof(uint32_t)));
@@ -1207,6 +1204,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 num_blocks(pair_inds_count_for_K_ss, 1);
 
+        timer.start("K kernel SSSS");
+
         hipLaunchKernelGGL(computeExchangeFockSSSS, num_blocks, threads_per_block, 0, 0, d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
@@ -1223,6 +1222,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("K kernel SSSS");
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -1247,6 +1248,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 num_blocks(pair_inds_count_for_K_ss, 1);
 
+        timer.start("K kernel SSSP");
+
         hipLaunchKernelGGL(computeExchangeFockSSSP, num_blocks, threads_per_block, 0, 0, d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
@@ -1268,6 +1271,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      d_boys_func_ft);
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("K kernel SSSP");
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -1292,6 +1297,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 num_blocks(pair_inds_count_for_K_ss, 1);
 
+        timer.start("K kernel SPSS");
+
         hipLaunchKernelGGL(computeExchangeFockSPSS, num_blocks, threads_per_block, 0, 0, d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
@@ -1312,9 +1319,9 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        std::vector<double> mat_K(pair_inds_count_for_K_ss);
-
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("K kernel SPSS");
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -1339,6 +1346,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 num_blocks(pair_inds_count_for_K_ss, 1);
 
+        timer.start("K kernel SPSP");
+
         hipLaunchKernelGGL(computeExchangeFockSPSP, num_blocks, threads_per_block, 0, 0, d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
@@ -1357,9 +1366,9 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        std::vector<double> mat_K(pair_inds_count_for_K_ss);
-
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("K kernel SPSP");
 
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
@@ -1372,10 +1381,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
             if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-
-            ss_mat_K[ik] += mat_K[ik];
-
-            if (std::fabs(ss_mat_K[ik]) > 1e-10) printf(" %3d  %3d      %22.12f\n", i, k, ss_mat_K[ik]);
         }
     }
 
