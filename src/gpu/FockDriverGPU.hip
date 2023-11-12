@@ -1115,6 +1115,34 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         }
     }
 
+    std::vector<double>   mat_Q_for_K_ps(p_prim_count * 3 * s_prim_count);
+    std::vector<uint32_t> density_inds_for_K_ps(p_prim_count * 3 * s_prim_count);
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            Q_vec_sorted.push_back(std::make_tuple(sp_mat_Q_orig.row(j)[i], i, j));
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            // auto i_idx = std::get<1>(q_ij);
+            auto j_idx = std::get<2>(q_ij);
+
+            mat_Q_for_K_ps[i * s_prim_count + j]        = q_val;
+            density_inds_for_K_ps[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
+        }
+    }
+
     std::vector<uint32_t> pair_inds_i_for_K_ss;
     std::vector<uint32_t> pair_inds_k_for_K_ss;
 
@@ -1170,24 +1198,28 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     hipSafe(hipMemcpy(d_pair_inds_k_for_K_sp, pair_inds_k_for_K_sp.data(), pair_inds_count_for_K_sp * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     double* d_mat_D_full_AO;
-    double *d_mat_Q_for_K_ss, *d_mat_Q_for_K_sp;
-    uint32_t *d_density_inds_for_K_ss, *d_density_inds_for_K_sp;
+    double *d_mat_Q_for_K_ss, *d_mat_Q_for_K_sp, *d_mat_Q_for_K_ps;
+    uint32_t *d_density_inds_for_K_ss, *d_density_inds_for_K_sp, *d_density_inds_for_K_ps;
 
     hipSafe(hipMalloc(&d_mat_D_full_AO, naos * naos * sizeof(double)));
 
     hipSafe(hipMalloc(&d_mat_Q_for_K_ss, s_prim_count * s_prim_count * sizeof(double)));
     hipSafe(hipMalloc(&d_mat_Q_for_K_sp, s_prim_count * p_prim_count * 3 * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_Q_for_K_ps, p_prim_count * 3 * s_prim_count * sizeof(double)));
 
     hipSafe(hipMalloc(&d_density_inds_for_K_ss, s_prim_count * s_prim_count * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_density_inds_for_K_sp, s_prim_count * p_prim_count * 3 * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_density_inds_for_K_ps, p_prim_count * 3 * s_prim_count * sizeof(uint32_t)));
 
     hipSafe(hipMemcpy(d_mat_D_full_AO, dens_ptr, naos * naos * sizeof(double), hipMemcpyHostToDevice));
 
     hipSafe(hipMemcpy(d_mat_Q_for_K_ss, mat_Q_for_K_ss.data(), s_prim_count * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_mat_Q_for_K_sp, mat_Q_for_K_sp.data(), s_prim_count * p_prim_count * 3 * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_mat_Q_for_K_ps, mat_Q_for_K_ps.data(), p_prim_count * 3 * s_prim_count * sizeof(double), hipMemcpyHostToDevice));
 
     hipSafe(hipMemcpy(d_density_inds_for_K_ss, density_inds_for_K_ss.data(), s_prim_count * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_density_inds_for_K_sp, density_inds_for_K_sp.data(), s_prim_count * p_prim_count * 3 * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_density_inds_for_K_ps, density_inds_for_K_ps.data(), p_prim_count * 3 * s_prim_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     timer.stop("Exchange prep.");
 
@@ -1384,6 +1416,58 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         }
     }
 
+    // K: (SS|PS)
+    //     *  *
+
+    if ((ss_prim_pair_count > 0) && (sp_prim_pair_count > 0))
+    {
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+        dim3 num_blocks(pair_inds_count_for_K_sp, 1);
+
+        timer.start("K kernel SSPS");
+
+        hipLaunchKernelGGL(computeExchangeFockSSPS, num_blocks, threads_per_block, 0, 0, d_mat_K,
+                                                     d_pair_inds_i_for_K_sp,
+                                                     d_pair_inds_k_for_K_sp,
+                                                     static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                                                     d_s_prim_info,
+                                                     d_s_prim_aoinds,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_p_prim_info,
+                                                     d_p_prim_aoinds,
+                                                     static_cast<uint32_t>(p_prim_count),
+                                                     pp_max_D,
+                                                     d_mat_D_full_AO,
+                                                     d_mat_Q_for_K_ss,
+                                                     d_mat_Q_for_K_ps,
+                                                     d_density_inds_for_K_ss,
+                                                     d_density_inds_for_K_ps,
+                                                     static_cast<uint32_t>(naos),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
+
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("K kernel SPSP");
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
+        {
+            const auto i = pair_inds_i_for_K_sp[ik];
+            const auto k = pair_inds_k_for_K_sp[ik];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
+
+            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+
+            if (std::fabs(mat_K[ik]) > 1e-10) printf(" %3d  %3d      %22.12f\n", i, k, mat_K[ik]);
+        }
+    }
+
     timer.stop("K computation");
 
     hipSafe(hipFree(d_boys_func_table));
@@ -1415,11 +1499,18 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     hipSafe(hipFree(d_pair_inds_i_for_K_ss));
     hipSafe(hipFree(d_pair_inds_k_for_K_ss));
+    hipSafe(hipFree(d_pair_inds_i_for_K_sp));
+    hipSafe(hipFree(d_pair_inds_k_for_K_sp));
 
     hipSafe(hipFree(d_mat_D_full_AO));
+
     hipSafe(hipFree(d_mat_Q_for_K_ss));
+    hipSafe(hipFree(d_mat_Q_for_K_sp));
+    hipSafe(hipFree(d_mat_Q_for_K_ps));
 
     hipSafe(hipFree(d_density_inds_for_K_ss));
+    hipSafe(hipFree(d_density_inds_for_K_sp));
+    hipSafe(hipFree(d_density_inds_for_K_ps));
 
     timer.stop("Total timing");
 
