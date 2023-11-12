@@ -1011,18 +1011,18 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     timer.stop("J computation");
 
-    /*
-    // preLinK test
+    // preLinK
+    // J. Chem. Phys. 138, 134114 (2013)
 
     CDenseMatrix mat_Q_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
-    CDenseMatrix mat_D_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
+    CDenseMatrix mat_D_abs_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
         for (int64_t j = 0; j < s_prim_count; j++)
         {
             mat_Q_full.row(i)[j] = ss_mat_Q_orig.row(i)[j];
-            mat_D_full.row(i)[j] = ss_mat_D_orig.row(i)[j];
+            mat_D_abs_full.row(i)[j] = std::fabs(ss_mat_D_orig.row(i)[j]);
         }
     }
 
@@ -1031,10 +1031,10 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
             mat_Q_full.row(i)[s_prim_count + j] = sp_mat_Q_orig.row(i)[j];
-            mat_D_full.row(i)[s_prim_count + j] = sp_mat_D_orig.row(i)[j];
+            mat_D_abs_full.row(i)[s_prim_count + j] = std::fabs(sp_mat_D_orig.row(i)[j]);
 
             mat_Q_full.row(s_prim_count + j)[i] = sp_mat_Q_orig.row(i)[j];
-            mat_D_full.row(s_prim_count + j)[i] = sp_mat_D_orig.row(i)[j];
+            mat_D_abs_full.row(s_prim_count + j)[i] = std::fabs(sp_mat_D_orig.row(i)[j]);
         }
     }
 
@@ -1043,29 +1043,11 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
             mat_Q_full.row(s_prim_count + i)[s_prim_count + j] = pp_mat_Q_orig.row(i)[j];
-            mat_D_full.row(s_prim_count + i)[s_prim_count + j] = pp_mat_D_orig.row(i)[j];
+            mat_D_abs_full.row(s_prim_count + i)[s_prim_count + j] = std::fabs(pp_mat_D_orig.row(i)[j]);
         }
     }
 
-    auto Q_prime = denblas::multAB(mat_Q_full, denblas::multAB(mat_D_full, mat_Q_full));
-
-    int64_t count_all = 0, count_8 = 0, count_10 = 0;
-
-    for (int64_t i = 0; i < s_prim_count + p_prim_count * 3; i++)
-    {
-        for (int64_t j = 0; j < s_prim_count + p_prim_count * 3; j++)
-        {
-            auto val = Q_prime.row(i)[j];
-
-            count_all++;
-            if (std::fabs(val) > 1.0e-10) count_10++;
-            if (std::fabs(val) > 1.0e-8) count_8++;
-        }
-    }
-
-    printf("count_10 : %12.5f\n", 1.0-static_cast<double>(count_10) / static_cast<double>(count_all));
-    printf("count_8  : %12.5f\n", 1.0-static_cast<double>(count_8 ) / static_cast<double>(count_all));
-    */
+    auto Q_prime = denblas::multAB(mat_Q_full, denblas::multAB(mat_D_abs_full, mat_Q_full));
 
     timer.start("Exchange prep.");
 
@@ -1191,6 +1173,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         }
     }
 
+    const double Q_prime_thresh = 1.0e-7;
+
     std::vector<uint32_t> pair_inds_i_for_K_ss;
     std::vector<uint32_t> pair_inds_k_for_K_ss;
 
@@ -1198,9 +1182,11 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     {
         for (int64_t k = i; k < s_prim_count; k++)
         {
-            // TODO use Q_prime (Q' = QDQ)
-            pair_inds_i_for_K_ss.push_back(i);
-            pair_inds_k_for_K_ss.push_back(k);
+            if (std::fabs(Q_prime.row(i)[k]) > Q_prime_thresh)
+            {
+                pair_inds_i_for_K_ss.push_back(i);
+                pair_inds_k_for_K_ss.push_back(k);
+            }
         }
     }
 
@@ -1211,9 +1197,11 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     {
         for (int64_t k = 0; k < p_prim_count * 3; k++)
         {
-            // TODO use Q_prime (Q' = QDQ)
-            pair_inds_i_for_K_sp.push_back(i);
-            pair_inds_k_for_K_sp.push_back(k);
+            if (std::fabs(Q_prime.row(i)[s_prim_count + k]) > Q_prime_thresh)
+            {
+                pair_inds_i_for_K_sp.push_back(i);
+                pair_inds_k_for_K_sp.push_back(k);
+            }
         }
     }
 
@@ -1224,15 +1212,21 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     {
         for (int64_t k = i; k < p_prim_count * 3; k++)
         {
-            // TODO use Q_prime (Q' = QDQ)
-            pair_inds_i_for_K_pp.push_back(i);
-            pair_inds_k_for_K_pp.push_back(k);
+            if (std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]) > Q_prime_thresh)
+            {
+                pair_inds_i_for_K_pp.push_back(i);
+                pair_inds_k_for_K_pp.push_back(k);
+            }
         }
     }
 
     auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
     auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
     auto pair_inds_count_for_K_pp = static_cast<uint32_t>(pair_inds_i_for_K_pp.size());
+
+    printf("Q_prime screening ratio: %12.5f\n", 1.0 - (
+                static_cast<double>(pair_inds_count_for_K_ss + pair_inds_count_for_K_sp + pair_inds_count_for_K_pp) /
+                static_cast<double>(ss_prim_pair_count + sp_prim_pair_count + pp_prim_pair_count)));
 
     printf("pair_inds_count_for_K_ss: %d\n", pair_inds_count_for_K_ss);
     printf("pair_inds_count_for_K_sp: %d\n", pair_inds_count_for_K_sp);
