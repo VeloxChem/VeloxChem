@@ -1593,7 +1593,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     // K: (SP|PS)
     //     *  *
 
-    if ((sp_prim_pair_count > 0) && (sp_prim_pair_count > 0))
+    if (sp_prim_pair_count > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1637,8 +1637,58 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
             mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
             mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+        }
+    }
 
-            if (std::fabs(mat_K[ik]) > 1e-10) printf(" %3d  %3d      %22.12f\n", i, k, mat_K[ik]);
+    // K: (SP|PP)
+    //     *  *
+
+    if ((sp_prim_pair_count > 0) && (pp_prim_pair_count > 0))
+    {
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+        dim3 num_blocks(pair_inds_count_for_K_sp, 1);
+
+        timer.start("K kernel SPPP");
+
+        hipLaunchKernelGGL(computeExchangeFockSPPP, num_blocks, threads_per_block, 0, 0, d_mat_K,
+                                                     d_pair_inds_i_for_K_sp,
+                                                     d_pair_inds_k_for_K_sp,
+                                                     static_cast<uint32_t>(pair_inds_count_for_K_sp),
+                                                     d_s_prim_info,
+                                                     d_s_prim_aoinds,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_p_prim_info,
+                                                     d_p_prim_aoinds,
+                                                     static_cast<uint32_t>(p_prim_count),
+                                                     pp_max_D,
+                                                     d_mat_D_full_AO,
+                                                     d_mat_Q_for_K_sp,
+                                                     d_mat_Q_for_K_pp,
+                                                     d_density_inds_for_K_sp,
+                                                     d_density_inds_for_K_pp,
+                                                     static_cast<uint32_t>(naos),
+                                                     d_boys_func_table,
+                                                     d_boys_func_ft);
+
+        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
+
+        timer.stop("K kernel SPPP");
+
+        for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
+        {
+            const auto i = pair_inds_i_for_K_sp[ik];
+            const auto k = pair_inds_k_for_K_sp[ik];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
+
+            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+
+            //if (std::fabs(mat_K[ik]) > 1e-10) printf(" %3d  %3d      %22.12f\n", i, k, mat_K[ik]);
         }
     }
 
