@@ -197,7 +197,103 @@ class RespChargesDriver:
         if method_dict is not None:
             self.method_dict = dict(method_dict)
 
-    def compute(self, molecule, basis, flag):
+    def compute(self, molecule, basis, *args):
+        """
+        Computes RESP or ESP charges.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The molecular basis set.
+        :param scf_results:
+            The SCF results.
+        :param chg_type:
+            The type of charges ('resp' or 'esp').
+
+        :return:
+            The charges.
+        """
+
+        # for backward compatibility, where three arguments were given: (mol,
+        # bas, chg_type)
+        if len(args) == 1 and isinstance(args[0], str):
+            chg_type = args[0]
+            return self.compute_weighted_charges(molecule, basis, chg_type)
+
+        # we expect scf_results and chg_type in addition to molecule and basis
+        assert_msg_critical(
+            len(args) == 2,
+            'RespChargesDriver.compute: Expecting scf_results and chg_type')
+        scf_results, chg_type = args
+
+        # sanity check for equal_charges
+        if self.equal_charges is not None:
+            if isinstance(self.equal_charges, str):
+                eq_chgs = []
+                for q in self.equal_charges.split(','):
+                    if q:
+                        eq_chgs.append(list(map(int, q.split('='))))
+                self.equal_charges = eq_chgs
+            assert_msg_critical(
+                isinstance(self.equal_charges, (list, tuple)),
+                'RespChargesDriver.compute: Invalid equal_charges')
+
+        output_dir = Path(self.filename).parent
+
+        use_631gs_basis = (basis.get_label() in ['6-31G*', '6-31G_D_'])
+
+        # sanity check for RESP
+        if chg_type.lower() == 'resp':
+            assert_msg_critical(
+                self.grid_type == 'mk',
+                'RespChargesDriver.compute: For RESP charges, ' +
+                'grid_type must be \'mk\'')
+            if not use_631gs_basis:
+                cur_str = 'Recommended basis set 6-31G* is not used!'
+                self.ostream.print_warning(cur_str)
+                self.ostream.print_blank()
+
+        if self.rank == mpi_master():
+            nalpha = molecule.number_of_alpha_electrons()
+            nbeta = molecule.number_of_beta_electrons()
+            if nalpha != nbeta:
+                assert_msg_critical(
+                    scf_results['scf_type'] != 'restricted',
+                    'RespChargesDriver.compute: Molecule is open-shell while ' +
+                    'SCF is closed-shell')
+
+        grid_m = self.get_grid_points(molecule)
+        esp_m = self.get_electrostatic_potential(grid_m, molecule, basis,
+                                                 scf_results)
+
+        if self.rank == mpi_master():
+            scf_energy_m = scf_results['scf_energy']
+            if self.energies is None:
+                self.energies = [scf_energy_m]
+            if self.weights is None:
+                self.weights = self.get_boltzmann_weights(
+                    self.energies, self.temperature)
+
+        q = None
+
+        if self.rank == mpi_master():
+            if self.fitting_points is not None:
+                q = self.compute_esp_charges_on_fitting_points([molecule],
+                                                               [grid_m],
+                                                               [esp_m])
+            elif chg_type.lower() == 'resp':
+                q = self.compute_resp_charges([molecule], [grid_m], [esp_m],
+                                              self.weights)
+            elif chg_type.lower() == 'esp':
+                q = self.compute_esp_charges([molecule], [grid_m], [esp_m],
+                                             self.weights)
+            if self.fitting_points is None:
+                filename = str(output_dir / Path(self.filename).name)
+                self.write_pdb_file(filename, [molecule], q)
+
+        return q
+
+    def compute_weighted_charges(self, molecule, basis, flag):
         """
         Computes RESP or ESP charges.
 
