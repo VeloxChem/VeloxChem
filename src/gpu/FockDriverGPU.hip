@@ -69,6 +69,7 @@ auto
 computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
     if (rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (rank % 8 == 1) hipSafe(hipSetDevice(5));
@@ -210,6 +211,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     std::vector<std::tuple<double, int64_t, int64_t, double>> pp_mat_Q_D_sorted;
 
     auto dens_ptr = densityMatrix.alphaDensity(0);
+
+    // TODO distribute computation of Q matrices
 
     double ss_max_D = 0.0;
     double sp_max_D = 0.0;
@@ -423,6 +426,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         }
     }
 
+    // TODO sync computed Q matrices
+
     printf("ss_max_D (K): %22.12f\n", ss_max_D);
     printf("sp_max_D (K): %22.12f\n", sp_max_D);
     printf("pp_max_D (K): %22.12f\n", pp_max_D);
@@ -574,6 +579,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     mat_Fock.zero();
 
+    /*
     timer.start("J computation");
 
     // compute J
@@ -1010,6 +1016,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     }
 
     timer.stop("J computation");
+    */
 
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
@@ -1175,6 +1182,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     const double Q_prime_thresh = 1.0e-7;
 
+    // TODO sort by Q_prime bound
+
     std::vector<uint32_t> pair_inds_i_for_K_ss;
     std::vector<uint32_t> pair_inds_k_for_K_ss;
 
@@ -1189,6 +1198,18 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             }
         }
     }
+
+    std::vector<uint32_t> local_pair_inds_i_for_K_ss;
+    std::vector<uint32_t> local_pair_inds_k_for_K_ss;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(pair_inds_i_for_K_ss.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_ss.push_back(pair_inds_i_for_K_ss[ik]);
+        local_pair_inds_k_for_K_ss.push_back(pair_inds_k_for_K_ss[ik]);
+    }
+
+    pair_inds_i_for_K_ss = local_pair_inds_i_for_K_ss;
+    pair_inds_k_for_K_ss = local_pair_inds_k_for_K_ss;
 
     std::vector<uint32_t> pair_inds_i_for_K_sp;
     std::vector<uint32_t> pair_inds_k_for_K_sp;
@@ -1205,6 +1226,18 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         }
     }
 
+    std::vector<uint32_t> local_pair_inds_i_for_K_sp;
+    std::vector<uint32_t> local_pair_inds_k_for_K_sp;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(pair_inds_i_for_K_sp.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_sp.push_back(pair_inds_i_for_K_sp[ik]);
+        local_pair_inds_k_for_K_sp.push_back(pair_inds_k_for_K_sp[ik]);
+    }
+
+    pair_inds_i_for_K_sp = local_pair_inds_i_for_K_sp;
+    pair_inds_k_for_K_sp = local_pair_inds_k_for_K_sp;
+
     std::vector<uint32_t> pair_inds_i_for_K_pp;
     std::vector<uint32_t> pair_inds_k_for_K_pp;
 
@@ -1219,6 +1252,18 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             }
         }
     }
+
+    std::vector<uint32_t> local_pair_inds_i_for_K_pp;
+    std::vector<uint32_t> local_pair_inds_k_for_K_pp;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(pair_inds_i_for_K_pp.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_pp.push_back(pair_inds_i_for_K_pp[ik]);
+        local_pair_inds_k_for_K_pp.push_back(pair_inds_k_for_K_pp[ik]);
+    }
+
+    pair_inds_i_for_K_pp = local_pair_inds_i_for_K_pp;
+    pair_inds_k_for_K_pp = local_pair_inds_k_for_K_pp;
 
     auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
     auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
