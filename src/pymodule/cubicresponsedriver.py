@@ -84,10 +84,10 @@ class CubicResponseDriver(NonlinearSolver):
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumber()
 
-        self.a_component = 'z'
-        self.b_component = 'z'
-        self.c_component = 'z'
-        self.d_component = 'z'
+        self.a_component = None
+        self.b_component = None
+        self.c_component = None
+        self.d_component = None
 
         # input keywords
         self._input_keywords['response'].update({
@@ -130,6 +130,36 @@ class CubicResponseDriver(NonlinearSolver):
         :return:
               A dictonary containing the E[3], X[2], A[2] contractions
         """
+
+        # for backward compatibility
+        if self.a_component is None and hasattr(self, 'a_components'):
+            self.a_component = self.a_components
+
+        if self.b_component is None and hasattr(self, 'b_components'):
+            self.b_component = self.b_components
+
+        if self.c_component is None and hasattr(self, 'c_components'):
+            self.c_component = self.c_components
+
+        if self.d_component is None and hasattr(self, 'd_components'):
+            self.d_component = self.d_components
+
+        # sanity check
+        assert_msg_critical(
+            self.a_component in ['x', 'y', 'z'],
+            'CubicResponseDriver: Undefined or invalid a_component')
+
+        assert_msg_critical(
+            self.b_component in ['x', 'y', 'z'],
+            'CubicResponseDriver: Undefined or invalid a_component')
+
+        assert_msg_critical(
+            self.c_component in ['x', 'y', 'z'],
+            'CubicResponseDriver: Undefined or invalid a_component')
+
+        assert_msg_critical(
+            self.d_component in ['x', 'y', 'z'],
+            'CubicResponseDriver: Undefined or invalid a_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
