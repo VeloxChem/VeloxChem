@@ -447,7 +447,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     // sorted Q, D, and indices on host
 
-    // TODO: use mat_J with max size
     std::vector<double> ss_mat_Q(ss_prim_pair_count);
     std::vector<double> ss_mat_D(ss_prim_pair_count);
     std::vector<double> ss_mat_J(ss_prim_pair_count);
@@ -475,7 +474,19 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         if (std::fabs(D_ij) > ss_max_D) ss_max_D = std::fabs(D_ij);
     }
 
-    // TODO: use mat_J with max size
+    std::vector<uint32_t> ss_first_inds_local;
+    std::vector<uint32_t> ss_second_inds_local;
+    std::vector<double> ss_mat_Q_local;
+
+    for (int64_t ij = rank; ij < ss_prim_pair_count; ij+=nnodes)
+    {
+        ss_first_inds_local.push_back(ss_first_inds[ij]);
+        ss_second_inds_local.push_back(ss_second_inds[ij]);
+        ss_mat_Q_local.push_back(ss_mat_Q[ij]);
+    }
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+
     std::vector<double> sp_mat_Q(sp_prim_pair_count);
     std::vector<double> sp_mat_D(sp_prim_pair_count);
     std::vector<double> sp_mat_J(sp_prim_pair_count);
@@ -503,7 +514,19 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         if (std::fabs(D_ij) > sp_max_D) sp_max_D = std::fabs(D_ij);
     }
 
-    // TODO: use mat_J with max size
+    std::vector<uint32_t> sp_first_inds_local;
+    std::vector<uint32_t> sp_second_inds_local;
+    std::vector<double> sp_mat_Q_local;
+
+    for (int64_t ij = rank; ij < sp_prim_pair_count; ij+=nnodes)
+    {
+        sp_first_inds_local.push_back(sp_first_inds[ij]);
+        sp_second_inds_local.push_back(sp_second_inds[ij]);
+        sp_mat_Q_local.push_back(sp_mat_Q[ij]);
+    }
+
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+
     std::vector<double> pp_mat_Q(pp_prim_pair_count);
     std::vector<double> pp_mat_D(pp_prim_pair_count);
     std::vector<double> pp_mat_J(pp_prim_pair_count);
@@ -531,16 +554,36 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         if (std::fabs(D_ij) > pp_max_D) pp_max_D = std::fabs(D_ij);
     }
 
+    std::vector<uint32_t> pp_first_inds_local;
+    std::vector<uint32_t> pp_second_inds_local;
+    std::vector<double> pp_mat_Q_local;
+
+    for (int64_t ij = rank; ij < pp_prim_pair_count; ij+=nnodes)
+    {
+        pp_first_inds_local.push_back(pp_first_inds[ij]);
+        pp_second_inds_local.push_back(pp_second_inds[ij]);
+        pp_mat_Q_local.push_back(pp_mat_Q[ij]);
+    }
+
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+
     printf("ss_max_D (J): %22.12f\n", ss_max_D);
     printf("sp_max_D (J): %22.12f\n", sp_max_D);
     printf("pp_max_D (J): %22.12f\n", pp_max_D);
 
     // sorted Q, D, and indices on device
 
-    double *  d_mat_J, *d_mat_D, *d_ss_mat_Q, *d_sp_mat_Q, *d_pp_mat_Q;
+    double *d_mat_J, *d_mat_D, *d_ss_mat_Q, *d_sp_mat_Q, *d_pp_mat_Q;
+
     uint32_t *d_ss_first_inds, *d_ss_second_inds;
     uint32_t *d_sp_first_inds, *d_sp_second_inds;
     uint32_t *d_pp_first_inds, *d_pp_second_inds;
+
+    double *d_ss_mat_Q_local, *d_sp_mat_Q_local, *d_pp_mat_Q_local;
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
 
     auto max_prim_pair_count = std::max(ss_prim_pair_count, std::max(sp_prim_pair_count, pp_prim_pair_count));
 
@@ -560,6 +603,19 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     hipSafe(hipMalloc(&d_pp_first_inds, pp_prim_pair_count * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_pp_second_inds, pp_prim_pair_count * sizeof(uint32_t)));
 
+    hipSafe(hipMalloc(&d_ss_mat_Q_local, ss_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_sp_mat_Q_local, sp_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_pp_mat_Q_local, pp_prim_pair_count_local * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
     hipSafe(hipMemcpy(d_ss_mat_Q, ss_mat_Q.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_sp_mat_Q, sp_mat_Q.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pp_mat_Q, pp_mat_Q.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
@@ -573,13 +629,25 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     hipSafe(hipMemcpy(d_pp_first_inds, pp_first_inds.data(), pp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pp_second_inds, pp_second_inds.data(), pp_prim_pair_count * sizeof(uint32_t), hipMemcpyHostToDevice));
 
+    hipSafe(hipMemcpy(d_ss_mat_Q_local, ss_mat_Q_local.data(), ss_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_mat_Q_local, sp_mat_Q_local.data(), sp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_mat_Q_local, pp_mat_Q_local.data(), pp_prim_pair_count_local * sizeof(double), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
     timer.stop("Coulomb prep.");
 
     CDenseMatrix mat_Fock(naos, naos);
 
     mat_Fock.zero();
 
-    /*
     timer.start("J computation");
 
     // compute J
@@ -595,28 +663,32 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
                                                      static_cast<uint32_t>(s_prim_count),
                                                      ss_max_D,
                                                      d_mat_D,
+                                                     d_ss_mat_Q_local,
                                                      d_ss_mat_Q,
+                                                     d_ss_first_inds_local,
+                                                     d_ss_second_inds_local,
+                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
                                                      d_ss_first_inds,
                                                      d_ss_second_inds,
                                                      static_cast<uint32_t>(ss_prim_pair_count),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel SSSS");
 
-        for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
-            const auto i = ss_first_inds[ij];
-            const auto j = ss_second_inds[ij];
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
 
             const auto i_cgto = s_prim_aoinds[i];
             const auto j_cgto = s_prim_aoinds[j];
@@ -638,7 +710,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSSSP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -647,25 +719,25 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(p_prim_count),
                                                      sp_max_D,
                                                      d_mat_D,
-                                                     d_ss_mat_Q,
+                                                     d_ss_mat_Q_local,
                                                      d_sp_mat_Q,
-                                                     d_ss_first_inds,
-                                                     d_ss_second_inds,
-                                                     static_cast<uint32_t>(ss_prim_pair_count),
+                                                     d_ss_first_inds_local,
+                                                     d_ss_second_inds_local,
+                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
                                                      d_sp_first_inds,
                                                      d_sp_second_inds,
                                                      static_cast<uint32_t>(sp_prim_pair_count),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel SSSP");
 
-        for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
-            const auto i = ss_first_inds[ij];
-            const auto j = ss_second_inds[ij];
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
 
             const auto i_cgto = s_prim_aoinds[i];
             const auto j_cgto = s_prim_aoinds[j];
@@ -687,7 +759,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((ss_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSSPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -696,25 +768,25 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(p_prim_count),
                                                      pp_max_D,
                                                      d_mat_D,
-                                                     d_ss_mat_Q,
+                                                     d_ss_mat_Q_local,
                                                      d_pp_mat_Q,
-                                                     d_ss_first_inds,
-                                                     d_ss_second_inds,
-                                                     static_cast<uint32_t>(ss_prim_pair_count),
+                                                     d_ss_first_inds_local,
+                                                     d_ss_second_inds_local,
+                                                     static_cast<uint32_t>(ss_prim_pair_count_local),
                                                      d_pp_first_inds,
                                                      d_pp_second_inds,
                                                      static_cast<uint32_t>(pp_prim_pair_count),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(ss_mat_J.data(), d_mat_J, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel SSPP");
 
-        for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
-            const auto i = ss_first_inds[ij];
-            const auto j = ss_second_inds[ij];
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
 
             const auto i_cgto = s_prim_aoinds[i];
             const auto j_cgto = s_prim_aoinds[j];
@@ -736,7 +808,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSPSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -746,24 +818,24 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      ss_max_D,
                                                      d_mat_D,
                                                      d_ss_mat_Q,
-                                                     d_sp_mat_Q,
+                                                     d_sp_mat_Q_local,
                                                      d_ss_first_inds,
                                                      d_ss_second_inds,
                                                      static_cast<uint32_t>(ss_prim_pair_count),
-                                                     d_sp_first_inds,
-                                                     d_sp_second_inds,
-                                                     static_cast<uint32_t>(sp_prim_pair_count),
+                                                     d_sp_first_inds_local,
+                                                     d_sp_second_inds_local,
+                                                     static_cast<uint32_t>(sp_prim_pair_count_local),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel SPSS");
 
-        for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
-            const auto i = sp_first_inds[ij];
-            const auto j = sp_second_inds[ij];
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
 
             const auto i_cgto = s_prim_aoinds[i];
 
@@ -786,7 +858,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSPSP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -795,21 +867,25 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(p_prim_count),
                                                      sp_max_D,
                                                      d_mat_D,
+                                                     d_sp_mat_Q_local,
                                                      d_sp_mat_Q,
+                                                     d_sp_first_inds_local,
+                                                     d_sp_second_inds_local,
+                                                     static_cast<uint32_t>(sp_prim_pair_count_local),
                                                      d_sp_first_inds,
                                                      d_sp_second_inds,
                                                      static_cast<uint32_t>(sp_prim_pair_count),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel SPSP");
 
-        for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
-            const auto i = sp_first_inds[ij];
-            const auto j = sp_second_inds[ij];
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
 
             const auto i_cgto = s_prim_aoinds[i];
 
@@ -832,7 +908,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((sp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockSPPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -841,25 +917,25 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(p_prim_count),
                                                      pp_max_D,
                                                      d_mat_D,
-                                                     d_sp_mat_Q,
+                                                     d_sp_mat_Q_local,
                                                      d_pp_mat_Q,
-                                                     d_sp_first_inds,
-                                                     d_sp_second_inds,
-                                                     static_cast<uint32_t>(sp_prim_pair_count),
+                                                     d_sp_first_inds_local,
+                                                     d_sp_second_inds_local,
+                                                     static_cast<uint32_t>(sp_prim_pair_count_local),
                                                      d_pp_first_inds,
                                                      d_pp_second_inds,
                                                      static_cast<uint32_t>(pp_prim_pair_count),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(sp_mat_J.data(), d_mat_J, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel SPPP");
 
-        for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
-            const auto i = sp_first_inds[ij];
-            const auto j = sp_second_inds[ij];
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
 
             const auto i_cgto = s_prim_aoinds[i];
 
@@ -882,7 +958,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockPPSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -892,24 +968,24 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      ss_max_D,
                                                      d_mat_D,
                                                      d_ss_mat_Q,
-                                                     d_pp_mat_Q,
+                                                     d_pp_mat_Q_local,
                                                      d_ss_first_inds,
                                                      d_ss_second_inds,
                                                      static_cast<uint32_t>(ss_prim_pair_count),
-                                                     d_pp_first_inds,
-                                                     d_pp_second_inds,
-                                                     static_cast<uint32_t>(pp_prim_pair_count),
+                                                     d_pp_first_inds_local,
+                                                     d_pp_second_inds_local,
+                                                     static_cast<uint32_t>(pp_prim_pair_count_local),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel PPSS");
 
-        for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
-            const auto i = pp_first_inds[ij];
-            const auto j = pp_second_inds[ij];
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
 
             // TODO: think about the ordering of cartesian components
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
@@ -932,7 +1008,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockPPSP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
@@ -942,24 +1018,24 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      sp_max_D,
                                                      d_mat_D,
                                                      d_sp_mat_Q,
-                                                     d_pp_mat_Q,
+                                                     d_pp_mat_Q_local,
                                                      d_sp_first_inds,
                                                      d_sp_second_inds,
                                                      static_cast<uint32_t>(sp_prim_pair_count),
-                                                     d_pp_first_inds,
-                                                     d_pp_second_inds,
-                                                     static_cast<uint32_t>(pp_prim_pair_count),
+                                                     d_pp_first_inds_local,
+                                                     d_pp_second_inds_local,
+                                                     static_cast<uint32_t>(pp_prim_pair_count_local),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel PPSP");
 
-        for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
-            const auto i = pp_first_inds[ij];
-            const auto j = pp_second_inds[ij];
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
 
             // TODO: think about the ordering of cartesian components
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
@@ -982,28 +1058,32 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-        dim3 num_blocks((pp_prim_pair_count + threads_per_block.x - 1) / threads_per_block.x, 1);
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
 
         hipLaunchKernelGGL(computeCoulombFockPPPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
                                                      pp_max_D,
                                                      d_mat_D,
+                                                     d_pp_mat_Q_local,
                                                      d_pp_mat_Q,
+                                                     d_pp_first_inds_local,
+                                                     d_pp_second_inds_local,
+                                                     static_cast<uint32_t>(pp_prim_pair_count_local),
                                                      d_pp_first_inds,
                                                      d_pp_second_inds,
                                                      static_cast<uint32_t>(pp_prim_pair_count),
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(pp_mat_J.data(), d_mat_J, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         timer.stop("J kernel PPPP");
 
-        for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
+        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
-            const auto i = pp_first_inds[ij];
-            const auto j = pp_second_inds[ij];
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
 
             // TODO: think about the ordering of cartesian components
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
@@ -1016,7 +1096,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     }
 
     timer.stop("J computation");
-    */
 
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
@@ -1053,6 +1132,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             mat_D_abs_full.row(s_prim_count + i)[s_prim_count + j] = std::fabs(pp_mat_D_orig.row(i)[j]);
         }
     }
+
+    // TODO distribute computation of Q_prime
 
     auto Q_prime = denblas::multAB(mat_Q_full, denblas::multAB(mat_D_abs_full, mat_Q_full));
 

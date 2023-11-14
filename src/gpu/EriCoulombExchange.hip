@@ -137,7 +137,11 @@ computeCoulombFockSSSS(double*         mat_J,
           const uint32_t  s_prim_count,
           const double    max_D,
           const double*   mat_D,
+          const double*   mat_Q_local,
           const double*   mat_Q,
+          const uint32_t* first_inds_local,
+          const uint32_t* second_inds_local,
+          const uint32_t  ss_prim_pair_count_local,
           const uint32_t* first_inds,
           const uint32_t* second_inds,
           const uint32_t  ss_prim_pair_count,
@@ -163,10 +167,10 @@ computeCoulombFockSSSS(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count) && (std::fabs(mat_Q[ij] * mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count_local) && (std::fabs(mat_Q_local[ij] * mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = first_inds[ij];
-            const auto j = second_inds[ij];
+            const auto i = first_inds_local[ij];
+            const auto j = second_inds_local[ij];
 
             const auto k = first_inds[kl];
             const auto l = second_inds[kl];
@@ -242,7 +246,7 @@ computeCoulombFockSSSS(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < ss_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < ss_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
@@ -256,11 +260,11 @@ computeCoulombFockSSSP(double*         mat_J,
                        const uint32_t  p_prim_count,
                        const double    max_D,
                        const double*   sp_mat_D,
-                       const double*   ss_mat_Q,
+                       const double*   ss_mat_Q_local,
                        const double*   sp_mat_Q,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
-                       const uint32_t  ss_prim_pair_count,
+                       const uint32_t* ss_first_inds_local,
+                       const uint32_t* ss_second_inds_local,
+                       const uint32_t  ss_prim_pair_count_local,
                        const uint32_t* sp_first_inds,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
@@ -286,10 +290,10 @@ computeCoulombFockSSSP(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < sp_prim_pair_count) && (ij < ss_prim_pair_count) && (std::fabs(ss_mat_Q[ij] * sp_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (std::fabs(ss_mat_Q_local[ij] * sp_mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = ss_first_inds[ij];
-            const auto j = ss_second_inds[ij];
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
 
             const auto k = sp_first_inds[kl];
             const auto l = sp_second_inds[kl];
@@ -388,7 +392,7 @@ computeCoulombFockSSSP(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < ss_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < ss_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
@@ -402,11 +406,11 @@ computeCoulombFockSSPP(double*         mat_J,
                        const uint32_t  p_prim_count,
                        const double    max_D,
                        const double*   pp_mat_D,
-                       const double*   ss_mat_Q,
+                       const double*   ss_mat_Q_local,
                        const double*   pp_mat_Q,
-                       const uint32_t* ss_first_inds,
-                       const uint32_t* ss_second_inds,
-                       const uint32_t  ss_prim_pair_count,
+                       const uint32_t* ss_first_inds_local,
+                       const uint32_t* ss_second_inds_local,
+                       const uint32_t  ss_prim_pair_count_local,
                        const uint32_t* pp_first_inds,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
@@ -432,10 +436,10 @@ computeCoulombFockSSPP(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < pp_prim_pair_count) && (ij < ss_prim_pair_count) && (std::fabs(ss_mat_Q[ij] * pp_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (std::fabs(ss_mat_Q_local[ij] * pp_mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = ss_first_inds[ij];
-            const auto j = ss_second_inds[ij];
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
 
             const auto k = pp_first_inds[kl];
             const auto l = pp_second_inds[kl];
@@ -555,7 +559,7 @@ computeCoulombFockSSPP(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < ss_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < ss_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
@@ -570,13 +574,13 @@ computeCoulombFockSPSS(double*         mat_J,
                        const double    max_D,
                        const double*   ss_mat_D,
                        const double*   ss_mat_Q,
-                       const double*   sp_mat_Q,
+                       const double*   sp_mat_Q_local,
                        const uint32_t* ss_first_inds,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
-                       const uint32_t  sp_prim_pair_count,
+                       const uint32_t* sp_first_inds_local,
+                       const uint32_t* sp_second_inds_local,
+                       const uint32_t  sp_prim_pair_count_local,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
@@ -599,10 +603,10 @@ computeCoulombFockSPSS(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < ss_prim_pair_count) && (ij < sp_prim_pair_count) && (std::fabs(sp_mat_Q[ij] * ss_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < sp_prim_pair_count_local) && (std::fabs(sp_mat_Q_local[ij] * ss_mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = sp_first_inds[ij];
-            const auto j = sp_second_inds[ij];
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
 
             const auto k = ss_first_inds[kl];
             const auto l = ss_second_inds[kl];
@@ -701,7 +705,7 @@ computeCoulombFockSPSS(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < sp_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < sp_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
@@ -715,7 +719,11 @@ computeCoulombFockSPSP(double*         mat_J,
                        const uint32_t  p_prim_count,
                        const double    max_D,
                        const double*   sp_mat_D,
+                       const double*   sp_mat_Q_local,
                        const double*   sp_mat_Q,
+                       const uint32_t* sp_first_inds_local,
+                       const uint32_t* sp_second_inds_local,
+                       const uint32_t  sp_prim_pair_count_local,
                        const uint32_t* sp_first_inds,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
@@ -741,10 +749,10 @@ computeCoulombFockSPSP(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < sp_prim_pair_count) && (ij < sp_prim_pair_count) && (std::fabs(sp_mat_Q[ij] * sp_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (std::fabs(sp_mat_Q_local[ij] * sp_mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = sp_first_inds[ij];
-            const auto j = sp_second_inds[ij];
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
 
             const auto k = sp_first_inds[kl];
             const auto l = sp_second_inds[kl];
@@ -853,7 +861,7 @@ computeCoulombFockSPSP(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < sp_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < sp_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
@@ -867,11 +875,11 @@ computeCoulombFockSPPP(double*         mat_J,
                        const uint32_t  p_prim_count,
                        const double    max_D,
                        const double*   pp_mat_D,
-                       const double*   sp_mat_Q,
+                       const double*   sp_mat_Q_local,
                        const double*   pp_mat_Q,
-                       const uint32_t* sp_first_inds,
-                       const uint32_t* sp_second_inds,
-                       const uint32_t  sp_prim_pair_count,
+                       const uint32_t* sp_first_inds_local,
+                       const uint32_t* sp_second_inds_local,
+                       const uint32_t  sp_prim_pair_count_local,
                        const uint32_t* pp_first_inds,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
@@ -897,10 +905,10 @@ computeCoulombFockSPPP(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < pp_prim_pair_count) && (ij < sp_prim_pair_count) && (std::fabs(sp_mat_Q[ij] * pp_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (std::fabs(sp_mat_Q_local[ij] * pp_mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = sp_first_inds[ij];
-            const auto j = sp_second_inds[ij];
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
 
             const auto k = pp_first_inds[kl];
             const auto l = pp_second_inds[kl];
@@ -1048,7 +1056,7 @@ computeCoulombFockSPPP(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < sp_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < sp_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
@@ -1063,13 +1071,13 @@ computeCoulombFockPPSS(double*         mat_J,
                        const double    max_D,
                        const double*   ss_mat_D,
                        const double*   ss_mat_Q,
-                       const double*   pp_mat_Q,
+                       const double*   pp_mat_Q_local,
                        const uint32_t* ss_first_inds,
                        const uint32_t* ss_second_inds,
                        const uint32_t  ss_prim_pair_count,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const uint32_t  pp_prim_pair_count,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const uint32_t  pp_prim_pair_count_local,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
@@ -1092,10 +1100,10 @@ computeCoulombFockPPSS(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < ss_prim_pair_count) && (ij < pp_prim_pair_count) && (std::fabs(pp_mat_Q[ij] * ss_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < ss_prim_pair_count) && (ij < pp_prim_pair_count_local) && (std::fabs(pp_mat_Q_local[ij] * ss_mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = pp_first_inds[ij];
-            const auto j = pp_second_inds[ij];
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
 
             const auto k = ss_first_inds[kl];
             const auto l = ss_second_inds[kl];
@@ -1215,7 +1223,7 @@ computeCoulombFockPPSS(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
@@ -1230,13 +1238,13 @@ computeCoulombFockPPSP(double*         mat_J,
                        const double    max_D,
                        const double*   sp_mat_D,
                        const double*   sp_mat_Q,
-                       const double*   pp_mat_Q,
+                       const double*   pp_mat_Q_local,
                        const uint32_t* sp_first_inds,
                        const uint32_t* sp_second_inds,
                        const uint32_t  sp_prim_pair_count,
-                       const uint32_t* pp_first_inds,
-                       const uint32_t* pp_second_inds,
-                       const uint32_t  pp_prim_pair_count,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const uint32_t  pp_prim_pair_count_local,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
@@ -1259,10 +1267,10 @@ computeCoulombFockPPSP(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < sp_prim_pair_count) && (ij < pp_prim_pair_count) && (std::fabs(pp_mat_Q[ij] * sp_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < sp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (std::fabs(pp_mat_Q_local[ij] * sp_mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = pp_first_inds[ij];
-            const auto j = pp_second_inds[ij];
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
 
             const auto k = sp_first_inds[kl];
             const auto l = sp_second_inds[kl];
@@ -1410,7 +1418,7 @@ computeCoulombFockPPSP(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
@@ -1422,7 +1430,11 @@ computeCoulombFockPPPP(double*         mat_J,
                        const uint32_t  p_prim_count,
                        const double    max_D,
                        const double*   pp_mat_D,
+                       const double*   pp_mat_Q_local,
                        const double*   pp_mat_Q,
+                       const uint32_t* pp_first_inds_local,
+                       const uint32_t* pp_second_inds_local,
+                       const uint32_t  pp_prim_pair_count_local,
                        const uint32_t* pp_first_inds,
                        const uint32_t* pp_second_inds,
                        const uint32_t  pp_prim_pair_count,
@@ -1448,10 +1460,10 @@ computeCoulombFockPPPP(double*         mat_J,
 
         // TODO: add D_kl into ket side
 
-        if ((kl < pp_prim_pair_count) && (ij < pp_prim_pair_count) && (std::fabs(pp_mat_Q[ij] * pp_mat_Q[kl] * max_D) > 1.0e-12))
+        if ((kl < pp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (std::fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * max_D) > 1.0e-12))
         {
-            const auto i = pp_first_inds[ij];
-            const auto j = pp_second_inds[ij];
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
 
             const auto k = pp_first_inds[kl];
             const auto l = pp_second_inds[kl];
@@ -1686,7 +1698,7 @@ computeCoulombFockPPPP(double*         mat_J,
         __syncthreads();
     }
 
-    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count))
+    if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
     {
         mat_J[ij] = J_ij;
     }
