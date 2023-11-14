@@ -4043,4 +4043,51 @@ computeExchangeFockPPPP(double*         mat_K,
     }
 }
 
+__global__ void
+matmulAB(double* C, double* A, double* B, uint32_t nrows_A, uint32_t ncols_A, uint32_t ncols_B)
+{
+    __shared__ double As[TILE_DIM][TILE_DIM + 1];
+    __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
+
+    const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
+
+    double val = 0.0;
+
+    for (uint32_t k = 0; k < (ncols_A + TILE_DIM - 1) / TILE_DIM; k++)
+    {
+        if ((i < nrows_A) && (k * TILE_DIM + threadIdx.x < ncols_A))
+        {
+            As[threadIdx.y][threadIdx.x] = A[i * ncols_A + (k * TILE_DIM + threadIdx.x)];
+        }
+        else
+        {
+            As[threadIdx.y][threadIdx.x] = 0.0;
+        }
+
+        if ((k * TILE_DIM + threadIdx.y < ncols_A) && (g < ncols_B))
+        {
+            Bs[threadIdx.y][threadIdx.x] = B[(k * TILE_DIM + threadIdx.y) * ncols_B + g];
+        }
+        else
+        {
+            Bs[threadIdx.y][threadIdx.x] = 0.0;
+        }
+
+        __syncthreads();
+
+        for (uint32_t m = 0; m < TILE_DIM; m++)
+        {
+            val += As[threadIdx.y][m] * Bs[m][threadIdx.x];
+        }
+
+        __syncthreads();
+    }
+
+    if ((i < nrows_A) && (g < ncols_B))
+    {
+        C[i * ncols_B + g] = val;
+    }
+}
+
 }  // namespace gpu

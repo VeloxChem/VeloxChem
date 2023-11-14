@@ -932,6 +932,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     timer.stop("J computation");
 
+    timer.start("PreLinK Q_prime");
+
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
 
@@ -970,7 +972,41 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     // TODO distribute computation of Q_prime
 
-    auto Q_prime = denblas::multAB(mat_Q_full, denblas::multAB(mat_D_abs_full, mat_Q_full));
+    double *d_matrix_A, *d_matrix_B, *d_matrix_C;
+
+    hipSafe(hipMalloc(&d_matrix_A, mat_Q_full.getNumberOfElements() * sizeof(double)));
+    hipSafe(hipMalloc(&d_matrix_B, mat_Q_full.getNumberOfElements() * sizeof(double)));
+    hipSafe(hipMalloc(&d_matrix_C, mat_Q_full.getNumberOfElements() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_matrix_A, mat_Q_full.values(), mat_Q_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_matrix_B, mat_D_abs_full.values(), mat_Q_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+
+    const auto all_prim_count = s_prim_count + p_prim_count * 3;
+
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+    dim3 num_blocks((all_prim_count + threads_per_block.x - 1) / threads_per_block.x, (all_prim_count + threads_per_block.y - 1) / threads_per_block.y);
+
+    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_C, d_matrix_A, d_matrix_B,
+            static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
+
+    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
+            static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
+
+    CDenseMatrix Q_prime(all_prim_count, all_prim_count);
+
+    hipSafe(hipMemcpy(Q_prime.values(), d_matrix_B, mat_Q_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
+
+    // auto Q_prime_2 = denblas::multAB(mat_Q_full, denblas::multAB(mat_D_abs_full, mat_Q_full));
+    // double max_diff = 0.0;
+    // for (int64_t i = 0; i < mat_Q_full.getNumberOfElements(); i++)
+    // {
+    //     const auto diff = std::fabs(Q_prime.values()[i] - Q_prime_2.values()[i]);
+    //     if (diff > max_diff) max_diff = diff;
+    // }
+    // printf("max_diff: %22.12e\n", max_diff);
+
+    timer.stop("PreLinK Q_prime");
 
     timer.start("Exchange prep.");
 
@@ -1886,6 +1922,10 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     hipSafe(hipFree(d_density_inds_for_K_sp));
     hipSafe(hipFree(d_density_inds_for_K_ps));
     hipSafe(hipFree(d_density_inds_for_K_pp));
+
+    hipSafe(hipFree(d_matrix_A));
+    hipSafe(hipFree(d_matrix_B));
+    hipSafe(hipFree(d_matrix_C));
 
     timer.stop("Total timing");
 

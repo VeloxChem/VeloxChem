@@ -414,6 +414,8 @@ __global__ void computeExchangeFockPPPP(double*         mat_K,
                                         const double*   boys_func_table,
                                         const double*   boys_func_ft);
 
+__global__ void matmulAB(double* C, double* A, double* B, uint32_t nrows_A, uint32_t ncols_A, uint32_t ncols_B);
+
 }  // namespace gpu
 
 #endif
