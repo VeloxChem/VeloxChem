@@ -512,7 +512,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         hipLaunchKernelGGL(computeCoulombFockSSSS, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_s_prim_info,
                                                      static_cast<uint32_t>(s_prim_count),
-                                                     ss_max_D,
                                                      d_mat_D,
                                                      d_ss_mat_Q_local,
                                                      d_ss_mat_Q,
@@ -561,7 +560,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
-                                                     sp_max_D,
                                                      d_mat_D,
                                                      d_ss_mat_Q_local,
                                                      d_sp_mat_Q,
@@ -610,7 +608,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
-                                                     pp_max_D,
                                                      d_mat_D,
                                                      d_ss_mat_Q_local,
                                                      d_pp_mat_Q,
@@ -659,7 +656,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
-                                                     ss_max_D,
                                                      d_mat_D,
                                                      d_ss_mat_Q,
                                                      d_sp_mat_Q_local,
@@ -709,7 +705,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
-                                                     sp_max_D,
                                                      d_mat_D,
                                                      d_sp_mat_Q_local,
                                                      d_sp_mat_Q,
@@ -759,7 +754,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
-                                                     pp_max_D,
                                                      d_mat_D,
                                                      d_sp_mat_Q_local,
                                                      d_pp_mat_Q,
@@ -809,7 +803,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
-                                                     ss_max_D,
                                                      d_mat_D,
                                                      d_ss_mat_Q,
                                                      d_pp_mat_Q_local,
@@ -859,7 +852,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
-                                                     sp_max_D,
                                                      d_mat_D,
                                                      d_sp_mat_Q,
                                                      d_pp_mat_Q_local,
@@ -907,7 +899,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
         hipLaunchKernelGGL(computeCoulombFockPPPP, num_blocks, threads_per_block, 0, 0, d_mat_J,
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
-                                                     pp_max_D,
                                                      d_mat_D,
                                                      d_pp_mat_Q_local,
                                                      d_pp_mat_Q,
@@ -1859,12 +1850,21 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     hipSafe(hipFree(d_ss_first_inds));
     hipSafe(hipFree(d_ss_second_inds));
-
     hipSafe(hipFree(d_sp_first_inds));
     hipSafe(hipFree(d_sp_second_inds));
-
     hipSafe(hipFree(d_pp_first_inds));
     hipSafe(hipFree(d_pp_second_inds));
+
+    hipSafe(hipFree(d_ss_mat_Q_local));
+    hipSafe(hipFree(d_sp_mat_Q_local));
+    hipSafe(hipFree(d_pp_mat_Q_local));
+
+    hipSafe(hipFree(d_ss_first_inds_local));
+    hipSafe(hipFree(d_ss_second_inds_local));
+    hipSafe(hipFree(d_sp_first_inds_local));
+    hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_pp_first_inds_local));
+    hipSafe(hipFree(d_pp_second_inds_local));
 
     hipSafe(hipFree(d_mat_K));
 
