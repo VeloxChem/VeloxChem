@@ -23,23 +23,23 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef BoysFuncTable_hpp
-#define BoysFuncTable_hpp
+#ifndef EriScreener_hpp
+#define EriScreener_hpp
 
-#include <array>
 #include <cstdint>
 #include <vector>
 
-namespace boysfunc {
+#include "AODensityMatrix.hpp"
+#include "DenseMatrix.hpp"
+#include "MolecularBasis.hpp"
+#include "Molecule.hpp"
 
-auto getBoysFuncFactors() -> std::vector<double>;
+namespace eriscreen {
 
-auto getFullBoysFuncTable() -> std::vector<double>;
+auto computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> std::vector<CDenseMatrix>;
 
-auto getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>;
+auto computeDMatrices(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> std::vector<CDenseMatrix>;
 
-auto getBoysFunction(const double fa, const uint32_t N, const double* bf_table, const double* ft) -> std::vector<double>;
+}  // namespace eriscreen
 
-}  // namespace boysfunc
-
-#endif /* BoysFuncTable_hpp */
+#endif /* EriScreener_hpp */

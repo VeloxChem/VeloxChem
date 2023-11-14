@@ -9,6 +9,40 @@
 namespace boysfunc {  // boysfunc namespace
 
 auto
+getBoysFuncFactors() -> std::vector<double>
+{
+    return std::vector<double>({1.0,        1.0 / 3.0,  1.0 / 5.0,  1.0 / 7.0,  1.0 / 9.0,  1.0 / 11.0, 1.0 / 13.0,
+                                1.0 / 15.0, 1.0 / 17.0, 1.0 / 19.0, 1.0 / 21.0, 1.0 / 23.0, 1.0 / 25.0, 1.0 / 27.0,
+                                1.0 / 29.0, 1.0 / 31.0, 1.0 / 33.0, 1.0 / 35.0, 1.0 / 37.0, 1.0 / 39.0, 1.0 / 41.0,
+                                1.0 / 43.0, 1.0 / 45.0, 1.0 / 47.0, 1.0 / 49.0, 1.0 / 51.0, 1.0 / 53.0, 1.0 / 55.0});
+}
+
+auto
+getFullBoysFuncTable() -> std::vector<double>
+{
+    // Boys function (tabulated for order 0-28)
+
+    std::vector<double> boys_func_table((28 + 1) * 121 * 7);
+
+    for (int64_t bf_order = 0; bf_order <= 28; bf_order++)
+    {
+        const auto bf_table = boysfunc::getBoysFuncTable(bf_order);
+
+        auto bf_data = boys_func_table.data() + bf_order * 121 * 7;
+
+        for (int64_t r = 0; r < 121; r++)
+        {
+            for (int64_t c = 0; c < 7; c++)
+            {
+                bf_data[r * 7 + c] = bf_table[r][c];
+            }
+        }
+    }
+
+    return boys_func_table;
+}
+
+auto
 getBoysFuncTable(const int64_t N) -> std::array<std::array<double, 7>, 121>
 {
     if (N == 0)
