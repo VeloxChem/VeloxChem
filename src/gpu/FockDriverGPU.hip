@@ -189,9 +189,13 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     const auto& sp_mat_D_orig = D_matrices[1];
     const auto& pp_mat_D_orig = D_matrices[2];
 
-    std::vector<std::tuple<double, int64_t, int64_t, double>> ss_mat_Q_D_sorted;
-    std::vector<std::tuple<double, int64_t, int64_t, double>> sp_mat_Q_D_sorted;
-    std::vector<std::tuple<double, int64_t, int64_t, double>> pp_mat_Q_D_sorted;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_ss_mat_Q;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_sp_mat_Q;
+    std::vector<std::tuple<double, int64_t, int64_t>> sorted_pp_mat_Q;
+
+    std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_ss_mat_Q_D;
+    std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_sp_mat_Q_D;
+    std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_pp_mat_Q_D;
 
     // S-S gto block pair and S-P gto block pair
 
@@ -204,7 +208,9 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
             const auto Q_ij = ss_mat_Q_orig.row(i)[j];
             const auto D_ij = ss_mat_D_orig.row(i)[j];
 
-            ss_mat_Q_D_sorted.push_back(std::make_tuple(Q_ij, i, j, D_ij));
+            sorted_ss_mat_Q.push_back(std::make_tuple(Q_ij, i, j));
+
+            sorted_ss_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i, j, Q_ij, D_ij));
         }
 
         // S-P gto block pair
@@ -216,7 +222,9 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                 const auto Q_ij = sp_mat_Q_orig.row(i)[j * 3 + s];
                 const auto D_ij = sp_mat_D_orig.row(i)[j * 3 + s];
 
-                sp_mat_Q_D_sorted.push_back(std::make_tuple(Q_ij, i, j * 3 + s, D_ij));
+                sorted_sp_mat_Q.push_back(std::make_tuple(Q_ij, i, j * 3 + s));
+
+                sorted_sp_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i, j * 3 + s, Q_ij, D_ij));
             }
         }
     }
@@ -236,20 +244,31 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
                     const auto Q_ij = pp_mat_Q_orig.row(i * 3 + i_cart)[j * 3 + j_cart];
                     const auto D_ij = pp_mat_D_orig.row(i * 3 + i_cart)[j * 3 + j_cart];
 
-                    pp_mat_Q_D_sorted.push_back(std::make_tuple(Q_ij, i * 3 + i_cart, j * 3 + j_cart, D_ij));
+                    sorted_pp_mat_Q.push_back(std::make_tuple(Q_ij, i * 3 + i_cart, j * 3 + j_cart));
+
+                    sorted_pp_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij));
                 }
             }
         }
     }
 
-    std::sort(ss_mat_Q_D_sorted.begin(), ss_mat_Q_D_sorted.end());
-    std::reverse(ss_mat_Q_D_sorted.begin(), ss_mat_Q_D_sorted.end());
+    std::sort(sorted_ss_mat_Q.begin(), sorted_ss_mat_Q.end());
+    std::reverse(sorted_ss_mat_Q.begin(), sorted_ss_mat_Q.end());
 
-    std::sort(sp_mat_Q_D_sorted.begin(), sp_mat_Q_D_sorted.end());
-    std::reverse(sp_mat_Q_D_sorted.begin(), sp_mat_Q_D_sorted.end());
+    std::sort(sorted_ss_mat_Q_D.begin(), sorted_ss_mat_Q_D.end());
+    std::reverse(sorted_ss_mat_Q_D.begin(), sorted_ss_mat_Q_D.end());
 
-    std::sort(pp_mat_Q_D_sorted.begin(), pp_mat_Q_D_sorted.end());
-    std::reverse(pp_mat_Q_D_sorted.begin(), pp_mat_Q_D_sorted.end());
+    std::sort(sorted_sp_mat_Q.begin(), sorted_sp_mat_Q.end());
+    std::reverse(sorted_sp_mat_Q.begin(), sorted_sp_mat_Q.end());
+
+    std::sort(sorted_sp_mat_Q_D.begin(), sorted_sp_mat_Q_D.end());
+    std::reverse(sorted_sp_mat_Q_D.begin(), sorted_sp_mat_Q_D.end());
+
+    std::sort(sorted_pp_mat_Q.begin(), sorted_pp_mat_Q.end());
+    std::reverse(sorted_pp_mat_Q.begin(), sorted_pp_mat_Q.end());
+
+    std::sort(sorted_pp_mat_Q_D.begin(), sorted_pp_mat_Q_D.end());
+    std::reverse(sorted_pp_mat_Q_D.begin(), sorted_pp_mat_Q_D.end());
 
     timer.stop("GTO block pair prep.");
 
@@ -277,14 +296,14 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
-        const auto& q_ij = ss_mat_Q_D_sorted[ij];
+        const auto& vals = sorted_ss_mat_Q_D[ij];
 
-        auto sqrt_ijij = std::get<0>(q_ij);
-        auto i         = std::get<1>(q_ij);
-        auto j         = std::get<2>(q_ij);
-        auto D_ij      = std::get<3>(q_ij);
+        auto i    = std::get<1>(vals);
+        auto j    = std::get<2>(vals);
+        auto Q_ij = std::get<3>(vals);
+        auto D_ij = std::get<4>(vals);
 
-        ss_mat_Q[ij] = sqrt_ijij;
+        ss_mat_Q[ij] = Q_ij;
         ss_mat_D[ij] = D_ij;
 
         ss_first_inds[ij]  = static_cast<uint32_t>(i);
@@ -299,9 +318,15 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     for (int64_t ij = rank; ij < ss_prim_pair_count; ij+=nnodes)
     {
-        ss_first_inds_local.push_back(ss_first_inds[ij]);
-        ss_second_inds_local.push_back(ss_second_inds[ij]);
-        ss_mat_Q_local.push_back(ss_mat_Q[ij]);
+        const auto& vals = sorted_ss_mat_Q[ij];
+
+        auto Q_ij = std::get<0>(vals);
+        auto i    = std::get<1>(vals);
+        auto j    = std::get<2>(vals);
+
+        ss_first_inds_local.push_back(static_cast<uint32_t>(i));
+        ss_second_inds_local.push_back(static_cast<uint32_t>(j));
+        ss_mat_Q_local.push_back(Q_ij);
     }
 
     const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
@@ -314,14 +339,14 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
     {
-        const auto& q_ij = sp_mat_Q_D_sorted[ij];
+        const auto& vals = sorted_sp_mat_Q_D[ij];
 
-        auto sqrt_ijij = std::get<0>(q_ij);
-        auto i         = std::get<1>(q_ij);
-        auto j         = std::get<2>(q_ij);
-        auto D_ij      = std::get<3>(q_ij);
+        auto i    = std::get<1>(vals);
+        auto j    = std::get<2>(vals);
+        auto Q_ij = std::get<3>(vals);
+        auto D_ij = std::get<4>(vals);
 
-        sp_mat_Q[ij] = sqrt_ijij;
+        sp_mat_Q[ij] = Q_ij;
         sp_mat_D[ij] = D_ij;
 
         sp_first_inds[ij]  = static_cast<uint32_t>(i);
@@ -336,9 +361,15 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     for (int64_t ij = rank; ij < sp_prim_pair_count; ij+=nnodes)
     {
-        sp_first_inds_local.push_back(sp_first_inds[ij]);
-        sp_second_inds_local.push_back(sp_second_inds[ij]);
-        sp_mat_Q_local.push_back(sp_mat_Q[ij]);
+        const auto& vals = sorted_sp_mat_Q[ij];
+
+        auto Q_ij = std::get<0>(vals);
+        auto i    = std::get<1>(vals);
+        auto j    = std::get<2>(vals);
+
+        sp_first_inds_local.push_back(static_cast<uint32_t>(i));
+        sp_second_inds_local.push_back(static_cast<uint32_t>(j));
+        sp_mat_Q_local.push_back(Q_ij);
     }
 
     const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
@@ -351,14 +382,14 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
     {
-        const auto& q_ij = pp_mat_Q_D_sorted[ij];
+        const auto& vals = sorted_pp_mat_Q_D[ij];
 
-        auto sqrt_ijij = std::get<0>(q_ij);
-        auto i         = std::get<1>(q_ij);
-        auto j         = std::get<2>(q_ij);
-        auto D_ij      = std::get<3>(q_ij);
+        auto i    = std::get<1>(vals);
+        auto j    = std::get<2>(vals);
+        auto Q_ij = std::get<3>(vals);
+        auto D_ij = std::get<4>(vals);
 
-        pp_mat_Q[ij] = sqrt_ijij;
+        pp_mat_Q[ij] = Q_ij;
         pp_mat_D[ij] = D_ij;
 
         pp_first_inds[ij]  = static_cast<uint32_t>(i);
@@ -373,9 +404,15 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     for (int64_t ij = rank; ij < pp_prim_pair_count; ij+=nnodes)
     {
-        pp_first_inds_local.push_back(pp_first_inds[ij]);
-        pp_second_inds_local.push_back(pp_second_inds[ij]);
-        pp_mat_Q_local.push_back(pp_mat_Q[ij]);
+        const auto& vals = sorted_pp_mat_Q[ij];
+
+        auto Q_ij = std::get<0>(vals);
+        auto i    = std::get<1>(vals);
+        auto j    = std::get<2>(vals);
+
+        pp_first_inds_local.push_back(static_cast<uint32_t>(i));
+        pp_second_inds_local.push_back(static_cast<uint32_t>(j));
+        pp_mat_Q_local.push_back(Q_ij);
     }
 
     const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
