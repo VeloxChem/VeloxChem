@@ -32,6 +32,9 @@ from .molecule import Molecule
 from .veloxchemlib import bohr_in_angstrom
 
 
+# TODO add a small test in python_tests for AtomIdentifier
+
+# TODO rename to AtomIdentifier, in filename and in other places
 class AtomIdentification:
 
     """
@@ -84,6 +87,9 @@ class AtomIdentification:
         Args:
             A molecule object from VeloxChem
         """
+
+        # TODO identification should be done in methods like generate_gaff_atomtypes/generate_opls_atomtypes
+        # TODO make sure that one identifier can work with different molecules
         self.coordinates = molecule.get_coordinates_in_angstrom()
         self.atomic_symbols = molecule.get_labels()
         self.num_atoms = len(self.atomic_symbols)
@@ -183,6 +189,7 @@ class AtomIdentification:
 
         pass
 
+    # TODO rename to "is_sp2_carbon"
     def is_sp2(self, atom_idx):
         """
         Determines if a given atom, identified by its index, is sp2 hybridized.
@@ -214,10 +221,12 @@ class AtomIdentification:
                     self.graph.add_edge(i, j)
 
         all_cycles = list(nx.simple_cycles(self.graph))
+        # TODO write comments and code in separate lines
         all_cycles = sorted(all_cycles, key=len)  # Sort by cycle length
         # Filter only the cycles of size 3 to 6
         filtered_cycles = [cycle for cycle in all_cycles if 3 <= len(cycle) <= 6]
 
+        # TODO just use the code once and remove "remove_subsets" method
         def remove_subsets(cycles):
             reduced_cycles = cycles[:]  # Create a copy of the list
             cycles_to_remove = set()
@@ -243,6 +252,8 @@ class AtomIdentification:
         self.cycle_ids = []
         self.atom_cycle_info = {}
 
+        # TODO use enumerate, so that one does not need to remember to increment cycle_id
+        # example: for cycle_id, cycle in enumerate(unique_cycles):
         cycle_id = 0
         for cycle in unique_cycles:
             self.cyclic_atoms.update(cycle)
@@ -283,6 +294,7 @@ class AtomIdentification:
             self.cycle_ids.append(cycle_id)
             cycle_id += 1
 
+        # TODO perhaps mention the name or molecule of the special case to remind ourselves
         # Additional logic for reassignment of aromaticity in special cases
         for index, cycle in enumerate(unique_cycles):
             # Check if all carbons in the cycle are sp2
@@ -638,6 +650,8 @@ class AtomIdentification:
                     
                 # Assignment for the Hydrogens linked to the carbons
 
+                # TODO rename to ewd_atom
+                # TODO also mention ewd == 'electron-withdrawing' in comment
                 EWD_atoms = ['N', 'Br', 'Cl', 'I', 'F', 'S', 'O']
 
                 for connected_atom_number in info['ConnectedAtomsNumbers']:
@@ -1096,6 +1110,9 @@ class AtomIdentification:
                             'gaff': f'{info["AtomicSymbol"]}{info["AtomNumber"]}'}
                 self.atom_types_dict[f"{info['AtomicSymbol']}{info['AtomNumber']}"] = atom_type
 
+                # TODO we usually want an "else" block at the end where we can
+                # e.g. print warning, terminate the program, or simply skip
+
         return self.atom_types_dict
 
     def extract_gaff_atom_types(self,atom_type):
@@ -1112,10 +1129,11 @@ class AtomIdentification:
 
         self.gaff_atom_types = []
 
+        # TODO this helper function is the same as self.get_atom_number
         # Helper function to extract the number from the atom type string
         def get_atom_number(atom_type_str):
-            match = re.search(r'\d+', atom_type_str)
-            return int(match.group()) if match else 0
+            atom_match = re.search(r'\d+', atom_type_str)
+            return int(atom_match.group()) if atom_match else 0
 
         # Sort atom types based on the number after the atomic symbol
         sorted_atom_types = sorted(self.atom_types_dict.keys(), key=get_atom_number)
@@ -1128,6 +1146,8 @@ class AtomIdentification:
 
         return self.gaff_atom_types
 
+    # TODO let generate_gaff_atomtypes/generate_opls_atomtypes return atom_types
+    # so that "to_array" is not needed
     def to_array(self):
         '''
         Returns an array with the atomtypes in GAFF 
@@ -1634,6 +1654,7 @@ class AtomIdentification:
         y = np.dot(m1, n2)
 
         # Compute the angle using arctan2 to get the correct quadrant
+        # TODO double check if we have made sure that we don't get e.g. NaN
         angle_rad = np.arctan2(y, x)
         angle_deg = np.degrees(angle_rad)
 
@@ -1679,6 +1700,7 @@ class AtomIdentification:
         sin_theta = np.linalg.norm(np.cross(n1, n2))
 
         # Compute the angle using arctan2 to get the correct quadrant
+        # TODO double check if we have made sure that we don't get e.g. NaN
         angle_rad = np.arctan2(sin_theta, cos_theta)
         angle_deg = np.degrees(angle_rad)
 
