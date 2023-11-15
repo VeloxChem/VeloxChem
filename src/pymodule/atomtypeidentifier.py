@@ -654,6 +654,10 @@ class AtomTypeIdentifier:
                                 carbon_type = {'opls': 'opls_XXX', 'gaff': 'ch'}
                             else:
                                 carbon_type = {'opls': 'opls_235', 'gaff': 'c1'}
+                    elif info['NumConnectedAtoms'] == 1:
+                        carbon_type = {'opls': 'opls_235', 'gaff': 'c1'}
+                    else:
+                        carbon_type = {'opls': f'opls_x{info["AtomNumber"]}', 'gaff': f'cx{info["AtomNumber"]}'}
                 else:
                     carbon_type = {'opls': f'opls_x{info["AtomNumber"]}', 'gaff': f'cx{info["AtomNumber"]}'}
                     
@@ -847,7 +851,11 @@ class AtomTypeIdentifier:
 
                     elif info['NumConnectedAtoms'] == 3:
 
-                        if 'C' in connected_symbols:
+                        # Check for Nitro N
+                        if connected_symbols == {'C', 'O', 'O'}:
+                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'no'}  # Nitro N
+
+                        elif 'C' in connected_symbols:
                             for atom in connected_atoms_numbers:
                                     
                                 # Check for aromaticity
@@ -929,10 +937,6 @@ class AtomTypeIdentifier:
                                         nitrogen_type = {'opls': 'opls_300', 'gaff': 'n3'}  # Special case of H2-N-C Sp1
                                     break
                                 break
-
-                        # Check for Nitro N
-                        elif connected_symbols <= {'O', 'O'}:
-                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'no'}  # Nitro N
 
                         # General Sp3 N with three connected atoms
                         else:
