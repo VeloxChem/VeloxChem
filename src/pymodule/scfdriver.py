@@ -41,7 +41,7 @@ from .veloxchemlib import ScreeningData
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
 from .veloxchemlib import compute_fock_gpu
-from .veloxchemlib import compute_overlap_gpu
+from .veloxchemlib import compute_overlap_and_kinetic_energy_gpu
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -1267,13 +1267,9 @@ class ScfDriver:
 
         t0 = tm.time()
 
-        ovl_mat = compute_overlap_gpu(molecule, basis, screener)
+        ovl_mat, kin_mat = compute_overlap_and_kinetic_energy_gpu(molecule, basis, screener)
         ovl_mat = self.comm.reduce(ovl_mat.to_numpy(), root=mpi_master())
-
-        t1 = tm.time()
-
-        kin_drv = KineticEnergyDriver()
-        kin_mat = kin_drv.compute(molecule, basis)
+        kin_mat = self.comm.reduce(kin_mat.to_numpy(), root=mpi_master())
 
         t2 = tm.time()
 
@@ -1310,12 +1306,8 @@ class ScfDriver:
 
         if self.rank == mpi_master() and self.print_level > 1:
 
-            self.ostream.print_info('Overlap matrix computed in' +
-                                    ' {:.2f} sec.'.format(t1 - t0))
-            self.ostream.print_blank()
-
-            self.ostream.print_info('Kinetic energy matrix computed in' +
-                                    ' {:.2f} sec.'.format(t2 - t1))
+            self.ostream.print_info('Overlap and kinetic energy matrices computed in' +
+                                    ' {:.2f} sec.'.format(t2 - t0))
             self.ostream.print_blank()
 
             self.ostream.print_info('Nuclear potential matrix computed in' +
@@ -1727,7 +1719,7 @@ class ScfDriver:
         if self.rank == mpi_master():
             # electronic, kinetic, nuclear energy
             D = den_mat.alpha_to_numpy(0)
-            T = kin_mat.get_full_matrix().to_numpy()
+            T = kin_mat
             V = npot_mat
             e_ee = np.sum(D * fock_mat)
             e_kin = 2.0 * np.sum(D * T)
@@ -1763,7 +1755,7 @@ class ScfDriver:
 
         if self.rank == mpi_master():
             # TODO: double check
-            T = kin_mat.get_full_matrix().to_numpy()
+            T = kin_mat
             V = npot_mat
             fock_mat += (T - V)
 

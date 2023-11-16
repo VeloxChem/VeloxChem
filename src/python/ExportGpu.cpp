@@ -81,7 +81,7 @@ export_gpu(py::module& m)
 
     m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
 
-    m.def("compute_overlap_gpu", &gpu::computeOverlapOnGPU, "Computes overlap matrix using GPU.");
+    m.def("compute_overlap_and_kinetic_energy_gpu", &gpu::computeOverlapAndKineticEnergyOnGPU, "Computes overlap and kinetic energy matrices using GPU.");
 }
 
 }  // namespace vlx_gpu

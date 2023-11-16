@@ -132,14 +132,15 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 }
 
 __global__ void
-computeOverlapSS(double*         mat_S,
-                 const double*   s_prim_info,
-                 const uint32_t  s_prim_count,
-                 const uint32_t* first_inds_local,
-                 const uint32_t* second_inds_local,
-                 const uint32_t  ss_prim_pair_count_local)
+computeOverlapAndKineticEnergySS(double*         mat_S,
+                                 double*         mat_T,
+                                 const double*   s_prim_info,
+                                 const uint32_t  s_prim_count,
+                                 const uint32_t* first_inds_local,
+                                 const uint32_t* second_inds_local,
+                                 const uint32_t  ss_prim_pair_count_local)
 {
-    // each thread computes a primitive S matrix element
+    // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -164,21 +165,28 @@ computeOverlapSS(double*         mat_S,
 
         // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-        mat_S[ij] = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
+
+        mat_S[ij] = S_ij_00;
+
+        mat_T[ij] = K_ij_00 * S_ij_00;
     }
 }
 
 __global__ void
-computeOverlapSP(double*         mat_S,
-                 const double*   s_prim_info,
-                 const uint32_t  s_prim_count,
-                 const double*   p_prim_info,
-                 const uint32_t  p_prim_count,
-                 const uint32_t* sp_first_inds_local,
-                 const uint32_t* sp_second_inds_local,
-                 const uint32_t  sp_prim_pair_count_local)
+computeOverlapAndKineticEnergySP(double*         mat_S,
+                                 double*         mat_T,
+                                 const double*   s_prim_info,
+                                 const uint32_t  s_prim_count,
+                                 const double*   p_prim_info,
+                                 const uint32_t  p_prim_count,
+                                 const uint32_t* sp_first_inds_local,
+                                 const uint32_t* sp_second_inds_local,
+                                 const uint32_t  sp_prim_pair_count_local)
 {
-    // each thread computes a primitive S matrix element
+    // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -207,25 +215,34 @@ computeOverlapSP(double*         mat_S,
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
+
         // p-1: py
         // p_0: pz
         // p+1: px
 
         const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
 
-        mat_S[ij] = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+        const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+
+        const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
+
+        mat_S[ij] = S_ij_01;
+
+        mat_T[ij] = K_ij_01 * S_ij_00 + K_ij_00 * S_ij_01;
     }
 }
 
 __global__ void
-computeOverlapPP(double*         mat_S,
-                 const double*   p_prim_info,
-                 const uint32_t  p_prim_count,
-                 const uint32_t* pp_first_inds_local,
-                 const uint32_t* pp_second_inds_local,
-                 const uint32_t  pp_prim_pair_count_local)
+computeOverlapAndKineticEnergyPP(double*         mat_S,
+                                 double*         mat_T,
+                                 const double*   p_prim_info,
+                                 const uint32_t  p_prim_count,
+                                 const uint32_t* pp_first_inds_local,
+                                 const uint32_t* pp_second_inds_local,
+                                 const uint32_t  pp_prim_pair_count_local)
 {
-    // each thread computes a primitive J matrix element
+    // each thread computes a primitive S/T matrix element
 
     const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -255,6 +272,8 @@ computeOverlapPP(double*         mat_S,
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
+        const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
+
         // p-1: py
         // p_0: pz
         // p+1: px
@@ -265,13 +284,23 @@ computeOverlapPP(double*         mat_S,
 
         const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
 
-        mat_S[ij] = (
+        const auto S_ij_11 = (
 
                 (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
 
                 (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
 
                 ) * S_ij_00;
+
+        const auto K_ij_10 = -2.0 * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * (-rij[i_cart]);
+
+        const auto K_ij_01 = -2.0 * a_i * a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * rij[j_cart];
+
+        const auto K_ij_11 = a_i * a_j / ((a_i + a_j) * (a_i + a_j)) * (i_cart == j_cart ? 1.0 : 0.0);
+
+        mat_S[ij] = S_ij_11;
+
+        mat_T[ij] = K_ij_11 * S_ij_00 + K_ij_10 * S_ij_01 + K_ij_01 * S_ij_10 + K_ij_00 * S_ij_11;
     }
 }
 

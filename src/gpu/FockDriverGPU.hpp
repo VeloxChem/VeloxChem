@@ -26,6 +26,8 @@
 #ifndef FockDriverGPU_hpp
 #define FockDriverGPU_hpp
 
+#include <vector>
+
 #include "AODensityMatrix.hpp"
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
@@ -34,7 +36,7 @@
 
 namespace gpu {
 
-auto computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix;
+auto computeOverlapAndKineticEnergyOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>;
 
 auto computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, CScreeningData& screening) -> CDenseMatrix;
 

@@ -69,7 +69,7 @@
 namespace gpu {  // gpu namespace
 
 auto
-computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix
+computeOverlapAndKineticEnergyOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
@@ -82,6 +82,8 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     if (rank % 8 == 5) hipSafe(hipSetDevice(7));
     if (rank % 8 == 6) hipSafe(hipSetDevice(0));
     if (rank % 8 == 7) hipSafe(hipSetDevice(1));
+
+    std::vector<CDenseMatrix> S_T_matrices(2);
 
     // GTOs blocks and number of AOs
 
@@ -154,6 +156,7 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, pp_prim_pair_count});
 
     std::vector<double> mat_S(max_prim_pair_count);
+    std::vector<double> mat_T(max_prim_pair_count);
 
     const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
     const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
@@ -161,13 +164,14 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
     // S on device
 
-    double *d_mat_S;
+    double *d_mat_S, *d_mat_T;
 
     uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
     uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
     uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
 
     hipSafe(hipMalloc(&d_mat_S, max_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_T, max_prim_pair_count * sizeof(double)));
 
     hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
@@ -187,9 +191,14 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    CDenseMatrix mat_overlap(naos, naos);
+    S_T_matrices[0] = CDenseMatrix(naos, naos);
+    S_T_matrices[1] = CDenseMatrix(naos, naos);
+
+    auto& mat_overlap = S_T_matrices[0];
+    auto& mat_kinetic_energy = S_T_matrices[1];
 
     mat_overlap.zero();
+    mat_kinetic_energy.zero();
 
     // compute S
 
@@ -201,7 +210,8 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(computeOverlapSS, num_blocks, threads_per_block, 0, 0, d_mat_S,
+        hipLaunchKernelGGL(computeOverlapAndKineticEnergySS, num_blocks, threads_per_block, 0, 0, d_mat_S,
+                                                     d_mat_T,
                                                      d_s_prim_info,
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_ss_first_inds_local,
@@ -209,6 +219,7 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                                                      static_cast<uint32_t>(ss_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
         {
@@ -221,6 +232,10 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
             mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
 
             if (i != j) mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+
+            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
+
+            if (i != j) mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
         }
     }
 
@@ -232,7 +247,8 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(computeOverlapSP, num_blocks, threads_per_block, 0, 0, d_mat_S,
+        hipLaunchKernelGGL(computeOverlapAndKineticEnergySP, num_blocks, threads_per_block, 0, 0, d_mat_S,
+                                                     d_mat_T,
                                                      d_s_prim_info,
                                                      static_cast<uint32_t>(s_prim_count),
                                                      d_p_prim_info,
@@ -242,6 +258,7 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                                                      static_cast<uint32_t>(sp_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
         {
@@ -255,6 +272,9 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
             mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
             mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+
+            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
+            mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
         }
     }
 
@@ -266,7 +286,8 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
-        hipLaunchKernelGGL(computeOverlapPP, num_blocks, threads_per_block, 0, 0, d_mat_S,
+        hipLaunchKernelGGL(computeOverlapAndKineticEnergyPP, num_blocks, threads_per_block, 0, 0, d_mat_S,
+                                                     d_mat_T,
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
                                                      d_pp_first_inds_local,
@@ -274,6 +295,7 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
                                                      static_cast<uint32_t>(pp_prim_pair_count_local));
 
         hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
         {
@@ -287,6 +309,10 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
             mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
 
             if (i != j) mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+
+            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
+
+            if (i != j) mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
         }
     }
 
@@ -297,6 +323,7 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     hipSafe(hipFree(d_p_prim_aoinds));
 
     hipSafe(hipFree(d_mat_S));
+    hipSafe(hipFree(d_mat_T));
 
     hipSafe(hipFree(d_ss_first_inds_local));
     hipSafe(hipFree(d_ss_second_inds_local));
@@ -305,7 +332,7 @@ computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, con
     hipSafe(hipFree(d_pp_first_inds_local));
     hipSafe(hipFree(d_pp_second_inds_local));
 
-    return mat_overlap;
+    return S_T_matrices;
 }
 
 auto
