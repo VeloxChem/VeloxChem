@@ -229,8 +229,8 @@ class PolarizabilityGradient():
             self.ostream.flush()
             self.ostream.print_blank()
 
-            orbrsp_results = all_orbrsp_results[w]
             if self.rank == mpi_master():
+                orbrsp_results = all_orbrsp_results[w]
                 mo = scf_tensors['C']  # only alpha part
                 # ovlp = scf_tensors['S']
                 nao = mo.shape[0]
