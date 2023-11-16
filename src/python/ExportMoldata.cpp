@@ -8,6 +8,7 @@
 
 #include "ChemicalElement.hpp"
 #include "Codata.hpp"
+#include "ErrorHandler.hpp"
 #include "ExportGeneral.hpp"
 #include "Molecule.hpp"
 #include "PartialCharges.hpp"
@@ -52,6 +53,18 @@ export_moldata(py::module& m)
         .def("add_atom", py::overload_cast<const int64_t, const TPoint3D&, const std::string&>(&CMolecule::addAtom), "Adds atom to molecule.")
         .def("set_charge", &CMolecule::setCharge, "Sets charge of molecule.")
         .def("set_multiplicity", &CMolecule::setMultiplicity, "Sets spin multiplicity of molecule.")
+        .def(
+            "check_multiplicity",
+            [](const CMolecule& self) -> void {
+                auto multip = self.getMultiplicity() % 2;
+                auto nelec = self.getNumberOfElectrons() % 2;
+                bool flag = true;
+                if ((multip == 0) && (nelec != 1)) flag = false;
+                if ((multip == 1) && (nelec != 0)) flag = false;
+                std::string errmult("Molecule.check_multiplicity: Incompatible multiplicity and number of electrons");
+                errors::assertMsgCritical(flag, errmult);
+            },
+            "Checks spin multiplicity of molecule.")
         .def("get_charge", &CMolecule::getCharge, "Gets charge of molecule.")
         .def("get_multiplicity", &CMolecule::getMultiplicity, "Gets spin multiplicity of molecule.")
         .def("number_of_atoms", py::overload_cast<>(&CMolecule::getNumberOfAtoms, py::const_), "Gets total number of atoms in molecule.")
@@ -76,11 +89,27 @@ export_moldata(py::module& m)
         .def("get_label", &CMolecule::getLabel, "Gets an atomic labels of specific atom in molecule.")
         .def("get_atom_coordinates", &CMolecule::getAtomCoordinates, "Gets coordinates [x,y,z] of atom.")
         .def("atom_indexes", &CMolecule::getAtomIndexes, "Gets indexes of atoms with requested atomic label")
+        .def(
+            "number_of_alpha_electrons",
+            [](const CMolecule& self) -> int32_t {
+                int32_t nelec  = self.getNumberOfElectrons();
+                int32_t mult_1 = self.getMultiplicity() - 1;
+                return (nelec + mult_1) / 2;
+            },
+            "Gets number of alpha electrons.")
+        .def(
+            "number_of_beta_electrons",
+            [](const CMolecule& self) -> int32_t {
+                int32_t nelec  = self.getNumberOfElectrons();
+                int32_t mult_1 = self.getMultiplicity() - 1;
+                return (nelec - mult_1) / 2;
+            },
+            "Gets number of beta electrons.")
         .def("nuclear_repulsion_energy",
              &CMolecule::getNuclearRepulsionEnergy,
              "Gets nuclear repulsion energy for molecule assuming point charge model for nucleus.")
         .def("check_proximity", &CMolecule::checkProximity, "Checks if proximity requirement is satisfied by all pairs of atoms in molecule..")
-        .def("get_str", &CMolecule::printGeometry, "Creates string representation of molecule.");
+        .def("get_string", &CMolecule::printGeometry, "Creates string representation of molecule.");
 }
 
 }  // namespace vlx_moldata

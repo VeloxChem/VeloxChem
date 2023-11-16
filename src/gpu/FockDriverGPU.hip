@@ -1544,9 +1544,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.stop("Total timing");
 
-    std::cout << "\nTiming of ERIs on GPU\n";
-    std::cout << "-----------------------\n";
-    std::cout << timer.getSummary() << std::endl;
+    // std::cout << "\nTiming of ERIs on GPU\n";
+    // std::cout << "-----------------------\n";
+    // std::cout << timer.getSummary() << std::endl;
 
     return mat_Fock;
 }

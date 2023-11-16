@@ -39,6 +39,7 @@
 #include "GridDriver.hpp"
 #include "MolecularGrid.hpp"
 #include "XCComponent.hpp"
+#include "XCFunctional.hpp"
 #include "XCIntegrator.hpp"
 
 namespace py = pybind11;
@@ -69,6 +70,15 @@ CXCIntegrator_create(py::object py_comm) -> std::shared_ptr<CXCIntegrator>
 void
 export_dft(py::module& m)
 {
+    // xcfun enum class
+
+    // clang-format off
+    py::enum_<xcfun>(m, "xcfun")
+        .value("lda", xcfun::lda)
+        .value("gga", xcfun::gga)
+        .value("mgga", xcfun::mgga);
+    // clang-format on
+
     // CAOKohnShamMatrix class
 
     PyClass<CAOKohnShamMatrix>(m, "AOKohnShamMatrix")
@@ -166,11 +176,23 @@ export_dft(py::module& m)
         .def("get_timing_summary", &CXCIntegrator::getTimingSummary, "Gets timing summary.");
 
     // XCComponent class
+
     PyClass<CXCComponent>(m, "XCComponent")
         .def(py::init<const std::string&, const double>(), "label"_a, "coeff"_a)
         .def(py::init<const CXCComponent&>())
         .def("get_scaling_factor", &CXCComponent::getScalingFactor, "Gets scaling factor of XC functional component.")
         .def("get_label", &CXCComponent::getLabel, "Gets name of XC functional component.")
+        .def(py::self == py::self);
+
+    // XCFunctional class
+
+    PyClass<CXCFunctional>(m, "XCFunctional")
+        .def(py::init<const std::string&, const std::vector<std::string>&, const std::vector<double>&, const double>(),
+             "name_of_functional"_a,
+             "labels"_a,
+             "coeffs"_a,
+             "fraction_of_exact_exchange"_a = 0.0)
+        .def(py::init<const CXCFunctional&>())
         .def(py::self == py::self);
 
     // exposing functions

@@ -128,6 +128,7 @@ export_general(py::module& m) -> void
 
     // exposing functions from Codata.hpp
 
+    m.def("bohr_in_angstrom", &units::getBohrValueInAngstroms, "Gets Bohr value in Angstroms.");
     m.def("bohr_in_angstroms", &units::getBohrValueInAngstroms, "Gets Bohr value in Angstroms.");
 
     m.def("hartree_in_ev", &units::getHartreeValueInElectronVolts, "Gets Hartree value in electronvolts.");
@@ -193,6 +194,11 @@ export_general(py::module& m) -> void
     // exposing functions from MpiFunc.hpp
 
     m.def("mpi_master", &mpi::master, "Returns rank of MPI master process.");
+
+    m.def(
+        "mpi_size_limit",
+        []() -> int32_t { return static_cast<int32_t>(1 << 30) / 5 * 9; },
+        "Gets the size limit in MPI communication (below 2^31-1).");
 
     m.def(
         "bcast_scalar",

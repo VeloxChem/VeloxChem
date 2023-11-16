@@ -1,9 +1,9 @@
 #
-#                              VELOXCHEM
+#                           VELOXCHEM 1.0-RC3
 #         ----------------------------------------------------
 #                     An Electronic Structure Code
 #
-#  Copyright © 2018-2023 by VeloxChem developers. All rights reserved.
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
 #  Contact: https://veloxchem.org/contact
 #
 #  SPDX-License-Identifier: LGPL-3.0-or-later
@@ -23,12 +23,15 @@
 #  You should have received a copy of the GNU Lesser General Public License
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
+from mpi4py import MPI
 from pathlib import PurePath
 from datetime import datetime
+from random import getrandbits
 import numpy as np
 import sys
 import re
 
+from .veloxchemlib import mpi_master
 from .errorhandler import assert_msg_critical
 
 
@@ -49,8 +52,6 @@ class InputParser:
         - outname: The name of the output file.
         - is_basis_set: The flag for parsing a basis set file.
         - basis_set_name: The name of the basis set.
-        - is_ecp_set: The flag for parsing a ecp set file.
-        - ecp_set_name: The name of the ecp set.
     """
 
     def __init__(self, inpname, outname=None):
@@ -66,9 +67,6 @@ class InputParser:
         self.is_basis_set = False
         self.basis_set_name = ''
 
-        self.is_ecp_set = False
-        self.ecp_set_name = ''
-
         self.parse()
 
     def parse(self):
@@ -79,17 +77,39 @@ class InputParser:
         errmsg = f'InputParser: bad syntax in file {self.inpname}. '
         errmsg += 'You may check for incorrect, incomplete or empty groups.'
 
+        self.input_dict = {}
+        input_groups = {}
         group = None
 
-        input_groups = {}
-
         with open(str(self.inpname), 'r') as f_inp:
+            input_lines = f_inp.readlines()
 
-            for line in f_inp:
+            # process the lines before the first group marked by "@"
+            # and save as "keyline" in dictionary
+
+            keyline = ''
+            line_of_first_group = 0
+
+            for line in input_lines:
+                line = line.strip()
+                line = re.sub(r'!.*', '', line)
+                line = re.sub(r'#.*', '', line)
+                if line.startswith('@'):
+                    break
+
+                keyline += ' '.join(line.split()) + ' '
+                line_of_first_group += 1
+
+            self.input_dict['keyline'] = keyline.strip()
+
+            # process the remaining part of the input file
+
+            for line in input_lines[line_of_first_group:]:
 
                 # remove comment and extra space
                 line = line.strip()
                 line = re.sub(r'!.*', '', line)
+                line = re.sub(r'#.*', '', line)
                 line = ' '.join(line.split())
 
                 # skip empty line
@@ -102,16 +122,15 @@ class InputParser:
                     self.basis_set_name = line[10:].strip()
                     continue
 
-                # skip first line if reading ecp set
-                if (not self.is_ecp_set) and (line[:8] == '@ECP_SET'):
-                    self.is_ecp_set = True
-                    self.ecp_set_name = line[8:].strip()
-                    continue
-
                 # begin of group
                 if line[0] == '@' and line.lower() != '@end':
                     assert_msg_critical(group is None, errmsg)
                     group = '_'.join(line[1:].strip().lower().split())
+                    # make sure that groups are not named "keyline"
+                    assert_msg_critical(
+                        group != 'keyline',
+                        'Input: "keyline" is reserved and should not be used as input'
+                    )
                     input_groups[group] = []
 
                 # end of group
@@ -125,10 +144,7 @@ class InputParser:
 
                 # outside group
                 else:
-                    flag_be = self.is_basis_set or self.is_ecp_set
-                    assert_msg_critical(flag_be, errmsg)
-
-        self.input_dict = {}
+                    assert_msg_critical(self.is_basis_set, errmsg)
 
         for group in input_groups:
             self.input_dict[group] = {}
@@ -166,14 +182,11 @@ class InputParser:
             self.input_dict['basis_set_name'] = self.basis_set_name
             return
 
-        # save ecp set name
-        if self.is_ecp_set:
-            self.input_dict['ecp_set_name'] = self.ecp_set_name
-            return
-
         # check empty group
         for group in self.input_dict:
-            assert_msg_critical(len(self.input_dict[group]), errmsg)
+            # note that "keyline" is a string and it may be empty
+            if group != 'keyline':
+                assert_msg_critical(len(self.input_dict[group]), errmsg)
 
         # save filename
         if self.outname not in [None, sys.stdout]:
@@ -220,6 +233,8 @@ def parse_seq_fixed(input_seq, flag='float'):
             return tuple([float(x) for x in seq_str.split()])
         elif flag == 'int':
             return tuple([int(x) for x in seq_str.split()])
+        elif flag == 'str':
+            return tuple(seq_str.split())
         else:
             assert_msg_critical(False,
                                 f'parse_seq_fixed: invalid flag \'{flag}\'')
@@ -357,12 +372,12 @@ def parse_input(obj, keyword_types, input_dictionary):
         - 'float' for floating-point input, such as 'eri_thresh: 1.0e-12'
         - 'bool' for floating-point input, such as 'restart: no'
         - 'list' for multi-line input, such as 'constraints'
+        - 'seq_fixed_str' for fixed-length string sequence, such as
+          'atom_types: c3,c3,hc'
         - 'seq_fixed_int' for fixed-length integer sequence, such as
           'cube_points: 80,80,80'
-        - 'seq_fixed' for fixed-length sequence, such as
-          'cube_origin: 0.0,0.0,0.0'
-        - 'seq_range' for sequence with range, such as
-          'frequencies: 0.0-0.1(0.02)'
+        - 'seq_fixed' for fixed-length sequence, such as 'cube_origin: 0.0,0.0,0.0'
+        - 'seq_range' for sequence with range, such as 'frequencies: 0.0-0.1(0.02)'
 
     :param obj:
         The object.
@@ -401,6 +416,9 @@ def parse_input(obj, keyword_types, input_dictionary):
         elif keyword_types[key] == 'list':
             setattr(obj, key, parse_list(val))
 
+        elif keyword_types[key] == 'seq_fixed_str':
+            setattr(obj, key, parse_seq_fixed(val, 'str'))
+
         elif keyword_types[key] == 'seq_fixed_int':
             setattr(obj, key, parse_seq_fixed(val, 'int'))
 
@@ -420,16 +438,33 @@ def print_keywords(input_keywords, ostream):
     Prints input keywords to output stream.
     """
 
-    width = 80
+    width = 90
     for group in input_keywords:
         group_print = group.replace('_', ' ')
         ostream.print_header('=' * width)
         ostream.print_header(f'  @{group_print}'.ljust(width))
         ostream.print_header('-' * width)
         for key, val in input_keywords[group].items():
-            text = f'  {key}'.ljust(20)
+            text = f'  {key}'.ljust(30)
             text += f'  {get_keyword_type(val[0])}'.ljust(15)
-            text += f'  {val[1]}'.ljust(width - 35)
+            text += f'  {val[1]}'.ljust(width - 45)
+            ostream.print_header(text)
+    ostream.print_header('=' * width)
+    ostream.flush()
+
+
+def print_attributes(input_keywords, ostream):
+    """
+    Prints attributes to output stream.
+    """
+
+    width = 90
+    ostream.print_header('=' * width)
+    for group in input_keywords:
+        for key, val in input_keywords[group].items():
+            text = f'  {key}'.ljust(30)
+            text += f'  {get_keyword_type(val[0])}'.ljust(15)
+            text += f'  {val[1]}'.ljust(width - 45)
             ostream.print_header(text)
     ostream.print_header('=' * width)
     ostream.flush()
@@ -443,7 +478,8 @@ def get_keyword_type(keyword_type):
         - 'float' -> 'float'
         - 'bool' -> 'boolean'
         - 'list' -> 'multi-line'
-        - 'seq_fixed_int', 'seq_fixed', 'seq_range' -> 'sequence'
+        - 'seq_fixed_str', 'seq_fixed_int', 'seq_fixed' -> 'sequence'
+        - 'seq_range' -> 'sequence'
 
     :return:
         The keyword type for printing.
@@ -457,6 +493,7 @@ def get_keyword_type(keyword_type):
         'float': 'float',
         'bool': 'boolean',
         'list': 'multi-line',
+        'seq_fixed_str': 'sequence',
         'seq_fixed_int': 'sequence',
         'seq_fixed': 'sequence',
         'seq_range': 'sequence',
@@ -471,5 +508,46 @@ def get_datetime_string():
         The datetime string (ISO format with ':' replaced by '.').
     """
 
+    # TODO: deprecate get_datetime_string
+
     return datetime.now().isoformat(sep='T',
                                     timespec='seconds').replace(':', '.')
+
+
+def get_random_string_serial():
+    """
+    Gets a random string.
+
+    :return:
+        The random string.
+    """
+
+    datetime_string = datetime.now().isoformat(sep='T', timespec='seconds')
+    datetime_string = datetime_string.replace(':', '.')
+
+    random_string = '{:>08s}'.format(hex(getrandbits(32))[2:])
+
+    return datetime_string + '_' + random_string
+
+
+def get_random_string_parallel(comm=None):
+    """
+    Gets a random string for an MPI communicator.
+
+    :param comm:
+        The MPI communicator.
+
+    :return:
+        The random string.
+    """
+
+    if comm is None:
+        comm = MPI.COMM_WORLD
+
+    if comm.Get_rank() == mpi_master():
+        random_string = get_random_string_serial()
+    else:
+        random_string = None
+    random_string = comm.bcast(random_string, root=mpi_master())
+
+    return random_string
