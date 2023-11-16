@@ -1264,17 +1264,18 @@ class ScfDriver:
 
         t2 = tm.time()
 
-        # TODO: parallelize npot_mat
-        """
         if molecule.number_of_atoms() >= self.nodes and self.nodes > 1:
             npot_mat = self._comp_npot_mat_split_comm(molecule, basis)
         else:
-            npot_drv = NuclearPotentialIntegralsDriver(self.comm)
-            npot_mat = npot_drv.compute(molecule, basis)
-        """
-
-        npot_drv = NuclearPotentialDriver()
-        npot_mat = npot_drv.compute(molecule, basis, molecule.get_charges(), molecule.get_coordinates())
+            npot_drv = NuclearPotentialDriver()
+            npot_mat = npot_drv.compute(molecule, basis, molecule.get_charges(), molecule.get_coordinates())
+            V = None
+            for key in npot_mat.get_keys():
+                if V is None:
+                    V = npot_mat.get_matrix(key).get_full_matrix().to_numpy()
+                else:
+                    V += npot_mat.get_matrix(key).get_full_matrix().to_numpy()
+            npot_mat = V
 
         t3 = tm.time()
 
@@ -1342,17 +1343,21 @@ class ScfDriver:
         start = sum(counts[:self.rank])
         end = sum(counts[:self.rank + 1])
 
-        charges = molecule.elem_ids_to_numpy()[start:end].astype(float)
-        coords = np.vstack(
-            (molecule.x_to_numpy()[start:end], molecule.y_to_numpy()[start:end],
-             molecule.z_to_numpy()[start:end])).T
+        charges = molecule.get_charges()[start:end]
+        coords = molecule.get_coordinates()[start:end]
 
-        npot_drv = NuclearPotentialIntegralsDriver(local_comm)
+        npot_drv = NuclearPotentialDriver()
         npot_mat = npot_drv.compute(molecule, basis, charges, coords)
 
+        V = None
+        for key in npot_mat.get_keys():
+            if V is None:
+                V = npot_mat.get_matrix(key).get_full_matrix().to_numpy()
+            else:
+                V += npot_mat.get_matrix(key).get_full_matrix().to_numpy()
+
         if local_comm.Get_rank() == mpi_master():
-            npot_mat.reduce_sum(cross_comm.Get_rank(), cross_comm.Get_size(),
-                                cross_comm)
+            npot_mat = cross_comm.reduce(V, op=MPI.SUM, root=mpi_master())
 
         return npot_mat
 
@@ -1710,12 +1715,7 @@ class ScfDriver:
             # electronic, kinetic, nuclear energy
             D = den_mat.alpha_to_numpy(0)
             T = kin_mat.get_full_matrix().to_numpy()
-            V = None
-            for key in npot_mat.get_keys():
-                if V is None:
-                    V = npot_mat.get_matrix(key).get_full_matrix().to_numpy()
-                else:
-                    V += npot_mat.get_matrix(key).get_full_matrix().to_numpy()
+            V = npot_mat
             e_ee = np.sum(D * fock_mat)
             e_kin = 2.0 * np.sum(D * T)
             e_en = -2.0 * np.sum(D * V)
@@ -1751,12 +1751,7 @@ class ScfDriver:
         if self.rank == mpi_master():
             # TODO: double check
             T = kin_mat.get_full_matrix().to_numpy()
-            V = None
-            for key in npot_mat.get_keys():
-                if V is None:
-                    V = npot_mat.get_matrix(key).get_full_matrix().to_numpy()
-                else:
-                    V += npot_mat.get_matrix(key).get_full_matrix().to_numpy()
+            V = npot_mat
             fock_mat += (T - V)
 
             if self._dft and not self._first_step:
