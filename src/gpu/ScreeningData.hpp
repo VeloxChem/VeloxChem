@@ -81,6 +81,25 @@ class CScreeningData
     double _sp_max_D;
     double _pp_max_D;
 
+    std::vector<double>   _mat_Q_for_K_ss;
+    std::vector<double>   _mat_Q_for_K_sp;
+    std::vector<double>   _mat_Q_for_K_ps;
+    std::vector<double>   _mat_Q_for_K_pp;
+
+    std::vector<uint32_t> _density_inds_for_K_ss;
+    std::vector<uint32_t> _density_inds_for_K_sp;
+    std::vector<uint32_t> _density_inds_for_K_ps;
+    std::vector<uint32_t> _density_inds_for_K_pp;
+
+    std::vector<uint32_t> _pair_inds_i_for_K_ss;
+    std::vector<uint32_t> _pair_inds_k_for_K_ss;
+
+    std::vector<uint32_t> _pair_inds_i_for_K_sp;
+    std::vector<uint32_t> _pair_inds_k_for_K_sp;
+
+    std::vector<uint32_t> _pair_inds_i_for_K_pp;
+    std::vector<uint32_t> _pair_inds_k_for_K_pp;
+
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
     auto _sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -> void;
@@ -131,6 +150,31 @@ class CScreeningData
     auto get_ss_max_D() const -> double;
     auto get_sp_max_D() const -> double;
     auto get_pp_max_D() const -> double;
+
+    auto get_mat_Q_for_K_ss() const -> const std::vector<double>&;
+    auto get_mat_Q_for_K_sp() const -> const std::vector<double>&;
+    auto get_mat_Q_for_K_ps() const -> const std::vector<double>&;
+    auto get_mat_Q_for_K_pp() const -> const std::vector<double>&;
+
+    auto get_density_inds_for_K_ss() const -> const std::vector<uint32_t>&;
+    auto get_density_inds_for_K_sp() const -> const std::vector<uint32_t>&;
+    auto get_density_inds_for_K_ps() const -> const std::vector<uint32_t>&;
+    auto get_density_inds_for_K_pp() const -> const std::vector<uint32_t>&;
+
+    auto get_pair_inds_i_for_K_ss() const -> const std::vector<uint32_t>&;
+    auto get_pair_inds_k_for_K_ss() const -> const std::vector<uint32_t>&;
+
+    auto get_pair_inds_i_for_K_sp() const -> const std::vector<uint32_t>&;
+    auto get_pair_inds_k_for_K_sp() const -> const std::vector<uint32_t>&;
+
+    auto get_pair_inds_i_for_K_pp() const -> const std::vector<uint32_t>&;
+    auto get_pair_inds_k_for_K_pp() const -> const std::vector<uint32_t>&;
+
+    auto get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix;
+    auto get_mat_D_abs_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix;
+
+    auto form_mat_Q_and_density_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count) -> void;
+    auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;
 };
 
 #endif /* ScreeningData_hpp */

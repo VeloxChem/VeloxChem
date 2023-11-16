@@ -710,3 +710,296 @@ auto CScreeningData::get_pp_mat_D() const -> const std::vector<double>& { return
 auto CScreeningData::get_ss_max_D() const -> double { return _ss_max_D; }
 auto CScreeningData::get_sp_max_D() const -> double { return _sp_max_D; }
 auto CScreeningData::get_pp_max_D() const -> double { return _pp_max_D; }
+
+auto CScreeningData::get_mat_Q_for_K_ss() const -> const std::vector<double>& { return _mat_Q_for_K_ss; };
+auto CScreeningData::get_mat_Q_for_K_sp() const -> const std::vector<double>& { return _mat_Q_for_K_sp; };
+auto CScreeningData::get_mat_Q_for_K_ps() const -> const std::vector<double>& { return _mat_Q_for_K_ps; };
+auto CScreeningData::get_mat_Q_for_K_pp() const -> const std::vector<double>& { return _mat_Q_for_K_pp; };
+
+auto CScreeningData::get_density_inds_for_K_ss() const -> const std::vector<uint32_t>& { return _density_inds_for_K_ss; }
+auto CScreeningData::get_density_inds_for_K_sp() const -> const std::vector<uint32_t>& { return _density_inds_for_K_sp; }
+auto CScreeningData::get_density_inds_for_K_ps() const -> const std::vector<uint32_t>& { return _density_inds_for_K_ps; }
+auto CScreeningData::get_density_inds_for_K_pp() const -> const std::vector<uint32_t>& { return _density_inds_for_K_pp; }
+
+auto CScreeningData::get_pair_inds_i_for_K_ss() const -> const std::vector<uint32_t>& { return _pair_inds_i_for_K_ss; };
+auto CScreeningData::get_pair_inds_k_for_K_ss() const -> const std::vector<uint32_t>& { return _pair_inds_k_for_K_ss; };
+
+auto CScreeningData::get_pair_inds_i_for_K_sp() const -> const std::vector<uint32_t>& { return _pair_inds_i_for_K_sp; };
+auto CScreeningData::get_pair_inds_k_for_K_sp() const -> const std::vector<uint32_t>& { return _pair_inds_k_for_K_sp; };
+
+auto CScreeningData::get_pair_inds_i_for_K_pp() const -> const std::vector<uint32_t>& { return _pair_inds_i_for_K_pp; };
+auto CScreeningData::get_pair_inds_k_for_K_pp() const -> const std::vector<uint32_t>& { return _pair_inds_k_for_K_pp; };
+
+auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix
+{
+    CDenseMatrix mat_Q_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            mat_Q_full.row(i)[j] = _Q_matrix_ss.row(i)[j];
+        }
+
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            mat_Q_full.row(i)[s_prim_count + j] = _Q_matrix_sp.row(i)[j];
+            mat_Q_full.row(s_prim_count + j)[i] = _Q_matrix_sp.row(i)[j];
+        }
+    }
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            mat_Q_full.row(s_prim_count + i)[s_prim_count + j] = _Q_matrix_pp.row(i)[j];
+        }
+    }
+
+    return mat_Q_full;
+}
+
+auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix
+{
+    CDenseMatrix mat_D_abs_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            mat_D_abs_full.row(i)[j] = std::fabs(_D_matrix_ss.row(i)[j]);
+        }
+
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            mat_D_abs_full.row(i)[s_prim_count + j] = std::fabs(_D_matrix_sp.row(i)[j]);
+            mat_D_abs_full.row(s_prim_count + j)[i] = std::fabs(_D_matrix_sp.row(i)[j]);
+        }
+    }
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            mat_D_abs_full.row(s_prim_count + i)[s_prim_count + j] = std::fabs(_D_matrix_pp.row(i)[j]);
+        }
+    }
+
+    return mat_D_abs_full;
+}
+
+auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count) -> void
+{
+    // Q_ss and D_ss for K
+
+    _mat_Q_for_K_ss = std::vector<double> (s_prim_count * s_prim_count);
+    _density_inds_for_K_ss = std::vector<uint32_t> (s_prim_count * s_prim_count);
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+
+        const auto Q_i = _Q_matrix_ss.row(i);
+
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            // auto i_idx = std::get<1>(q_ij);
+            auto j_idx = std::get<2>(q_ij);
+
+            _mat_Q_for_K_ss[i * s_prim_count + j]        = q_val;
+            _density_inds_for_K_ss[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
+        }
+    }
+
+    _mat_Q_for_K_sp = std::vector<double> (s_prim_count * p_prim_count * 3);
+    _density_inds_for_K_sp = std::vector<uint32_t> (s_prim_count * p_prim_count * 3);
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+
+        const auto Q_i = _Q_matrix_sp.row(i);
+
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            // auto i_idx = std::get<1>(q_ij);
+            auto j_idx = std::get<2>(q_ij);
+
+            _mat_Q_for_K_sp[i * p_prim_count * 3 + j]        = q_val;
+            _density_inds_for_K_sp[i * p_prim_count * 3 + j] = static_cast<uint32_t>(j_idx);
+        }
+    }
+
+    _mat_Q_for_K_ps = std::vector<double> (p_prim_count * 3 * s_prim_count);
+    _density_inds_for_K_ps = std::vector<uint32_t> (p_prim_count * 3 * s_prim_count);
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            Q_vec_sorted.push_back(std::make_tuple(_Q_matrix_sp.row(j)[i], i, j));
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        for (int64_t j = 0; j < s_prim_count; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            // auto i_idx = std::get<1>(q_ij);
+            auto j_idx = std::get<2>(q_ij);
+
+            _mat_Q_for_K_ps[i * s_prim_count + j]        = q_val;
+            _density_inds_for_K_ps[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
+        }
+    }
+
+    _mat_Q_for_K_pp = std::vector<double> (p_prim_count * 3 * p_prim_count * 3);
+    _density_inds_for_K_pp = std::vector<uint32_t> (p_prim_count * 3 * p_prim_count * 3);
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
+
+        const auto Q_i = _Q_matrix_pp.row(i);
+
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
+        }
+
+        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
+        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
+
+        for (int64_t j = 0; j < p_prim_count * 3; j++)
+        {
+            const auto& q_ij = Q_vec_sorted[j];
+
+            auto q_val = std::get<0>(q_ij);
+            // auto i_idx = std::get<1>(q_ij);
+            auto j_idx = std::get<2>(q_ij);
+
+            _mat_Q_for_K_pp[i * p_prim_count * 3 + j]        = q_val;
+            _density_inds_for_K_pp[i * p_prim_count * 3 + j] = static_cast<uint32_t>(j_idx);
+        }
+    }
+}
+
+auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    // ss block
+
+    _pair_inds_i_for_K_ss = std::vector<uint32_t>();
+    _pair_inds_k_for_K_ss = std::vector<uint32_t>();
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        for (int64_t k = i; k < s_prim_count; k++)
+        {
+            if (std::fabs(Q_prime.row(i)[k]) > Q_prime_thresh)
+            {
+                _pair_inds_i_for_K_ss.push_back(i);
+                _pair_inds_k_for_K_ss.push_back(k);
+            }
+        }
+    }
+
+    std::vector<uint32_t> local_pair_inds_i_for_K_ss;
+    std::vector<uint32_t> local_pair_inds_k_for_K_ss;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_ss.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_ss.push_back(_pair_inds_i_for_K_ss[ik]);
+        local_pair_inds_k_for_K_ss.push_back(_pair_inds_k_for_K_ss[ik]);
+    }
+
+    _pair_inds_i_for_K_ss = local_pair_inds_i_for_K_ss;
+    _pair_inds_k_for_K_ss = local_pair_inds_k_for_K_ss;
+
+    // sp block
+
+    _pair_inds_i_for_K_sp = std::vector<uint32_t>();
+    _pair_inds_k_for_K_sp = std::vector<uint32_t>();
+
+    for (int64_t i = 0; i < s_prim_count; i++)
+    {
+        for (int64_t k = 0; k < p_prim_count * 3; k++)
+        {
+            if (std::fabs(Q_prime.row(i)[s_prim_count + k]) > Q_prime_thresh)
+            {
+                _pair_inds_i_for_K_sp.push_back(i);
+                _pair_inds_k_for_K_sp.push_back(k);
+            }
+        }
+    }
+
+    std::vector<uint32_t> local_pair_inds_i_for_K_sp;
+    std::vector<uint32_t> local_pair_inds_k_for_K_sp;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_sp.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_sp.push_back(_pair_inds_i_for_K_sp[ik]);
+        local_pair_inds_k_for_K_sp.push_back(_pair_inds_k_for_K_sp[ik]);
+    }
+
+    _pair_inds_i_for_K_sp = local_pair_inds_i_for_K_sp;
+    _pair_inds_k_for_K_sp = local_pair_inds_k_for_K_sp;
+
+    // pp block
+
+    _pair_inds_i_for_K_pp = std::vector<uint32_t>();
+    _pair_inds_k_for_K_pp = std::vector<uint32_t>();
+
+    for (int64_t i = 0; i < p_prim_count * 3; i++)
+    {
+        for (int64_t k = i; k < p_prim_count * 3; k++)
+        {
+            if (std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]) > Q_prime_thresh)
+            {
+                _pair_inds_i_for_K_pp.push_back(i);
+                _pair_inds_k_for_K_pp.push_back(k);
+            }
+        }
+    }
+
+    std::vector<uint32_t> local_pair_inds_i_for_K_pp;
+    std::vector<uint32_t> local_pair_inds_k_for_K_pp;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_pp.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_pp.push_back(_pair_inds_i_for_K_pp[ik]);
+        local_pair_inds_k_for_K_pp.push_back(_pair_inds_k_for_K_pp[ik]);
+    }
+
+    _pair_inds_i_for_K_pp = local_pair_inds_i_for_K_pp;
+    _pair_inds_k_for_K_pp = local_pair_inds_k_for_K_pp;
+}

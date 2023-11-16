@@ -182,9 +182,7 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     auto screening = CScreeningData(molecule, basis);
 
-    const auto& ss_mat_Q_orig = screening.getQMatrixSS();
-    const auto& sp_mat_Q_orig = screening.getQMatrixSP();
-    const auto& pp_mat_Q_orig = screening.getQMatrixPP();
+    screening.form_mat_Q_and_density_inds_for_K(s_prim_count, p_prim_count);
 
     timer.stop("  Q matrices");
 
@@ -192,13 +190,21 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     screening.updateDensityMatrix(molecule, basis, densityMatrix);
 
-    const auto& ss_mat_D_orig = screening.getDMatrixSS();
-    const auto& sp_mat_D_orig = screening.getDMatrixSP();
-    const auto& pp_mat_D_orig = screening.getDMatrixPP();
+    screening.sortQD(s_prim_count, p_prim_count);
 
     timer.stop("  D matrices");
 
-    screening.sortQD(s_prim_count, p_prim_count);
+    timer.stop("GTO block pair prep.");
+
+    timer.start("Coulomb prep.");
+
+    const auto& ss_mat_Q_orig = screening.getQMatrixSS();
+    const auto& sp_mat_Q_orig = screening.getQMatrixSP();
+    const auto& pp_mat_Q_orig = screening.getQMatrixPP();
+
+    const auto& ss_mat_D_orig = screening.getDMatrixSS();
+    const auto& sp_mat_D_orig = screening.getDMatrixSP();
+    const auto& pp_mat_D_orig = screening.getDMatrixPP();
 
     const auto& ss_first_inds_local = screening.get_ss_first_inds_local(); 
     const auto& sp_first_inds_local = screening.get_sp_first_inds_local(); 
@@ -764,38 +770,8 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
 
-    CDenseMatrix mat_Q_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
-    CDenseMatrix mat_D_abs_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
-
-    for (int64_t i = 0; i < s_prim_count; i++)
-    {
-        for (int64_t j = 0; j < s_prim_count; j++)
-        {
-            mat_Q_full.row(i)[j] = ss_mat_Q_orig.row(i)[j];
-            mat_D_abs_full.row(i)[j] = std::fabs(ss_mat_D_orig.row(i)[j]);
-        }
-    }
-
-    for (int64_t i = 0; i < s_prim_count; i++)
-    {
-        for (int64_t j = 0; j < p_prim_count * 3; j++)
-        {
-            mat_Q_full.row(i)[s_prim_count + j] = sp_mat_Q_orig.row(i)[j];
-            mat_D_abs_full.row(i)[s_prim_count + j] = std::fabs(sp_mat_D_orig.row(i)[j]);
-
-            mat_Q_full.row(s_prim_count + j)[i] = sp_mat_Q_orig.row(i)[j];
-            mat_D_abs_full.row(s_prim_count + j)[i] = std::fabs(sp_mat_D_orig.row(i)[j]);
-        }
-    }
-
-    for (int64_t i = 0; i < p_prim_count * 3; i++)
-    {
-        for (int64_t j = 0; j < p_prim_count * 3; j++)
-        {
-            mat_Q_full.row(s_prim_count + i)[s_prim_count + j] = pp_mat_Q_orig.row(i)[j];
-            mat_D_abs_full.row(s_prim_count + i)[s_prim_count + j] = std::fabs(pp_mat_D_orig.row(i)[j]);
-        }
-    }
+    const auto mat_Q_full = screening.get_mat_Q_full(s_prim_count, p_prim_count);
+    const auto mat_D_abs_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count);
 
     // TODO distribute computation of Q_prime
 
@@ -839,210 +815,30 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
 
     // K preparation
 
-    // Q_ss and D_ss for K
+    const auto mat_Q_for_K_ss = screening.get_mat_Q_for_K_ss();
+    const auto mat_Q_for_K_sp = screening.get_mat_Q_for_K_sp();
+    const auto mat_Q_for_K_ps = screening.get_mat_Q_for_K_ps();
+    const auto mat_Q_for_K_pp = screening.get_mat_Q_for_K_pp();
 
-    std::vector<double>   mat_Q_for_K_ss(s_prim_count * s_prim_count);
-    std::vector<uint32_t> density_inds_for_K_ss(s_prim_count * s_prim_count);
-
-    for (int64_t i = 0; i < s_prim_count; i++)
-    {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
-
-        const auto Q_i = ss_mat_Q_orig.row(i);
-
-        for (int64_t j = 0; j < s_prim_count; j++)
-        {
-            Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
-        }
-
-        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
-        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
-
-        for (int64_t j = 0; j < s_prim_count; j++)
-        {
-            const auto& q_ij = Q_vec_sorted[j];
-
-            auto q_val = std::get<0>(q_ij);
-            // auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
-
-            mat_Q_for_K_ss[i * s_prim_count + j]        = q_val;
-            density_inds_for_K_ss[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
-        }
-    }
-
-    std::vector<double>   mat_Q_for_K_sp(s_prim_count * p_prim_count * 3);
-    std::vector<uint32_t> density_inds_for_K_sp(s_prim_count * p_prim_count * 3);
-
-    for (int64_t i = 0; i < s_prim_count; i++)
-    {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
-
-        const auto Q_i = sp_mat_Q_orig.row(i);
-
-        for (int64_t j = 0; j < p_prim_count * 3; j++)
-        {
-            Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
-        }
-
-        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
-        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
-
-        for (int64_t j = 0; j < p_prim_count * 3; j++)
-        {
-            const auto& q_ij = Q_vec_sorted[j];
-
-            auto q_val = std::get<0>(q_ij);
-            // auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
-
-            mat_Q_for_K_sp[i * p_prim_count * 3 + j]        = q_val;
-            density_inds_for_K_sp[i * p_prim_count * 3 + j] = static_cast<uint32_t>(j_idx);
-        }
-    }
-
-    std::vector<double>   mat_Q_for_K_ps(p_prim_count * 3 * s_prim_count);
-    std::vector<uint32_t> density_inds_for_K_ps(p_prim_count * 3 * s_prim_count);
-
-    for (int64_t i = 0; i < p_prim_count * 3; i++)
-    {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
-
-        for (int64_t j = 0; j < s_prim_count; j++)
-        {
-            Q_vec_sorted.push_back(std::make_tuple(sp_mat_Q_orig.row(j)[i], i, j));
-        }
-
-        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
-        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
-
-        for (int64_t j = 0; j < s_prim_count; j++)
-        {
-            const auto& q_ij = Q_vec_sorted[j];
-
-            auto q_val = std::get<0>(q_ij);
-            // auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
-
-            mat_Q_for_K_ps[i * s_prim_count + j]        = q_val;
-            density_inds_for_K_ps[i * s_prim_count + j] = static_cast<uint32_t>(j_idx);
-        }
-    }
-
-    std::vector<double>   mat_Q_for_K_pp(p_prim_count * 3 * p_prim_count * 3);
-    std::vector<uint32_t> density_inds_for_K_pp(p_prim_count * 3 * p_prim_count * 3);
-
-    for (int64_t i = 0; i < p_prim_count * 3; i++)
-    {
-        std::vector<std::tuple<double, int64_t, int64_t>> Q_vec_sorted;
-
-        const auto Q_i = pp_mat_Q_orig.row(i);
-
-        for (int64_t j = 0; j < p_prim_count * 3; j++)
-        {
-            Q_vec_sorted.push_back(std::make_tuple(Q_i[j], i, j));
-        }
-
-        std::sort(Q_vec_sorted.begin(), Q_vec_sorted.end());
-        std::reverse(Q_vec_sorted.begin(), Q_vec_sorted.end());
-
-        for (int64_t j = 0; j < p_prim_count * 3; j++)
-        {
-            const auto& q_ij = Q_vec_sorted[j];
-
-            auto q_val = std::get<0>(q_ij);
-            // auto i_idx = std::get<1>(q_ij);
-            auto j_idx = std::get<2>(q_ij);
-
-            mat_Q_for_K_pp[i * p_prim_count * 3 + j]        = q_val;
-            density_inds_for_K_pp[i * p_prim_count * 3 + j] = static_cast<uint32_t>(j_idx);
-        }
-    }
+    const auto density_inds_for_K_ss = screening.get_density_inds_for_K_ss();
+    const auto density_inds_for_K_sp = screening.get_density_inds_for_K_sp();
+    const auto density_inds_for_K_ps = screening.get_density_inds_for_K_ps();
+    const auto density_inds_for_K_pp = screening.get_density_inds_for_K_pp();
 
     const double Q_prime_thresh = 1.0e-7;
 
     // TODO sort by Q_prime bound
 
-    std::vector<uint32_t> pair_inds_i_for_K_ss;
-    std::vector<uint32_t> pair_inds_k_for_K_ss;
+    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, Q_prime, Q_prime_thresh);
 
-    for (int64_t i = 0; i < s_prim_count; i++)
-    {
-        for (int64_t k = i; k < s_prim_count; k++)
-        {
-            if (std::fabs(Q_prime.row(i)[k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_ss.push_back(i);
-                pair_inds_k_for_K_ss.push_back(k);
-            }
-        }
-    }
+    const auto pair_inds_i_for_K_ss = screening.get_pair_inds_i_for_K_ss();
+    const auto pair_inds_k_for_K_ss = screening.get_pair_inds_k_for_K_ss();
 
-    std::vector<uint32_t> local_pair_inds_i_for_K_ss;
-    std::vector<uint32_t> local_pair_inds_k_for_K_ss;
+    const auto pair_inds_i_for_K_sp = screening.get_pair_inds_i_for_K_sp();
+    const auto pair_inds_k_for_K_sp = screening.get_pair_inds_k_for_K_sp();
 
-    for (int64_t ik = rank; ik < static_cast<int64_t>(pair_inds_i_for_K_ss.size()); ik+=nnodes)
-    {
-        local_pair_inds_i_for_K_ss.push_back(pair_inds_i_for_K_ss[ik]);
-        local_pair_inds_k_for_K_ss.push_back(pair_inds_k_for_K_ss[ik]);
-    }
-
-    pair_inds_i_for_K_ss = local_pair_inds_i_for_K_ss;
-    pair_inds_k_for_K_ss = local_pair_inds_k_for_K_ss;
-
-    std::vector<uint32_t> pair_inds_i_for_K_sp;
-    std::vector<uint32_t> pair_inds_k_for_K_sp;
-
-    for (int64_t i = 0; i < s_prim_count; i++)
-    {
-        for (int64_t k = 0; k < p_prim_count * 3; k++)
-        {
-            if (std::fabs(Q_prime.row(i)[s_prim_count + k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_sp.push_back(i);
-                pair_inds_k_for_K_sp.push_back(k);
-            }
-        }
-    }
-
-    std::vector<uint32_t> local_pair_inds_i_for_K_sp;
-    std::vector<uint32_t> local_pair_inds_k_for_K_sp;
-
-    for (int64_t ik = rank; ik < static_cast<int64_t>(pair_inds_i_for_K_sp.size()); ik+=nnodes)
-    {
-        local_pair_inds_i_for_K_sp.push_back(pair_inds_i_for_K_sp[ik]);
-        local_pair_inds_k_for_K_sp.push_back(pair_inds_k_for_K_sp[ik]);
-    }
-
-    pair_inds_i_for_K_sp = local_pair_inds_i_for_K_sp;
-    pair_inds_k_for_K_sp = local_pair_inds_k_for_K_sp;
-
-    std::vector<uint32_t> pair_inds_i_for_K_pp;
-    std::vector<uint32_t> pair_inds_k_for_K_pp;
-
-    for (int64_t i = 0; i < p_prim_count * 3; i++)
-    {
-        for (int64_t k = i; k < p_prim_count * 3; k++)
-        {
-            if (std::fabs(Q_prime.row(s_prim_count + i)[s_prim_count + k]) > Q_prime_thresh)
-            {
-                pair_inds_i_for_K_pp.push_back(i);
-                pair_inds_k_for_K_pp.push_back(k);
-            }
-        }
-    }
-
-    std::vector<uint32_t> local_pair_inds_i_for_K_pp;
-    std::vector<uint32_t> local_pair_inds_k_for_K_pp;
-
-    for (int64_t ik = rank; ik < static_cast<int64_t>(pair_inds_i_for_K_pp.size()); ik+=nnodes)
-    {
-        local_pair_inds_i_for_K_pp.push_back(pair_inds_i_for_K_pp[ik]);
-        local_pair_inds_k_for_K_pp.push_back(pair_inds_k_for_K_pp[ik]);
-    }
-
-    pair_inds_i_for_K_pp = local_pair_inds_i_for_K_pp;
-    pair_inds_k_for_K_pp = local_pair_inds_k_for_K_pp;
+    const auto pair_inds_i_for_K_pp = screening.get_pair_inds_i_for_K_pp();
+    const auto pair_inds_k_for_K_pp = screening.get_pair_inds_k_for_K_pp();
 
     auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
     auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
