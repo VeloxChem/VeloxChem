@@ -147,7 +147,8 @@ computeCoulombFockSSSS(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -267,7 +268,8 @@ computeCoulombFockSSSP(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -410,7 +412,8 @@ computeCoulombFockSSPP(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -574,7 +577,8 @@ computeCoulombFockSPSS(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -717,7 +721,8 @@ computeCoulombFockSPSP(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -870,7 +875,8 @@ computeCoulombFockSPPP(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -1062,7 +1068,8 @@ computeCoulombFockPPSS(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -1226,7 +1233,8 @@ computeCoulombFockPPSP(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -1416,7 +1424,8 @@ computeCoulombFockPPPP(double*         mat_J,
                        const double*   boys_func_table,
                        const double*   boys_func_ft)
 {
-    // each thread block scans over [ij|??] and sum up to a primitive J matrix element
+    // each thread row scans over [ij|??] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -1694,6 +1703,7 @@ computeExchangeFockSSSS(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -1845,6 +1855,7 @@ computeExchangeFockSSSP(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -2017,6 +2028,7 @@ computeExchangeFockSPSS(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -2187,6 +2199,7 @@ computeExchangeFockSPSP(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -2370,6 +2383,7 @@ computeExchangeFockSSPS(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -2543,6 +2557,7 @@ computeExchangeFockSSPP(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -2736,6 +2751,7 @@ computeExchangeFockSPPS(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -2918,6 +2934,7 @@ computeExchangeFockSPPP(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -3137,6 +3154,7 @@ computeExchangeFockPSPS(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -3320,6 +3338,7 @@ computeExchangeFockPSPP(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -3541,6 +3560,7 @@ computeExchangeFockPPPS(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;
@@ -3757,6 +3777,7 @@ computeExchangeFockPPPP(double*         mat_K,
                         const double*   boys_func_ft)
 {
     // each thread block scans over [i?|k?] and sum up to a primitive J matrix element
+    // J. Chem. Theory Comput. 2009, 5, 4, 1004–1015
 
     __shared__ double ERIs[TILE_DIM][TILE_DIM + 1];
     __shared__ uint32_t skip_thread_block;

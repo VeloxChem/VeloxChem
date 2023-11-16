@@ -87,7 +87,7 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            smat = ovl_mat.get_full_matrix().to_numpy()
+            smat = ovl_mat
             tmat = oao_mat.to_numpy()
 
             dmat = den_mat.alpha_to_numpy(0)

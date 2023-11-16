@@ -47,6 +47,7 @@
 #include "MatrixFunc.hpp"
 #include "MpiFunc.hpp"
 #include "MultiTimer.hpp"
+#include "OneElectronIntegrals.hpp"
 #include "StringFormat.hpp"
 
 #define TILE_DIM 16
@@ -66,6 +67,246 @@
     }
 
 namespace gpu {  // gpu namespace
+
+auto
+computeOverlapOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> CDenseMatrix
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    if (rank % 8 == 0) hipSafe(hipSetDevice(4));
+    if (rank % 8 == 1) hipSafe(hipSetDevice(5));
+    if (rank % 8 == 2) hipSafe(hipSetDevice(2));
+    if (rank % 8 == 3) hipSafe(hipSetDevice(3));
+    if (rank % 8 == 4) hipSafe(hipSetDevice(6));
+    if (rank % 8 == 5) hipSafe(hipSetDevice(7));
+    if (rank % 8 == 6) hipSafe(hipSetDevice(0));
+    if (rank % 8 == 7) hipSafe(hipSetDevice(1));
+
+    // GTOs blocks and number of AOs
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    // gto blocks
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+    }
+
+    // S gto block
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    double*   d_s_prim_info;
+    uint32_t* d_s_prim_aoinds;
+
+    hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_s_prim_aoinds, s_prim_aoinds.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // P gto block
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    double*   d_p_prim_info;
+    uint32_t* d_p_prim_aoinds;
+
+    hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
+    hipSafe(hipMalloc(&d_p_prim_aoinds, p_prim_aoinds.size() * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    // GTO block pairs
+
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(); 
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(); 
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(); 
+
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(); 
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(); 
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(); 
+
+    const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
+    const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
+    const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
+
+    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, pp_prim_pair_count});
+
+    std::vector<double> mat_S(max_prim_pair_count);
+
+    const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
+    const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
+    const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+
+    // S on device
+
+    double *d_mat_S;
+
+    uint32_t *d_ss_first_inds_local, *d_ss_second_inds_local;
+    uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
+    uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
+
+    hipSafe(hipMalloc(&d_mat_S, max_prim_pair_count * sizeof(double)));
+
+    hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_sp_first_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_sp_second_inds_local, sp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMalloc(&d_pp_first_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+    hipSafe(hipMalloc(&d_pp_second_inds_local, pp_prim_pair_count_local * sizeof(uint32_t)));
+
+    hipSafe(hipMemcpy(d_ss_first_inds_local, ss_first_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_ss_second_inds_local, ss_second_inds_local.data(), ss_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_sp_first_inds_local, sp_first_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_sp_second_inds_local, sp_second_inds_local.data(), sp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
+
+    CDenseMatrix mat_overlap(naos, naos);
+
+    mat_overlap.zero();
+
+    // compute S
+
+    // S: SS
+
+    if (ss_prim_pair_count > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(computeOverlapSS, num_blocks, threads_per_block, 0, 0, d_mat_S,
+                                                     d_s_prim_info,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_ss_first_inds_local,
+                                                     d_ss_second_inds_local,
+                                                     static_cast<uint32_t>(ss_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
+        {
+            const auto i = ss_first_inds_local[ij];
+            const auto j = ss_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+            const auto j_cgto = s_prim_aoinds[j];
+
+            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
+
+            if (i != j) mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+        }
+    }
+
+    // S: SP
+
+    if (sp_prim_pair_count > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(computeOverlapSP, num_blocks, threads_per_block, 0, 0, d_mat_S,
+                                                     d_s_prim_info,
+                                                     static_cast<uint32_t>(s_prim_count),
+                                                     d_p_prim_info,
+                                                     static_cast<uint32_t>(p_prim_count),
+                                                     d_sp_first_inds_local,
+                                                     d_sp_second_inds_local,
+                                                     static_cast<uint32_t>(sp_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
+        {
+            const auto i = sp_first_inds_local[ij];
+            const auto j = sp_second_inds_local[ij];
+
+            const auto i_cgto = s_prim_aoinds[i];
+
+            // TODO: think about the ordering of cartesian components
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
+            mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+        }
+    }
+
+    // S: PP
+
+    if (pp_prim_pair_count > 0)
+    {
+        dim3 threads_per_block(TILE_DIM);
+
+        dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(computeOverlapPP, num_blocks, threads_per_block, 0, 0, d_mat_S,
+                                                     d_p_prim_info,
+                                                     static_cast<uint32_t>(p_prim_count),
+                                                     d_pp_first_inds_local,
+                                                     d_pp_second_inds_local,
+                                                     static_cast<uint32_t>(pp_prim_pair_count_local));
+
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
+        for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
+        {
+            const auto i = pp_first_inds_local[ij];
+            const auto j = pp_second_inds_local[ij];
+
+            // TODO: think about the ordering of cartesian components
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
+
+            if (i != j) mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+        }
+    }
+
+    hipSafe(hipFree(d_s_prim_info));
+    hipSafe(hipFree(d_s_prim_aoinds));
+
+    hipSafe(hipFree(d_p_prim_info));
+    hipSafe(hipFree(d_p_prim_aoinds));
+
+    hipSafe(hipFree(d_mat_S));
+
+    hipSafe(hipFree(d_ss_first_inds_local));
+    hipSafe(hipFree(d_ss_second_inds_local));
+    hipSafe(hipFree(d_sp_first_inds_local));
+    hipSafe(hipFree(d_sp_second_inds_local));
+    hipSafe(hipFree(d_pp_first_inds_local));
+    hipSafe(hipFree(d_pp_second_inds_local));
+
+    return mat_overlap;
+}
 
 auto
 computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, CScreeningData& screening) -> CDenseMatrix

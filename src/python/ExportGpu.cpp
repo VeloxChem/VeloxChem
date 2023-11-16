@@ -79,7 +79,9 @@ export_gpu(py::module& m)
 
     m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 
-    m.def("compute_fock", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
+    m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
+
+    m.def("compute_overlap_gpu", &gpu::computeOverlapOnGPU, "Computes overlap matrix using GPU.");
 }
 
 }  // namespace vlx_gpu

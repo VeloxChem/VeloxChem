@@ -40,7 +40,8 @@ from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import ScreeningData
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
-from .veloxchemlib import compute_fock as compute_fock_gpu
+from .veloxchemlib import compute_fock_gpu
+from .veloxchemlib import compute_overlap_gpu
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -907,8 +908,29 @@ class ScfDriver:
         self._density_matrices_alpha.clear()
         self._density_matrices_beta.clear()
 
+        if self.use_split_comm:
+            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
+
+        if self.use_split_comm and not self._first_step:
+            screener = None
+            if not self._first_step:
+                valstr = 'ERI'
+                if self._dft:
+                    valstr += '/DFT'
+                if self._pe:
+                    valstr += '/PE'
+                self.ostream.print_info(
+                    'Using sub-communicators for {}.'.format(valstr))
+        else:
+            t0 = tm.time()
+
+            screener = ScreeningData(molecule, ao_basis)
+
+            self.ostream.print_info('Screening data computed in {:.2f} sec.'.format(tm.time() - t0))
+            self.ostream.print_blank()
+
         ovl_mat, kin_mat, npot_mat, dipole_mats = self._comp_one_ints(
-            molecule, ao_basis)
+            molecule, ao_basis, screener)
 
         if self.rank == mpi_master() and self.electric_field is not None:
             dipole_ints = (dipole_mats.x_to_numpy(), dipole_mats.y_to_numpy(),
@@ -919,7 +941,7 @@ class ScfDriver:
         if self.rank == mpi_master():
             t0 = tm.time()
 
-            S = ovl_mat.get_full_matrix().to_numpy()
+            S = ovl_mat
             eigvals, eigvecs = np.linalg.eigh(S)
             num_eigs = sum(eigvals > self.ovl_thresh)
             if num_eigs < eigvals.size:
@@ -959,27 +981,6 @@ class ScfDriver:
                 self.ostream.print_blank()
 
         self._density = AODensityMatrix(den_mat)
-
-        if self.use_split_comm:
-            self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
-
-        if self.use_split_comm and not self._first_step:
-            screener = None
-            if not self._first_step:
-                valstr = 'ERI'
-                if self._dft:
-                    valstr += '/DFT'
-                if self._pe:
-                    valstr += '/PE'
-                self.ostream.print_info(
-                    'Using sub-communicators for {}.'.format(valstr))
-        else:
-            t0 = tm.time()
-
-            screener = ScreeningData(molecule, ao_basis)
-
-            self.ostream.print_info('Screening data computed in {:.2f} sec.'.format(tm.time() - t0))
-            self.ostream.print_blank()
 
         profiler.check_memory_usage('Initial guess')
 
@@ -1132,7 +1133,7 @@ class ScfDriver:
 
         if (self.rank == mpi_master() and (not self._first_step) and
                 self.is_converged):
-            S = ovl_mat.get_full_matrix().to_numpy()
+            S = ovl_mat
 
             # TODO: assemble scf_tensors
 
@@ -1250,7 +1251,7 @@ class ScfDriver:
 
         sys.exit(0)
 
-    def _comp_one_ints(self, molecule, basis):
+    def _comp_one_ints(self, molecule, basis, screener):
         """
         Computes one-electron integrals (overlap, kinetic energy and nuclear
         potential) using molecular data.
@@ -1266,8 +1267,8 @@ class ScfDriver:
 
         t0 = tm.time()
 
-        ovl_drv = OverlapDriver()
-        ovl_mat = ovl_drv.compute(molecule, basis)
+        ovl_mat = compute_overlap_gpu(molecule, basis, screener)
+        ovl_mat = self.comm.reduce(ovl_mat.to_numpy(), root=mpi_master())
 
         t1 = tm.time()
 
@@ -1872,7 +1873,7 @@ class ScfDriver:
         """
 
         if self.rank == mpi_master():
-            smat = ovl_mat.to_numpy()
+            smat = ovl_mat
 
             mo_a = self.molecular_orbitals.alpha_to_numpy()
             ea = self.molecular_orbitals.ea_to_numpy()
@@ -2038,7 +2039,7 @@ class ScfDriver:
         if self.rank == mpi_master():
             D_alpha = self.density.alpha_to_numpy(0)
             D_beta = self.density.beta_to_numpy(0)
-            S = ovl_mat.to_numpy()
+            S = ovl_mat
             calc_nelec = (np.sum(D_alpha * S), np.sum(D_beta * S))
         else:
             calc_nelec = None

@@ -59,7 +59,7 @@ class CTwoDiis:
             The orthogonalization matrix.
         """
 
-        smat = overlap_matrix.get_full_matrix().to_numpy()
+        smat = overlap_matrix
         tmat = oao_matrix.to_numpy()
 
         self.error_vectors.clear()
@@ -94,7 +94,7 @@ class CTwoDiis:
             The orthogonalization matrix.
         """
 
-        smat = overlap_matrix.to_numpy()
+        smat = overlap_matrix
         tmat = oao_matrix.to_numpy()
 
         self.error_vectors.clear()
@@ -135,7 +135,7 @@ class CTwoDiis:
             The orthogonalization matrix.
         """
 
-        smat = overlap_matrix.to_numpy()
+        smat = overlap_matrix
         tmat = oao_matrix.to_numpy()
 
         self.error_vectors.clear()
