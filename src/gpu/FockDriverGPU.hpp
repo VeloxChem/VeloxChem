@@ -30,10 +30,11 @@
 #include "DenseMatrix.hpp"
 #include "MolecularBasis.hpp"
 #include "Molecule.hpp"
+#include "ScreeningData.hpp"
 
 namespace gpu {
 
-auto computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix;
+auto computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, CScreeningData& screening) -> CDenseMatrix;
 
 }  // namespace gpu
 

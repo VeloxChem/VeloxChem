@@ -68,7 +68,7 @@
 namespace gpu {  // gpu namespace
 
 auto
-computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> CDenseMatrix
+computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, CScreeningData& screening) -> CDenseMatrix
 {
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
@@ -177,14 +177,6 @@ computeCoulombFock(const CMolecule& molecule, const CMolecularBasis& basis, cons
     auto dens_ptr = densityMatrix.alphaDensity(0);
 
     // TODO distribute computation of Q matrices
-
-    timer.start("  Q matrices");
-
-    auto screening = CScreeningData(molecule, basis);
-
-    screening.form_mat_Q_and_density_inds_for_K(s_prim_count, p_prim_count);
-
-    timer.stop("  Q matrices");
 
     timer.start("  D matrices");
 

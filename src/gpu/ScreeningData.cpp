@@ -58,6 +58,8 @@ CScreeningData::CScreeningData(const CMolecule& molecule, const CMolecularBasis&
     }
 
     _sortQ(s_prim_count, p_prim_count);
+
+    form_mat_Q_and_density_inds_for_K(s_prim_count, p_prim_count);
 }
 
 auto

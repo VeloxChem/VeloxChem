@@ -31,6 +31,7 @@
 #include "CudaDevices.hpp"
 #include "FockDriverGPU.hpp"
 #include "ExportGeneral.hpp"
+#include "ScreeningData.hpp"
 #include "XCIntegratorGPU.hpp"
 
 namespace py = pybind11;
@@ -48,6 +49,11 @@ export_gpu(py::module& m)
         .def(py::init<>())
         .def("get_number_devices", &CCudaDevices::getNumberOfDevices)
         .def("__str__", &CCudaDevices::getString);
+
+    // CScreeningData class
+
+    py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
+        .def(py::init<const CMolecule&, const CMolecularBasis&>());
 
     m.def(
         "compute_gto_values",
@@ -73,7 +79,7 @@ export_gpu(py::module& m)
 
     m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 
-    m.def("compute_coulomb_fock", &gpu::computeCoulombFock, "Computes Coulomb contribution to Fock matrix using GPU.");
+    m.def("compute_fock", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");
 }
 
 }  // namespace vlx_gpu
