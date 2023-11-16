@@ -51,6 +51,8 @@
 
 #define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
 
+#define MATH_CONST_TWO_OVER_SQRT_PI 1.12837916709551255856
+
 #define hipSafe(e)                                                                                                        \
     {                                                                                                                     \
         hipError_t err = (e);                                                                                             \
@@ -301,6 +303,254 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
         mat_S[ij] = S_ij_11;
 
         mat_T[ij] = K_ij_11 * S_ij_00 + K_ij_10 * S_ij_01 + K_ij_01 * S_ij_10 + K_ij_00 * S_ij_11;
+    }
+}
+
+__global__ void
+computeNuclearPotentialSS(double*         mat_V,
+                          const double*   s_prim_info,
+                          const uint32_t  s_prim_count,
+                          const uint32_t* first_inds_local,
+                          const uint32_t* second_inds_local,
+                          const uint32_t  ss_prim_pair_count_local,
+                          const double*   points_info,
+                          const uint32_t  npoints,
+                          const double*   boys_func_table,
+                          const double*   boys_func_ft)
+{
+    // each thread computes a primitive S/T matrix element
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (ij < ss_prim_pair_count_local)
+    {
+        const auto i = first_inds_local[ij];
+        const auto j = second_inds_local[ij];
+
+        const auto a_i = s_prim_info[i + s_prim_count * 0];
+        const auto c_i = s_prim_info[i + s_prim_count * 1];
+        const auto x_i = s_prim_info[i + s_prim_count * 2];
+        const auto y_i = s_prim_info[i + s_prim_count * 3];
+        const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+        const auto a_j = s_prim_info[j + s_prim_count * 0];
+        const auto c_j = s_prim_info[j + s_prim_count * 1];
+        const auto x_j = s_prim_info[j + s_prim_count * 2];
+        const auto y_j = s_prim_info[j + s_prim_count * 3];
+        const auto z_j = s_prim_info[j + s_prim_count * 4];
+
+        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+        // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+
+        double V_ij = 0.0;
+
+        for (uint32_t c = 0; c < npoints; c++)
+        {
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto q_c = points_info[c + npoints * 3];
+
+            const double rPC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                   x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+
+            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+
+            double F0_t[1];
+
+            gpu::computeBoysFunction(F0_t, (a_i + a_j) * r2_PC, 0, boys_func_table, boys_func_ft);
+
+            V_ij += q_c * S_ij_00 * F0_t[0];
+        }
+
+        mat_V[ij] = theta * V_ij;
+    }
+}
+
+__global__ void
+computeNuclearPotentialSP(double*         mat_V,
+                          const double*   s_prim_info,
+                          const uint32_t  s_prim_count,
+                          const double*   p_prim_info,
+                          const uint32_t  p_prim_count,
+                          const uint32_t* sp_first_inds_local,
+                          const uint32_t* sp_second_inds_local,
+                          const uint32_t  sp_prim_pair_count_local,
+                          const double*   points_info,
+                          const uint32_t  npoints,
+                          const double*   boys_func_table,
+                          const double*   boys_func_ft)
+{
+    // each thread computes a primitive S/T matrix element
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (ij < sp_prim_pair_count_local)
+    {
+        const auto i = sp_first_inds_local[ij];
+        const auto j = sp_second_inds_local[ij];
+
+        const auto a_i = s_prim_info[i + s_prim_count * 0];
+        const auto c_i = s_prim_info[i + s_prim_count * 1];
+        const auto x_i = s_prim_info[i + s_prim_count * 2];
+        const auto y_i = s_prim_info[i + s_prim_count * 3];
+        const auto z_i = s_prim_info[i + s_prim_count * 4];
+
+        const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+        const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+        const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+        const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
+        const auto j_cart = j % 3;
+
+        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+        // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // p-1: py
+        // p_0: pz
+        // p+1: px
+
+        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+
+        const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+
+        double V_ij = 0.0;
+
+        for (uint32_t c = 0; c < npoints; c++)
+        {
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto q_c = points_info[c + npoints * 3];
+
+            // p-1: py
+            // p_0: pz
+            // p+1: px
+
+            const double rPC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                   x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+
+            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+
+            double F1_t[2];
+
+            gpu::computeBoysFunction(F1_t, (a_i + a_j) * r2_PC, 1, boys_func_table, boys_func_ft);
+
+            V_ij += q_c * (S_ij_01 * F1_t[0] + S_ij_00 * rPC[j_cart] * F1_t[1]);
+        }
+
+        mat_V[ij] = theta * V_ij;
+    }
+}
+
+__global__ void
+computeNuclearPotentialPP(double*         mat_V,
+                          const double*   p_prim_info,
+                          const uint32_t  p_prim_count,
+                          const uint32_t* pp_first_inds_local,
+                          const uint32_t* pp_second_inds_local,
+                          const uint32_t  pp_prim_pair_count_local,
+                          const double*   points_info,
+                          const uint32_t  npoints,
+                          const double*   boys_func_table,
+                          const double*   boys_func_ft)
+{
+    // each thread computes a primitive S/T matrix element
+
+    const uint32_t ij = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (ij < pp_prim_pair_count_local)
+    {
+        const auto i = pp_first_inds_local[ij];
+        const auto j = pp_second_inds_local[ij];
+
+        const auto a_i = p_prim_info[i / 3 + p_prim_count * 0];
+        const auto c_i = p_prim_info[i / 3 + p_prim_count * 1];
+        const auto x_i = p_prim_info[i / 3 + p_prim_count * 2];
+        const auto y_i = p_prim_info[i / 3 + p_prim_count * 3];
+        const auto z_i = p_prim_info[i / 3 + p_prim_count * 4];
+
+        const auto a_j = p_prim_info[j / 3 + p_prim_count * 0];
+        const auto c_j = p_prim_info[j / 3 + p_prim_count * 1];
+        const auto x_j = p_prim_info[j / 3 + p_prim_count * 2];
+        const auto y_j = p_prim_info[j / 3 + p_prim_count * 3];
+        const auto z_j = p_prim_info[j / 3 + p_prim_count * 4];
+
+        const auto i_cart = i % 3;
+        const auto j_cart = j % 3;
+
+        const auto r2_ij = (x_j - x_i) * (x_j - x_i) + (y_j - y_i) * (y_j - y_i) + (z_j - z_i) * (z_j - z_i);
+
+        // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
+
+        const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+
+        // p-1: py
+        // p_0: pz
+        // p+1: px
+
+        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+
+        const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
+
+        const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
+
+        const auto S_ij_11 = (
+
+                (i_cart == j_cart ? 1.0 : 0.0) * (0.5 / (a_i + a_j)) +
+
+                (a_i * a_j / ((a_i + a_j) * (a_i + a_j))) * (-rij[i_cart]) * rij[j_cart]
+
+                ) * S_ij_00;
+
+        const auto theta = MATH_CONST_TWO_OVER_SQRT_PI * std::sqrt(a_i + a_j);
+
+        double V_ij = 0.0;
+
+        for (uint32_t c = 0; c < npoints; c++)
+        {
+            const auto x_c = points_info[c + npoints * 0];
+            const auto y_c = points_info[c + npoints * 1];
+            const auto z_c = points_info[c + npoints * 2];
+            const auto q_c = points_info[c + npoints * 3];
+
+            // p-1: py
+            // p_0: pz
+            // p+1: px
+
+            const double rPC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
+                                   x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+
+            const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
+
+            double F2_t[3];
+
+            gpu::computeBoysFunction(F2_t, (a_i + a_j) * r2_PC, 2, boys_func_table, boys_func_ft);
+
+            V_ij += q_c * (S_ij_11 * F2_t[0]
+
+                         + S_ij_10 * rPC[j_cart] * F2_t[1]
+
+                         + S_ij_01 * rPC[i_cart] * F2_t[1]
+
+                         + S_ij_00 * (rPC[i_cart] * rPC[j_cart] * F2_t[2] - 0.5 / (a_i + a_j) * (i_cart == j_cart ? 1.0 : 0.0) * F2_t[1]));
+        }
+
+        mat_V[ij] = theta * V_ij;
     }
 }
 

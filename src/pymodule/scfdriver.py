@@ -41,7 +41,7 @@ from .veloxchemlib import ScreeningData
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
 from .veloxchemlib import compute_fock_gpu
-from .veloxchemlib import compute_overlap_and_kinetic_energy_gpu
+from .veloxchemlib import compute_one_electron_integrals_gpu
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
 from .molecularorbitals import MolecularOrbitals, molorb
@@ -1267,26 +1267,13 @@ class ScfDriver:
 
         t0 = tm.time()
 
-        ovl_mat, kin_mat = compute_overlap_and_kinetic_energy_gpu(molecule, basis, screener)
+        # TODO merge kin_mat and npot_mat
+        ovl_mat, kin_mat, npot_mat = compute_one_electron_integrals_gpu(molecule, basis, screener)
         ovl_mat = self.comm.reduce(ovl_mat.to_numpy(), root=mpi_master())
         kin_mat = self.comm.reduce(kin_mat.to_numpy(), root=mpi_master())
+        npot_mat = self.comm.reduce(npot_mat.to_numpy(), root=mpi_master())
 
-        t2 = tm.time()
-
-        if molecule.number_of_atoms() >= self.nodes and self.nodes > 1:
-            npot_mat = self._comp_npot_mat_split_comm(molecule, basis)
-        else:
-            npot_drv = NuclearPotentialDriver()
-            npot_mat = npot_drv.compute(molecule, basis, molecule.get_charges(), molecule.get_coordinates())
-            V = None
-            for key in npot_mat.get_keys():
-                if V is None:
-                    V = npot_mat.get_matrix(key).get_full_matrix().to_numpy()
-                else:
-                    V += npot_mat.get_matrix(key).get_full_matrix().to_numpy()
-            npot_mat = V
-
-        t3 = tm.time()
+        t1 = tm.time()
 
         if self.electric_field is not None:
             if molecule.get_charge() != 0:
@@ -1302,21 +1289,17 @@ class ScfDriver:
         else:
             dipole_mats = None
 
-        t4 = tm.time()
+        t2 = tm.time()
 
         if self.rank == mpi_master() and self.print_level > 1:
 
-            self.ostream.print_info('Overlap and kinetic energy matrices computed in' +
-                                    ' {:.2f} sec.'.format(t2 - t0))
-            self.ostream.print_blank()
-
-            self.ostream.print_info('Nuclear potential matrix computed in' +
-                                    ' {:.2f} sec.'.format(t3 - t2))
+            self.ostream.print_info('One-electron integral matrices computed in' +
+                                    ' {:.2f} sec.'.format(t1 - t0))
             self.ostream.print_blank()
 
             if self.electric_field is not None:
                 self.ostream.print_info('Electric dipole matrices computed in' +
-                                        ' {:.2f} sec.'.format(t4 - t3))
+                                        ' {:.2f} sec.'.format(t2 - t1))
                 self.ostream.print_blank()
 
             self.ostream.flush()
