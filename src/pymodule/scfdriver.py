@@ -623,9 +623,16 @@ class ScfDriver:
             self.conv_thresh = old_thresh
             self.max_iter = old_max_iter
 
-            den_mat = self.gen_initial_density_proj(molecule, ao_basis,
-                                                    val_basis,
-                                                    self._molecular_orbitals)
+            if self.rank == mpi_master():
+                den_mat = self.gen_initial_density_proj(molecule, ao_basis,
+                                                        val_basis,
+                                                        self._molecular_orbitals)
+                den_mat_np = den_mat.alpha_to_numpy(0)
+            else:
+                den_mat_np = None
+            den_mat_np = self.comm.bcast(den_mat_np, root=mpi_master())
+            den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+
             self._comp_diis(molecule, ao_basis, val_basis, den_mat, profiler)
 
         self._fock_matrices_alpha.clear()
@@ -967,7 +974,12 @@ class ScfDriver:
                 self.ostream.print_info(
                     'Using sub-communicators for {}.'.format(valstr))
         else:
+            t0 = tm.time()
+
             screener = ScreeningData(molecule, ao_basis)
+
+            self.ostream.print_info('Screening data computed in {:.2f} sec.'.format(tm.time() - t0))
+            self.ostream.print_blank()
 
         profiler.check_memory_usage('Initial guess')
 
