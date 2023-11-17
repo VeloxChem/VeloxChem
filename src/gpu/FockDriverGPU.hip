@@ -1122,19 +1122,21 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
 
-    const auto mat_Q_full = screening.get_mat_Q_full(s_prim_count, p_prim_count);
-    const auto mat_D_abs_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
-
     // TODO distribute computation of Q_prime
 
     double *d_matrix_A, *d_matrix_B, *d_matrix_C;
 
-    hipSafe(hipMalloc(&d_matrix_A, mat_Q_full.getNumberOfElements() * sizeof(double)));
-    hipSafe(hipMalloc(&d_matrix_B, mat_Q_full.getNumberOfElements() * sizeof(double)));
-    hipSafe(hipMalloc(&d_matrix_C, mat_Q_full.getNumberOfElements() * sizeof(double)));
+    auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count);
 
-    hipSafe(hipMemcpy(d_matrix_A, mat_Q_full.values(), mat_Q_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_matrix_B, mat_D_abs_full.values(), mat_Q_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMalloc(&d_matrix_A, mat_full.getNumberOfElements() * sizeof(double)));
+    hipSafe(hipMalloc(&d_matrix_B, mat_full.getNumberOfElements() * sizeof(double)));
+    hipSafe(hipMalloc(&d_matrix_C, mat_full.getNumberOfElements() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+
+    mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
+
+    hipSafe(hipMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
 
     const auto all_prim_count = s_prim_count + p_prim_count * 3;
 
@@ -1148,18 +1150,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
             static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
 
-    CDenseMatrix Q_prime(all_prim_count, all_prim_count);
+    hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
 
-    hipSafe(hipMemcpy(Q_prime.values(), d_matrix_B, mat_Q_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
-
-    // auto Q_prime_2 = denblas::multAB(mat_Q_full, denblas::multAB(mat_D_abs_full, mat_Q_full));
-    // double max_diff = 0.0;
-    // for (int64_t i = 0; i < mat_Q_full.getNumberOfElements(); i++)
-    // {
-    //     const auto diff = std::fabs(Q_prime.values()[i] - Q_prime_2.values()[i]);
-    //     if (diff > max_diff) max_diff = diff;
-    // }
-    // printf("max_diff: %22.12e\n", max_diff);
+    auto& Q_prime = mat_full;
 
     timer.stop("PreLinK Q_prime");
 
@@ -1182,6 +1175,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // TODO sort by Q_prime bound
 
     screening.form_pair_inds_for_K(s_prim_count, p_prim_count, Q_prime, Q_prime_thresh);
+
+    mat_full = CDenseMatrix();
 
     const auto pair_inds_i_for_K_ss = screening.get_pair_inds_i_for_K_ss();
     const auto pair_inds_k_for_K_ss = screening.get_pair_inds_k_for_K_ss();
