@@ -284,120 +284,6 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 }
 
 auto
-CScreeningData::updateDensityMatrix(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> void
-{
-    // GTO blocks
-
-    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
-
-    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    std::string errnaos("eriscreen::computeDMatrices: Inconsistent number of AOs");
-
-    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
-
-    int64_t s_prim_count = 0;
-    int64_t p_prim_count = 0;
-
-    for (const auto& gto_block : gto_blocks)
-    {
-        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
-        const auto npgtos = gto_block.getNumberOfPrimitives();
-
-        const auto gto_ang = gto_block.getAngularMomentum();
-
-        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
-        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
-    }
-
-    // S block
-
-    std::vector<double>   s_prim_info(5 * s_prim_count);
-    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
-
-    // P block
-
-    std::vector<double>   p_prim_info(5 * p_prim_count);
-    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
-
-    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
-
-    // GTO block pairs
-
-    _D_matrix_ss = CDenseMatrix(s_prim_count, s_prim_count);
-    _D_matrix_sp = CDenseMatrix(s_prim_count, p_prim_count * 3);
-    _D_matrix_pp = CDenseMatrix(p_prim_count * 3, p_prim_count * 3);
-
-    auto dens_ptr = densityMatrix.alphaDensity(0);
-
-    // S-S and S-P gto block pairs
-
-    for (int64_t i = 0, ij = 0; i < s_prim_count; i++)
-    {
-        const auto i_cgto = s_prim_aoinds[i];
-
-        // S-S gto block pair
-
-        for (int64_t j = i; j < s_prim_count; j++, ij++)
-        {
-            const auto j_cgto = s_prim_aoinds[j];
-
-            const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
-
-            _D_matrix_ss.row(i)[j] = D_ij;
-
-            if (i != j) _D_matrix_ss.row(j)[i] = D_ij;
-        }
-
-        // S-P gto block pair
-
-        for (int64_t j = 0; j < p_prim_count; j++, ij++)
-        {
-            for (int64_t s = 0; s < 3; s++)
-            {
-                const auto j_cgto = p_prim_aoinds[j + p_prim_count * s];
-
-                const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
-
-                // TODO: think about the ordering of cartesian components
-
-                _D_matrix_sp.row(i)[j * 3 + s] = D_ij;
-            }
-        }
-    }
-
-    // P-P gto block pair
-
-    for (int64_t i = 0; i < p_prim_count; i++)
-    {
-        for (int64_t j = i; j < p_prim_count; j++)
-        {
-            for (int64_t i_cart = 0; i_cart < 3; i_cart++)
-            {
-                const auto i_cgto = p_prim_aoinds[i + p_prim_count * i_cart];
-
-                auto j_cart_start = (j == i ? i_cart : 0);
-
-                for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
-                {
-                    const auto j_cgto = p_prim_aoinds[j + p_prim_count * j_cart];
-
-                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
-
-                    // TODO: think about the ordering of cartesian components
-
-                    _D_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart] = D_ij;
-
-                    if (i * 3 + i_cart != j * 3 + j_cart) _D_matrix_pp.row(j * 3 + j_cart)[i * 3 + i_cart] = D_ij;
-                }
-            }
-        }
-    }
-}
-
-auto
 CScreeningData::getQMatrixSS() const -> const CDenseMatrix&
 {
     return _Q_matrix_ss;
@@ -413,24 +299,6 @@ auto
 CScreeningData::getQMatrixPP() const -> const CDenseMatrix&
 {
     return _Q_matrix_pp;
-}
-
-auto
-CScreeningData::getDMatrixSS() const -> const CDenseMatrix&
-{
-    return _D_matrix_ss;
-}
-
-auto
-CScreeningData::getDMatrixSP() const -> const CDenseMatrix&
-{
-    return _D_matrix_sp;
-}
-
-auto
-CScreeningData::getDMatrixPP() const -> const CDenseMatrix&
-{
-    return _D_matrix_pp;
 }
 
 auto
@@ -547,7 +415,7 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -
 }
 
 auto
-CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count) -> void
+CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, const std::vector<uint32_t>& s_prim_aoinds, const std::vector<uint32_t>& p_prim_aoinds, const int64_t naos, const double* dens_ptr) -> void
 {
     std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_ss_mat_Q_D;
     std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_sp_mat_Q_D;
@@ -559,10 +427,16 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count) -
     {
         // S-S gto block pair
 
+        const auto i_cgto = s_prim_aoinds[i];
+
         for (int64_t j = i; j < s_prim_count; j++, ij++)
         {
+            const auto j_cgto = s_prim_aoinds[j];
+
+            const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
             const auto Q_ij = _Q_matrix_ss.row(i)[j];
-            const auto D_ij = _D_matrix_ss.row(i)[j];
+
             sorted_ss_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i, j, Q_ij, D_ij));
         }
 
@@ -572,8 +446,12 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count) -
         {
             for (int64_t s = 0; s < 3; s++)
             {
+                const auto j_cgto = p_prim_aoinds[j + p_prim_count * s];
+
+                const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
                 const auto Q_ij = _Q_matrix_sp.row(i)[j * 3 + s];
-                const auto D_ij = _D_matrix_sp.row(i)[j * 3 + s];
+
                 sorted_sp_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i, j * 3 + s, Q_ij, D_ij));
             }
         }
@@ -587,12 +465,18 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count) -
         {
             for (int64_t i_cart = 0; i_cart < 3; i_cart++)
             {
-                auto j_cart_start = (j == i ? i_cart : 0);
+                const auto i_cgto = p_prim_aoinds[i + p_prim_count * i_cart];
+
+                const auto j_cart_start = (j == i ? i_cart : 0);
 
                 for (int64_t j_cart = j_cart_start; j_cart < 3; j_cart++)
                 {
+                    const auto j_cgto = p_prim_aoinds[j + p_prim_count * j_cart];
+
+                    const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
+
                     const auto Q_ij = _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart];
-                    const auto D_ij = _D_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart];
+
                     sorted_pp_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij));
                 }
             }
@@ -761,29 +645,41 @@ auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_
     return mat_Q_full;
 }
 
-auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix
+auto CScreeningData::get_mat_D_abs_full(const int64_t s_prim_count, const int64_t p_prim_count, const std::vector<uint32_t>& s_prim_aoinds, const std::vector<uint32_t>& p_prim_aoinds, const int64_t naos, const double* dens_ptr) const -> CDenseMatrix
 {
     CDenseMatrix mat_D_abs_full(s_prim_count + p_prim_count * 3, s_prim_count + p_prim_count * 3);
 
     for (int64_t i = 0; i < s_prim_count; i++)
     {
+        const auto i_cgto = s_prim_aoinds[i];
+
         for (int64_t j = 0; j < s_prim_count; j++)
         {
-            mat_D_abs_full.row(i)[j] = std::fabs(_D_matrix_ss.row(i)[j]);
+            const auto j_cgto = s_prim_aoinds[j];
+
+            mat_D_abs_full.row(i)[j] = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
         }
 
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
-            mat_D_abs_full.row(i)[s_prim_count + j] = std::fabs(_D_matrix_sp.row(i)[j]);
-            mat_D_abs_full.row(s_prim_count + j)[i] = std::fabs(_D_matrix_sp.row(i)[j]);
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            const auto D_ij = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
+
+            mat_D_abs_full.row(i)[s_prim_count + j] = D_ij;
+            mat_D_abs_full.row(s_prim_count + j)[i] = D_ij;
         }
     }
 
     for (int64_t i = 0; i < p_prim_count * 3; i++)
     {
+        const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+
         for (int64_t j = 0; j < p_prim_count * 3; j++)
         {
-            mat_D_abs_full.row(s_prim_count + i)[s_prim_count + j] = std::fabs(_D_matrix_pp.row(i)[j]);
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+
+            mat_D_abs_full.row(s_prim_count + i)[s_prim_count + j] = std::fabs(dens_ptr[i_cgto * naos + j_cgto]);
         }
     }
 

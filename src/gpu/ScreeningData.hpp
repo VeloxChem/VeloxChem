@@ -45,10 +45,6 @@ class CScreeningData
     CDenseMatrix _Q_matrix_sp;
     CDenseMatrix _Q_matrix_pp;
 
-    CDenseMatrix _D_matrix_ss;
-    CDenseMatrix _D_matrix_sp;
-    CDenseMatrix _D_matrix_pp;
-
     std::vector<uint32_t> _ss_first_inds_local;
     std::vector<uint32_t> _sp_first_inds_local;
     std::vector<uint32_t> _pp_first_inds_local;
@@ -107,17 +103,11 @@ class CScreeningData
    public:
     CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis);
 
-    auto updateDensityMatrix(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix) -> void;
-
     auto getQMatrixSS() const -> const CDenseMatrix&;
     auto getQMatrixSP() const -> const CDenseMatrix&;
     auto getQMatrixPP() const -> const CDenseMatrix&;
 
-    auto getDMatrixSS() const -> const CDenseMatrix&;
-    auto getDMatrixSP() const -> const CDenseMatrix&;
-    auto getDMatrixPP() const -> const CDenseMatrix&;
-
-    auto sortQD(const int64_t s_prim_count, const int64_t p_prim_count) -> void;
+    auto sortQD(const int64_t s_prim_count, const int64_t p_prim_count, const std::vector<uint32_t>& s_prim_aoinds, const std::vector<uint32_t>& p_prim_aoinds, const int64_t naos, const double* dens_ptr) -> void;
 
     auto get_ss_first_inds_local() const -> const std::vector<uint32_t>&;
     auto get_sp_first_inds_local() const -> const std::vector<uint32_t>&;
@@ -171,7 +161,7 @@ class CScreeningData
     auto get_pair_inds_k_for_K_pp() const -> const std::vector<uint32_t>&;
 
     auto get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix;
-    auto get_mat_D_abs_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix;
+    auto get_mat_D_abs_full(const int64_t s_prim_count, const int64_t p_prim_count, const std::vector<uint32_t>& s_prim_aoinds, const std::vector<uint32_t>& p_prim_aoinds, const int64_t naos, const double* dens_ptr) const -> CDenseMatrix;
 
     auto form_mat_Q_and_density_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count) -> void;
     auto form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void;

@@ -546,9 +546,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.start("  D matrices");
 
-    screening.updateDensityMatrix(molecule, basis, densityMatrix);
-
-    screening.sortQD(s_prim_count, p_prim_count);
+    screening.sortQD(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
 
     timer.stop("  D matrices");
 
@@ -559,10 +557,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& ss_mat_Q_orig = screening.getQMatrixSS();
     const auto& sp_mat_Q_orig = screening.getQMatrixSP();
     const auto& pp_mat_Q_orig = screening.getQMatrixPP();
-
-    const auto& ss_mat_D_orig = screening.getDMatrixSS();
-    const auto& sp_mat_D_orig = screening.getDMatrixSP();
-    const auto& pp_mat_D_orig = screening.getDMatrixPP();
 
     const auto& ss_first_inds_local = screening.get_ss_first_inds_local(); 
     const auto& sp_first_inds_local = screening.get_sp_first_inds_local(); 
@@ -1129,7 +1123,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J. Chem. Phys. 138, 134114 (2013)
 
     const auto mat_Q_full = screening.get_mat_Q_full(s_prim_count, p_prim_count);
-    const auto mat_D_abs_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count);
+    const auto mat_D_abs_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
 
     // TODO distribute computation of Q_prime
 
