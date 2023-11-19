@@ -390,7 +390,10 @@ class CphfSolver(LinearSolver):
 
         # converged?
         if self.rank == mpi_master():
-            self._print_convergence('Coupled-Perturbed Hartree-Fock')
+            if self._dft:
+                self._print_convergence('Coupled-Perturbed Kohn-Sham')
+            else:
+                self._print_convergence('Coupled-Perturbed Hartree-Fock')
 
         # transform Distributed arrays into numpy arrays
         # TODO: decide whether using Distributed arrays in
@@ -1027,19 +1030,15 @@ class CphfSolver(LinearSolver):
 
             # TODO: how can this be done better?
             fock_uij_numpy = np.zeros((natm,3,nao,nao))
+            fock_uij_mo = np.zeros((natm, 3, nocc, nvir))
             for i in range(natm):
                 for x in range(3):
                     fock_uij_numpy[i,x] = fock_uij.to_numpy(3*i + x)
-
-            # transform to MO basis
-            fock_uij_mo = np.zeros((natm, 3, nocc, nvir))
-            for a in range(natm):
-                for x in range(3):
-                    fock_uij_numpy = fock_uij.to_numpy(3*a + x)
-                    fock_uij_mo[a,x] = np.linalg.multi_dot([
-                        mo_occ.T, fock_uij_numpy, mo_vir
-                    ])
-
+                    # transform to MO basis
+                    fock_uij_mo[i,x] = np.linalg.multi_dot([
+                        mo_occ.T, fock_uij_numpy[i, x], mo_vir
+                        ])
+                    
             # sum up the terms of the RHS
             cphf_rhs = (fock_deriv_ov - orben_ovlp_deriv_ov
                         + 2 * fock_uij_mo)

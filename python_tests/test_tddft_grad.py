@@ -56,11 +56,11 @@ class TestGrad:
 
         rsp_results = rsp_solver.compute(molecule, basis, scf_drv.scf_tensors)
 
-        tddft_grad = TddftGradientDriver(scf_drv)
+        tddft_grad = TddftGradientDriver()
 
         orbrsp_dict = {"conv_thresh": 1e-7}
         tddft_grad.update_settings({}, rsp_dict, orbrsp_dict, method_dict)
-        tddft_grad.compute(molecule, basis, rsp_solver, rsp_results)
+        tddft_grad.compute(molecule, basis, scf_drv, rsp_solver, rsp_results)
 
         if is_mpi_master():
             grad = tddft_grad.get_gradient()[0]

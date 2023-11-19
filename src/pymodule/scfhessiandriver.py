@@ -190,7 +190,6 @@ class ScfHessianDriver(HessianDriver):
         self.ostream.print_blank()
         self.ostream.flush()
 
-
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
         Performs the calculation of a numerical Hessian based only
@@ -1047,7 +1046,7 @@ class ScfHessianDriver(HessianDriver):
                     coords[i, d] -= 2.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     scf_drv.compute(new_mol, ao_basis)
-                    grad_drv.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis, scf_drv)
                     grad_minus = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,
@@ -1116,7 +1115,7 @@ class ScfHessianDriver(HessianDriver):
                     coords[i, d] -= 3.0 * self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     scf_drv.compute(new_mol, ao_basis, scf_drv)
-                    grad_drv.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis, scf_drv)
                     grad_minus1 = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,
@@ -1131,7 +1130,7 @@ class ScfHessianDriver(HessianDriver):
                     coords[i, d] -= self.delta_h
                     new_mol = Molecule(labels, coords, units='au')
                     scf_drv.compute(new_mol, ao_basis)
-                    grad_drv.compute(new_mol, ao_basis)
+                    grad_drv.compute(new_mol, ao_basis, scf_drv)
                     grad_minus2 = grad_drv.get_gradient()
 
                     prop.compute_scf_prop(new_mol, ao_basis,

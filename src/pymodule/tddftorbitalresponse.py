@@ -525,7 +525,7 @@ class TddftOrbitalResponse(CphfSolver):
                     fock_ao_rhs_x_minus_y[s], x_minus_y_ao[s].T, ovlp.T
                 ])
                 Fp2_oo[s] = 0.5 * np.linalg.multi_dot([
-                    fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T
+                    fock_ao_rhs_x_plus_y[s].T, x_plus_y_ao[s].T, ovlp.T
                 ])
                 Fm2_oo[s] = 0.5 * np.linalg.multi_dot([
                     fock_ao_rhs_x_minus_y[s].T, x_minus_y_ao[s].T, ovlp.T

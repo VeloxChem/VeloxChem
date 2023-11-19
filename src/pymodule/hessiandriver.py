@@ -653,12 +653,12 @@ class HessianDriver:
 
         if self.numerical:
             cur_str += 'Numerical'
-            cur_str2 = 'Numerical Method             : '
+            cur_str2 = 'Numerical Method                : '
             if self.do_four_point:
                 cur_str2 += 'Five-Point Stencil'
             else:
                 cur_str2 += 'Symmetric Difference Quotient'
-            cur_str3 = 'Finite Difference Step Size  : '
+            cur_str3 = 'Finite Difference Step Size     : '
             cur_str3 += str(self.delta_h) + ' a.u.'
         else:
             cur_str += 'Analytical'

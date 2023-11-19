@@ -29,10 +29,10 @@ class TestCphfSolver(unittest.TestCase):
         scf_drv.ostream.mute()
         scf_tensors = scf_drv.compute(molecule, basis)
 
-        cphf_solver = CphfSolver(scfdrv=scf_drv)
+        cphf_solver = CphfSolver()
         cphf_settings = {'conv_thresh':2e-7}
         cphf_solver.update_settings(cphf_settings, method_settings)
-        cphf_solver.compute(molecule, basis, scf_tensors)
+        cphf_solver.compute(molecule, basis, scf_tensors, scf_drv)
 
         if scf_drv.rank == mpi_master():
             cphf_coefficients = cphf_solver.cphf_results['cphf_ov']
@@ -44,7 +44,7 @@ class TestCphfSolver(unittest.TestCase):
             cphf_reference = np.array(hf.get(label))
             hf.close()
              
-            print("\ncphf_reference\n", cphf_reference)
+            #print("\ncphf_reference\n", cphf_reference)
 
             self.assertTrue(np.max(np.abs(cphf_coefficients - cphf_reference))
                              < 1.0e-6)

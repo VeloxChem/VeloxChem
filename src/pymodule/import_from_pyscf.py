@@ -9,6 +9,7 @@ from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import xcfun
 from .veloxchemlib import XCMolecularHessian
 from .veloxchemlib import GridDriver
+from .dftutils import get_default_grid_level
 import numpy as np
 import sys
 import h5py
@@ -1473,6 +1474,8 @@ def import_xc_contrib_tddft(molecule, basis, scfdrv, xmy_ao, rel_dm_ao,
     # set functional, convergence threshold and grid level 
     pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
     pyscf_scf.conv_tol = scfdrv.conv_thresh
+    if scfdrv.grid_level is None:
+        scfdrv.grid_level = get_default_grid_level(scfdrv.xcfun)
     if scfdrv.grid_level == 6 or scfdrv.grid_level == 7:
         pyscf_scf.grids.level = 9
     else:
@@ -2021,12 +2024,18 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
                                  basis=pyscf_basis, unit=unit,
                                  charge=molecule.get_charge())
 
+    gs_dm = ao_matrix_to_dalton(DenseMatrix(density), basis, molecule).to_numpy()
+    nao = density.shape[0]
+    vlx_vxc_deriv_atom_i = np.zeros((3, nao, nao))
+
     if scfdrv is not None:
         if scfdrv._dft:
             pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
             # set functional, convergence threshold and grid level 
             pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
             pyscf_scf.conv_tol = scfdrv.conv_thresh
+            if scfdrv.grid_level is None:
+                scfdrv.grid_level = get_default_grid_level(scfdrv.xcfun)
             if scfdrv.grid_level == 6 or scfdrv.grid_level == 7:
                 pyscf_scf.grids.level = 9
             else:
@@ -2034,7 +2043,10 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
 
             #if scfdrv.xcfun.get_func_type() == xcfun.lda:
             grid_drv = GridDriver()
-            grid_drv.set_level(scfdrv.grid_level)
+            if scfdrv.grid_level is not None:
+                grid_drv.set_level(scfdrv.grid_level)
+            else:
+                grid_level = get_default_grid_level(scfdrv.xcfun)
             xc_mol_hess = XCMolecularHessian()
             mol_grid = grid_drv.generate(molecule)
             vlx_density = scfdrv.density
@@ -2049,8 +2061,6 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
             pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
     else:
         pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
-    gs_dm = ao_matrix_to_dalton(DenseMatrix(density), basis, molecule).to_numpy()
-    nao = density.shape[0]
     
     if nao != pyscf_molecule.nao:
         error_text = "vlx and pyscf number of atomic orbitals are different!"
@@ -2081,8 +2091,6 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
 
     # fraction of exact exchange
     x_frac = 1.0
-
-    vlx_vxc_deriv_atom_i = np.zeros_like(fock_deriv_atom_i)
 
     if scfdrv is not None:
         if scfdrv._dft:
@@ -2174,6 +2182,8 @@ def vxc_deriv(molecule, basis, scfdrv, unit="au"):
     pyscf_scf.conv_tol = scfdrv.conv_thresh
     # some functional are parametrized differently in PYSCF
     pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
+    if scfdrv.grid_level is None:
+        scfdrv.grid_level = get_default_grid_level(scfdrv.xcfun)
     if scfdrv.grid_level == 6 or scfdrv.grid_level == 7:
         pyscf_scf.grids.level = 9
     else:
