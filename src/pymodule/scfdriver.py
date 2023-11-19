@@ -1012,8 +1012,6 @@ class ScfDriver:
             fock_mat, vxc_mat, e_pe, V_pe = self._comp_2e_fock(
                 den_mat, molecule, ao_basis, screener, e_grad, profiler)
 
-            np.set_printoptions(suppress=True, linewidth=200, precision=4)
-
             profiler.start_timer('CompEnergy')
 
             e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,

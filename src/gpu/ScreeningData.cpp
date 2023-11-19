@@ -25,6 +25,8 @@
 
 #include "ScreeningData.hpp"
 
+#include <omp.h>
+
 #include <cmath>
 #include <string>
 
@@ -284,6 +286,12 @@ CScreeningData::_computeQMatrices(const CMolecule& molecule, const CMolecularBas
 }
 
 auto
+CScreeningData::getNumGpusPerNode() const -> const int64_t
+{
+    return _num_gpus_per_node;
+}
+
+auto
 CScreeningData::getQMatrixSS() const -> const CDenseMatrix&
 {
     return _Q_matrix_ss;
@@ -304,9 +312,6 @@ CScreeningData::getQMatrixPP() const -> const CDenseMatrix&
 auto
 CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -> void
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_ss_mat_Q;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_sp_mat_Q;
     std::vector<std::tuple<double, int64_t, int64_t>> sorted_pp_mat_Q;
@@ -362,11 +367,15 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -
     const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
     const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
 
-    _ss_first_inds_local  = std::vector<uint32_t>();
-    _ss_second_inds_local = std::vector<uint32_t>();
-    _ss_mat_Q_local       = std::vector<double>();
+    _ss_prim_pair_count = ss_prim_pair_count;
+    _sp_prim_pair_count = sp_prim_pair_count;
+    _pp_prim_pair_count = pp_prim_pair_count;
 
-    for (int64_t ij = rank; ij < ss_prim_pair_count; ij+=nnodes)
+    _ss_first_inds_bra  = std::vector<uint32_t>(ss_prim_pair_count);
+    _ss_second_inds_bra = std::vector<uint32_t>(ss_prim_pair_count);
+    _ss_mat_Q_bra       = std::vector<double>(ss_prim_pair_count);
+
+    for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
     {
         const auto& vals = sorted_ss_mat_Q[ss_prim_pair_count - 1 - ij];
 
@@ -374,16 +383,16 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -
         auto i    = std::get<1>(vals);
         auto j    = std::get<2>(vals);
 
-        _ss_first_inds_local.push_back(static_cast<uint32_t>(i));
-        _ss_second_inds_local.push_back(static_cast<uint32_t>(j));
-        _ss_mat_Q_local.push_back(Q_ij);
+        _ss_first_inds_bra[ij] = static_cast<uint32_t>(i);
+        _ss_second_inds_bra[ij] = static_cast<uint32_t>(j);
+        _ss_mat_Q_bra[ij] = Q_ij;
     }
 
-    _sp_first_inds_local  = std::vector<uint32_t>();
-    _sp_second_inds_local = std::vector<uint32_t>();
-    _sp_mat_Q_local       = std::vector<double>();
+    _sp_first_inds_bra  = std::vector<uint32_t>(sp_prim_pair_count);
+    _sp_second_inds_bra = std::vector<uint32_t>(sp_prim_pair_count);
+    _sp_mat_Q_bra       = std::vector<double>(sp_prim_pair_count);
 
-    for (int64_t ij = rank; ij < sp_prim_pair_count; ij+=nnodes)
+    for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
     {
         const auto& vals = sorted_sp_mat_Q[sp_prim_pair_count - 1 - ij];
 
@@ -391,16 +400,16 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -
         auto i    = std::get<1>(vals);
         auto j    = std::get<2>(vals);
 
-        _sp_first_inds_local.push_back(static_cast<uint32_t>(i));
-        _sp_second_inds_local.push_back(static_cast<uint32_t>(j));
-        _sp_mat_Q_local.push_back(Q_ij);
+        _sp_first_inds_bra[ij] = static_cast<uint32_t>(i);
+        _sp_second_inds_bra[ij] = static_cast<uint32_t>(j);
+        _sp_mat_Q_bra[ij] = Q_ij;
     }
 
-    _pp_first_inds_local  = std::vector<uint32_t>();
-    _pp_second_inds_local = std::vector<uint32_t>();
-    _pp_mat_Q_local       = std::vector<double>();
+    _pp_first_inds_bra  = std::vector<uint32_t>(pp_prim_pair_count);
+    _pp_second_inds_bra = std::vector<uint32_t>(pp_prim_pair_count);
+    _pp_mat_Q_bra       = std::vector<double>(pp_prim_pair_count);
 
-    for (int64_t ij = rank; ij < pp_prim_pair_count; ij+=nnodes)
+    for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
     {
         const auto& vals = sorted_pp_mat_Q[pp_prim_pair_count - 1 - ij];
 
@@ -408,9 +417,9 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -
         auto i    = std::get<1>(vals);
         auto j    = std::get<2>(vals);
 
-        _pp_first_inds_local.push_back(static_cast<uint32_t>(i));
-        _pp_second_inds_local.push_back(static_cast<uint32_t>(j));
-        _pp_mat_Q_local.push_back(Q_ij);
+        _pp_first_inds_bra[ij] = static_cast<uint32_t>(i);
+        _pp_second_inds_bra[ij] = static_cast<uint32_t>(j);
+        _pp_mat_Q_bra[ij] = Q_ij;
     }
 }
 
@@ -565,17 +574,212 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
     }
 }
 
-auto CScreeningData::get_ss_first_inds_local() const -> const std::vector<uint32_t>& { return _ss_first_inds_local; }
-auto CScreeningData::get_sp_first_inds_local() const -> const std::vector<uint32_t>& { return _sp_first_inds_local; }
-auto CScreeningData::get_pp_first_inds_local() const -> const std::vector<uint32_t>& { return _pp_first_inds_local; }
+auto CScreeningData::get_ss_first_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+{
+    std::vector<uint32_t> ss_first_inds_local;
 
-auto CScreeningData::get_ss_second_inds_local() const -> const std::vector<uint32_t>& { return _ss_second_inds_local; }
-auto CScreeningData::get_sp_second_inds_local() const -> const std::vector<uint32_t>& { return _sp_second_inds_local; }
-auto CScreeningData::get_pp_second_inds_local() const -> const std::vector<uint32_t>& { return _pp_second_inds_local; }
+    for (int64_t ij = gpu_rank; ij < _ss_prim_pair_count; ij+=gpu_count)
+    {
+        ss_first_inds_local.push_back(_ss_first_inds_bra[ij]);
+    }
 
-auto CScreeningData::get_ss_mat_Q_local() const -> const std::vector<double>& { return _ss_mat_Q_local; }
-auto CScreeningData::get_sp_mat_Q_local() const -> const std::vector<double>& { return _sp_mat_Q_local; }
-auto CScreeningData::get_pp_mat_Q_local() const -> const std::vector<double>& { return _pp_mat_Q_local; }
+    return ss_first_inds_local;
+}
+
+auto CScreeningData::get_sp_first_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+{
+    std::vector<uint32_t> sp_first_inds_local;
+
+    for (int64_t ij = gpu_rank; ij < _sp_prim_pair_count; ij+=gpu_count)
+    {
+        sp_first_inds_local.push_back(_sp_first_inds_bra[ij]);
+    }
+
+    return sp_first_inds_local;
+}
+
+auto CScreeningData::get_pp_first_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+{
+    std::vector<uint32_t> pp_first_inds_local;
+
+    for (int64_t ij = gpu_rank; ij < _pp_prim_pair_count; ij+=gpu_count)
+    {
+        pp_first_inds_local.push_back(_pp_first_inds_bra[ij]);
+    }
+
+    return pp_first_inds_local;
+}
+
+auto CScreeningData::get_ss_second_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+{
+    std::vector<uint32_t> ss_second_inds_local;
+
+    for (int64_t ij = gpu_rank; ij < _ss_prim_pair_count; ij+=gpu_count)
+    {
+        ss_second_inds_local.push_back(_ss_second_inds_bra[ij]);
+    }
+
+    return ss_second_inds_local;
+}
+
+auto CScreeningData::get_sp_second_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+{
+    std::vector<uint32_t> sp_second_inds_local;
+
+    for (int64_t ij = gpu_rank; ij < _sp_prim_pair_count; ij+=gpu_count)
+    {
+        sp_second_inds_local.push_back(_sp_second_inds_bra[ij]);
+    }
+
+    return sp_second_inds_local;
+}
+
+auto CScreeningData::get_pp_second_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+{
+    std::vector<uint32_t> pp_second_inds_local;
+
+    for (int64_t ij = gpu_rank; ij < _pp_prim_pair_count; ij+=gpu_count)
+    {
+        pp_second_inds_local.push_back(_pp_second_inds_bra[ij]);
+    }
+
+    return pp_second_inds_local;
+}
+
+auto CScreeningData::get_ss_first_inds_local() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> ss_first_inds_local;
+
+    for (int64_t ij = rank; ij < _ss_prim_pair_count; ij+=nnodes)
+    {
+        ss_first_inds_local.push_back(_ss_first_inds_bra[ij]);
+    }
+
+    return ss_first_inds_local;
+}
+
+auto CScreeningData::get_sp_first_inds_local() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> sp_first_inds_local;
+
+    for (int64_t ij = rank; ij < _sp_prim_pair_count; ij+=nnodes)
+    {
+        sp_first_inds_local.push_back(_sp_first_inds_bra[ij]);
+    }
+
+    return sp_first_inds_local;
+}
+
+auto CScreeningData::get_pp_first_inds_local() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> pp_first_inds_local;
+
+    for (int64_t ij = rank; ij < _pp_prim_pair_count; ij+=nnodes)
+    {
+        pp_first_inds_local.push_back(_pp_first_inds_bra[ij]);
+    }
+
+    return pp_first_inds_local;
+}
+
+auto CScreeningData::get_ss_second_inds_local() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> ss_second_inds_local;
+
+    for (int64_t ij = rank; ij < _ss_prim_pair_count; ij+=nnodes)
+    {
+        ss_second_inds_local.push_back(_ss_second_inds_bra[ij]);
+    }
+
+    return ss_second_inds_local;
+}
+
+auto CScreeningData::get_sp_second_inds_local() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> sp_second_inds_local;
+
+    for (int64_t ij = rank; ij < _sp_prim_pair_count; ij+=nnodes)
+    {
+        sp_second_inds_local.push_back(_sp_second_inds_bra[ij]);
+    }
+
+    return sp_second_inds_local;
+}
+
+auto CScreeningData::get_pp_second_inds_local() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> pp_second_inds_local;
+
+    for (int64_t ij = rank; ij < _pp_prim_pair_count; ij+=nnodes)
+    {
+        pp_second_inds_local.push_back(_pp_second_inds_bra[ij]);
+    }
+
+    return pp_second_inds_local;
+}
+
+auto CScreeningData::get_ss_mat_Q_local() const -> const std::vector<double>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<double> ss_mat_Q_local;
+
+    for (int64_t ij = rank; ij < _ss_prim_pair_count; ij+=nnodes)
+    {
+        ss_mat_Q_local.push_back(_ss_mat_Q_bra[ij]);
+    }
+
+    return ss_mat_Q_local;
+}
+
+auto CScreeningData::get_sp_mat_Q_local() const -> const std::vector<double>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<double> sp_mat_Q_local;
+
+    for (int64_t ij = rank; ij < _sp_prim_pair_count; ij+=nnodes)
+    {
+        sp_mat_Q_local.push_back(_sp_mat_Q_bra[ij]);
+    }
+
+    return sp_mat_Q_local;
+}
+
+auto CScreeningData::get_pp_mat_Q_local() const -> const std::vector<double>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<double> pp_mat_Q_local;
+
+    for (int64_t ij = rank; ij < _pp_prim_pair_count; ij+=nnodes)
+    {
+        pp_mat_Q_local.push_back(_pp_mat_Q_bra[ij]);
+    }
+
+    return pp_mat_Q_local;
+}
 
 auto CScreeningData::get_ss_first_inds() const -> const std::vector<uint32_t>& { return _ss_first_inds; }
 auto CScreeningData::get_sp_first_inds() const -> const std::vector<uint32_t>& { return _sp_first_inds; }
@@ -607,14 +811,95 @@ auto CScreeningData::get_density_inds_for_K_sp() const -> const std::vector<uint
 auto CScreeningData::get_density_inds_for_K_ps() const -> const std::vector<uint32_t>& { return _density_inds_for_K_ps; }
 auto CScreeningData::get_density_inds_for_K_pp() const -> const std::vector<uint32_t>& { return _density_inds_for_K_pp; }
 
-auto CScreeningData::get_pair_inds_i_for_K_ss() const -> const std::vector<uint32_t>& { return _pair_inds_i_for_K_ss; };
-auto CScreeningData::get_pair_inds_k_for_K_ss() const -> const std::vector<uint32_t>& { return _pair_inds_k_for_K_ss; };
+auto CScreeningData::get_local_pair_inds_i_for_K_ss() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
-auto CScreeningData::get_pair_inds_i_for_K_sp() const -> const std::vector<uint32_t>& { return _pair_inds_i_for_K_sp; };
-auto CScreeningData::get_pair_inds_k_for_K_sp() const -> const std::vector<uint32_t>& { return _pair_inds_k_for_K_sp; };
+    std::vector<uint32_t> local_pair_inds_i_for_K_ss;
 
-auto CScreeningData::get_pair_inds_i_for_K_pp() const -> const std::vector<uint32_t>& { return _pair_inds_i_for_K_pp; };
-auto CScreeningData::get_pair_inds_k_for_K_pp() const -> const std::vector<uint32_t>& { return _pair_inds_k_for_K_pp; };
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_ss.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_ss.push_back(_pair_inds_i_for_K_ss[ik]);
+    }
+
+    return local_pair_inds_i_for_K_ss;
+}
+
+auto CScreeningData::get_local_pair_inds_k_for_K_ss() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> local_pair_inds_k_for_K_ss;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_ss.size()); ik+=nnodes)
+    {
+        local_pair_inds_k_for_K_ss.push_back(_pair_inds_k_for_K_ss[ik]);
+    }
+
+    return local_pair_inds_k_for_K_ss;
+}
+
+auto CScreeningData::get_local_pair_inds_i_for_K_sp() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> local_pair_inds_i_for_K_sp;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_sp.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_sp.push_back(_pair_inds_i_for_K_sp[ik]);
+    }
+
+    return local_pair_inds_i_for_K_sp;
+}
+
+auto CScreeningData::get_local_pair_inds_k_for_K_sp() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> local_pair_inds_k_for_K_sp;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_sp.size()); ik+=nnodes)
+    {
+        local_pair_inds_k_for_K_sp.push_back(_pair_inds_k_for_K_sp[ik]);
+    }
+
+    return local_pair_inds_k_for_K_sp;
+}
+
+auto CScreeningData::get_local_pair_inds_i_for_K_pp() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> local_pair_inds_i_for_K_pp;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_pp.size()); ik+=nnodes)
+    {
+        local_pair_inds_i_for_K_pp.push_back(_pair_inds_i_for_K_pp[ik]);
+    }
+
+    return local_pair_inds_i_for_K_pp;
+}
+
+auto CScreeningData::get_local_pair_inds_k_for_K_pp() const -> const std::vector<uint32_t>
+{
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    std::vector<uint32_t> local_pair_inds_k_for_K_pp;
+
+    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_pp.size()); ik+=nnodes)
+    {
+        local_pair_inds_k_for_K_pp.push_back(_pair_inds_k_for_K_pp[ik]);
+    }
+
+    return local_pair_inds_k_for_K_pp;
+}
 
 auto CScreeningData::get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix
 {
@@ -811,9 +1096,6 @@ auto CScreeningData::form_mat_Q_and_density_inds_for_K(const int64_t s_prim_coun
 
 auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int64_t p_prim_count, const CDenseMatrix& Q_prime, const double Q_prime_thresh) -> void
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     // ss block
 
     _pair_inds_i_for_K_ss = std::vector<uint32_t>();
@@ -830,18 +1112,6 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
             }
         }
     }
-
-    std::vector<uint32_t> local_pair_inds_i_for_K_ss;
-    std::vector<uint32_t> local_pair_inds_k_for_K_ss;
-
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_ss.size()); ik+=nnodes)
-    {
-        local_pair_inds_i_for_K_ss.push_back(_pair_inds_i_for_K_ss[ik]);
-        local_pair_inds_k_for_K_ss.push_back(_pair_inds_k_for_K_ss[ik]);
-    }
-
-    _pair_inds_i_for_K_ss = local_pair_inds_i_for_K_ss;
-    _pair_inds_k_for_K_ss = local_pair_inds_k_for_K_ss;
 
     // sp block
 
@@ -860,18 +1130,6 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
         }
     }
 
-    std::vector<uint32_t> local_pair_inds_i_for_K_sp;
-    std::vector<uint32_t> local_pair_inds_k_for_K_sp;
-
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_sp.size()); ik+=nnodes)
-    {
-        local_pair_inds_i_for_K_sp.push_back(_pair_inds_i_for_K_sp[ik]);
-        local_pair_inds_k_for_K_sp.push_back(_pair_inds_k_for_K_sp[ik]);
-    }
-
-    _pair_inds_i_for_K_sp = local_pair_inds_i_for_K_sp;
-    _pair_inds_k_for_K_sp = local_pair_inds_k_for_K_sp;
-
     // pp block
 
     _pair_inds_i_for_K_pp = std::vector<uint32_t>();
@@ -888,16 +1146,4 @@ auto CScreeningData::form_pair_inds_for_K(const int64_t s_prim_count, const int6
             }
         }
     }
-
-    std::vector<uint32_t> local_pair_inds_i_for_K_pp;
-    std::vector<uint32_t> local_pair_inds_k_for_K_pp;
-
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_pp.size()); ik+=nnodes)
-    {
-        local_pair_inds_i_for_K_pp.push_back(_pair_inds_i_for_K_pp[ik]);
-        local_pair_inds_k_for_K_pp.push_back(_pair_inds_k_for_K_pp[ik]);
-    }
-
-    _pair_inds_i_for_K_pp = local_pair_inds_i_for_K_pp;
-    _pair_inds_k_for_K_pp = local_pair_inds_k_for_K_pp;
 }

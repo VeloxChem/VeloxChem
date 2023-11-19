@@ -25,6 +25,8 @@
 
 #include <hip/hip_runtime.h>
 
+#include <omp.h>
+
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
@@ -71,19 +73,57 @@ namespace gpu {  // gpu namespace
 auto
 computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CScreeningData& screening) -> std::vector<CDenseMatrix>
 {
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    std::vector<CDenseMatrix> STV_matrices(3);
+
+    STV_matrices[0] = CDenseMatrix(naos, naos);
+    STV_matrices[1] = CDenseMatrix(naos, naos);
+    STV_matrices[2] = CDenseMatrix(naos, naos);
+
+    STV_matrices[0].zero();
+    STV_matrices[1].zero();
+    STV_matrices[2].zero();
+
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
-    if (rank % 8 == 0) hipSafe(hipSetDevice(4));
-    if (rank % 8 == 1) hipSafe(hipSetDevice(5));
-    if (rank % 8 == 2) hipSafe(hipSetDevice(2));
-    if (rank % 8 == 3) hipSafe(hipSetDevice(3));
-    if (rank % 8 == 4) hipSafe(hipSetDevice(6));
-    if (rank % 8 == 5) hipSafe(hipSetDevice(7));
-    if (rank % 8 == 6) hipSafe(hipSetDevice(0));
-    if (rank % 8 == 7) hipSafe(hipSetDevice(1));
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = screening.getNumGpusPerNode();
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
 
-    std::vector<CDenseMatrix> STV_matrices(3);
+    std::vector<CDenseMatrix> S_matrices(num_gpus_per_node);
+    std::vector<CDenseMatrix> T_matrices(num_gpus_per_node);
+    std::vector<CDenseMatrix> V_matrices(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        S_matrices[gpu_id] = CDenseMatrix(naos, naos);
+        T_matrices[gpu_id] = CDenseMatrix(naos, naos);
+        V_matrices[gpu_id] = CDenseMatrix(naos, naos);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
+
+    printf("rank %d,  thread %d,  gpu_rank %d\n", rank, thread_id, gpu_rank);
+
+    if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
+    if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
+    if (gpu_rank % 8 == 2) hipSafe(hipSetDevice(2));
+    if (gpu_rank % 8 == 3) hipSafe(hipSetDevice(3));
+    if (gpu_rank % 8 == 4) hipSafe(hipSetDevice(6));
+    if (gpu_rank % 8 == 5) hipSafe(hipSetDevice(7));
+    if (gpu_rank % 8 == 6) hipSafe(hipSetDevice(0));
+    if (gpu_rank % 8 == 7) hipSafe(hipSetDevice(1));
 
     // Boys function (tabulated for order 0-28)
 
@@ -159,13 +199,13 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     // GTO block pairs
 
-    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(); 
-    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(); 
-    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(); 
+    const auto ss_first_inds_local = screening.get_ss_first_inds_local_gpu(gpu_rank, gpu_count);
+    const auto sp_first_inds_local = screening.get_sp_first_inds_local_gpu(gpu_rank, gpu_count);
+    const auto pp_first_inds_local = screening.get_pp_first_inds_local_gpu(gpu_rank, gpu_count);
 
-    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(); 
-    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(); 
-    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(); 
+    const auto ss_second_inds_local = screening.get_ss_second_inds_local_gpu(gpu_rank, gpu_count);
+    const auto sp_second_inds_local = screening.get_sp_second_inds_local_gpu(gpu_rank, gpu_count);
+    const auto pp_second_inds_local = screening.get_pp_second_inds_local_gpu(gpu_rank, gpu_count);
 
     const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
     const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
@@ -211,17 +251,13 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    STV_matrices[0] = CDenseMatrix(naos, naos);
-    STV_matrices[1] = CDenseMatrix(naos, naos);
-    STV_matrices[2] = CDenseMatrix(naos, naos);
+    S_matrices[gpu_id].zero();
+    T_matrices[gpu_id].zero();
+    V_matrices[gpu_id].zero();
 
-    auto& mat_overlap = STV_matrices[0];
-    auto& mat_kinetic_energy = STV_matrices[1];
-    auto& mat_nuclear_potential = STV_matrices[2];
-
-    mat_overlap.zero();
-    mat_kinetic_energy.zero();
-    mat_nuclear_potential.zero();
+    auto& mat_overlap = S_matrices[gpu_id];
+    auto& mat_kinetic_energy = T_matrices[gpu_id];
+    auto& mat_nuclear_potential = V_matrices[gpu_id];
 
     const auto mol_charges = molecule.getCharges();
     const auto mol_coords = molecule.getCoordinates(std::string("BOHR"));
@@ -430,6 +466,26 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipFree(d_pp_first_inds_local));
     hipSafe(hipFree(d_pp_second_inds_local));
 
+    }}
+
+    auto p_mat_S = STV_matrices[0].values();
+    auto p_mat_T = STV_matrices[1].values();
+    auto p_mat_V = STV_matrices[2].values();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        auto p_mat_overlap = S_matrices[gpu_id].values();
+        auto p_mat_kinetic_energy = T_matrices[gpu_id].values();
+        auto p_mat_nuclear_potential = V_matrices[gpu_id].values();
+
+        for (int64_t ind = 0; ind < naos * naos; ind++)
+        {
+            p_mat_S[ind] += p_mat_overlap[ind];
+            p_mat_T[ind] += p_mat_kinetic_energy[ind];
+            p_mat_V[ind] += p_mat_nuclear_potential[ind];
+        }
+    }
+
     return STV_matrices;
 }
 
@@ -558,17 +614,17 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& sp_mat_Q_orig = screening.getQMatrixSP();
     const auto& pp_mat_Q_orig = screening.getQMatrixPP();
 
-    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(); 
-    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(); 
-    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(); 
+    const auto ss_first_inds_local = screening.get_ss_first_inds_local(); 
+    const auto sp_first_inds_local = screening.get_sp_first_inds_local(); 
+    const auto pp_first_inds_local = screening.get_pp_first_inds_local(); 
 
-    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(); 
-    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(); 
-    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(); 
+    const auto ss_second_inds_local = screening.get_ss_second_inds_local(); 
+    const auto sp_second_inds_local = screening.get_sp_second_inds_local(); 
+    const auto pp_second_inds_local = screening.get_pp_second_inds_local(); 
 
-    const auto& ss_mat_Q_local = screening.get_ss_mat_Q_local(); 
-    const auto& sp_mat_Q_local = screening.get_sp_mat_Q_local(); 
-    const auto& pp_mat_Q_local = screening.get_pp_mat_Q_local(); 
+    const auto ss_mat_Q_local = screening.get_ss_mat_Q_local(); 
+    const auto sp_mat_Q_local = screening.get_sp_mat_Q_local(); 
+    const auto pp_mat_Q_local = screening.get_pp_mat_Q_local(); 
 
     const auto& ss_first_inds = screening.get_ss_first_inds(); 
     const auto& sp_first_inds = screening.get_sp_first_inds(); 
@@ -1178,14 +1234,14 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     mat_full = CDenseMatrix();
 
-    const auto pair_inds_i_for_K_ss = screening.get_pair_inds_i_for_K_ss();
-    const auto pair_inds_k_for_K_ss = screening.get_pair_inds_k_for_K_ss();
+    const auto pair_inds_i_for_K_ss = screening.get_local_pair_inds_i_for_K_ss();
+    const auto pair_inds_k_for_K_ss = screening.get_local_pair_inds_k_for_K_ss();
 
-    const auto pair_inds_i_for_K_sp = screening.get_pair_inds_i_for_K_sp();
-    const auto pair_inds_k_for_K_sp = screening.get_pair_inds_k_for_K_sp();
+    const auto pair_inds_i_for_K_sp = screening.get_local_pair_inds_i_for_K_sp();
+    const auto pair_inds_k_for_K_sp = screening.get_local_pair_inds_k_for_K_sp();
 
-    const auto pair_inds_i_for_K_pp = screening.get_pair_inds_i_for_K_pp();
-    const auto pair_inds_k_for_K_pp = screening.get_pair_inds_k_for_K_pp();
+    const auto pair_inds_i_for_K_pp = screening.get_local_pair_inds_i_for_K_pp();
+    const auto pair_inds_k_for_K_pp = screening.get_local_pair_inds_k_for_K_pp();
 
     auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
     auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
