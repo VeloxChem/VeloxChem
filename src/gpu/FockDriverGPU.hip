@@ -82,9 +82,12 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     STV_matrices[1] = CDenseMatrix(naos, naos);
     STV_matrices[2] = CDenseMatrix(naos, naos);
 
-    STV_matrices[0].zero();
-    STV_matrices[1].zero();
-    STV_matrices[2].zero();
+    for (int64_t ind = 0; ind < naos * naos; ind++)
+    {
+        STV_matrices[0].values()[ind] = 0.0;
+        STV_matrices[1].values()[ind] = 0.0;
+        STV_matrices[2].values()[ind] = 0.0;
+    }
 
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
@@ -114,7 +117,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    printf("rank %d,  thread %d,  gpu_rank %d\n", rank, thread_id, gpu_rank);
+    // printf("rank %d,  thread %d,  gpu_rank %d\n", rank, thread_id, gpu_rank);
 
     if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
@@ -199,13 +202,13 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     // GTO block pairs
 
-    const auto ss_first_inds_local = screening.get_ss_first_inds_local_gpu(gpu_rank, gpu_count);
-    const auto sp_first_inds_local = screening.get_sp_first_inds_local_gpu(gpu_rank, gpu_count);
-    const auto pp_first_inds_local = screening.get_pp_first_inds_local_gpu(gpu_rank, gpu_count);
+    const auto ss_first_inds_local = screening.get_ss_first_inds_local(gpu_rank, gpu_count);
+    const auto sp_first_inds_local = screening.get_sp_first_inds_local(gpu_rank, gpu_count);
+    const auto pp_first_inds_local = screening.get_pp_first_inds_local(gpu_rank, gpu_count);
 
-    const auto ss_second_inds_local = screening.get_ss_second_inds_local_gpu(gpu_rank, gpu_count);
-    const auto sp_second_inds_local = screening.get_sp_second_inds_local_gpu(gpu_rank, gpu_count);
-    const auto pp_second_inds_local = screening.get_pp_second_inds_local_gpu(gpu_rank, gpu_count);
+    const auto ss_second_inds_local = screening.get_ss_second_inds_local(gpu_rank, gpu_count);
+    const auto sp_second_inds_local = screening.get_sp_second_inds_local(gpu_rank, gpu_count);
+    const auto pp_second_inds_local = screening.get_pp_second_inds_local(gpu_rank, gpu_count);
 
     const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
     const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
@@ -251,9 +254,12 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipMemcpy(d_pp_first_inds_local, pp_first_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_pp_second_inds_local, pp_second_inds_local.data(), pp_prim_pair_count_local * sizeof(uint32_t), hipMemcpyHostToDevice));
 
-    S_matrices[gpu_id].zero();
-    T_matrices[gpu_id].zero();
-    V_matrices[gpu_id].zero();
+    for (int64_t ind = 0; ind < naos * naos; ind++)
+    {
+        S_matrices[gpu_id].values()[ind] = 0.0;
+        T_matrices[gpu_id].values()[ind] = 0.0;
+        V_matrices[gpu_id].values()[ind] = 0.0;
+    }
 
     auto& mat_overlap = S_matrices[gpu_id];
     auto& mat_kinetic_energy = T_matrices[gpu_id];
@@ -495,14 +501,136 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     auto rank = mpi::rank(MPI_COMM_WORLD);
     auto nnodes = mpi::nodes(MPI_COMM_WORLD);
 
-    if (rank % 8 == 0) hipSafe(hipSetDevice(4));
-    if (rank % 8 == 1) hipSafe(hipSetDevice(5));
-    if (rank % 8 == 2) hipSafe(hipSetDevice(2));
-    if (rank % 8 == 3) hipSafe(hipSetDevice(3));
-    if (rank % 8 == 4) hipSafe(hipSetDevice(6));
-    if (rank % 8 == 5) hipSafe(hipSetDevice(7));
-    if (rank % 8 == 6) hipSafe(hipSetDevice(0));
-    if (rank % 8 == 7) hipSafe(hipSetDevice(1));
+    auto nthreads = omp_get_max_threads();
+    auto num_gpus_per_node = screening.getNumGpusPerNode();
+    auto num_threads_per_gpu = nthreads / num_gpus_per_node;
+
+    auto gpu_rank = rank * num_gpus_per_node;
+
+    if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
+    if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
+    if (gpu_rank % 8 == 2) hipSafe(hipSetDevice(2));
+    if (gpu_rank % 8 == 3) hipSafe(hipSetDevice(3));
+    if (gpu_rank % 8 == 4) hipSafe(hipSetDevice(6));
+    if (gpu_rank % 8 == 5) hipSafe(hipSetDevice(7));
+    if (gpu_rank % 8 == 6) hipSafe(hipSetDevice(0));
+    if (gpu_rank % 8 == 7) hipSafe(hipSetDevice(1));
+
+    const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
+    const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
+
+    int64_t s_prim_count = 0;
+    int64_t p_prim_count = 0;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto ncgtos = gto_block.getNumberOfBasisFunctions();
+        const auto npgtos = gto_block.getNumberOfPrimitives();
+
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 0) s_prim_count += npgtos * ncgtos;
+        if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
+    }
+
+    std::vector<double>   s_prim_info(5 * s_prim_count);
+    std::vector<uint32_t> s_prim_aoinds(1 * s_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
+
+    std::vector<double>   p_prim_info(5 * p_prim_count);
+    std::vector<uint32_t> p_prim_aoinds(3 * p_prim_count);
+
+    gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
+
+    auto dens_ptr = densityMatrix.alphaDensity(0);
+
+    screening.sortQD(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
+
+    // timer.start("PreLinK Q_prime");
+
+    // preLinK
+    // J. Chem. Phys. 138, 134114 (2013)
+
+    // TODO distribute computation of Q_prime
+
+    double *d_matrix_A, *d_matrix_B, *d_matrix_C;
+
+    auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count);
+
+    hipSafe(hipMalloc(&d_matrix_A, mat_full.getNumberOfElements() * sizeof(double)));
+    hipSafe(hipMalloc(&d_matrix_B, mat_full.getNumberOfElements() * sizeof(double)));
+    hipSafe(hipMalloc(&d_matrix_C, mat_full.getNumberOfElements() * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+
+    mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
+
+    hipSafe(hipMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
+
+    const auto all_prim_count = s_prim_count + p_prim_count * 3;
+
+    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+
+    dim3 num_blocks((all_prim_count + threads_per_block.x - 1) / threads_per_block.x, (all_prim_count + threads_per_block.y - 1) / threads_per_block.y);
+
+    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_C, d_matrix_A, d_matrix_B,
+            static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
+
+    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
+            static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
+
+    hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_matrix_A));
+    hipSafe(hipFree(d_matrix_B));
+    hipSafe(hipFree(d_matrix_C));
+
+    auto& Q_prime = mat_full;
+
+    // timer.stop("PreLinK Q_prime");
+
+    const double Q_prime_thresh = 1.0e-7;
+
+    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, Q_prime, Q_prime_thresh);
+
+    std::string errnaos("gpu::computeCoulombFock: Inconsistent number of AOs");
+    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
+
+    CDenseMatrix mat_Fock_sum (naos, naos);
+
+    for (int64_t ind = 0; ind < naos * naos; ind++)
+    {
+        mat_Fock_sum.values()[ind] = 0.0;
+    }
+
+    std::vector<CDenseMatrix> mat_Fock_omp(num_gpus_per_node);
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        mat_Fock_omp[gpu_id] = CDenseMatrix(naos, naos);
+    }
+
+#pragma omp parallel
+    {
+    auto thread_id = omp_get_thread_num();
+
+    if (thread_id % num_threads_per_gpu == 0)
+    {
+    auto gpu_id = thread_id / num_threads_per_gpu;
+    auto gpu_rank = gpu_id + rank * num_gpus_per_node;
+    auto gpu_count = nnodes * num_gpus_per_node;
+
+    // printf("rank %d,  thread %d,  gpu_rank %d\n", rank, thread_id, gpu_rank);
+
+    if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
+    if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
+    if (gpu_rank % 8 == 2) hipSafe(hipSetDevice(2));
+    if (gpu_rank % 8 == 3) hipSafe(hipSetDevice(3));
+    if (gpu_rank % 8 == 4) hipSafe(hipSetDevice(6));
+    if (gpu_rank % 8 == 5) hipSafe(hipSetDevice(7));
+    if (gpu_rank % 8 == 6) hipSafe(hipSetDevice(0));
+    if (gpu_rank % 8 == 7) hipSafe(hipSetDevice(1));
 
     CMultiTimer timer;
 
@@ -537,10 +665,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
 
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
-
-    std::string errnaos("gpu::computeCoulombFock: Inconsistent number of AOs");
-
-    errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
 
     // gto blocks
 
@@ -600,31 +724,31 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // TODO distribute computation of Q matrices
 
-    timer.start("  D matrices");
+    // timer.start("  D matrices");
 
-    screening.sortQD(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
+    // screening.sortQD(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
 
-    timer.stop("  D matrices");
+    // timer.stop("  D matrices");
 
     timer.stop("GTO block pair prep.");
 
     timer.start("Coulomb prep.");
 
-    const auto& ss_mat_Q_orig = screening.getQMatrixSS();
-    const auto& sp_mat_Q_orig = screening.getQMatrixSP();
-    const auto& pp_mat_Q_orig = screening.getQMatrixPP();
+    const auto ss_mat_Q_orig = screening.getQMatrixSS();
+    const auto sp_mat_Q_orig = screening.getQMatrixSP();
+    const auto pp_mat_Q_orig = screening.getQMatrixPP();
 
-    const auto ss_first_inds_local = screening.get_ss_first_inds_local(); 
-    const auto sp_first_inds_local = screening.get_sp_first_inds_local(); 
-    const auto pp_first_inds_local = screening.get_pp_first_inds_local(); 
+    const auto ss_first_inds_local = screening.get_ss_first_inds_local(gpu_rank, gpu_count); 
+    const auto sp_first_inds_local = screening.get_sp_first_inds_local(gpu_rank, gpu_count); 
+    const auto pp_first_inds_local = screening.get_pp_first_inds_local(gpu_rank, gpu_count); 
 
-    const auto ss_second_inds_local = screening.get_ss_second_inds_local(); 
-    const auto sp_second_inds_local = screening.get_sp_second_inds_local(); 
-    const auto pp_second_inds_local = screening.get_pp_second_inds_local(); 
+    const auto ss_second_inds_local = screening.get_ss_second_inds_local(gpu_rank, gpu_count); 
+    const auto sp_second_inds_local = screening.get_sp_second_inds_local(gpu_rank, gpu_count); 
+    const auto pp_second_inds_local = screening.get_pp_second_inds_local(gpu_rank, gpu_count); 
 
-    const auto ss_mat_Q_local = screening.get_ss_mat_Q_local(); 
-    const auto sp_mat_Q_local = screening.get_sp_mat_Q_local(); 
-    const auto pp_mat_Q_local = screening.get_pp_mat_Q_local(); 
+    const auto ss_mat_Q_local = screening.get_ss_mat_Q_local(gpu_rank, gpu_count); 
+    const auto sp_mat_Q_local = screening.get_sp_mat_Q_local(gpu_rank, gpu_count); 
+    const auto pp_mat_Q_local = screening.get_pp_mat_Q_local(gpu_rank, gpu_count); 
 
     const auto& ss_first_inds = screening.get_ss_first_inds(); 
     const auto& sp_first_inds = screening.get_sp_first_inds(); 
@@ -729,9 +853,12 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.stop("Coulomb prep.");
 
-    CDenseMatrix mat_Fock(naos, naos);
+    for (int64_t ind = 0; ind < naos * naos; ind++)
+    {
+        mat_Fock_omp[gpu_id].values()[ind] = 0.0;
+    }
 
-    mat_Fock.zero();
+    // auto& mat_Fock = mat_Fock_omp[gpu_id];
 
     timer.start("J computation");
 
@@ -777,9 +904,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto j_cgto = s_prim_aoinds[j];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
 
-            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
@@ -825,9 +952,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto j_cgto = s_prim_aoinds[j];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
 
-            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
@@ -873,9 +1000,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto j_cgto = s_prim_aoinds[j];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
 
-            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
@@ -923,8 +1050,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
-            mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
@@ -972,8 +1099,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
-            mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
@@ -1021,8 +1148,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
-            mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
@@ -1069,9 +1196,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
 
-            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
@@ -1118,9 +1245,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
 
-            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
@@ -1165,83 +1292,40 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_Fock.row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
+            mat_Fock_omp[gpu_id].row(i_cgto)[j_cgto] += mat_J[ij] * 2.0;
 
-            if (i != j) mat_Fock.row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
+            if (i != j) mat_Fock_omp[gpu_id].row(j_cgto)[i_cgto] += mat_J[ij] * 2.0;
         }
     }
 
     timer.stop("J computation");
 
-    timer.start("PreLinK Q_prime");
-
-    // preLinK
-    // J. Chem. Phys. 138, 134114 (2013)
-
-    // TODO distribute computation of Q_prime
-
-    double *d_matrix_A, *d_matrix_B, *d_matrix_C;
-
-    auto mat_full = screening.get_mat_Q_full(s_prim_count, p_prim_count);
-
-    hipSafe(hipMalloc(&d_matrix_A, mat_full.getNumberOfElements() * sizeof(double)));
-    hipSafe(hipMalloc(&d_matrix_B, mat_full.getNumberOfElements() * sizeof(double)));
-    hipSafe(hipMalloc(&d_matrix_C, mat_full.getNumberOfElements() * sizeof(double)));
-
-    hipSafe(hipMemcpy(d_matrix_A, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
-
-    mat_full = screening.get_mat_D_abs_full(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
-
-    hipSafe(hipMemcpy(d_matrix_B, mat_full.values(), mat_full.getNumberOfElements() * sizeof(double), hipMemcpyHostToDevice));
-
-    const auto all_prim_count = s_prim_count + p_prim_count * 3;
-
-    dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-    dim3 num_blocks((all_prim_count + threads_per_block.x - 1) / threads_per_block.x, (all_prim_count + threads_per_block.y - 1) / threads_per_block.y);
-
-    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_C, d_matrix_A, d_matrix_B,
-            static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
-
-    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
-            static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
-
-    hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
-
-    auto& Q_prime = mat_full;
-
-    timer.stop("PreLinK Q_prime");
-
     timer.start("Exchange prep.");
 
     // K preparation
 
-    const auto mat_Q_for_K_ss = screening.get_mat_Q_for_K_ss();
-    const auto mat_Q_for_K_sp = screening.get_mat_Q_for_K_sp();
-    const auto mat_Q_for_K_ps = screening.get_mat_Q_for_K_ps();
-    const auto mat_Q_for_K_pp = screening.get_mat_Q_for_K_pp();
+    const auto& mat_Q_for_K_ss = screening.get_mat_Q_for_K_ss();
+    const auto& mat_Q_for_K_sp = screening.get_mat_Q_for_K_sp();
+    const auto& mat_Q_for_K_ps = screening.get_mat_Q_for_K_ps();
+    const auto& mat_Q_for_K_pp = screening.get_mat_Q_for_K_pp();
 
-    const auto density_inds_for_K_ss = screening.get_density_inds_for_K_ss();
-    const auto density_inds_for_K_sp = screening.get_density_inds_for_K_sp();
-    const auto density_inds_for_K_ps = screening.get_density_inds_for_K_ps();
-    const auto density_inds_for_K_pp = screening.get_density_inds_for_K_pp();
-
-    const double Q_prime_thresh = 1.0e-7;
+    const auto& density_inds_for_K_ss = screening.get_density_inds_for_K_ss();
+    const auto& density_inds_for_K_sp = screening.get_density_inds_for_K_sp();
+    const auto& density_inds_for_K_ps = screening.get_density_inds_for_K_ps();
+    const auto& density_inds_for_K_pp = screening.get_density_inds_for_K_pp();
 
     // TODO sort by Q_prime bound
 
-    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, Q_prime, Q_prime_thresh);
+    // screening.form_pair_inds_for_K(s_prim_count, p_prim_count, Q_prime, Q_prime_thresh);
 
-    mat_full = CDenseMatrix();
+    const auto pair_inds_i_for_K_ss = screening.get_local_pair_inds_i_for_K_ss(gpu_rank, gpu_count);
+    const auto pair_inds_k_for_K_ss = screening.get_local_pair_inds_k_for_K_ss(gpu_rank, gpu_count);
 
-    const auto pair_inds_i_for_K_ss = screening.get_local_pair_inds_i_for_K_ss();
-    const auto pair_inds_k_for_K_ss = screening.get_local_pair_inds_k_for_K_ss();
+    const auto pair_inds_i_for_K_sp = screening.get_local_pair_inds_i_for_K_sp(gpu_rank, gpu_count);
+    const auto pair_inds_k_for_K_sp = screening.get_local_pair_inds_k_for_K_sp(gpu_rank, gpu_count);
 
-    const auto pair_inds_i_for_K_sp = screening.get_local_pair_inds_i_for_K_sp();
-    const auto pair_inds_k_for_K_sp = screening.get_local_pair_inds_k_for_K_sp();
-
-    const auto pair_inds_i_for_K_pp = screening.get_local_pair_inds_i_for_K_pp();
-    const auto pair_inds_k_for_K_pp = screening.get_local_pair_inds_k_for_K_pp();
+    const auto pair_inds_i_for_K_pp = screening.get_local_pair_inds_i_for_K_pp(gpu_rank, gpu_count);
+    const auto pair_inds_k_for_K_pp = screening.get_local_pair_inds_k_for_K_pp(gpu_rank, gpu_count);
 
     auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
     auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
@@ -1348,9 +1432,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto k_cgto = s_prim_aoinds[k];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1397,9 +1481,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto k_cgto = s_prim_aoinds[k];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1446,9 +1530,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto k_cgto = s_prim_aoinds[k];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1493,9 +1577,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = s_prim_aoinds[i];
             const auto k_cgto = s_prim_aoinds[k];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1544,8 +1628,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-            mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1594,8 +1678,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-            mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1644,8 +1728,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-            mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1694,8 +1778,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             // TODO: think about the ordering of cartesian components
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-            mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1741,9 +1825,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1791,9 +1875,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1841,9 +1925,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1886,9 +1970,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
             const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
 
-            mat_Fock.row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
+            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
 
-            if (i != k) mat_Fock.row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
+            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
     }
 
@@ -1949,17 +2033,27 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipFree(d_density_inds_for_K_ps));
     hipSafe(hipFree(d_density_inds_for_K_pp));
 
-    hipSafe(hipFree(d_matrix_A));
-    hipSafe(hipFree(d_matrix_B));
-    hipSafe(hipFree(d_matrix_C));
-
     timer.stop("Total timing");
 
-    // std::cout << "\nTiming of ERIs on GPU\n";
+    // std::cout << "\nTiming of ERIs on GPU " << gpu_id << "\n";
     // std::cout << "-----------------------\n";
     // std::cout << timer.getSummary() << std::endl;
 
-    return mat_Fock;
+    }}
+
+    auto p_mat_F = mat_Fock_sum.values();
+
+    for (int64_t gpu_id = 0; gpu_id < num_gpus_per_node; gpu_id++)
+    {
+        auto p_mat_fock = mat_Fock_omp[gpu_id].values();
+
+        for (int64_t ind = 0; ind < naos * naos; ind++)
+        {
+            p_mat_F[ind] += p_mat_fock[ind];
+        }
+    }
+
+    return mat_Fock_sum;
 }
 
 }  // namespace gpu

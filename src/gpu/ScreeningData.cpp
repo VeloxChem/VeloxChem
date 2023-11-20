@@ -574,7 +574,7 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
     }
 }
 
-auto CScreeningData::get_ss_first_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+auto CScreeningData::get_ss_first_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
     std::vector<uint32_t> ss_first_inds_local;
 
@@ -586,7 +586,7 @@ auto CScreeningData::get_ss_first_inds_local_gpu(const int64_t gpu_rank, const i
     return ss_first_inds_local;
 }
 
-auto CScreeningData::get_sp_first_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+auto CScreeningData::get_sp_first_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
     std::vector<uint32_t> sp_first_inds_local;
 
@@ -598,7 +598,7 @@ auto CScreeningData::get_sp_first_inds_local_gpu(const int64_t gpu_rank, const i
     return sp_first_inds_local;
 }
 
-auto CScreeningData::get_pp_first_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+auto CScreeningData::get_pp_first_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
     std::vector<uint32_t> pp_first_inds_local;
 
@@ -610,7 +610,7 @@ auto CScreeningData::get_pp_first_inds_local_gpu(const int64_t gpu_rank, const i
     return pp_first_inds_local;
 }
 
-auto CScreeningData::get_ss_second_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+auto CScreeningData::get_ss_second_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
     std::vector<uint32_t> ss_second_inds_local;
 
@@ -622,7 +622,7 @@ auto CScreeningData::get_ss_second_inds_local_gpu(const int64_t gpu_rank, const 
     return ss_second_inds_local;
 }
 
-auto CScreeningData::get_sp_second_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+auto CScreeningData::get_sp_second_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
     std::vector<uint32_t> sp_second_inds_local;
 
@@ -634,7 +634,7 @@ auto CScreeningData::get_sp_second_inds_local_gpu(const int64_t gpu_rank, const 
     return sp_second_inds_local;
 }
 
-auto CScreeningData::get_pp_second_inds_local_gpu(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
+auto CScreeningData::get_pp_second_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
     std::vector<uint32_t> pp_second_inds_local;
 
@@ -646,104 +646,11 @@ auto CScreeningData::get_pp_second_inds_local_gpu(const int64_t gpu_rank, const 
     return pp_second_inds_local;
 }
 
-auto CScreeningData::get_ss_first_inds_local() const -> const std::vector<uint32_t>
+auto CScreeningData::get_ss_mat_Q_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<double>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
-    std::vector<uint32_t> ss_first_inds_local;
-
-    for (int64_t ij = rank; ij < _ss_prim_pair_count; ij+=nnodes)
-    {
-        ss_first_inds_local.push_back(_ss_first_inds_bra[ij]);
-    }
-
-    return ss_first_inds_local;
-}
-
-auto CScreeningData::get_sp_first_inds_local() const -> const std::vector<uint32_t>
-{
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
-    std::vector<uint32_t> sp_first_inds_local;
-
-    for (int64_t ij = rank; ij < _sp_prim_pair_count; ij+=nnodes)
-    {
-        sp_first_inds_local.push_back(_sp_first_inds_bra[ij]);
-    }
-
-    return sp_first_inds_local;
-}
-
-auto CScreeningData::get_pp_first_inds_local() const -> const std::vector<uint32_t>
-{
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
-    std::vector<uint32_t> pp_first_inds_local;
-
-    for (int64_t ij = rank; ij < _pp_prim_pair_count; ij+=nnodes)
-    {
-        pp_first_inds_local.push_back(_pp_first_inds_bra[ij]);
-    }
-
-    return pp_first_inds_local;
-}
-
-auto CScreeningData::get_ss_second_inds_local() const -> const std::vector<uint32_t>
-{
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
-    std::vector<uint32_t> ss_second_inds_local;
-
-    for (int64_t ij = rank; ij < _ss_prim_pair_count; ij+=nnodes)
-    {
-        ss_second_inds_local.push_back(_ss_second_inds_bra[ij]);
-    }
-
-    return ss_second_inds_local;
-}
-
-auto CScreeningData::get_sp_second_inds_local() const -> const std::vector<uint32_t>
-{
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
-    std::vector<uint32_t> sp_second_inds_local;
-
-    for (int64_t ij = rank; ij < _sp_prim_pair_count; ij+=nnodes)
-    {
-        sp_second_inds_local.push_back(_sp_second_inds_bra[ij]);
-    }
-
-    return sp_second_inds_local;
-}
-
-auto CScreeningData::get_pp_second_inds_local() const -> const std::vector<uint32_t>
-{
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
-    std::vector<uint32_t> pp_second_inds_local;
-
-    for (int64_t ij = rank; ij < _pp_prim_pair_count; ij+=nnodes)
-    {
-        pp_second_inds_local.push_back(_pp_second_inds_bra[ij]);
-    }
-
-    return pp_second_inds_local;
-}
-
-auto CScreeningData::get_ss_mat_Q_local() const -> const std::vector<double>
-{
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<double> ss_mat_Q_local;
 
-    for (int64_t ij = rank; ij < _ss_prim_pair_count; ij+=nnodes)
+    for (int64_t ij = gpu_rank; ij < _ss_prim_pair_count; ij+=gpu_count)
     {
         ss_mat_Q_local.push_back(_ss_mat_Q_bra[ij]);
     }
@@ -751,14 +658,11 @@ auto CScreeningData::get_ss_mat_Q_local() const -> const std::vector<double>
     return ss_mat_Q_local;
 }
 
-auto CScreeningData::get_sp_mat_Q_local() const -> const std::vector<double>
+auto CScreeningData::get_sp_mat_Q_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<double>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<double> sp_mat_Q_local;
 
-    for (int64_t ij = rank; ij < _sp_prim_pair_count; ij+=nnodes)
+    for (int64_t ij = gpu_rank; ij < _sp_prim_pair_count; ij+=gpu_count)
     {
         sp_mat_Q_local.push_back(_sp_mat_Q_bra[ij]);
     }
@@ -766,14 +670,11 @@ auto CScreeningData::get_sp_mat_Q_local() const -> const std::vector<double>
     return sp_mat_Q_local;
 }
 
-auto CScreeningData::get_pp_mat_Q_local() const -> const std::vector<double>
+auto CScreeningData::get_pp_mat_Q_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<double>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<double> pp_mat_Q_local;
 
-    for (int64_t ij = rank; ij < _pp_prim_pair_count; ij+=nnodes)
+    for (int64_t ij = gpu_rank; ij < _pp_prim_pair_count; ij+=gpu_count)
     {
         pp_mat_Q_local.push_back(_pp_mat_Q_bra[ij]);
     }
@@ -811,14 +712,11 @@ auto CScreeningData::get_density_inds_for_K_sp() const -> const std::vector<uint
 auto CScreeningData::get_density_inds_for_K_ps() const -> const std::vector<uint32_t>& { return _density_inds_for_K_ps; }
 auto CScreeningData::get_density_inds_for_K_pp() const -> const std::vector<uint32_t>& { return _density_inds_for_K_pp; }
 
-auto CScreeningData::get_local_pair_inds_i_for_K_ss() const -> const std::vector<uint32_t>
+auto CScreeningData::get_local_pair_inds_i_for_K_ss(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<uint32_t> local_pair_inds_i_for_K_ss;
 
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_ss.size()); ik+=nnodes)
+    for (int64_t ik = gpu_rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_ss.size()); ik+=gpu_count)
     {
         local_pair_inds_i_for_K_ss.push_back(_pair_inds_i_for_K_ss[ik]);
     }
@@ -826,14 +724,11 @@ auto CScreeningData::get_local_pair_inds_i_for_K_ss() const -> const std::vector
     return local_pair_inds_i_for_K_ss;
 }
 
-auto CScreeningData::get_local_pair_inds_k_for_K_ss() const -> const std::vector<uint32_t>
+auto CScreeningData::get_local_pair_inds_k_for_K_ss(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<uint32_t> local_pair_inds_k_for_K_ss;
 
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_ss.size()); ik+=nnodes)
+    for (int64_t ik = gpu_rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_ss.size()); ik+=gpu_count)
     {
         local_pair_inds_k_for_K_ss.push_back(_pair_inds_k_for_K_ss[ik]);
     }
@@ -841,14 +736,11 @@ auto CScreeningData::get_local_pair_inds_k_for_K_ss() const -> const std::vector
     return local_pair_inds_k_for_K_ss;
 }
 
-auto CScreeningData::get_local_pair_inds_i_for_K_sp() const -> const std::vector<uint32_t>
+auto CScreeningData::get_local_pair_inds_i_for_K_sp(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<uint32_t> local_pair_inds_i_for_K_sp;
 
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_sp.size()); ik+=nnodes)
+    for (int64_t ik = gpu_rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_sp.size()); ik+=gpu_count)
     {
         local_pair_inds_i_for_K_sp.push_back(_pair_inds_i_for_K_sp[ik]);
     }
@@ -856,14 +748,11 @@ auto CScreeningData::get_local_pair_inds_i_for_K_sp() const -> const std::vector
     return local_pair_inds_i_for_K_sp;
 }
 
-auto CScreeningData::get_local_pair_inds_k_for_K_sp() const -> const std::vector<uint32_t>
+auto CScreeningData::get_local_pair_inds_k_for_K_sp(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<uint32_t> local_pair_inds_k_for_K_sp;
 
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_sp.size()); ik+=nnodes)
+    for (int64_t ik = gpu_rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_sp.size()); ik+=gpu_count)
     {
         local_pair_inds_k_for_K_sp.push_back(_pair_inds_k_for_K_sp[ik]);
     }
@@ -871,14 +760,11 @@ auto CScreeningData::get_local_pair_inds_k_for_K_sp() const -> const std::vector
     return local_pair_inds_k_for_K_sp;
 }
 
-auto CScreeningData::get_local_pair_inds_i_for_K_pp() const -> const std::vector<uint32_t>
+auto CScreeningData::get_local_pair_inds_i_for_K_pp(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<uint32_t> local_pair_inds_i_for_K_pp;
 
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_pp.size()); ik+=nnodes)
+    for (int64_t ik = gpu_rank; ik < static_cast<int64_t>(_pair_inds_i_for_K_pp.size()); ik+=gpu_count)
     {
         local_pair_inds_i_for_K_pp.push_back(_pair_inds_i_for_K_pp[ik]);
     }
@@ -886,14 +772,11 @@ auto CScreeningData::get_local_pair_inds_i_for_K_pp() const -> const std::vector
     return local_pair_inds_i_for_K_pp;
 }
 
-auto CScreeningData::get_local_pair_inds_k_for_K_pp() const -> const std::vector<uint32_t>
+auto CScreeningData::get_local_pair_inds_k_for_K_pp(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
 {
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
-
     std::vector<uint32_t> local_pair_inds_k_for_K_pp;
 
-    for (int64_t ik = rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_pp.size()); ik+=nnodes)
+    for (int64_t ik = gpu_rank; ik < static_cast<int64_t>(_pair_inds_k_for_K_pp.size()); ik+=gpu_count)
     {
         local_pair_inds_k_for_K_pp.push_back(_pair_inds_k_for_K_pp[ik]);
     }
