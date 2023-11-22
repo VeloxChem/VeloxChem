@@ -41,7 +41,7 @@
  */
 class CScreeningData
 {
-    int64_t _num_gpus_per_node{2};
+    int64_t _num_gpus_per_node{4};
 
     CDenseMatrix _Q_matrix_ss;
     CDenseMatrix _Q_matrix_sp;

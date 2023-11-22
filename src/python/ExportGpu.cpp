@@ -29,6 +29,7 @@
 #include <pybind11/pybind11.h>
 
 #include "CudaDevices.hpp"
+#include "ErrorHandler.hpp"
 #include "FockDriverGPU.hpp"
 #include "ExportGeneral.hpp"
 #include "ScreeningData.hpp"
@@ -76,6 +77,33 @@ export_gpu(py::module& m)
             return ret;
         },
         "Computes GTO values and derivatives on grid points using GPU.");
+
+    m.def(
+        "matmul_gpu",
+        [](const py::array_t<double>& A, const py::array_t<double>& B) -> py::array_t<double> {
+            std::string errshape("matmul_gpu: Mismatch in matrix shape");
+
+            errors::assertMsgCritical(A.shape(1) == B.shape(0), errshape);
+
+            std::string errstyle("matmul_gpu: Expecting contiguous numpy array");
+
+            auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
+            auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
+
+            errors::assertMsgCritical(c_style_A, errstyle);
+            errors::assertMsgCritical(c_style_B, errstyle);
+
+            const auto nrows_A = static_cast<int64_t>(A.shape(0));
+            const auto ncols_A = static_cast<int64_t>(A.shape(1));
+            const auto ncols_B = static_cast<int64_t>(B.shape(1));
+
+            std::vector<double> C(nrows_A * ncols_B);
+
+            gpu::computeMatrixMultiplication(C.data(), A.data(), B.data(), nrows_A, ncols_A, ncols_B);
+
+            return vlx_general::pointer_to_numpy(C.data(), {nrows_A, ncols_B});
+        },
+        "Computes matrix multiplication using GPU.");
 
     m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 

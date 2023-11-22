@@ -40,6 +40,8 @@ auto computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecula
 
 auto computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, CScreeningData& screening) -> CDenseMatrix;
 
+auto computeMatrixMultiplication(double* C, const double* A, const double* B, const int64_t nrows_A, const int64_t ncols_A, const int64_t ncols_B) -> void;
+
 }  // namespace gpu
 
 #endif
