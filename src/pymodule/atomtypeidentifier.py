@@ -400,8 +400,7 @@ class AtomTypeIdentifier:
                         carbon_type = {'opls': f'opls_x{info["AtomNumber"]}', 'gaff': f'cx{info["AtomNumber"]}'}
                         
                 # Default assignation for carbons in non-pure aromatic cyclic structures
-                elif info.get('CyclicStructure') == 'cycle' and 'non_pure_aromatic' in info['Aromaticity']:
-                #elif info.get('CyclicStructure') == 'cycle' and info['Aromaticity'] == ['non_pure_aromatic']:
+                elif info.get('CyclicStructure') == 'cycle' and 'non_pure_aromatic' in info.get('Aromaticity'):
             
                     if 'O' in connected_symbols:
                     # Directly loop through the connected atom numbers
@@ -487,8 +486,8 @@ class AtomTypeIdentifier:
                     else:
                         carbon_type = {'opls': 'opls_508', 'gaff': 'cc'}
 
-                # Chain structures
-                elif info.get('CyclicStructure') == 'cycle' and 'non_aromatic' in info['Aromaticity']:
+                # Aliphatic cycles
+                elif info.get('CyclicStructure') == 'cycle' and 'non_aromatic' in info.get('Aromaticity'):
 
                     if info['NumConnectedAtoms'] == 4 and 3 in info['CycleSize']:
                         carbon_type = {'opls': 'opls_CX', 'gaff': 'cx'}
@@ -1299,15 +1298,18 @@ class AtomTypeIdentifier:
             for j in range(len(self.connectivity_matrix)):
                 if self.connectivity_matrix[i][j] == 1:  # If i and j are connected
                     for k in range(j + 1, len(self.connectivity_matrix)):
-                        if self.connectivity_matrix[j][k] == 1 and self.connectivity_matrix[i][k] == 0:  # If j and k are connected, but i and k are not (forming an angle)
-                            angle = {
-                                'atoms': (i + 1, j + 1, k + 1),
-                                'types': (self.gaff_atom_types[i], self.gaff_atom_types[j], self.gaff_atom_types[k]),
-                                'angle': AtomTypeIdentifier.calculate_angle(
-                                    self.coordinates[i], self.coordinates[j], self.coordinates[k]
-                                )
-                            }
-                            structural_features['angles'].append(angle)
+                        if self.connectivity_matrix[j][k] == 1 and self.connectivity_matrix[i][k] == 0:  # If j and k are connected, but i and k are not
+                            # Ensure i, j, k are distinct
+                            if i != j and j != k and i != k:
+                                angle = {
+                                    'atoms': (i + 1, j + 1, k + 1),
+                                    'types': (self.gaff_atom_types[i], self.gaff_atom_types[j], self.gaff_atom_types[k]),
+                                    'angle': AtomTypeIdentifier.calculate_angle(
+                                        self.coordinates[i], self.coordinates[j], self.coordinates[k]
+                                    )
+                                }
+                                structural_features['angles'].append(angle)
+
 
         # Compute dihedrals based on the connectivity matrix and the distance matrix
         for i in range(len(self.connectivity_matrix)):
@@ -1349,7 +1351,7 @@ class AtomTypeIdentifier:
 
         return structural_features
     
-    def generate_force_field(self, ff_file_path):
+    def generate_force_field_dict(self, ff_file_path):
         '''
         Generates a force field dictionary for a molecule based on its structural features and a given GAFF force field file.
 
@@ -1467,7 +1469,7 @@ class AtomTypeIdentifier:
                         force_field_data['bonds'][bond_key] = {
                             'ids': bond['atoms'],  # Include the atom IDs
                             'types': bond['types'],
-                            'force_constant': force_constant,
+                            'force_constant': force_constant * 2,
                             'eq_distance': eq_distance,
                             'comment': 'GAFF2'
                         }
@@ -1482,8 +1484,8 @@ class AtomTypeIdentifier:
                     force_field_data['bonds'][bond_key] = {
                         'ids': bond['atoms'],  # Include the atom IDs
                         'types': bond['types'],
-                        'force_constant': 250000.000 * kcalmol_to_kjmol,  # Default force constant converted to kJ/mol
-                        'eq_distance': computed_distance,
+                        'force_constant': 25000.000,  # Default force constant converted to kJ/mol
+                        'eq_distance': computed_distance * angstrom_to_nm,
                         'comment': 'unknown'
                     }
 
@@ -1505,7 +1507,7 @@ class AtomTypeIdentifier:
                     force_field_data['angles'][angle_key] = {
                         'ids': angle['atoms'],  # Include the atom IDs
                         'types': angle['types'],
-                        'force_constant': force_constant,
+                        'force_constant': force_constant * 2,
                         'eq_angle': eq_angle_degrees,
                         'comment': 'GAFF2'
                     }
@@ -1520,7 +1522,7 @@ class AtomTypeIdentifier:
                 force_field_data['angles'][angle_key] = {
                     'ids': angle['atoms'],  # Include the atom IDs
                     'types': angle['types'],
-                    'force_constant': 2000.000 * kcalmol_to_kjmol,  # Default force constant converted to kJ/mol
+                    'force_constant': 2000.000,  # Default force constant converted to kJ/mol
                     'eq_angle': computed_angle,
                     'comment': 'unknown'
                 }
@@ -1569,10 +1571,12 @@ class AtomTypeIdentifier:
                     'comment': 'unknown'
                 }
 
-
         # Parse impropers section
         for improper in self.structural_features['impropers']:
-            # Assuming 'types' and 'ids' are lists of the four atom types and IDs involved in the improper
+            # Check if 'improper_angle' key exists
+            computed_angle = improper.get('improper_angle', 0)  # Default to 0 if not provided
+
+            # Use the 'types' from your data to create the pattern
             improper_type_pattern = '-'.join(improper['types'])
             improper_regex = re.escape(improper_type_pattern) + r'\s+(\d+)\s+(-?\d+\.\d+)\s+(-?\d+\.\d+)'
             match_found = False  # Flag to check if we find a match in the force field file
@@ -1583,10 +1587,10 @@ class AtomTypeIdentifier:
                     periodicity = int(improper_match.group(1))
                     force_constant = float(improper_match.group(2)) * kcalmol_to_kjmol
                     eq_angle = float(improper_match.group(3))  # Assuming this angle does not require conversion
-                    # The improper key will include atom types and IDs for uniqueness
-                    improper_key = tuple(improper['ids'])  # Use atom IDs instead of types for the key
+                    # The improper key will include atom IDs for uniqueness
+                    improper_key = tuple(improper['atoms'])  # Use atom IDs for the key
                     force_field_data['impropers'][improper_key] = {
-                        'ids': improper['ids'],  # Include the atom IDs
+                        'ids': improper['atoms'],  # Include the atom IDs
                         'types': improper['types'],
                         'periodicity': periodicity,
                         'force_constant': force_constant,
@@ -1597,12 +1601,11 @@ class AtomTypeIdentifier:
                     break  # Exit the loop after finding the match
 
             if not match_found:
-                # Default values if no match is found, using the computed angle from structural_features
-                computed_angle = improper.get('angle', 0)  # Default to 0 if not provided
-                # The improper key will include atom types and IDs for uniqueness
-                improper_key = tuple(improper['ids'])  # Use atom IDs instead of types for the key
+                # Use default values if no match is found
+                # The improper key will include atom IDs for uniqueness
+                improper_key = tuple(improper['atoms'])  # Use atom IDs for the key
                 force_field_data['impropers'][improper_key] = {
-                    'ids': improper['ids'],  # Include the atom IDs
+                    'ids': improper['atoms'],  # Include the atom IDs
                     'types': improper['types'],
                     'periodicity': 2,  # Default periodicity
                     'force_constant': 0,  # Default force constant
@@ -1630,6 +1633,142 @@ class AtomTypeIdentifier:
             force_field_data['pairs'].pop(angle_pair_ids, None)
 
         return force_field_data
+    
+    def generate_itp(self, ff_file_path):
+        '''
+        Generate a raw itp file from GROMACS for a molecule based on its structural features and a given GAFF force field file.
+        '''
+
+        self.force_field_data = self.generate_force_field_dict(ff_file_path)
+
+        # Initialize the itp file
+        itp_file = '; Created by VeloxChem\n\n'
+
+        # Print the moleculetype section
+        itp_file += '[moleculetype]\n; name  nrexcl\nMOL  3\n\n'
+
+        # Print the atoms section
+        itp_file += '[ atoms ]\n'
+        itp_file += '; nr    type  resnr  residue  atom  cgnr  charge      mass\n'
+        for atom_id, atom_data in self.force_field_data['atomtypes'].items():
+            itp_file += f'{atom_id:<6} {atom_data["type"]:>4}  1     MOL     {atom_data["type"]:>4}  1     {0.00000:9.5f} {atom_data["mass"]:9.5f}\n'
+
+        # Print the bonds section
+        itp_file += '\n[ bonds ]\n; ai  aj  funct  r0 (nm)  fc (kJ/(mol nm2))\n'
+        for bond_key, bond_data in self.force_field_data['bonds'].items():
+            itp_file += f'{bond_key[0]:<4} {bond_key[1]:<4} 1 {bond_data["eq_distance"]:>6.6f} {bond_data["force_constant"]:>8.3f}\n'
+
+        # Print the angles section
+        itp_file += '\n[ angles ]\n; ai  aj  ak  funct  theta0 (degr)  fc (kJ/(mol rad2)\n'
+        for angle_key, angle_data in self.force_field_data['angles'].items():
+            itp_file += f'{angle_key[0]:<4} {angle_key[1]:<4} {angle_key[2]:<4} 1 {angle_data["eq_angle"]:>6.3f} {angle_data["force_constant"]:>8.3f}\n'
+
+        # Print the dihedrals section
+        itp_file += '\n[ dihedrals ]\n; ai  aj  ak  al  funct  theta  k  mult\n'
+        for dihedral_key, dihedral_data in self.force_field_data['dihedrals'].items():
+            itp_file += f'{dihedral_key[0]:<4} {dihedral_key[1]:<4} {dihedral_key[2]:<4} {dihedral_key[3]:<4} 1 {dihedral_data["eq_angle"]:>8.3f} {dihedral_data["force_constant"]:>8.3f}  1\n'
+
+        # Print the impropers section
+        itp_file += '\n[ dihedrals ] ; Improper dihedral section\n; ai  aj  ak  al  type  phi0  fc  n\n'
+        for improper_key, improper_data in self.force_field_data['impropers'].items():
+            itp_file += f'{improper_key[0]:<4} {improper_key[1]:<4} {improper_key[2]:<4} {improper_key[3]:<4} 4 {improper_data["eq_angle"]:>8.3f} {improper_data["force_constant"]:>8.3f} {improper_data["periodicity"]:>2}\n'
+
+        # Print the pairs section
+        itp_file += '\n[ pairs ]\n; ai  aj  funct\n'
+        for pair_key in self.force_field_data['pairs']:
+            itp_file += f'{pair_key[0]:<4} {pair_key[1]:<4} 1\n'
+
+        return itp_file
+    
+    def generate_top(self, ff_file_path):
+                                            
+        '''
+        Generate a raw top file from GROMACS for a molecule based on its structural features and a given GAFF force field file.
+        '''
+
+        self.force_field_data = self.generate_force_field_dict(ff_file_path)
+
+        # Initialize the top file
+        top_file = '; Created by VeloxChem\n\n'
+
+        # Print the include section for including the itp file
+        top_file += '#include "mol.itp"\n'
+
+        # Print the defaults section
+        top_file += '\n[ defaults ]\n; nbfunc  comb-rule  gen-pairs  fudgeLJ  fudgeQQ\n1  3  yes  0.5  0.8333\n'
+
+        # Print the atomtypes section
+        top_file += '\n[ atomtypes ]\n; name  bond_type  mass  charge  ptype  sigma  epsilon\n'
+        for atom_id, atom_data in self.force_field_data['atomtypes'].items():
+            top_file += f'{atom_data["type"]:<6} {atom_data["type"]:<10} {atom_data["mass"]:<7.2f} 0.0000  A {atom_data["sigma"]:11.4e} {atom_data["epsilon"]:11.4e}\n'
+
+        # Print the system directive
+        top_file += '\n[ system ]\n; name\nMOL\n'
+
+        # Print the molecules section
+        top_file += '\n[ molecules ]\n; name  number\nMOL  1\n'
+
+        return top_file
+
+    # Method to save the itp and top files
+    def generate_topology(self, ff_file_path):
+        '''
+        Save the itp and top files for a molecule based on its structural features and a given GAFF force field file.
+
+        Arguments:
+        - self
+        '''
+
+        # Generate the itp file
+        itp_file = self.generate_itp(ff_file_path)
+
+        # Generate the top file
+        top_file = self.generate_top(ff_file_path)
+
+        # Save the itp file
+        with open('mol.itp', 'w') as f:
+            f.write(itp_file)
+
+        # Save the top file
+        with open('mol.top', 'w') as f:
+            f.write(top_file)
+
+        return
+    
+    def generate_gro(self, atomtypes):
+        """
+        Generate a GRO file for the molecule.
+
+        Args:
+        - atomtypes (list): List of atom types.
+        """
+
+        # Constants
+        ANGSTROM_TO_NM = 0.1  # Conversion factor from Angstroms to Nanometers
+
+        # Initialize the GRO file content
+        gro_file = 'Generated by VeloxChem\n'
+        gro_file += f'{len(self.coordinates):>5}\n'  # Number of atoms
+
+        # Format each atom line
+        for i, atom in enumerate(self.coordinates):
+            # Convert coordinates from Angstroms to Nanometers
+            x, y, z = [coord * ANGSTROM_TO_NM for coord in atom]
+
+            # Atom line format: (residue number, residue name, atom name, atom number, coordinates)
+            # Residue number is always 1
+            gro_file += f'{1:>5d}MOL  {atomtypes[i]:>4}{i+1:>5}  {x:8.3f}{y:8.3f}{z:8.3f}\n'
+
+        # Add box dimensions as 0 nm
+        gro_file += '   0.00000   0.00000   0.00000\n'
+
+        # Write the GRO file
+        with open('mol.gro', 'w') as file:
+            file.write(gro_file)
+
+        print("GRO file generated successfully.")
+
+
 
     @staticmethod
     def get_atom_number(atom_type_str):
