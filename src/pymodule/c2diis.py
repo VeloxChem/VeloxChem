@@ -25,6 +25,8 @@
 
 import numpy as np
 
+from .veloxchemlib import matmul_gpu
+
 
 class CTwoDiis:
     """
@@ -60,16 +62,19 @@ class CTwoDiis:
         """
 
         smat = overlap_matrix
-        tmat = oao_matrix.to_numpy()
+        tmat = oao_matrix
 
         self.error_vectors.clear()
 
         for fmat, dmat in zip(fock_matrices, density_matrices):
 
-            fds = np.matmul(fmat, np.matmul(dmat, smat))
+            fds = matmul_gpu(fmat, matmul_gpu(dmat, smat))
 
+            fds = fds - fds.T
+
+            # TODO: allow transpose in matmul_gpu
             self.error_vectors.append(
-                np.matmul(tmat.T, np.matmul(fds - fds.T, tmat)))
+                matmul_gpu(tmat.T.copy(), matmul_gpu(fds, tmat)))
 
     def compute_error_vectors_restricted_openshell(self, fock_matrices,
                                                    fock_matrices_beta,
@@ -95,7 +100,7 @@ class CTwoDiis:
         """
 
         smat = overlap_matrix
-        tmat = oao_matrix.to_numpy()
+        tmat = oao_matrix
 
         self.error_vectors.clear()
 
@@ -136,7 +141,7 @@ class CTwoDiis:
         """
 
         smat = overlap_matrix
-        tmat = oao_matrix.to_numpy()
+        tmat = oao_matrix
 
         self.error_vectors.clear()
 

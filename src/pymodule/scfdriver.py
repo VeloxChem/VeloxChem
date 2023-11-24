@@ -31,6 +31,7 @@ import numpy as np
 import time as tm
 import math
 import sys
+import os
 
 from .veloxchemlib import (OverlapDriver, KineticEnergyDriver,
                            NuclearPotentialDriver, DipoleDriver)
@@ -629,9 +630,15 @@ class ScfDriver:
                                                         val_basis,
                                                         self._molecular_orbitals)
                 den_mat_np = den_mat.alpha_to_numpy(0)
+                naos = den_mat_np.shape[0]
             else:
-                den_mat_np = None
-            den_mat_np = self.comm.bcast(den_mat_np, root=mpi_master())
+                naos = None
+            naos = self.comm.bcast(naos, root=mpi_master())
+
+            if self.rank != mpi_master():
+                den_mat_np = np.zeros((naos, naos))
+
+            self.comm.Bcast(den_mat_np, root=mpi_master())
             den_mat = AODensityMatrix([den_mat_np], denmat.rest)
 
             self._comp_diis(molecule, ao_basis, val_basis, den_mat, profiler)
@@ -942,20 +949,27 @@ class ScfDriver:
             t0 = tm.time()
 
             S = ovl_mat
+
+            # TODO: eigh on GPU
+            bak_omp_num = os.environ['OMP_NUM_THREADS']
+            os.environ['OMP_NUM_THREADS'] = '16'
             eigvals, eigvecs = np.linalg.eigh(S)
+            os.environ['OMP_NUM_THREADS'] = bak_omp_num
+            #eigvals, eigvecs = eigh_gpu(S)
+            #eigvecs = eigvecs.T.copy()
+
             num_eigs = sum(eigvals > self.ovl_thresh)
             if num_eigs < eigvals.size:
                 eigvals = eigvals[-num_eigs:]
                 eigvecs = eigvecs[:, -num_eigs:]
             oao_mat = eigvecs * (1.0 / np.sqrt(eigvals))
-            oao_mat = DenseMatrix(oao_mat)
 
             self.ostream.print_info('Orthogonalization matrix computed in' +
                                     ' {:.2f} sec.'.format(tm.time() - t0))
             self.ostream.print_blank()
 
-            nrow = oao_mat.number_of_rows()
-            ncol = oao_mat.number_of_columns()
+            nrow = oao_mat.shape[0]
+            ncol = oao_mat.shape[1]
             linear_dependency = (nrow != ncol)
 
             if linear_dependency:
@@ -1017,7 +1031,13 @@ class ScfDriver:
             e_el = self._comp_energy(fock_mat, vxc_mat, e_pe, kin_mat, npot_mat,
                                      den_mat)
 
+            self.ostream.print_info(f'Elec. energy: {e_el} a.u.')
+            self.ostream.flush()
+
             fock_mat = self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
+
+            self.ostream.print_info(f'Full Fock computed')
+            self.ostream.flush()
 
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
@@ -1047,9 +1067,15 @@ class ScfDriver:
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                    oao_mat)
 
+            self.ostream.print_info(f'e_grad computed')
+            self.ostream.flush()
+
             # compute density change and energy change
 
             diff_den = self._comp_density_change(den_mat, self.density)
+
+            self.ostream.print_info(f'diff_den computed')
+            self.ostream.flush()
 
             e_scf = (e_el + self._nuc_energy + self._d4_energy +
                      self._ef_nuc_energy)
@@ -1091,8 +1117,14 @@ class ScfDriver:
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
+            self.ostream.print_info(f'eff_fock computed')
+            self.ostream.flush()
+
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
+
+            self.ostream.print_info(f'new mol_orbs computed')
+            self.ostream.flush()
 
             if self._mom is not None:
                 self._apply_mom(molecule, ovl_mat)
@@ -1102,10 +1134,19 @@ class ScfDriver:
             if self.rank == mpi_master():
                 den_mat = self.molecular_orbitals.get_density(molecule)
                 den_mat_np = den_mat.alpha_to_numpy(0)
+                naos = den_mat_np.shape[0]
             else:
-                den_mat_np = None
-            den_mat_np = self.comm.bcast(den_mat_np, root=mpi_master())
+                naos = None
+            naos = self.comm.bcast(naos, root=mpi_master())
+
+            if self.rank != mpi_master():
+                den_mat_np = np.zeros((naos, naos))
+
+            self.comm.Bcast(den_mat_np, root=mpi_master())
             den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+
+            self.ostream.print_info(f'new density computed')
+            self.ostream.flush()
 
             # TODO: broadcast den_mat
             # den_mat.broadcast(self.rank, self.comm)
@@ -1267,9 +1308,19 @@ class ScfDriver:
 
         # TODO merge kin_mat and npot_mat
         ovl_mat, kin_mat, npot_mat = compute_one_electron_integrals_gpu(molecule, basis, screener)
-        ovl_mat = self.comm.reduce(ovl_mat.to_numpy(), root=mpi_master())
-        kin_mat = self.comm.reduce(kin_mat.to_numpy(), root=mpi_master())
-        npot_mat = self.comm.reduce(npot_mat.to_numpy(), root=mpi_master())
+
+        naos = ovl_mat.number_of_rows()
+        ovl_mat_np = np.zeros((naos, naos))
+        kin_mat_np = np.zeros((naos, naos))
+        npot_mat_np = np.zeros((naos, naos))
+
+        self.comm.Reduce(ovl_mat.to_numpy(), ovl_mat_np, op=MPI.SUM, root=mpi_master())
+        self.comm.Reduce(kin_mat.to_numpy(), kin_mat_np, op=MPI.SUM, root=mpi_master())
+        self.comm.Reduce(npot_mat.to_numpy(), npot_mat_np, op=MPI.SUM, root=mpi_master())
+
+        ovl_mat = ovl_mat_np
+        kin_mat = kin_mat_np
+        npot_mat = npot_mat_np
 
         t1 = tm.time()
 
@@ -1458,10 +1509,22 @@ class ScfDriver:
         else:
             thresh_int = int(-math.log10(self._get_dyn_threshold(e_grad)))
 
+        self.ostream.print_info(f'Fock build started...')
+        self.ostream.flush()
+
         eri_t0 = tm.time()
 
         fock_mat = compute_fock_gpu(molecule, basis, den_mat, screener)
-        fock_mat = self.comm.reduce(fock_mat.to_numpy(), op=MPI.SUM, root=mpi_master())
+
+        naos = fock_mat.number_of_rows()
+        fock_mat_np = np.zeros((naos, naos))
+
+        self.comm.Reduce(fock_mat.to_numpy(), fock_mat_np, op=MPI.SUM, root=mpi_master())
+
+        fock_mat = fock_mat_np
+
+        self.ostream.print_info(f'Fock build done in {tm.time()-eri_t0:.2f} sec')
+        self.ostream.flush()
 
         # TODO: add beta density
         # TODO: add other fock_t/fockmat

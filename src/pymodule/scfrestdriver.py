@@ -27,10 +27,12 @@ from mpi4py import MPI
 from copy import deepcopy
 import numpy as np
 import sys
+import os
 
 from .veloxchemlib import mpi_master
 from .veloxchemlib import fock_t as fockmat
 from .veloxchemlib import XCFunctional, MolecularGrid
+from .veloxchemlib import matmul_gpu
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -87,15 +89,21 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            smat = ovl_mat
-            tmat = oao_mat.to_numpy()
 
-            dmat = den_mat.alpha_to_numpy(0)
-            fmat = fock_mat
+            self.ostream.print_info(f'e_grad start...')
+            self.ostream.flush()
 
-            fds = np.matmul(fmat, np.matmul(dmat, smat))
+            m = matmul_gpu(den_mat.alpha_to_numpy(0), ovl_mat)
+            m = matmul_gpu(fock_mat, m)
 
-            e_mat = np.matmul(tmat.T, np.matmul(fds - fds.T, tmat))
+            m = m - m.T
+
+            m = matmul_gpu(m, oao_mat)
+            # TODO: allow transpose in matmul_gpu
+            m = matmul_gpu(oao_mat.T.copy(), m)
+
+            e_mat = m
+
             e_grad = 2.0 * np.linalg.norm(e_mat)
             max_grad = np.max(np.abs(e_mat))
         else:
@@ -189,7 +197,7 @@ class ScfRestrictedDriver(ScfDriver):
 
                 return self._get_scaled_fock(weights)
 
-            return fock_mat.alpha_to_numpy(0)
+            return fock_mat
 
         return None
 
@@ -230,11 +238,20 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-            tmat = oao_mat.to_numpy()
-            fmo = np.matmul(tmat.T, np.matmul(fock_mat, tmat))
+            tmat = oao_mat
+            #fmo = np.matmul(tmat.T, np.matmul(fock_mat, tmat))
+            fmo = matmul_gpu(tmat.T.copy(), matmul_gpu(fock_mat, tmat))
 
+            # TODO: eigh on GPU
+            bak_omp_num = os.environ['OMP_NUM_THREADS']
+            os.environ['OMP_NUM_THREADS'] = '16'
             eigs, evecs = np.linalg.eigh(fmo)
-            orb_coefs = np.matmul(tmat, evecs)
+            os.environ['OMP_NUM_THREADS'] = bak_omp_num
+            #eigs, evecs = eigh_gpu(fmo)
+            #evecs = evecs.T.copy()
+
+            #orb_coefs = np.matmul(tmat, evecs)
+            orb_coefs = matmul_gpu(tmat, evecs)
             orb_coefs, eigs = self._delete_mos(orb_coefs, eigs)
 
             occa = molecule.get_aufbau_alpha_occupation(eigs.size)

@@ -32,6 +32,7 @@ import sys
 from .veloxchemlib import to_angular_momentum
 from .veloxchemlib import denmat
 from .veloxchemlib import AODensityMatrix
+from .veloxchemlib import matmul_gpu
 from .outputstream import OutputStream
 from .errorhandler import assert_msg_critical
 
@@ -277,7 +278,8 @@ class MolecularOrbitals:
 
             occ_mo = occ * mo
 
-            dens = np.matmul(occ_mo, occ_mo.T)
+            # TODO: allow transpose in matmul_gpu
+            dens = matmul_gpu(occ_mo.copy(), occ_mo.T.copy())
 
             return AODensityMatrix([dens], denmat.rest)
 

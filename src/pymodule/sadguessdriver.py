@@ -26,6 +26,7 @@
 import numpy as np
 
 from .veloxchemlib import OverlapDriver
+from .veloxchemlib import matmul_gpu
 from .errorhandler import assert_msg_critical
 
 
@@ -925,7 +926,8 @@ class SadGuessDriver:
                         csad_b[aoinds_2[j], aoinds_1[i]] = c2_j_sqrt_b_occ[i]
 
         if density_type.lower() == 'restricted':
-            return np.matmul(csad, csad.T)
+            # TODO: allow transpose in matmul_gpu
+            return matmul_gpu(csad, csad.T.copy())
 
         elif density_type.lower() == 'unrestricted':
             return (
