@@ -25,6 +25,8 @@
 
 #include <hip/hip_runtime.h>
 
+//#include <rocsolver.h>
+
 #include <omp.h>
 
 #include <algorithm>
@@ -32,6 +34,7 @@
 #include <cstring>
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -114,16 +117,15 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     if (thread_id % num_threads_per_gpu == 0)
     {
-
     auto gpu_id = thread_id / num_threads_per_gpu;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
     std::stringstream ss;
 
-    ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << ",  nthreads_per_gpu " << num_threads_per_gpu;
+    ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
 
-    std::cout << ss.str() << std::endl;
+    std::cout << ss.str();
 
     if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
@@ -309,6 +311,9 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                                                      d_ss_second_inds_local,
                                                      static_cast<uint32_t>(ss_prim_pair_count_local));
 
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
         hipLaunchKernelGGL(computeNuclearPotentialSS, num_blocks, threads_per_block, 0, 0, d_mat_V,
                                                      d_s_prim_info,
                                                      static_cast<uint32_t>(s_prim_count),
@@ -320,8 +325,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, ss_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < ss_prim_pair_count_local; ij++)
@@ -364,6 +367,9 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                                                      d_sp_second_inds_local,
                                                      static_cast<uint32_t>(sp_prim_pair_count_local));
 
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
         hipLaunchKernelGGL(computeNuclearPotentialSP, num_blocks, threads_per_block, 0, 0, d_mat_V,
                                                      d_s_prim_info,
                                                      static_cast<uint32_t>(s_prim_count),
@@ -377,8 +383,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, sp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < sp_prim_pair_count_local; ij++)
@@ -418,6 +422,9 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                                                      d_pp_second_inds_local,
                                                      static_cast<uint32_t>(pp_prim_pair_count_local));
 
+        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
+
         hipLaunchKernelGGL(computeNuclearPotentialPP, num_blocks, threads_per_block, 0, 0, d_mat_V,
                                                      d_p_prim_info,
                                                      static_cast<uint32_t>(p_prim_count),
@@ -429,8 +436,6 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_S.data(), d_mat_S, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
-        hipSafe(hipMemcpy(mat_T.data(), d_mat_T, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
         hipSafe(hipMemcpy(mat_V.data(), d_mat_V, pp_prim_pair_count_local * sizeof(double), hipMemcpyDeviceToHost));
 
         for (int64_t ij = 0; ij < pp_prim_pair_count_local; ij++)
@@ -513,6 +518,10 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     auto gpu_rank = rank * num_gpus_per_node;
 
+    std::stringstream ss;
+    ss << "(Q_prime) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
+    std::cout << ss.str();
+
     if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
     if (gpu_rank % 8 == 2) hipSafe(hipSetDevice(2));
@@ -521,6 +530,10 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     if (gpu_rank % 8 == 5) hipSafe(hipSetDevice(7));
     if (gpu_rank % 8 == 6) hipSafe(hipSetDevice(0));
     if (gpu_rank % 8 == 7) hipSafe(hipSetDevice(1));
+
+    CMultiTimer timer;
+
+    timer.start("Prep. blocks");
 
     const auto gto_blocks = gtofunc::makeGtoBlocks(basis, molecule);
     const auto naos = gtofunc::getNumberOfAtomicOrbitals(gto_blocks);
@@ -549,11 +562,17 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
+    timer.stop("Prep. blocks");
+
+    timer.start("Prep. sortQD");
+
     auto dens_ptr = densityMatrix.alphaDensity(0);
 
     screening.sortQD(s_prim_count, p_prim_count, s_prim_aoinds, p_prim_aoinds, naos, dens_ptr);
 
-    // timer.start("PreLinK Q_prime");
+    timer.stop("Prep. sortQD");
+
+    timer.start("Prep. Q_prime");
 
     // preLinK
     // J. Chem. Phys. 138, 134114 (2013)
@@ -583,6 +602,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_C, d_matrix_A, d_matrix_B,
             static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
 
+    hipSafe(hipDeviceSynchronize());
+
     hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
             static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
 
@@ -592,13 +613,45 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     hipSafe(hipFree(d_matrix_B));
     hipSafe(hipFree(d_matrix_C));
 
-    auto& Q_prime = mat_full;
+    timer.stop("Prep. Q_prime");
 
-    // timer.stop("PreLinK Q_prime");
+    timer.start("Prep. preLinK");
 
+    // auto& Q_prime = mat_full;
     const double Q_prime_thresh = 1.0e-7;
 
-    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, Q_prime, Q_prime_thresh);
+    screening.form_pair_inds_for_K(s_prim_count, p_prim_count, mat_full, Q_prime_thresh);
+
+    timer.stop("Prep. preLinK");
+
+    /*
+    if (mpi::rank(MPI_COMM_WORLD) == mpi::master())
+    {
+        std::ofstream file_qprime("qprime.dat", std::ios::out | std::ios::binary);
+        if (file_qprime.is_open()) {
+            auto rows = static_cast<size_t>(Q_prime.getNumberOfRows());
+            file_qprime.write(reinterpret_cast<const char*>(&rows), sizeof(size_t));
+            file_qprime.write(reinterpret_cast<const char*>(Q_prime.values()), rows * rows * sizeof(double));
+            file_qprime.close();
+        }
+
+        std::ofstream file_qfull("qfull.dat", std::ios::out | std::ios::binary);
+        if (file_qfull.is_open()) {
+            auto rows = static_cast<size_t>(mat_Q_full.getNumberOfRows());
+            file_qfull.write(reinterpret_cast<const char*>(&rows), sizeof(size_t));
+            file_qfull.write(reinterpret_cast<const char*>(mat_Q_full.values()), rows * rows * sizeof(double));
+            file_qfull.close();
+        }
+
+        std::ofstream file_dabsfull("dabsfull.dat", std::ios::out | std::ios::binary);
+        if (file_dabsfull.is_open()) {
+            auto rows = static_cast<size_t>(mat_D_abs_full.getNumberOfRows());
+            file_dabsfull.write(reinterpret_cast<const char*>(&rows), sizeof(size_t));
+            file_dabsfull.write(reinterpret_cast<const char*>(mat_D_abs_full.values()), rows * rows * sizeof(double));
+            file_dabsfull.close();
+        }
+    }
+    */
 
     std::string errnaos("gpu::computeCoulombFock: Inconsistent number of AOs");
     errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
@@ -617,22 +670,23 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         mat_Fock_omp[gpu_id] = CDenseMatrix(naos, naos);
     }
 
+    std::cout << "\nTiming of prep. on rank " << rank << "\n";
+    std::cout << "-------------------------\n";
+    std::cout << timer.getSummary();
+
 #pragma omp parallel
     {
     auto thread_id = omp_get_thread_num();
 
     if (thread_id % num_threads_per_gpu == 0)
     {
-
     auto gpu_id = thread_id / num_threads_per_gpu;
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
     std::stringstream ss;
-
-    ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << ",  nthreads_per_gpu " << num_threads_per_gpu;
-
-    std::cout << ss.str() << std::endl;
+    ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
+    std::cout << ss.str();
 
     if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
@@ -878,7 +932,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (SS|SS)
     //     **
 
-    if (ss_prim_pair_count > 0)
+    if (ss_prim_pair_count_local > 0 && ss_prim_pair_count > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -924,7 +978,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (SS|SP)
     //     **
 
-    if (ss_prim_pair_count > 0 && sp_prim_pair_count > 0)
+    if (ss_prim_pair_count_local > 0 && sp_prim_pair_count > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -972,7 +1026,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (SS|PP)
     //     **
 
-    if (ss_prim_pair_count > 0 && pp_prim_pair_count > 0)
+    if (ss_prim_pair_count_local > 0 && pp_prim_pair_count > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1020,7 +1074,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (SP|SS)
     //     **
 
-    if (ss_prim_pair_count > 0 && sp_prim_pair_count > 0)
+    if (ss_prim_pair_count > 0 && sp_prim_pair_count_local > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1069,7 +1123,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (SP|SP)
     //     **
 
-    if (sp_prim_pair_count > 0)
+    if (sp_prim_pair_count_local > 0 && sp_prim_pair_count > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1118,7 +1172,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (SP|PP)
     //     **
 
-    if (sp_prim_pair_count > 0 && pp_prim_pair_count > 0)
+    if (sp_prim_pair_count_local > 0 && pp_prim_pair_count > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1167,7 +1221,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (PP|SS)
     //     **
 
-    if (ss_prim_pair_count > 0 && pp_prim_pair_count > 0)
+    if (ss_prim_pair_count > 0 && pp_prim_pair_count_local > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, ss_mat_D.data(), ss_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1216,7 +1270,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (PP|SP)
     //     **
 
-    if (sp_prim_pair_count > 0 && pp_prim_pair_count > 0)
+    if (sp_prim_pair_count > 0 && pp_prim_pair_count_local > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, sp_mat_D.data(), sp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1265,7 +1319,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // J: (PP|PP)
     //     **
 
-    if (pp_prim_pair_count > 0)
+    if (pp_prim_pair_count_local > 0 && pp_prim_pair_count > 0)
     {
         hipSafe(hipMemcpy(d_mat_D, pp_mat_D.data(), pp_prim_pair_count * sizeof(double), hipMemcpyHostToDevice));
 
@@ -1433,7 +1487,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (SS|SS)
     //     *  *
 
-    if (ss_prim_pair_count > 0)
+    if (pair_inds_count_for_K_ss > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1477,7 +1531,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (SS|SP)
     //     *  *
 
-    if ((ss_prim_pair_count > 0) && (sp_prim_pair_count > 0))
+    if (pair_inds_count_for_K_ss > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1526,7 +1580,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (SP|SS)
     //     *  *
 
-    if ((ss_prim_pair_count > 0) && (sp_prim_pair_count > 0))
+    if (pair_inds_count_for_K_ss > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1575,7 +1629,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (SP|SP)
     //     *  *
 
-    if (sp_prim_pair_count > 0)
+    if (pair_inds_count_for_K_ss > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1622,7 +1676,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (SS|PS)
     //     *  *
 
-    if ((ss_prim_pair_count > 0) && (sp_prim_pair_count > 0))
+    if (pair_inds_count_for_K_sp > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1672,7 +1726,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (SS|PP)
     //     *  *
 
-    if ((ss_prim_pair_count > 0) && (pp_prim_pair_count > 0))
+    if (pair_inds_count_for_K_sp > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1722,7 +1776,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (SP|PS)
     //     *  *
 
-    if (sp_prim_pair_count > 0)
+    if (pair_inds_count_for_K_sp > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1772,7 +1826,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (SP|PP)
     //     *  *
 
-    if ((sp_prim_pair_count > 0) && (pp_prim_pair_count > 0))
+    if (pair_inds_count_for_K_sp > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1822,7 +1876,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (PS|PS)
     //     *  *
 
-    if (sp_prim_pair_count > 0)
+    if (pair_inds_count_for_K_pp > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1870,7 +1924,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (PS|PP)
     //     *  *
 
-    if ((sp_prim_pair_count > 0) && (pp_prim_pair_count > 0))
+    if (pair_inds_count_for_K_pp > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1920,7 +1974,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (PP|PS)
     //     *  *
 
-    if ((sp_prim_pair_count > 0) && (pp_prim_pair_count > 0))
+    if (pair_inds_count_for_K_pp > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -1970,7 +2024,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     // K: (PP|PP)
     //     *  *
 
-    if (pp_prim_pair_count > 0)
+    if (pair_inds_count_for_K_pp > 0)
     {
         dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
@@ -2046,9 +2100,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.stop("Total timing");
 
-    // std::cout << "\nTiming of ERIs on GPU " << gpu_id << "\n";
-    // std::cout << "-----------------------\n";
-    // std::cout << timer.getSummary() << std::endl;
+    std::cout << "\nTiming of ERIs on GPU " << gpu_id << "\n";
+    std::cout << "-----------------------\n";
+    std::cout << timer.getSummary() << std::endl;
 
     }}
 
@@ -2096,5 +2150,53 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const i
     hipSafe(hipFree(d_B));
     hipSafe(hipFree(d_C));
 }
+
+/*
+auto
+diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
+{
+    hipSafe(hipSetDevice(4));
+
+    rocblas_status rstatus = rocblas_status_success;
+
+    rocblas_handle handle;
+    rstatus = rocblas_create_handle(&handle);
+    //CHECK_ROCBLAS_STATUS(rstatus);
+
+    int32_t info;
+
+    std::cout << "eigh_gpu size: " << nrows_A << std::endl;
+
+    double *d_A, *d_D, *d_E;
+    int32_t *d_info;
+
+    hipSafe(hipMalloc(&d_A, nrows_A * nrows_A * sizeof(double)));
+    hipSafe(hipMalloc(&d_D, nrows_A * sizeof(double)));
+    hipSafe(hipMalloc(&d_E, nrows_A * sizeof(double)));
+    hipSafe(hipMalloc(&d_info, sizeof(int32_t)));
+
+    std::cout << "eigh_gpu malloc!" << std::endl;
+
+    hipSafe(hipMemcpy(d_A, A, nrows_A * nrows_A * sizeof(double), hipMemcpyHostToDevice));
+
+    std::cout << "eigh_gpu memcpy!" << std::endl;
+
+    //rstatus = rocsolver_dsyevd(handle, rocblas_evect_original, rocblas_fill_upper, static_cast<int32_t>(nrows_A), d_A, static_cast<int32_t>(nrows_A), d_D, d_E, d_info);
+    rstatus = rocsolver_dsyev(handle, rocblas_evect_original, rocblas_fill_upper, static_cast<int32_t>(nrows_A), d_A, static_cast<int32_t>(nrows_A), d_D, d_E, d_info);
+
+    std::cout << "eigh_gpu dsyevd!" << std::endl;
+    std::cout << "eigh_gpu size: " << nrows_A << std::endl;
+
+    hipSafe(hipMemcpy(A, d_A, nrows_A * nrows_A * sizeof(double), hipMemcpyDeviceToHost));
+    std::cout << "eigh_gpu memcpy2!" << std::endl;
+    hipSafe(hipMemcpy(D, d_D, nrows_A * sizeof(double), hipMemcpyDeviceToHost));
+    std::cout << "eigh_gpu memcpy3!" << std::endl;
+
+    hipSafe(hipFree(d_A));
+    hipSafe(hipFree(d_D));
+    hipSafe(hipFree(d_E));
+    hipSafe(hipFree(d_info));
+}
+*/
 
 }  // namespace gpu

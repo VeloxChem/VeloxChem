@@ -105,6 +105,53 @@ export_gpu(py::module& m)
         },
         "Computes matrix multiplication using GPU.");
 
+    /*
+    m.def(
+        "eigh_gpu",
+        [](const py::array_t<double>& A) -> py::list {
+            // check dimension and shape
+
+            errors::assertMsgCritical(A.ndim() == 2, "eigh_gpu: Invalid shape of matrix A");
+
+            auto nrows_A = A.shape(0);
+            auto ncols_A = A.shape(1);
+
+            errors::assertMsgCritical(ncols_A == nrows_A, "eigh_gpu: Matrix A is not symmetric");
+
+            // check layout
+
+            auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
+
+            errors::assertMsgCritical(c_style_A, "eigh_gpu: Matrix A is not C-style contiguous");
+
+            // initialize eigenvalues and eigenvectors
+
+            auto dim = nrows_A;
+
+            py::array_t<double> eigenValues(dim);
+            py::array_t<double> eigenVectors({dim, dim});
+
+            auto evecs = eigenVectors.mutable_data();
+            auto evals = eigenValues.mutable_data();
+
+            std::memcpy(evecs, A.data(), A.size() * sizeof(double));
+
+            // diagonalize matrix
+
+            gpu::diagonalizeMatrix(evecs, evals, static_cast<int64_t>(nrows_A));
+
+            py::list result;
+
+            result.append(eigenValues);
+
+            result.append(eigenVectors);
+
+            return result;
+
+            },
+        "Diagonalizes matrix using GPU.");
+    */
+
     m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 
     m.def("compute_fock_gpu", &gpu::computeFockOnGPU, "Computes Fock matrix using GPU.");

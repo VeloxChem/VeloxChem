@@ -951,10 +951,10 @@ class ScfDriver:
             S = ovl_mat
 
             # TODO: eigh on GPU
-            bak_omp_num = os.environ['OMP_NUM_THREADS']
-            os.environ['OMP_NUM_THREADS'] = '16'
+            #bak_omp_num = os.environ['OMP_NUM_THREADS']
+            #os.environ['OMP_NUM_THREADS'] = '16'
             eigvals, eigvecs = np.linalg.eigh(S)
-            os.environ['OMP_NUM_THREADS'] = bak_omp_num
+            #os.environ['OMP_NUM_THREADS'] = bak_omp_num
             #eigvals, eigvecs = eigh_gpu(S)
             #eigvecs = eigvecs.T.copy()
 
@@ -1067,7 +1067,7 @@ class ScfDriver:
             e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
                                                    oao_mat)
 
-            self.ostream.print_info(f'e_grad computed')
+            self.ostream.print_info(f'e_grad computed: {e_grad}')
             self.ostream.flush()
 
             # compute density change and energy change
