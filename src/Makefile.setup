@@ -38,9 +38,9 @@ CXX := CC
 CXX_REL_FLG := -fopenmp=libomp -std=c++17
 CXX_DEB_FLG := -fopenmp=libomp -std=c++17
 
-MATH_INC := 
+MATH_INC := -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/openblas_llvm/include
 #MATH_LIB := -lomp -lpthread -lm -ldl
-MATH_LIB := 
+MATH_LIB := -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/openblas_llvm/lib -lopenblas
 
 XC_INC := -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/include
 XC_LIB := -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/lib
@@ -54,7 +54,7 @@ PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vl
 PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/pybind11/include
 
 NVCC := hipcc --offload-arch=gfx90a -fopenmp=libomp -std=c++17
-NVCC_REL_FLG := $(XC_INC) -fPIC 
+NVCC_REL_FLG := $(XC_INC) -fPIC
 NVCC_DEB_FLG := $(XC_INC) -fPIC
 CUDA_LIB := 
 
@@ -117,7 +117,8 @@ CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 #  LIB_LIST += $(CUDA_LIB)
 #endif
 
-#LIB_LIST += -lhipblas
+#LIB_LIST += -lhipblas -lhipsolver
+LIB_LIST += -lhipblas
 
 # XTB interface (optional)
 

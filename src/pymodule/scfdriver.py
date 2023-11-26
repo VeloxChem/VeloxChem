@@ -951,10 +951,7 @@ class ScfDriver:
             S = ovl_mat
 
             # TODO: eigh on GPU
-            #bak_omp_num = os.environ['OMP_NUM_THREADS']
-            #os.environ['OMP_NUM_THREADS'] = '16'
             eigvals, eigvecs = np.linalg.eigh(S)
-            #os.environ['OMP_NUM_THREADS'] = bak_omp_num
             #eigvals, eigvecs = eigh_gpu(S)
             #eigvecs = eigvecs.T.copy()
 

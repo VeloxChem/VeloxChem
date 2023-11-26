@@ -24,8 +24,8 @@
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 #include <hip/hip_runtime.h>
-
-//#include <rocsolver.h>
+#include <hipblas.h>
+//#include <hipsolver.h>
 
 #include <omp.h>
 
@@ -67,10 +67,32 @@
         hipError_t err = (e);                                                                                             \
         if (err != hipSuccess)                                                                                            \
         {                                                                                                                 \
-            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl;  \
+            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl;  \
             std::exit(EXIT_FAILURE);                                                                                      \
         }                                                                                                                 \
     }
+
+#define hipblasSafe(e)                                                                            \
+    {                                                                                             \
+        hipblasStatus_t err = (e);                                                                \
+        if (err != HIPBLAS_STATUS_SUCCESS)                                                        \
+        {                                                                                         \
+            std::cerr << "hipBLAS error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
+            std::exit(EXIT_FAILURE);                                                              \
+        }                                                                                         \
+    }
+
+/*
+#define hipsolverSafe(e)                                                                            \
+    {                                                                                               \
+        hipsolverStatus_t err = (e);                                                                \
+        if (err != HIPSOLVER_STATUS_SUCCESS)                                                        \
+        {                                                                                           \
+            std::cerr << "hipSolver error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
+            std::exit(EXIT_FAILURE);                                                                \
+        }                                                                                           \
+    }
+*/
 
 namespace gpu {  // gpu namespace
 
@@ -595,6 +617,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     const auto all_prim_count = s_prim_count + p_prim_count * 3;
 
+    // TODO double check the criteria
+    if (all_prim_count < 4096)
+    {
     dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
     dim3 num_blocks((all_prim_count + threads_per_block.x - 1) / threads_per_block.x, (all_prim_count + threads_per_block.y - 1) / threads_per_block.y);
@@ -606,6 +631,25 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
             static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
+    }
+    else
+    {
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto n = static_cast<int32_t>(all_prim_count);
+
+    // compute A^T * (B^T * A^T) since hipblas is column-major
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
+
+    hipblasSafe(hipblasDestroy(handle));
+    }
 
     hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
 
@@ -2151,51 +2195,79 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const i
     hipSafe(hipFree(d_C));
 }
 
+auto
+computeMatrixMultiplicationTranspose(double* C, const double* A, const double* B, const int64_t narow, const int64_t nacol, const int64_t nbcol) -> void
+{
+    const auto nbrow = nacol;
+
+    double *d_A, *d_B, *d_C;
+
+    hipSafe(hipMalloc(&d_A, narow * nacol * sizeof(double)));
+    hipSafe(hipMalloc(&d_B, nbrow * nbcol * sizeof(double)));
+    hipSafe(hipMalloc(&d_C, narow * nbcol * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_A, A, narow * nacol * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_B, B, nbrow * nbcol * sizeof(double), hipMemcpyHostToDevice));
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double alpha = 1.0, beta = 0.0;
+
+    auto m = narow, k = nacol, n = nbcol;
+
+    // compute C^T = B^T * A^T since hipblas is column-major
+    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k, &alpha, d_B, n, d_A, k, &beta, d_C, n));
+
+    hipblasDestroy(handle);
+
+    hipSafe(hipMemcpy(C, d_C, narow * nbcol * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_A));
+    hipSafe(hipFree(d_B));
+    hipSafe(hipFree(d_C));
+}
+
 /*
 auto
 diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
 {
     hipSafe(hipSetDevice(4));
 
-    rocblas_status rstatus = rocblas_status_success;
+    auto n = static_cast<int32_t>(nrows_A);
+    int32_t lwork;
 
-    rocblas_handle handle;
-    rstatus = rocblas_create_handle(&handle);
-    //CHECK_ROCBLAS_STATUS(rstatus);
-
-    int32_t info;
-
-    std::cout << "eigh_gpu size: " << nrows_A << std::endl;
-
-    double *d_A, *d_D, *d_E;
+    double *d_A, *d_D, *d_work;
     int32_t *d_info;
 
-    hipSafe(hipMalloc(&d_A, nrows_A * nrows_A * sizeof(double)));
-    hipSafe(hipMalloc(&d_D, nrows_A * sizeof(double)));
-    hipSafe(hipMalloc(&d_E, nrows_A * sizeof(double)));
+    hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
+    hipSafe(hipMalloc(&d_D, n * sizeof(double)));
     hipSafe(hipMalloc(&d_info, sizeof(int32_t)));
 
-    std::cout << "eigh_gpu malloc!" << std::endl;
+    hipSafe(hipMemcpy(d_A, A, n * n * sizeof(double), hipMemcpyHostToDevice));
 
-    hipSafe(hipMemcpy(d_A, A, nrows_A * nrows_A * sizeof(double), hipMemcpyHostToDevice));
+    hipsolverHandle_t handle;
+    hipsolverSafe(hipsolverCreate(&handle));
 
-    std::cout << "eigh_gpu memcpy!" << std::endl;
+    hipsolverSafe(hipsolverDsyevd_bufferSize(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, &lwork));
 
-    //rstatus = rocsolver_dsyevd(handle, rocblas_evect_original, rocblas_fill_upper, static_cast<int32_t>(nrows_A), d_A, static_cast<int32_t>(nrows_A), d_D, d_E, d_info);
-    rstatus = rocsolver_dsyev(handle, rocblas_evect_original, rocblas_fill_upper, static_cast<int32_t>(nrows_A), d_A, static_cast<int32_t>(nrows_A), d_D, d_E, d_info);
+    hipSafe(hipMalloc(&d_work, lwork));
 
-    std::cout << "eigh_gpu dsyevd!" << std::endl;
-    std::cout << "eigh_gpu size: " << nrows_A << std::endl;
+    hipsolverSafe(hipsolverDsyevd(handle, HIPSOLVER_EIG_MODE_VECTOR, HIPSOLVER_FILL_MODE_UPPER, n, d_A, n, d_D, d_work, lwork, d_info));
 
-    hipSafe(hipMemcpy(A, d_A, nrows_A * nrows_A * sizeof(double), hipMemcpyDeviceToHost));
-    std::cout << "eigh_gpu memcpy2!" << std::endl;
-    hipSafe(hipMemcpy(D, d_D, nrows_A * sizeof(double), hipMemcpyDeviceToHost));
-    std::cout << "eigh_gpu memcpy3!" << std::endl;
+    hipsolverSafe(hipsolverDestroy(handle));
+
+    // TODO check h_info
+    int32_t h_info;
+
+    hipSafe(hipMemcpy(&h_info, d_info, sizeof(int32_t), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
+    hipSafe(hipMemcpy(D, d_D, n * sizeof(double), hipMemcpyDeviceToHost));
 
     hipSafe(hipFree(d_A));
     hipSafe(hipFree(d_D));
-    hipSafe(hipFree(d_E));
     hipSafe(hipFree(d_info));
+    hipSafe(hipFree(d_work));
 }
 */
 

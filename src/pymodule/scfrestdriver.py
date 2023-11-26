@@ -240,10 +240,7 @@ class ScfRestrictedDriver(ScfDriver):
             fmo = matmul_gpu(tmat.T.copy(), matmul_gpu(fock_mat, tmat))
 
             # TODO: eigh on GPU
-            #bak_omp_num = os.environ['OMP_NUM_THREADS']
-            #os.environ['OMP_NUM_THREADS'] = '16'
             eigs, evecs = np.linalg.eigh(fmo)
-            #os.environ['OMP_NUM_THREADS'] = bak_omp_num
             #eigs, evecs = eigh_gpu(fmo)
             #evecs = evecs.T.copy()
 
