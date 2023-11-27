@@ -89,14 +89,14 @@ class CScreeningData
     std::vector<uint32_t> _density_inds_for_K_ps;
     std::vector<uint32_t> _density_inds_for_K_pp;
 
-    std::vector<uint32_t> _pair_inds_i_for_K_ss;
-    std::vector<uint32_t> _pair_inds_k_for_K_ss;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_ss;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_ss;
 
-    std::vector<uint32_t> _pair_inds_i_for_K_sp;
-    std::vector<uint32_t> _pair_inds_k_for_K_sp;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_sp;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_sp;
 
-    std::vector<uint32_t> _pair_inds_i_for_K_pp;
-    std::vector<uint32_t> _pair_inds_k_for_K_pp;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_i_for_K_pp;
+    std::vector<std::vector<uint32_t>> _local_pair_inds_k_for_K_pp;
 
     auto _computeQMatrices(const CMolecule& molecule, const CMolecularBasis& basis) -> void;
 
@@ -155,14 +155,14 @@ class CScreeningData
     auto get_density_inds_for_K_ps() const -> const std::vector<uint32_t>&;
     auto get_density_inds_for_K_pp() const -> const std::vector<uint32_t>&;
 
-    auto get_local_pair_inds_i_for_K_ss(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>;
-    auto get_local_pair_inds_k_for_K_ss(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>;
+    auto get_local_pair_inds_i_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_k_for_K_ss(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
 
-    auto get_local_pair_inds_i_for_K_sp(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>;
-    auto get_local_pair_inds_k_for_K_sp(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>;
+    auto get_local_pair_inds_i_for_K_sp(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_k_for_K_sp(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
 
-    auto get_local_pair_inds_i_for_K_pp(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>;
-    auto get_local_pair_inds_k_for_K_pp(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>;
+    auto get_local_pair_inds_i_for_K_pp(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
+    auto get_local_pair_inds_k_for_K_pp(const int64_t gpu_id) const -> const std::vector<uint32_t>&;
 
     auto get_mat_Q_full(const int64_t s_prim_count, const int64_t p_prim_count) const -> CDenseMatrix;
     auto get_mat_D_abs_full(const int64_t s_prim_count, const int64_t p_prim_count, const std::vector<uint32_t>& s_prim_aoinds, const std::vector<uint32_t>& p_prim_aoinds, const int64_t naos, const double* dens_ptr) const -> CDenseMatrix;

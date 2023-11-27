@@ -1446,18 +1446,14 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto& density_inds_for_K_ps = screening.get_density_inds_for_K_ps();
     const auto& density_inds_for_K_pp = screening.get_density_inds_for_K_pp();
 
-    // TODO sort by Q_prime bound
+    const auto& pair_inds_i_for_K_ss = screening.get_local_pair_inds_i_for_K_ss(gpu_id);
+    const auto& pair_inds_k_for_K_ss = screening.get_local_pair_inds_k_for_K_ss(gpu_id);
 
-    // screening.form_pair_inds_for_K(s_prim_count, p_prim_count, Q_prime, Q_prime_thresh);
+    const auto& pair_inds_i_for_K_sp = screening.get_local_pair_inds_i_for_K_sp(gpu_id);
+    const auto& pair_inds_k_for_K_sp = screening.get_local_pair_inds_k_for_K_sp(gpu_id);
 
-    const auto pair_inds_i_for_K_ss = screening.get_local_pair_inds_i_for_K_ss(gpu_rank, gpu_count);
-    const auto pair_inds_k_for_K_ss = screening.get_local_pair_inds_k_for_K_ss(gpu_rank, gpu_count);
-
-    const auto pair_inds_i_for_K_sp = screening.get_local_pair_inds_i_for_K_sp(gpu_rank, gpu_count);
-    const auto pair_inds_k_for_K_sp = screening.get_local_pair_inds_k_for_K_sp(gpu_rank, gpu_count);
-
-    const auto pair_inds_i_for_K_pp = screening.get_local_pair_inds_i_for_K_pp(gpu_rank, gpu_count);
-    const auto pair_inds_k_for_K_pp = screening.get_local_pair_inds_k_for_K_pp(gpu_rank, gpu_count);
+    const auto& pair_inds_i_for_K_pp = screening.get_local_pair_inds_i_for_K_pp(gpu_id);
+    const auto& pair_inds_k_for_K_pp = screening.get_local_pair_inds_k_for_K_pp(gpu_id);
 
     auto pair_inds_count_for_K_ss = static_cast<uint32_t>(pair_inds_i_for_K_ss.size());
     auto pair_inds_count_for_K_sp = static_cast<uint32_t>(pair_inds_i_for_K_sp.size());
