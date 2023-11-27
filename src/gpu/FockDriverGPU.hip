@@ -240,19 +240,15 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
     const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
 
-    const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
-    const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
-    const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
-
-    const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, pp_prim_pair_count});
-
-    std::vector<double> mat_S(max_prim_pair_count);
-    std::vector<double> mat_T(max_prim_pair_count);
-    std::vector<double> mat_V(max_prim_pair_count);
-
     const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
     const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
     const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, pp_prim_pair_count_local});
+
+    std::vector<double> mat_S(max_prim_pair_count_local);
+    std::vector<double> mat_T(max_prim_pair_count_local);
+    std::vector<double> mat_V(max_prim_pair_count_local);
 
     // S on device
 
@@ -262,9 +258,9 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     uint32_t *d_sp_first_inds_local, *d_sp_second_inds_local;
     uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
 
-    hipSafe(hipMalloc(&d_mat_S, max_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_T, max_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_V, max_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_S, max_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_T, max_prim_pair_count_local * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_V, max_prim_pair_count_local * sizeof(double)));
 
     hipSafe(hipMalloc(&d_ss_first_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
     hipSafe(hipMalloc(&d_ss_second_inds_local, ss_prim_pair_count_local * sizeof(uint32_t)));
@@ -319,7 +315,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     // S: SS
 
-    if (ss_prim_pair_count > 0)
+    if (ss_prim_pair_count_local > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
@@ -373,7 +369,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     // S: SP
 
-    if (sp_prim_pair_count > 0)
+    if (sp_prim_pair_count_local > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
@@ -430,7 +426,7 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     // S: PP
 
-    if (pp_prim_pair_count > 0)
+    if (pp_prim_pair_count_local > 0)
     {
         dim3 threads_per_block(TILE_DIM);
 
@@ -541,7 +537,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     auto gpu_rank = rank * num_gpus_per_node;
 
     std::stringstream ss;
-    ss << "(Q_prime) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
+    ss << "\n(Prep.) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
     std::cout << ss.str();
 
     if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
@@ -879,17 +875,19 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto sp_max_D = screening.get_sp_max_D(); 
     const auto pp_max_D = screening.get_pp_max_D(); 
 
-    const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
-    const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
-    const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
+    const auto ss_prim_pair_count = static_cast<int64_t>(ss_first_inds.size());
+    const auto sp_prim_pair_count = static_cast<int64_t>(sp_first_inds.size());
+    const auto pp_prim_pair_count = static_cast<int64_t>(pp_first_inds.size());
 
     const auto max_prim_pair_count = std::max({ss_prim_pair_count, sp_prim_pair_count, pp_prim_pair_count});
-
-    std::vector<double> mat_J(max_prim_pair_count);
 
     const auto ss_prim_pair_count_local = static_cast<int64_t>(ss_first_inds_local.size());
     const auto sp_prim_pair_count_local = static_cast<int64_t>(sp_first_inds_local.size());
     const auto pp_prim_pair_count_local = static_cast<int64_t>(pp_first_inds_local.size());
+
+    const auto max_prim_pair_count_local = std::max({ss_prim_pair_count_local, sp_prim_pair_count_local, pp_prim_pair_count_local});
+
+    std::vector<double> mat_J(max_prim_pair_count_local);
 
     // sorted Q, D, and indices on device
 
@@ -906,7 +904,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     uint32_t *d_pp_first_inds_local, *d_pp_second_inds_local;
 
     hipSafe(hipMalloc(&d_mat_D, max_prim_pair_count * sizeof(double)));
-    hipSafe(hipMalloc(&d_mat_J, max_prim_pair_count * sizeof(double)));
+    hipSafe(hipMalloc(&d_mat_J, max_prim_pair_count_local * sizeof(double)));
 
     hipSafe(hipMalloc(&d_ss_mat_Q, ss_prim_pair_count * sizeof(double)));
     hipSafe(hipMalloc(&d_sp_mat_Q, sp_prim_pair_count * sizeof(double)));

@@ -369,10 +369,6 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -
     const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
     const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
 
-    _ss_prim_pair_count = ss_prim_pair_count;
-    _sp_prim_pair_count = sp_prim_pair_count;
-    _pp_prim_pair_count = pp_prim_pair_count;
-
     // form local vectors
 
     _ss_first_inds_local  = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
@@ -480,14 +476,10 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
     auto max_Q_ss_ptr = std::max_element(_Q_matrix_ss.values(), _Q_matrix_ss.values() + _Q_matrix_ss.getNumberOfElements());
     auto max_Q_sp_ptr = std::max_element(_Q_matrix_sp.values(), _Q_matrix_sp.values() + _Q_matrix_sp.getNumberOfElements());
     auto max_Q_pp_ptr = std::max_element(_Q_matrix_pp.values(), _Q_matrix_pp.values() + _Q_matrix_pp.getNumberOfElements());
-    double max_Q = std::max({*max_Q_ss_ptr, *max_Q_sp_ptr, *max_Q_pp_ptr});
-    std::cout << "max_Q: " << max_Q << "\n";
+    const double max_Q = std::max({*max_Q_ss_ptr, *max_Q_sp_ptr, *max_Q_pp_ptr});
 
-    double thresh_QD = 1.0e-13 / max_Q;
-    std::cout << "thresh_QD: " << thresh_QD << "\n";
-
-    int64_t count_QD = 0;
-    double max_QD = 0.0;
+    // TODO use J threshold from arguments
+    const double thresh_QD = 1.0e-13 / max_Q;
 
     // S-S gto block pair and S-P gto block pair
 
@@ -502,13 +494,10 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
             const auto j_cgto = s_prim_aoinds[j];
 
             const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
-
             const auto Q_ij = _Q_matrix_ss.row(i)[j];
+            const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-            sorted_ss_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i, j, Q_ij, D_ij));
-
-            if (std::fabs(Q_ij * D_ij) > thresh_QD) count_QD++;
-            if (std::fabs(Q_ij * D_ij) > max_QD) max_QD = std::fabs(Q_ij * D_ij);
+            if (QD_abs_ij > thresh_QD) sorted_ss_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j, Q_ij, D_ij));
         }
 
         // S-P gto block pair
@@ -520,14 +509,10 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
                 const auto j_cgto = p_prim_aoinds[j + p_prim_count * s];
 
                 const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
-
                 const auto Q_ij = _Q_matrix_sp.row(i)[j * 3 + s];
+                const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-                sorted_sp_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i, j * 3 + s, Q_ij, D_ij));
-
-                if (std::fabs(Q_ij * D_ij) > thresh_QD) count_QD++;
-
-                if (std::fabs(Q_ij * D_ij) > max_QD) max_QD = std::fabs(Q_ij * D_ij);
+                if (QD_abs_ij > thresh_QD) sorted_sp_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i, j * 3 + s, Q_ij, D_ij));
             }
         }
     }
@@ -549,14 +534,10 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
                     const auto j_cgto = p_prim_aoinds[j + p_prim_count * j_cart];
 
                     const auto D_ij = dens_ptr[i_cgto * naos + j_cgto];
-
                     const auto Q_ij = _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart];
+                    const auto QD_abs_ij = Q_ij * std::fabs(D_ij);
 
-                    sorted_pp_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij));
-
-                    if (std::fabs(Q_ij * D_ij) > thresh_QD) count_QD++;
-
-                    if (std::fabs(Q_ij * D_ij) > max_QD) max_QD = std::fabs(Q_ij * D_ij);
+                    if (QD_abs_ij > thresh_QD) sorted_pp_mat_Q_D.push_back(std::make_tuple(QD_abs_ij, i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij));
                 }
             }
         }
@@ -566,15 +547,20 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
     std::sort(sorted_sp_mat_Q_D.begin(), sorted_sp_mat_Q_D.end());
     std::sort(sorted_pp_mat_Q_D.begin(), sorted_pp_mat_Q_D.end());
 
-    const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
-    const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
-    const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
+    const auto ss_prim_pair_count = static_cast<int64_t>(sorted_ss_mat_Q_D.size());
+    const auto sp_prim_pair_count = static_cast<int64_t>(sorted_sp_mat_Q_D.size());
+    const auto pp_prim_pair_count = static_cast<int64_t>(sorted_pp_mat_Q_D.size());
 
-    std::cout << "QD valid count: " << count_QD << "\n";
-    std::cout << "QD total count: " << sorted_ss_mat_Q_D.size() + sorted_sp_mat_Q_D.size() + sorted_pp_mat_Q_D.size() << "\n";
-    std::cout << "QD total ref:   " << ss_prim_pair_count + sp_prim_pair_count + pp_prim_pair_count << "\n";
-    std::cout << "QD screening ratio: " << 1.0 - static_cast<double>(count_QD) / (sorted_ss_mat_Q_D.size() + sorted_sp_mat_Q_D.size() + sorted_pp_mat_Q_D.size()) << "\n";
-    std::cout << "max QD: " << max_QD << "\n";
+    const auto ss_prim_pair_total = s_prim_count * (s_prim_count + 1) / 2;
+    const auto sp_prim_pair_total = s_prim_count * p_prim_count * 3;
+    const auto pp_prim_pair_total = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
+
+    const auto prim_pair_count = ss_prim_pair_count + sp_prim_pair_count + pp_prim_pair_count;
+    const auto prim_pair_total = ss_prim_pair_total + sp_prim_pair_total + pp_prim_pair_total;
+
+    std::cout << "\nJ screening total ket prim. pairs: " << prim_pair_count << "\n";
+    std::cout << "J screening valid ket prim. pairs: " << prim_pair_total << "\n";
+    std::cout << "J screening ratio on the ket side: " << 1.0 - static_cast<double>(prim_pair_count) / prim_pair_total << "\n";
 
     _ss_max_D = 0.0;
     _sp_max_D = 0.0;

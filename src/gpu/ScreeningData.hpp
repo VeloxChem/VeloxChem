@@ -47,10 +47,6 @@ class CScreeningData
     CDenseMatrix _Q_matrix_sp;
     CDenseMatrix _Q_matrix_pp;
 
-    int64_t _ss_prim_pair_count;
-    int64_t _sp_prim_pair_count;
-    int64_t _pp_prim_pair_count;
-
     std::vector<std::vector<uint32_t>> _ss_first_inds_local;
     std::vector<std::vector<uint32_t>> _sp_first_inds_local;
     std::vector<std::vector<uint32_t>> _pp_first_inds_local;
