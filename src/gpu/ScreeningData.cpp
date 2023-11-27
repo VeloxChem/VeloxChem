@@ -29,11 +29,13 @@
 
 #include <cmath>
 #include <string>
+#include <iostream>
 
 #include "BoysFuncTable.hpp"
 #include "ErrorHandler.hpp"
 #include "GtoFunc.hpp"
 #include "GtoInfo.hpp"
+#include "MathFunc.hpp"
 #include "MpiFunc.hpp"
 #include "StringFormat.hpp"
 
@@ -371,55 +373,100 @@ CScreeningData::_sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -
     _sp_prim_pair_count = sp_prim_pair_count;
     _pp_prim_pair_count = pp_prim_pair_count;
 
-    _ss_first_inds_bra  = std::vector<uint32_t>(ss_prim_pair_count);
-    _ss_second_inds_bra = std::vector<uint32_t>(ss_prim_pair_count);
-    _ss_mat_Q_bra       = std::vector<double>(ss_prim_pair_count);
+    // form local vectors
 
-    for (int64_t ij = 0; ij < ss_prim_pair_count; ij++)
+    _ss_first_inds_local  = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
+    _ss_second_inds_local = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
+    _ss_mat_Q_local       = std::vector<std::vector<double>>(_num_gpus_per_node);
+
+    _sp_first_inds_local  = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
+    _sp_second_inds_local = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
+    _sp_mat_Q_local       = std::vector<std::vector<double>>(_num_gpus_per_node);
+
+    _pp_first_inds_local  = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
+    _pp_second_inds_local = std::vector<std::vector<uint32_t>>(_num_gpus_per_node);
+    _pp_mat_Q_local       = std::vector<std::vector<double>>(_num_gpus_per_node);
+
+    // TODO use communicator from arguments
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+    auto nnodes = mpi::nodes(MPI_COMM_WORLD);
+
+    for (int64_t gpu_id = 0; gpu_id < _num_gpus_per_node; gpu_id++)
     {
-        const auto& vals = sorted_ss_mat_Q[ss_prim_pair_count - 1 - ij];
+        auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
+        auto gpu_count = nnodes * _num_gpus_per_node;
 
-        auto Q_ij = std::get<0>(vals);
-        auto i    = std::get<1>(vals);
-        auto j    = std::get<2>(vals);
+        auto ss_batch_size = mathfunc::batch_size(ss_prim_pair_count, gpu_rank, gpu_count);
 
-        _ss_first_inds_bra[ij] = static_cast<uint32_t>(i);
-        _ss_second_inds_bra[ij] = static_cast<uint32_t>(j);
-        _ss_mat_Q_bra[ij] = Q_ij;
+        _ss_first_inds_local[gpu_id]  = std::vector<uint32_t>(ss_batch_size);
+        _ss_second_inds_local[gpu_id] = std::vector<uint32_t>(ss_batch_size);
+        _ss_mat_Q_local[gpu_id]       = std::vector<double>(ss_batch_size);
+
+        auto sp_batch_size = mathfunc::batch_size(sp_prim_pair_count, gpu_rank, gpu_count);
+
+        _sp_first_inds_local[gpu_id]  = std::vector<uint32_t>(sp_batch_size);
+        _sp_second_inds_local[gpu_id] = std::vector<uint32_t>(sp_batch_size);
+        _sp_mat_Q_local[gpu_id]       = std::vector<double>(sp_batch_size);
+
+        auto pp_batch_size = mathfunc::batch_size(pp_prim_pair_count, gpu_rank, gpu_count);
+
+        _pp_first_inds_local[gpu_id]  = std::vector<uint32_t>(pp_batch_size);
+        _pp_second_inds_local[gpu_id] = std::vector<uint32_t>(pp_batch_size);
+        _pp_mat_Q_local[gpu_id]       = std::vector<double>(pp_batch_size);
     }
 
-    _sp_first_inds_bra  = std::vector<uint32_t>(sp_prim_pair_count);
-    _sp_second_inds_bra = std::vector<uint32_t>(sp_prim_pair_count);
-    _sp_mat_Q_bra       = std::vector<double>(sp_prim_pair_count);
+    auto nthreads = omp_get_max_threads();
+    auto num_threads_per_gpu = nthreads / _num_gpus_per_node;
 
-    for (int64_t ij = 0; ij < sp_prim_pair_count; ij++)
+    #pragma omp parallel
     {
-        const auto& vals = sorted_sp_mat_Q[sp_prim_pair_count - 1 - ij];
+        auto thread_id = omp_get_thread_num();
 
-        auto Q_ij = std::get<0>(vals);
-        auto i    = std::get<1>(vals);
-        auto j    = std::get<2>(vals);
+        if (thread_id % num_threads_per_gpu == 0)
+        {
+            auto gpu_id = thread_id / num_threads_per_gpu;
+            auto gpu_rank = gpu_id + rank * _num_gpus_per_node;
+            auto gpu_count = nnodes * _num_gpus_per_node;
 
-        _sp_first_inds_bra[ij] = static_cast<uint32_t>(i);
-        _sp_second_inds_bra[ij] = static_cast<uint32_t>(j);
-        _sp_mat_Q_bra[ij] = Q_ij;
-    }
+            for (int64_t ij = gpu_rank, idx = 0; ij < ss_prim_pair_count; ij+=gpu_count, idx++)
+            {
+                const auto& vals = sorted_ss_mat_Q[ss_prim_pair_count - 1 - ij];
 
-    _pp_first_inds_bra  = std::vector<uint32_t>(pp_prim_pair_count);
-    _pp_second_inds_bra = std::vector<uint32_t>(pp_prim_pair_count);
-    _pp_mat_Q_bra       = std::vector<double>(pp_prim_pair_count);
+                auto Q_ij = std::get<0>(vals);
+                auto i    = std::get<1>(vals);
+                auto j    = std::get<2>(vals);
 
-    for (int64_t ij = 0; ij < pp_prim_pair_count; ij++)
-    {
-        const auto& vals = sorted_pp_mat_Q[pp_prim_pair_count - 1 - ij];
+                _ss_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                _ss_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                _ss_mat_Q_local[gpu_id][idx]       = Q_ij;
+            }
 
-        auto Q_ij = std::get<0>(vals);
-        auto i    = std::get<1>(vals);
-        auto j    = std::get<2>(vals);
+            for (int64_t ij = gpu_rank, idx = 0; ij < sp_prim_pair_count; ij+=gpu_count, idx++)
+            {
+                const auto& vals = sorted_sp_mat_Q[sp_prim_pair_count - 1 - ij];
 
-        _pp_first_inds_bra[ij] = static_cast<uint32_t>(i);
-        _pp_second_inds_bra[ij] = static_cast<uint32_t>(j);
-        _pp_mat_Q_bra[ij] = Q_ij;
+                auto Q_ij = std::get<0>(vals);
+                auto i    = std::get<1>(vals);
+                auto j    = std::get<2>(vals);
+
+                _sp_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                _sp_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                _sp_mat_Q_local[gpu_id][idx]       = Q_ij;
+            }
+
+            for (int64_t ij = gpu_rank, idx = 0; ij < pp_prim_pair_count; ij+=gpu_count, idx++)
+            {
+                const auto& vals = sorted_pp_mat_Q[pp_prim_pair_count - 1 - ij];
+
+                auto Q_ij = std::get<0>(vals);
+                auto i    = std::get<1>(vals);
+                auto j    = std::get<2>(vals);
+
+                _pp_first_inds_local[gpu_id][idx]  = static_cast<uint32_t>(i);
+                _pp_second_inds_local[gpu_id][idx] = static_cast<uint32_t>(j);
+                _pp_mat_Q_local[gpu_id][idx]       = Q_ij;
+            }
+        }
     }
 }
 
@@ -429,6 +476,18 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
     std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_ss_mat_Q_D;
     std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_sp_mat_Q_D;
     std::vector<std::tuple<double, int64_t, int64_t, double, double>> sorted_pp_mat_Q_D;
+
+    auto max_Q_ss_ptr = std::max_element(_Q_matrix_ss.values(), _Q_matrix_ss.values() + _Q_matrix_ss.getNumberOfElements());
+    auto max_Q_sp_ptr = std::max_element(_Q_matrix_sp.values(), _Q_matrix_sp.values() + _Q_matrix_sp.getNumberOfElements());
+    auto max_Q_pp_ptr = std::max_element(_Q_matrix_pp.values(), _Q_matrix_pp.values() + _Q_matrix_pp.getNumberOfElements());
+    double max_Q = std::max({*max_Q_ss_ptr, *max_Q_sp_ptr, *max_Q_pp_ptr});
+    std::cout << "max_Q: " << max_Q << "\n";
+
+    double thresh_QD = 1.0e-13 / max_Q;
+    std::cout << "thresh_QD: " << thresh_QD << "\n";
+
+    int64_t count_QD = 0;
+    double max_QD = 0.0;
 
     // S-S gto block pair and S-P gto block pair
 
@@ -447,6 +506,9 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
             const auto Q_ij = _Q_matrix_ss.row(i)[j];
 
             sorted_ss_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i, j, Q_ij, D_ij));
+
+            if (std::fabs(Q_ij * D_ij) > thresh_QD) count_QD++;
+            if (std::fabs(Q_ij * D_ij) > max_QD) max_QD = std::fabs(Q_ij * D_ij);
         }
 
         // S-P gto block pair
@@ -462,6 +524,10 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
                 const auto Q_ij = _Q_matrix_sp.row(i)[j * 3 + s];
 
                 sorted_sp_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i, j * 3 + s, Q_ij, D_ij));
+
+                if (std::fabs(Q_ij * D_ij) > thresh_QD) count_QD++;
+
+                if (std::fabs(Q_ij * D_ij) > max_QD) max_QD = std::fabs(Q_ij * D_ij);
             }
         }
     }
@@ -487,6 +553,10 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
                     const auto Q_ij = _Q_matrix_pp.row(i * 3 + i_cart)[j * 3 + j_cart];
 
                     sorted_pp_mat_Q_D.push_back(std::make_tuple(Q_ij * std::fabs(D_ij), i * 3 + i_cart, j * 3 + j_cart, Q_ij, D_ij));
+
+                    if (std::fabs(Q_ij * D_ij) > thresh_QD) count_QD++;
+
+                    if (std::fabs(Q_ij * D_ij) > max_QD) max_QD = std::fabs(Q_ij * D_ij);
                 }
             }
         }
@@ -499,6 +569,12 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
     const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
     const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
     const auto pp_prim_pair_count = p_prim_count * 3 * (p_prim_count * 3 + 1) / 2;
+
+    std::cout << "QD valid count: " << count_QD << "\n";
+    std::cout << "QD total count: " << sorted_ss_mat_Q_D.size() + sorted_sp_mat_Q_D.size() + sorted_pp_mat_Q_D.size() << "\n";
+    std::cout << "QD total ref:   " << ss_prim_pair_count + sp_prim_pair_count + pp_prim_pair_count << "\n";
+    std::cout << "QD screening ratio: " << 1.0 - static_cast<double>(count_QD) / (sorted_ss_mat_Q_D.size() + sorted_sp_mat_Q_D.size() + sorted_pp_mat_Q_D.size()) << "\n";
+    std::cout << "max QD: " << max_QD << "\n";
 
     _ss_max_D = 0.0;
     _sp_max_D = 0.0;
@@ -574,113 +650,17 @@ CScreeningData::sortQD(const int64_t s_prim_count, const int64_t p_prim_count, c
     }
 }
 
-auto CScreeningData::get_ss_first_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
-{
-    std::vector<uint32_t> ss_first_inds_local;
+auto CScreeningData::get_ss_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _ss_first_inds_local[gpu_id]; }
+auto CScreeningData::get_sp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _sp_first_inds_local[gpu_id]; }
+auto CScreeningData::get_pp_first_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _pp_first_inds_local[gpu_id]; }
 
-    for (int64_t ij = gpu_rank; ij < _ss_prim_pair_count; ij+=gpu_count)
-    {
-        ss_first_inds_local.push_back(_ss_first_inds_bra[ij]);
-    }
+auto CScreeningData::get_ss_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _ss_second_inds_local[gpu_id]; }
+auto CScreeningData::get_sp_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _sp_second_inds_local[gpu_id]; }
+auto CScreeningData::get_pp_second_inds_local(const int64_t gpu_id) const -> const std::vector<uint32_t>& { return _pp_second_inds_local[gpu_id]; }
 
-    return ss_first_inds_local;
-}
-
-auto CScreeningData::get_sp_first_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
-{
-    std::vector<uint32_t> sp_first_inds_local;
-
-    for (int64_t ij = gpu_rank; ij < _sp_prim_pair_count; ij+=gpu_count)
-    {
-        sp_first_inds_local.push_back(_sp_first_inds_bra[ij]);
-    }
-
-    return sp_first_inds_local;
-}
-
-auto CScreeningData::get_pp_first_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
-{
-    std::vector<uint32_t> pp_first_inds_local;
-
-    for (int64_t ij = gpu_rank; ij < _pp_prim_pair_count; ij+=gpu_count)
-    {
-        pp_first_inds_local.push_back(_pp_first_inds_bra[ij]);
-    }
-
-    return pp_first_inds_local;
-}
-
-auto CScreeningData::get_ss_second_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
-{
-    std::vector<uint32_t> ss_second_inds_local;
-
-    for (int64_t ij = gpu_rank; ij < _ss_prim_pair_count; ij+=gpu_count)
-    {
-        ss_second_inds_local.push_back(_ss_second_inds_bra[ij]);
-    }
-
-    return ss_second_inds_local;
-}
-
-auto CScreeningData::get_sp_second_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
-{
-    std::vector<uint32_t> sp_second_inds_local;
-
-    for (int64_t ij = gpu_rank; ij < _sp_prim_pair_count; ij+=gpu_count)
-    {
-        sp_second_inds_local.push_back(_sp_second_inds_bra[ij]);
-    }
-
-    return sp_second_inds_local;
-}
-
-auto CScreeningData::get_pp_second_inds_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<uint32_t>
-{
-    std::vector<uint32_t> pp_second_inds_local;
-
-    for (int64_t ij = gpu_rank; ij < _pp_prim_pair_count; ij+=gpu_count)
-    {
-        pp_second_inds_local.push_back(_pp_second_inds_bra[ij]);
-    }
-
-    return pp_second_inds_local;
-}
-
-auto CScreeningData::get_ss_mat_Q_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<double>
-{
-    std::vector<double> ss_mat_Q_local;
-
-    for (int64_t ij = gpu_rank; ij < _ss_prim_pair_count; ij+=gpu_count)
-    {
-        ss_mat_Q_local.push_back(_ss_mat_Q_bra[ij]);
-    }
-
-    return ss_mat_Q_local;
-}
-
-auto CScreeningData::get_sp_mat_Q_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<double>
-{
-    std::vector<double> sp_mat_Q_local;
-
-    for (int64_t ij = gpu_rank; ij < _sp_prim_pair_count; ij+=gpu_count)
-    {
-        sp_mat_Q_local.push_back(_sp_mat_Q_bra[ij]);
-    }
-
-    return sp_mat_Q_local;
-}
-
-auto CScreeningData::get_pp_mat_Q_local(const int64_t gpu_rank, const int64_t gpu_count) const -> const std::vector<double>
-{
-    std::vector<double> pp_mat_Q_local;
-
-    for (int64_t ij = gpu_rank; ij < _pp_prim_pair_count; ij+=gpu_count)
-    {
-        pp_mat_Q_local.push_back(_pp_mat_Q_bra[ij]);
-    }
-
-    return pp_mat_Q_local;
-}
+auto CScreeningData::get_ss_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _ss_mat_Q_local[gpu_id]; }
+auto CScreeningData::get_sp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _sp_mat_Q_local[gpu_id]; }
+auto CScreeningData::get_pp_mat_Q_local(const int64_t gpu_id) const -> const std::vector<double>& { return _pp_mat_Q_local[gpu_id]; }
 
 auto CScreeningData::get_ss_first_inds() const -> const std::vector<uint32_t>& { return _ss_first_inds; }
 auto CScreeningData::get_sp_first_inds() const -> const std::vector<uint32_t>& { return _sp_first_inds; }

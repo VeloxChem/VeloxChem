@@ -232,13 +232,13 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
     // GTO block pairs
 
-    const auto ss_first_inds_local = screening.get_ss_first_inds_local(gpu_rank, gpu_count);
-    const auto sp_first_inds_local = screening.get_sp_first_inds_local(gpu_rank, gpu_count);
-    const auto pp_first_inds_local = screening.get_pp_first_inds_local(gpu_rank, gpu_count);
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
 
-    const auto ss_second_inds_local = screening.get_ss_second_inds_local(gpu_rank, gpu_count);
-    const auto sp_second_inds_local = screening.get_sp_second_inds_local(gpu_rank, gpu_count);
-    const auto pp_second_inds_local = screening.get_pp_second_inds_local(gpu_rank, gpu_count);
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
 
     const auto ss_prim_pair_count = s_prim_count * (s_prim_count + 1) / 2;
     const auto sp_prim_pair_count = s_prim_count * p_prim_count * 3;
@@ -847,25 +847,25 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto sp_mat_Q_orig = screening.getQMatrixSP();
     const auto pp_mat_Q_orig = screening.getQMatrixPP();
 
-    const auto ss_first_inds_local = screening.get_ss_first_inds_local(gpu_rank, gpu_count); 
-    const auto sp_first_inds_local = screening.get_sp_first_inds_local(gpu_rank, gpu_count); 
-    const auto pp_first_inds_local = screening.get_pp_first_inds_local(gpu_rank, gpu_count); 
+    const auto& ss_first_inds_local = screening.get_ss_first_inds_local(gpu_id);
+    const auto& sp_first_inds_local = screening.get_sp_first_inds_local(gpu_id);
+    const auto& pp_first_inds_local = screening.get_pp_first_inds_local(gpu_id);
 
-    const auto ss_second_inds_local = screening.get_ss_second_inds_local(gpu_rank, gpu_count); 
-    const auto sp_second_inds_local = screening.get_sp_second_inds_local(gpu_rank, gpu_count); 
-    const auto pp_second_inds_local = screening.get_pp_second_inds_local(gpu_rank, gpu_count); 
+    const auto& ss_second_inds_local = screening.get_ss_second_inds_local(gpu_id);
+    const auto& sp_second_inds_local = screening.get_sp_second_inds_local(gpu_id);
+    const auto& pp_second_inds_local = screening.get_pp_second_inds_local(gpu_id);
 
-    const auto ss_mat_Q_local = screening.get_ss_mat_Q_local(gpu_rank, gpu_count); 
-    const auto sp_mat_Q_local = screening.get_sp_mat_Q_local(gpu_rank, gpu_count); 
-    const auto pp_mat_Q_local = screening.get_pp_mat_Q_local(gpu_rank, gpu_count); 
+    const auto& ss_mat_Q_local = screening.get_ss_mat_Q_local(gpu_id);
+    const auto& sp_mat_Q_local = screening.get_sp_mat_Q_local(gpu_id);
+    const auto& pp_mat_Q_local = screening.get_pp_mat_Q_local(gpu_id);
 
-    const auto& ss_first_inds = screening.get_ss_first_inds(); 
-    const auto& sp_first_inds = screening.get_sp_first_inds(); 
-    const auto& pp_first_inds = screening.get_pp_first_inds(); 
+    const auto& ss_first_inds = screening.get_ss_first_inds();
+    const auto& sp_first_inds = screening.get_sp_first_inds();
+    const auto& pp_first_inds = screening.get_pp_first_inds();
 
-    const auto& ss_second_inds = screening.get_ss_second_inds(); 
-    const auto& sp_second_inds = screening.get_sp_second_inds(); 
-    const auto& pp_second_inds = screening.get_pp_second_inds(); 
+    const auto& ss_second_inds = screening.get_ss_second_inds();
+    const auto& sp_second_inds = screening.get_sp_second_inds();
+    const auto& pp_second_inds = screening.get_pp_second_inds();
 
     const auto& ss_mat_Q = screening.get_ss_mat_Q(); 
     const auto& sp_mat_Q = screening.get_sp_mat_Q(); 
