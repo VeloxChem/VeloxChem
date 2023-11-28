@@ -1837,7 +1837,7 @@ computeExchangeFockSSSS(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -2010,7 +2010,7 @@ computeExchangeFockSSSP(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -2183,7 +2183,7 @@ computeExchangeFockSPSS(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -2365,7 +2365,7 @@ computeExchangeFockSPSP(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_ss))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -2539,7 +2539,7 @@ computeExchangeFockSSPS(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_sp))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -2733,7 +2733,7 @@ computeExchangeFockSSPP(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_sp))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -2916,7 +2916,7 @@ computeExchangeFockSPPS(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_sp))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -3138,7 +3138,7 @@ computeExchangeFockSPPP(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_sp))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -3320,7 +3320,7 @@ computeExchangeFockPSPS(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pp))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -3542,7 +3542,7 @@ computeExchangeFockPSPP(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pp))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -3764,7 +3764,7 @@ computeExchangeFockPPPS(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pp))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 
@@ -4068,7 +4068,7 @@ computeExchangeFockPPPP(double*         mat_K,
 
     if ((threadIdx.y == 0) && (threadIdx.x == 0) && (ik < pair_inds_count_for_K_pp))
     {
-        mat_K[ik] = K_ik;
+        mat_K[ik] += K_ik;
     }
 }
 

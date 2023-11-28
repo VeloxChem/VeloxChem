@@ -143,11 +143,9 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    std::stringstream ss;
-
-    ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-
-    std::cout << ss.str();
+    // std::stringstream ss;
+    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
+    // std::cout << ss.str();
 
     if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
@@ -536,9 +534,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     auto gpu_rank = rank * num_gpus_per_node;
 
-    std::stringstream ss;
-    ss << "\n(Prep.) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
-    std::cout << ss.str();
+    // std::stringstream ss;
+    // ss << "\n(Prep.) rank " << rank << ",  gpu_rank " << gpu_rank << "\n";
+    // std::cout << ss.str();
 
     if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
@@ -683,7 +681,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     std::cout << "\nTiming of prep. on rank " << rank << "\n";
     std::cout << "-------------------------\n";
-    std::cout << timer.getSummary();
+    std::cout << timer.getSummary() << "\n";
 
 #pragma omp parallel
     {
@@ -695,9 +693,9 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     auto gpu_rank = gpu_id + rank * num_gpus_per_node;
     auto gpu_count = nnodes * num_gpus_per_node;
 
-    std::stringstream ss;
-    ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
-    std::cout << ss.str();
+    // std::stringstream ss;
+    // ss << "rank " << rank << ",  thread " << thread_id << ",  gpu_rank " << gpu_rank << "\n";
+    // std::cout << ss.str();
 
     if (gpu_rank % 8 == 0) hipSafe(hipSetDevice(4));
     if (gpu_rank % 8 == 1) hipSafe(hipSetDevice(5));
@@ -956,6 +954,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(ss_prim_pair_count_local));
 
+        // set up thread blocks for J
+
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
         num_blocks = dim3((ss_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x, 1);
@@ -1067,6 +1067,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         dim3 num_blocks((sp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(sp_prim_pair_count_local));
+
+        // set up thread blocks for J
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -1183,6 +1185,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         dim3 num_blocks((pp_prim_pair_count_local + threads_per_block.x - 1) / threads_per_block.x);
 
         hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_J, static_cast<uint32_t>(pp_prim_pair_count_local));
+
+        // set up thread blocks for J
 
         threads_per_block = dim3(TILE_DIM, TILE_DIM);
 
@@ -1400,18 +1404,33 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     // compute K
 
-    // K: (SS|SS)
-    //     *  *
+    // K: S-S block
 
     if (pair_inds_count_for_K_ss > 0)
     {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+        timer.start("  K block SS");
 
-        dim3 num_blocks(pair_inds_count_for_K_ss, 1);
+        // zeroize K on device
 
-        timer.start("  K kernel SSSS");
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
 
-        hipLaunchKernelGGL(computeExchangeFockSSSS, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        dim3 num_blocks((pair_inds_count_for_K_ss + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_ss));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3(pair_inds_count_for_K_ss, 1);
+
+        // K: (SS|SS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSSS, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -1426,36 +1445,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel SSSS");
+        // K: (SS|SP)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
-        {
-            const auto i = pair_inds_i_for_K_ss[ik];
-            const auto k = pair_inds_k_for_K_ss[ik];
-
-            const auto i_cgto = s_prim_aoinds[i];
-            const auto k_cgto = s_prim_aoinds[k];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (SS|SP)
-    //     *  *
-
-    if (pair_inds_count_for_K_ss > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_ss, 1);
-
-        timer.start("  K kernel SSSP");
-
-        hipLaunchKernelGGL(computeExchangeFockSSSP, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSSP, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -1475,36 +1471,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel SSSP");
+        // K: (SP|SS)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
-        {
-            const auto i = pair_inds_i_for_K_ss[ik];
-            const auto k = pair_inds_k_for_K_ss[ik];
-
-            const auto i_cgto = s_prim_aoinds[i];
-            const auto k_cgto = s_prim_aoinds[k];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (SP|SS)
-    //     *  *
-
-    if (pair_inds_count_for_K_ss > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_ss, 1);
-
-        timer.start("  K kernel SPSS");
-
-        hipLaunchKernelGGL(computeExchangeFockSPSS, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPSS, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -1524,36 +1497,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel SPSS");
+        // K: (SP|SP)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
-        {
-            const auto i = pair_inds_i_for_K_ss[ik];
-            const auto k = pair_inds_k_for_K_ss[ik];
-
-            const auto i_cgto = s_prim_aoinds[i];
-            const auto k_cgto = s_prim_aoinds[k];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (SP|SP)
-    //     *  *
-
-    if (pair_inds_count_for_K_ss > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_ss, 1);
-
-        timer.start("  K kernel SPSP");
-
-        hipLaunchKernelGGL(computeExchangeFockSPSP, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPSP, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_ss,
                                                      d_pair_inds_k_for_K_ss,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_ss),
@@ -1573,8 +1523,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_ss * sizeof(double), hipMemcpyDeviceToHost));
 
-        timer.stop("  K kernel SPSP");
-
         for (int64_t ik = 0; ik < pair_inds_count_for_K_ss; ik++)
         {
             const auto i = pair_inds_i_for_K_ss[ik];
@@ -1587,20 +1535,37 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
+
+        timer.stop("  K block SS");
     }
 
-    // K: (SS|PS)
-    //     *  *
+    // K: S-P block
 
     if (pair_inds_count_for_K_sp > 0)
     {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+        timer.start("  K block SP");
 
-        dim3 num_blocks(pair_inds_count_for_K_sp, 1);
+        // zeroize K on device
 
-        timer.start("  K kernel SSPS");
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
 
-        hipLaunchKernelGGL(computeExchangeFockSSPS, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        dim3 num_blocks((pair_inds_count_for_K_sp + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_sp));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3(pair_inds_count_for_K_sp, 1);
+
+        // K: (SS|PS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSPS, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_sp,
                                                      d_pair_inds_k_for_K_sp,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_sp),
@@ -1620,37 +1585,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel SSPS");
+        // K: (SS|PP)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
-        {
-            const auto i = pair_inds_i_for_K_sp[ik];
-            const auto k = pair_inds_k_for_K_sp[ik];
-
-            const auto i_cgto = s_prim_aoinds[i];
-
-            // TODO: think about the ordering of cartesian components
-            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (SS|PP)
-    //     *  *
-
-    if (pair_inds_count_for_K_sp > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_sp, 1);
-
-        timer.start("  K kernel SSPP");
-
-        hipLaunchKernelGGL(computeExchangeFockSSPP, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockSSPP, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_sp,
                                                      d_pair_inds_k_for_K_sp,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_sp),
@@ -1670,37 +1611,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel SSPP");
+        // K: (SP|PS)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
-        {
-            const auto i = pair_inds_i_for_K_sp[ik];
-            const auto k = pair_inds_k_for_K_sp[ik];
-
-            const auto i_cgto = s_prim_aoinds[i];
-
-            // TODO: think about the ordering of cartesian components
-            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (SP|PS)
-    //     *  *
-
-    if (pair_inds_count_for_K_sp > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_sp, 1);
-
-        timer.start("  K kernel SPPS");
-
-        hipLaunchKernelGGL(computeExchangeFockSPPS, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPPS, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_sp,
                                                      d_pair_inds_k_for_K_sp,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_sp),
@@ -1720,37 +1637,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel SPPS");
+        // K: (SP|PP)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
-        {
-            const auto i = pair_inds_i_for_K_sp[ik];
-            const auto k = pair_inds_k_for_K_sp[ik];
-
-            const auto i_cgto = s_prim_aoinds[i];
-
-            // TODO: think about the ordering of cartesian components
-            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-            mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (SP|PP)
-    //     *  *
-
-    if (pair_inds_count_for_K_sp > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_sp, 1);
-
-        timer.start("  K kernel SPPP");
-
-        hipLaunchKernelGGL(computeExchangeFockSPPP, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockSPPP, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_sp,
                                                      d_pair_inds_k_for_K_sp,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_sp),
@@ -1772,8 +1665,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_sp * sizeof(double), hipMemcpyDeviceToHost));
 
-        timer.stop("  K kernel SPPP");
-
         for (int64_t ik = 0; ik < pair_inds_count_for_K_sp; ik++)
         {
             const auto i = pair_inds_i_for_K_sp[ik];
@@ -1787,20 +1678,37 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
             mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
             mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
+
+        timer.stop("  K block SP");
     }
 
-    // K: (PS|PS)
-    //     *  *
+    // K: P-P block
 
     if (pair_inds_count_for_K_pp > 0)
     {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
+        timer.start("  K block PP");
 
-        dim3 num_blocks(pair_inds_count_for_K_pp, 1);
+        // zeroize K on device
 
-        timer.start("  K kernel PSPS");
+        dim3 threads_per_block(TILE_DIM * TILE_DIM);
 
-        hipLaunchKernelGGL(computeExchangeFockPSPS, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        dim3 num_blocks((pair_inds_count_for_K_pp + threads_per_block.x - 1) / threads_per_block.x);
+
+        hipLaunchKernelGGL(gpu::zeroData, num_blocks, threads_per_block, 0, 0, d_mat_K, static_cast<uint32_t>(pair_inds_count_for_K_pp));
+
+        hipSafe(hipDeviceSynchronize());
+
+        // set up thread blocks for K
+
+        threads_per_block = dim3(TILE_DIM, TILE_DIM);
+
+        num_blocks = dim3(pair_inds_count_for_K_pp, 1);
+
+        // K: (PS|PS)
+        //     *  *
+
+        hipLaunchKernelGGL(gpu::computeExchangeFockPSPS, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_pp,
                                                      d_pair_inds_k_for_K_pp,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_pp),
@@ -1818,37 +1726,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel PSPS");
+        // K: (PS|PP)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
-        {
-            const auto i = pair_inds_i_for_K_pp[ik];
-            const auto k = pair_inds_k_for_K_pp[ik];
-
-            // TODO: think about the ordering of cartesian components
-            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
-            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (PS|PP)
-    //     *  *
-
-    if (pair_inds_count_for_K_pp > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_pp, 1);
-
-        timer.start("  K kernel PSPP");
-
-        hipLaunchKernelGGL(computeExchangeFockPSPP, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockPSPP, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_pp,
                                                      d_pair_inds_k_for_K_pp,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_pp),
@@ -1868,37 +1752,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel PSPP");
+        // K: (PP|PS)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
-        {
-            const auto i = pair_inds_i_for_K_pp[ik];
-            const auto k = pair_inds_k_for_K_pp[ik];
-
-            // TODO: think about the ordering of cartesian components
-            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
-            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (PP|PS)
-    //     *  *
-
-    if (pair_inds_count_for_K_pp > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_pp, 1);
-
-        timer.start("  K kernel PPPS");
-
-        hipLaunchKernelGGL(computeExchangeFockPPPS, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPPS, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_pp,
                                                      d_pair_inds_k_for_K_pp,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_pp),
@@ -1918,37 +1778,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
                                                      d_boys_func_table,
                                                      d_boys_func_ft);
 
-        hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
+        hipSafe(hipDeviceSynchronize());
 
-        timer.stop("  K kernel PPPS");
+        // K: (PP|PP)
+        //     *  *
 
-        for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
-        {
-            const auto i = pair_inds_i_for_K_pp[ik];
-            const auto k = pair_inds_k_for_K_pp[ik];
-
-            // TODO: think about the ordering of cartesian components
-            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
-            const auto k_cgto = p_prim_aoinds[(k / 3) + p_prim_count * (k % 3)];
-
-            mat_Fock_omp[gpu_id].row(i_cgto)[k_cgto] += mat_K[ik] * (-1.0);
-
-            if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
-        }
-    }
-
-    // K: (PP|PP)
-    //     *  *
-
-    if (pair_inds_count_for_K_pp > 0)
-    {
-        dim3 threads_per_block(TILE_DIM, TILE_DIM);
-
-        dim3 num_blocks(pair_inds_count_for_K_pp, 1);
-
-        timer.start("  K kernel PPPP");
-
-        hipLaunchKernelGGL(computeExchangeFockPPPP, num_blocks, threads_per_block, 0, 0, d_mat_K,
+        hipLaunchKernelGGL(gpu::computeExchangeFockPPPP, num_blocks, threads_per_block, 0, 0,
+                                                     d_mat_K,
                                                      d_pair_inds_i_for_K_pp,
                                                      d_pair_inds_k_for_K_pp,
                                                      static_cast<uint32_t>(pair_inds_count_for_K_pp),
@@ -1965,8 +1801,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
         hipSafe(hipMemcpy(mat_K.data(), d_mat_K, pair_inds_count_for_K_pp * sizeof(double), hipMemcpyDeviceToHost));
 
-        timer.stop("  K kernel PPPP");
-
         for (int64_t ik = 0; ik < pair_inds_count_for_K_pp; ik++)
         {
             const auto i = pair_inds_i_for_K_pp[ik];
@@ -1980,6 +1814,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
             if (i != k) mat_Fock_omp[gpu_id].row(k_cgto)[i_cgto] += mat_K[ik] * (-1.0);
         }
+
+        timer.stop("  K block PP");
     }
 
     timer.stop("K computation");
@@ -2016,7 +1852,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.stop("Total timing");
 
-    std::cout << "\nTiming of ERIs on GPU " << gpu_id << "\n";
+    std::cout << "\nTiming of ERIs on GPU " << gpu_rank << "\n";
     std::cout << "-----------------------\n";
     std::cout << timer.getSummary() << std::endl;
 

@@ -597,8 +597,22 @@ class ScfDriver:
 
         # C2-DIIS method
         if self.acc_type.upper() == 'DIIS':
-            den_mat = self.gen_initial_density_sad(molecule, ao_basis,
-                                                   min_basis)
+
+            if self.rank == mpi_master():
+                den_mat = self.gen_initial_density_sad(molecule, ao_basis,
+                                                       min_basis)
+                den_mat_np = den_mat.alpha_to_numpy(0)
+                naos = den_mat_np.shape[0]
+            else:
+                naos = None
+            naos = self.comm.bcast(naos, root=mpi_master())
+
+            if self.rank != mpi_master():
+                den_mat_np = np.zeros((naos, naos))
+
+            self.comm.Bcast(den_mat_np, root=mpi_master())
+            den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+
             self._comp_diis(molecule, ao_basis, min_basis, den_mat, profiler)
 
         # two level C2-DIIS method
@@ -614,8 +628,22 @@ class ScfDriver:
             self.max_iter = 5
 
             val_basis = ao_basis.reduce_to_valence_basis()
-            den_mat = self.gen_initial_density_sad(molecule, val_basis,
-                                                   min_basis)
+
+            if self.rank == mpi_master():
+                den_mat = self.gen_initial_density_sad(molecule, val_basis,
+                                                       min_basis)
+                den_mat_np = den_mat.alpha_to_numpy(0)
+                naos = den_mat_np.shape[0]
+            else:
+                naos = None
+            naos = self.comm.bcast(naos, root=mpi_master())
+
+            if self.rank != mpi_master():
+                den_mat_np = np.zeros((naos, naos))
+
+            self.comm.Bcast(den_mat_np, root=mpi_master())
+            den_mat = AODensityMatrix([den_mat_np], denmat.rest)
+
             self._comp_diis(molecule, val_basis, min_basis, den_mat, profiler)
 
             # second step
@@ -1033,9 +1061,6 @@ class ScfDriver:
 
             fock_mat = self._comp_full_fock(fock_mat, vxc_mat, V_pe, kin_mat, npot_mat)
 
-            self.ostream.print_info(f'Full Fock computed')
-            self.ostream.flush()
-
             if self.rank == mpi_master() and self.electric_field is not None:
                 efpot = sum([
                     ef * mat
@@ -1070,9 +1095,6 @@ class ScfDriver:
             # compute density change and energy change
 
             diff_den = self._comp_density_change(den_mat, self.density)
-
-            self.ostream.print_info(f'diff_den computed')
-            self.ostream.flush()
 
             e_scf = (e_el + self._nuc_energy + self._d4_energy +
                      self._ef_nuc_energy)
@@ -1114,14 +1136,8 @@ class ScfDriver:
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
-            self.ostream.print_info(f'eff_fock computed')
-            self.ostream.flush()
-
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
-
-            self.ostream.print_info(f'new mol_orbs computed')
-            self.ostream.flush()
 
             if self._mom is not None:
                 self._apply_mom(molecule, ovl_mat)
