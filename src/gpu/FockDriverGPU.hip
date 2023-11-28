@@ -614,37 +614,37 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const auto all_prim_count = s_prim_count + p_prim_count * 3;
 
     // TODO double check the criteria
-    if (all_prim_count < 4096)
+    if (all_prim_count < 8192)
     {
-    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-    dim3 num_blocks((all_prim_count + threads_per_block.x - 1) / threads_per_block.x, (all_prim_count + threads_per_block.y - 1) / threads_per_block.y);
+        dim3 num_blocks((all_prim_count + threads_per_block.x - 1) / threads_per_block.x, (all_prim_count + threads_per_block.y - 1) / threads_per_block.y);
 
-    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_C, d_matrix_A, d_matrix_B,
-            static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_C, d_matrix_A, d_matrix_B,
+                static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
 
-    hipSafe(hipDeviceSynchronize());
+        hipSafe(hipDeviceSynchronize());
 
-    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
-            static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_matrix_B, d_matrix_C, d_matrix_A,
+                static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count), static_cast<uint32_t>(all_prim_count));
     }
     else
     {
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
+        hipblasHandle_t handle;
+        hipblasSafe(hipblasCreate(&handle));
 
-    double alpha = 1.0, beta = 0.0;
+        double alpha = 1.0, beta = 0.0;
 
-    auto n = static_cast<int32_t>(all_prim_count);
+        auto n = static_cast<int32_t>(all_prim_count);
 
-    // compute A^T * (B^T * A^T) since hipblas is column-major
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
+        // compute A^T * (B^T * A^T) since hipblas is column-major
+        hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_B, n, d_matrix_A, n, &beta, d_matrix_C, n));
 
-    hipSafe(hipDeviceSynchronize());
+        hipSafe(hipDeviceSynchronize());
 
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
+        hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, n, n, &alpha, d_matrix_A, n, d_matrix_C, n, &beta, d_matrix_B, n));
 
-    hipblasSafe(hipblasDestroy(handle));
+        hipblasSafe(hipblasDestroy(handle));
     }
 
     hipSafe(hipMemcpy(mat_full.values(), d_matrix_B, mat_full.getNumberOfElements() * sizeof(double), hipMemcpyDeviceToHost));
@@ -663,35 +663,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     screening.form_pair_inds_for_K(s_prim_count, p_prim_count, mat_full, Q_prime_thresh);
 
     timer.stop("Prep. preLinK");
-
-    /*
-    if (mpi::rank(MPI_COMM_WORLD) == mpi::master())
-    {
-        std::ofstream file_qprime("qprime.dat", std::ios::out | std::ios::binary);
-        if (file_qprime.is_open()) {
-            auto rows = static_cast<size_t>(Q_prime.getNumberOfRows());
-            file_qprime.write(reinterpret_cast<const char*>(&rows), sizeof(size_t));
-            file_qprime.write(reinterpret_cast<const char*>(Q_prime.values()), rows * rows * sizeof(double));
-            file_qprime.close();
-        }
-
-        std::ofstream file_qfull("qfull.dat", std::ios::out | std::ios::binary);
-        if (file_qfull.is_open()) {
-            auto rows = static_cast<size_t>(mat_Q_full.getNumberOfRows());
-            file_qfull.write(reinterpret_cast<const char*>(&rows), sizeof(size_t));
-            file_qfull.write(reinterpret_cast<const char*>(mat_Q_full.values()), rows * rows * sizeof(double));
-            file_qfull.close();
-        }
-
-        std::ofstream file_dabsfull("dabsfull.dat", std::ios::out | std::ios::binary);
-        if (file_dabsfull.is_open()) {
-            auto rows = static_cast<size_t>(mat_D_abs_full.getNumberOfRows());
-            file_dabsfull.write(reinterpret_cast<const char*>(&rows), sizeof(size_t));
-            file_dabsfull.write(reinterpret_cast<const char*>(mat_D_abs_full.values()), rows * rows * sizeof(double));
-            file_dabsfull.close();
-        }
-    }
-    */
 
     std::string errnaos("gpu::computeCoulombFock: Inconsistent number of AOs");
     errors::assertMsgCritical((naos == densityMatrix.getNumberOfRows(0)) && (naos == densityMatrix.getNumberOfColumns(0)), errnaos);
@@ -2069,6 +2040,13 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 auto
 computeMatrixMultiplication(double* C, const double* A, const double* B, const int64_t nrows_A, const int64_t ncols_A, const int64_t ncols_B) -> void
 {
+    // TODO allow computeMatrixMultiplication on non-master MPI rank
+
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    std::string errmpirank("gpu::computeMatrixMultiplication: Should only be called from MPI master rank");
+    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+
     hipSafe(hipSetDevice(4));
 
     const auto nrows_B = ncols_A;
@@ -2082,47 +2060,32 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const i
     hipSafe(hipMemcpy(d_A, A, nrows_A * ncols_A * sizeof(double), hipMemcpyHostToDevice));
     hipSafe(hipMemcpy(d_B, B, nrows_B * ncols_B * sizeof(double), hipMemcpyHostToDevice));
 
-    dim3 threads_per_block(TILE_DIM, TILE_DIM);
+    // TODO double check the criteria
+    if (std::max({nrows_A, ncols_A, ncols_B}) < 8192)
+    {
+        dim3 threads_per_block(TILE_DIM, TILE_DIM);
 
-    dim3 num_blocks((ncols_B + threads_per_block.x - 1) / threads_per_block.x, (nrows_A + threads_per_block.y - 1) / threads_per_block.y);
+        dim3 num_blocks((ncols_B + threads_per_block.x - 1) / threads_per_block.x, (nrows_A + threads_per_block.y - 1) / threads_per_block.y);
 
-    hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_C, d_A, d_B,
-            static_cast<uint32_t>(nrows_A), static_cast<uint32_t>(ncols_A), static_cast<uint32_t>(ncols_B));
+        hipLaunchKernelGGL(gpu::matmulAB, num_blocks, threads_per_block, 0, 0, d_C, d_A, d_B,
+                static_cast<uint32_t>(nrows_A), static_cast<uint32_t>(ncols_A), static_cast<uint32_t>(ncols_B));
+    }
+    else
+    {
+        hipblasHandle_t handle;
+        hipblasSafe(hipblasCreate(&handle));
+
+        double alpha = 1.0, beta = 0.0;
+
+        auto m = nrows_A, k = ncols_A, n = ncols_B;
+
+        // compute C^T = B^T * A^T since hipblas is column-major
+        hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k, &alpha, d_B, n, d_A, k, &beta, d_C, n));
+
+        hipblasSafe(hipblasDestroy(handle));
+    }
 
     hipSafe(hipMemcpy(C, d_C, nrows_A * ncols_B * sizeof(double), hipMemcpyDeviceToHost));
-
-    hipSafe(hipFree(d_A));
-    hipSafe(hipFree(d_B));
-    hipSafe(hipFree(d_C));
-}
-
-auto
-computeMatrixMultiplicationTranspose(double* C, const double* A, const double* B, const int64_t narow, const int64_t nacol, const int64_t nbcol) -> void
-{
-    const auto nbrow = nacol;
-
-    double *d_A, *d_B, *d_C;
-
-    hipSafe(hipMalloc(&d_A, narow * nacol * sizeof(double)));
-    hipSafe(hipMalloc(&d_B, nbrow * nbcol * sizeof(double)));
-    hipSafe(hipMalloc(&d_C, narow * nbcol * sizeof(double)));
-
-    hipSafe(hipMemcpy(d_A, A, narow * nacol * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_B, B, nbrow * nbcol * sizeof(double), hipMemcpyHostToDevice));
-
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
-
-    double alpha = 1.0, beta = 0.0;
-
-    auto m = narow, k = nacol, n = nbcol;
-
-    // compute C^T = B^T * A^T since hipblas is column-major
-    hipblasSafe(hipblasDgemm(handle, HIPBLAS_OP_N, HIPBLAS_OP_N, n, m, k, &alpha, d_B, n, d_A, k, &beta, d_C, n));
-
-    hipblasDestroy(handle);
-
-    hipSafe(hipMemcpy(C, d_C, narow * nbcol * sizeof(double), hipMemcpyDeviceToHost));
 
     hipSafe(hipFree(d_A));
     hipSafe(hipFree(d_B));
