@@ -31,6 +31,9 @@
 namespace gpu {  // gpu namespace
 
 __global__ void
+zeroData(double* d_data, const uint32_t n);
+
+__global__ void
 computeCoulombFockSSSS(double*         mat_J,
                        const double*   s_prim_info,
                        const uint32_t  s_prim_count,

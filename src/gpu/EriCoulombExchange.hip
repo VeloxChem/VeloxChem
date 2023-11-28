@@ -132,6 +132,14 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 }
 
 __global__ void
+zeroData(double* d_data, const uint32_t n)
+{
+    const uint32_t i = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (i < n) d_data[i] = 0.0;
+}
+
+__global__ void
 computeCoulombFockSSSS(double*         mat_J,
                        const double*   s_prim_info,
                        const uint32_t  s_prim_count,
@@ -246,7 +254,7 @@ computeCoulombFockSSSS(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < ss_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
@@ -390,7 +398,7 @@ computeCoulombFockSSSP(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < ss_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
@@ -555,7 +563,7 @@ computeCoulombFockSSPP(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < ss_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
@@ -699,7 +707,7 @@ computeCoulombFockSPSS(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < sp_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
@@ -853,7 +861,7 @@ computeCoulombFockSPSP(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < sp_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
@@ -1046,7 +1054,7 @@ computeCoulombFockSPPP(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < sp_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
@@ -1211,7 +1219,7 @@ computeCoulombFockPPSS(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
@@ -1404,7 +1412,7 @@ computeCoulombFockPPSP(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
@@ -1682,7 +1690,7 @@ computeCoulombFockPPPP(double*         mat_J,
 
     if ((threadIdx.y == 0) && (ij < pp_prim_pair_count_local))
     {
-        mat_J[ij] = J_ij;
+        mat_J[ij] += J_ij;
     }
 }
 
