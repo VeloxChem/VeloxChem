@@ -217,8 +217,9 @@ class ScfRestrictedDriver(ScfDriver):
             for w, fmat in zip(weights, self._fock_matrices_alpha):
                 effmat += w * fmat
         else:
-            for w, fmat in zip(weights, self._fock_matrices_alpha):
-                add_matrix_gpu(effmat, fmat, w)
+            self.ostream.print_info('== add_matrix_gpu ==')
+            fmat_list = [fmat for fmat in self._fock_matrices_alpha]
+            add_matrix_gpu(effmat, fmat_list, list(weights))
 
         return effmat
 

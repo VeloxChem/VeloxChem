@@ -1884,7 +1884,7 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 }
 
 auto
-addMatrix(double* Y, const double* X, const int64_t n, const double alpha) -> void
+addMatrix(double* Y, const std::vector<const double*>& Xs, const int64_t n, const std::vector<double>& alphas) -> void
 {
     // TODO allow addMatrix on non-master MPI rank
 
@@ -1901,13 +1901,20 @@ addMatrix(double* Y, const double* X, const int64_t n, const double alpha) -> vo
     hipSafe(hipMalloc(&d_X, n * sizeof(double)));
 
     hipSafe(hipMemcpy(d_Y, Y, n * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_X, X, n * sizeof(double), hipMemcpyHostToDevice));
 
     hipblasHandle_t handle;
     hipblasSafe(hipblasCreate(&handle));
 
-    // Y = alpha * X + Y
-    hipblasSafe(hipblasDaxpy(handle, static_cast<int32_t>(n), &alpha, d_X, 1, d_Y, 1));
+    for (int64_t i = 0; i < static_cast<int64_t>(Xs.size()); i++)
+    {
+        const auto& X = Xs[i];
+        const auto alpha = alphas[i];
+
+        hipSafe(hipMemcpy(d_X, X, n * sizeof(double), hipMemcpyHostToDevice));
+
+        // Y = alpha * X + Y
+        hipblasSafe(hipblasDaxpy(handle, static_cast<int32_t>(n), &alpha, d_X, 1, d_Y, 1));
+    }
 
     hipblasSafe(hipblasDestroy(handle));
 
