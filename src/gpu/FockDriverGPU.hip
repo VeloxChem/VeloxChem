@@ -86,7 +86,7 @@
 #define magmaSafe(e)                                                                                                   \
     {                                                                                                                  \
         magma_int_t err = (e);                                                                                         \
-        if (err != 0) {                                                                                                \
+        if (err != MAGMA_SUCCESS) {                                                                                    \
             std::cerr << "MAGMA error in " << __FILE__ << ":" << __LINE__ << ": " << magma_strerror(err) << std::endl; \
             std::exit(EXIT_FAILURE);                                                                                   \
         }                                                                                                              \
@@ -1964,13 +1964,15 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
     auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
     auto liwork = 3 + 5*n;
 
-    std::vector<double> wA(n * n);
-    std::vector<double> work(lwork);
-    std::vector<magma_int_t> iwork(liwork);
+    double *wA, *work;
+    magma_int_t *iwork;
+
+    hipSafe(hipHostMalloc(&wA, n * n * sizeof(double)));
+    hipSafe(hipHostMalloc(&work, lwork * sizeof(double)));
+    hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
 
     magma_int_t info;
-
-    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, W, wA.data(), n, work.data(), lwork, iwork.data(), liwork, &info);
+    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, W, wA, n, work, lwork, iwork, liwork, &info);
 
     if (info != 0)
     {
@@ -1982,6 +1984,10 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
     hipSafe(hipMemcpy(A, d_A, n*n * sizeof(double), hipMemcpyDeviceToHost));
 
     hipSafe(hipFree(d_A));
+
+    hipSafe(hipHostFree(wA));
+    hipSafe(hipHostFree(work));
+    hipSafe(hipHostFree(iwork));
 
     magmaSafe(magma_finalize());
 }
