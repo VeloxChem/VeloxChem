@@ -1992,9 +1992,11 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
 
     magma_int_t n = static_cast<magma_int_t>(nrows_A);
 
+    magma_int_t ldda = magma_roundup(n, 32);
+
     double *d_A;
-    hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
-    hipSafe(hipMemcpy(d_A, A, n * n * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMalloc(&d_A, n * ldda * sizeof(double)));
+    hipblasSafe(hipblasSetMatrix(n, n, sizeof(double), A, n, d_A, ldda));
 
     auto nb = magma_get_dsytrd_nb(n);
     auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
@@ -2008,7 +2010,7 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
     hipSafe(hipHostMalloc(&iwork, liwork * sizeof(magma_int_t)));
 
     magma_int_t info;
-    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, W, wA, n, work, lwork, iwork, liwork, &info);
+    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, ldda, W, wA, n, work, lwork, iwork, liwork, &info);
 
     if (info != 0)
     {
@@ -2017,7 +2019,7 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
         errors::assertMsgCritical(false, ss.str());
     }
 
-    hipSafe(hipMemcpy(A, d_A, n*n * sizeof(double), hipMemcpyDeviceToHost));
+    hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
 
     hipSafe(hipFree(d_A));
 
