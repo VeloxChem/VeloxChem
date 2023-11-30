@@ -41,7 +41,7 @@ from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
 from .veloxchemlib import ScreeningData
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
-from .veloxchemlib import compute_fock_gpu
+from .veloxchemlib import compute_fock_gpu, eigh_gpu
 from .veloxchemlib import compute_one_electron_integrals_gpu
 from .profiler import Profiler
 from .molecularbasis import MolecularBasis
@@ -978,10 +978,12 @@ class ScfDriver:
 
             S = ovl_mat
 
-            # TODO: eigh on GPU
-            eigvals, eigvecs = np.linalg.eigh(S)
-            #eigvals, eigvecs = eigh_gpu(S)
-            #eigvecs = eigvecs.T.copy()
+            # TODO: double check the criteria
+            if S.shape[0] < 4096:
+                eigvals, eigvecs = np.linalg.eigh(S)
+            else:
+                eigvals, eigvecs = eigh_gpu(S)
+                eigvecs = eigvecs.T.copy()
 
             num_eigs = sum(eigvals > self.ovl_thresh)
             if num_eigs < eigvals.size:
@@ -1130,19 +1132,27 @@ class ScfDriver:
 
             # compute new Fock matrix, molecular orbitals and density
 
-            profiler.start_timer('FockDiag')
+            profiler.start_timer('EffFock')
 
             self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
+            profiler.stop_timer('EffFock')
+
+            profiler.start_timer('FockDiag')
+
             self._molecular_orbitals = self._gen_molecular_orbitals(
                 molecule, eff_fock_mat, oao_mat)
+
+            profiler.stop_timer('FockDiag')
 
             if self._mom is not None:
                 self._apply_mom(molecule, ovl_mat)
 
             self._update_mol_orbs_phase()
+
+            profiler.start_timer('NewDens')
 
             if self.rank == mpi_master():
                 den_mat = self.molecular_orbitals.get_density(molecule)
@@ -1158,13 +1168,10 @@ class ScfDriver:
             self.comm.Bcast(den_mat_np, root=mpi_master())
             den_mat = AODensityMatrix([den_mat_np], denmat.rest)
 
+            profiler.stop_timer('NewDens')
+
             self.ostream.print_info(f'new density computed')
             self.ostream.flush()
-
-            # TODO: broadcast den_mat
-            # den_mat.broadcast(self.rank, self.comm)
-
-            profiler.stop_timer('FockDiag')
 
             profiler.check_memory_usage('Iteration {:d} Fock diag.'.format(
                 self._num_iter))

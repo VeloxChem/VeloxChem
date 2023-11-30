@@ -39,8 +39,10 @@ CXX_REL_FLG := -fopenmp=libomp -std=c++17
 CXX_DEB_FLG := -fopenmp=libomp -std=c++17
 
 MATH_INC := -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/openblas_llvm/include
+MATH_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/magma/src/icl-magma-16ae28340736/include
 #MATH_LIB := -lomp -lpthread -lm -ldl
 MATH_LIB := -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/openblas_llvm/lib -lopenblas
+MATH_LIB += -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/magma/src/icl-magma-16ae28340736/lib -lmagma
 
 XC_INC := -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/include
 XC_LIB := -L/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/dependencies/libxc/lib

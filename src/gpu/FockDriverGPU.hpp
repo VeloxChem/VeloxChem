@@ -42,7 +42,7 @@ auto computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, c
 
 auto computeMatrixMultiplication(double* C, const double* A, const double* B, const int64_t nrows_A, const int64_t ncols_A, const int64_t ncols_B) -> void;
 
-//auto diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void;
+auto diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void;
 
 }  // namespace gpu
 

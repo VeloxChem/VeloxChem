@@ -32,7 +32,7 @@ import os
 from .veloxchemlib import mpi_master
 from .veloxchemlib import fock_t as fockmat
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .veloxchemlib import matmul_gpu
+from .veloxchemlib import matmul_gpu, eigh_gpu
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -239,10 +239,12 @@ class ScfRestrictedDriver(ScfDriver):
             #fmo = np.matmul(tmat.T, np.matmul(fock_mat, tmat))
             fmo = matmul_gpu(tmat.T.copy(), matmul_gpu(fock_mat, tmat))
 
-            # TODO: eigh on GPU
-            eigs, evecs = np.linalg.eigh(fmo)
-            #eigs, evecs = eigh_gpu(fmo)
-            #evecs = evecs.T.copy()
+            # TODO: double check the criteria
+            if fmo.shape[0] < 4096:
+                eigs, evecs = np.linalg.eigh(fmo)
+            else:
+                eigs, evecs = eigh_gpu(fmo)
+                evecs = evecs.T.copy()
 
             #orb_coefs = np.matmul(tmat, evecs)
             orb_coefs = matmul_gpu(tmat, evecs)

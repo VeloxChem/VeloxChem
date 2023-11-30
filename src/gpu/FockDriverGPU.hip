@@ -26,6 +26,7 @@
 #include <hip/hip_runtime.h>
 #include <hipblas.h>
 //#include <hipsolver.h>
+#include <magma_v2.h>
 
 #include <omp.h>
 
@@ -62,14 +63,14 @@
 
 #define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
 
-#define hipSafe(e)                                                                                                        \
-    {                                                                                                                     \
-        hipError_t err = (e);                                                                                             \
-        if (err != hipSuccess)                                                                                            \
-        {                                                                                                                 \
+#define hipSafe(e)                                                                                                       \
+    {                                                                                                                    \
+        hipError_t err = (e);                                                                                            \
+        if (err != hipSuccess)                                                                                           \
+        {                                                                                                                \
             std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl;  \
-            std::exit(EXIT_FAILURE);                                                                                      \
-        }                                                                                                                 \
+            std::exit(EXIT_FAILURE);                                                                                     \
+        }                                                                                                                \
     }
 
 #define hipblasSafe(e)                                                                            \
@@ -80,6 +81,15 @@
             std::cerr << "hipBLAS error in " << __FILE__ << ":" << __LINE__ << ": " << std::endl; \
             std::exit(EXIT_FAILURE);                                                              \
         }                                                                                         \
+    }
+
+#define magmaSafe(e)                                                                                                   \
+    {                                                                                                                  \
+        magma_int_t err = (e);                                                                                         \
+        if (err != 0) {                                                                                                \
+            std::cerr << "MAGMA error in " << __FILE__ << ":" << __LINE__ << ": " << magma_strerror(err) << std::endl; \
+            std::exit(EXIT_FAILURE);                                                                                   \
+        }                                                                                                              \
     }
 
 /*
@@ -1926,6 +1936,54 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const i
     hipSafe(hipFree(d_A));
     hipSafe(hipFree(d_B));
     hipSafe(hipFree(d_C));
+}
+
+auto
+diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
+{
+    // TODO allow diagonalizeMatrix on non-master MPI rank
+
+    auto rank = mpi::rank(MPI_COMM_WORLD);
+
+    std::string errmpirank("gpu::diagonalizeMatrix: Should only be called from MPI master rank");
+    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
+
+    hipSafe(hipSetDevice(4));
+
+    magmaSafe(magma_init());
+
+    magma_setdevice(4);
+
+    magma_int_t n = static_cast<magma_int_t>(nrows_A);
+
+    double *d_A;
+    hipSafe(hipMalloc(&d_A, n * n * sizeof(double)));
+    hipSafe(hipMemcpy(d_A, A, n * n * sizeof(double), hipMemcpyHostToDevice));
+
+    auto nb = magma_get_dsytrd_nb(n);
+    auto lwork = static_cast<magma_int_t>(std::max(2*n + n*nb, 1 + 6*n + 2*n*n));
+    auto liwork = 3 + 5*n;
+
+    std::vector<double> wA(n * n);
+    std::vector<double> work(lwork);
+    std::vector<magma_int_t> iwork(liwork);
+
+    magma_int_t info;
+
+    magma_dsyevd_gpu(MagmaVec, MagmaUpper, n, d_A, n, W, wA.data(), n, work.data(), lwork, iwork.data(), liwork, &info);
+
+    if (info != 0)
+    {
+        std::stringstream ss;
+        ss << "gpu::diagonalizeMatrix: (magma error) " << magma_strerror(info);
+        errors::assertMsgCritical(false, ss.str());
+    }
+
+    hipSafe(hipMemcpy(A, d_A, n*n * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipFree(d_A));
+
+    magmaSafe(magma_finalize());
 }
 
 /*

@@ -105,7 +105,6 @@ export_gpu(py::module& m)
         },
         "Computes matrix multiplication using GPU.");
 
-    /*
     m.def(
         "eigh_gpu",
         [](const py::array_t<double>& A) -> py::list {
@@ -150,7 +149,6 @@ export_gpu(py::module& m)
 
             },
         "Diagonalizes matrix using GPU.");
-    */
 
     m.def("integrate_vxc_fock", &gpu::integrateVxcFock, "Integrates Vxc matrix using GPU.");
 
