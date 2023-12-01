@@ -1132,9 +1132,12 @@ class ScfDriver:
 
             # compute new Fock matrix, molecular orbitals and density
 
-            profiler.start_timer('EffFock')
+            profiler.start_timer('StoreDIIS')
 
             self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
+
+            profiler.stop_timer('StoreDIIS')
+            profiler.start_timer('EffFock')
 
             eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
 
@@ -1536,6 +1539,8 @@ class ScfDriver:
 
         fock_mat = compute_fock_gpu(molecule, basis, den_mat, screener)
 
+        eri_t1 = tm.time()
+
         naos = fock_mat.number_of_rows()
         fock_mat_np = np.zeros((naos, naos))
 
@@ -1543,7 +1548,10 @@ class ScfDriver:
 
         fock_mat = fock_mat_np
 
-        self.ostream.print_info(f'Fock build done in {tm.time()-eri_t0:.2f} sec')
+        eri_t2 = tm.time()
+
+        self.ostream.print_info(f'Fock build done in {eri_t1-eri_t0:.2f} sec')
+        self.ostream.print_info(f'Fock comm. done in {eri_t2-eri_t1:.2f} sec')
         self.ostream.flush()
 
         # TODO: add beta density
