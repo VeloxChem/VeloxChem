@@ -38,7 +38,7 @@ from .veloxchemlib import (OverlapDriver, KineticEnergyDriver,
 from .veloxchemlib import AODensityMatrix, denmat, make_matrix, mat_t
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
-from .veloxchemlib import ScreeningData
+from .veloxchemlib import ScreeningData, CudaDevices
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
 from .veloxchemlib import compute_fock_gpu, eigh_gpu
@@ -959,7 +959,16 @@ class ScfDriver:
         else:
             t0 = tm.time()
 
-            screener = ScreeningData(molecule, ao_basis)
+            if 'VLX_NUM_GPUS_PER_NODE' in os.environ:
+                num_gpus_per_node = int(os.environ['VLX_NUM_GPUS_PER_NODE'])
+            else:
+                devices = CudaDevices()
+                num_gpus_per_node = devices.get_number_devices()
+
+            screener = ScreeningData(molecule, ao_basis, num_gpus_per_node)
+
+            self.ostream.print_info(f'Using {num_gpus_per_node} GPU devices per MPI rank.')
+            self.ostream.print_blank()
 
             self.ostream.print_info('Screening data computed in {:.2f} sec.'.format(tm.time() - t0))
             self.ostream.print_blank()

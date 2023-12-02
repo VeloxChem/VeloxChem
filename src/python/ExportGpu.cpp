@@ -59,7 +59,7 @@ export_gpu(py::module& m)
     // CScreeningData class
 
     py::class_<CScreeningData, std::shared_ptr<CScreeningData>>(m, "ScreeningData")
-        .def(py::init<const CMolecule&, const CMolecularBasis&>());
+        .def(py::init<const CMolecule&, const CMolecularBasis&, const int64_t>());
 
     m.def(
         "compute_gto_values",

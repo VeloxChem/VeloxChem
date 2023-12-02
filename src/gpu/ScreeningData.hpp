@@ -103,7 +103,7 @@ class CScreeningData
     auto _sortQ(const int64_t s_prim_count, const int64_t p_prim_count) -> void;
 
    public:
-    CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis);
+    CScreeningData(const CMolecule& molecule, const CMolecularBasis& basis, const int64_t num_gpus_per_node);
 
     auto getNumGpusPerNode() const -> const int64_t;
 
