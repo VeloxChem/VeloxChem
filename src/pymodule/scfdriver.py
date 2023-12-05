@@ -988,7 +988,7 @@ class ScfDriver:
             S = ovl_mat
 
             # TODO: double check the criteria
-            if S.shape[0] < 4096:
+            if max(S.shape) < 4096:
                 eigvals, eigvecs = np.linalg.eigh(S)
             else:
                 eigvals, eigvecs = eigh_gpu(S)

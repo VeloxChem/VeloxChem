@@ -40,8 +40,6 @@ auto computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecula
 
 auto computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const CAODensityMatrix& densityMatrix, CScreeningData& screening) -> CDenseMatrix;
 
-auto addMatrix(double* Y, const std::vector<const double*>& Xs, const int64_t n, const std::vector<double>& alphas) -> void;
-
 auto computeMatrixMultiplication(double* C, const double* A, const double* B, const int64_t nrows_A, const int64_t ncols_A, const int64_t ncols_B) -> void;
 
 auto diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void;

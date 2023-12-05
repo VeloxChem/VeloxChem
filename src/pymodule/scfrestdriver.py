@@ -32,7 +32,7 @@ import os
 from .veloxchemlib import mpi_master
 from .veloxchemlib import fock_t as fockmat
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .veloxchemlib import matmul_gpu, eigh_gpu, add_matrix_gpu
+from .veloxchemlib import matmul_gpu, eigh_gpu
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -212,14 +212,8 @@ class ScfRestrictedDriver(ScfDriver):
 
         effmat = np.zeros(self._fock_matrices_alpha[0].shape)
 
-        # TODO: double check the criteria
-        if effmat.shape[0] < 1024:
-            for w, fmat in zip(weights, self._fock_matrices_alpha):
-                effmat += w * fmat
-        else:
-            self.ostream.print_info('== add_matrix_gpu ==')
-            fmat_list = [fmat for fmat in self._fock_matrices_alpha]
-            add_matrix_gpu(effmat, fmat_list, list(weights))
+        for w, fmat in zip(weights, self._fock_matrices_alpha):
+            effmat += w * fmat
 
         return effmat
 
@@ -246,7 +240,7 @@ class ScfRestrictedDriver(ScfDriver):
             fmo = matmul_gpu(tmat.T.copy(), matmul_gpu(fock_mat, tmat))
 
             # TODO: double check the criteria
-            if fmo.shape[0] < 4096:
+            if max(fmo.shape) < 4096:
                 eigs, evecs = np.linalg.eigh(fmo)
             else:
                 eigs, evecs = eigh_gpu(fmo)

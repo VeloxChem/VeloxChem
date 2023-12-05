@@ -84,29 +84,6 @@ export_gpu(py::module& m)
         "Computes GTO values and derivatives on grid points using GPU.");
 
     m.def(
-        "add_matrix_gpu",
-        [](py::array_t<double>& Y, const std::vector<py::array_t<double>>& Xs, const std::vector<double>& alphas) -> void {
-            //std::string errshape("add_matrix_gpu: Mismatch in shape");
-            //std::string errstyle("add_matrix_gpu: Expecting contiguous numpy array");
-
-            //auto c_style_Y = py::detail::check_flags(Y.ptr(), py::array::c_style);
-            //errors::assertMsgCritical(c_style_Y, errstyle);
-
-            std::vector<const double*> X_ptr_s;
-            for (auto& X : Xs)
-            {
-                //auto c_style_X = py::detail::check_flags(X.ptr(), py::array::c_style);
-                //errors::assertMsgCritical(c_style_X, errstyle);
-                //errors::assertMsgCritical(Y.size() == X.size(), errshape);
-                X_ptr_s.push_back(X.data());
-            }
-
-            const auto n2 = static_cast<int64_t>(Y.size());
-            gpu::addMatrix(Y.mutable_data(), X_ptr_s, n2, alphas);
-        },
-        "Adds matrix using GPU.");
-
-    m.def(
         "matmul_gpu",
         [](const py::array_t<double>& A, const py::array_t<double>& B) -> py::array_t<double> {
             std::string errshape("matmul_gpu: Mismatch in matrix shape");

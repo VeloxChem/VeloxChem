@@ -1884,47 +1884,6 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 }
 
 auto
-addMatrix(double* Y, const std::vector<const double*>& Xs, const int64_t n, const std::vector<double>& alphas) -> void
-{
-    // TODO allow addMatrix on non-master MPI rank
-
-    auto rank = mpi::rank(MPI_COMM_WORLD);
-
-    std::string errmpirank("gpu::addMatrix: Should only be called from MPI master rank");
-    errors::assertMsgCritical(rank == mpi::master(), errmpirank);
-
-    hipSafe(hipSetDevice(4));
-
-    double *d_Y, *d_X;
-
-    hipSafe(hipMalloc(&d_Y, n * sizeof(double)));
-    hipSafe(hipMalloc(&d_X, n * sizeof(double)));
-
-    hipSafe(hipMemcpy(d_Y, Y, n * sizeof(double), hipMemcpyHostToDevice));
-
-    hipblasHandle_t handle;
-    hipblasSafe(hipblasCreate(&handle));
-
-    for (int64_t i = 0; i < static_cast<int64_t>(Xs.size()); i++)
-    {
-        const auto& X = Xs[i];
-        const auto alpha = alphas[i];
-
-        hipSafe(hipMemcpy(d_X, X, n * sizeof(double), hipMemcpyHostToDevice));
-
-        // Y = alpha * X + Y
-        hipblasSafe(hipblasDaxpy(handle, static_cast<int32_t>(n), &alpha, d_X, 1, d_Y, 1));
-    }
-
-    hipblasSafe(hipblasDestroy(handle));
-
-    hipSafe(hipMemcpy(Y, d_Y, n * sizeof(double), hipMemcpyDeviceToHost));
-
-    hipSafe(hipFree(d_Y));
-    hipSafe(hipFree(d_X));
-}
-
-auto
 computeMatrixMultiplication(double* C, const double* A, const double* B, const int64_t nrows_A, const int64_t ncols_A, const int64_t ncols_B) -> void
 {
     // TODO allow computeMatrixMultiplication on non-master MPI rank
