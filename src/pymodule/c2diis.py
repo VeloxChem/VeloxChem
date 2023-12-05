@@ -37,13 +37,56 @@ class CTwoDiis:
         - error_vectors: The list of error vectors.
     """
 
-    def __init__(self):
+    def __init__(self, max_err_vecs, diis_thresh):
         """
         Initializes iterative subspace by setting list of error vectors to
         empty list.
         """
 
         self.error_vectors = []
+        self.fock_matrices = []
+        self.max_err_vecs = max_err_vecs
+        self.diis_thresh = diis_thresh
+        self.b_matrix = np.zeros((max_err_vecs, max_err_vecs))
+
+    def clear(self):
+
+        self.error_vectors.clear()
+        self.fock_matrices.clear()
+        self.max_err_vecs = None
+        self.diis_thresh = None
+        self.b_matrix = None
+
+    def store_diis_data(self, fock_mat, e_mat, e_grad):
+
+        if e_grad < self.diis_thresh:
+
+            if len(self.error_vectors) == self.max_err_vecs:
+                self.error_vectors.pop(0)
+                self.fock_matrices.pop(0)
+                sub_bmat = self.b_matrix[1:, 1:].copy()
+                self.b_matrix[:-1, :-1] = sub_bmat[:, :]
+
+            self.error_vectors.append(e_mat)
+            self.fock_matrices.append(fock_mat)
+
+            n_vecs = len(self.error_vectors)
+            for i in range(n_vecs):
+                fij = np.vdot(self.error_vectors[i],
+                              self.error_vectors[n_vecs - 1])
+                self.b_matrix[i][n_vecs - 1] = fij
+                self.b_matrix[n_vecs - 1][i] = fij
+
+    def get_effective_fock(self):
+
+        weights = self.compute_weights()
+
+        effmat = np.zeros(self.fock_matrices[0].shape)
+
+        for w, fmat in zip(weights, self.fock_matrices):
+            effmat += w * fmat
+
+        return effmat
 
     def compute_error_vectors_restricted(self, fock_matrices, density_matrices,
                                          overlap_matrix, oao_matrix):
@@ -168,35 +211,13 @@ class CTwoDiis:
             The array of C2-DIIS weights with smallest residual error.
         """
 
-        bmat = self._comp_bmatrix()
+        n_vecs = len(self.error_vectors)
+        bmat = self.b_matrix[:n_vecs, :n_vecs].copy()
 
         beigs, bvecs = np.linalg.eigh(bmat)
-
         weights = self._pick_weights(self._norm_bvectors(bvecs))
 
         return weights
-
-    def _comp_bmatrix(self):
-        """
-        Computes B-matrix of C2-DIIS method using error vectors.
-
-        :return:
-            The B-matrix.
-        """
-
-        bdim = len(self.error_vectors)
-
-        bmat = np.zeros(shape=(bdim, bdim), dtype='float64')
-        bidx = np.triu_indices(bdim)
-
-        for i, j in zip(bidx[0], bidx[1]):
-
-            fij = np.vdot(self.error_vectors[i], self.error_vectors[j])
-
-            bmat[i][j] = fij
-            bmat[j][i] = fij
-
-        return bmat
 
     def _norm_bvectors(self, bvectors):
         """

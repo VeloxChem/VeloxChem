@@ -51,6 +51,7 @@ from .subcommunicators import SubCommunicators
 from .signalhandler import SignalHandler
 from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
+from .c2diis import CTwoDiis
 from .dftutils import get_default_grid_level
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
@@ -147,12 +148,12 @@ class ScfDriver:
         self._num_iter = 0
 
         # DIIS data
-        self._fock_matrices_alpha = deque()
-        self._fock_matrices_beta = deque()
-        self._fock_matrices_proj = deque()
+        #self._fock_matrices_alpha = deque()
+        #self._fock_matrices_beta = deque()
+        #self._fock_matrices_proj = deque()
 
-        self._density_matrices_alpha = deque()
-        self._density_matrices_beta = deque()
+        #self._density_matrices_alpha = deque()
+        #self._density_matrices_beta = deque()
 
         # density matrix and molecular orbitals
         self._density = AODensityMatrix()
@@ -671,12 +672,12 @@ class ScfDriver:
 
             self._comp_diis(molecule, ao_basis, val_basis, den_mat, profiler)
 
-        self._fock_matrices_alpha.clear()
-        self._fock_matrices_beta.clear()
-        self._fock_matrices_proj.clear()
+        #self._fock_matrices_alpha.clear()
+        #self._fock_matrices_beta.clear()
+        #self._fock_matrices_proj.clear()
 
-        self._density_matrices_alpha.clear()
-        self._density_matrices_beta.clear()
+        #self._density_matrices_alpha.clear()
+        #self._density_matrices_beta.clear()
 
         profiler.end(self.ostream, scf_flag=True)
 
@@ -936,12 +937,14 @@ class ScfDriver:
 
         diis_start_time = tm.time()
 
-        self._fock_matrices_alpha.clear()
-        self._fock_matrices_beta.clear()
-        self._fock_matrices_proj.clear()
+        #self._fock_matrices_alpha.clear()
+        #self._fock_matrices_beta.clear()
+        #self._fock_matrices_proj.clear()
 
-        self._density_matrices_alpha.clear()
-        self._density_matrices_beta.clear()
+        #self._density_matrices_alpha.clear()
+        #self._density_matrices_beta.clear()
+
+        acc_diis = CTwoDiis(self.max_err_vecs, self.diis_thresh)
 
         if self.use_split_comm:
             self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
@@ -1097,8 +1100,8 @@ class ScfDriver:
                         elem_ids[i] * (coords[i] - self._dipole_origin),
                         self.electric_field)
 
-            e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
-                                                   oao_mat)
+            e_mat, e_grad, max_grad = self._comp_gradient(fock_mat, ovl_mat, den_mat,
+                                                          oao_mat)
 
             self.ostream.print_info(f'e_grad computed: {e_grad}')
             self.ostream.flush()
@@ -1143,12 +1146,14 @@ class ScfDriver:
 
             profiler.start_timer('StoreDIIS')
 
-            self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
+            #self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
+            acc_diis.store_diis_data(fock_mat, e_mat, e_grad)
 
             profiler.stop_timer('StoreDIIS')
             profiler.start_timer('EffFock')
 
-            eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
+            #eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
+            eff_fock_mat = acc_diis.get_effective_fock()
 
             profiler.stop_timer('EffFock')
 
@@ -1192,6 +1197,8 @@ class ScfDriver:
                 iter_in_hours = (tm.time() - iter_start_time) / 3600
                 if self._need_graceful_exit(iter_in_hours):
                     self._graceful_exit(molecule, ao_basis)
+
+        acc_diis.clear()
 
         if not self._first_step:
             signal_handler.remove_sigterm_function()

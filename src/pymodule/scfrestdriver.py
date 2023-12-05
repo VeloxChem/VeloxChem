@@ -89,28 +89,28 @@ class ScfRestrictedDriver(ScfDriver):
         """
 
         if self.rank == mpi_master():
-
-            m = matmul_gpu(den_mat.alpha_to_numpy(0), ovl_mat)
-            m = matmul_gpu(fock_mat, m)
-
-            m = m - m.T
-
-            m = matmul_gpu(m, oao_mat)
+            fds = matmul_gpu(fock_mat, matmul_gpu(den_mat.alpha_to_numpy(0), ovl_mat))
+            fds = fds - fds.T
             # TODO: allow transpose in matmul_gpu
-            m = matmul_gpu(oao_mat.T.copy(), m)
+            e_mat = matmul_gpu(oao_mat.T.copy(), matmul_gpu(fds, oao_mat))
 
-            e_mat = m
-
+            e_mat_shape = e_mat.shape
             e_grad = 2.0 * np.linalg.norm(e_mat)
             max_grad = np.max(np.abs(e_mat))
         else:
-            e_grad = 0.0
-            max_grad = 0.0
+            e_mat_shape = None
+            e_grad = None
+            max_grad = None
 
+        e_mat_shape = self.comm.bcast(e_mat_shape, root=mpi_master())
         e_grad = self.comm.bcast(e_grad, root=mpi_master())
         max_grad = self.comm.bcast(max_grad, root=mpi_master())
 
-        return e_grad, max_grad
+        if self.rank != mpi_master():
+            e_mat = np.zeros(e_mat_shape)
+        self.comm.Bcast(e_mat, root=mpi_master())
+
+        return e_mat, e_grad, max_grad
 
     def _comp_density_change(self, den_mat, old_den_mat):
         """
