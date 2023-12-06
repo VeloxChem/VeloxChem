@@ -944,7 +944,8 @@ class ScfDriver:
         #self._density_matrices_alpha.clear()
         #self._density_matrices_beta.clear()
 
-        acc_diis = CTwoDiis(self.max_err_vecs, self.diis_thresh)
+        if self.rank == mpi_master():
+            acc_diis = CTwoDiis(self.max_err_vecs, self.diis_thresh)
 
         if self.use_split_comm:
             self.use_split_comm = ((self._dft or self._pe) and self.nodes >= 8)
@@ -967,6 +968,8 @@ class ScfDriver:
             else:
                 devices = CudaDevices()
                 num_gpus_per_node = devices.get_number_devices()
+                if 'SLURM_NTASKS_PER_NODE' in os.environ:
+                    num_gpus_per_node //= int(os.environ['SLURM_NTASKS_PER_NODE'])
 
             screener = ScreeningData(molecule, ao_basis, num_gpus_per_node)
 
@@ -1147,13 +1150,17 @@ class ScfDriver:
             profiler.start_timer('StoreDIIS')
 
             #self._store_diis_data(fock_mat, den_mat, ovl_mat, e_grad)
-            acc_diis.store_diis_data(fock_mat, e_mat, e_grad)
+            if self.rank == mpi_master():
+                acc_diis.store_diis_data(fock_mat, e_mat, e_grad)
 
             profiler.stop_timer('StoreDIIS')
             profiler.start_timer('EffFock')
 
             #eff_fock_mat = self._get_effective_fock(fock_mat, ovl_mat, oao_mat)
-            eff_fock_mat = acc_diis.get_effective_fock()
+            if self.rank == mpi_master():
+                eff_fock_mat = acc_diis.get_effective_fock(fock_mat)
+            else:
+                eff_fock_mat = None
 
             profiler.stop_timer('EffFock')
 
@@ -1198,7 +1205,8 @@ class ScfDriver:
                 if self._need_graceful_exit(iter_in_hours):
                     self._graceful_exit(molecule, ao_basis)
 
-        acc_diis.clear()
+        if self.rank == mpi_master():
+            acc_diis.clear()
 
         if not self._first_step:
             signal_handler.remove_sigterm_function()

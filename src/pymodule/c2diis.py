@@ -67,26 +67,32 @@ class CTwoDiis:
                 sub_bmat = self.b_matrix[1:, 1:].copy()
                 self.b_matrix[:-1, :-1] = sub_bmat[:, :]
 
-            self.error_vectors.append(e_mat)
-            self.fock_matrices.append(fock_mat)
+            self.error_vectors.append(e_mat.copy())
+            self.fock_matrices.append(fock_mat.copy())
 
             n_vecs = len(self.error_vectors)
             for i in range(n_vecs):
                 fij = np.vdot(self.error_vectors[i],
                               self.error_vectors[n_vecs - 1])
-                self.b_matrix[i][n_vecs - 1] = fij
-                self.b_matrix[n_vecs - 1][i] = fij
+                self.b_matrix[i, n_vecs - 1] = fij
+                self.b_matrix[n_vecs - 1, i] = fij
 
-    def get_effective_fock(self):
+    def get_effective_fock(self, fock_mat):
 
-        weights = self.compute_weights()
+        n_vecs = len(self.error_vectors)
 
-        effmat = np.zeros(self.fock_matrices[0].shape)
+        if n_vecs == 0:
+            return fock_mat
 
-        for w, fmat in zip(weights, self.fock_matrices):
-            effmat += w * fmat
+        elif n_vecs == 1:
+            return self.fock_matrices[0]
 
-        return effmat
+        else:
+            weights = self.compute_weights()
+            effmat = np.zeros(self.fock_matrices[0].shape)
+            for w, fmat in zip(weights, self.fock_matrices):
+                effmat += w * fmat
+            return effmat
 
     def compute_error_vectors_restricted(self, fock_matrices, density_matrices,
                                          overlap_matrix, oao_matrix):
