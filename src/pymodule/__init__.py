@@ -125,7 +125,10 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .numerovdriver import NumerovDriver
+
+from .seminario import Seminario
 from .atomtypeidentifier import AtomTypeIdentifier
+from .topology import Topology
 
 # for backward compatibility
 from .veloxchemlib import XCIntegrator as XCNewIntegrator
