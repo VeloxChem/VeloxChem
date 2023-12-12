@@ -55,10 +55,11 @@ PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vl
 PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/numpy/core/include
 PYTHON_INC += -I/cfs/klemming/projects/snic/panor/lxin/gitlab/VeloxChemMP.gpu/vlxenv/lib/python3.9/site-packages/pybind11/include
 
-NVCC := hipcc --offload-arch=gfx90a -fopenmp=libomp -std=c++17
-NVCC_REL_FLG := $(XC_INC) -fPIC
-NVCC_DEB_FLG := $(XC_INC) -fPIC
-CUDA_LIB := 
+DEVCC := hipcc --offload-arch=gfx90a -fopenmp=libomp -std=c++17
+DEVCC_REL_FLG := $(XC_INC) -fPIC
+DEVCC_DEB_FLG := $(XC_INC) -fPIC
+DEVICE_LIB := -lhipblas
+#DEVICE_LIB := -lhipblas -lhipsolver
 
 MACLIBS := 
 
@@ -111,16 +112,9 @@ LIB_LIST += $(MACLIBS)
 CXX_REL_FLG += -fPIC $(PYTHON_INC)
 CXX_DEB_FLG += -fPIC $(PYTHON_INC)
 
-# Cuda flags
+# flag for GPU devices
 
-#ifeq ($(USE_GPU),true)
-#  NVCC_REL_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-fPIC" $(PYTHON_INC)
-#  NVCC_DEB_FLG += -std=c++11 -O3 --compiler-options "-Wall" --compiler-options "-fPIC" $(PYTHON_INC) --compiler-options "-g"
-#  LIB_LIST += $(CUDA_LIB)
-#endif
-
-#LIB_LIST += -lhipblas -lhipsolver
-LIB_LIST += -lhipblas
+LIB_LIST += $(DEVICE_LIB)
 
 # XTB interface (optional)
 

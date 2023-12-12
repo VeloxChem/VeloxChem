@@ -25,7 +25,19 @@
 
 #include <hip/hip_runtime.h>
 
+#include <iostream>
+
 #include "DeviceProp.hpp"
+
+#define hipSafe(e)                                                                                                       \
+    {                                                                                                                    \
+        hipError_t err = (e);                                                                                            \
+        if (err != hipSuccess)                                                                                           \
+        {                                                                                                                \
+            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl;  \
+            std::exit(EXIT_FAILURE);                                                                                     \
+        }                                                                                                                \
+    }
 
 namespace gpu {  // gpu namespace
 
@@ -35,16 +47,15 @@ getDevicesProperty(std::vector<std::string>& namesOfDevices,
                    std::vector<int64_t>&     computeMajorCapabilityOfDevices,
                    std::vector<int64_t>&     computeMinorCapabilityOfDevices)
 {
-#ifdef ENABLE_GPU
     int device_count = 0;
 
-    hipGetDeviceCount(&device_count);
+    hipSafe(hipGetDeviceCount(&device_count));
 
     for (int i = 0; i < device_count; i++)
     {
         hipDeviceProp_t prop;
 
-        hipGetDeviceProperties(&prop, i);
+        hipSafe(hipGetDeviceProperties(&prop, i));
 
         namesOfDevices.push_back(std::string(prop.name));
 
@@ -54,7 +65,6 @@ getDevicesProperty(std::vector<std::string>& namesOfDevices,
 
         computeMinorCapabilityOfDevices.push_back(static_cast<int64_t>(prop.minor));
     }
-#endif
 }
 
 }  // namespace gpu

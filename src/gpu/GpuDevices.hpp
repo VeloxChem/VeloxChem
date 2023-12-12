@@ -23,59 +23,60 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#ifndef CudaDevices_hpp
-#define CudaDevices_hpp
+#ifndef GpuDevices_hpp
+#define GpuDevices_hpp
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
 /**
- Class CudaDevices stores data about available CUDA devices and provides these devices managment functions.
+ Class GpuDevices stores data about available GPU devices and provides these
+ devices managment functions.
 
  @author Z. Rinkevicius
  */
-class CCudaDevices
+class CGpuDevices
 {
     /**
-     The vector of names of CUDA compute capable devices.
+     The vector of names of GPU devices.
      */
     std::vector<std::string> _namesOfDevices;
 
     /**
-     The vector of available global memory on CUDA compute capable devices.
+     The vector of available global memory on GPU devices.
      */
     std::vector<int64_t> _globalMemoryOfDevices;
 
     /**
-     The vector of compute major capabilities on CUDA compute capable devices.
+     The vector of compute major capabilities on GPU devices.
      */
     std::vector<int64_t> _computeMajorCapabilityOfDevices;
 
     /**
-     The vector of compute minor capabilities on CUDA compute capable devices.
+     The vector of compute minor capabilities on GPU devices.
      */
     std::vector<int64_t> _computeMinorCapabilityOfDevices;
 
    public:
     /**
-     Creates an CUDA devices object.
+     Creates an GPU devices object.
      */
-    CCudaDevices();
+    CGpuDevices();
 
     /**
-     Gets number of CUDA compute capable devices.
+     Gets number of GPU devices.
 
      @return the number of devices.
      */
     int64_t getNumberOfDevices() const;
 
     /**
-     Gets string representation of CUDA devices object.
+     Gets string representation of GPU devices object.
 
      @return the representation string.
      */
     std::string getString() const;
 };
 
-#endif /* CudaDevices_hpp */
+#endif /* GpuDevices_hpp */

@@ -52,14 +52,14 @@
 
 #define TILE_DIM 16
 
-#define hipSafe(e)                                                                                                       \
-    {                                                                                                                     \
-        hipError_t err = (e);                                                                                            \
-        if (err != hipSuccess)                                                                                           \
-        {                                                                                                                 \
-            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                                      \
-        }                                                                                                                 \
+#define hipSafe(e)                                                                                                      \
+    {                                                                                                                   \
+        hipError_t err = (e);                                                                                           \
+        if (err != hipSuccess)                                                                                          \
+        {                                                                                                               \
+            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
+            std::exit(EXIT_FAILURE);                                                                                    \
+        }                                                                                                               \
     }
 
 namespace gpu {  // gpu namespace
@@ -92,7 +92,7 @@ zeroKohnShamMatrix(double* d_mat_Vxc_full, const uint32_t naos)
 }
 
 __global__ void
-cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_values, const uint32_t aocount, const uint32_t npoints)
+getDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_values, const uint32_t aocount, const uint32_t npoints)
 {
     __shared__ double As[TILE_DIM][TILE_DIM + 1];
     __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
@@ -135,16 +135,16 @@ cudaDensityOnGrids(double* d_rho, const double* d_mat_F, const double* d_gto_val
 }
 
 __global__ void
-cudaDensitySigmaOnGrids(double*        d_rho,
-                        double*        d_rhograd,
-                        double*        d_sigma,
-                        const double*  d_mat_F,
-                        const double*  d_gto_values,
-                        const double*  d_gto_values_x,
-                        const double*  d_gto_values_y,
-                        const double*  d_gto_values_z,
-                        const uint32_t aocount,
-                        const uint32_t npoints)
+getDensitySigmaOnGrids(double*        d_rho,
+                       double*        d_rhograd,
+                       double*        d_sigma,
+                       const double*  d_mat_F,
+                       const double*  d_gto_values,
+                       const double*  d_gto_values_x,
+                       const double*  d_gto_values_y,
+                       const double*  d_gto_values_z,
+                       const uint32_t aocount,
+                       const uint32_t npoints)
 {
     __shared__ double As[TILE_DIM][TILE_DIM + 1];
     __shared__ double Bs[TILE_DIM][TILE_DIM + 1];
@@ -213,13 +213,13 @@ cudaDensitySigmaOnGrids(double*        d_rho,
 }
 
 __global__ void
-cudaGetLdaMatrixG(double*        d_mat_G,
-                  const double*  d_grid_w,
-                  const uint32_t grid_offset,
-                  const uint32_t npoints,
-                  const double*  d_gto_values,
-                  const uint32_t aocount,
-                  const double*  d_vrho)
+getLdaMatrixG(double*        d_mat_G,
+              const double*  d_grid_w,
+              const uint32_t grid_offset,
+              const uint32_t npoints,
+              const double*  d_gto_values,
+              const uint32_t aocount,
+              const double*  d_vrho)
 {
     const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
@@ -231,18 +231,18 @@ cudaGetLdaMatrixG(double*        d_mat_G,
 }
 
 __global__ void
-cudaGetGgaMatrixG(double*        d_mat_G,
-                  const double*  d_grid_w,
-                  const uint32_t grid_offset,
-                  const uint32_t npoints,
-                  const double*  d_gto_values,
-                  const double*  d_gto_values_x,
-                  const double*  d_gto_values_y,
-                  const double*  d_gto_values_z,
-                  const uint32_t aocount,
-                  const double*  d_rhograd,
-                  const double*  d_vrho,
-                  const double*  d_vsigma)
+getGgaMatrixG(double*        d_mat_G,
+              const double*  d_grid_w,
+              const uint32_t grid_offset,
+              const uint32_t npoints,
+              const double*  d_gto_values,
+              const double*  d_gto_values_x,
+              const double*  d_gto_values_y,
+              const double*  d_gto_values_z,
+              const uint32_t aocount,
+              const double*  d_rhograd,
+              const double*  d_vrho,
+              const double*  d_vsigma)
 {
     const uint32_t i = blockIdx.y * blockDim.y + threadIdx.y;
     const uint32_t g = blockIdx.x * blockDim.x + threadIdx.x;
@@ -1078,7 +1078,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
         // Note: one block in y dimension
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        hipLaunchKernelGGL(gpu::cudaDensityOnGrids, num_blocks, threads_per_block, 0, 0, 
+        hipLaunchKernelGGL(gpu::getDensityOnGrids, num_blocks, threads_per_block, 0, 0, 
             d_rho, d_mat_F, d_gto_values, static_cast<uint32_t>(aocount), static_cast<uint32_t>(npoints));
 
         hipSafe(hipMemcpy(rho, d_rho, 2 * npoints * sizeof(double), hipMemcpyDeviceToHost));
@@ -1098,7 +1098,7 @@ integrateVxcFockForLDA(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::cudaGetLdaMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
+        hipLaunchKernelGGL(gpu::getLdaMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
                                                                   d_grid_w,
                                                                   static_cast<uint32_t>(gridblockpos),
                                                                   static_cast<uint32_t>(npoints),
@@ -1409,7 +1409,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
         // Note: one block in y dimension
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, 1);
 
-        hipLaunchKernelGGL(gpu::cudaDensitySigmaOnGrids, num_blocks, threads_per_block, 0, 0, d_rho,
+        hipLaunchKernelGGL(gpu::getDensitySigmaOnGrids, num_blocks, threads_per_block, 0, 0, d_rho,
                                                                         d_rhograd,
                                                                         d_sigma,
                                                                         d_mat_F,
@@ -1440,7 +1440,7 @@ integrateVxcFockForGGA(const CMolecule&        molecule,
 
         num_blocks = dim3((npoints + threads_per_block.x - 1) / threads_per_block.x, (aocount + threads_per_block.y - 1) / threads_per_block.y);
 
-        hipLaunchKernelGGL(gpu::cudaGetGgaMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
+        hipLaunchKernelGGL(gpu::getGgaMatrixG, num_blocks, threads_per_block, 0, 0, d_mat_G,
                                                                   d_grid_w,
                                                                   static_cast<uint32_t>(gridblockpos),
                                                                   static_cast<uint32_t>(npoints),

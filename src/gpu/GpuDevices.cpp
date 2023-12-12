@@ -23,7 +23,7 @@
 //  You should have received a copy of the GNU Lesser General Public License
 //  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
-#include "CudaDevices.hpp"
+#include "GpuDevices.hpp"
 
 #include <cmath>
 #include <iomanip>
@@ -32,7 +32,7 @@
 #include "DeviceProp.hpp"
 #include "StringFormat.hpp"
 
-CCudaDevices::CCudaDevices()
+CGpuDevices::CGpuDevices()
 
     : _namesOfDevices(std::vector<std::string>())
 
@@ -42,23 +42,21 @@ CCudaDevices::CCudaDevices()
 
     , _computeMinorCapabilityOfDevices(std::vector<int64_t>())
 {
-#ifdef ENABLE_GPU
     gpu::getDevicesProperty(_namesOfDevices, _globalMemoryOfDevices, _computeMajorCapabilityOfDevices, _computeMinorCapabilityOfDevices);
-#endif
 }
 
 int64_t
-CCudaDevices::getNumberOfDevices() const
+CGpuDevices::getNumberOfDevices() const
 {
     return static_cast<int64_t>(_namesOfDevices.size());
 }
 
 std::string
-CCudaDevices::getString() const
+CGpuDevices::getString() const
 {
     std::stringstream ss;
 
-    std::string str("CUDA Compute Capable Devices");
+    std::string str("GPU Devices");
 
     ss << str << "\n" << std::string(str.size(), '=') << "\n\n";
 

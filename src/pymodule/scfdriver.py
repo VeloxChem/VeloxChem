@@ -38,7 +38,7 @@ from .veloxchemlib import (OverlapDriver, KineticEnergyDriver,
 from .veloxchemlib import AODensityMatrix, denmat, make_matrix, mat_t
 from .veloxchemlib import GridDriver, MolecularGrid, XCIntegrator
 from .veloxchemlib import AOKohnShamMatrix, DenseMatrix
-from .veloxchemlib import ScreeningData, CudaDevices
+from .veloxchemlib import ScreeningData, GpuDevices
 from .veloxchemlib import mpi_master
 from .veloxchemlib import xcfun
 from .veloxchemlib import compute_fock_gpu, eigh_gpu
@@ -966,7 +966,7 @@ class ScfDriver:
             if 'VLX_NUM_GPUS_PER_NODE' in os.environ:
                 num_gpus_per_node = int(os.environ['VLX_NUM_GPUS_PER_NODE'])
             else:
-                devices = CudaDevices()
+                devices = GpuDevices()
                 num_gpus_per_node = devices.get_number_devices()
                 if 'SLURM_NTASKS_PER_NODE' in os.environ:
                     num_gpus_per_node //= int(os.environ['SLURM_NTASKS_PER_NODE'])

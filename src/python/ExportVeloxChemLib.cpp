@@ -38,9 +38,7 @@ PYBIND11_MODULE(veloxchemlib, m)
 {
     vlx_general::export_general(m);
 
-#ifdef ENABLE_GPU
     vlx_gpu::export_gpu(m);
-#endif
 
     vlx_math::export_math(m);
 

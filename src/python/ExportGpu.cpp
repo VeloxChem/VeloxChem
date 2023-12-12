@@ -32,7 +32,7 @@
 
 #include <vector>
 
-#include "CudaDevices.hpp"
+#include "GpuDevices.hpp"
 #include "ErrorHandler.hpp"
 #include "FockDriverGPU.hpp"
 #include "ExportGeneral.hpp"
@@ -49,12 +49,12 @@ namespace vlx_gpu {  // vlx_gpu namespace
 void
 export_gpu(py::module& m)
 {
-    // CCudaDevices class
+    // CGpuDevices class
 
-    py::class_<CCudaDevices, std::shared_ptr<CCudaDevices>>(m, "CudaDevices")
+    py::class_<CGpuDevices, std::shared_ptr<CGpuDevices>>(m, "GpuDevices")
         .def(py::init<>())
-        .def("get_number_devices", &CCudaDevices::getNumberOfDevices)
-        .def("__str__", &CCudaDevices::getString);
+        .def("get_number_devices", &CGpuDevices::getNumberOfDevices)
+        .def("__str__", &CGpuDevices::getString);
 
     // CScreeningData class
 

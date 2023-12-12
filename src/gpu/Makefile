@@ -14,29 +14,29 @@ LOCAL_OBJ := $(subst .cpp,.o,$(LOCAL_SCR))
 LOCAL_DEP := $(subst .cpp,.d,$(LOCAL_SCR))
 LOCAL_OPT := $(subst .cpp,.optrpt,$(LOCAL_SCR))
 
-LOCAL_CU_SCR := $(wildcard *.hip)
-LOCAL_CU_OBJ := $(subst .hip,.o,$(LOCAL_CU_SCR))
-LOCAL_CU_DEP := $(subst .hip,.d,$(LOCAL_CU_SCR))
-LOCAL_CU_OPT := $(subst .hip,.optrpt,$(LOCAL_CU_SCR))
+LOCAL_DEV_SCR := $(wildcard *.hip)
+LOCAL_DEV_OBJ := $(subst .hip,.o,$(LOCAL_DEV_SCR))
+LOCAL_DEV_DEP := $(subst .hip,.d,$(LOCAL_DEV_SCR))
+LOCAL_DEV_OPT := $(subst .hip,.optrpt,$(LOCAL_DEV_SCR))
 
 # Read in compilers & shell commands info
 include ../Makefile.setup
 
-# Add cuda objects
+# Add device objects
 ifeq ($(USE_GPU),true)
-LOCAL_SCR += $(LOCAL_CU_SCR)
-LOCAL_OBJ += $(LOCAL_CU_OBJ)
-LOCAL_DEP += $(LOCAL_CU_DEP)
-LOCAL_OPT += $(LOCAL_CU_OPT)
+LOCAL_SCR += $(LOCAL_DEV_SCR)
+LOCAL_OBJ += $(LOCAL_DEV_OBJ)
+LOCAL_DEP += $(LOCAL_DEV_DEP)
+LOCAL_OPT += $(LOCAL_DEV_OPT)
 endif
 
 # Select compiler flags
 ifneq "$(MAKECMDGOALS)" "release"
-NVCCFLAGS := $(NVCC_DEB_FLG)
+DEVCCFLAGS := $(DEVCC_DEB_FLG)
 CXXFLAGS := $(CXX_DEB_FLG)
 CPPFLAGS := $(CPP_DEB_FLG)
 else
-NVCCFLAGS := $(NVCC_REL_FLG)
+DEVCCFLAGS := $(DEVCC_REL_FLG)
 CXXFLAGS := $(CXX_DEB_FLG)
 CPPFLAGS := $(CPP_REL_FLG)
 endif
@@ -45,11 +45,11 @@ endif
 VLX_INCLUDES := ${shell find ../* -type d -print}
 
 # Update CXX flags & includes path
-NVCCFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
+DEVCCFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
 vpath %.hpp $(VLX_INCLUDES)
 
 # Add MKL includes
-NVCCFLAGS += $(MATH_INC)
+DEVCCFLAGS += $(MATH_INC)
 
 # Update CXX flags & includes path
 CXXFLAGS += $(addprefix -I $(CURDIR)/,$(VLX_INCLUDES))
@@ -81,12 +81,12 @@ endif
 # Default rule for compiling cu files
 %.o: %.hip
 	@echo ====== Compiling $@...
-	$(NVCC) -c $(NVCCFLAGS) $(CPPFLAGS) $(LIB_INC) -o $@ $<
+	$(DEVCC) -c $(DEVCCFLAGS) $(CPPFLAGS) $(LIB_INC) -o $@ $<
 
 # Default rule for generating dependencies
 %.d: %.hip
 	@echo ====== Updating dependencies for $@
-	$(NVCC) $(NVCCFLAGS) $(CPPFLAGS) -M $< > $@
+	$(DEVCC) $(DEVCCFLAGS) $(CPPFLAGS) -M $< > $@
 
 # Default rule for compiling cpp files
 %.o: %.cpp

@@ -51,14 +51,14 @@
 
 #define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
 
-#define hipSafe(e)                                                                                                        \
-    {                                                                                                                     \
-        hipError_t err = (e);                                                                                             \
-        if (err != hipSuccess)                                                                                            \
-        {                                                                                                                 \
-            std::cerr << "CUDA error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl;  \
-            std::exit(EXIT_FAILURE);                                                                                      \
-        }                                                                                                                 \
+#define hipSafe(e)                                                                                                      \
+    {                                                                                                                   \
+        hipError_t err = (e);                                                                                           \
+        if (err != hipSuccess)                                                                                          \
+        {                                                                                                               \
+            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
+            std::exit(EXIT_FAILURE);                                                                                    \
+        }                                                                                                               \
     }
 
 namespace gpu {  // gpu namespace
