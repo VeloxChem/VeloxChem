@@ -1,5 +1,6 @@
 import math
 import numpy as np
+# from veloxchem import mathconst_pi, hartree_in_kcalpermol, bohr_in_angstrom, Molecule
 from .veloxchemlib import mathconst_pi
 from .veloxchemlib import hartree_in_kcalpermol
 from .veloxchemlib import bohr_in_angstrom
@@ -8,17 +9,33 @@ from .seminario import Seminario
 from .atomtypeidentifier import AtomTypeIdentifier
 
 class Topology():
-    def __init__(self,molecule:Molecule,ff_file_path:str):
+
+    """
+    example:
+    >>> top = Topology()
+    >>> top.lead_forcefield(molecule,"path_to_gaff.dat")
+    >>> top.load_charge(charge_array)
+    >>> top.reparameterise(molecule, hessian)
+    >>> top.write_itp(filename,output_folder)
+    >>> top.write_top(filename,output_folder)
+    """
+    def __init__(self):
+        ""
+
+    def load_forcefield(self,molecule,ff_file_path):
         """
-        Generates a topology based on standard force-field parameters corresponding to a given molecule
+        Populates the topology based on the force-field parameters corresponding to a given molecule
         """
-        ff_data = AtomTypeIdentifier(molecule).generate_force_field_dict(ff_file_path)
+        ao_identifier = AtomTypeIdentifier()
+        ao_identifier.generate_gaff_atomtypes(molecule)
+        ff_data = ao_identifier.generate_force_field_dict(ff_file_path)
         self.atoms = ff_data['atomtypes']
         self.bonds = ff_data['bonds']
         self.angles = ff_data['angles']
         self.dihedrals = ff_data['dihedrals']
         self.impropers = ff_data['impropers']
         self.pairs = ff_data['pairs']
+        return ao_identifier
 
     def update_charge(self,charges):
         """
@@ -43,7 +60,7 @@ class Topology():
             itp_string += f'{atom_data["type"]:<6} {atom_data["type"]:<10} {atom_data["mass"]:<7.2f} 0.0000  A {atom_data["sigma"]:11.4e} {atom_data["epsilon"]:11.4e}\n'
 
         # Print the moleculetype section
-        itp_string += f"[moleculetype]\n; name  nrexcl\{RES}  3\n\n"
+        itp_string += f"[moleculetype]\n; name  nrexcl\n{RES}  3\n\n"
         
         # Print the atoms section
         itp_string += '[ atoms ]\n'
@@ -117,6 +134,7 @@ class Topology():
 
         # Print the molecules section
         top_string += f"\n[ molecules ]\n; name  number\n{RES}  1\n"
+        return top_string
 
     def write_top(self,filename,output_folder,RES="MOL"):
         """

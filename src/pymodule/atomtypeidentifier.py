@@ -29,6 +29,7 @@ import re
 import networkx as nx
 import math
 
+
 from .molecule import Molecule
 from .veloxchemlib import bohr_in_angstrom
 from .veloxchemlib import mathconst_pi
@@ -74,8 +75,8 @@ class AtomTypeIdentifier:
     the file and set the corresponding attributes.
 
     Example:
-        >>> atom_identifier = AtomTypeIdentifier('molecule.xyz')
-        >>> print(atom_identifier.gaff_atom_types)
+        >>> atom_identifier = AtomTypeIdentifier()
+        >>> atom_identifier.generate_gaff_atom_types(molecule)
     """
 
     def __init__(self):
@@ -85,16 +86,6 @@ class AtomTypeIdentifier:
         Args:
             self
         """
-
-    def __init__(self, molecule:Molecule):
-        """
-        Initializes the AtomTypeIdentifier instance and calls generate_gaff_atomtypes
-
-        Args:
-            self
-            molecule
-        """
-        self.generate_gaff_atomtypes(molecule)
 
     def create_connectivity_matrix(self, coordinates, covalent_radii, factor=1.3):
         """
