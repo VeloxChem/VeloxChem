@@ -25,41 +25,11 @@
 
 #include <hip/hip_runtime.h>
 
-#include <algorithm>
-#include <cstdint>
-#include <cstring>
-#include <iostream>
-#include <string>
-#include <tuple>
-#include <vector>
-
-#include "BoysFuncTable.hpp"
-#include "EriCoulombExchange.hpp"
-#include "ErrorHandler.hpp"
-#include "GtoFunc.hpp"
-#include "GtoInfo.hpp"
-#include "MathConst.hpp"
-#include "MathFunc.hpp"
-#include "MatrixFunc.hpp"
-#include "MpiFunc.hpp"
-#include "MultiTimer.hpp"
-#include "StringFormat.hpp"
-
 #define TILE_DIM 16
 
 #define MATH_CONST_PI 3.14159265358979323846
 
 #define MATH_CONST_HALF_SQRT_PI 0.88622692545275794096
-
-#define hipSafe(e)                                                                                                      \
-    {                                                                                                                   \
-        hipError_t err = (e);                                                                                           \
-        if (err != hipSuccess)                                                                                          \
-        {                                                                                                               \
-            std::cerr << "HIP error in " << __FILE__ << ":" << __LINE__ << ": " << hipGetErrorString(err) << std::endl; \
-            std::exit(EXIT_FAILURE);                                                                                    \
-        }                                                                                                               \
-    }
 
 namespace gpu {  // gpu namespace
 
@@ -85,7 +55,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         const double f2a = fa + fa;
 
-        const double fx = std::exp(-fa);
+        const double fx = exp(-fa);
 
         for (uint32_t j = 0; j < N; j++)
         {
@@ -98,7 +68,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
         double pf = 0.5 * fia;
 
-        values[0] = MATH_CONST_HALF_SQRT_PI * std::sqrt(fia);
+        values[0] = MATH_CONST_HALF_SQRT_PI * sqrt(fia);
 
         if (pnt < 921)
         {
@@ -106,7 +76,7 @@ computeBoysFunction(double* values, const double fa, const uint32_t N, const dou
 
             const double f = 0.4999489092 * fia - 0.2473631686 * fia2 + 0.3211809090 * fia2 * fia - 0.3811559346 * fia2 * fia2;
 
-            const double fx = std::exp(-fa);
+            const double fx = exp(-fa);
 
             values[0] -= f * fx;
 
@@ -173,7 +143,7 @@ computeCoulombFockSSSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count_local) && (std::fabs(mat_Q_local[ij] * mat_Q[kl] * mat_D[kl]) > 1.0e-13))
+        if ((kl < ss_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(mat_Q_local[ij] * mat_Q[kl] * mat_D[kl]) > 1.0e-13))
         {
             const auto i = first_inds_local[ij];
             const auto j = second_inds_local[ij];
@@ -216,14 +186,14 @@ computeCoulombFockSSSS(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F0_t[1];
 
             gpu::computeBoysFunction(F0_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 0, boys_func_table, boys_func_ft);
 
-            const auto S_ij = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-            const auto S_kl = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_ij = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_kl = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // NOTE: doubling for off-diagonal elements of D due to k<=>l symmetry
             ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij * S_kl * F0_t[0] * mat_D[kl] * (k == l ? 1.0 : 2.0);
@@ -294,7 +264,7 @@ computeCoulombFockSSSP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (std::fabs(ss_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-13))
+        if ((kl < sp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-13))
         {
             const auto i = ss_first_inds_local[ij];
             const auto j = ss_second_inds_local[ij];
@@ -343,15 +313,15 @@ computeCoulombFockSSSP(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F1_t[2];
 
             gpu::computeBoysFunction(F1_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 1, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // p-1: py
             // p_0: pz
@@ -438,7 +408,7 @@ computeCoulombFockSSPP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (std::fabs(ss_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-13))
+        if ((kl < pp_prim_pair_count) && (ij < ss_prim_pair_count_local) && (fabs(ss_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-13))
         {
             const auto i = ss_first_inds_local[ij];
             const auto j = ss_second_inds_local[ij];
@@ -488,15 +458,15 @@ computeCoulombFockSSPP(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F2_t[3];
 
             gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // p-1: py
             // p_0: pz
@@ -603,7 +573,7 @@ computeCoulombFockSPSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < sp_prim_pair_count_local) && (std::fabs(sp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-13))
+        if ((kl < ss_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-13))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -652,15 +622,15 @@ computeCoulombFockSPSS(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F1_t[2];
 
             gpu::computeBoysFunction(F1_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 1, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // p-1: py
             // p_0: pz
@@ -747,7 +717,7 @@ computeCoulombFockSPSP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (std::fabs(sp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-13))
+        if ((kl < sp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-13))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -797,14 +767,14 @@ computeCoulombFockSPSP(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F2_t[3];
 
             gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // p-1: py
             // p_0: pz
@@ -901,7 +871,7 @@ computeCoulombFockSPPP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (std::fabs(sp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-13))
+        if ((kl < pp_prim_pair_count) && (ij < sp_prim_pair_count_local) && (fabs(sp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-13))
         {
             const auto i = sp_first_inds_local[ij];
             const auto j = sp_second_inds_local[ij];
@@ -952,14 +922,14 @@ computeCoulombFockSPPP(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F3_t[4];
 
             gpu::computeBoysFunction(F3_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // p-1: py
             // p_0: pz
@@ -1094,7 +1064,7 @@ computeCoulombFockPPSS(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < ss_prim_pair_count) && (ij < pp_prim_pair_count_local) && (std::fabs(pp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-13))
+        if ((kl < ss_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * ss_mat_Q[kl] * ss_mat_D[kl]) > 1.0e-13))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -1144,15 +1114,15 @@ computeCoulombFockPPSS(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F2_t[3];
 
             gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // p-1: py
             // p_0: pz
@@ -1259,7 +1229,7 @@ computeCoulombFockPPSP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < sp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (std::fabs(pp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-13))
+        if ((kl < sp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * sp_mat_Q[kl] * sp_mat_D[kl]) > 1.0e-13))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -1310,14 +1280,14 @@ computeCoulombFockPPSP(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F3_t[4];
 
             gpu::computeBoysFunction(F3_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // p-1: py
             // p_0: pz
@@ -1450,7 +1420,7 @@ computeCoulombFockPPPP(double*         mat_J,
     {
         const uint32_t kl = m * TILE_DIM + threadIdx.y;
 
-        if ((kl < pp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (std::fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-13))
+        if ((kl < pp_prim_pair_count) && (ij < pp_prim_pair_count_local) && (fabs(pp_mat_Q_local[ij] * pp_mat_Q[kl] * pp_mat_D[kl]) > 1.0e-13))
         {
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
@@ -1502,14 +1472,14 @@ computeCoulombFockPPPP(double*         mat_J,
 
             // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-            const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+            const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
             double F4_t[5];
 
             gpu::computeBoysFunction(F4_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-            const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-            const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+            const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+            const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
             // p-1: py
             // p_0: pz
@@ -1743,7 +1713,7 @@ computeExchangeFockSSSS(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_ss[i * s_prim_count + j];
                 const auto Q_kl = mat_Q_for_K_ss[k * s_prim_count + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_ss[i * s_prim_count + j];
                     const auto l_prim = density_inds_for_K_ss[k * s_prim_count + l];
@@ -1786,7 +1756,7 @@ computeExchangeFockSSSS(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     const auto t = (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ;
 
@@ -1794,8 +1764,8 @@ computeExchangeFockSSSS(double*         mat_K,
 
                     gpu::computeBoysFunction(F0_t, t, 0, boys_func_table, boys_func_ft);
 
-                    const auto S_ij = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     ERIs[threadIdx.y][threadIdx.x] = Lambda * S_ij * S_kl * F0_t[0] * mat_D_full_AO[j_cgto * naos + l_cgto];
                 }
@@ -1895,7 +1865,7 @@ computeExchangeFockSSSP(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_ss[i * s_prim_count + j];
                 const auto Q_kl = mat_Q_for_K_sp[k * p_prim_count * 3 + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_ss[i * s_prim_count + j];
                     const auto l_prim = density_inds_for_K_sp[k * p_prim_count * 3 + l];
@@ -1944,15 +1914,15 @@ computeExchangeFockSSSP(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F1_t[2];
 
                     gpu::computeBoysFunction(F1_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 1, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -2068,7 +2038,7 @@ computeExchangeFockSPSS(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_sp[i * p_prim_count * 3 + j];
                 const auto Q_kl = mat_Q_for_K_ss[k * s_prim_count + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_sp[i * p_prim_count * 3 + j];
                     const auto l_prim = density_inds_for_K_ss[k * s_prim_count + l];
@@ -2117,15 +2087,15 @@ computeExchangeFockSPSS(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F1_t[2];
 
                     gpu::computeBoysFunction(F1_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 1, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -2239,7 +2209,7 @@ computeExchangeFockSPSP(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_sp[i * p_prim_count * 3 + j];
                 const auto Q_kl = mat_Q_for_K_sp[k * p_prim_count * 3 + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_sp[i * p_prim_count * 3 + j];
                     const auto l_prim = density_inds_for_K_sp[k * p_prim_count * 3 + l];
@@ -2290,14 +2260,14 @@ computeExchangeFockSPSP(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F2_t[3];
 
                     gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -2423,7 +2393,7 @@ computeExchangeFockSSPS(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_ss[i * s_prim_count + j];
                 const auto Q_kl = mat_Q_for_K_ps[k * s_prim_count + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_ss[i * s_prim_count + j];
                     const auto l_prim = density_inds_for_K_ps[k * s_prim_count + l];
@@ -2473,15 +2443,15 @@ computeExchangeFockSSPS(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F1_t[2];
 
                     gpu::computeBoysFunction(F1_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 1, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -2597,7 +2567,7 @@ computeExchangeFockSSPP(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_ss[i * s_prim_count + j];
                 const auto Q_kl = mat_Q_for_K_pp[k * p_prim_count * 3 + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_ss[i * s_prim_count + j];
                     const auto l_prim = density_inds_for_K_pp[k * p_prim_count * 3 + l];
@@ -2647,15 +2617,15 @@ computeExchangeFockSSPP(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F2_t[3];
 
                     gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -2791,7 +2761,7 @@ computeExchangeFockSPPS(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_sp[i * p_prim_count * 3 + j];
                 const auto Q_kl = mat_Q_for_K_ps[k * s_prim_count + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_sp[i * p_prim_count * 3 + j];
                     const auto l_prim = density_inds_for_K_ps[k * s_prim_count + l];
@@ -2841,14 +2811,14 @@ computeExchangeFockSPPS(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F2_t[3];
 
                     gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -2974,7 +2944,7 @@ computeExchangeFockSPPP(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_sp[i * p_prim_count * 3 + j];
                 const auto Q_kl = mat_Q_for_K_pp[k * p_prim_count * 3 + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_sp[i * p_prim_count * 3 + j];
                     const auto l_prim = density_inds_for_K_pp[k * p_prim_count * 3 + l];
@@ -3025,14 +2995,14 @@ computeExchangeFockSPPP(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F3_t[4];
 
                     gpu::computeBoysFunction(F3_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -3194,7 +3164,7 @@ computeExchangeFockPSPS(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_ps[i * s_prim_count + j];
                 const auto Q_kl = mat_Q_for_K_ps[k * s_prim_count + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_ps[i * s_prim_count + j];
                     const auto l_prim = density_inds_for_K_ps[k * s_prim_count + l];
@@ -3245,14 +3215,14 @@ computeExchangeFockPSPS(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F2_t[3];
 
                     gpu::computeBoysFunction(F2_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 2, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -3378,7 +3348,7 @@ computeExchangeFockPSPP(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_ps[i * s_prim_count + j];
                 const auto Q_kl = mat_Q_for_K_pp[k * p_prim_count * 3 + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_ps[i * s_prim_count + j];
                     const auto l_prim = density_inds_for_K_pp[k * p_prim_count * 3 + l];
@@ -3429,14 +3399,14 @@ computeExchangeFockPSPP(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F3_t[4];
 
                     gpu::computeBoysFunction(F3_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -3600,7 +3570,7 @@ computeExchangeFockPPPS(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_pp[i * p_prim_count * 3 + j];
                 const auto Q_kl = mat_Q_for_K_ps[k * s_prim_count + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_pp[i * p_prim_count * 3 + j];
                     const auto l_prim = density_inds_for_K_ps[k * s_prim_count + l];
@@ -3651,14 +3621,14 @@ computeExchangeFockPPPS(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F3_t[4];
 
                     gpu::computeBoysFunction(F3_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 3, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
@@ -3817,7 +3787,7 @@ computeExchangeFockPPPP(double*         mat_K,
                 const auto Q_ij = mat_Q_for_K_pp[i * p_prim_count * 3 + j];
                 const auto Q_kl = mat_Q_for_K_pp[k * p_prim_count * 3 + l];
 
-                if (std::fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
+                if (fabs(Q_ij * Q_kl * max_D) > 1.0e-12)
                 {
                     const auto j_prim = density_inds_for_K_pp[i * p_prim_count * 3 + j];
                     const auto l_prim = density_inds_for_K_pp[k * p_prim_count * 3 + l];
@@ -3869,14 +3839,14 @@ computeExchangeFockPPPP(double*         mat_K,
 
                     // Electron. J. Theor. Chem., Vol. 2, 66–70 (1997)
 
-                    const auto Lambda = std::sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
+                    const auto Lambda = sqrt(4.0 * (a_i + a_j) * (a_k + a_l) / (MATH_CONST_PI * (a_i + a_j + a_k + a_l)));
 
                     double F4_t[5];
 
                     gpu::computeBoysFunction(F4_t, (a_i + a_j) * (a_k + a_l) / (a_i + a_j + a_k + a_l) * r2_PQ, 4, boys_func_table, boys_func_ft);
 
-                    const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
-                    const auto S_kl_00 = c_k * c_l * std::pow(MATH_CONST_PI / (a_k + a_l), 1.5) * std::exp(-a_k * a_l / (a_k + a_l) * r2_kl);
+                    const auto S_ij_00 = c_i * c_j * pow(MATH_CONST_PI / (a_i + a_j), 1.5) * exp(-a_i * a_j / (a_i + a_j) * r2_ij);
+                    const auto S_kl_00 = c_k * c_l * pow(MATH_CONST_PI / (a_k + a_l), 1.5) * exp(-a_k * a_l / (a_k + a_l) * r2_kl);
 
                     // p-1: py
                     // p_0: pz
