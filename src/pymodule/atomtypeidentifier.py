@@ -111,7 +111,7 @@ class AtomTypeIdentifier:
             - Updates the 'connectivity_matrix' and 'distance_matrix' attributes of the class.
 
         Example:
-            >>> atom_identifier = AtomTypeIdentifier('molecule.xyz')
+            >>> atom_identifier = AtomTypeIdentifier()
             >>> atom_identifier.create_connectivity_matrix()
             >>> print(atom_identifier.connectivity_matrix)
             >>> print(atom_identifier.distance_matrix)
@@ -245,7 +245,6 @@ class AtomTypeIdentifier:
             max_distance = max(cc_bond_distances) if cc_bond_distances else 0
             min_distance = min(cc_bond_distances) if cc_bond_distances else 0
 
-            # Aromaticity determination logic
             if size == 6 and all(elem in ["C", "N"] for elem in cycle_elements):
                 if all(self.is_sp2_carbon(atom_idx) for atom_idx in cycle if self.atomic_symbols[atom_idx] == "C"):
                     aro = "pure_aromatic" if max_distance - min_distance <= 0.08 else "non_pure_aromatic"
@@ -255,7 +254,7 @@ class AtomTypeIdentifier:
                 if "S" in cycle_elements:
                     aro = "non_pure_aromatic" if len(list(self.graph.neighbors(cycle_elements.index("S")))) == 2 else "non_aromatic"
                 else:
-                    aro = "non_pure_aromatic" if "N" in cycle_elements or "O" in cycle_elements else "non_aromatic"
+                    aro = "non_pure_aromatic" if "N" in cycle_elements or "O" in cycle_elements else "non_pure_aromatic"
             elif size == 4:
                 aro = "non_pure_aromatic" if all(self.is_sp2_carbon(atom_idx) for atom_idx in cycle if self.atomic_symbols[atom_idx] == "C") else "non_aromatic"
             else:
@@ -429,7 +428,7 @@ class AtomTypeIdentifier:
                             # Check if the C atom has been previously assigned
                             if key_neigh in self.atom_types_dict:
                                 existing_type = self.atom_types_dict[key_neigh]
-                                #carbon_type = None
+
                                 # For neighboring atom type {'opls': 'opls_XXX', 'gaff': 'cc'}
                                 if existing_type == {'opls': 'opls_508', 'gaff': 'cc'}:
                                     if distance <= 1.4:
@@ -500,79 +499,8 @@ class AtomTypeIdentifier:
                         carbon_type = {'opls': 'opls_CU', 'gaff': 'cu'}
                     elif info['NumConnectedAtoms'] == 3 and 4 in info['CycleSize']:
                         carbon_type = {'opls': 'opls_CV', 'gaff': 'cv'}
-                    elif info['NumConnectedAtoms'] == 3 and 5 in info['CycleSize']:
 
-                        carbon_type = {'opls': 'opls_XXX', 'gaff': 'ce'} # Inner Sp2 carbons in conjugated systems - Default
-
-                        # Immediately assign C atom types based on distances
-                        connected_atoms_numbers = info['ConnectedAtomsNumbers']
-
-                        # Current atom's cycle number (will be 'none' if not in a cycle)
-                        current_cycle_number = info.get('CycleNumber')
-
-                        for neighboring_atom_number, distance in zip(connected_atoms_numbers, connected_distances):
-                            # Check if the neighbour is also a C
-                            if self.atom_info_dict[neighboring_atom_number]['AtomicSymbol'] != 'C':
-                                continue
-                            key_neigh = f"C{neighboring_atom_number}"
-                            
-                            # Check if the C atom has been previously assigned
-                            if key_neigh in self.atom_types_dict:
-                                existing_type = self.atom_types_dict[key_neigh]
-                                #carbon_type = None
-                                # For neighboring atom type {'opls': 'opls_XXX', 'gaff': 'ce'}
-                                if existing_type == {'opls': 'opls_XXX', 'gaff': 'ce'}:
-                                    if distance <= 1.4:
-                                        carbon_type = {'opls': 'opls_XXX', 'gaff': 'cf'}
-                                    elif distance > 1.4:
-                                        carbon_type = {'opls': 'opls_XXX', 'gaff': 'ce'}
-                                
-                                # For neighboring atom type {'opls': 'opls_XXX', 'gaff': 'cf'}
-                                elif existing_type == {'opls': 'opls_XXX', 'gaff': 'cf'}:
-                                    if distance <= 1.4:
-                                        carbon_type = {'opls': 'opls_XXX', 'gaff': 'ce'}
-                                    elif distance > 1.4:
-                                        carbon_type = {'opls': 'opls_XXX', 'gaff': 'cf'}
-                                
-                                else:
-                                    continue
-                            else:
-                                neighboring_cycle_number = self.atom_info_dict[neighboring_atom_number].get('CycleNumber', 'none')
-
-                                # Check if neighboring atom is not in a cycle or belongs to another cycle ID
-                                if neighboring_cycle_number == 'none' or neighboring_cycle_number != current_cycle_number:
-                                    continue
-                                else:
-                                    if distance <= 1.4: # Double bonded
-                                        conn_carbon_type = {'opls': 'opls_XXX', 'gaff': 'cf'}
-                                        
-                                    elif distance > 1.4: # Single bonded
-                                        conn_carbon_type = {'opls': 'opls_XXX', 'gaff': 'ce'}
-                                    
-                                    # Store the atomtype in the dictionary 
-                                    self.atom_types_dict[f"C{neighboring_atom_number}"] = conn_carbon_type
-
-                                    # If there is an H connected to this carbon, assign it now
-                                    for connected_atom_number in self.atom_info_dict[neighboring_atom_number]['ConnectedAtomsNumbers']:
-                                        connected_atom_info = self.atom_info_dict[connected_atom_number]
-                                        if connected_atom_info['AtomicSymbol'] == 'H' and connected_atom_info['NumConnectedAtoms'] == 1:
-                                            ewd_atoms = ['N', 'Br', 'Cl', 'I', 'F', 'S', 'O']
-                                            ewd_count = sum(1 for num in self.atom_info_dict[neighboring_atom_number]['ConnectedAtomsNumbers'] 
-                                                            if self.atom_info_dict[num]['AtomicSymbol'] in ewd_atoms)
-                                            if ewd_count == 1:
-                                                hydrogen_type = {'opls': 'opls_146', 'gaff': 'h4'}  # 1 EWD atom
-                                            elif ewd_count == 2:
-                                                hydrogen_type = {'opls': 'opls_h5', 'gaff': 'h5'}  # 2 EWD atom
-                                            else:
-                                                hydrogen_type = {'opls': 'opls_146', 'gaff': 'ha'}  # Default Aliphatic sp2 Hydrogen for c2
-                                            
-                                            # Store it in the dictionary
-                                            self.atom_types_dict[f"H{connected_atom_info['AtomNumber']}"] = hydrogen_type
-                                    
-                                    # Next iteration
-                                    continue
-
-                    # Cases for general Non-Aromatic cycles bigger than 5
+                    # Cases for general Non-Aromatic cycles bigger than 4
                     elif info['NumConnectedAtoms'] == 3:
                         if 'O' in connected_symbols:
                             # Directly loop through the connected atom numbers
@@ -610,6 +538,7 @@ class AtomTypeIdentifier:
                             carbon_type = {'opls': 'opls_135', 'gaff': 'c3'} # General case, anything connected to it
                             
                     elif info['NumConnectedAtoms'] == 3:
+
                         if 'O' in connected_symbols:
                             # Directly loop through the connected atom numbers
                             for connected_atom_number in info['ConnectedAtomsNumbers']:
@@ -618,7 +547,16 @@ class AtomTypeIdentifier:
                                         carbon_type = {'opls': 'opls_235', 'gaff': 'c'}  # Carbonyl Carbon
                                         break  # Exit the loop once the carbonyl carbon is identified
                                     else:
-                                        carbon_type = {'opls': 'opls_141', 'gaff': 'c2'}  # Alcohol
+                                        carbon_type = {'opls': 'opls_141', 'gaff': 'c2'}
+                       
+                        elif 'S' in connected_symbols: # Double bond with a Sulfur
+                            for connected_atom_number in info['ConnectedAtomsNumbers']:
+                                if self.atom_info_dict[connected_atom_number]['AtomicSymbol'] == 'S':
+                                    if self.atom_info_dict[connected_atom_number]['NumConnectedAtoms'] == 1:
+                                        carbon_type = {'opls': 'opls_cs', 'gaff': 'cs'}  # Carbon double bonded to Sulfur
+                                        break  # Exit the loop as soon as we find a sulfur atom with only one connected atom
+                                    else:
+                                        carbon_type = {'opls': 'opls_141', 'gaff': 'c2'}
 
                         elif 'C' in connected_symbols:
                             # Count the number of sp2-hybridized carbons connected to the current carbon
@@ -626,10 +564,17 @@ class AtomTypeIdentifier:
                                                 if self.atom_info_dict[num]['AtomicSymbol'] == 'C' and self.atom_info_dict[num]['NumConnectedAtoms'] == 3)
                             sp1_carbon_count = sum(1 for num in info['ConnectedAtomsNumbers'] 
                                                 if self.atom_info_dict[num]['AtomicSymbol'] == 'C' and self.atom_info_dict[num]['NumConnectedAtoms'] == 2)
+                            n_count = sum(1 for num in info['ConnectedAtomsNumbers'] 
+                                                if self.atom_info_dict[num]['AtomicSymbol'] == 'N' and self.atom_info_dict[num]['NumConnectedAtoms'] == 1)
+                            n2_count = sum(1 for num in info['ConnectedAtomsNumbers']
+                                                if self.atom_info_dict[num]['AtomicSymbol'] == 'N' and self.atom_info_dict[num]['NumConnectedAtoms'] == 2)
                             if sp2_carbon_count + sp1_carbon_count == 2 or sp2_carbon_count + sp1_carbon_count == 3: # If the current carbon is connected to 2 sp2 carbons
+                                carbon_type = {'opls': 'opls_XXX', 'gaff': 'ce'} # Inner Sp2 carbons in conjugated systems
+                            elif sp2_carbon_count + sp1_carbon_count + n2_count == 2: # If the current carbon is connected to 2 sp2 carbons
                                 carbon_type = {'opls': 'opls_XXX', 'gaff': 'ce'} # Inner Sp2 carbons in conjugated systems
                             else:
                                 carbon_type = {'opls': 'opls_141', 'gaff': 'c2'}  # Aliphatic sp2 Carbon
+
                         else:
                             carbon_type = {'opls': 'opls_141', 'gaff': 'c2'} #Generic sp2 C
                             
@@ -646,7 +591,9 @@ class AtomTypeIdentifier:
                                                 if self.atom_info_dict[num]['AtomicSymbol'] == 'N' and self.atom_info_dict[num]['NumConnectedAtoms'] == 1)
                             n2_count = sum(1 for num in info['ConnectedAtomsNumbers'] 
                                                 if self.atom_info_dict[num]['AtomicSymbol'] == 'N' and self.atom_info_dict[num]['NumConnectedAtoms'] == 2)
-                            if sp2_carbon_count + sp1_carbon_count + n_count == 2: # If the current carbon is connected to 2 sp2 carbons
+                            if sp2_carbon_count == 2:
+                                carbon_type = {'opls': 'opls_235', 'gaff': 'c1'}
+                            elif sp2_carbon_count + sp1_carbon_count + n_count == 2: # If the current carbon is connected to 2 sp2 carbons
                                 carbon_type = {'opls': 'opls_XXX', 'gaff': 'cg'} 
                             elif sp2_carbon_count + sp1_carbon_count + n2_count == 2:
                                 carbon_type = {'opls': 'opls_XXX', 'gaff': 'ch'}
@@ -788,7 +735,7 @@ class AtomTypeIdentifier:
                     if info['NumConnectedAtoms'] == 2 and connected_symbols == {'H'}:
                         oxygen_type = {'opls': 'opls_154', 'gaff': 'oh'}  # Alcohol group
                     
-                    elif info['NumConnectedAtoms'] == 2 and 'C' in connected_symbols:
+                    elif info['NumConnectedAtoms'] == 2 and ('C' in connected_symbols or 'S' in connected_symbols): # Ether and thioether
                         if any(self.atom_info_dict[atom]['AtomicSymbol'] == 'O' for atom in info['ConnectedAtomsNumbers']):
                             oxygen_type = {'opls': 'opls_160', 'gaff': 'os'}  # Ether group or secondary amide
                         else:
@@ -855,7 +802,7 @@ class AtomTypeIdentifier:
 
                         elif 'C' in connected_symbols:
                             for atom in connected_atoms_numbers:
-                                    
+
                                 # Check for aromaticity
                                 if 'cycle' in self.atom_info_dict[atom]['CyclicStructure'] and 'pure_aromatic' in self.atom_info_dict[atom]['Aromaticity']:
                                     num_hydrogens = sum([1 for symbol in connected_atoms if symbol == 'H'])
@@ -969,14 +916,50 @@ class AtomTypeIdentifier:
                     elif info['NumConnectedAtoms'] == 3 and 'non_pure_aromatic' in info.get('Aromaticity'):
                         nitrogen_type = {'opls': 'opls_na', 'gaff': 'na'}
                 
-                    # Nitrogens in Non aromatic cycles
+                    # Nitrogens in Non-aromatic cycles
                     elif info['NumConnectedAtoms'] == 3 and 'non_aromatic' in info.get('Aromaticity'):
-                        if 3 in info.get('CycleSize'):
-                            nitrogen_type = {'opls': 'opls_np', 'gaff': 'np'}
-                        if 4 in info.get('CycleSize'):
-                            nitrogen_type = {'opls': 'opls_nq', 'gaff': 'nq'}
+                        if 'C' in connected_symbols:
+                            # Check for amides and sulfamides by checking the connected atoms to the carbon
+                            found_CO = False  # Flag variable
+
+                            for atom in connected_atoms_numbers:
+                                for connected_to_carbon in self.atom_info_dict[atom]['ConnectedAtomsNumbers']:
+                                    atom_symbol = self.atom_info_dict[connected_to_carbon]['AtomicSymbol']
+                                    atom_connectivity = self.atom_info_dict[connected_to_carbon]['NumConnectedAtoms']
+                                    if (atom_symbol == 'O' and atom_connectivity ==1) or (atom_symbol == 'S' and atom_connectivity == 1):
+                                        num_hydrogens = sum([1 for symbol in connected_atoms if symbol == 'H'])
+                                        if num_hydrogens == 1:
+                                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'ns'}
+                                        elif num_hydrogens == 2:
+                                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'nt'}
+                                        else:
+                                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'n'}
+                                        found_CO = True  # Set the flag to True
+                                        break  # This will break the inner loop
+                                if found_CO:  # Check the flag after each iteration of the outer loop
+                                    break  # If the flag is True, break the outer loop
+                            else:
+                                nitrogen_type = {'opls': 'opls_300', 'gaff': 'n3'}  # General n3 case
+
+                        # Check for special RG3 and RG4 cases
                         else:
-                            nitrogen_type = {'opls': f'opls_x{info["AtomNumber"]}', 'gaff': f'nx{info["AtomNumber"]}'}
+                            num_hydrogens = sum([1 for symbol in connected_atoms if symbol == 'H'])
+                            if num_hydrogens == 1:
+                                if 3 in info.get('CycleSize'):
+                                    nitrogen_type = {'opls': 'opls_n5', 'gaff': 'n5'}
+                                elif 4 in info.get('CycleSize'):
+                                    nitrogen_type = {'opls': 'opls_n6', 'gaff': 'n6'}
+                                else:
+                                    nitrogen_type = {'opls': 'opls_300', 'gaff': 'n7'}
+                            elif num_hydrogens == 0:
+                                if 3 in info.get('CycleSize'):
+                                    nitrogen_type = {'opls': 'opls_np', 'gaff': 'np'}
+                                elif 4 in info.get('CycleSize'):
+                                    nitrogen_type = {'opls': 'opls_nq', 'gaff': 'nq'}
+                                else:
+                                    nitrogen_type = {'opls': 'opls_300', 'gaff': 'n3'}
+                            else:
+                                nitrogen_type = {'opls': f'opls_x{info["AtomNumber"]}', 'gaff': f'nx{info["AtomNumber"]}'}
                     else:
                         # Add other conditions for cyclic nitrogen atoms if needed or add a default case
                         nitrogen_type = {'opls': f'opls_x{info["AtomNumber"]}', 'gaff': f'nx{info["AtomNumber"]}'}
@@ -1051,7 +1034,7 @@ class AtomTypeIdentifier:
                 elif info['NumConnectedAtoms'] == 2: 
                     if 'H' in connected_symbols:
                         sulfur_type = {'opls': 'opls_924S', 'gaff': 'sh'}
-                    elif all(self.atom_info_dict[num]['AtomicSymbol'] in ['C', 'N', 'S'] for num in info['ConnectedAtomsNumbers']):  # Both connected atoms are carbons or one carbon and one nitrogen
+                    elif all(self.atom_info_dict[num]['AtomicSymbol'] in ['C', 'N', 'S', 'O'] for num in info['ConnectedAtomsNumbers']):  # Both connected atoms are carbons or one carbon and one nitrogen
                         sulfur_type = {'opls': 'opls_SS', 'gaff': 'ss'}  # Thio-ether or Thio-ester
                     else:
                         sulfur_type = {'opls': 'opls_921S', 'gaff': 's2'}
@@ -1154,6 +1137,103 @@ class AtomTypeIdentifier:
                     self.gaff_atom_types.append(gaff_type)
 
         return self.gaff_atom_types
+    
+    def check_for_bad_assignations(self, gaff_force_field):
+        '''
+        Method that checks if there are any atom types that have not been
+        assigned properly. To do that, the method will check if any of the 
+        bonds assigned do not exist in the GAFF force field. If there are
+        any, the method will print a warning message and propose alternatives.
+
+        Args:
+            self
+            gaff_force_field: the dat file containing the force field information
+
+        Returns:
+            None
+        '''
+
+        # Create a dictionary with the assigned bond types
+        assigned_bonds = {}
+        atom_types = self.gaff_atom_types
+        distances = self.distance_matrix
+
+        for i in range(len(atom_types)):
+            for j in range(i + 1, len(atom_types)):  # Avoid checking the same bond twice
+                # Append the bond and the atom ids to the dictionary
+                if distances[i][j] != 0:
+                    atomtype1 = atom_types[i]
+                    atom_id1 = i + 1
+                    atomtype2 = atom_types[j]
+                    atom_id2 = j + 1 
+                    bond = (atomtype1, atomtype2)
+                    assigned_bonds[bond] = (atom_id1, atom_id2)
+        
+        with open(gaff_force_field, 'r') as f:
+            lines = f.readlines()
+
+        start_bonds_section = False
+        # Save a list with the bonds in the force field
+        bonds = {}
+
+        for line in lines:
+            if 'hn  ho  hs  n   na  nc  nd  ne  nf  n2  n3  n4' in line:
+                start_bonds_section = True
+                continue
+            elif line.strip() == '':
+                start_bonds_section = False
+            elif start_bonds_section:
+                # Bonds sections always are xy-zw or x -zw, so, the atom
+                # types are always in the same position
+                atomtype1 = line[0:2].strip()
+                element1 = atomtype1[0]
+                atomtype2 = line[3:5].strip()
+                element2 = atomtype2[0]
+                bond = (atomtype1, atomtype2)
+                bonds[bond] = (element1, element2)
+
+        # Check if the assigned bonds are in the force field
+        # TODO: Propose alternatives
+        bad_bonds = {} # Dictionary with the bad bonds format {(atomtype1, atomtype2): (atom_id1, atom_id2)}
+        for bond in assigned_bonds:
+            # Check if the bond or the reverse bond is in the force field
+            if bond not in bonds and bond[::-1] not in bonds:
+                print(f'Warning: the bond {bond[0]}-{bond[1]} is not in the force field')
+                print(f'Which means that {bond[0]} or {bond[1]} may not have been assigned properly')
+                print('Check the atom type', bond[0], 'assigned to id', assigned_bonds[bond][0])
+                print('Check the atom type', bond[1], 'assigned to id', assigned_bonds[bond][1])
+                bad_bonds[bond] = assigned_bonds[bond]
+            else:
+                continue
+
+        if bad_bonds == {}:  # If there are no bad bonds, print a message
+            print('All atom types have been assigned properly')
+
+        # Print the definition of the atom types that have been assigned wrong
+        first_atoms = []
+        second_atoms = []
+
+        for key, value in bad_bonds.items():
+            first_atom = key[0]
+            first_atoms.append(first_atom)
+            second_atom = key[1]
+            second_atoms.append(second_atom)
+            found_first_atom = found_second_atom = False
+            for line in lines[1:100]:
+                # Look for first atom type
+                if not found_first_atom and first_atom in line:
+                    parts = line.split()
+                    comment = ' '.join(parts[3:])
+                    print(f'{first_atom} is {comment}')
+                    found_first_atom = True
+                elif not found_second_atom and second_atom in line:
+                    parts = line.split()
+                    comment = ' '.join(parts[3:])
+                    print(f'{second_atom} is {comment}')
+                    found_second_atom = True
+                if found_first_atom and found_second_atom:
+                    break
+        
 
     def generate_gaff_atomtypes(self, molecule):
         """
