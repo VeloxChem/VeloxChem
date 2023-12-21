@@ -29,6 +29,9 @@ class Topology():
         ao_identifier = AtomTypeIdentifier()
         ao_identifier.generate_gaff_atomtypes(molecule)
         ff_data = ao_identifier.generate_force_field_dict(ff_file_path)
+        masses = molecule.masses_to_numpy()
+        for i,id in enumerate(ff_data['atomtypes']):
+            ff_data['atomtypes'][id]['mass'] =masses[i]
         self.atoms = ff_data['atomtypes']
         self.bonds = ff_data['bonds']
         self.angles = ff_data['angles']
@@ -36,6 +39,7 @@ class Topology():
         self.impropers = ff_data['impropers']
         self.pairs = ff_data['pairs']
         return ao_identifier
+
 
     def update_charge(self,charges):
         """
@@ -57,36 +61,36 @@ class Topology():
         # Print the atomtypes section
         itp_string += '\n[ atomtypes ]\n; name  bond_type  mass  charge  ptype  sigma  epsilon\n'
         for atom_id, atom_data in self.atoms.items():
-            itp_string += f'{atom_data["type"]:<6} {atom_data["type"]:<10} {atom_data["mass"]:<7.2f} 0.0000  A {atom_data["sigma"]:11.4e} {atom_data["epsilon"]:11.4e}\n'
+            itp_string += f'{atom_data["type"]:<6} {atom_data["type"]:<10} {atom_data["mass"]:<7.2f} {atom_data["charge"]:9.5f}  A {atom_data["sigma"]:11.4e} {atom_data["epsilon"]:11.4e}\n'
 
         # Print the moleculetype section
         itp_string += f"[moleculetype]\n; name  nrexcl\n{RES}  3\n\n"
         
         # Print the atoms section
         itp_string += '[ atoms ]\n'
-        itp_string += '; nr    type  resnr  residue  atom  cgnr  charge  mass type2 charge2; comment - comment2\n'
+        itp_string += '; nr    type  resnr  residue  atom  cgnr  charge  mass; comment\n'
         for atom_id, atom_data in self.atoms.items():
-            itp_string += f'{atom_id:<6} {atom_data["type"]:>4}  1     {RES}     {atom_data["type"]:>4}  1     {0.00000:9.5f} {atom_data["mass"]:9.5f} ; {atom_data["comment"]}\n' #todo fix charge
+            itp_string += f'{atom_id:<6} {atom_data["type"]:>4}  1     {RES}     {atom_data["type"]:>4}  1     {atom_data["charge"]:9.5f} {atom_data["mass"]:9.5f} ; {atom_data["comment"]}\n'
 
         # Print the bonds section
-        itp_string += '\n[ bonds ]\n; ai  aj  funct  r0 (nm)  fc (kJ/(mol nm2)) r02 fc2; comment - comment2\n'
+        itp_string += '\n[ bonds ]\n; ai  aj  funct  r0 (nm)  fc (kJ/(mol nm2)); comment\n'
         for bond_key, bond_data in self.bonds.items():
             itp_string += f'{bond_key[0]:<4} {bond_key[1]:<4} 1 {bond_data["eq"]:>6.6f} {bond_data["fc"]:>8.3f}; {bond_data["comment"]}\n'
 
         # Print the angles section
-        itp_string += '\n[ angles ]\n; ai  aj  ak  funct  theta0 (degr)  fc (kJ/(mol rad2)) theta02 fc2; comment - comment2\n'
+        itp_string += '\n[ angles ]\n; ai  aj  ak  funct  theta0 (degr)  fc (kJ/(mol rad2)); comment\n'
         for angle_key, angle_data in self.angles.items():
             itp_string += f'{angle_key[0]:<4} {angle_key[1]:<4} {angle_key[2]:<4} 1 {angle_data["eq"]:>6.3f} {angle_data["fc"]:>8.3f}; {angle_data["comment"]}\n'
 
         # Print the dihedrals section
-        itp_string += '\n[ dihedrals ]\n; ai  aj  ak  al  funct  theta  k  mult; comment\n'#todo deal with other types of dihedrals
+        itp_string += '\n[ dihedrals ]\n; ai  aj  ak  al  funct  theta  k  mult; comment\n'
         for dihedral_key, dihedral_data in self.dihedrals.items():
-            itp_string += f'{dihedral_key[0]:<4} {dihedral_key[1]:<4} {dihedral_key[2]:<4} {dihedral_key[3]:<4} 1 {dihedral_data["eq"]:>8.3f} {dihedral_data["fc"]:>8.3f}  1; {dihedral_data["comment"]}\n'
+            itp_string += f'{dihedral_key[0]:<4} {dihedral_key[1]:<4} {dihedral_key[2]:<4} {dihedral_key[3]:<4} 9 {dihedral_data["eq"]:>8.3f} {dihedral_data["fc"]:>8.3f}  {abs(dihedral_data["periodicity"])}; {dihedral_data["comment"]}\n'
 
         # Print the impropers section
         itp_string += '\n[ dihedrals ] ; Improper dihedral section\n; ai  aj  ak  al  type  phi0  fc  n; comment\n'
         for improper_key, improper_data in self.impropers.items():
-            itp_string += f'{improper_key[0]:<4} {improper_key[1]:<4} {improper_key[2]:<4} {improper_key[3]:<4} 4 {improper_data["eq"]:>8.3f} {improper_data["fc"]:>8.3f} {improper_data["periodicity"]:>2}; {improper_data["comment"]}\n'
+            itp_string += f'{improper_key[0]:<4} {improper_key[1]:<4} {improper_key[2]:<4} {improper_key[3]:<4} {improper_data["type"]} {improper_data["eq"]:>8.3f} {improper_data["fc"]:>8.3f} {improper_data["periodicity"]:>2}; {improper_data["comment"]}\n'
 
         # Print the pairs section
         itp_string += '\n[ pairs ]\n; ai  aj  funct\n'
@@ -154,7 +158,7 @@ class Topology():
         with open(f"{output_folder}/{filename}.top", "w") as f:
             f.write(top_string)
     
-    def reparameterise(self,mol,hes,keys=None,element=None,print_all=False,only_eq=False):
+    def reparameterise(self,mol,hes,keys=None,element=None,print_all=False,only_eq=False,no_repar=False,repar_imp=False):
         """
         Reparameterises all unknown parameters with the seminario method using the given hessian
 
@@ -163,6 +167,7 @@ class Topology():
         keys: one or multiple tuples corresponding to bonds angles or dihedrals that need to be reparameterised. If passed, the unknown parameters will be ignored
         print_all: if true, all parameters will be printed, and not just the adjusted ones
         only_eq: only adjust the eq values, and not the fc values. Useful for transition states
+        dihed: boolean, if false(default) will assign 0 improper torsion barrier, if true computes improper torsion barrier with seminario (experimental)
         """
         print("\nVeloxchem force-field reparameterisation\n\n----------------------------------------")
         A_to_nm=0.1 #1 angstrom is 0.1 nm
@@ -193,266 +198,68 @@ class Topology():
                     newfc = sem.angle_fc(ids[0]-1,ids[1]-1,ids[2]-1) #Returns in H/rad^2 i think
                     newfc *= Hartree_to_kJmol #Convert to kJmol^-1/rad^2
                 elif label == "dihedral":
-                    phase = self.dihedrals[ids]["phase"]
                     perio = self.dihedrals[ids]["periodicity"]
                 elif label == "improper":
                     perio = self.impropers[ids]["periodicity"]
-                    neweq = AtomTypeIdentifier.measure_dihedral(coords[ids[0]-1],coords[ids[1]-1],coords[ids[2]-1],coords[ids[3]-1])
+                    if repar_imp:
+                        neweq = AtomTypeIdentifier.measure_dihedral(coords[ids[0]-1],coords[ids[1]-1],coords[ids[2]-1],coords[ids[3]-1])
+                        newfc = sem.dihed_fc(ids[0]-1,ids[1]-1,ids[2]-1,ids[3]-1,avg_improper=True) #Returns in H/rad^2 i think
+                        newfc *= Hartree_to_kJmol #Convert to kJmol^-1/rad^2
+                    else:
+                        neweq = 0
+                        newfc = 0
 
-                    newfc = sem.dihed_fc(ids[0]-1,ids[1]-1,ids[2]-1,ids[3]-1) #Returns in H/rad^2 i think
-                    newfc *= Hartree_to_kJmol #Convert to kJmol^-1/rad^2
-
-                comment = parameters[ids]["comment"]
+                comment = parameters[ids]["comment"] #GAFF2 or unknown
                 
                 repar = False
-                if keys is not None:
+                if no_repar:
+                    ""
+                elif keys is not None:
                     if ids in keys:
                         repar = True
                 elif keys is None and element is not None:
                     for id in ids:
                         if element == mol.get_labels()[id-1]:
                             repar = True
-                        
-                elif keys is None and element is None and comment =="unknown":
+                elif keys is None and element is None and "unknown" in comment:
                     repar = True
-                
 
                 if repar:
-                    if not label == "dihedral":
+                    if label =="dihedral" and not repar_imp:
+                        comment += ", not reparameterising impropers"
+                    elif not label == "dihedral":
                         parameters[ids]["eq"] = neweq
                         if not only_eq:
                             parameters[ids]["fc"] = newfc
-                            new_comment = f"reparameterised from (eq,fc)=({eq:>.1f},{fc:.1f}) to (eq,fc)=({neweq:.1f},{newfc:.1f})"
+                            comment += f", reparameterised from (eq,fc)=({eq:>.1f},{fc:.1f}) to (eq,fc)=({neweq:.1f},{newfc:.1f})"
                         else:
-                            new_comment = f"reparameterised from eq={eq:>.1f} to eq={neweq:.1f}"
-                        parameters[ids]["comment"] = new_comment
-                        comment = new_comment
+                            comment += f", reparameterised from eq={eq:>.1f} to eq={neweq:.1f}"
+                        parameters[ids]["comment"] = comment
+
+                        if label =="improper":
+                            parameters[ids]["type"] =2    
+                            parameters[ids]["periodicity"] = ""                        
                     else:
                         comment+=", reparameterisation of proper dihedrals should be done with other method"
 
                 if repar or print_all:
                     if label == "bond":
-                        print(f"{f'{ids}{types}:':<{20}}\t{eq:>6f}\t{fc:>6f}\t\t{neweq:>6f}\t{newfc:>6f}\t\t{comment}")
+                        print(f"{f'{ids}:':<{10}}\t{eq:>6f}\t{fc:>6f}\t\t{neweq:>6f}\t{newfc:>6f}\t\t{comment}")
                     if label == "angle":
-                        print(f"{f'{ids}{types}:':<{30}}\t{eq:>6f}\t{fc:>6f}\t\t{neweq:>6f}\t{newfc:>6f}\t\t{comment}")
+                        print(f"{f'{ids}:':<{15}}\t{eq:>6f}\t{fc:>6f}\t\t{neweq:>6f}\t{newfc:>6f}\t\t{comment}")
                     if label == "dihedral":
-                        print(f"{f'{ids}{types}: ':<{40}}{eq:>6f}\t{fc:>6f}\t\t{phase:>6f}\t{perio}\t\t{comment}")
+                        print(f"{f'{ids}: ':<{20}}{eq:>6f}\t{fc:>6f}\t\t{abs(perio)}\t\t{comment}")
                     if label == "improper":
-                        print(f"{f'{ids}{types}: ':<{40}}{eq:>6f}\t{fc:>6f}\t\t{perio}\t\t{neweq:.<3f}\t{newfc:.<3f}\t\t{perio}\t\t{comment}")
+                        print(f"{f'{ids}: ':<{20}}{eq:>6f}\t{fc:>6f}\t\t{perio}\t\t{neweq:.<3f}\t{newfc:.<3f}\t\t{perio}\t\t{comment}")
 
-        print("Bond \t\t\tr0(nm) \t\tfc(kJmol^-1/nm^2) \tNew r0(nm) \tNew fc(kJmol^-1/nm^2) \tComment")
+        print("Bond \t\tr0(nm) \t\tfc(kJmol^-1/nm^2) \tNew r0(nm) \tNew fc(kJmol^-1/nm^2) \tComment")
         process_parameter(self.bonds, "bond")
 
-        print("\nAngle \t\t\t\ttheta0(deg)  \tfc(kJmol^-1/rad^2) \tNew theta0(deg)\tNew fc(kJmol^-1/rad^2) \tComment")
+        print("\nAngle \t\ttheta0(deg)  \tfc(kJmol^-1/rad^2) \tNew theta0(deg)\tNew fc(kJmol^-1/rad^2) \tComment")
         process_parameter(self.angles, "angle")
 
-        print("\nDihedrals\t\t\t\teq(deg)  \tfc(kJmol^-1/rad^2?) \tPhase(deg) \tPeriodicity \tComment")
+        print("\nDihedrals\t\teq(deg)  \tfc(kJmol^-1) \tPeriodicity \tComment")
         process_parameter(self.dihedrals, "dihedral")
 
-        print("\nImpropers\t\t\t\teq(deg)  \tfc(kJmol^-1/rad^2?) \tperiodicity \tNew eq(deg) \tNew fc(kJmol^-1/rad^2?)\tNew periodicity\tComment")
+        print("\nImpropers\t\teq(deg)  \tfc(kJmol^-1/rad^2?) \tperiodicity \tNew eq(deg) \tNew fc(kJmol^-1/rad^2?)\tNew periodicity\tComment")
         process_parameter(self.impropers, "improper")
-
-    @staticmethod
-    def write_FEP_itp(filename,output_folder,topA,topB,molA,molB,RES="MOL"):
-        """
-        Writes a gromacs FEP incorporating all bonds in both topA and topB
-        """
-        topA.filename = filename
-        topA.RES=RES
-        
-        # Initialize the itp file
-        itp_AB = '; Created by VeloxChem\n\n'
-        itp_A = itp_AB
-        itp_B = itp_AB
-
-        coordsA = molA.get_coordinates()
-        coordsB = molB.get_coordinates()
-
-        # Print the atomtypes section
-        atomtypes_sec = '\n[ atomtypes ]\n; name  bond_type  mass  charge  ptype  sigma  epsilon\n'
-        #Atoms in both topologies should be the same #todo implement checks
-        for atom_id, atom_data in topA.atoms.items():
-            atomtypes_sec += f'{atom_data["type"]:<6} {atom_data["type"]:<10} {atom_data["mass"]:<7.2f} 0.0000  A {atom_data["sigma"]:11.4e} {atom_data["epsilon"]:11.4e}\n'
-
-        # Print the moleculetype section
-        moltype_sec = f"[moleculetype]\n; name  nrexcl\{RES}  3\n\n"
-
-        itp_AB += atomtypes_sec + moltype_sec 
-        itp_A  += atomtypes_sec + moltype_sec 
-        itp_B  += atomtypes_sec + moltype_sec 
-
-        # Print the atoms section
-        atoms_sec = '[ atoms ]\n ; nr    type  resnr  residue  atom  cgnr  charge  mass type2 charge2; comment - comment2\n'
-        atoms_secA = atoms_sec
-        atoms_secB = atoms_sec
-        #Atoms in both topologies should be the same #todo implement checks
-        for atom_id, atom_data in topA.atoms.items():
-            atomA = f'{atom_id:<6} {atom_data["type"]:>4}  1     {RES}     {atom_data["type"]:>4}  1     {0.00000:9.5f} {atom_data["mass"]:9.5f}' #todo fix charge
-            atomB = f'{atom_id:<6} {atom_data["type"]:>4}  1     {RES}     {atom_data["type"]:>4}  1     {0.00000:9.5f} {atom_data["mass"]:9.5f}' #todo fix charge
-            atom = atomA+f' {topB.atoms[atom_id]["type"]:>4} {0.00000:9.5f}'
-            
-            commentA =f' {topA.atoms[atom_id]["comment"]}'
-            commentB =f' {topB.atoms[atom_id]["comment"]}'
-            
-            atoms_secA += atomA+";"+commentA+'\n'
-            atoms_secB += atomB+";"+commentB+'\n'
-            atoms_sec += atom+";"+commentA+" -"+commentB+'\n'
-        
-        itp_AB += atoms_sec
-        itp_A  += atoms_secA
-        itp_B  += atoms_secB
-
-        #todo refactor this code
-        # Print the bonds section
-        sec = '\n[ bonds ]\n; ai  aj  funct  r0 (nm)  fc (kJ/(mol nm2)) r02 fc2; comment - comment2\n'
-        secA = sec
-        secB = sec
-        keys = topA.bonds.keys() | topB.bonds.keys()
-        for key in keys:
-            id = f'{key[0]:<4} {key[1]:<4} 1'
-            
-            Aflag = key in topA.bonds.keys()
-            Bflag = key in topB.bonds.keys()
-            
-            if Aflag: 
-                parA = f' {topA.bonds[key]["eq"]:>6.6f} {topA.bonds[key]["fc"]:>8.3f}'
-                commentA =f' {topA.bonds[key]["comment"]}'
-            else: 
-                bondlength = AtomTypeIdentifier.measure_length(coordsA[key[0]-1],coordsA[key[1]-1])
-                bondlength *= bohr_in_angstrom()*0.1
-                parA = f' {bondlength:>6.6f} 0'
-                commentA = ' Nonbonded'
-
-            if Bflag: 
-                parB = f' {topB.bonds[key]["eq"]:>6.6f} {topB.bonds[key]["fc"]:>8.3f}'
-                commentB =f' {topB.bonds[key]["comment"]}'
-            else: 
-                bondlength = AtomTypeIdentifier.measure_length(coordsB[key[0]-1],coordsB[key[1]-1])
-                bondlength *= bohr_in_angstrom()*0.1
-                parB = f' {bondlength:>6.6f} 0'
-                commentB = ' Nonbonded'
-            
-            secA += id+parA+";"+commentA+'\n'
-            secB += id+parB+";"+commentB+'\n'
-            sec += id+parA+parB+";"+commentA+" -"+commentB+'\n'
-        
-        itp_AB += sec
-        itp_A  += secA
-        itp_B  += secB
-
-        # Print the angles section
-        sec = '\n[ angles ]\n; ai  aj  ak  funct  theta0 (degr)  fc (kJ/(mol rad2)) theta02 fc2; comment - comment2\n'
-        secA = sec
-        secB = sec
-        keys = topA.angles.keys() | topB.angles.keys()
-        for key in keys:
-            Aflag = key in topA.angles.keys()
-            Bflag = key in topB.angles.keys()
-
-            id = f'{key[0]:<4} {key[1]:<4} {key[2]:<4} 1 '
-            if Aflag: 
-                parA = f' {topA.angles[key]["eq"]:>6.6f} {topA.angles[key]["fc"]:>8.3f}'
-                commentA = f' {topA.angles[key]["comment"]}'
-            else:
-                angle = AtomTypeIdentifier.measure_angle(coordsA[key[0]-1],coordsA[key[1]-1],coordsA[key[2]-1])
-                parA = f' {angle:>6.6f} 0'
-                commentA = ' Nonbonded'
-
-            if Bflag:
-                parB = f' {topB.angles[key]["eq"]:>6.6f} {topB.angles[key]["fc"]:>8.3f}'
-                commentB = f' {topB.angles[key]["comment"]}'
-            else:
-                angle = AtomTypeIdentifier.measure_angle(coordsB[key[0]-1],coordsB[key[1]-1],coordsB[key[2]-1])
-                parB = f' {topA.angles[key]["eq"]:>6.6f} 0'
-                commentB = ' Nonbonded'
-
-            secA += id+parA+';'+commentA+'\n'
-            secB += id+parB+';'+commentB+'\n'
-            sec += id+parA+parB+';'+commentA+" -"+commentB+'\n'
-
-        itp_AB += sec
-        itp_A+=secA
-        itp_B+=secB
-        
-        # Print the dihedrals section
-        sec = '\n[ dihedrals ]\n; ai  aj  ak  al  funct  theta  k  mult theta2 k2 mult2; comment - comment2 ; WARNING: theta2, k2 and mult2 might be wrong in the wrong order or might be missing parameters\n'
-        secA = sec
-        secB = sec
-
-        keys = topA.dihedrals.keys() | topB.dihedrals.keys()
-        for key in  keys:
-            Aflag = key in topA.dihedrals.keys()
-            Bflag = key in topB.dihedrals.keys()
-
-            id = f'{key[0]:<4} {key[1]:<4} {key[2]:<4} {key[3]:<4} 1'
-
-            if Aflag:
-                parA = f' {topA.dihedrals[key]["eq"]:>8.3f} {topA.dihedrals[key]["fc"]:>8.3f} 1'
-                commentA = f' {topA.dihedrals[key]["comment"]}' 
-            else: 
-                angle = AtomTypeIdentifier.measure_dihedral(coordsA[key[0]-1],coordsA[key[1]-1],coordsA[key[2]-1],coordsA[key[3]-1])
-                parA = f' {angle:>8.3f} 0 1'
-                commentA = ' Nonbonded'
-            if Bflag: 
-                parB = f' {topB.dihedrals[key]["eq"]:>8.3f} {topB.dihedrals[key]["fc"]:>8.3f} 1'
-                commentB = f' {topB.dihedrals[key]["comment"]}'
-            else: 
-                angle = AtomTypeIdentifier.measure_dihedral(coordsB[key[0]-1],coordsB[key[1]-1],coordsB[key[2]-1],coordsB[key[3]-1])
-                parB = f' {angle:>8.3f} 0 1'
-                commentB = ' Nonbonded'
-        
-            secA += id+parA+';'+commentA+'\n'
-            secB += id+parB+';'+commentB+'\n'
-            sec += id+parA+parB+';'+commentA+" -"+commentB+'\n'
-
-        itp_AB += sec
-        itp_A+=secA
-        itp_B+=secB
-
-        # Print the impropers section
-        sec = '\n[ dihedrals ] ; Improper dihedral section\n; ai  aj  ak  al  type  phi0  fc  n phi02 fc2 n2; comment - comment2 ; WARNING: phi02, fc2 and n2 might be wrong in the wrong order or might be missing parameters\n'
-        secA = sec
-        secB = sec
-        keys = topA.impropers.keys() | topB.impropers.keys()
-        for key in keys:
-            Aflag = key in topA.impropers.keys()
-            Bflag = key in topB.impropers.keys()
-
-            id = f'{key[0]:<4} {key[1]:<4} {key[2]:<4} {key[3]:<4} 4'
-            
-            if Aflag:
-                parA = f' {topA.impropers[key]["eq"]:>8.3f} {topA.impropers[key]["fc"]:>8.3f} {topA.impropers[key]["periodicity"]:>2}'
-                commentA = f' {topA.impropers[key]["comment"]}'
-            else:
-                angle = AtomTypeIdentifier.measure_dihedral(coordsA[key[0]-1],coordsA[key[1]-1],coordsA[key[2]-1],coordsA[key[3]-1])
-                parA = f' {angle:>8.3f} 0 1' 
-                commentA = ' Nonbonded'
-            if Bflag: 
-                parB = f' {topB.impropers[key]["eq"]:>8.3f} {topB.impropers[key]["fc"]:>8.3f} {topB.impropers[key]["periodicity"]:>2}'
-                commentA = f' {topB.impropers[key]["comment"]}'
-            else:
-                angle = AtomTypeIdentifier.measure_dihedral(coordsB[key[0]-1],coordsB[key[1]-1],coordsB[key[2]-1],coordsB[key[3]-1])
-                parB = f' {angle} 0 1' 
-                commentB = ' Nonbonded'
-
-            secA += id+parA+';'+commentA+'\n'
-            secB += id+parB+';'+commentB+'\n'
-            sec += id+parA+parB+';'+commentA+" -"+commentB+'\n'
-
-        itp_AB += sec
-        itp_A+=secA
-        itp_B+=secB
-
-        # Print the pairs section
-        itp_AB += '\n[ pairs ]\n; ai  aj  funct\n'
-        for pair_key in topA.pairs:
-            itp_AB += f'{pair_key[0]:<4} {pair_key[1]:<4} 1\n'
-            #todo add pairs for topB, whattodo with the pairs at all?
-            
-        with open(f"{output_folder}/{filename}AB.itp", "w") as f:
-            f.write(itp_AB)
-        with open(f"{output_folder}/{filename}A.itp", "w") as f:
-            f.write(itp_A)
-        with open(f"{output_folder}/{filename}B.itp", "w") as f:
-            f.write(itp_B)
-    #Utility functions for measuring parameters

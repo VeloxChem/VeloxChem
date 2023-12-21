@@ -1,19 +1,24 @@
 import numpy as np
 class Seminario:
+    'Implements the seminario approach https://doi.org/10.1002/(SICI)1097-461X(1996)60:7%3C1271::AID-QUA8%3E3.0.CO;2-W'
     def __init__(self,H,coords):
         self.H=H
         self.coords = coords
 
-    def eig_sum(self,a,b):
+    def eig_sum(self,a,b,vec):
         """
-        Calculate the eigenvalues and eigenvectors of the 3x3 submatrix of H starting with the left corner at (3*a,3*b), and return the sum of the vectors multiplied by their respective eigenvalue
+        Calculate the eigenvalues and eigenvectors of the 3x3 submatrix of H starting with the left corner at (3*a,3*b), and return their sum multiplied by a given vector as given in the seminario paper
         """
         k=-self.H[3*a:3*(a+1),3*b:3*(b+1)]
         eig = np.linalg.eig(k)
         l = eig.eigenvalues
         v = eig.eigenvectors
         v = np.transpose(v)
-        return np.sum(v * l[:, None], axis=0)
+
+        sum = 0
+        for i in range(3):
+            sum+=l[i]*abs(np.dot(vec,v[i]))
+        return sum
     
     def u(self,a,b):
         disp = self.coords[a]-self.coords[b]
@@ -22,8 +27,8 @@ class Seminario:
     #Equation (11) in the seminario paper
     def u_N(self,a,b,c):
         uab=self.u(a,b)
-        ubc=self.u(b,c)
-        cross=np.cross(uab,ubc) #Signs don't matter because all normal-vectors only appear inside |x| terms
+        ucb=self.u(c,b)
+        cross=np.cross(ucb,uab) #Signs don't matter because all normal-vectors only appear inside |x| terms
         return cross/np.linalg.norm(cross)
 
     def Rsq(self,a,b):
@@ -36,28 +41,37 @@ class Seminario:
 
         a,b(int): atom indices indicating the dihedral, starting at 0 and corresponding to the coords
         """
-        u_ab = self.u(a,b)
-        u_bc = self.u(b,c)
-        u_cd = self.u(c,d)
-        prefac1 = self.Rsq(a,b)*np.sum(np.square(np.cross(u_ab,u_bc)))
-        prefac2 = self.Rsq(c,d)*np.sum(np.square(np.cross(u_bc,u_cd)))
-        denom1=prefac1*np.linalg.norm(self.u_N(a,b,c)*self.eig_sum(a,b))
-        denom2=prefac2*np.linalg.norm(self.u_N(b,c,d)*self.eig_sum(c,d))
-        return 1/(1/denom1+1/denom2)
+        def calc_par(i,j,k,l):
+            u_ij = self.u(i,j)
+            u_jk = self.u(j,k)
+            u_kl = self.u(k,l)
+            prefac1 = self.Rsq(i,j)*np.sum(np.square(np.cross(u_ij,u_jk)))
+            prefac2 = self.Rsq(k,l)*np.sum(np.square(np.cross(u_jk,u_kl)))
+
+            denom1=prefac1*self.eig_sum(i,j,self.u_N(i,j,k))
+            denom2=prefac2*self.eig_sum(k,l,self.u_N(j,k,l))
+            
+            return (1/(1/denom1+1/denom2)).real
+        
+        fc = max(0,0.5*(calc_par(a,b,c,d)+calc_par(d,c,b,a)))
+
+        return fc
 
     #equation (14) 
     def angle_fc(self,a,b,c):
         """
         Calculate the angle force constant
         a,b,c(int): atom indices indicating the angle, starting at 0 and corresponding to the coords"""
-        u_N=self.u_N(a,b,c)
-        u_P_a=np.cross(u_N,self.u(a,b))
-        u_P_c=np.cross(self.u(c,b),u_N)
+        def calc_par(i,j,k):
+            u_N=self.u_N(i,j,k)
+            u_P_i=np.cross(u_N,self.u(i,j))
+            u_P_k=np.cross(self.u(k,j),u_N)
 
-        denom1=self.Rsq(a,b)*np.linalg.norm(u_P_a*self.eig_sum(a,b))
-        denom2=self.Rsq(c,b)*np.linalg.norm(u_P_c*self.eig_sum(c,b))
-        return 1/(1/(denom1)+1/(denom2))
-        
+            denom1=self.Rsq(i,j)*self.eig_sum(i,j,u_P_i)
+            denom2=self.Rsq(k,j)*self.eig_sum(k,j,u_P_k)
+
+            return 1/(1/(denom1)+1/(denom2)).real
+        return max(0,0.5*(calc_par(a,b,c)+calc_par(c,b,a)))
     #equation (10)
     def bond_fc(self,a,b):
         """
@@ -65,5 +79,8 @@ class Seminario:
 
         a,b(int): atom indices indicating the bond, starting at 0 and corresponding to the coords
         """
-        u_ab = self.u(a,b)
-        return np.linalg.norm(u_ab*self.eig_sum(a,b))
+        def calc_par(i,j):
+            u_ab = self.u(i,j)
+            return self.eig_sum(i,j,u_ab).real
+        
+        return max(0,0.5*(calc_par(a,b)+calc_par(b,a)))
