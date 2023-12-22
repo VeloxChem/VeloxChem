@@ -1,13 +1,14 @@
 import numpy as np
 class Seminario:
-    'Implements the seminario approach https://doi.org/10.1002/(SICI)1097-461X(1996)60:7%3C1271::AID-QUA8%3E3.0.CO;2-W'
+    
     def __init__(self,H,coords):
         self.H=H
         self.coords = coords
 
+
     def eig_sum(self,a,b,vec):
         """
-        Calculate the eigenvalues and eigenvectors of the 3x3 submatrix of H starting with the left corner at (3*a,3*b), and return their sum multiplied by a given vector as given in the seminario paper
+        Calculate the eigenvalues and eigenvectors of the 3x3 submatrix of H starting with the left corner at (3*a,3*b), and return the sum of the vectors multiplied by their respective eigenvalue
         """
         k=-self.H[3*a:3*(a+1),3*b:3*(b+1)]
         eig = np.linalg.eig(k)
@@ -53,7 +54,7 @@ class Seminario:
             
             return (1/(1/denom1+1/denom2)).real
         
-        fc = max(0,0.5*(calc_par(a,b,c,d)+calc_par(d,c,b,a)))
+        fc = max(0,0.5*(calc_par(a,b,c,d)+calc_par(a,c,b,d)))
 
         return fc
 

@@ -1314,6 +1314,7 @@ class AtomTypeIdentifier:
         return self.gaff_atom_types
         
     #todo, potentially move this to the topology class. Populating the topology should be part of the topology fucntionality, not of the atomtypeidentifyer
+    
     def compute_structural_features(self):
         '''
         Computes the structural features of a molecule based on its connectivity and distance matrices. The features include bonds, angles, dihedrals, and improper dihedrals. Each feature is represented by the involved atoms' IDs, the corresponding atom types, and the geometric parameters like distances and angles.
@@ -1405,24 +1406,24 @@ class AtomTypeIdentifier:
                 # check for cycle
                 cycle = False
                 if self.gaff_atom_types[neighbours[0]] in sp2_atom_types and self.gaff_atom_types[neighbours[1]] in sp2_atom_types:
-                    add_improper(neighbours[0],neighbours[1],center,neighbours[2])
+                    add_improper(center,neighbours[0],neighbours[1],neighbours[2])
                     cycle=True
                 if self.gaff_atom_types[neighbours[1]] in sp2_atom_types and self.gaff_atom_types[neighbours[2]] in sp2_atom_types:
-                    add_improper(neighbours[1],neighbours[2],center,neighbours[0])
+                    add_improper(center,neighbours[1],neighbours[2],neighbours[0])
                     cycle=True
                 if self.gaff_atom_types[neighbours[2]] in sp2_atom_types and self.gaff_atom_types[neighbours[0]] in sp2_atom_types:
-                    add_improper(neighbours[2],neighbours[0],center,neighbours[1])
+                    add_improper(center,neighbours[2],neighbours[0],neighbours[1])
                     cycle=True
                 if cycle:
                     return
             
                 #check for double bond
                 if self.gaff_atom_types[neighbours[0]] in sp2_atom_types:
-                    add_improper(neighbours[1],center,neighbours[2],neighbours[0])
+                    add_improper(center,neighbours[1],neighbours[2],neighbours[0])
                 if self.gaff_atom_types[neighbours[1]] in sp2_atom_types:
-                    add_improper(neighbours[2],center,neighbours[0],neighbours[1])
+                    add_improper(center,neighbours[2],neighbours[0],neighbours[1])
                 if self.gaff_atom_types[neighbours[2]] in sp2_atom_types:
-                    add_improper(neighbours[0],center,neighbours[1],neighbours[2])
+                    add_improper(center,neighbours[0],neighbours[1],neighbours[2])
                 return
 
 
@@ -1462,7 +1463,6 @@ class AtomTypeIdentifier:
 
         return structural_features
     
-    #todo, potentially move this to the topology class. Populating the topology should be part of the topology fucntionality, not of the atomtypeidentifyer
     def generate_force_field_dict(self, ff_file_path):
         '''
         Generates a force field dictionary for a molecule based on its structural features and a given GAFF force field file.
@@ -1622,7 +1622,6 @@ class AtomTypeIdentifier:
             for line in ff_lines:
                 angle_match = re.search(angle_regex, line)
                 if angle_match:
-                    #todo fix this
                     fc = float(angle_match.group(1)) * 2*kcalmol_to_kjmol #unit
                     eq_angle_radians = float(angle_match.group(2))
                     eq_angle_degrees = eq_angle_radians  # Assuming angle is in radians, convert to degrees if necessary
@@ -1715,14 +1714,14 @@ class AtomTypeIdentifier:
                         'fc': fc,
                         'eq': eq,
                         'periodicity': periodicity,
-                        'comment': f"GAFF2, {dihedral['types']}".replace("'","")
+                        'comment': f"GAFF2, {dihedral['types']}".replace("'",""),
+                        'type':9
                     }
                     
                     if periodicity > 0:
                             break
 
             else:
-                #todo what is this dihedral.get
                 computed_angle = dihedral['dihedral_angle']
                 # The dihedral key will include atom types and IDs for uniqueness
                 force_field_data['dihedrals'][dihedral_key] = {
@@ -1732,7 +1731,8 @@ class AtomTypeIdentifier:
                     'fc': 0,  # Default force constant
                     'eq': computed_angle,
                     'periodicity': 1,  # Default phase
-                    'comment': f"unknown, {dihedral['types']}".replace("'","")
+                    'comment': f"unknown, {dihedral['types']}".replace("'",""),
+                    'type':9
                 }
         
         # improper dihedrals
@@ -1798,7 +1798,6 @@ class AtomTypeIdentifier:
             eq = float(dihedral_ff[1])
             periodicity = abs(int(float(dihedral_ff[2])))
 
-            #todo check this
             improper_key = tuple(improper['atoms'])  # Use atom IDs instead of types for the key
             if improper_key[0]>improper_key[3]:
                 improper_key = improper_key[::-1]
@@ -1814,7 +1813,6 @@ class AtomTypeIdentifier:
                     'type': 4
                 }
             else:
-                #todo what is this improper.get
                 computed_angle = improper['improper_angle']
                 force_field_data['impropers'][improper_key] = {
                     # 'ids': improper['ids'],  # Include the atom IDs

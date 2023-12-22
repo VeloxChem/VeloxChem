@@ -1,4 +1,3 @@
-import math
 import numpy as np
 # from veloxchem import mathconst_pi, hartree_in_kcalpermol, bohr_in_angstrom, Molecule
 from .veloxchemlib import mathconst_pi
@@ -22,6 +21,18 @@ class Topology():
     def __init__(self):
         ""
 
+    def parse_ffld(self,molecule,itp,ffld):
+        ffld_data = ffld_parser.parse(itp,ffld,molecule)
+        masses = molecule.masses_to_numpy()
+        for i,id in enumerate(ffld_data['atoms']): #todo do i need to add masses manually?
+            ffld_data['atoms'][id]['mass'] =masses[i]
+        self.atoms = ffld_data['atoms']
+        self.bonds = ffld_data['bonds']
+        self.angles = ffld_data['angles']
+        self.dihedrals = ffld_data['dihedrals']
+        self.impropers = ffld_data['impropers']
+        self.pairs = ffld_data['pairs']
+
     def load_forcefield(self,molecule,ff_file_path):
         """
         Populates the topology based on the force-field parameters corresponding to a given molecule
@@ -39,7 +50,6 @@ class Topology():
         self.impropers = ff_data['impropers']
         self.pairs = ff_data['pairs']
         return ao_identifier
-
 
     def update_charge(self,charges):
         """
@@ -85,12 +95,22 @@ class Topology():
         # Print the dihedrals section
         itp_string += '\n[ dihedrals ]\n; ai  aj  ak  al  funct  theta  k  mult; comment\n'
         for dihedral_key, dihedral_data in self.dihedrals.items():
-            itp_string += f'{dihedral_key[0]:<4} {dihedral_key[1]:<4} {dihedral_key[2]:<4} {dihedral_key[3]:<4} 9 {dihedral_data["eq"]:>8.3f} {dihedral_data["fc"]:>8.3f}  {abs(dihedral_data["periodicity"])}; {dihedral_data["comment"]}\n'
+            if dihedral_data["type"]==9:
+                itp_string += f'{dihedral_key[0]:<4} {dihedral_key[1]:<4} {dihedral_key[2]:<4} {dihedral_key[3]:<4} {dihedral_data["type"]} {dihedral_data["eq"]:>8.3f} {dihedral_data["fc"]:>8.3f}  {abs(dihedral_data["periodicity"])}; {dihedral_data["comment"]}\n'
+            elif dihedral_data["type"]==5:
+                itp_string += f'{dihedral_key[0]:<4} {dihedral_key[1]:<4} {dihedral_key[2]:<4} {dihedral_key[3]:<4} {dihedral_data["type"]} {dihedral_data["c1"]} {dihedral_data["c2"]} {dihedral_data["c3"]} {dihedral_data["c4"]} {dihedral_data["c5"]} ; {dihedral_data["comment"]}\n'
+            else:
+                print(f"ERROR: dihedral type {dihedral_data['type']} not supported") #todo raise exception?
 
         # Print the impropers section
         itp_string += '\n[ dihedrals ] ; Improper dihedral section\n; ai  aj  ak  al  type  phi0  fc  n; comment\n'
         for improper_key, improper_data in self.impropers.items():
-            itp_string += f'{improper_key[0]:<4} {improper_key[1]:<4} {improper_key[2]:<4} {improper_key[3]:<4} {improper_data["type"]} {improper_data["eq"]:>8.3f} {improper_data["fc"]:>8.3f} {improper_data["periodicity"]:>2}; {improper_data["comment"]}\n'
+            if improper_data['type']==4:
+                itp_string += f'{improper_key[0]:<4} {improper_key[1]:<4} {improper_key[2]:<4} {improper_key[3]:<4} {improper_data["type"]} {improper_data["eq"]:>8.3f} {improper_data["fc"]:>8.3f} {improper_data["periodicity"]:>2}; {improper_data["comment"]}\n'
+            elif improper_data['type']==2:
+                itp_string += f'{improper_key[0]:<4} {improper_key[1]:<4} {improper_key[2]:<4} {improper_key[3]:<4} {improper_data["type"]} {improper_data["eq"]:>8.3f} {improper_data["fc"]:>8.3f}; {improper_data["comment"]}\n'
+            else:
+                print(f"ERROR: dihedral type {improper_data['type']} not supported") #todo raise exception?
 
         # Print the pairs section
         itp_string += '\n[ pairs ]\n; ai  aj  funct\n'
@@ -183,7 +203,6 @@ class Topology():
 
         def process_parameter(parameters, label):
             for ids in parameters.keys():
-                types = parameters[ids]['types']
                 eq = parameters[ids]["eq"]
                 fc = parameters[ids]["fc"]
 
