@@ -1,5 +1,29 @@
+#
+#                           VELOXCHEM 1.0-RC3
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
-# from veloxchem import mathconst_pi, hartree_in_kcalpermol, bohr_in_angstrom, Molecule
 from .veloxchemlib import mathconst_pi
 from .veloxchemlib import hartree_in_kcalpermol
 from .veloxchemlib import bohr_in_angstrom
@@ -7,21 +31,34 @@ from .molecule import Molecule
 from .seminario import Seminario
 from .atomtypeidentifier import AtomTypeIdentifier
 
-class Topology():
+class Topology:
 
     """
+    Class for creating a topology based on a molecule and a force-field file
+
     example:
     >>> top = Topology()
-    >>> top.lead_forcefield(molecule,"path_to_gaff.dat")
-    >>> top.load_charge(charge_array)
-    >>> top.reparameterise(molecule, hessian)
-    >>> top.write_itp(filename,output_folder)
-    >>> top.write_top(filename,output_folder)
+    >>> top.identify_atomtypes(molecule,"path_to_gaff.dat")
+    >>> top.create_topology()
+    >>> top.write_gromacs_files("mol","output_folder")
     """
-    def __init__(self):
-        ""
 
-    def parse_ffld(self,molecule,itp,ffld):
+    def __init__(self):
+        """
+        Initialize the topology
+        """
+        self.atoms = {}
+        self.bonds = {}
+        self.angles = {}
+        self.dihedrals = {}
+        self.impropers = {}
+        self.pairs = []
+        self.coordinates = []
+        self.filename = ""
+        self.RES = ""   
+    
+    # TODO: Add the ffld parser function
+    def parse_ffld(self, molecule, itp, ffld):
         ffld_data = ffld_parser.parse(itp,ffld,molecule)
         masses = molecule.masses_to_numpy()
         for i,id in enumerate(ffld_data['atoms']): #todo do i need to add masses manually?
@@ -33,14 +70,46 @@ class Topology():
         self.impropers = ffld_data['impropers']
         self.pairs = ffld_data['pairs']
 
-    def load_forcefield(self,molecule,ff_file_path):
+    def identify_atomtypes(self,molecule,ff_file_path):
         """
-        Populates the topology based on the force-field parameters corresponding to a given molecule
+        Uses the atomtype identifier to identify the atomtypes of a molecule
+        This method can be used to correct missidentifications in the force-field file
+
+        Example:
+        >>> top = Topology()
+        >>> top.identify_atomtypes(molecule,"path_to_gaff.dat")
+        >>> top.atomtypes #list of atomtypes
+        If the atom type in the 4th atom is wrong, you can correct it with:
+        >>> top.atomtypes[3] = "ca"
+
+        molecule: Molecule object from veloxchem
+        ff_file_path: path to the force-field file
+
+        Returns: a list of atomtypes       
         """
-        ao_identifier = AtomTypeIdentifier()
-        ao_identifier.generate_gaff_atomtypes(molecule)
-        ff_data = ao_identifier.generate_force_field_dict(ff_file_path)
-        masses = molecule.masses_to_numpy()
+
+        self.ao_identifier = AtomTypeIdentifier()
+        self.atomtypes = self.ao_identifier.generate_gaff_atomtypes(molecule)
+        self.ao_identifier.check_for_bad_assignations(ff_file_path)
+
+        self.molecule = molecule
+        self.ff_file_path = ff_file_path
+
+    def create_topology(self):
+        """
+        Creates a topology based on a molecule and a force-field file
+        The atomtypes should be identified first with identify_atomtypes
+        """
+
+        # Print an error if the atomtypes are not identified
+        if self.ao_identifier is None:
+            raise Exception("Atomtypes are not identified yet. Use the identify_atomtypes method first")
+        
+        # Generate the force-field dictionary
+        # Method from atomtypeidentifier.py to analize the topology of the molecule 
+        ff_data = self.ao_identifier.generate_force_field_dict(self.ff_file_path)
+        masses = self.molecule.masses_to_numpy()
+
         for i,id in enumerate(ff_data['atomtypes']):
             ff_data['atomtypes'][id]['mass'] =masses[i]
         self.atoms = ff_data['atomtypes']
@@ -49,8 +118,9 @@ class Topology():
         self.dihedrals = ff_data['dihedrals']
         self.impropers = ff_data['impropers']
         self.pairs = ff_data['pairs']
-        return ao_identifier
-
+        self.coordinates = self.molecule.get_coordinates_in_angstrom() * 0.1
+    
+    # Methods for updating the topology
     def update_charge(self,charges):
         """
         Takes list list of charges, and assigns those to the atoms 
@@ -59,6 +129,8 @@ class Topology():
         for atom_id,charge in zip(self.atoms,charges):
             self.atoms[atom_id]['charge']=float(charge)
 
+    # Methods for generating GROMACS the topology
+            
     def get_itp_string(self,RES="Mol"):
         """
         generate an itp string based on this topology.
@@ -118,6 +190,35 @@ class Topology():
             itp_string += f'{pair_key[0]:<4} {pair_key[1]:<4} 1\n'
         return itp_string
 
+    def get_top_string(self,filename,RES="MOL"):
+        """
+        Generate a GROMACS top file based on this topology. Filename and RES will be set as instance variables
+
+        Res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .top file.
+        """
+        # Construct the topol.top file string
+        # Initialize the top file
+        top_string = '; Created by VeloxChem\n\n'
+
+        # Print the include section for including the itp file
+        top_string += " "
+        top_string += f"""#include "{filename}.itp"\n"""
+
+        # Print the defaults section all aligned
+        top_string += '[ defaults ]'
+        top_string += ';nbfunc comb-rule gen-pairs fudgeLJ fudgeQQ'
+        # Values aligned with the comment
+        top_string += '\n1        2        yes       0.5     0.8333\n'
+
+        # Print the system directive
+        top_string += f"\n[ system ]\n; name\n{RES}\n"
+
+        # Print the molecules section
+        top_string += f"\n[ molecules ]\n; name  number\n{RES}  1\n"
+        return top_string
+    
+    # Methods for writing the GROMACS files
+    
     def write_itp(self,filename,output_folder,RES="MOL"):
         """
         Generate a GROMACS itp file based on this topology. Filename and RES will be set as instance variables
@@ -137,34 +238,11 @@ class Topology():
         with open(f"{output_folder}/{filename}.itp", "w") as f:
             f.write(itp_string)
 
-    def get_top_string(self,filename,RES="MOL"):
+    def write_top(self, filename, output_folder, RES="MOL"):
         """
         Generate a GROMACS top file based on this topology. Filename and RES will be set as instance variables
 
-        Res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .top file.
-        """
-        # Construct the topol.top file string
-        # Initialize the top file
-        top_string = '; Created by VeloxChem\n\n'
-
-        # Print the include section for including the itp file
-        top_string += f"""#include "{filename}.itp"\n"""
-
-        # Print the defaults section
-        top_string += '\n[ defaults ]\n; nbfunc  comb-rule  gen-pairs  fudgeLJ  fudgeQQ\n1  3  yes  0.5  0.8333\n'
-
-        # Print the system directive
-        top_string += f"\n[ system ]\n; name\n{RES}\n"
-
-        # Print the molecules section
-        top_string += f"\n[ molecules ]\n; name  number\n{RES}  1\n"
-        return top_string
-
-    def write_top(self,filename,output_folder,RES="MOL"):
-        """
-        Generate a GROMACS top file based on this topology. Filename and RES will be set as instance variables, and should match with the .itp file
-
-        Res: residue name used in the topology, defaults to "MOL".
+        Res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .itp file.
         """
         if hasattr(self,filename):
             if self.filename != filename:
@@ -177,19 +255,69 @@ class Topology():
 
         with open(f"{output_folder}/{filename}.top", "w") as f:
             f.write(top_string)
-    
-    def reparameterise(self,mol,hes,keys=None,element=None,print_all=False,only_eq=False,no_repar=False,repar_imp=False):
-        """
-        Reparameterises all unknown parameters with the seminario method using the given hessian
 
-        mol: veloxchem molecule, used for geometry information
-        hes: cartesian hessian matrix as 2D array
-        keys: one or multiple tuples corresponding to bonds angles or dihedrals that need to be reparameterised. If passed, the unknown parameters will be ignored
-        print_all: if true, all parameters will be printed, and not just the adjusted ones
-        only_eq: only adjust the eq values, and not the fc values. Useful for transition states
-        dihed: boolean, if false(default) will assign 0 improper torsion barrier, if true computes improper torsion barrier with seminario (experimental)
+    def write_gro(self, filename, output_folder, RES='MOL'):
         """
-        print("\nVeloxchem force-field reparameterisation\n\n----------------------------------------")
+        Writes a GROMACS gro file based on the coordinates of the molecule
+        and the atom types in the topology.
+
+        :param filename: Name of the gro file
+        :param output_folder: Output directory for the gro file
+        :param RES: Name of the residue
+        """
+        # Check if coordinates are available
+        if not hasattr(self, 'coordinates'):
+            raise ValueError("Coordinates are not set for the topology.")
+
+        # Construct the gro file content
+        gro_string = f'Generated by VeloxChem\n'
+        gro_string += f'{len(self.atoms)}\n'
+
+        # Atom lines formatting
+        for atom_id, atom_data in enumerate(self.atoms.values(), start=1):
+            x, y, z = self.coordinates[atom_id - 1]
+            gro_string += f'{1 % 100000:>5d}{RES:<5}{atom_data["type"]:>5}{atom_id % 100000:>5d}{x:8.3f}{y:8.3f}{z:8.3f}\n'
+        
+        # TODO: Replace with actual box dimensions if available
+        gro_string += '   2.00000   2.00000   2.00000\n'
+
+        # Write to file
+        with open(f"{output_folder}/{filename}.gro", "w") as f:
+            f.write(gro_string)
+
+    # This method is a wrapper for the other write methods
+
+    def write_gromacs_files(self, filename, output_folder, RES="MOL"):
+        """
+        Generate a GROMACS top and itp file based on this topology. Filename and RES will be set as instance variables, and should match with the .itp file
+
+        Res: residue name used in the topology, defaults to "MOL".
+        """
+        self.write_itp(filename,output_folder,RES)
+        self.write_top(filename,output_folder,RES)
+        self.write_gro(filename,output_folder,RES)
+
+    # Methods for reparameterizing the force-field
+    
+    def reparameterize(self, molecule, hessian, origin='ORCA', keys=None, element=None, print_all=False, only_eq=False, no_repar=False, repar_imp=False):
+        """
+        Reparameterizes all unknown parameters with the seminario method using the given hessian
+
+        molecule: Molecule object from veloxchem
+        hessian: Hessian matrix in a 2D numpy array or path to the hessian file
+        origin: origin of the hessian, either 'ORCA' or 'VeloxChem'
+            If the origin is ORCA, the hessian will be parsed from the file
+            If the origin is VeloxChem, the hessian should be already a 2D numpy array
+        keys: list of tuples of atom ids, for which the parameters should be reparameterised
+        element: element for which all parameters should be reparameterised
+        print_all: print all parameters, not just the ones that are reparameterised
+        only_eq: only reparameterise the equilibrium values, not the force constants
+        no_repar: do not reparameterise anything, just print the parameters
+        repar_imp: reparameterise impropers as well (experimental)
+
+        """
+        print("\nVeloxChem Force Field Reparameterization\n\n----------------------------------------")
+        print("Based on the Seminario method\n")
         A_to_nm=0.1 #1 angstrom is 0.1 nm
         Bohr_to_nm = bohr_in_angstrom()*A_to_nm
         cal_to_joule = 4.184 #1 calorie is 4.184 joule
@@ -198,8 +326,15 @@ class Topology():
         if (type(keys) == tuple):
             keys = [keys]
 
-        coords = mol.get_coordinates_in_bohr() #Coordinates in Bohr
-        sem = Seminario(hes,coords)
+        if origin == 'ORCA':
+            hessian = Seminario.parse_orca_hessian(hessian)
+        elif origin == 'VeloxChem':
+            hessian = np.array(hessian)
+        else:
+            raise Exception("Please specify the origin of the hessian as 'ORCA' or 'VeloxChem'")
+        
+        coords = molecule.get_coordinates_in_bohr() #Coordinates in Bohr
+        sem = Seminario(hessian,coords)
 
         def process_parameter(parameters, label):
             for ids in parameters.keys():
@@ -238,7 +373,7 @@ class Topology():
                         repar = True
                 elif keys is None and element is not None:
                     for id in ids:
-                        if element == mol.get_labels()[id-1]:
+                        if element == molecule.get_labels()[id-1]:
                             repar = True
                 elif keys is None and element is None and "unknown" in comment:
                     repar = True
@@ -259,7 +394,7 @@ class Topology():
                             parameters[ids]["type"] =2    
                             parameters[ids]["periodicity"] = ""                        
                     else:
-                        comment+=", reparameterisation of proper dihedrals should be done with other method"
+                        comment+=", reparameterization of proper dihedrals should be done with other method"
 
                 if repar or print_all:
                     if label == "bond":
@@ -282,3 +417,72 @@ class Topology():
 
         print("\nImpropers\t\teq(deg)  \tfc(kJmol^-1/rad^2?) \tperiodicity \tNew eq(deg) \tNew fc(kJmol^-1/rad^2?)\tNew periodicity\tComment")
         process_parameter(self.impropers, "improper")
+
+    # TODO Check this method because the specific libraries to be imported are 
+    # not clear.
+        
+    def test_force_field(self,filename, output_folder, save_trajectory=False):
+        """
+        This method will perfom a short MD simulation and measure the RMSD
+        of the molecule during the simulation compared to the original molecule.
+
+        This method requires the GROMACS force-field files to be present in the current directory.
+        """
+        # TODO: USE THE GROMACS PYTHON API INSTEAD OF OPENMM
+
+        from openmm.app import GromacsGroFile, GromacsTopFile, PDBReporter, StateDataReporter, Simulation
+        from openmm import LangevinMiddleIntegrator
+        from openmm.unit import kelvin, picosecond, nanometer
+        from openmm.NonbondedForce import PME ## TODO: Check if this is the correct import
+        from openmm.constraint import HBonds # TODO: Check if this is the correct import
+
+        from sys import stdout
+        import mdtraj as md
+        import numpy as np
+        import os
+    
+        # Load GROMACS files
+        # Check if the GROMACS files are present
+        if not os.path.isfile(f"{filename}.gro"):
+            raise ValueError(f"{filename}.gro is not present in the current directory")
+        if not os.path.isfile(f"{filename}.top"):
+            raise ValueError(f"{filename}.top is not present in the current directory")
+        
+        gro = GromacsGroFile(f"{filename}.gro")
+        top = GromacsTopFile(f"{filename}.top", periodicBoxVectors=gro.getPeriodicBoxVectors())
+
+        # Create the simulation
+        system = top.createSystem(nonbondedMethod=PME, nonbondedCutoff=1*nanometer,
+                constraints=HBonds)
+        integrator = LangevinMiddleIntegrator(298*kelvin, 1/picosecond, 0.004*picosecond)
+        simulation = Simulation(top.topology, system, integrator)
+        simulation.context.setPositions(gro.positions)
+
+        # Run the simulation
+        simulation.minimizeEnergy()
+        simulation.reporters.append(PDBReporter('tajectory.pdb', 10))
+        simulation.reporters.append(StateDataReporter(stdout, 10, step=True,
+                potentialEnergy=True, temperature=True))
+        simulation.step(1000)
+
+        # Load the trajectory
+        traj = md.load('save.pdb', top=f"{filename}.gro")
+        traj.superpose(traj, 0)
+        rmsd = md.rmsd(traj, traj, 0)
+        
+        # Print a table with the RMSD, Avg, Max, Min and StdDev
+        print("RMSD\tAvg\tMax\tMin\tStdDev")
+        print(f"{np.mean(rmsd):.3f}\t{np.max(rmsd):.3f}\t{np.min(rmsd):.3f}\t{np.std(rmsd):.3f}")
+
+        # Print warnings if the RMSD is too high
+        if np.mean(rmsd) > 0.1:
+            print("WARNING: RMSD is too high, check the force-field parameters")
+        
+        # Save the trajectory if requested
+        if save_trajectory == False:
+            os.remove("save.pdb")
+        else:
+            print("Trajectory saved as trajectory.pdb")
+
+
+

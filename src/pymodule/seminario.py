@@ -1,10 +1,78 @@
+#
+#                           VELOXCHEM 1.0-RC3
+#         ----------------------------------------------------
+#                     An Electronic Structure Code
+#
+#  Copyright © 2018-2022 by VeloxChem developers. All rights reserved.
+#  Contact: https://veloxchem.org/contact
+#
+#  SPDX-License-Identifier: LGPL-3.0-or-later
+#
+#  This file is part of VeloxChem.
+#
+#  VeloxChem is free software: you can redistribute it and/or modify it under
+#  the terms of the GNU Lesser General Public License as published by the Free
+#  Software Foundation, either version 3 of the License, or (at your option)
+#  any later version.
+#
+#  VeloxChem is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public
+#  License for more details.
+#
+#  You should have received a copy of the GNU Lesser General Public License
+#  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
+
 import numpy as np
+
 class Seminario:
-    
-    def __init__(self,H,coords):
+    """
+    Class for calculating force constants using the Seminario method
+    """
+
+    def __init__(self, H, coords):
         self.H=H
         self.coords = coords
 
+    # Auxiliary function to parse the ORCA output file
+    # Intended to be temporary
+    @staticmethod
+    def parse_orca_hessian(filename):
+        """ Parse an ORCA hessian file and return the hessian matrix  
+        
+        Parameters
+        ----------
+        filename : str
+            Name of the ORCA output file ('.hess' extension)
+
+        Returns
+        -------
+        hessian : ndarray
+            Hessian matrix    
+        """
+
+        with open(filename, 'r') as f:
+            for line in f:
+                #
+                # Read the hessian matrix
+                #
+                if '$hessian' in line:
+                    dimension = int(f.readline())
+                    matrix = np.zeros((dimension, dimension))
+                    while line != '\n':
+                        line = f.readline()
+                        if '.' not in line:
+                            jindex = [int(jj) for jj in line.split()]
+                        else:
+                            iindex = int(line.split()[0])
+                            datas = [float(val) for val in line.split()[1:]]
+                            for j, data in enumerate(datas):
+                                # print (j, jindex[j], iindex)
+                                matrix[iindex, jindex[j]] = data
+
+                    hessian = matrix
+
+        return hessian
 
     def eig_sum(self,a,b,vec):
         """
