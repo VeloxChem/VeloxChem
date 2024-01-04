@@ -414,7 +414,7 @@ class PolarizabilityGradient():
                         if self.rank == mpi_master():
                             pol_gradient[i,i] += polgrad_xcgrad
 
-                polgrad_results[(w)] = pol_gradient.reshape(dof, dof, 3 * natm)
+                polgrad_results[w] = pol_gradient.reshape(dof, dof, 3 * natm)
 
         self.polgradient = dict(polgrad_results)
 
@@ -440,8 +440,6 @@ class PolarizabilityGradient():
             The SCF driver.
         """
 
-        scf_drv.ostream.mute()
-
         # number of atoms
         natm = molecule.number_of_atoms()
 
@@ -454,9 +452,11 @@ class PolarizabilityGradient():
         # number of frequencies
         n_freqs = len(self.frequencies)
 
+        # dictionary
+        polgrad_results = {}
+
         # linear response driver for polarizability calculation
         lr_drv = LinearResponseSolver(self.comm, self.ostream)
-        lr_drv.ostream.state = False
         lr_drv.frequencies = self.frequencies
 
         # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
@@ -469,6 +469,10 @@ class PolarizabilityGradient():
             self.ostream.print_blank()
             self.ostream.print_info('do_four_point: False')
             self.ostream.flush()
+
+            # mute the drivers
+            scf_drv.ostream.mute()
+            lr_drv.ostream.state = False
 
             for i in range(natm):
                 for d in range(3):
@@ -498,7 +502,8 @@ class PolarizabilityGradient():
                                      lr_results_m['response_functions'][key]) /
                                     (2.0 * self.delta_h))
             for f, w in enumerate(self.frequencies):
-                self.polgradient[w] = num_polgradient[f]
+                polgrad_results[w] = num_polgradient[f]
+            self.polgradient = dict(polgrad_results)
 
         # four-point approximation for debugging of analytical gradient
         else:
@@ -548,7 +553,8 @@ class PolarizabilityGradient():
                                     lr_results_p2['response_functions'][key]) / (
                                         12.0 * self.delta_h))
             for f, w in enumerate(self.frequencies):
-                self.polgradient[w] = num_polgradient[f]
+                polgrad_results[w] = num_polgradient[f]
+            self.polgradient = dict(polgrad_results)
 
         scf_drv.ostream.unmute()
         lr_drv.ostream.state = True
