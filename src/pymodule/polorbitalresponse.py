@@ -186,11 +186,11 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(x_minus_y.shape[0])
                 ])
 
-                valstr = ' * comput_rhs() > Time spent on mdot #0: '
-                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
+                #valstr = ' * comput_rhs() > Time spent on mdot #0: '
+                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
+                #self.ostream.print_header(valstr)
+                #self.ostream.print_blank()
+                #self.ostream.flush()
 
                 # Turn them into a list (for AODensityMatrix)
                 xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
@@ -239,11 +239,11 @@ class PolOrbitalResponse(CphfSolver):
                             ]).T
                         )
                         
-                valstr = ' * comput_rhs() > Time spent on mdot #1: '
-                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
+                #valstr = ' * comput_rhs() > Time spent on mdot #1: '
+                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
+                #self.ostream.print_header(valstr)
+                #self.ostream.print_blank()
+                #self.ostream.flush()
 
                 mdot_start_time = tm.time()
 
@@ -257,11 +257,11 @@ class PolOrbitalResponse(CphfSolver):
                         )
                 dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
 
-                valstr = ' * comput_rhs() > Time spent on mdot #2: '
-                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
+                #valstr = ' * comput_rhs() > Time spent on mdot #2: '
+                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
+                #self.ostream.print_header(valstr)
+                #self.ostream.print_blank()
+                #self.ostream.flush()
 
                 # 2) Construct the right-hand side
                 dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list, denmat.rest)
@@ -443,11 +443,11 @@ class PolOrbitalResponse(CphfSolver):
                         ])
                 fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(dof**2, nocc, nvir)
 
-                valstr = ' * comput_rhs() > Time spent on mdot #3: '
-                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
+                #valstr = ' * comput_rhs() > Time spent on mdot #3: '
+                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
+                #self.ostream.print_header(valstr)
+                #self.ostream.print_blank()
+                #self.ostream.flush()
 
                 # Calculate the dipole contributions to the RHS:
                 # Dipole integrals in AO basis
@@ -490,11 +490,11 @@ class PolOrbitalResponse(CphfSolver):
                         )
                 rhs_dipole_contrib = rhs_dipole_contrib.reshape(dof**2, nocc, nvir)
 
-                valstr = ' * comput_rhs() > Time spent on mdot #4: '
-                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
+                #valstr = ' * comput_rhs() > Time spent on mdot #4: '
+                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
+                #self.ostream.print_header(valstr)
+                #self.ostream.print_blank()
+                #self.ostream.flush()
 
                 rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
 
@@ -681,11 +681,11 @@ class PolOrbitalResponse(CphfSolver):
                             + np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T
                             + np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
 
-                valstr = ' * comput_omega() > Time spent on mdot #1: '
-                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
+                #valstr = ' * comput_omega() > Time spent on mdot #1: '
+                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
+                #self.ostream.print_header(valstr)
+                #self.ostream.print_blank()
+                #self.ostream.flush()
 
                 mdot_start_time = tm.time()
 
@@ -699,11 +699,11 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(dof)
                 ])
 
-                valstr = ' * comput_omega() > Time spent on mdot #2: '
-                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
+                #valstr = ' * comput_omega() > Time spent on mdot #2: '
+                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
+                #self.ostream.print_header(valstr)
+                #self.ostream.print_blank()
+                #self.ostream.flush()
 
                 # The density matrix; only alpha block;
                 # Only works for the restricted case
@@ -765,11 +765,11 @@ class PolOrbitalResponse(CphfSolver):
                             mo_vir.T
                         ])
 
-                valstr = ' * compute_omega() > Time spent on mdot #3: '
-                valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-                self.ostream.flush()
+                #valstr = ' * compute_omega() > Time spent on mdot #3: '
+                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
+                #self.ostream.print_header(valstr)
+                #self.ostream.print_blank()
+                #self.ostream.flush()
                 # OV + VO
                 epsilon_dm_ao -= (epsilon_cphf_ao +
                                   epsilon_cphf_ao.transpose(0, 1, 3, 2))
