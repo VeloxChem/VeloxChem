@@ -34,46 +34,6 @@ class Seminario:
         self.H=H
         self.coords = coords
 
-    # Auxiliary function to parse the ORCA output file
-    # Intended to be temporary
-    @staticmethod
-    def parse_orca_hessian(filename):
-        """ Parse an ORCA hessian file and return the hessian matrix  
-        
-        Parameters
-        ----------
-        filename : str
-            Name of the ORCA output file ('.hess' extension)
-
-        Returns
-        -------
-        hessian : ndarray
-            Hessian matrix    
-        """
-
-        with open(filename, 'r') as f:
-            for line in f:
-                #
-                # Read the hessian matrix
-                #
-                if '$hessian' in line:
-                    dimension = int(f.readline())
-                    matrix = np.zeros((dimension, dimension))
-                    while line != '\n':
-                        line = f.readline()
-                        if '.' not in line:
-                            jindex = [int(jj) for jj in line.split()]
-                        else:
-                            iindex = int(line.split()[0])
-                            datas = [float(val) for val in line.split()[1:]]
-                            for j, data in enumerate(datas):
-                                # print (j, jindex[j], iindex)
-                                matrix[iindex, jindex[j]] = data
-
-                    hessian = matrix
-
-        return hessian
-
     def eig_sum(self,a,b,vec):
         """
         Calculate the eigenvalues and eigenvectors of the 3x3 submatrix of H starting with the left corner at (3*a,3*b), and return the sum of the vectors multiplied by their respective eigenvalue
@@ -141,6 +101,7 @@ class Seminario:
 
             return 1/(1/(denom1)+1/(denom2)).real
         return max(0,0.5*(calc_par(a,b,c)+calc_par(c,b,a)))
+    
     #equation (10)
     def bond_fc(self,a,b):
         """
@@ -153,3 +114,41 @@ class Seminario:
             return self.eig_sum(i,j,u_ab).real
         
         return max(0,0.5*(calc_par(a,b)+calc_par(b,a)))
+    
+    # Auxiliary function to parse the ORCA output file
+    # Intended to be temporary
+    @staticmethod
+    def parse_orca_hessian(filename):
+        """ Parse an ORCA hessian file and return the hessian matrix  
+        
+        Parameters
+        ----------
+        filename : str
+            Name of the ORCA output file ('.hess' extension)
+
+        Returns
+        -------
+        hessian : ndarray
+            Hessian matrix    
+        """
+
+        with open(filename, 'r') as f:
+            for line in f:
+
+                if '$hessian' in line:
+                    dimension = int(f.readline())
+                    matrix = np.zeros((dimension, dimension))
+                    while line != '\n':
+                        line = f.readline()
+                        if '.' not in line:
+                            jindex = [int(jj) for jj in line.split()]
+                        else:
+                            iindex = int(line.split()[0])
+                            datas = [float(val) for val in line.split()[1:]]
+                            for j, data in enumerate(datas):
+                                # print (j, jindex[j], iindex)
+                                matrix[iindex, jindex[j]] = data
+
+                    hessian = matrix
+
+        return hessian

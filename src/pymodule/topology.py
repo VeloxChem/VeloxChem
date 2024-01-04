@@ -219,7 +219,7 @@ class Topology:
     
     # Methods for writing the GROMACS files
     
-    def write_itp(self,filename,output_folder,RES="MOL"):
+    def write_itp(self, filename, output_folder, RES="MOL"):
         """
         Generate a GROMACS itp file based on this topology. Filename and RES will be set as instance variables
 
@@ -316,8 +316,19 @@ class Topology:
         repar_imp: reparameterise impropers as well (experimental)
 
         """
-        print("\nVeloxChem Force Field Reparameterization\n\n----------------------------------------")
-        print("Based on the Seminario method\n")
+
+        print(
+        """
+        VeloxChem Force-Field Reparameterization
+        Based on the Seminario method
+
+        ------------------------------------------------------------------------------------------
+        References:
+        J. M. Seminario (1996) Calculation of intramolecular force fields from second-derivative tensors. 
+        Internat. J. Quant. Chem. 60:1271-1277
+        """
+        )
+
         A_to_nm=0.1 #1 angstrom is 0.1 nm
         Bohr_to_nm = bohr_in_angstrom()*A_to_nm
         cal_to_joule = 4.184 #1 calorie is 4.184 joule
@@ -380,14 +391,14 @@ class Topology:
 
                 if repar:
                     if label =="dihedral" and not repar_imp:
-                        comment += ", not reparameterising impropers"
+                        comment += ", not reparameterizing impropers"
                     elif not label == "dihedral":
                         parameters[ids]["eq"] = neweq
                         if not only_eq:
                             parameters[ids]["fc"] = newfc
-                            comment += f", reparameterised from (eq,fc)=({eq:>.1f},{fc:.1f}) to (eq,fc)=({neweq:.1f},{newfc:.1f})"
+                            comment += f", reparameterized from (eq,fc)=({eq:>.1f},{fc:.1f}) to (eq,fc)=({neweq:.1f},{newfc:.1f})"
                         else:
-                            comment += f", reparameterised from eq={eq:>.1f} to eq={neweq:.1f}"
+                            comment += f", reparameterized from eq={eq:>.1f} to eq={neweq:.1f}"
                         parameters[ids]["comment"] = comment
 
                         if label =="improper":
@@ -421,20 +432,18 @@ class Topology:
     # TODO Check this method because the specific libraries to be imported are 
     # not clear.
         
-    def test_force_field(self,filename, output_folder, save_trajectory=False):
+    def test_force_field(self,filename, output_folder, save_trajectory=False, show_output=False):
         """
         This method will perfom a short MD simulation and measure the RMSD
         of the molecule during the simulation compared to the original molecule.
 
         This method requires the GROMACS force-field files to be present in the current directory.
         """
-        # TODO: USE THE GROMACS PYTHON API INSTEAD OF OPENMM
+        # TODO: USE VELOXCHEM INSTEAD OF OPENMM
 
-        from openmm.app import GromacsGroFile, GromacsTopFile, PDBReporter, StateDataReporter, Simulation
+        from openmm.app import GromacsGroFile, GromacsTopFile, PDBReporter, StateDataReporter, Simulation, PME, HBonds
         from openmm import LangevinMiddleIntegrator
         from openmm.unit import kelvin, picosecond, nanometer
-        from openmm.NonbondedForce import PME ## TODO: Check if this is the correct import
-        from openmm.constraint import HBonds # TODO: Check if this is the correct import
 
         from sys import stdout
         import mdtraj as md
@@ -460,27 +469,33 @@ class Topology:
 
         # Run the simulation
         simulation.minimizeEnergy()
-        simulation.reporters.append(PDBReporter('tajectory.pdb', 10))
-        simulation.reporters.append(StateDataReporter(stdout, 10, step=True,
-                potentialEnergy=True, temperature=True))
+        simulation.reporters.append(PDBReporter('trajectory.pdb', 10))
+        if show_output:
+            simulation.reporters.append(StateDataReporter(stdout, 10, step=True,
+                    potentialEnergy=True, temperature=True))
         simulation.step(1000)
 
         # Load the trajectory
-        traj = md.load('save.pdb', top=f"{filename}.gro")
+        traj = md.load('trajectory.pdb', top=f"{filename}.gro")
         traj.superpose(traj, 0)
         rmsd = md.rmsd(traj, traj, 0)
         
         # Print a table with the RMSD, Avg, Max, Min and StdDev
-        print("RMSD\tAvg\tMax\tMin\tStdDev")
+        print("Runnning a short MD simulation to test the force-field")
+        print("RMSD of the molecule during the simulation compared to the original molecule")
+        print("RMSD report:")
+        print("Avg\tMax\tMin\tStdDev")
         print(f"{np.mean(rmsd):.3f}\t{np.max(rmsd):.3f}\t{np.min(rmsd):.3f}\t{np.std(rmsd):.3f}")
 
         # Print warnings if the RMSD is too high
         if np.mean(rmsd) > 0.1:
             print("WARNING: RMSD is too high, check the force-field parameters")
+        else:
+            print("RMSD is under 0.1 nm, the force-field parameters seem to be stable")
         
         # Save the trajectory if requested
         if save_trajectory == False:
-            os.remove("save.pdb")
+            os.remove("trajectory.pdb")
         else:
             print("Trajectory saved as trajectory.pdb")
 
