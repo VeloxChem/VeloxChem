@@ -362,8 +362,6 @@ class PolarizabilityGradient():
                                 d_dipole[y,a].reshape(nao**2), x_minus_y[x].reshape(nao**2)
                                 ])
                                 )
-                   # DEBUG
-                   # print(pol_gradient[:,:,i])
 
                     valstr = ' * Time spent calculating pol. gradient for '
                     valstr += 'atom #{:d}: {:.6f} sec * '.format(
@@ -649,7 +647,6 @@ class PolarizabilityGradient():
             'dft_func_label': dft_func_label,
         }
 
-    # TODO: setup print of polarizability gradient
     def print_polarizability_gradient(self, molecule):
         """
         Prints the polarizability gradient.
@@ -660,12 +657,46 @@ class PolarizabilityGradient():
 
         labels = molecule.get_labels()
 
+        natm = molecule.number_of_atoms()
+
         if self.numerical:
             title = 'Numerical '
         else:
             title = 'Analytical '
 
-        return None
+        header = title + 'Polarizability Gradients \n'
+        line = '+' * 40 
+        self.ostream.print_header(header)
+        self.ostream.print_header(line)
+        self.ostream.print_blank()
+        self.ostream.flush()
+
+        # loop over freq
+        gradient = []
+        for w in self.frequencies:
+            # extract gradients from dict
+            gradient = self.polgradient[w].reshape(3, 3, natm, 3)
+
+            # print frequency 
+            freq_header = 'Frequency = {0} a.u.\n'.format(w)
+
+            for i in range(natm):
+
+                valstr = '* Atom #{0}: {1} *'.format(i+1, labels[i])
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+
+                column_header = '        x       y       z \n'
+                for aop, acomp in enumerate('xyz'):
+                    for bop, bcomp in enumerate('xyz'):
+                        rows = ' {0}{1} '.format(acomp, bcomp)
+                        for cop, ccomp in enumerate('xyz'):
+                            grad_element = gradient[aop, bop, i, cop]
+                            rows += ' {:3.4f} '.format(grad_element)
+                        rows += '\n'
+                gradient_block = freq_header + column_header + rows
+                self.ostream.print_block(gradient_block)
+                self.ostream.print_blank()
 
     def print_geometry(self, molecule):
         """
