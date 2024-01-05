@@ -402,7 +402,7 @@ class Topology:
 
     # Methods for reparameterizing the force-field
     
-    def reparameterize(self, molecule, hessian, origin='ORCA', keys=None, element=None, print_all=False, only_eq=False, no_repar=False, repar_imp=False):
+    def reparameterize(self, filename=None, origin='XTB', keys=None, element=None, print_all=False, only_eq=False, no_repar=False, repar_imp=False):
         """
         Reparameterizes all unknown parameters with the seminario method using the given hessian
 
@@ -420,15 +420,22 @@ class Topology:
 
         """
 
+        from .xtbdriver import XtbDriver
+        from .xtbhessiandriver import XtbHessianDriver
+
         print(
         """
-        VeloxChem Force-Field Reparameterization
-        Based on the Seminario method
 
-        ------------------------------------------------------------------------------------------
-        References:
-        J. M. Seminario (1996) Calculation of intramolecular force fields from second-derivative tensors. 
-        Internat. J. Quant. Chem. 60:1271-1277
+VeloxChem Force-Field Reparameterization
+Based on the Seminario method
+------------------------------------------------------------------------------------------
+Reference:
+J. M. Seminario (1996) Calculation of intramolecular force fields from second-derivative tensors. 
+Internat. J. Quant. Chem. 60:1271-1277
+
+Disclaimer: Dihedral and improper parameters are not reparameterized with this method.
+Consider scanning manually sensitive diherals and impropers.
+
         """
         )
 
@@ -440,15 +447,33 @@ class Topology:
         if (type(keys) == tuple):
             keys = [keys]
 
+        # Generate the hessian matrix depending on the origin
+            
         if origin == 'ORCA':
-            hessian = Seminario.parse_orca_hessian(hessian)
+            self.hessian = Seminario.parse_orca_hessian(filename)
+            print("Hessian parsed from ORCA hessian output file")
+        elif origin == 'XTB':
+            xtb_drv = XtbDriver()
+            xtb_hessian = XtbHessianDriver(ostream=None)
+            xtb_hessian.compute(self.molecule, xtb_drv)
+            self.hessian = xtb_hessian.hessian
+            print("""
+                  
+Hessian computed with the XTB method
+------------------------------------------------------------------------------------------------
+C. Bannwarth, E. Caldeweyher, S. Ehlert, A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme 
+WIREs Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
+                  
+                  """)
+            
         elif origin == 'VeloxChem':
-            hessian = np.array(hessian)
+            print("Method yet not implemented, please use the XTB driver")
+            pass
         else:
-            raise Exception("Please specify the origin of the hessian as 'ORCA' or 'VeloxChem'")
+            raise Exception("Please specify the origin of the hessian as 'ORCA' or 'XTB'")
         
-        coords = molecule.get_coordinates_in_bohr() #Coordinates in Bohr
-        sem = Seminario(hessian,coords)
+        coordinates = self.molecule.get_coordinates_in_bohr() #Coordinates in Bohr
+        sem = Seminario(self.hessian, coordinates)
 
         def process_parameter(parameters, label):
             for ids in parameters.keys():
@@ -456,13 +481,13 @@ class Topology:
                 fc = parameters[ids]["fc"]
 
                 if label == "bond":
-                    neweq = AtomTypeIdentifier.measure_length(coords[ids[0]-1],coords[ids[1]-1])
+                    neweq = AtomTypeIdentifier.measure_length(coordinates[ids[0]-1],coordinates[ids[1]-1])
                     neweq *= Bohr_to_nm #Convert to nm
 
                     newfc = sem.bond_fc(ids[0]-1,ids[1]-1) #fc in H/Bohr^2
                     newfc *= Hartree_to_kJmol/(Bohr_to_nm**2) #Convert to kJ/mol nm^2
                 elif label == "angle":
-                    neweq = AtomTypeIdentifier.measure_angle(coords[ids[0]-1],coords[ids[1]-1],coords[ids[2]-1])
+                    neweq = AtomTypeIdentifier.measure_angle(coordinates[ids[0]-1],coordinates[ids[1]-1],coordinates[ids[2]-1])
                     newfc = sem.angle_fc(ids[0]-1,ids[1]-1,ids[2]-1) #Returns in H/rad^2 i think
                     newfc *= Hartree_to_kJmol #Convert to kJmol^-1/rad^2
                 elif label == "dihedral":
@@ -470,7 +495,7 @@ class Topology:
                 elif label == "improper":
                     perio = self.impropers[ids]["periodicity"]
                     if repar_imp:
-                        neweq = AtomTypeIdentifier.measure_dihedral(coords[ids[0]-1],coords[ids[1]-1],coords[ids[2]-1],coords[ids[3]-1])
+                        neweq = AtomTypeIdentifier.measure_dihedral(coordinates[ids[0]-1],coordinates[ids[1]-1],coordinates[ids[2]-1],coordinates[ids[3]-1])
                         newfc = sem.dihed_fc(ids[0]-1,ids[1]-1,ids[2]-1,ids[3]-1,avg_improper=True) #Returns in H/rad^2 i think
                         newfc *= Hartree_to_kJmol #Convert to kJmol^-1/rad^2
                     else:
@@ -487,14 +512,14 @@ class Topology:
                         repar = True
                 elif keys is None and element is not None:
                     for id in ids:
-                        if element == molecule.get_labels()[id-1]:
+                        if element == self.molecule.get_labels()[id-1]:
                             repar = True
                 elif keys is None and element is None and "unknown" in comment:
                     repar = True
 
                 if repar:
                     if label =="dihedral" and not repar_imp:
-                        comment += ", not reparameterizing impropers"
+                        comment += ", not reparameterizing dihedrals"
                     elif not label == "dihedral":
                         parameters[ids]["eq"] = neweq
                         if not only_eq:
@@ -535,7 +560,7 @@ class Topology:
     # TODO Check this method because the specific libraries to be imported are 
     # not clear.
         
-    def test_force_field(self,filename, output_folder, save_trajectory=False, show_output=False):
+    def test_force_field(self, filename, output_folder, save_trajectory=False, show_output=False):
         """
         This method will perfom a short MD simulation and measure the RMSD
         of the molecule during the simulation compared to the original molecule.
