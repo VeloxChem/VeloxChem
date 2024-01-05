@@ -24,6 +24,7 @@
 #  along with VeloxChem. If not, see <https://www.gnu.org/licenses/>.
 
 import numpy as np
+from collections import defaultdict
 from .veloxchemlib import mathconst_pi
 from .veloxchemlib import hartree_in_kcalpermol
 from .veloxchemlib import bohr_in_angstrom
@@ -70,6 +71,7 @@ class Topology:
         self.impropers = ffld_data['impropers']
         self.pairs = ffld_data['pairs']
 
+
     def identify_atomtypes(self,molecule,ff_file_path):
         """
         Uses the atomtype identifier to identify the atomtypes of a molecule
@@ -88,12 +90,109 @@ class Topology:
         Returns: a list of atomtypes       
         """
 
-        self.ao_identifier = AtomTypeIdentifier()
-        self.atomtypes = self.ao_identifier.generate_gaff_atomtypes(molecule)
-        self.ao_identifier.check_for_bad_assignations(ff_file_path)
+        self.at_identifier = AtomTypeIdentifier()
+        self.atomtypes = self.at_identifier.generate_gaff_atomtypes(molecule)
+        self.at_identifier.check_for_bad_assignations(ff_file_path)
 
         self.molecule = molecule
         self.ff_file_path = ff_file_path
+
+    def identify_equivalences(self, depth=1):
+        """
+        Identifies equivalent atoms in the molecule.
+        The depth parameter specifies how many bonds are considered for the equivalence.
+        The default value is 1, which means that only directly bonded atoms are considered equivalent.
+
+        Example:
+        >>> top = Topology()
+        >>> top.identify_atomtypes(molecule,"path_to_gaff.dat")
+        >>> top.identify_equivalences()
+        >>> top.equivalent_atoms
+
+        Also will generate a dictionary with the equivalent charges
+        >>> top.equivalent_charges
+
+        And a list with the renamed atom types for writing the topology
+        >>> top.renamed_atom_types
+
+        depth: depth of the equivalence search
+
+        """
+
+        def gather_neighbors(atom_index, current_depth=0, path=()):
+            """
+            Nested function to gather the paths to neighbors of an atom up to a certain depth.
+            """
+            if current_depth == depth:
+                return []
+
+            neighbors = []
+            for i, connected in enumerate(connectivity_matrix[atom_index]):
+                if connected and i not in path:
+                    new_path = path + (i,)
+                    neighbors.append(new_path)
+                    if current_depth < depth - 1:
+                        neighbors.extend(gather_neighbors(i, current_depth + 1, new_path))
+
+            return neighbors
+
+        # Main logic for identifying equivalences
+        connectivity_matrix = self.at_identifier.connectivity_matrix
+
+        atom_type_counts = defaultdict(int)
+        for atom in self.atomtypes:
+            atom_type_counts[atom] += 1
+
+        repeated_atomtypes = [atom for atom, count in atom_type_counts.items() if count > 1]
+        self.equivalent_atoms = defaultdict(list)
+
+        for atom_type in repeated_atomtypes:
+            atom_paths = defaultdict(list)
+
+            for i, atom in enumerate(self.atomtypes):
+                if atom == atom_type:
+                    paths = gather_neighbors(i)
+                    path_types = tuple(tuple(self.atomtypes[step] for step in path) for path in paths)
+                    atom_paths[path_types].append(i)
+
+            for index, (path_set, indices) in enumerate(atom_paths.items()):
+                for atom_index in indices:
+                    self.equivalent_atoms[atom_index] = f"{atom_type}_{index:02d}"
+
+        # Print a table with the atom indices and the equivalent atom indices
+        print("Equivalent atoms:")
+        print("Atom\tEquivalent atoms")
+        for key, value in self.equivalent_atoms.items():
+            print(f"{key}\t{value}")
+        print("Check that the assigned equivalentes are correct.")
+        print("If the equivalences are not correct, you can try changing the depth parameter.")       
+        print("Current depth: ", depth)
+
+        # Temporary dictionary to group equivalent atoms
+        temp_equivalent_groups = defaultdict(list)
+        for atom_index, equivalence_class in self.equivalent_atoms.items():
+            temp_equivalent_groups[equivalence_class].append(atom_index)
+
+        # Generating the formatted string for equivalent charges
+        equal_charges_str = []
+        for group in temp_equivalent_groups.values():
+            if len(group) > 1:  # Only consider groups with more than one member
+                # Create strings in the format "1 = 3 = 4" for each group
+                group_str = ' = '.join(map(str, group))
+                equal_charges_str.append(group_str)
+
+        # Combine all group strings into one comma-separated string
+        self.equivalent_charges = {"equal_charges": ', '.join(equal_charges_str)}
+
+
+        # Update atom types with equivalence indices
+        self.renamed_atom_types = [atom if i not in self.equivalent_atoms else self.equivalent_atoms[i] for i, atom in enumerate(self.atomtypes)]
+
+        # Append "_00" to the atomtypes that are not equivalent
+        for i, atom in enumerate(self.atomtypes):
+            if i not in self.equivalent_atoms:
+                self.renamed_atom_types[i] = f"{atom}_00"
+
 
     def create_topology(self):
         """
@@ -102,12 +201,12 @@ class Topology:
         """
 
         # Print an error if the atomtypes are not identified
-        if self.ao_identifier is None:
+        if self.at_identifier is None:
             raise Exception("Atomtypes are not identified yet. Use the identify_atomtypes method first")
         
         # Generate the force-field dictionary
         # Method from atomtypeidentifier.py to analize the topology of the molecule 
-        ff_data = self.ao_identifier.generate_force_field_dict(self.ff_file_path)
+        ff_data = self.at_identifier.generate_force_field_dict(self.ff_file_path)
         masses = self.molecule.masses_to_numpy()
 
         for i,id in enumerate(ff_data['atomtypes']):
@@ -119,7 +218,11 @@ class Topology:
         self.impropers = ff_data['impropers']
         self.pairs = ff_data['pairs']
         self.coordinates = self.molecule.get_coordinates_in_angstrom() * 0.1
-    
+
+        # Update the atomtypes with the renamed atom types based on the equivalences
+        for atom_id, atom_data in self.atoms.items():
+            atom_data["type"] = self.renamed_atom_types[atom_id - 1]
+
     # Methods for updating the topology
     def update_charge(self,charges):
         """
@@ -481,8 +584,8 @@ class Topology:
         rmsd = md.rmsd(traj, traj, 0)
         
         # Print a table with the RMSD, Avg, Max, Min and StdDev
-        print("Runnning a short MD simulation to test the force-field")
-        print("RMSD of the molecule during the simulation compared to the original molecule")
+        print("Runnning a short (4 ps) MD simulation to test the force-field")
+        print("RMSD of the molecule during the simulation compared to the optimized molecule")
         print("RMSD report:")
         print("Avg\tMax\tMin\tStdDev")
         print(f"{np.mean(rmsd):.3f}\t{np.max(rmsd):.3f}\t{np.min(rmsd):.3f}\t{np.std(rmsd):.3f}")
