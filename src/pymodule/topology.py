@@ -37,17 +37,29 @@ class Topology:
     """
     Class for creating a topology based on a molecule and a force-field file
 
-    example:
+    Methods:
+    identify_atomtypes: identifies the atomtypes of the molecule based on a force-field file
+    identify_equivalences: identifies equivalent atoms in the molecule
+    create_topology: creates a topology based on the identified atomtypes and equivalences
+    update_charge: updates the charges of the atoms in the topology
+    write_gromacs_files: writes the topology, itp and gro files for GROMACS
+    reparameterize: reparameterizes the force-field based on a hessian
+    test_force_field: runs a short MD simulation to test the stability of the force-field via RMSD
+    
+    Example:
     >>> top = Topology()
     >>> top.identify_atomtypes(molecule,"path_to_gaff.dat")
+    >>> top.identify_equivalences()
     >>> top.create_topology()
-    >>> top.write_gromacs_files("mol","output_folder")
+    >>> top.update_charge(charges)
+    >>> top.write_gromacs_files("mol","output_folder","MOL")
     """
 
     def __init__(self):
         """
-        Initialize the topology
+        Initialize the topology class
         """
+        self.atomtypes = []
         self.atoms = {}
         self.bonds = {}
         self.angles = {}
@@ -58,24 +70,16 @@ class Topology:
         self.filename = ""
         self.RES = ""   
     
-    # TODO: Add the ffld parser function
-    def parse_ffld(self, molecule, itp, ffld):
-        ffld_data = ffld_parser.parse(itp,ffld,molecule)
-        masses = molecule.masses_to_numpy()
-        for i,id in enumerate(ffld_data['atoms']): #todo do i need to add masses manually?
-            ffld_data['atoms'][id]['mass'] =masses[i]
-        self.atoms = ffld_data['atoms']
-        self.bonds = ffld_data['bonds']
-        self.angles = ffld_data['angles']
-        self.dihedrals = ffld_data['dihedrals']
-        self.impropers = ffld_data['impropers']
-        self.pairs = ffld_data['pairs']
-
+    # Methods for identifying the atomtypes and equivalences
 
     def identify_atomtypes(self,molecule,ff_file_path):
         """
         Uses the atomtype identifier to identify the atomtypes of a molecule
         This method can be used to correct missidentifications in the force-field file
+
+        Arguments:
+        molecule: Molecule object from veloxchem
+        ff_file_path: path to the force-field file
 
         Example:
         >>> top = Topology()
@@ -83,9 +87,6 @@ class Topology:
         >>> top.atomtypes #list of atomtypes
         If the atom type in the 4th atom is wrong, you can correct it with:
         >>> top.atomtypes[3] = "ca"
-
-        molecule: Molecule object from veloxchem
-        ff_file_path: path to the force-field file
 
         Returns: a list of atomtypes       
         """
@@ -115,6 +116,7 @@ class Topology:
         And a list with the renamed atom types for writing the topology
         >>> top.renamed_atom_types
 
+        Arguments:
         depth: depth of the equivalence search
 
         """
@@ -293,7 +295,7 @@ class Topology:
             itp_string += f'{pair_key[0]:<4} {pair_key[1]:<4} 1\n'
         return itp_string
 
-    def get_top_string(self,filename,RES="MOL"):
+    def get_top_string(self, filename, RES="MOL"):
         """
         Generate a GROMACS top file based on this topology. Filename and RES will be set as instance variables
 
@@ -470,7 +472,7 @@ WIREs Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
             
         elif origin == 'VeloxChem':
             print("Method yet not implemented, please use the XTB driver")
-            pass
+            return
         else:
             raise Exception("Please specify the origin of the hessian as 'ORCA' or 'XTB'")
         

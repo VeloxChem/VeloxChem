@@ -44,38 +44,40 @@ class AtomTypeIdentifier:
     radii, creating a connectivity matrix, identifying cyclic structures, and assigning atom types.
 
     Attributes:
-        molecule (vlx.Molecule object): The molecule object from VeloxChem.
-        num_atoms (int): The number of atoms in the molecule.
-        atomic_symbols (list): The list of atomic symbols for the atoms in the molecule.
-        coordinates (numpy.ndarray): The coordinates of the atoms in the molecule.
-        covalent_radii (numpy.ndarray): The covalent radii of the atoms.
-        connectivity_matrix (numpy.ndarray): The connectivity matrix representing bonded atoms in the molecule.
-        distances (numpy.ndarray): The distances between bonded atoms in the molecule.
-        cyclic_atoms (set): A set of atom indices that are part of cyclic structures.
-        cycle_sizes (list): The list of sizes of the detected cycles.
-        aromaticity (list): The list indicating the aromaticity of each cycle.
-        cycles (list): The list of cycles detected in the molecule.
-        cycle_ids (list): The list of unique identifiers for each cycle.
-        atom_cycle_info (dict): A dictionary containing cycle information for each atom.
-        self.atom_info_dict (dict): A dictionary holding detailed atom information used for atom type decision.
-        self.atom_types_dict (dict): A dictionary with assigned atom types for each atom.
-        gaff_atom_types (list): A list of GAFF atom types extracted from `self.atom_types_dict`.
+        molecule (Molecule): A VeloxChem molecule object containing the atomic coordinates of the molecule.
+        atomic_symbols (list): A list of the atomic symbols of the atoms in the molecule.
+        coordinates (numpy.ndarray): A 2D numpy array containing the atomic coordinates of the molecule.
+        distances (numpy.ndarray): A 2D numpy array containing the distances between atoms in the molecule.
+        covalent_radii (list): A list of the covalent radii of the atoms in the molecule.
+        connectivity_matrix (numpy.ndarray): A 2D numpy array containing the connectivity matrix of the molecule.
+        distance_matrix (numpy.ndarray): A 2D numpy array containing the distance matrix of the molecule.
+        cyclic_atoms (set): A set containing the atom numbers of the atoms in cyclic structures.
+        cycle_sizes (list): A list containing the sizes of the cyclic structures in the molecule.
+        aromaticity (list): A list containing the aromaticity of the cyclic structures in the molecule.
+        cycles (list): A list containing the cyclic structures in the molecule.
+        cycle_ids (list): A list containing the IDs of the cyclic structures in the molecule.
+        atom_cycle_info (dict): A dictionary containing information about the cyclic structures of each atom.
+        atom_info_dict (dict): A dictionary containing detailed information about each atom in the molecule.
+        atom_types_dict (dict): A dictionary containing the GAFF atom types for each atom in the molecule.
 
     Methods:
-        create_connectivity_matrix: Creates a matrix that represents bonded atoms in the molecule.
-        detect_closed_cyclic_structures: Identifies cyclic structures within the molecule.
-        create_self.atom_info_dict: Constructs a dictionary with information about each atom.
-        decide_atom_type: Assigns atom types based on the gathered information.
-        extract_gaff_atom_types: Extracts the GAFF atom types from the assigned atom types.
-        get_atom_number: Utility method to extract the atom number from a string.
-        to_array: Generates an array with the GAFF atom types.
+        measure_length: Calculates the distance between two points in 3D space.
+        read_xyz_file: Reads an XYZ file and extracts the atomic coordinates and symbols.
+        generate_gaff_atom_types: Generates GAFF atom types for the atoms in the molecule.
+        create_connectivity_matrix: Creates a connectivity matrix for the molecule based on the atomic coordinates.
+        plot_connectivity_map_3D: Plots a 3D connectivity map of the molecule using Matplotlib.
+        is_sp2_carbon: Determines if a given atom is sp2 hybridized.
+        detect_closed_cyclic_structures: Detects closed cyclic structures in a molecule and determines their aromaticity.
+        create_atom_info_dict: Creates a dictionary containing detailed information for each atom in the molecule.
+        decide_atom_type: Analyzes the molecular structure information to assign atom types to each atom in the molecule.
 
     The class should be initialized with the path to an XYZ file, after which it will automatically process 
     the file and set the corresponding attributes.
 
     Example:
-        >>> atom_identifier = AtomTypeIdentifier()
-        >>> atom_identifier.generate_gaff_atom_types(molecule)
+        >>> atom_identifier = AtomTypeIdentifier('molecule.xyz')
+        >>> atom_identifier.generate_gaff_atom_types()
+        >>> print(atom_identifier.atom_types_dict)
     """
 
     def __init__(self):
