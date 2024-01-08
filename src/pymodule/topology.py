@@ -97,11 +97,11 @@ class Topology:
         self.molecule = molecule
         self.ff_file_path = ff_file_path
 
-    def identify_equivalences(self, depth=1):
+    def identify_equivalences(self, depth=4):
         """
         Identifies equivalent atoms in the molecule.
         The depth parameter specifies how many bonds are considered for the equivalence.
-        The default value is 1, which means that only directly bonded atoms are considered equivalent.
+        The default value is 4, which means that only directly bonded atoms are considered equivalent.
 
         Example:
         >>> top = Topology()
@@ -146,39 +146,39 @@ class Topology:
         repeated_atomtypes = [atom for atom, count in atom_type_counts.items() if count > 1]
         self.equivalent_atoms = defaultdict(list)
 
+     # Adjust for one-indexing in the equivalent_atoms dictionary
         for atom_type in repeated_atomtypes:
             atom_paths = defaultdict(list)
 
-            for i, atom in enumerate(self.atomtypes):
+            for i, atom in enumerate(self.atomtypes, start=1):  # Start indexing from 1
                 if atom == atom_type:
-                    paths = gather_neighbors(i)
+                    paths = gather_neighbors(i - 1)  # Convert back to zero-index for internal processing
                     path_types = tuple(tuple(self.atomtypes[step] for step in path) for path in paths)
-                    atom_paths[path_types].append(i)
+                    atom_paths[path_types].append(i)  # Use one-indexing
 
             for index, (path_set, indices) in enumerate(atom_paths.items()):
                 for atom_index in indices:
                     self.equivalent_atoms[atom_index] = f"{atom_type}_{index:02d}"
 
-        # Print a table with the atom indices and the equivalent atom indices
+        # Adjusting for one-indexing in the printing and equal_charges_str generation
         print("Equivalent atoms:")
         print("Atom\tEquivalent atoms")
         for key, value in self.equivalent_atoms.items():
             print(f"{key}\t{value}")
-        print("Check that the assigned equivalentes are correct.")
+        print("Check that the assigned equivalences are correct.")
         print("If the equivalences are not correct, you can try changing the depth parameter.")       
         print("Current depth: ", depth)
 
-        # Temporary dictionary to group equivalent atoms
+        # Temporary dictionary to group equivalent atoms (now using one-indexed format)
         temp_equivalent_groups = defaultdict(list)
         for atom_index, equivalence_class in self.equivalent_atoms.items():
             temp_equivalent_groups[equivalence_class].append(atom_index)
 
-        # Generating the formatted string for equivalent charges
+        # Generating the formatted string for equivalent charges (one-indexed)
         equal_charges_str = []
         for group in temp_equivalent_groups.values():
             if len(group) > 1:  # Only consider groups with more than one member
-                # Create strings in the format "1 = 3 = 4" for each group
-                group_str = ' = '.join(map(str, group))
+                group_str = ' = '.join(map(str, group))  # Already one-indexed
                 equal_charges_str.append(group_str)
 
         # Combine all group strings into one comma-separated string
@@ -186,12 +186,12 @@ class Topology:
 
 
         # Update atom types with equivalence indices
-        self.renamed_atom_types = [atom if i not in self.equivalent_atoms else self.equivalent_atoms[i] for i, atom in enumerate(self.atomtypes)]
+        self.renamed_atom_types = [atom if i + 1 not in self.equivalent_atoms else self.equivalent_atoms[i + 1] for i, atom in enumerate(self.atomtypes)]
 
         # Append "_00" to the atomtypes that are not equivalent
-        for i, atom in enumerate(self.atomtypes):
+        for i, atom in enumerate(self.atomtypes, start=1):
             if i not in self.equivalent_atoms:
-                self.renamed_atom_types[i] = f"{atom}_00"
+                self.renamed_atom_types[i - 1] = f"{atom}_00"  # Correct index in the list
 
 
     def create_topology(self):
@@ -454,7 +454,9 @@ Consider scanning manually sensitive diherals and impropers.
             print("Hessian parsed from ORCA hessian output file")
         elif origin == 'XTB':
             xtb_drv = XtbDriver()
-            xtb_hessian = XtbHessianDriver(ostream=None)
+            xtb_hessian = XtbHessianDriver()
+
+            xtb_hessian.ostream.mute()
             xtb_hessian.compute(self.molecule, xtb_drv)
             self.hessian = xtb_hessian.hessian
             print("""
