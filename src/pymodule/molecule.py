@@ -38,7 +38,7 @@ from .errorhandler import assert_msg_critical
 import sys
 
 @staticmethod
-def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
+def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
     Converts SMILES string to xyz string.
 
@@ -69,7 +69,7 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
             ff.ConjugateGradients(250, 1.0e-4)
             ff.GetCoordinates(mol.OBMol)
 
-        if no_hydrogen:
+        if hydrogen == False:
             # remove hydrogens
             mol.removeh()
             return mol.write(format="xyz")
@@ -79,37 +79,6 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
 
     except ImportError:
         raise ImportError('Unable to import openbabel')
-
-
-
-@staticmethod
-def _Molecule_draw_2d_svg(smiles_str, width=300, height=300):
-    """
-    Draw 2D representation for SMILES string.
-
-    :param smiles_str: The SMILES string.
-    :param width: The width of the drawing area.
-    :param height: The height of the drawing area.
-    """
-    try:
-        from openbabel import pybel as pb
-        from IPython.display import SVG, display
-
-        # Convert SMILES to molecule
-        mol = pb.readstring('smiles', smiles_str)
-
-        # Generate 2D coordinates
-        #mol.addh()
-        mol.make2D()
-
-        # Convert to SVG using pybel's drawing method
-        svg_string = mol.write(format='svg', opt={'w': width, 'h': height})
-
-        # Display SVG
-        display(SVG(svg_string))
-
-    except ImportError:
-        raise ImportError('Unable to import openbabel and/or IPython.display.')
 
 
 @staticmethod
@@ -421,6 +390,31 @@ def _Molecule_show(self, width=400, height=300):
         
     except ImportError:
         raise ImportError('Unable to import py3Dmol')
+    
+def _Molecule_2d(self, width=400, height=300):
+    """
+    Generates an SVG of the molecule
+    """
+    try:
+        from openbabel import pybel as pb
+        from IPython.display import SVG, display
+
+        # From the molecule object, generate a 2D representation
+        molecule = self.get_xyz_string()
+
+        mol = pb.readstring('xyz', molecule)
+
+        mol.make2D()
+        mol.removeh()
+
+        # Convert to SVG using pybel's drawing method
+        svg_string = mol.write(format='svg', opt={'w': width, 'h': height})
+
+        # Display SVG
+        display(SVG(svg_string))
+    
+    except ImportError:
+        raise ImportError('Unable to import openbabel and/or IPython.display.')
 
 
 def _Molecule_moments_of_inertia(self):
@@ -588,8 +582,8 @@ def _Molecule_deepcopy(self, memo):
 Molecule._get_input_keywords = _Molecule_get_input_keywords
 
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
-Molecule.draw_2d_svg = _Molecule_draw_2d_svg
 Molecule.show = _Molecule_show
+Molecule.draw_2d = _Molecule_2d
 Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
