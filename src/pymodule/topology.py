@@ -424,6 +424,8 @@ class Topology:
 
         from .xtbdriver import XtbDriver
         from .xtbhessiandriver import XtbHessianDriver
+        from .xtbgradientdriver import XtbGradientDriver
+        from .optimizationdriver import OptimizationDriver
 
         print(
         """
@@ -455,10 +457,21 @@ Consider scanning manually sensitive diherals and impropers.
             self.hessian = Seminario.parse_orca_hessian(filename)
             print("Hessian parsed from ORCA hessian output file")
         elif origin == 'XTB':
+            # XTB optimization of the molecule before computing the hessian
             xtb_drv = XtbDriver()
+            method_settings = {'xtb':'gfn2'}
+            xtb_drv.set_method(method_settings['xtb'].lower())
+            xtb_grad_drv = XtbGradientDriver()
+            xtb_grad_drv.ostream.mute()
+            xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
+            xtb_opt_drv.ostream.mute()
+            print("Optimizing the molecule with XTB...")
+            self.molecule = xtb_opt_drv.compute(self.molecule, xtb_drv)
+            print('Molecule optimized')
+            # XTB hessian
             xtb_hessian = XtbHessianDriver()
-
             xtb_hessian.ostream.mute()
+            print("Computing the hessian with XTB")
             xtb_hessian.compute(self.molecule, xtb_drv)
             self.hessian = xtb_hessian.hessian
             print("""
@@ -560,9 +573,6 @@ WIREs Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
 
         print("\nImpropers\t\teq(deg)  \tfc(kJmol^-1/rad^2?) \tperiodicity \tNew eq(deg) \tNew fc(kJmol^-1/rad^2?)\tNew periodicity\tComment")
         process_parameter(self.impropers, "improper")
-
-    # TODO Check this method because the specific libraries to be imported are 
-    # not clear.
         
     def test_force_field(self, filename, output_folder, save_trajectory=False, show_output=False):
         """
