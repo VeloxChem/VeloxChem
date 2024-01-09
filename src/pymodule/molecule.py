@@ -35,35 +35,51 @@ from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical
 
 
+import sys
+
 @staticmethod
 def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
     """
     Converts SMILES string to xyz string.
 
-    :param smiles_str:
-        The SMILES string.
-
-    :return:
-        An xyz string (including number of atoms).
+    :param smiles_str: The SMILES string.
+    :param optimize: Boolean indicating whether to perform geometry optimization.
+    :param no_hydrogen: Boolean indicating whether to remove hydrogens.
+    :return: An xyz string (including number of atoms).
     """
-
     try:
-        from rdkit import Chem
-        from rdkit.Chem import AllChem
+        from openbabel import pybel as pb  
+        from openbabel import openbabel as ob
 
-        mol_bare = Chem.MolFromSmiles(smiles_str)
-        mol_full = Chem.AddHs(mol_bare)
-        AllChem.EmbedMolecule(mol_full)
+        mol = pb.readstring('smiles', smiles_str)
+        mol.make3D()
+
         if optimize:
-            AllChem.UFFOptimizeMolecule(mol_full)
+            ff = pb._forcefields["mmff94"]
+            success = ff.Setup(mol.OBMol)
+            if not success:
+                ff = pb._forcefields["uff"]
+                success = ff.Setup(mol.OBMol)
+                if not success:
+                    sys.exit("Cannot set up forcefield")
+
+            ff.ConjugateGradients(100, 1.0e-3)
+            ff.FastRotorSearch(True)  # permute central bonds
+            ff.WeightedRotorSearch(100, 25)  # 100 cycles, each with 25 forcefield ops
+            ff.ConjugateGradients(250, 1.0e-4)
+            ff.GetCoordinates(mol.OBMol)
 
         if no_hydrogen:
-            return Chem.RemoveHs(mol_full)
+            # remove hydrogens
+            mol.removeh()
+            return mol.write(format="xyz")
+        
         else:
-            return Chem.MolToXYZBlock(mol_full)
+            return mol.write(format="xyz")
 
     except ImportError:
-        raise ImportError('Unable to import rdkit.')
+        raise ImportError('Unable to import openbabel')
+
 
 
 @staticmethod
@@ -71,31 +87,29 @@ def _Molecule_draw_2d_svg(smiles_str, width=300, height=300):
     """
     Draw 2D representation for SMILES string.
 
-    :param smiles_str:
-        The SMILES string.
-    :param width:
-        The width of the drawing area.
-    :param height:
-        The height of the drawing area.
+    :param smiles_str: The SMILES string.
+    :param width: The width of the drawing area.
+    :param height: The height of the drawing area.
     """
-
     try:
-        from rdkit import Chem
-        from IPython.display import SVG
-        from IPython.display import display
+        from openbabel import pybel as pb
+        from IPython.display import SVG, display
 
-        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
-                                                 optimize=True,
-                                                 no_hydrogen=True)
+        # Convert SMILES to molecule
+        mol = pb.readstring('smiles', smiles_str)
 
-        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
-        drawer.DrawMolecule(mol_no_hydrogen)
-        drawer.FinishDrawing()
+        # Generate 2D coordinates
+        #mol.addh()
+        mol.make2D()
 
-        display(SVG(drawer.GetDrawingText()))
+        # Convert to SVG using pybel's drawing method
+        svg_string = mol.write(format='svg', opt={'w': width, 'h': height})
+
+        # Display SVG
+        display(SVG(svg_string))
 
     except ImportError:
-        raise ImportError('Unable to import rdkit.Chem and/or IPython.display.')
+        raise ImportError('Unable to import openbabel and/or IPython.display.')
 
 
 @staticmethod
@@ -391,6 +405,23 @@ def _Molecule_write_xyz_file(self, xyz_filename):
     with open(str(xyz_filename), 'w') as fh:
         fh.write(self.get_xyz_string())
 
+def _Molecule_show(self, width=400, height=300):
+    """
+    Create a 3D view with py3dmol
+    """
+
+    try:
+        import py3Dmol
+        viewer = py3Dmol.view(width=width, height=height)  
+        viewer.addModel(self.get_xyz_string())
+        viewer.setViewStyle({"style": "outline", "width": 0.05})
+        viewer.setStyle({"stick":{},"sphere": {"scale":0.25}})
+        viewer.zoomTo()
+        viewer.show()
+        
+    except ImportError:
+        raise ImportError('Unable to import py3Dmol')
+
 
 def _Molecule_moments_of_inertia(self):
     """
@@ -558,6 +589,7 @@ Molecule._get_input_keywords = _Molecule_get_input_keywords
 
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.draw_2d_svg = _Molecule_draw_2d_svg
+Molecule.show = _Molecule_show
 Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
