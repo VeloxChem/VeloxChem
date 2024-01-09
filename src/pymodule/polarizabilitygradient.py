@@ -659,44 +659,49 @@ class PolarizabilityGradient():
 
         natm = molecule.number_of_atoms()
 
+        nfreq = len(self.frequencies)
+
         if self.numerical:
             title = 'Numerical '
         else:
             title = 'Analytical '
 
-        header = title + 'Polarizability Gradients \n'
-        line = '+' * 40 
+        # title for result output
+        header = title + 'Polarizability Gradients'
+        line = '=' * 40 
+
+        self.ostream.print_blank()
         self.ostream.print_header(header)
         self.ostream.print_header(line)
         self.ostream.print_blank()
         self.ostream.flush()
 
-        # loop over freq
-        gradient = []
-        for w in self.frequencies:
-            # extract gradients from dict
-            gradient = self.polgradient[w].reshape(3, 3, natm, 3)
+        #gradient = self.polgradient
+        for i in range(natm):
+            atom_info = '** Atom #{0}: {1} **'.format(i+1, labels[i])
+            self.ostream.print_header(atom_info)
+            self.ostream.print_blank()
 
-            # print frequency 
-            freq_header = 'Frequency = {0} a.u.\n'.format(w)
+            # column headers
+            column_headers = '{:<12}{:<16}{:>12}{:>12}{:>12} \n'.format(
+                    "frequency", "alpha components", "coord. x", "coord. y", "coord. z")
+            gradient_block =  column_headers
 
-            for i in range(natm):
-
-                valstr = '* Atom #{0}: {1} *'.format(i+1, labels[i])
-                self.ostream.print_header(valstr)
-                self.ostream.print_blank()
-
-                column_header = '        x       y       z \n'
+            for w in self.frequencies:
+                freq = '{:<12}'.format(round(w, 4))
+                current_gradient = self.polgradient[w].reshape(3, 3, natm, 3)
                 for aop, acomp in enumerate('xyz'):
                     for bop, bcomp in enumerate('xyz'):
-                        rows = ' {0}{1} '.format(acomp, bcomp)
+                        row = freq + '{:<16}'.format(acomp + bcomp)
                         for cop, ccomp in enumerate('xyz'):
-                            grad_element = gradient[aop, bop, i, cop]
-                            rows += ' {:3.4f} '.format(grad_element)
-                        rows += '\n'
-                gradient_block = freq_header + column_header + rows
-                self.ostream.print_block(gradient_block)
-                self.ostream.print_blank()
+                            grad_element = current_gradient[aop, bop, i, cop]
+                            row += '{:>12}'.format(round(grad_element, 4))
+                        row += ' \n'
+                gradient_block += row
+
+            self.ostream.print_block(gradient_block)
+            self.ostream.print_blank()
+            self.ostream.print_blank()
 
     def print_geometry(self, molecule):
         """
