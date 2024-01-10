@@ -545,13 +545,13 @@ class ScfHessianDriver(HessianDriver):
 
             # Set up the polarizability gradient driver
             polgrad_drv = PolarizabilityGradient()
-            self.cphf_dict['frequency'] = 0
+            self.cphf_dict['frequencies'] = [ 0.0 ]
             polgrad_drv.update_settings(self.rsp_dict,
                                         orbrsp_dict = self.cphf_dict,
                                         method_dict = self.method_dict)
             polgrad_drv.compute(molecule, ao_basis,
                                 scf_drv.scf_tensors, lr_results)
-            self.polarizability_gradient = polgrad_drv.pol_gradient
+            self.polarizability_gradient = polgrad_drv.polgradient[0]
 
     def compute_pople(self, molecule, ao_basis, cphf_oo, cphf_ov, fock_uij,
                       fock_deriv_oo, orben_ovlp_deriv_oo, perturbed_density,
