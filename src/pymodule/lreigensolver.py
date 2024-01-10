@@ -564,7 +564,7 @@ class LinearResponseEigenSolver(LinearSolver):
                     self.ostream.flush()
 
                     if self.rank == mpi_master():
-                        nto_mo = self.get_nto(z_mat, mo_occ, mo_vir)
+                        nto_mo = self.get_nto(z_mat - y_mat, mo_occ, mo_vir)
 
                         nto_lam = nto_mo.occa_to_numpy()
                         lam_start = mo_occ.shape[1]
