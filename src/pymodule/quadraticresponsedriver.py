@@ -86,6 +86,10 @@ class QuadraticResponseDriver(NonlinearSolver):
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumber()
 
+        self.a_operator = 'electric dipole'
+        self.b_operator = 'electric dipole'
+        self.c_operator = 'electric dipole'
+
         self.a_component = None
         self.b_component = None
         self.c_component = None
