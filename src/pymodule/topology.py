@@ -237,20 +237,46 @@ class Topology:
 
     # Methods for generating GROMACS the topology
             
-    def get_itp_string(self,RES="Mol"):
+    def get_itp_string(self, RES="MOL"):
         """
         generate an itp string based on this topology.
 
         Res: residue name used in the topology, defaults to "MOL"
         """
         # Initialize the itp file
+        # TODO: Generate a proper header
+
         itp_string = '; Created by VeloxChem\n\n'
 
-        # Print the atomtypes section
-        itp_string += '\n[ atomtypes ]\n; name  bond_type  mass  charge  ptype  sigma  epsilon\n'
-        for atom_id, atom_data in self.atoms.items():
-            itp_string += f'{atom_data["type"]:<6} {atom_data["type"]:<10} {atom_data["mass"]:<7.2f} {atom_data["charge"]:9.5f}  A {atom_data["sigma"]:11.4e} {atom_data["epsilon"]:11.4e}\n'
+        # Print the defaults section all aligned
+        itp_string += '[ defaults ]\n'
+        itp_string += ';nbfunc comb-rule gen-pairs fudgeLJ fudgeQQ\n'
+        # # Values aligned with the comment
+        itp_string += '1        2        yes       0.5     0.8333\n'
 
+        # Print the atomtypes section
+        # In this section it cannot be repeated atom types, so we make a set
+        atomtypes = set()
+        atomtype_data = {}
+        for atom_id, atom_data in self.atoms.items():
+            atomtype = atom_data["type"]
+            atomtypes.add(atomtype)
+            # Store the properties of the first atom of each type
+            if atomtype not in atomtype_data:
+                atomtype_data[atomtype] = atom_data
+
+        # Now, for each atomtype in the set, we have to find the mass, charge, sigma and epsilon
+        # We will use the first atom of each type to get the data
+
+        itp_string += '\n[ atomtypes ]\n; name  bond_type  mass  charge  ptype  sigma  epsilon\n'
+        for atomtype in atomtypes:
+            # Get the properties of the atom type from the dictionary
+            atom_data = atomtype_data[atomtype]
+            # Print the atomtype
+            itp_string += f'{atomtype:<6} 1  {atom_data["mass"]:<7.2f} {atom_data["charge"]:9.5f}  A {atom_data["sigma"]:11.4e} {atom_data["epsilon"]:11.4e}\n'
+        
+        # Blank line
+        itp_string += '\n' 
         # Print the moleculetype section
         itp_string += f"[moleculetype]\n; name  nrexcl\n{RES}  3\n\n"
         
@@ -309,12 +335,6 @@ class Topology:
         # Print the include section for including the itp file
         top_string += " "
         top_string += f"""#include "{filename}.itp"\n"""
-
-        # Print the defaults section all aligned
-        top_string += '[ defaults ]'
-        top_string += ';nbfunc comb-rule gen-pairs fudgeLJ fudgeQQ'
-        # Values aligned with the comment
-        top_string += '\n1        2        yes       0.5     0.8333\n'
 
         # Print the system directive
         top_string += f"\n[ system ]\n; name\n{RES}\n"
