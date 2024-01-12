@@ -49,25 +49,13 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
     try:
         from openbabel import pybel as pb  
-        from openbabel import openbabel as ob
 
         mol = pb.readstring('smiles', smiles_str)
         mol.make3D()
 
         if optimize:
-            ff = pb._forcefields["mmff94"]
-            success = ff.Setup(mol.OBMol)
-            if not success:
-                ff = pb._forcefields["uff"]
-                success = ff.Setup(mol.OBMol)
-                if not success:
-                    sys.exit("Cannot set up forcefield")
-
-            ff.ConjugateGradients(100, 1.0e-3)
-            ff.FastRotorSearch(True)  # permute central bonds
-            ff.WeightedRotorSearch(100, 25)  # 100 cycles, each with 25 forcefield ops
-            ff.ConjugateGradients(250, 1.0e-4)
-            ff.GetCoordinates(mol.OBMol)
+            # TODO: Double check if UFF is needed
+            mol.localopt(forcefield="mmff94", steps=300)
 
         if hydrogen == False:
             # remove hydrogens
@@ -391,7 +379,7 @@ def _Molecule_show(self, width=400, height=300):
     except ImportError:
         raise ImportError('Unable to import py3Dmol')
     
-def _Molecule_2d(self, width=400, height=300):
+def _Molecule_draw_2d(self, width=400, height=300):
     """
     Generates an SVG of the molecule
     """
@@ -583,7 +571,7 @@ Molecule._get_input_keywords = _Molecule_get_input_keywords
 
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
 Molecule.show = _Molecule_show
-Molecule.draw_2d = _Molecule_2d
+Molecule.draw_2d = _Molecule_draw_2d
 Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file

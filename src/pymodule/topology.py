@@ -92,7 +92,8 @@ class Topology:
         """
 
         self.at_identifier = AtomTypeIdentifier()
-        self.atomtypes = self.at_identifier.generate_gaff_atomtypes(molecule)
+        self.at_identifier.generate_gaff_atomtypes(molecule)
+        self.atomtypes = self.at_identifier.check_alternating_atom_types()
         self.at_identifier.check_for_bad_assignations(ff_file_path)
 
         self.molecule = molecule
