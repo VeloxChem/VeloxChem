@@ -140,6 +140,13 @@ class CGtoBlock
     auto getAtomicOrbitalsIndexes() const -> std::vector<int64_t>;
 
     /**
+     Gets vector of atomic orbitals indexes of contracted Cartesian GTOs.
+
+     @return the vector of atomic orbitals indexes of Cartesian GTOs.
+     */
+    auto getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>;
+
+    /**
      Gets angular momentum.
 
      @return the angular momentum.

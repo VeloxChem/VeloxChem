@@ -418,17 +418,27 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
             const auto i_cgto = s_prim_aoinds[i];
 
+            // Cartesian to spherical
+            // p-1 <- py
+            // p_0 <- pz
+            // p+1 <- px
+
             // TODO: think about the ordering of cartesian components
-            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+            // const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
-            mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+            uint32_t j_cgto_sph;
+            if (j % 3 == 0) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 2];
+            if (j % 3 == 1) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 0];
+            if (j % 3 == 2) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 1];
 
-            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
-            mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
+            mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij];
+            mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij];
 
-            mat_nuclear_potential.row(i_cgto)[j_cgto] += mat_V[ij];
-            mat_nuclear_potential.row(j_cgto)[i_cgto] += mat_V[ij];
+            mat_kinetic_energy.row(i_cgto)[j_cgto_sph] += mat_T[ij];
+            mat_kinetic_energy.row(j_cgto_sph)[i_cgto] += mat_T[ij];
+
+            mat_nuclear_potential.row(i_cgto)[j_cgto_sph] += mat_V[ij];
+            mat_nuclear_potential.row(j_cgto_sph)[i_cgto] += mat_V[ij];
         }
     }
 
@@ -469,21 +479,36 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
 
+            // Cartesian to spherical
+            // p-1 <- py
+            // p_0 <- pz
+            // p+1 <- px
+
             // TODO: think about the ordering of cartesian components
-            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
-            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+            // const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            // const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            mat_overlap.row(i_cgto)[j_cgto] += mat_S[ij];
+            uint32_t i_cgto_sph, j_cgto_sph;
 
-            if (i != j) mat_overlap.row(j_cgto)[i_cgto] += mat_S[ij];
+            if (i % 3 == 0) i_cgto_sph = p_prim_aoinds[(i / 3) + p_prim_count * 2];
+            if (i % 3 == 1) i_cgto_sph = p_prim_aoinds[(i / 3) + p_prim_count * 0];
+            if (i % 3 == 2) i_cgto_sph = p_prim_aoinds[(i / 3) + p_prim_count * 1];
 
-            mat_kinetic_energy.row(i_cgto)[j_cgto] += mat_T[ij];
+            if (j % 3 == 0) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 2];
+            if (j % 3 == 1) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 0];
+            if (j % 3 == 2) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 1];
 
-            if (i != j) mat_kinetic_energy.row(j_cgto)[i_cgto] += mat_T[ij];
+            mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij];
 
-            mat_nuclear_potential.row(i_cgto)[j_cgto] += mat_V[ij];
+            if (i != j) mat_overlap.row(j_cgto_sph)[i_cgto_sph] += mat_S[ij];
 
-            if (i != j) mat_nuclear_potential.row(j_cgto)[i_cgto] += mat_V[ij];
+            mat_kinetic_energy.row(i_cgto_sph)[j_cgto_sph] += mat_T[ij];
+
+            if (i != j) mat_kinetic_energy.row(j_cgto_sph)[i_cgto_sph] += mat_T[ij];
+
+            mat_nuclear_potential.row(i_cgto_sph)[j_cgto_sph] += mat_V[ij];
+
+            if (i != j) mat_nuclear_potential.row(j_cgto_sph)[i_cgto_sph] += mat_V[ij];
         }
     }
 

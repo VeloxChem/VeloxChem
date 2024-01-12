@@ -219,11 +219,7 @@ computeOverlapAndKineticEnergySP(double*         mat_S,
 
         const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
 
-        // p-1: py
-        // p_0: pz
-        // p+1: px
-
-        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
 
@@ -276,11 +272,7 @@ computeOverlapAndKineticEnergyPP(double*         mat_S,
 
         const auto K_ij_00 = 3.0 * a_i * a_j / (a_i + a_j) - 2.0 * a_i * a_i * a_j * a_j / ((a_i + a_j) * (a_i + a_j)) * r2_ij;
 
-        // p-1: py
-        // p_0: pz
-        // p+1: px
-
-        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
 
@@ -416,11 +408,7 @@ computeNuclearPotentialSP(double*         mat_V,
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        // p-1: py
-        // p_0: pz
-        // p+1: px
-
-        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto S_ij_01 = -(a_i / (a_i + a_j)) * rij[j_cart] * S_ij_00;
 
@@ -435,13 +423,9 @@ computeNuclearPotentialSP(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rPC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                   x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
 
@@ -498,11 +482,7 @@ computeNuclearPotentialPP(double*         mat_V,
 
         const auto S_ij_00 = c_i * c_j * std::pow(MATH_CONST_PI / (a_i + a_j), 1.5) * std::exp(-a_i * a_j / (a_i + a_j) * r2_ij);
 
-        // p-1: py
-        // p_0: pz
-        // p+1: px
-
-        const double rij[3] = {y_j - y_i, z_j - z_i, x_j - x_i};
+        const double rij[3] = {x_j - x_i, y_j - y_i, z_j - z_i};
 
         const auto S_ij_10 = (a_j / (a_i + a_j)) * rij[i_cart] * S_ij_00;
 
@@ -527,13 +507,9 @@ computeNuclearPotentialPP(double*         mat_V,
             const auto z_c = points_info[c + npoints * 2];
             const auto q_c = points_info[c + npoints * 3];
 
-            // p-1: py
-            // p_0: pz
-            // p+1: px
-
-            const double rPC[3] = {y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
-                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j),
-                                   x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j)};
+            const double rPC[3] = {x_c - (a_i * x_i + a_j * x_j) / (a_i + a_j),
+                                   y_c - (a_i * y_i + a_j * y_j) / (a_i + a_j),
+                                   z_c - (a_i * z_i + a_j * z_j) / (a_i + a_j)};
 
             const auto r2_PC = rPC[0] * rPC[0] + rPC[1] * rPC[1] + rPC[2] * rPC[2];
 
