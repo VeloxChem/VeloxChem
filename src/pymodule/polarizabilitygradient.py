@@ -97,7 +97,7 @@ class PolarizabilityGradient():
         :param grad_dict:
             The input dictionary of gradient input.
         :param orbrsp_dict:
-            The dictionary of orbital response input.
+            The dictionary of orbital response (CPHF) input.
         :param method_dict:
             The dictionary of method settings.
         :param scf_drv:
