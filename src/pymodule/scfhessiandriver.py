@@ -109,7 +109,7 @@ class ScfHessianDriver(HessianDriver):
             The input dictionary of CPHF (orbital response) settings.
         :param rsp_dict:
             The input dictionary for linear response settings
-            (needed to compute the numericalpolarizability gradient).
+            (needed to compute the polarizability gradient).
         """
 
         super().update_settings(method_dict, freq_dict)
@@ -132,7 +132,7 @@ class ScfHessianDriver(HessianDriver):
             key = freq_dict['pople_hessian'].lower()
             self.pople_hessian = True if key in ['yes', 'y'] else False
 
-        # check if Raman intensities are to be calculated (numerically)
+        # check if Raman intensities are to be calculated
         if 'do_raman' in freq_dict:
             key = freq_dict['do_raman'].lower()
             self.do_raman = (key in ['yes', 'y'])
