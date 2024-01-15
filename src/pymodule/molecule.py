@@ -35,20 +35,24 @@ from .inputparser import print_keywords
 from .errorhandler import assert_msg_critical
 
 
-import sys
-
 @staticmethod
 def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
     Converts SMILES string to xyz string.
 
-    :param smiles_str: The SMILES string.
-    :param optimize: Boolean indicating whether to perform geometry optimization.
-    :param no_hydrogen: Boolean indicating whether to remove hydrogens.
-    :return: An xyz string (including number of atoms).
+    :param smiles_str:
+        The SMILES string.
+    :param optimize:
+        Boolean indicating whether to perform geometry optimization.
+    :param hydrogen:
+        Boolean indicating whether to remove hydrogens.
+
+    :return:
+        An xyz string (including number of atoms).
     """
+
     try:
-        from openbabel import pybel as pb  
+        from openbabel import pybel as pb
 
         mol = pb.readstring('smiles', smiles_str)
         mol.make3D()
@@ -57,11 +61,11 @@ def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
             # TODO: Double check if UFF is needed
             mol.localopt(forcefield="mmff94", steps=300)
 
-        if hydrogen == False:
+        if not hydrogen:
             # remove hydrogens
             mol.removeh()
             return mol.write(format="xyz")
-        
+
         else:
             return mol.write(format="xyz")
 
@@ -362,32 +366,44 @@ def _Molecule_write_xyz_file(self, xyz_filename):
     with open(str(xyz_filename), 'w') as fh:
         fh.write(self.get_xyz_string())
 
+
 def _Molecule_show(self, width=400, height=300):
     """
-    Create a 3D view with py3dmol
+    Creates a 3D view with py3dmol.
+
+    :param width:
+        The width.
+    :param height:
+        The height.
     """
 
     try:
         import py3Dmol
-        viewer = py3Dmol.view(width=width, height=height)  
+        viewer = py3Dmol.view(width=width, height=height)
         viewer.addModel(self.get_xyz_string())
         viewer.setViewStyle({"style": "outline", "width": 0.05})
-        viewer.setStyle({"stick":{},"sphere": {"scale":0.25}})
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
         viewer.zoomTo()
         viewer.show()
-        
+
     except ImportError:
         raise ImportError('Unable to import py3Dmol')
-    
+
+
 def _Molecule_draw_2d(self, width=400, height=300):
     """
-    Generates an SVG of the molecule
+    Generates 2D representation of the molecule.
+
+    :param width:
+        The width.
+    :param height:
+        The height.
     """
+
     try:
         from openbabel import pybel as pb
         from IPython.display import SVG, display
 
-        # From the molecule object, generate a 2D representation
         molecule = self.get_xyz_string()
 
         mol = pb.readstring('xyz', molecule)
@@ -400,7 +416,7 @@ def _Molecule_draw_2d(self, width=400, height=300):
 
         # Display SVG
         display(SVG(svg_string))
-    
+
     except ImportError:
         raise ImportError('Unable to import openbabel and/or IPython.display.')
 
