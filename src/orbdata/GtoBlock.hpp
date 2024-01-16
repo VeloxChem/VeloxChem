@@ -147,6 +147,13 @@ class CGtoBlock
     auto getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>;
 
     /**
+     Gets Cartesian to spherical mapping for p-CGTOs.
+
+     @return the Cartesian to spherical mapping for p-CGTOs.
+     */
+    auto getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, int64_t>;
+
+    /**
      Gets angular momentum.
 
      @return the angular momentum.

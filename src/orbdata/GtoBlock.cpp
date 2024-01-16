@@ -191,6 +191,39 @@ CGtoBlock::getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>
 }
 
 auto
+CGtoBlock::getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, int64_t>
+{
+    std::unordered_map<int64_t, int64_t> cart_sph_p;
+
+    if (_angmom == 1)
+    {
+        // p-1 (0) <- py (1)
+        // p_0 (1) <- pz (2)
+        // p+1 (2) <- px (0)
+
+        std::unordered_map<int64_t, int64_t> cart_sph_comp_map = {{0, 2}, {1, 0}, {2, 1}};
+
+        for (const auto& [cart_comp, sph_comp] : cart_sph_comp_map)
+        {
+            // go through CGTOs in this block
+            // note that ind starts from 1
+            // because _orb_indexes[0] is the total number of CGTOs of _angmom
+            // which could be larger than the number of CGTOs in this block
+
+            for (size_t ind = 1; ind < _orb_indexes.size(); ind++)
+            {
+                auto cart_ind = cart_comp * _orb_indexes[0] + _orb_indexes[ind];
+                auto sph_ind  = sph_comp  * _orb_indexes[0] + _orb_indexes[ind];
+
+                cart_sph_p[cart_ind] = sph_ind;
+            }
+        }
+    }
+
+    return cart_sph_p;
+}
+
+auto
 CGtoBlock::getAngularMomentum() const -> int64_t
 {
     return _angmom;

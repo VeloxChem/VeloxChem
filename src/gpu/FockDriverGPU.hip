@@ -205,6 +205,25 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
         if (gto_ang == 1) p_prim_count += npgtos * ncgtos;
     }
 
+    // Cartesian to spherical index mapping for P
+
+    std::unordered_map<int64_t, int64_t> cart_sph_p;
+
+    for (const auto& gto_block : gto_blocks)
+    {
+        const auto gto_ang = gto_block.getAngularMomentum();
+
+        if (gto_ang == 1)
+        {
+            auto p_map = gto_block.getCartesianToSphericalMappingForP();
+
+            for (const auto& [cart_ind, sph_ind] : p_map)
+            {
+                cart_sph_p[cart_ind] = sph_ind;
+            }
+        }
+    }
+
     // S gto block
 
     std::vector<double>   s_prim_info(5 * s_prim_count);
@@ -417,18 +436,11 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
 
             const auto i_cgto = s_prim_aoinds[i];
 
-            // Cartesian to spherical
-            // p-1 <- py
-            // p_0 <- pz
-            // p+1 <- px
-
             // TODO: think about the ordering of cartesian components
-            // const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            uint32_t j_cgto_sph;
-            if (j % 3 == 0) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 2];
-            if (j % 3 == 1) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 0];
-            if (j % 3 == 2) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 1];
+            // Cartesian to spherical
+            auto j_cgto_sph = cart_sph_p[j_cgto];
 
             mat_overlap.row(i_cgto)[j_cgto_sph] += mat_S[ij];
             mat_overlap.row(j_cgto_sph)[i_cgto] += mat_S[ij];
@@ -478,24 +490,13 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
             const auto i = pp_first_inds_local[ij];
             const auto j = pp_second_inds_local[ij];
 
-            // Cartesian to spherical
-            // p-1 <- py
-            // p_0 <- pz
-            // p+1 <- px
-
             // TODO: think about the ordering of cartesian components
-            // const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
-            // const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
+            const auto i_cgto = p_prim_aoinds[(i / 3) + p_prim_count * (i % 3)];
+            const auto j_cgto = p_prim_aoinds[(j / 3) + p_prim_count * (j % 3)];
 
-            uint32_t i_cgto_sph, j_cgto_sph;
-
-            if (i % 3 == 0) i_cgto_sph = p_prim_aoinds[(i / 3) + p_prim_count * 2];
-            if (i % 3 == 1) i_cgto_sph = p_prim_aoinds[(i / 3) + p_prim_count * 0];
-            if (i % 3 == 2) i_cgto_sph = p_prim_aoinds[(i / 3) + p_prim_count * 1];
-
-            if (j % 3 == 0) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 2];
-            if (j % 3 == 1) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 0];
-            if (j % 3 == 2) j_cgto_sph = p_prim_aoinds[(j / 3) + p_prim_count * 1];
+            // Cartesian to spherical
+            auto i_cgto_sph = cart_sph_p[i_cgto];
+            auto j_cgto_sph = cart_sph_p[j_cgto];
 
             mat_overlap.row(i_cgto_sph)[j_cgto_sph] += mat_S[ij];
 
