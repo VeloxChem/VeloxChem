@@ -41,7 +41,6 @@
 #include <vector>
 
 #include "ScreeningData.hpp"
-#include "EriScreener.hpp"
 #include "BoysFuncTable.hpp"
 #include "DenseLinearAlgebra.hpp"
 #include "FockDriverGPU.hpp"
