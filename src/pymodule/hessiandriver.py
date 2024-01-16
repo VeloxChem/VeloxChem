@@ -330,34 +330,52 @@ class HessianDriver:
             self.ir_intensities = ir_intensity_au_amu * conv_ir_ea0amu2kmmol
 
         # Calculate Raman intensities, if applicable
-
         if self.polarizability_gradient is not None:
-            # einsum 'xyi,ik->xyk'
-            size_x = self.polarizability_gradient.shape[0]
-            size_y = self.polarizability_gradient.shape[1]
-            size_k = self.normal_modes.shape[0]
-            raman_transmom = np.matmul(
-                self.polarizability_gradient.reshape(size_x * size_y, -1),
-                self.normal_modes.T).reshape(size_x, size_y, size_k)
-            # Calculate rotational invariants
-            alpha_bar = np.zeros((number_of_modes))
-            gamma_bar_sq = np.zeros((number_of_modes))
-            for i in range(3):
-                alpha_bar += raman_transmom[i, i] / 3
-                for j in range(i + 1, 3):
-                    gamma_bar_sq += 0.5 * (
-                        raman_transmom[i, i] -
-                        raman_transmom[j, j])**2 + 3 * raman_transmom[i, j]**2
+            # Get information from polarizability gradient dictionary
+            nfreq = len(self.polarizability_gradient)
+            freqs = list(self.polarizability_gradient.keys())
+            self.ostream.print_blank()
+            self.ostream.print_info('Polarizability gradient calculated for {0} frequencies: {1}'.format(
+                nfreq, freqs))
+            self.ostream.print_blank()
 
-            alpha_bar_sq = alpha_bar**2
+            # dictionary for Raman intensities
+            self.raman_intensities = {}
+            for freq in freqs:
+                # get gradient for current frequency
+                current_polarizability_gradient = self.polarizability_gradient[freq]
+                size_x = current_polarizability_gradient.shape[0]
+                size_y = current_polarizability_gradient.shape[1]
+                size_k = self.normal_modes.shape[0]
 
-            if self.print_depolarization_ratio:
-                int_pol = 45 * alpha_bar_sq + 4 * gamma_bar_sq
-                int_depol = 3 * gamma_bar_sq
-                depol_ratio = int_depol / int_pol
+                # einsum 'xyi,ik->xyk'
+                raman_transmom = np.matmul(
+                    current_polarizability_gradient.reshape(size_x * size_y, -1),
+                    self.normal_modes.T).reshape(size_x, size_y, size_k)
 
-            self.raman_intensities = (
-                45 * alpha_bar_sq + 7 * gamma_bar_sq) * raman_conversion_factor
+                # Calculate rotational invariants
+                alpha_bar = np.zeros((number_of_modes))
+                gamma_bar_sq = np.zeros((number_of_modes))
+                for i in range(3):
+                    alpha_bar += raman_transmom[i, i] / 3
+                    for j in range(i + 1, 3):
+                        gamma_bar_sq += 0.5 * (
+                            raman_transmom[i, i] -
+                            raman_transmom[j, j])**2 + 3 * raman_transmom[i, j]**2
+                alpha_bar_sq = alpha_bar**2
+                self.raman_intensities[freq] = (
+                    45 * alpha_bar_sq + 7 * gamma_bar_sq) * raman_conversion_factor
+                # DEBUG
+                self.ostream.print_blank()
+                print('alpha_YY for freq = {0}: {1}'.format(
+                    round(freq, 4), alpha_bar_sq + 4.0/45.0 * gamma_bar_sq))
+                print('alpha_ZY for freq = {0}: {1}'.format(
+                    round(freq, 4), 1.0/15.0 * gamma_bar_sq))
+
+                if self.print_depolarization_ratio and (freq == 0.0): # TODO dynamic also?
+                    int_pol = 45 * alpha_bar_sq + 4 * gamma_bar_sq
+                    int_depol = 3 * gamma_bar_sq
+                    depol_ratio = int_depol / int_pol
 
         # Now we can normalize the normal modes -- as done in geomeTRIC
         self.normal_modes /= np.linalg.norm(self.normal_modes,
@@ -369,7 +387,6 @@ class HessianDriver:
         self.ostream.print_blank()
 
         width = 52
-
         for k in range(number_of_modes):
 
             # Print indices and frequencies:
@@ -394,27 +411,36 @@ class HessianDriver:
                     'IR intensity:', self.ir_intensities[k], 'km/mol')
                 self.ostream.print_header(ir_intens_string.ljust(width))
 
-                if self.raman_intensities is not None:
-                    raman_intens_string = '{:22s}{:20.4f}  {:8s}'.format(
-                        'Raman activity:', self.raman_intensities[k],
-                        'A**4/amu')
+            if self.raman_intensities is not None:
+                freq_unit = ' a.u.'
+                for freq in freqs:
+                    if freq == 0.0:
+                        this_freq = 'static'
+                    else:
+                        this_freq = str(round(freq,4)) + freq_unit # TODO convert to other unit?
+                    #raman_intens_string = '{:24s}{:18.4f}  {:8s}'.format(
+                    #        'Raman activity: ' + this_freq, self.raman_intensities[freq][k],
+                    #        'A**4/amu')
+                    raman_intens_string = '{:16s} {:12s} {:12.4f}  {:8s}'.format(
+                            'Raman activity:', this_freq, self.raman_intensities[freq][k],
+                            'A**4/amu')
                     self.ostream.print_header(raman_intens_string.ljust(width))
 
-                    if self.print_depolarization_ratio:
-                        raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
-                            'Parallel Raman:', int_pol[k], 'A**4/amu')
-                        self.ostream.print_header(
-                            raman_parallel_str.ljust(width))
+                if self.print_depolarization_ratio:
+                    raman_parallel_str = '{:22s}{:20.4f}  {:8s}'.format(
+                        'Parallel Raman:', int_pol[k], 'A**4/amu')
+                    self.ostream.print_header(
+                        raman_parallel_str.ljust(width))
 
-                        raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
-                            'Perpendicular Raman:', int_depol[k], 'A**4/amu')
-                        self.ostream.print_header(
-                            raman_perpendicular_str.ljust(width))
+                    raman_perpendicular_str = '{:22s}{:20.4f}  {:8s}'.format(
+                        'Perpendicular Raman:', int_depol[k], 'A**4/amu')
+                    self.ostream.print_header(
+                        raman_perpendicular_str.ljust(width))
 
-                        depolarization_str = '{:22s}{:20.4f}'.format(
-                            'Depolarization ratio:', depol_ratio[k])
-                        self.ostream.print_header(
-                            depolarization_str.ljust(width))
+                    depolarization_str = '{:22s}{:20.4f}'.format(
+                        'Depolarization ratio:', depol_ratio[k])
+                    self.ostream.print_header(
+                        depolarization_str.ljust(width))
 
             normal_mode_string = '{:22s}'.format('Normal mode:')
             self.ostream.print_header(normal_mode_string.ljust(width))
