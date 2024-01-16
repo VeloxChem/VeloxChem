@@ -514,8 +514,6 @@ def main():
     # Polarizability gradient
 
     if task_type in ['polarizability_gradient']:
-        #DEBUG
-        task.ostream.print_info('POLARIZABILITY GRADIENT')
 
         polgrad_dict = (task.input_dict['polarizability_gradient']
                      if 'polarizability_gradient' in task.input_dict else {})
