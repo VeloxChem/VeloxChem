@@ -510,7 +510,8 @@ def main():
                                     polgrad_dict = polgrad_dict)
         hessian_drv.compute(task.molecule, task.ao_basis, scf_drv)
         # TODO: add output file name for geomeTRIC vibrational analysis
-        hessian_drv.vibrational_analysis(task.molecule, task.ao_basis)
+        if task.mpi_rank == mpi_master():
+            hessian_drv.vibrational_analysis(task.molecule)
 
     # TODO: maybe remove (this was included for testing the MPI-parallelization)
     if task_type in ['cphf']:
@@ -608,8 +609,8 @@ def main():
                                                 freq_dict, orbrsp_dict)
                 tdhfhessian_drv.compute(task.molecule, task.ao_basis,
                                         rsp_prop._rsp_driver)
-                tdhfhessian_drv.vibrational_analysis(task.molecule,
-                                                     task.ao_basis)
+                if task.mpi_rank == mpi_master():
+                    tdhfhessian_drv.vibrational_analysis(task.molecule)
 
             # Excited state optimization
             if 'optimize_excited_state' in task.input_dict:

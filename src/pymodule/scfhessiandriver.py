@@ -162,10 +162,13 @@ class ScfHessianDriver(HessianDriver):
         :param scf_drv:
             The SCF driver.
         """
-        self.print_header()
+
+        if self.rank == mpi_master():
+            self.print_header()
 
         start_time = tm.time()
 
+        # TODO: find a better place for the profiler?
         profiler = Profiler({
             'timing': self.timing,
             'profiling': self.profiling,
@@ -181,18 +184,19 @@ class ScfHessianDriver(HessianDriver):
         else:
             self.compute_analytical(molecule, ao_basis, scf_drv, profiler)
 
-        # print Hessian
-        if self.do_print_hessian:
-            self.print_geometry(molecule)
-            self.ostream.print_blank()
-            self.print_hessian(molecule)
+        if self.rank == mpi_master():
+            # print Hessian
+            if self.do_print_hessian:
+                self.print_geometry(molecule)
+                self.ostream.print_blank()
+                self.print_hessian(molecule)
 
-        valstr = '*** Time spent in Hessian calculation: '
-        valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
-        self.ostream.print_header(valstr)
-        self.ostream.print_blank()
-        self.ostream.print_blank()
-        self.ostream.flush()
+            valstr = '*** Time spent in Hessian calculation: '
+            valstr += '{:.2f} sec ***'.format(tm.time() - start_time)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.print_blank()
+            self.ostream.flush()
 
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
@@ -395,19 +399,21 @@ class ScfHessianDriver(HessianDriver):
             The profiler.
         """
 
-        scf_tensors = scf_drv.scf_tensors
-        density = scf_tensors['D_alpha'] # MPI BUG
         natm = molecule.number_of_atoms()
-        mo = scf_tensors['C_alpha']
-        nao = mo.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
-        mo_occ = mo[:, :nocc]
-        mo_vir = mo[:, nocc:]
-        nvir = mo_vir.shape[1]
-        mo_energies = scf_tensors['E']
-        eocc = mo_energies[:nocc]
-        eoo = eocc.reshape(-1, 1) + eocc #ei+ej
-        omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
+        scf_tensors = scf_drv.scf_tensors
+
+        if self.rank == mpi_master(): 
+            density = scf_tensors['D_alpha'] # MPI BUG
+            mo = scf_tensors['C_alpha']
+            nao = mo.shape[0]
+            nocc = molecule.number_of_alpha_electrons()
+            mo_occ = mo[:, :nocc]
+            mo_vir = mo[:, nocc:]
+            nvir = mo_vir.shape[1]
+            mo_energies = scf_tensors['E']
+            eocc = mo_energies[:nocc]
+            eoo = eocc.reshape(-1, 1) + eocc #ei+ej
+            omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
         # Set up a CPHF solver
         # TODO: remove scf_drv
@@ -416,39 +422,47 @@ class ScfHessianDriver(HessianDriver):
 
         # Solve the CPHF equations
         cphf_solver.compute(molecule, ao_basis, scf_tensors, scf_drv)
-        cphf_solution_dict = cphf_solver.cphf_results
-        cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
-        ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
+        
+        if self.rank == mpi_master():
+            print("Solved CPHF...")
+            hessian_first_order_derivatives = np.zeros((natm, natm, 3, 3))
+            cphf_solution_dict = cphf_solver.cphf_results
+            cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
+            ovlp_deriv_oo = cphf_solution_dict['ovlp_deriv_oo']
 
-        # Calculate the perturbed density matrix
-        # cphf_oo = -0.5*ovlp_deriv_oo
-        perturbed_density = ( - np.einsum('mj,xyij,ni->xymn',
+            # Calculate the perturbed density matrix
+            # cphf_oo = -0.5*ovlp_deriv_oo
+            perturbed_density = ( - np.einsum('mj,xyij,ni->xymn',
                                         mo_occ, ovlp_deriv_oo, mo_occ)
                               + np.einsum('ma,xyia,ni->xymn',
                                         mo_vir, cphf_ov, mo_occ)
                               + np.einsum('mi,xyia,na->xymn',
                                         mo_occ, cphf_ov, mo_vir)
                             )
-        t1 = tm.time()
-        # Parts related to first-order integral derivatives
-        if self.pople_hessian:
-            fock_uij = cphf_solution_dict['fock_uij']
-            fock_deriv_ao = cphf_solution_dict['fock_deriv_ao']
-            fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
-                                       fock_deriv_ao, mo_occ)
-            # (ei+ej)S^\chi_ij
-            orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo, ovlp_deriv_oo)
-            hessian_first_order_derivatives = self.compute_pople(molecule,
-                                ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov,
-                                fock_uij, fock_deriv_oo, orben_ovlp_deriv_oo,
-                                perturbed_density, scf_drv, profiler)
-        else:
-            cphf_rhs = cphf_solution_dict['cphf_rhs'].reshape(natm, 3, nocc, nvir)
-            hessian_first_order_derivatives = self.compute_furche(molecule,
-                                ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
-                                cphf_ov, scf_drv, profiler)
+            t1 = tm.time()
+        
+            # Parts related to first-order integral derivatives
+            if self.pople_hessian:
+                fock_uij = cphf_solution_dict['fock_uij']
+                fock_deriv_ao = cphf_solution_dict['fock_deriv_ao']
+                fock_deriv_oo = np.einsum('mi,xymn,nj->xyij', mo_occ,
+                                           fock_deriv_ao, mo_occ)
+                # (ei+ej)S^\chi_ij
+                orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo,
+                                               ovlp_deriv_oo)
+                #hessian_first_order_derivatives = self.compute_pople(molecule,
+                #                    ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov,
+                #                    fock_uij, fock_deriv_oo,
+                #                    orben_ovlp_deriv_oo,
+                #                    perturbed_density, scf_drv, profiler)
+            else:
+                cphf_rhs = cphf_solution_dict['cphf_rhs'].reshape(natm, 3,
+                                                                  nocc, nvir)
+                #hessian_first_order_derivatives = self.compute_furche(molecule,
+                #                    ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
+                #                    cphf_ov, scf_drv, profiler)
 
-        # amount of exact exchange
+        ## amount of exact exchange
         frac_K = 1.0
 
         # DFT:
@@ -471,70 +485,71 @@ class ScfHessianDriver(HessianDriver):
                                                 scf_drv.xcfun.get_func_label())
             scf_drv.comm.reduce(hessian_dft_xc, root=mpi_master())
 
-        t2 = tm.time()
         if self.rank == mpi_master():
+            t2 = tm.time()
             self.ostream.print_info('First order derivative contributions'
                                     + ' to the Hessian computed in' +
                                      ' {:.2f} sec.'.format(t2 - t1))
             self.ostream.print_blank()
             self.ostream.flush()
-        # Parts related to second-order integral derivatives
-        hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
-        for i in range(natm):
-            # do only upper triangular matrix
-            for j in range(i, natm):
-                # Get integral second-order derivatives
-                ovlp_2nd_deriv_ii, ovlp_2nd_deriv_ij = overlap_second_deriv(
-                                                molecule, ao_basis, i, j)
-                hcore_2nd_deriv_ij = hcore_second_deriv(
-                                        molecule, ao_basis, i, j)
-                eri_2nd_deriv_ii, eri_2nd_deriv_ij = eri_second_deriv(
-                                        molecule, ao_basis, i, j)
-                if i == j:
-                    # Add diagonal (same atom) contributions, 2S + 2J - K
-                    hessian_2nd_order_derivatives[i,i] += 2*np.einsum(
-                                'mn,xymn->xy', omega_ao, ovlp_2nd_deriv_ii)
-                    hessian_2nd_order_derivatives[i,i] += 2*np.einsum(
+
+            # Parts related to second-order integral derivatives
+            hessian_2nd_order_derivatives = np.zeros((natm, natm, 3, 3))
+            for i in range(natm):
+                # do only upper triangular matrix
+                for j in range(i, natm):
+                    # Get integral second-order derivatives
+                    ovlp_2nd_deriv_ii, ovlp_2nd_deriv_ij = overlap_second_deriv(
+                                                    molecule, ao_basis, i, j)
+                    hcore_2nd_deriv_ij = hcore_second_deriv(
+                                            molecule, ao_basis, i, j)
+                    eri_2nd_deriv_ii, eri_2nd_deriv_ij = eri_second_deriv(
+                                            molecule, ao_basis, i, j)
+                    if i == j:
+                        # Add diagonal (same atom) contributions, 2S + 2J - K
+                        hessian_2nd_order_derivatives[i,i] += 2*np.einsum(
+                                    'mn,xymn->xy', omega_ao, ovlp_2nd_deriv_ii)
+                        hessian_2nd_order_derivatives[i,i] += 2*np.einsum(
                         'mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
-                    hessian_2nd_order_derivatives[i,i] -= frac_K*np.einsum(
-                        'mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
-                # Add non-diagonal contributions, 2S + 2J - K + 2h
-                hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
-                        'mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
-                hessian_2nd_order_derivatives[i,j] -= frac_K*np.einsum(
-                        'mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
-                hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
-                        'mn,xymn->xy', omega_ao, ovlp_2nd_deriv_ij)
-                hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
-                        'mn,xymn->xy', density, hcore_2nd_deriv_ij)
+                        hessian_2nd_order_derivatives[i,i] -= frac_K*np.einsum(
+                         'mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
+                    # Add non-diagonal contributions, 2S + 2J - K + 2h
+                    hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
+                         'mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
+                    hessian_2nd_order_derivatives[i,j] -= frac_K*np.einsum(
+                         'mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
+                    hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
+                            'mn,xymn->xy', omega_ao, ovlp_2nd_deriv_ij)
+                    hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
+                            'mn,xymn->xy', density, hcore_2nd_deriv_ij)
 
-            # lower triangle is transpose of the upper part
-            for j in range(i):
-                hessian_2nd_order_derivatives[i,j] += (
-                            hessian_2nd_order_derivatives[j,i].T )
+                # lower triangle is transpose of the upper part
+                for j in range(i):
+                    hessian_2nd_order_derivatives[i,j] += (
+                                hessian_2nd_order_derivatives[j,i].T )
 
-        # Nuclear-nuclear repulsion contribution
-        hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
+            ## Nuclear-nuclear repulsion contribution
+            hessian_nuclear_nuclear = self.hess_nuc_contrib(molecule)
 
-        # Sum up the terms and reshape for final Hessian
-        self.hessian = ( hessian_first_order_derivatives
-                        + hessian_2nd_order_derivatives
-                        + hessian_nuclear_nuclear
-                        ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
+            ## Sum up the terms and reshape for final Hessian
+            self.hessian = ( hessian_first_order_derivatives
+                            + hessian_2nd_order_derivatives
+                            + hessian_nuclear_nuclear
+                            ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
-        if self.dft:
-            self.hessian += hessian_dft_xc
+            if self.dft:
+                self.hessian += hessian_dft_xc
 
-        t3 = tm.time()
-        if self.rank == mpi_master():
+            t3 = tm.time()
             self.ostream.print_info('Second order derivative contributions'
                                     + ' to the Hessian computed in' +
                                      ' {:.2f} sec.'.format(t3 - t2))
             self.ostream.print_blank()
             self.ostream.flush()
 
-        # Calculate the gradient of the dipole moment, needed for IR intensities
-        self.compute_dipole_gradient(molecule, ao_basis, scf_drv,
+            # Calculate the gradient of the dipole moment,
+            # needed for IR intensities
+            self.compute_dipole_gradient(molecule, ao_basis, scf_drv,
                                     perturbed_density)
 
         # Calculate the polarizability gradient, needed for Raman intensities
