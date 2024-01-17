@@ -2,6 +2,8 @@
 #define GtoBlock_hpp
 
 #include <cstdint>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "MolecularBasis.hpp"
@@ -151,7 +153,7 @@ class CGtoBlock
 
      @return the Cartesian to spherical mapping for p-CGTOs.
      */
-    auto getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, int64_t>;
+    auto getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>;
 
     /**
      Gets angular momentum.

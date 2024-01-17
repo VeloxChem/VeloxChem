@@ -1,5 +1,7 @@
 #include "GtoBlock.hpp"
 
+#include "ErrorHandler.hpp"
+
 CGtoBlock::CGtoBlock(const std::vector<TPoint3D>& coordinates,
                      const std::vector<double>&   exponents,
                      const std::vector<double>&   norms,
@@ -170,6 +172,8 @@ CGtoBlock::getAtomicOrbitalsIndexes() const -> std::vector<int64_t>
 auto
 CGtoBlock::getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>
 {
+    errors::assertMsgCritical(_angmom <= 2, std::string("GtoBlock: getAtomicOrbitalsIndexesForCartesian only supports up to d-orbitals"));
+
     std::vector<int64_t> ao_inds;
 
     // go through Cartesian components
@@ -191,31 +195,43 @@ CGtoBlock::getAtomicOrbitalsIndexesForCartesian() const -> std::vector<int64_t>
 }
 
 auto
-CGtoBlock::getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, int64_t>
+CGtoBlock::getCartesianToSphericalMappingForP() const -> std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>>
 {
-    std::unordered_map<int64_t, int64_t> cart_sph_p;
+    errors::assertMsgCritical(_angmom == 1, std::string("GtoBlock: getCartesianToSphericalMappingForP only works for p-orbitals"));
 
-    if (_angmom == 1)
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_p;
+
+    // p-1 (0) <- py (1)
+    // p_0 (1) <- pz (2)
+    // p+1 (2) <- px (0)
+
+    std::unordered_map<int64_t, std::vector<std::pair<int64_t, double>>> cart_sph_comp_map;
+
+    cart_sph_comp_map[0] = std::vector<std::pair<int64_t, double>>({{2, 1.0}});
+    cart_sph_comp_map[1] = std::vector<std::pair<int64_t, double>>({{0, 1.0}});
+    cart_sph_comp_map[2] = std::vector<std::pair<int64_t, double>>({{1, 1.0}});
+
+    for (const auto& [cart_comp, sph_comp_coef_vec] : cart_sph_comp_map)
     {
-        // p-1 (0) <- py (1)
-        // p_0 (1) <- pz (2)
-        // p+1 (2) <- px (0)
+        // go through CGTOs in this block
+        // note that ind starts from 1
+        // because _orb_indexes[0] is the total number of CGTOs of _angmom
+        // which could be larger than the number of CGTOs in this block
 
-        std::unordered_map<int64_t, int64_t> cart_sph_comp_map = {{0, 2}, {1, 0}, {2, 1}};
-
-        for (const auto& [cart_comp, sph_comp] : cart_sph_comp_map)
+        for (size_t ind = 1; ind < _orb_indexes.size(); ind++)
         {
-            // go through CGTOs in this block
-            // note that ind starts from 1
-            // because _orb_indexes[0] is the total number of CGTOs of _angmom
-            // which could be larger than the number of CGTOs in this block
+            auto cart_ind = cart_comp * _orb_indexes[0] + _orb_indexes[ind];
 
-            for (size_t ind = 1; ind < _orb_indexes.size(); ind++)
+            cart_sph_p[cart_ind] = std::vector<std::pair<int64_t, double>>();
+
+            for (const auto& sph_comp_coef : sph_comp_coef_vec)
             {
-                auto cart_ind = cart_comp * _orb_indexes[0] + _orb_indexes[ind];
-                auto sph_ind  = sph_comp  * _orb_indexes[0] + _orb_indexes[ind];
+                auto sph_comp = sph_comp_coef.first;
+                auto sph_coef = sph_comp_coef.second;
 
-                cart_sph_p[cart_ind] = sph_ind;
+                auto sph_ind = sph_comp * _orb_indexes[0] + _orb_indexes[ind];
+
+                cart_sph_p[cart_ind].push_back(std::pair<int64_t, double>({sph_ind, sph_coef}));
             }
         }
     }
