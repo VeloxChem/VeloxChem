@@ -93,18 +93,18 @@ class ScfHessianDriver(HessianDriver):
         self.iter_count = 0
         self._is_converged = False
 
-        self.frequency = 0.0
+        self.frequency = 0.0 # used for numerical only
 
 
-    def update_settings(self, method_dict, freq_dict=None, cphf_dict=None,
+    def update_settings(self, method_dict, hess_dict=None, cphf_dict=None,
                         rsp_dict=None, polgrad_dict=None):
         """
         Updates settings in ScfHessianDriver.
 
         :param method_dict:
             The input dictionary of method settings group.
-        :param freq_dict:
-            The input dictionary of Hessian/frequency settings group.
+        :param hess_dict:
+            The input dictionary of Hessian settings group.
         :param cphf_dict:
             The input dictionary of CPHF (orbital response) settings.
         :param rsp_dict:
@@ -112,10 +112,10 @@ class ScfHessianDriver(HessianDriver):
             (needed to compute the polarizability gradient).
         """
 
-        super().update_settings(method_dict, freq_dict)
+        super().update_settings(method_dict, hess_dict)
 
-        if freq_dict is None:
-            freq_dict = {}
+        if hess_dict is None:
+            hess_dict = {}
 
         # Settings for orbital response module
         if cphf_dict is None:
@@ -128,13 +128,13 @@ class ScfHessianDriver(HessianDriver):
         if 'max_iter' in cphf_dict:
             self.max_iter = int(cphf_dict['max_iter'])
 
-        if 'pople_hessian' in freq_dict:
-            key = freq_dict['pople_hessian'].lower()
+        if 'pople_hessian' in hess_dict:
+            key = hess_dict['pople_hessian'].lower()
             self.pople_hessian = True if key in ['yes', 'y'] else False
 
         # check if Raman intensities are to be calculated
-        if 'do_raman' in freq_dict:
-            key = freq_dict['do_raman'].lower()
+        if 'do_raman' in hess_dict:
+            key = hess_dict['do_raman'].lower()
             self.do_raman = (key in ['yes', 'y'])
             # dictionary for polarizability gradient module
             if polgrad_dict is None:
@@ -142,8 +142,8 @@ class ScfHessianDriver(HessianDriver):
             self.polgrad_dict = dict(polgrad_dict)
 
         # The frequency for the frequency-dependent polarizability
-        if 'frequency' in freq_dict:
-            self.frequency = float(grad_dict['frequency'])
+        if 'frequency' in hess_dict:
+            self.frequency = float(hess_dict['frequency'])
 
         # Settings for the linear response driver used to calculate
         # the polarizability.
@@ -207,7 +207,7 @@ class ScfHessianDriver(HessianDriver):
             The SCF driver.
         """
 
-        scf_drv.ostream.mute()
+#        scf_drv.ostream.mute()
 
         # atom labels
         labels = molecule.get_labels()
@@ -240,12 +240,11 @@ class ScfHessianDriver(HessianDriver):
             # polarizability: 3 coordinates x 3 coordinates
             # (ignoring frequencies)
             # polarizability gradient: dictionary goes through
-            # 3 coordinates x 3 coordinates
+            # 1 frequency and 3 coordinates x 3 coordinates
             # each entry having values for no. atoms x 3 coordinates
             if self.rank == mpi_master():
                 self.polarizability_gradient = {}
-                # hard-code static Raman
-                self.polarizability_gradient[0.0] = np.zeros((3, 3, 3 * natm))
+                self.polarizability_gradient[self.frequency] = np.zeros((3, 3, 3 * natm))
 
         scf_drv.restart = False
         scf_results = scf_drv.compute(molecule, ao_basis)
@@ -397,7 +396,7 @@ class ScfHessianDriver(HessianDriver):
         """
 
         scf_tensors = scf_drv.scf_tensors
-        density = scf_tensors['D_alpha']
+        density = scf_tensors['D_alpha'] # MPI BUG
         natm = molecule.number_of_atoms()
         mo = scf_tensors['C_alpha']
         nao = mo.shape[0]
@@ -972,7 +971,7 @@ class ScfHessianDriver(HessianDriver):
 
 
         # settings dictionary for gradient driver
-        grad_dict = dict(self.freq_dict)
+        grad_dict = dict(self.hess_dict)
         if self.numerical_grad:
             grad_dict['numerical'] = 'yes'
             warn_msg = '*** Warning: Numerical Hessian will be calculated '
