@@ -25,10 +25,10 @@
 
 import numpy as np
 from collections import defaultdict
-from .veloxchemlib import mathconst_pi
+
 from .veloxchemlib import hartree_in_kcalpermol
 from .veloxchemlib import bohr_in_angstrom
-from .molecule import Molecule
+
 from .seminario import Seminario
 from .atomtypeidentifier import AtomTypeIdentifier
 
@@ -37,15 +37,15 @@ class Topology:
     """
     Class for creating a topology based on a molecule and a force-field file
 
-    Methods:
-    identify_atomtypes: identifies the atomtypes of the molecule based on a force-field file
-    identify_equivalences: identifies equivalent atoms in the molecule
-    create_topology: creates a topology based on the identified atomtypes and equivalences
-    update_charge: updates the charges of the atoms in the topology
-    write_gromacs_files: writes the topology, itp and gro files for GROMACS
-    reparameterize: reparameterizes the force-field based on a hessian
-    test_force_field: runs a short MD simulation to test the stability of the force-field via RMSD
-    
+    Instance variables
+        - identify_atomtypes: identifies the atomtypes of the molecule based on a force-field file
+        - identify_equivalences: identifies equivalent atoms in the molecule
+        - create_topology: creates a topology based on the atomtypes and equivalences
+        - update_charge: updates the charges of the atoms in the topology
+        - write_gromacs_files: writes the topology, itp and gro files
+        - reparameterize: reparameterizes the force-field based on a hessian
+        - test_force_field: runs a short MD simulation to test the force-field
+
     Example:
     >>> top = Topology()
     >>> top.identify_atomtypes(molecule,"path_to_gaff.dat")
@@ -68,7 +68,7 @@ class Topology:
         self.pairs = []
         self.coordinates = []
         self.filename = ""
-        self.RES = ""
+        self.res = ""
 
     # Methods for identifying the atomtypes and equivalences
 
@@ -77,9 +77,10 @@ class Topology:
         Uses the atomtype identifier to identify the atomtypes of a molecule
         This method can be used to correct missidentifications in the force-field file
 
-        Arguments:
-        molecule: Molecule object from veloxchem
-        ff_file_path: path to the force-field file
+        :param molecule:
+            Molecule object from veloxchem
+        :param ff_file_path: 
+            Path to the force-field file
 
         Example:
         >>> top = Topology()
@@ -87,8 +88,7 @@ class Topology:
         >>> top.atomtypes #list of atomtypes
         If the atom type in the 4th atom is wrong, you can correct it with:
         >>> top.atomtypes[3] = "ca"
-
-        Returns: a list of atomtypes       
+     
         """
 
         self.at_identifier = AtomTypeIdentifier()
@@ -117,9 +117,8 @@ class Topology:
         And a list with the renamed atom types for writing the topology
         >>> top.renamed_atom_types
 
-        Arguments:
-        depth: depth of the equivalence search
-
+        :param depth:
+            Depth of the equivalence search
         """
 
         def gather_neighbors(atom_index, current_depth=0, path=()):
@@ -247,24 +246,27 @@ class Topology:
             atom_data["type"] = self.renamed_atom_types[atom_id - 1]
 
     # Methods for updating the topology
+            
     def update_charge(self, charges):
         """
         Takes list list of charges, and assigns those to the atoms 
         Ordering of the coordinates is assumed to be the same as the atoms
+
+        :param charges: 
+            list of charges
         """
         for atom_id, charge in zip(self.atoms, charges):
             self.atoms[atom_id]['charge'] = float(charge)
 
     # Methods for generating GROMACS the topology
 
-    def get_itp_string(self, RES="MOL"):
+    def get_itp_string(self, res="MOL"):
         """
-        generate an itp string based on this topology.
+        Generate a string for the GROMACS itp file based on this topology.
 
-        Res: residue name used in the topology, defaults to "MOL"
+        :param res: 
+            Residue name used in the topology, defaults to "MOL"
         """
-        # Initialize the itp file
-        # TODO: Generate a proper header
 
         itp_string = '; Created by VeloxChem\n\n'
 
@@ -298,13 +300,13 @@ class Topology:
         # Blank line
         itp_string += '\n'
         # Print the moleculetype section
-        itp_string += f"[moleculetype]\n; name  nrexcl\n{RES}  3\n\n"
+        itp_string += f"[moleculetype]\n; name  nrexcl\n{res}  3\n\n"
 
         # Print the atoms section
         itp_string += '[ atoms ]\n'
         itp_string += '; nr    type  resnr  residue  atom  cgnr  charge  mass; comment\n'
         for atom_id, atom_data in self.atoms.items():
-            itp_string += f'{atom_id:<6} {atom_data["type"]:>4}  1     {RES}     {atom_data["type"]:>4}  1     {atom_data["charge"]:9.5f} {atom_data["mass"]:9.5f} ; {atom_data["comment"]}\n'
+            itp_string += f'{atom_id:<6} {atom_data["type"]:>4}  1     {res}     {atom_data["type"]:>4}  1     {atom_data["charge"]:9.5f} {atom_data["mass"]:9.5f} ; {atom_data["comment"]}\n'
 
         # Print the bonds section
         itp_string += '\n[ bonds ]\n; ai  aj  funct  r0 (nm)  fc (kJ/(mol nm2)); comment\n'
@@ -324,9 +326,10 @@ class Topology:
             elif dihedral_data["type"] == 5:
                 itp_string += f'{dihedral_key[0]:<4} {dihedral_key[1]:<4} {dihedral_key[2]:<4} {dihedral_key[3]:<4} {dihedral_data["type"]} {dihedral_data["c1"]} {dihedral_data["c2"]} {dihedral_data["c3"]} {dihedral_data["c4"]} {dihedral_data["c5"]} ; {dihedral_data["comment"]}\n'
             else:
-                print(
+                # Error message
+                raise Exception(
                     f"ERROR: dihedral type {dihedral_data['type']} not supported"
-                )  #todo raise exception?
+                )  
 
         # Print the impropers section
         itp_string += '\n[ dihedrals ] ; Improper dihedral section\n; ai  aj  ak  al  type  phi0  fc  n; comment\n'
@@ -336,9 +339,10 @@ class Topology:
             elif improper_data['type'] == 2:
                 itp_string += f'{improper_key[0]:<4} {improper_key[1]:<4} {improper_key[2]:<4} {improper_key[3]:<4} {improper_data["type"]} {improper_data["eq"]:>8.3f} {improper_data["fc"]:>8.3f}; {improper_data["comment"]}\n'
             else:
-                print(
-                    f"ERROR: dihedral type {improper_data['type']} not supported"
-                )  #todo raise exception?
+                # Error message
+                raise Exception(
+                    f"ERROR: improper type {improper_data['type']} not supported"
+                )
 
         # Print the pairs section
         itp_string += '\n[ pairs ]\n; ai  aj  funct\n'
@@ -346,11 +350,11 @@ class Topology:
             itp_string += f'{pair_key[0]:<4} {pair_key[1]:<4} 1\n'
         return itp_string
 
-    def get_top_string(self, filename, RES="MOL"):
+    def get_top_string(self, filename, res="MOL"):
         """
-        Generate a GROMACS top file based on this topology. Filename and RES will be set as instance variables
+        Generate a GROMACS top file based on this topology. Filename and res will be set as instance variables
 
-        Res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .top file.
+        res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .top file.
         """
         # Construct the topol.top file string
         # Initialize the top file
@@ -361,68 +365,68 @@ class Topology:
         top_string += f"""#include "{filename}.itp"\n"""
 
         # Print the system directive
-        top_string += f"\n[ system ]\n; name\n{RES}\n"
+        top_string += f"\n[ system ]\n; name\n{res}\n"
 
         # Print the molecules section
-        top_string += f"\n[ molecules ]\n; name  number\n{RES}  1\n"
+        top_string += f"\n[ molecules ]\n; name  number\n{res}  1\n"
         return top_string
 
     # Methods for writing the GROMACS files
 
-    def write_itp(self, filename, output_folder, RES="MOL"):
+    def write_itp(self, filename, output_folder, res="MOL"):
         """
-        Generate a GROMACS itp file based on this topology. Filename and RES will be set as instance variables
+        Generate a GROMACS itp file based on this topology. Filename and res will be set as instance variables
 
-        Res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .top file.
+        res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .top file.
         """
         if hasattr(self, filename):
             if self.filename != filename:
                 print(
                     f"WARNING: {self.filename} was set earlier as filename (probably in write_top), while {filename} was passed to write_itp"
                 )
-        if hasattr(self, RES):
-            if self.RES != RES:
+        if hasattr(self, res):
+            if self.res != res:
                 print(
-                    f"WARNING: {self.RES} was set earlier as residue name (probably in write_top), while {RES} was passed to write_itp"
+                    f"WARNING: {self.res} was set earlier as residue name (probably in write_top), while {res} was passed to write_itp"
                 )
 
         self.filename = filename
-        self.RES = RES
-        itp_string = self.get_itp_string(RES)
+        self.res = res
+        itp_string = self.get_itp_string(res)
         # TODO use pathlib
         with open(f"{output_folder}/{filename}.itp", "w") as f:
             f.write(itp_string)
 
-    def write_top(self, filename, output_folder, RES="MOL"):
+    def write_top(self, filename, output_folder, res="MOL"):
         """
-        Generate a GROMACS top file based on this topology. Filename and RES will be set as instance variables
+        Generate a GROMACS top file based on this topology. Filename and res will be set as instance variables
 
-        Res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .itp file.
+        res: residue name used in the topology, defaults to "MOL". Should match with the residue name in the .itp file.
         """
         if hasattr(self, filename):
             if self.filename != filename:
                 print(
                     f"WARNING: {self.filename} was set earlier as filename (probably in write_itp), while {filename} was passed to write_top"
                 )
-        if hasattr(self, RES):
-            if self.RES != RES:
+        if hasattr(self, res):
+            if self.res != res:
                 print(
-                    f"WARNING: {self.RES} was set earlier as residue name (probably in write_itp), while {RES} was passed to write_top"
+                    f"WARNING: {self.res} was set earlier as residue name (probably in write_itp), while {res} was passed to write_top"
                 )
 
-        top_string = self.get_top_string(filename, RES)
+        top_string = self.get_top_string(filename, res)
 
         with open(f"{output_folder}/{filename}.top", "w") as f:
             f.write(top_string)
 
-    def write_gro(self, filename, output_folder, RES='MOL'):
+    def write_gro(self, filename, output_folder, res='MOL'):
         """
         Writes a GROMACS gro file based on the coordinates of the molecule
         and the atom types in the topology.
 
         :param filename: Name of the gro file
         :param output_folder: Output directory for the gro file
-        :param RES: Name of the residue
+        :param res: Name of the residue
         """
         # Check if coordinates are available
         if not hasattr(self, 'coordinates'):
@@ -435,7 +439,7 @@ class Topology:
         # Atom lines formatting
         for atom_id, atom_data in enumerate(self.atoms.values(), start=1):
             x, y, z = self.coordinates[atom_id - 1]
-            gro_string += f'{1 % 100000:>5d}{RES:<5}{atom_data["type"]:>5}{atom_id % 100000:>5d}{x:8.3f}{y:8.3f}{z:8.3f}\n'
+            gro_string += f'{1 % 100000:>5d}{res:<5}{atom_data["type"]:>5}{atom_id % 100000:>5d}{x:8.3f}{y:8.3f}{z:8.3f}\n'
 
         # TODO: Replace with actual box dimensions if available
         gro_string += '   2.00000   2.00000   2.00000\n'
@@ -446,20 +450,20 @@ class Topology:
 
     # This method is a wrapper for the other write methods
 
-    def write_gromacs_files(self, filename, output_folder, RES="MOL"):
+    def write_gromacs_files(self, filename, output_folder, res="MOL"):
         """
-        Generate a GROMACS top and itp file based on this topology. Filename and RES will be set as instance variables, and should match with the .itp file
+        Generate a GROMACS top and itp file based on this topology. Filename and res will be set as instance variables, and should match with the .itp file
 
-        Res: residue name used in the topology, defaults to "MOL".
+        res: residue name used in the topology, defaults to "MOL".
         """
-        self.write_itp(filename, output_folder, RES)
-        self.write_top(filename, output_folder, RES)
-        self.write_gro(filename, output_folder, RES)
+        self.write_itp(filename, output_folder, res)
+        self.write_top(filename, output_folder, res)
+        self.write_gro(filename, output_folder, res)
 
     # Methods for reparameterizing the force-field
 
     def reparameterize(self,
-                       filename=None,
+                       hessian_matrix=None,
                        origin='XTB',
                        keys=None,
                        element=None,
@@ -470,17 +474,22 @@ class Topology:
         """
         Reparameterizes all unknown parameters with the seminario method using the given hessian
 
-        molecule: Molecule object from veloxchem
-        hessian: Hessian matrix in a 2D numpy array or path to the hessian file
-        origin: origin of the hessian, either 'ORCA' or 'VeloxChem'
-            If the origin is ORCA, the hessian will be parsed from the file
-            If the origin is VeloxChem, the hessian should be already a 2D numpy array
-        keys: list of tuples of atom ids, for which the parameters should be reparameterised
-        element: element for which all parameters should be reparameterised
-        print_all: print all parameters, not just the ones that are reparameterised
-        only_eq: only reparameterise the equilibrium values, not the force constants
-        no_repar: do not reparameterise anything, just print the parameters
-        repar_imp: reparameterise impropers as well (experimental)
+        :param heassian_matrix:
+            Hessian matrix, if origin is 'Other' this must be provided. 2D numpy array.
+        :param origin:
+            Origin of the hessian file, can be 'Other' or 'XTB'
+        :param keys:
+            List of tuples with the atom indices of the parameters to be reparameterized
+        :param element:
+            Element to be reparameterized
+        :param print_all:
+            Print all the parameters, not only the ones that are going to be reparameterized
+        :param only_eq:
+            Only reparameterize the equilibrium values
+        :param no_repar:
+            Do not reparameterize the force-field, only print the parameters
+        :param repar_imp:
+            Reparameterize the improper parameters. Experimental.
 
         """
 
@@ -513,9 +522,9 @@ Consider scanning manually sensitive diherals and impropers.
 
         # Generate the hessian matrix depending on the origin
 
-        if origin == 'ORCA':
-            self.hessian = Seminario.parse_orca_hessian(filename)
-            print("Hessian parsed from ORCA hessian output file")
+        if origin == 'Other':
+            # The hessian must be directly provided as a numpy array
+            hessian = hessian_matrix
         elif origin == 'XTB':
             # XTB optimization of the molecule before computing the hessian
             xtb_drv = XtbDriver()
@@ -539,19 +548,21 @@ Consider scanning manually sensitive diherals and impropers.
 Hessian computed with the XTB method
 ------------------------------------------------------------------------------------------------
 C. Bannwarth, E. Caldeweyher, S. Ehlert, A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme 
-WIREs Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
+WIres Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
                   
                   """)
-
+            
+        # Method pending to be implemented. Waiting for the VeloxChem hessian.
         elif origin == 'VeloxChem':
             print("Method yet not implemented, please use the XTB driver")
             return
         else:
             raise Exception(
-                "Please specify the origin of the hessian as 'ORCA' or 'XTB'")
+                "Please specify the origin of the hessian as 'Other' or 'XTB'")
 
         coordinates = self.molecule.get_coordinates_in_bohr(
         )  #Coordinates in Bohr
+        
         sem = Seminario(self.hessian, coordinates)
 
         def process_parameter(parameters, label):
@@ -664,7 +675,6 @@ WIREs Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
 
     def test_force_field(self,
                          filename,
-                         output_folder,
                          save_trajectory=False,
                          show_output=False):
         """

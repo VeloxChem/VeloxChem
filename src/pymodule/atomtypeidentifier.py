@@ -43,41 +43,22 @@ class AtomTypeIdentifier:
     of atoms according to the GAFF. It involves several steps including reading the file, determining covalent 
     radii, creating a connectivity matrix, identifying cyclic structures, and assigning atom types.
 
-    Attributes:
-        molecule (Molecule): A VeloxChem molecule object containing the atomic coordinates of the molecule.
-        atomic_symbols (list): A list of the atomic symbols of the atoms in the molecule.
-        coordinates (numpy.ndarray): A 2D numpy array containing the atomic coordinates of the molecule.
-        distances (numpy.ndarray): A 2D numpy array containing the distances between atoms in the molecule.
-        covalent_radii (list): A list of the covalent radii of the atoms in the molecule.
-        connectivity_matrix (numpy.ndarray): A 2D numpy array containing the connectivity matrix of the molecule.
-        distance_matrix (numpy.ndarray): A 2D numpy array containing the distance matrix of the molecule.
-        cyclic_atoms (set): A set containing the atom numbers of the atoms in cyclic structures.
-        cycle_sizes (list): A list containing the sizes of the cyclic structures in the molecule.
-        aromaticity (list): A list containing the aromaticity of the cyclic structures in the molecule.
-        cycles (list): A list containing the cyclic structures in the molecule.
-        cycle_ids (list): A list containing the IDs of the cyclic structures in the molecule.
-        atom_cycle_info (dict): A dictionary containing information about the cyclic structures of each atom.
-        atom_info_dict (dict): A dictionary containing detailed information about each atom in the molecule.
-        atom_types_dict (dict): A dictionary containing the GAFF atom types for each atom in the molecule.
+    Instance variables
+        - molecule: A VeloxChem molecule object.
+        - atomic_symbols: A list of atomic symbols for each atom in the molecule.
+        - coordinates: A 2D numpy array of atomic coordinates for each atom in the molecule.
+        - covalent_radii: A list of covalent radii for each atom in the molecule.
+        - connectivity_matrix: A 2D numpy array indicating which atoms are bonded.
+        - distance_matrix: A 2D numpy array containing the distances between atoms.
+        - cyclic_atoms: A set of atom indices that are part of a cyclic structure.
+        - cycle_sizes: A list of the sizes of each cyclic structure.
+        - aromaticity: A list of aromaticity classifications for each cyclic structure.
+        - cycles: A list of cyclic structures.
+        - cycle_ids: A list of cyclic structure IDs.
+        - atom_cycle_info: A dictionary containing cycle information for each atom.
+        - atom_info_dict: A dictionary containing detailed information for each atom.
+        - atom_types_dict: A dictionary containing the GAFF atom types for each atom.
 
-    Methods:
-        measure_length: Calculates the distance between two points in 3D space.
-        read_xyz_file: Reads an XYZ file and extracts the atomic coordinates and symbols.
-        generate_gaff_atom_types: Generates GAFF atom types for the atoms in the molecule.
-        create_connectivity_matrix: Creates a connectivity matrix for the molecule based on the atomic coordinates.
-        plot_connectivity_map_3D: Plots a 3D connectivity map of the molecule using Matplotlib.
-        is_sp2_carbon: Determines if a given atom is sp2 hybridized.
-        detect_closed_cyclic_structures: Detects closed cyclic structures in a molecule and determines their aromaticity.
-        create_atom_info_dict: Creates a dictionary containing detailed information for each atom in the molecule.
-        decide_atom_type: Analyzes the molecular structure information to assign atom types to each atom in the molecule.
-
-    The class should be initialized with the path to an XYZ file, after which it will automatically process 
-    the file and set the corresponding attributes.
-
-    Example:
-        >>> atom_identifier = AtomTypeIdentifier('molecule.xyz')
-        >>> atom_identifier.generate_gaff_atom_types()
-        >>> print(atom_identifier.atom_types_dict)
     """
 
     def __init__(self):
@@ -88,10 +69,7 @@ class AtomTypeIdentifier:
             self
         """
 
-    def create_connectivity_matrix(self,
-                                   coordinates,
-                                   covalent_radii,
-                                   factor=1.3):
+    def create_connectivity_matrix(self, factor=1.3):
         """
         Creates a connectivity matrix for the molecule based on the atomic coordinates
         and covalent radii, determining which atoms are bonded.
@@ -102,23 +80,13 @@ class AtomTypeIdentifier:
         accordingly. The method also constructs a corresponding distance matrix with the
         actual distances between connected atoms.
 
-        Parameters:
-            factor (float, optional): A scaling factor for the covalent radii to account for
-                                      the bond threshold. Defaults to 1.3.
-
-        Returns:
+        :param factor: 
+            A scaling factor for the covalent radii to account for the bond threshold.
+            Default value is 1.3.
+        :return:
             tuple: A tuple containing two 2D numpy arrays:
                    - The first array is the connectivity matrix with 1s indicating bonded atom pairs.
                    - The second array is the distance matrix with actual distances between atoms.
-
-        Side Effects:
-            - Updates the 'connectivity_matrix' and 'distance_matrix' attributes of the class.
-
-        Example:
-            >>> atom_identifier = AtomTypeIdentifier()
-            >>> atom_identifier.create_connectivity_matrix()
-            >>> print(atom_identifier.connectivity_matrix)
-            >>> print(atom_identifier.distance_matrix)
         """
         num_atoms = len(self.coordinates)
         self.connectivity_matrix = np.zeros((num_atoms, num_atoms), dtype=int)
@@ -144,15 +112,6 @@ class AtomTypeIdentifier:
         """
         Plots a 3D connectivity map of the molecule using Matplotlib.
 
-        This method uses the atomic symbols, connectivity matrix, and coordinates
-        to plot a 3D representation of the molecule, showing bonds between atoms.
-
-        Side Effects:
-            - Generates a 3D plot showing the connected atoms in the molecule.
-
-        Example:
-            >>> atom_identifier = AtomTypeIdentifier('molecule.xyz')
-            >>> atom_identifier.plot_connectivity_map_3D()
         """
         fig = plt.figure(figsize=(8, 8))
         ax = fig.add_subplot(111, projection='3d')
@@ -187,41 +146,37 @@ class AtomTypeIdentifier:
 
     def is_sp2_carbon(self, atom_idx):
         """
-        Determines if a given atom, identified by its index, is sp2 hybridized.
+        Determines if a C atom, identified by its index, is sp2 hybridized.
 
-        Args:
-            atom_idx (int): Index of the atom in the molecule.
+        :param atom_idx:
+            Index of the atom in the molecule.
 
-        Returns:
-            bool: True if the atom is sp2 hybridized, False otherwise.
+        :return:
+            True if the atom is sp2 hybridized, False otherwise.
         """
         return self.atomic_symbols[atom_idx] == "C" and len(
             list(self.graph.neighbors(atom_idx))) == 3
 
     def is_sp2_nitrogen(self, atom_idx):
         """
-        Determines if a given atom, identified by its index, is sp2 hybridized.
+        Determines if a N atom, identified by its index, is sp2 hybridized.
 
-        Args:
-            atom_idx (int): Index of the atom in the molecule.
+        :param atom_idx:
+            Index of the atom in the molecule.
 
-        Returns:
-            bool: True if the atom is sp2 hybridized, False otherwise.
+        :return:
+            True if the atom is sp2 hybridized, False otherwise.
         """
         return self.atomic_symbols[atom_idx] == "N" and len(
             list(self.graph.neighbors(atom_idx))) == 2
 
-    def detect_closed_cyclic_structures(self, atomic_symbols,
-                                        connectivity_matrix, distances):
+    def detect_closed_cyclic_structures(self):
         """
         Detects closed cyclic structures in a molecule and determines their aromaticity.
 
         This method analyzes the graph of atoms and their connectivity to identify cycles,
         determine the size of each cycle, and classify them based on aromaticity criteria.
 
-        Returns:
-            tuple: Contains sets and lists of cyclic atoms, cycle sizes, aromaticity,
-            unique cycles, cycle ids, and atom cycle information.
         """
         self.graph = nx.Graph()
         for i in range(len(self.atomic_symbols)):
@@ -241,7 +196,7 @@ class AtomTypeIdentifier:
         ]
 
         # Remove super-cycles (cycles that contain smaller cycles)
-        reduced_cycles = filtered_cycles[:]
+        self.reduced_cycles = filtered_cycles[:]
         cycles_to_remove = set()
         for i, cycle in enumerate(filtered_cycles):
             for j, larger_cycle in enumerate(filtered_cycles):
@@ -253,8 +208,8 @@ class AtomTypeIdentifier:
         cycles_to_remove = {tuple(c) for c in cycles_to_remove}
 
         # Rebuild reduced_cycles excluding the ones in cycles_to_remove
-        reduced_cycles = [
-            cycle for cycle in reduced_cycles
+        self.reduced_cycles = [
+            cycle for cycle in self.reduced_cycles
             if tuple(cycle) not in cycles_to_remove
         ]
 
@@ -266,7 +221,7 @@ class AtomTypeIdentifier:
 
         # Assignation of aromaticity to all the reduced cycles
 
-        for cycle_id, cycle in enumerate(reduced_cycles):
+        for cycle_id, cycle in enumerate(self.reduced_cycles):
             self.cyclic_atoms.update(cycle)
 
             size = len(cycle)
@@ -275,7 +230,7 @@ class AtomTypeIdentifier:
             cycle_elements = [self.atomic_symbols[i] for i in cycle]
 
             cc_bond_distances = [
-                self.distances[cycle[i]][cycle[(i + 1) % size]]
+                self.distance_matrix[cycle[i]][cycle[(i + 1) % size]]
                 for i in range(size)
                 if self.atomic_symbols[cycle[i]] == "C" and
                 self.atomic_symbols[cycle[(i + 1) % size]] == "C"
@@ -346,7 +301,7 @@ class AtomTypeIdentifier:
             self.cycle_ids.append(cycle_id)
 
         # Additional logic for reassignment of aromaticity in special cases where 3 atoms are shared with aromatic rings.
-        for index, cycle in enumerate(reduced_cycles):
+        for index, cycle in enumerate(self.reduced_cycles):
             # Check if all carbons in the cycle are sp2
             all_carbons_sp2 = all(
                 self.is_sp2_carbon(atom_idx)
@@ -365,21 +320,17 @@ class AtomTypeIdentifier:
                             for a in self.atom_cycle_info[atom]['aromaticities']
                         ]
 
-        return self.cyclic_atoms, self.cycle_sizes, self.aromaticity, reduced_cycles, self.cycle_ids, self.atom_cycle_info
-
-    def create_atom_info_dict(self, atomic_symbols, connectivity_matrix,
-                              distances, cyclic_atoms, cycle_sizes, aromaticity,
-                              cycles, cycle_ids, atom_cycle_info):
+    def create_atom_info_dict(self):
         """
         Creates a dictionary containing detailed information for each atom in the molecule.
 
         This method compiles the atomic symbol, atom number, number of connected atoms, symbols of connected atoms,
         atom numbers of connected atoms, distances to connected atoms, and cycle information into a structured dictionary.
 
-        Returns:
-            dict: A dictionary where each key is an atom number and each value is another dictionary of atom information.
+        :return:
+            The dictionary where each key is an atom number and each value is another dictionary of atom information.
         """
-        self.atom_info = {}
+        self.atom_info_dict = {}
         for i, symbol in enumerate(self.atomic_symbols):
             num_connected_atoms = np.sum(self.connectivity_matrix[i])
             connected_atoms_numbers = [
@@ -393,7 +344,7 @@ class AtomTypeIdentifier:
                 if self.connectivity_matrix[i][j] == 1
             ]
             connected_atoms_distances = [
-                self.distances[i][j]
+                self.distance_matrix[i][j]
                 for j in range(len(self.atomic_symbols))
                 if self.connectivity_matrix[i][j] == 1
             ]
@@ -412,18 +363,16 @@ class AtomTypeIdentifier:
                 info["CycleSize"] = self.atom_cycle_info[i]['sizes']
                 info["Aromaticity"] = self.atom_cycle_info[i]['aromaticities']
                 info["CycleNumber"] = [
-                    self.cycle_ids[self.cycles.index(c)]
-                    for c in self.cycles
+                    self.cycle_ids[self.reduced_cycles.index(c)]
+                    for c in self.reduced_cycles
                     if i in c
                 ]
             else:
                 info["CyclicStructure"] = "none"
 
-            self.atom_info[i + 1] = info
+            self.atom_info_dict[i + 1] = info
 
-        return self.atom_info
-
-    def decide_atom_type(self, atom_info_dict):
+    def decide_atom_type(self):
         """
         Analyzes the molecular structure information to assign atom types to each atom in the molecule.
 
@@ -432,13 +381,9 @@ class AtomTypeIdentifier:
         factors such as the atom's chemical environment, its connectivity to other atoms, and whether it is part of
         a cyclic structure.
 
-        The atom types are determined for both the OPLS and GAFF force fields, which are used in various molecular
-        dynamics simulations and computational chemistry analyses. The assignment process is crucial for the accurate
-        representation of the molecule in these simulations.
-
-        Returns:
-            dict: A dictionary where each key corresponds to an atom identifier (e.g., "C1" for the first carbon atom),
-                  and each value is another dictionary containing the 'opls' and 'gaff' force field identifiers for the atom.
+        :return:
+            A dictionary where each key corresponds to an atom identifier (e.g., "C1" for the first carbon atom),
+            and each value is another dictionary containing the 'opls' and 'gaff' force field identifiers for the atom.
         """
 
         self.atom_types_dict = {}
@@ -844,12 +789,12 @@ class AtomTypeIdentifier:
                                 if self.atom_info_dict[num]['AtomicSymbol'] ==
                                 'N' and self.atom_info_dict[num]
                                 ['NumConnectedAtoms'] == 2)
-                            if sp2_carbon_count + sp1_carbon_count == 2 or sp2_carbon_count + sp1_carbon_count == 3:  # If the current carbon is connected to 2 sp2 carbons
+                            if sp2_carbon_count + sp1_carbon_count == 2 or sp2_carbon_count + sp1_carbon_count == 3:  
                                 carbon_type = {
                                     'opls': 'opls_XXX',
                                     'gaff': 'ce'
                                 }  # Inner Sp2 carbons in conjugated systems
-                            elif sp2_carbon_count + sp1_carbon_count + n2_count == 2:  # If the current carbon is connected to 2 sp2 carbons
+                            elif sp2_carbon_count + sp1_carbon_count + n2_count == 2:  
                                 carbon_type = {
                                     'opls': 'opls_XXX',
                                     'gaff': 'ce'
@@ -2062,28 +2007,23 @@ class AtomTypeIdentifier:
         """
         Extracts GAFF atom types from the atom types dictionary.
 
-        This method sorts the atom types based on their numerical suffix and then extracts
-        the GAFF atom types from the dictionary that contains atom type information for
-        both OPLS and GAFF force fields.
-
-        Returns:
-            list: A list of GAFF atom types in the order determined by the sorted atom keys.
         """
 
+        # Initialize the list of gaff atom types
         self.gaff_atom_types = []
 
         # Sort atom types based on the number after the atomic symbol
         sorted_atom_types = sorted(self.atom_types_dict.keys(),
                                    key=self.get_atom_number)
 
+        # Append the gaff atom types to the list
         for atom_type in sorted_atom_types:
             if isinstance(self.atom_types_dict[atom_type], dict):
                 gaff_type = self.atom_types_dict[atom_type].get('gaff', None)
                 if gaff_type:
                     self.gaff_atom_types.append(gaff_type)
 
-    # TODO: Additional auxiliary method to check alternating atom types
-    # ce-cf, cg-ch and nc-nd
+
     def check_alternating_atom_types(self):
         """
         This method checks the alternating atom types in GAFF2.
@@ -2091,15 +2031,8 @@ class AtomTypeIdentifier:
         The decide_atom_types method does assign a default atom type
         as cc, ce, cg and nc, but it does not assign the other atom type.
 
-        If the distance is shorter than a threshold, the method will
-        assign the other atom type to the atom. If the distance is longer
-        than the threshold, the method will assign the same atom type.
-
-        Args:
-            self
-
-        Returns:
-            atom_types_dict: the dictionary with the atom types updated with the
+        :return:
+            The dictionary with the atom types updated with the
             alternating atom types
         """
 
@@ -2145,19 +2078,18 @@ class AtomTypeIdentifier:
 
         return self.gaff_atom_types
 
+    # TODO: Fetch the force field file from the URL: 
+    # https://github.com/openmm/openmmforcefields/blob/main/openmmforcefields/ffxml/amber/gaff/dat/gaff-2.11.dat
+
     def check_for_bad_assignations(self, gaff_force_field):
         '''
         Method that checks if there are any atom types that have not been
         assigned properly. To do that, the method will check if any of the 
-        bonds assigned do not exist in the GAFF force field. If there are
-        any, the method will print a warning message and propose alternatives.
+        bonds assigned do not exist in the GAFF force field. 
 
-        Args:
-            self
-            gaff_force_field: the dat file containing the force field information
+        :param gaff_force_field:
+            The dat file containing the force field information
 
-        Returns:
-            None
         '''
 
         # Create a dictionary with the assigned bond types
@@ -2249,42 +2181,17 @@ class AtomTypeIdentifier:
                     found_second_atom = True
                 if found_first_atom and found_second_atom:
                     break
-
+    
+    # Main wrapper method of the class
     def generate_gaff_atomtypes(self, molecule):
         """
         Generates GAFF (General Amber Force Field) atom types for a given molecule.
 
-        This method takes a VeloxChem molecule object as input and performs several
-        steps to determine GAFF atom types for each atom in the molecule.
+        :param molecule:
+            A VeloxChem molecule object.
 
-        Steps:
-        1. Extracts molecular information such as coordinates, atomic symbols, and
-        the number of atoms from the input molecule.
-        2. Calculates covalent radii for each atom and stores them.
-        3. Creates a connectivity matrix and computes pairwise distances between atoms.
-        4. Detects closed cyclic structures within the molecule and gathers information
-        about cyclic atoms, cycle sizes, aromaticity, and cycle IDs.
-        5. Generates an atom information dictionary using the gathered data.
-        6. Determines atom types for each atom based on the atom information dictionary.
-        7. Extracts GAFF atom types from the determined atom types.
-
-        Args:
-            molecule: A VeloxChem molecule object.
-
-        Returns:
-            list: A list of GAFF atom types for each atom in the molecule.
-
-        Note:
-            The method populates various attributes of the class instance with
-            intermediate data during its execution, such as 'coordinates', 'atomic_symbols',
-            'covalent_radii', 'connectivity_matrix', 'distances', 'cyclic_atoms',
-            'cycle_sizes', 'aromaticity', 'cycles', 'cycle_ids', 'atom_cycle_info',
-            'atom_info_dict', and 'atom_types_dict'.
-
-        Example:
-            To generate GAFF atom types for a VeloxChem molecule 'my_molecule', you can
-            call this method as follows:
-            gaff_atom_types = my_instance.generate_gaff_atomtypes(my_molecule)
+        :return:
+            A list of GAFF atom types for each atom in the molecule.
         """
 
         # Workflow of the method
@@ -2293,17 +2200,10 @@ class AtomTypeIdentifier:
         self.num_atoms = len(self.atomic_symbols)
         self.covalent_radii = molecule.covalent_radii_to_numpy(
         ) * bohr_in_angstrom()
-        self.connectivity_matrix, self.distances = self.create_connectivity_matrix(
-            self.coordinates, self.covalent_radii)
-        (self.cyclic_atoms, self.cycle_sizes, self.aromaticity, self.cycles,
-         self.cycle_ids,
-         self.atom_cycle_info) = self.detect_closed_cyclic_structures(
-             self.atomic_symbols, self.connectivity_matrix, self.distances)
-        self.atom_info_dict = self.create_atom_info_dict(
-            self.atomic_symbols, self.connectivity_matrix, self.distances,
-            self.cyclic_atoms, self.cycle_sizes, self.aromaticity, self.cycles,
-            self.cycle_ids, self.atom_cycle_info)
-        self.atom_types_dict = self.decide_atom_type(self.atom_info_dict)
+        self.create_connectivity_matrix()
+        self.detect_closed_cyclic_structures()
+        self.create_atom_info_dict()
+        self.atom_types_dict = self.decide_atom_type()
         self.extract_gaff_atom_types(self.atom_types_dict)
         self.gaff_atom_types = self.check_alternating_atom_types()
 
@@ -2340,46 +2240,17 @@ class AtomTypeIdentifier:
 
         return self.gaff_atom_types
 
-    #todo, potentially move this to the topology class. Populating the topology should be part of the topology fucntionality, not of the atomtypeidentifyer
-
     def compute_structural_features(self):
         '''
-        Computes the structural features of a molecule based on its connectivity and distance matrices. The features include bonds, angles, dihedrals, and improper dihedrals. Each feature is represented by the involved atoms' IDs, the corresponding atom types, and the geometric parameters like distances and angles.
+        Computes the structural features of a molecule based on its connectivity and distance matrices. 
 
-        This method populates a dictionary with the following keys and values:
-        - 'bonds': A list of dictionaries, each representing a bond. Each dictionary contains:
-        - 'atoms': A tuple of atom IDs that form the bond.
-        - 'types': A tuple of GAFF atom types for the atoms in the bond.
-        - 'distance': The distance between the atoms, derived from the distance matrix.
-        
-        - 'angles': A list of dictionaries, each representing an angle formed by three connected atoms. Each dictionary contains:
-        - 'atoms': A tuple of atom IDs that form the angle.
-        - 'types': A tuple of GAFF atom types for the atoms in the angle.
-        - 'angle': The calculated angle between the atoms, in degrees.
-
-        - 'dihedrals': A list of dictionaries, each representing a dihedral angle formed by four sequentially bonded atoms. Each dictionary contains:
-        - 'atoms': A tuple of atom IDs that form the dihedral.
-        - 'types': A tuple of GAFF atom types for the atoms in the dihedral.
-        - 'dihedral': The calculated dihedral angle between the atoms, in degrees.
-        
-        - 'impropers': A list of dictionaries, each representing an improper dihedral angle where one atom is connected to three others, forming a pyramid structure. Each dictionary contains:
-        - 'atoms': A tuple of atom IDs, with the first being the central atom.
-        - 'types': A tuple of GAFF atom types for the atoms in the improper dihedral.
-        - 'improper_angle': The calculated improper dihedral angle, in degrees.
-
-        - 'pairs': Currently initialized as an empty list, to be populated with non-bonded atom pairs that need to be considered during force field generation.
-
-        Returns:
-        - A dictionary containing the lists of bonds, angles, dihedrals, impropers, and pairs with their respective structural information.
-
-        Note:
-        - This method assumes that `self.connectivity_matrix` and `self.distance_matrix` are already computed and available as attributes of the class instance.
-        - Atom IDs are assumed to be 1-indexed, corresponding to their order in the `self.gaff_atom_types` list.
-        - The method `AtomTypeIdentifier.calculate_angle` is used to calculate the angles, and `AtomTypeIdentifier.calculate_dihedral` is used for dihedral angles. These methods should be defined elsewhere in the AtomTypeIdentifier class.
-        - The `self.coordinates` attribute is assumed to hold the coordinates of each atom, used for geometric calculations.
+        :return:
+            A dictionary containing the lists of bonds, angles, dihedrals, impropers, 
+            and pairs with their respective structural information.
         '''
 
         # Initialize the dictionary structure for structural features
+
         structural_features = {
             'bonds': [],
             'angles': [],
@@ -2524,44 +2395,16 @@ class AtomTypeIdentifier:
 
     def generate_force_field_dict(self, ff_file_path):
         '''
-        Generates a force field dictionary for a molecule based on its structural features and a given GAFF force field file.
+        Generates a force field dictionary for a molecule based on its structural features 
+        and a given GAFF force field file.
 
-        Arguments:
-        - ff_file_path (str): The file path to the GAFF force field data file.
+        :param ff_file_path:
+            The file path to the GAFF force field data file.
 
-        Returns:
-        - dict: A dictionary containing force field parameters for atom types, bonds, angles, dihedrals, impropers, and non-bonded pairs.
+        :return:
+            The dictionary containing force field parameters for atom types, 
+            bonds, angles, dihedrals, impropers, and non-bonded pairs.
 
-        Overview:
-        This method constructs a force field data structure that includes parameters for each atom type, bond, angle, dihedral, and improper torsion in the molecule. It also calculates non-bonded pairs that are not explicitly covered by bonds or angles. The method relies on pre-computed structural features such as connectivity and distance matrices provided by `self.compute_structural_features()`.
-
-        Details:
-        - The force field data for each atom type includes its mass, sigma, epsilon values, and any additional info as defined in the GAFF force field file.
-        - Bonds are defined by the atoms they connect and include force constants and equilibrium distances.
-        - Angles are determined by three connected atoms and include force constants and equilibrium angles.
-        - Dihedrals are defined by four sequentially bonded atoms and include force constants, equilibrium angles, periodicity, and phase.
-        - Improper torsions are defined by a central atom connected to three other atoms, including force constants and equilibrium angles.
-        - Non-bonded pairs are computed based on dihedrals but exclude atoms already connected by bonds or as terminal atoms in angles.
-
-        The output dictionary keys are as follows:
-        - 'atomtypes': Each entry contains the ID, type, mass, sigma, epsilon, and additional info for each atom type.
-        - 'bonds': A list of bond dictionaries, each with atom IDs, types, force constants, and equilibrium distances.
-        - 'angles': A list of angle dictionaries, each with atom IDs, types, force constants, and equilibrium angles.
-        - 'dihedrals': A list of dihedral dictionaries, each with atom IDs, types, force constants, equilibrium angles, periodicity, and phase.
-        - 'impropers': A list of improper dictionaries, each with atom IDs, types, force constants, and equilibrium angles.
-        - 'pairs': A dictionary of non-bonded atom pairs with comments describing their computed origin.
-
-        Exceptions:
-        - FileNotFoundError: If the provided force field file path does not exist or is inaccessible.
-        - ValueError or IndexError: If there are issues parsing the force field file or if the structural features do not align with the expected format.
-
-        Usage:
-        The method is designed to be used within an instance of a molecule class that contains methods and properties for structural feature computation and has GAFF atom types assigned to its atoms.
-
-        Example:
-        ```python
-        molecule = MoleculeClass(...)  # Instance of a molecule class with GAFF atom types and structural features.
-        force_field_data = molecule.generate_force_field('./gaff-2.20.dat')
         '''
 
         # Required structural features
@@ -2626,7 +2469,7 @@ class AtomTypeIdentifier:
                         'mass': mass,
                         'comment': 'GAFF2 ' + info
                     })
-                    comment += 'Gaff2 ' + info
+                    comment += 'GAFF2 ' + info
 
             # If sigma and epsilon data is found in the force field, update those values
             if gaff_atom_type in sigma_epsilon_data:
@@ -2934,18 +2777,20 @@ class AtomTypeIdentifier:
         This static method uses regular expression to find the first sequence of digits
         in the atom type string, which typically represents the atom number.
 
-        Args:
-            atom_type_str (str): The atom type string containing a numeric suffix.
-
-        Returns:
-            int: The numeric part extracted from the atom type string. Returns 0 if no number is found.
+        :param atom_type_str: 
+            The atom type string containing a numeric suffix.
+            
+        :return:
+            The numeric part extracted from the atom type string. Returns 0 if no number is found.
         """
         match = re.search(r'\d+', atom_type_str)
+
         return int(match.group()) if match else 0
 
     @staticmethod
     def measure_length(v1, v2):
         "Calculates the distance between v1 and v2"
+
         return np.linalg.norm(np.array(v1) - np.array(v2))
 
     @staticmethod
@@ -2954,6 +2799,7 @@ class AtomTypeIdentifier:
         rad_to_deg = 180 / mathconst_pi()
         v12 = np.array(v1) - np.array(v2)
         v32 = np.array(v3) - np.array(v2)
+
         return math.acos(
             np.dot(v12, v32) /
             (np.linalg.norm(v12) * np.linalg.norm(v32))) * rad_to_deg
@@ -2974,4 +2820,5 @@ class AtomTypeIdentifier:
 
         x = np.dot(u2, np.cross(n1, n2))
         y = np.linalg.norm(u2,) * np.dot(n1, n2)
+
         return math.atan2(x, y) * rad_to_deg
