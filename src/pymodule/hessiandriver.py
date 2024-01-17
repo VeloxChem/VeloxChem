@@ -142,26 +142,26 @@ class HessianDriver:
         self.memory_profiling = False
         self.memory_tracing = False
 
-    def update_settings(self, method_dict, freq_dict=None):
+    def update_settings(self, method_dict, hess_dict=None):
         """
         Updates settings in HessianDriver.
 
         :param method_dict:
             The input dictionary of method settings group.
-        :param freq_dict:
-            The input dictionary of Hessian/frequency settings group.
+        :param hess_dict:
+            The input dictionary of Hessian settings group.
         """
 
-        if freq_dict is None:
-            freq_dict = {}
+        if hess_dict is None:
+            hess_dict = {}
 
         # check if Hessian is to be calculated numerically
-        if 'numerical' in freq_dict:
-            key = freq_dict['numerical'].lower()
+        if 'numerical' in hess_dict:
+            key = hess_dict['numerical'].lower()
             self.numerical = (key in ['yes', 'y'])
 
-        if 'do_four_point' in freq_dict:
-            key = freq_dict['do_four_point'].lower()
+        if 'do_four_point' in hess_dict:
+            key = hess_dict['do_four_point'].lower()
             self.do_four_point = (key in ['yes', 'y'])
 
         # TODO: use parse_input and _dft_sanity_check
@@ -184,8 +184,8 @@ class HessianDriver:
         # TODO: check if analytical gradient is available; 
         # if not, calculate numerical hessian using energy differences
         # check if gradient is to be calculated numerically
-        if 'numerical_grad' in freq_dict:
-            key = freq_dict['numerical_grad'].lower()
+        if 'numerical_grad' in hess_dict:
+            key = hess_dict['numerical_grad'].lower()
             self.numerical_grad = True if key in ['yes', 'y'] else False
 
         # if gradient is calculated numerically, so is the Hessian
@@ -202,43 +202,43 @@ class HessianDriver:
             self.dft = True if key in ['yes', 'y'] else False
 
         # print vibrational analysis (frequencies and normal modes)
-        if 'print_vib_analysis' in freq_dict:
-            key = freq_dict['print_vib_analysis'].lower()
+        if 'print_vib_analysis' in hess_dict:
+            key = hess_dict['print_vib_analysis'].lower()
             self.print_vib_analysis = True if key in ['yes', 'y'] else False
 
         # print the Hessian (not mass-weighted)
-        if 'do_print_hessian' in freq_dict:
-            key = freq_dict['do_print_hessian'].lower()
+        if 'do_print_hessian' in hess_dict:
+            key = hess_dict['do_print_hessian'].lower()
             self.do_print_hessian = True if key in ['yes', 'y'] else False
 
         # print the depolarization ratio, parallel, and perpendicular
         # Raman activities
-        if 'print_depolarization_ratio' in freq_dict:
-            key = freq_dict['print_depolarization_ratio'].lower()
+        if 'print_depolarization_ratio' in hess_dict:
+            key = hess_dict['print_depolarization_ratio'].lower()
             self.print_depolarization_ratio = (key in ['yes', 'y'])
 
-        if 'temperature' in freq_dict:
-            self.temperature = float(freq_dict['temperature'])
-        if 'pressure' in freq_dict:
-            self.pressure = float(freq_dict['pressure'])
+        if 'temperature' in hess_dict:
+            self.temperature = float(hess_dict['temperature'])
+        if 'pressure' in hess_dict:
+            self.pressure = float(hess_dict['pressure'])
 
         # TODO: check if timing and profiling are needed
         # Timing and profiling
-        if 'timing' in freq_dict:
-            key = freq_dict['timing'].lower()
+        if 'timing' in hess_dict:
+            key = hess_dict['timing'].lower()
             self.timing = True if key in ['yes', 'y'] else False
-        if 'profiling' in freq_dict:
-            key = freq_dict['profiling'].lower()
+        if 'profiling' in hess_dict:
+            key = hess_dict['profiling'].lower()
             self.profiling = True if key in ['yes', 'y'] else False
-        if 'memory_profiling' in freq_dict:
-            key = freq_dict['memory_profiling'].lower()
+        if 'memory_profiling' in hess_dict:
+            key = hess_dict['memory_profiling'].lower()
             self.memory_profiling = True if key in ['yes', 'y'] else False
-        if 'memory_tracing' in freq_dict:
-            key = freq_dict['memory_tracing'].lower()
+        if 'memory_tracing' in hess_dict:
+            key = hess_dict['memory_tracing'].lower()
             self.memory_tracing = True if key in ['yes', 'y'] else False
 
         self.method_dict = dict(method_dict)
-        self.freq_dict = dict(freq_dict)
+        self.hess_dict = dict(hess_dict)
 
 
     def compute(self, molecule, ao_basis=None, min_basis=None):
