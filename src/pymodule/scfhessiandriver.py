@@ -243,7 +243,9 @@ class ScfHessianDriver(HessianDriver):
             # 3 coordinates x 3 coordinates
             # each entry having values for no. atoms x 3 coordinates
             if self.rank == mpi_master():
-                self.polarizability_gradient = np.zeros((3, 3, 3 * natm))
+                self.polarizability_gradient = {}
+                # hard-code static Raman
+                self.polarizability_gradient[0.0] = np.zeros((3, 3, 3 * natm))
 
         scf_drv.restart = False
         scf_results = scf_drv.compute(molecule, ao_basis)
@@ -297,7 +299,7 @@ class ScfHessianDriver(HessianDriver):
                                 comp_minus = (
                                     lr_results_m['response_functions'][aop, bop,
                                                                self.frequency])
-                                self.polarizability_gradient[
+                                self.polarizability_gradient[0.0][
                                     ind_aop, ind_bop,
                                     3 * i + x] = ((comp_plus - comp_minus) /
                                                   (2.0 * self.delta_h))
