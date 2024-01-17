@@ -31,6 +31,7 @@ import sys
 import re
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .atomtypeidentifier import AtomTypeIdentifier
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
@@ -226,6 +227,13 @@ class ForceFieldGenerator:
         :param basis:
             The AO basis set.
         """
+
+        # atom type identification
+
+        if self.atom_types is None:
+            atomtypeidentifier = AtomTypeIdentifier(self.comm, self.ostream)
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
+                molecule)
 
         # sanity check
 
