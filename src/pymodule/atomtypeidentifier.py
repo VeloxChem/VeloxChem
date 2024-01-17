@@ -386,10 +386,12 @@ class AtomTypeIdentifier:
             and each value is another dictionary containing the 'opls' and 'gaff' force field identifiers for the atom.
         """
 
+        self.bad_hydrogen = False
+
         self.atom_types_dict = {}
 
         for atom_number, info in self.atom_info_dict.items():
-
+            
             if info['AtomicSymbol'] == 'C':
 
                 # If this carbon was previously assigned, skip the rest of the loop
@@ -1959,21 +1961,48 @@ class AtomTypeIdentifier:
                 halogen_type = {'opls': 'opls_XXX', 'gaff': 'br'}
                 self.atom_types_dict[
                     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = halogen_type
+                
+                if 'H' in info['ConnectedAtoms']:
+                    hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}
+                    self.atom_types_dict[
+                        f"H{info['ConnectedAtomsNumbers'][info['ConnectedAtoms'].index('H')]}"
+                    ] = hydrogen_type
+                    self.bad_hydrogen = True
 
             elif info['AtomicSymbol'] == 'Cl':
                 halogen_type = {'opls': 'opls_XXX', 'gaff': 'cl'}
                 self.atom_types_dict[
                     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = halogen_type
+                if 'H' in info['ConnectedAtoms']:
+                    hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}
+                    self.atom_types_dict[
+                        f"H{info['ConnectedAtomsNumbers'][info['ConnectedAtoms'].index('H')]}"
+                    ] = hydrogen_type
+                    self.bad_hydrogen = True
+
 
             elif info['AtomicSymbol'] == 'F':
                 halogen_type = {'opls': 'opls_XXX', 'gaff': 'f'}
                 self.atom_types_dict[
                     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = halogen_type
+                if 'H' in info['ConnectedAtoms']:
+                    hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}
+                    self.atom_types_dict[
+                        f"H{info['ConnectedAtomsNumbers'][info['ConnectedAtoms'].index('H')]}"
+                    ] = hydrogen_type
+                    self.bad_hydrogen = True
+        
 
             elif info['AtomicSymbol'] == 'I':
                 halogen_type = {'opls': 'opls_XXX', 'gaff': 'i'}
                 self.atom_types_dict[
                     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = halogen_type
+                if 'H' in info['ConnectedAtoms']:
+                    hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}
+                    self.atom_types_dict[
+                        f"H{info['ConnectedAtomsNumbers'][info['ConnectedAtoms'].index('H')]}"
+                    ] = hydrogen_type
+                    self.bad_hydrogen = True
 
             # Decision for Transition Metals
 
@@ -1988,6 +2017,13 @@ class AtomTypeIdentifier:
                 }
                 self.atom_types_dict[
                     f"{info['AtomicSymbol']}{info['AtomNumber']}"] = atom_type
+                
+                if 'H' in info['ConnectedAtoms']:
+                    hydrogen_type = {'opls': 'opls_h_x', 'gaff': 'h_x'}
+                    self.atom_types_dict[
+                        f"H{info['ConnectedAtomsNumbers'][info['ConnectedAtoms'].index('H')]}"
+                    ] = hydrogen_type
+                    self.bad_hydrogen = True
 
             else:
                 # Else for the cases falling off the decision tree
@@ -2237,6 +2273,9 @@ class AtomTypeIdentifier:
                 print(f"Cycle size {size}: Non-pure Aromatic Cycle")
             elif aromaticity == "pure_aromatic":
                 print(f"Cycle size {size}: Pure Aromatic Cycle")
+        
+        if self.bad_hydrogen:
+            print('\nWarning: Hydrogen type not defined in GAFF')
 
         return self.gaff_atom_types
 
