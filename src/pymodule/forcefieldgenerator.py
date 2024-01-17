@@ -112,9 +112,7 @@ class ForceFieldGenerator:
         self.comb_rule = 2
         self.nbfunc = 1
         self.nrexcl = 3
-        # https://github.com/openmm/openmmforcefields/blob/master/amber/gaff/dat/gaff-2.11.dat
-        # https://raw.githubusercontent.com/openmm/openmmforcefields/master/amber/gaff/dat/gaff-2.11.dat
-        self.force_field_data = 'gaff-2.11.dat'
+        self.force_field_data = None
         self.force_field_data_extension = None
 
         # number of rounds for fitting dihedral potentials
@@ -194,25 +192,19 @@ class ForceFieldGenerator:
         if 'filename' in ffg_dict and 'molecule_name' not in ffg_dict:
             self.molecule_name = ffg_dict['filename']
 
-        force_field_file = Path(
-            self.molecule_name).parent / self.force_field_data
-        if force_field_file.is_file():
-            self.force_field_data = str(force_field_file)
-
-        assert_msg_critical(
-            Path(self.force_field_data).is_file(),
-            f'ForceFieldGenerator: force field file {self.force_field_data} ' +
-            'does not exist')
-
-        assert_msg_critical(
-            'gaff' in Path(self.force_field_data).name.lower(),
-            'ForceFieldGenerator: unrecognized force field ' +
-            f'{self.force_field_data}. Only GAFF is supported.')
-
-        if self.force_field_data_extension is None:
-            ff_file = Path(self.force_field_data)
-            self.force_field_data_extension = str(
-                ff_file.parent / (ff_file.stem + '_extension.dat'))
+        if self.force_field_data is not None:
+            force_field_file = Path(
+                self.molecule_name).parent / self.force_field_data
+            if force_field_file.is_file():
+                self.force_field_data = str(force_field_file)
+                assert_msg_critical(
+                    'gaff' in Path(self.force_field_data).name.lower(),
+                    'ForceFieldGenerator: unrecognized force field ' +
+                    f'{self.force_field_data}. Only GAFF is supported.')
+                if self.force_field_data_extension is None:
+                    ff_file = Path(self.force_field_data)
+                    self.force_field_data_extension = str(
+                        ff_file.parent / (ff_file.stem + '_extension.dat'))
 
         if resp_dict is None:
             resp_dict = {}
@@ -506,6 +498,25 @@ class ForceFieldGenerator:
             f_top.write('; Compound        nmols\n')
             f_top.write('{:>10}{:9}\n'.format(mol_name, 1))
 
+    @staticmethod
+    def get_gaff_data_lines():
+        """
+        Reads GAFF data lines into a list.
+        """
+
+        from urllib.request import urlopen
+
+        openmmff_commit = 'b3e92a373c80bfb8fd791e4a72beafc035fcc722'
+        gaff_url = (
+            'https://raw.githubusercontent.com/openmm/openmmforcefields/' +
+            openmmff_commit + '/openmmforcefields/ffxml/amber/gaff/dat/' +
+            'gaff-2.11.dat')
+
+        with urlopen(gaff_url) as f_gaff:
+            content = f_gaff.read().decode('utf-8')
+
+        return content.splitlines()
+
     def write_original_itp(self, itp_file, atom_types, charges):
         """
         Writes an itp file with the original parameters.
@@ -589,10 +600,14 @@ class ForceFieldGenerator:
                 pairs_14.add((i, l))
         pairs_14 = sorted(list(pairs_14))
 
-        with open(self.force_field_data, 'r') as ff_data:
-            ff_data_lines = ff_data.readlines()
+        if self.force_field_data is None:
+            ff_data_lines = self.get_gaff_data_lines()
+        else:
+            with open(self.force_field_data, 'r') as ff_data:
+                ff_data_lines = ff_data.readlines()
 
-        if Path(self.force_field_data_extension).is_file():
+        if (self.force_field_data_extension is not None and
+                Path(self.force_field_data_extension).is_file()):
             with open(self.force_field_data_extension, 'r') as ff_extension:
                 ff_data_lines += ff_extension.readlines()
 

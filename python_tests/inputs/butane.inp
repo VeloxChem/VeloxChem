@@ -8,7 +8,6 @@ basis: 6-31G*
 
 @force field
 scan_xyz_files: butane-scan-final.xyz
-force_field_data: gaff-2.11.dat
 @end
 
 @resp charges
