@@ -9,7 +9,7 @@ from veloxchem.respchargesdriver import RespChargesDriver
 
 class TestRespCharges:
 
-    def run_resp(self, inpfile, ref_charges, inp_chg_dict, flag):
+    def run_resp(self, inpfile, ref_charges, inp_chg_dict, chg_type):
 
         task = MpiTask([inpfile, None])
         task.input_dict['scf']['checkpoint_file'] = None
@@ -17,7 +17,8 @@ class TestRespCharges:
         scf_drv = ScfRestrictedDriver(task.mpi_comm, task.ostream)
         scf_drv.update_settings(task.input_dict['scf'],
                                 task.input_dict['method_settings'])
-        scf_drv.compute(task.molecule, task.ao_basis, task.min_basis)
+        scf_results = scf_drv.compute(task.molecule, task.ao_basis,
+                                      task.min_basis)
 
         chg_dict = {'filename': task.input_dict['filename']}
         chg_dict.update(inp_chg_dict)
@@ -25,7 +26,8 @@ class TestRespCharges:
         chg_drv = RespChargesDriver(task.mpi_comm, task.ostream)
         chg_drv.update_settings(chg_dict, task.input_dict['method_settings'])
 
-        q_fit = chg_drv.compute(task.molecule, task.ao_basis, flag.lower())
+        q_fit = chg_drv.compute(task.molecule, task.ao_basis, scf_results,
+                                chg_type.lower())
 
         if is_mpi_master(task.mpi_comm):
             assert np.max(np.abs(q_fit - ref_charges)) < 1.0e-5

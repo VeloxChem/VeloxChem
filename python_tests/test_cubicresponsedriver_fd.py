@@ -46,10 +46,10 @@ class TestCrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
-            'd_components': d,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
+            'd_component': d,
             'b_frequencies': [wb],
             'c_frequencies': [wc],
             'd_frequencies': [wd],
@@ -58,16 +58,16 @@ class TestCrfFD:
         crf_result = crf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            gamma = -crf_result[('gamma', wb, wc, wd)]
+            gamma = -crf_result[('crf', wb, wc, wd)]
 
         # permutation test
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': d,
-            'd_components': c,
+            'a_component': a,
+            'b_component': b,
+            'c_component': d,
+            'd_component': c,
             'b_frequencies': [wb],
             'c_frequencies': [wd],
             'd_frequencies': [wc],
@@ -76,7 +76,7 @@ class TestCrfFD:
         crf_result = crf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            gamma_perm = -crf_result[('gamma', wb, wd, wc)]
+            gamma_perm = -crf_result[('crf', wb, wd, wc)]
             assert abs(gamma.real - gamma_perm.real) < 1.0e-6
             assert abs(gamma.imag - gamma_perm.imag) < 1.0e-6
 
@@ -84,10 +84,10 @@ class TestCrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
-            'd_components': d,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
+            'd_component': d,
             'b_frequencies': [-wb],
             'c_frequencies': [-wc],
             'd_frequencies': [-wd],
@@ -96,7 +96,7 @@ class TestCrfFD:
         crf_result = crf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            gamma_conj = -crf_result[('gamma', -wb, -wc, -wd)]
+            gamma_conj = -crf_result[('crf', -wb, -wc, -wd)]
             assert abs(gamma.real - gamma_conj.real) < 1.0e-6
             assert abs(gamma.imag + gamma_conj.imag) < 1.0e-6
 
@@ -104,10 +104,10 @@ class TestCrfFD:
 
         rsp_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
-            'd_components': d,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
+            'd_component': d,
             'b_frequencies': [wb],
             'c_frequencies': [wc],
             'd_frequencies': [0],
@@ -117,14 +117,14 @@ class TestCrfFD:
         crf_result = crf.compute(molecule, basis, scf_result)
 
         if is_mpi_master():
-            gamma_0 = -crf_result[('gamma', wb, wc, 0)].real
-            assert abs(-crf_result[('gamma', wb, wc, 0)].imag) < 1.0e-6
+            gamma_0 = -crf_result[('crf', wb, wc, 0)].real
+            assert abs(-crf_result[('crf', wb, wc, 0)].imag) < 1.0e-6
 
         qrf_settings = {
             'conv_thresh': rsp_conv_thresh,
-            'a_components': a,
-            'b_components': b,
-            'c_components': c,
+            'a_component': a,
+            'b_component': b,
+            'c_component': c,
             'b_frequencies': [wb],
             'c_frequencies': [wc],
             'damping': 0,
@@ -160,8 +160,8 @@ class TestCrfFD:
         quad_result_minus = qrf_minus.compute(molecule, basis, scf_result_minus)
 
         if is_mpi_master():
-            beta_plus = -quad_result_plus[(wb, wc)]
-            beta_minus = -quad_result_minus[(wb, wc)]
+            beta_plus = -quad_result_plus[('qrf', wb, wc)]
+            beta_minus = -quad_result_minus[('qrf', wb, wc)]
             assert abs(beta_plus.imag) < 1.0e-6
             assert abs(beta_minus.imag) < 1.0e-6
 

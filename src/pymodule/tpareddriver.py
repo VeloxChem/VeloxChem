@@ -968,9 +968,7 @@ class TpaReducedDriver(TpaDriver):
 
         self.ostream.print_blank()
 
-        w_str = 'The Isotropic Average gamma Tensor and Its'
-        self.ostream.print_header(w_str)
-        w_str = 'Isotropic Contributions at Given Frequencies'
+        w_str = 'Isotropic Average gamma Tensor at Given Frequencies'
         self.ostream.print_header(w_str)
         self.ostream.print_header('=' * (len(w_str) + 2))
         self.ostream.print_blank()
@@ -985,19 +983,16 @@ class TpaReducedDriver(TpaDriver):
 
         freqs = rsp_results['frequencies']
 
-        for w in freqs:
-            title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
-                'Component', 'Frequency', 'Real', 'Imaginary')
-            width = len(title)
-            self.ostream.print_header(title.ljust(width))
-            self.ostream.print_header(('-' * len(title)).ljust(width))
+        title = '{:<9s} {:>12s} {:>20s} {:>21s}'.format(
+            '', 'Frequency', 'Real', 'Imaginary')
+        width = len(title)
+        self.ostream.print_header(title.ljust(width))
+        self.ostream.print_header(('-' * len(title)).ljust(width))
 
-            self._print_component('T3', w, t3_dict[w, -w, w], width)
-            self._print_component('X2', w, NaX2Nyz[w, -w, w], width)
-            self._print_component('A2', w, NxA2Nyz[w, -w, w], width)
+        for w in freqs:
             self._print_component('gamma', w, gamma[w, -w, w], width)
 
-            self.ostream.print_blank()
+        self.ostream.print_blank()
 
         title = 'Reference: '
         title += 'K. Ahmadzadeh, M. Scott, M. Brand, O. Vahtras, X. Li, '

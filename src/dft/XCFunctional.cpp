@@ -3065,7 +3065,7 @@ CXCFunctional::getFunctionalPointerToMetaGgaComponent() const
     return nullptr;
 }
 
-const int32_t
+int32_t
 CXCFunctional::getDimensionOfDerivatives() const
 {
     auto indices_and_counts = _getIndicesAndCountsOfDerivatives();
@@ -3093,4 +3093,52 @@ CXCFunctional::getDimensionOfDerivatives() const
     }
 
     return 0;
+}
+
+std::string
+CXCFunctional::getLibxcVersion() const
+{
+    std::stringstream ss;
+
+    ss << xc_version_string();
+
+    return ss.str();
+}
+
+std::string
+CXCFunctional::getLibxcReference() const
+{
+    std::stringstream ss;
+
+    ss << xc_reference();
+
+    return ss.str();
+}
+
+std::vector<std::string>
+CXCFunctional::getFunctionalReference() const
+{
+    std::vector<std::string> func_ref;
+
+    for (const auto& xccomp : _components)
+    {
+        auto funcptr = xccomp.getFunctionalPointer();
+
+        auto info = funcptr->info;
+
+        for (int i = 0; i < XC_MAX_REFERENCES; i++)
+        {
+            auto ref_ptr = xc_func_info_get_references(funcptr->info, i);
+
+            if (ref_ptr == NULL) continue;
+
+            std::stringstream ss;
+
+            ss << xc_func_reference_get_ref(ref_ptr);
+
+            func_ref.push_back(ss.str());
+        }
+    }
+
+    return func_ref;
 }

@@ -59,9 +59,9 @@ class QuadraticResponseDriver(NonlinearSolver):
         - damping: The damping parameter.
         - conv_thresh: The convergence threshold for the solver.
         - max_iter: The maximum number of solver iterations.
-        - a_components: Cartesian components of the A operator.
-        - b_components: Cartesian components of the B operator.
-        - c_components: Cartesian components of the C operator.
+        - a_component: Cartesian component of the A operator.
+        - b_component: Cartesian component of the B operator.
+        - c_component: Cartesian component of the C operator.
     """
 
     def __init__(self, comm=None, ostream=None):
@@ -86,18 +86,22 @@ class QuadraticResponseDriver(NonlinearSolver):
         self.comp = None
         self.damping = 1000.0 / hartree_in_wavenumber()
 
-        self.a_components = 'z'
-        self.b_components = 'z'
-        self.c_components = 'z'
+        self.a_operator = 'electric dipole'
+        self.b_operator = 'electric dipole'
+        self.c_operator = 'electric dipole'
+
+        self.a_component = None
+        self.b_component = None
+        self.c_component = None
 
         # input keywords
         self._input_keywords['response'].update({
             'b_frequencies': ('seq_range', 'B frequencies'),
             'c_frequencies': ('seq_range', 'C frequencies'),
             'damping': ('float', 'damping parameter'),
-            'a_components': ('str_lower', 'Cartesian components of A operator'),
-            'b_components': ('str_lower', 'Cartesian components of B operator'),
-            'c_components': ('str_lower', 'Cartesian components of C operator'),
+            'a_component': ('str_lower', 'Cartesian component of A operator'),
+            'b_component': ('str_lower', 'Cartesian component of B operator'),
+            'c_component': ('str_lower', 'Cartesian component of C operator'),
         })
 
     def update_settings(self, rsp_dict, method_dict=None):
@@ -129,6 +133,29 @@ class QuadraticResponseDriver(NonlinearSolver):
         :return:
               A dictonary containing the E[3], X[2], A[2] contractions
         """
+
+        # for backward compatibility
+        if self.a_component is None and hasattr(self, 'a_components'):
+            self.a_component = self.a_components
+
+        if self.b_component is None and hasattr(self, 'b_components'):
+            self.b_component = self.b_components
+
+        if self.c_component is None and hasattr(self, 'c_components'):
+            self.c_component = self.c_components
+
+        # sanity check
+        assert_msg_critical(
+            self.a_component in ['x', 'y', 'z'],
+            'QuadaticResponseDriver: Undefined or invalid a_component')
+
+        assert_msg_critical(
+            self.b_component in ['x', 'y', 'z'],
+            'QuadaticResponseDriver: Undefined or invalid b_component')
+
+        assert_msg_critical(
+            self.c_component in ['x', 'y', 'z'],
+            'QuadaticResponseDriver: Undefined or invalid c_component')
 
         if self.norm_thresh is None:
             self.norm_thresh = self.conv_thresh * 1.0e-6
@@ -181,16 +208,13 @@ class QuadraticResponseDriver(NonlinearSolver):
 
         operator = 'dipole'
         linear_solver = LinearSolver(self.comm, self.ostream)
-        a_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.a_components,
+        a_grad = linear_solver.get_complex_prop_grad(operator, self.a_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        b_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.b_components,
+        b_grad = linear_solver.get_complex_prop_grad(operator, self.b_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
-        c_grad = linear_solver.get_complex_prop_grad(operator,
-                                                     self.c_components,
+        c_grad = linear_solver.get_complex_prop_grad(operator, self.c_component,
                                                      molecule, ao_basis,
                                                      scf_tensors)
 
@@ -349,9 +373,9 @@ class QuadraticResponseDriver(NonlinearSolver):
 
             if self.rank == mpi_master():
 
-                op_a = X[self.a_components]
-                op_b = X[self.b_components]
-                op_c = X[self.c_components]
+                op_a = X[self.a_component]
+                op_b = X[self.b_component]
+                op_c = X[self.c_component]
 
                 kb = self.complex_lrvec2mat(Nb, nocc, norb)
                 kc = self.complex_lrvec2mat(Nc, nocc, norb)
@@ -376,25 +400,21 @@ class QuadraticResponseDriver(NonlinearSolver):
                 self.ostream.print_blank()
                 w_str = 'Quadratic response function: '
                 w_str += '<< {};{},{} >>  ({},{})'.format(
-                    self.a_components, self.b_components, self.c_components,
+                    self.a_component, self.b_component, self.c_component,
                     str(wb), str(wc))
                 self.ostream.print_header(w_str)
                 self.ostream.print_header('=' * (len(w_str) + 2))
                 self.ostream.print_blank()
 
-                title = '{:<9s} {:>20s} {:>21s}'.format('Component', 'Real',
-                                                        'Imaginary')
+                title = '{:<9s} {:>20s} {:>21s}'.format('', 'Real', 'Imaginary')
                 width = len(title)
                 self.ostream.print_header(title.ljust(width))
                 self.ostream.print_header(('-' * len(title)).ljust(width))
-                self._print_component('X2', val_X2, width)
-                self._print_component('A2', val_A2, width)
-                self._print_component('E3', val_E3, width)
-                self._print_component('beta', beta, width)
+                self._print_component('QRF', beta, width)
                 self.ostream.print_blank()
                 self.ostream.flush()
 
-                result[(wb, wc)] = beta
+                result[('qrf', wb, wc)] = beta
 
         profiler.check_memory_usage('End of QRF')
 

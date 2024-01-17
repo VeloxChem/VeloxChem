@@ -41,9 +41,9 @@ class TestQrf:
             'b_frequencies': [0.2],
             'c_frequencies': [0.2],
             'damping': 0.1,
-            'a_components': 'x',
-            'b_components': 'x',
-            'c_components': 'x'
+            'a_component': 'x',
+            'b_component': 'x',
+            'c_component': 'x'
         }
         qrf_drv.update_settings(rsp_settings)
         qrf_result_xxx = qrf_drv.compute(molecule, basis, scf_results)
@@ -53,9 +53,9 @@ class TestQrf:
             'b_frequencies': [0.2],
             'c_frequencies': [0.2],
             'damping': 0.1,
-            'a_components': 'z',
-            'b_components': 'z',
-            'c_components': 'x'
+            'a_component': 'z',
+            'b_component': 'z',
+            'c_component': 'x'
         }
         qrf_drv.update_settings(rsp_settings)
         qrf_result_zzx = qrf_drv.compute(molecule, basis, scf_results)
@@ -65,9 +65,9 @@ class TestQrf:
             'b_frequencies': [0.2],
             'c_frequencies': [0.2],
             'damping': 0.1,
-            'a_components': 'y',
-            'b_components': 'y',
-            'c_components': 'x'
+            'a_component': 'y',
+            'b_component': 'y',
+            'c_component': 'x'
         }
         qrf_drv.update_settings(rsp_settings)
         qrf_result_yyx = qrf_drv.compute(molecule, basis, scf_results)
@@ -76,21 +76,21 @@ class TestQrf:
             thresh = 1.0e-4
 
             # x-component
-            assert abs(qrf_result_xxx[(0.2, 0.2)].real -
+            assert abs(qrf_result_xxx[('qrf', 0.2, 0.2)].real -
                        ref_result['xxx'].real) < thresh
-            assert abs(qrf_result_xxx[(0.2, 0.2)].imag -
+            assert abs(qrf_result_xxx[('qrf', 0.2, 0.2)].imag -
                        ref_result['xxx'].imag) < thresh
 
             # y-component
-            assert abs(qrf_result_yyx[(0.2, 0.2)].real -
+            assert abs(qrf_result_yyx[('qrf', 0.2, 0.2)].real -
                        ref_result['yyx'].real) < thresh
-            assert abs(qrf_result_yyx[(0.2, 0.2)].imag -
+            assert abs(qrf_result_yyx[('qrf', 0.2, 0.2)].imag -
                        ref_result['yyx'].imag) < thresh
 
             # z-component
-            assert abs(qrf_result_zzx[(0.2, 0.2)].real -
+            assert abs(qrf_result_zzx[('qrf', 0.2, 0.2)].real -
                        ref_result['zzx'].real) < thresh
-            assert abs(qrf_result_zzx[(0.2, 0.2)].imag -
+            assert abs(qrf_result_zzx[('qrf', 0.2, 0.2)].imag -
                        ref_result['zzx'].imag) < thresh
 
     def test_qrf(self):

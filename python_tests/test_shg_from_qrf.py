@@ -51,43 +51,43 @@ class TestShgFromQrf:
                 rsp_settings.update({
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
-                    'a_components': a,
-                    'b_components': b,
-                    'c_components': b,
+                    'a_component': a,
+                    'b_component': b,
+                    'c_component': b,
                     'damping': damping,
                 })
                 qrf.update_settings(rsp_settings, method_settings)
                 qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_shg_results[ind] += qrf_results[(w1, w2)]
+                    ref_shg_results[ind] += qrf_results[('qrf', w1, w2)]
 
             for b in components:
                 rsp_settings.update({
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
-                    'a_components': b,
-                    'b_components': a,
-                    'c_components': b,
+                    'a_component': b,
+                    'b_component': a,
+                    'c_component': b,
                     'damping': damping,
                 })
                 qrf.update_settings(rsp_settings, method_settings)
                 qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_shg_results[ind] += qrf_results[(w1, w2)]
+                    ref_shg_results[ind] += qrf_results[('qrf', w1, w2)]
 
             for b in components:
                 rsp_settings.update({
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
-                    'a_components': b,
-                    'b_components': b,
-                    'c_components': a,
+                    'a_component': b,
+                    'b_component': b,
+                    'c_component': a,
                     'damping': damping,
                 })
                 qrf.update_settings(rsp_settings, method_settings)
                 qrf_results = qrf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_shg_results[ind] += qrf_results[(w1, w2)]
+                    ref_shg_results[ind] += qrf_results[('qrf', w1, w2)]
 
         rsp_settings = {
             'frequencies': [w1],

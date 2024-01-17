@@ -100,3 +100,33 @@ def get_default_grid_level(xc_func):
     else:
         assert_msg_critical(
             False, 'get_default_grid_level: Invalid XC functional type')
+
+
+def print_libxc_reference(xcfun_label, ostream):
+    """
+    Prints libxc reference.
+
+    :param ostream:
+        The output stream.
+    """
+
+    if isinstance(xcfun_label, str) and xcfun_label.lower() != 'hf':
+        xcfun = parse_xc_func(xcfun_label)
+        ostream.print_blank()
+
+        valstr = f'The Libxc library (version {xcfun.get_libxc_version()})'
+        valstr += ' was used in DFT calculation. Reference:'
+        ostream.print_header(valstr.ljust(100))
+        valstr = xcfun.get_libxc_reference()
+        ostream.print_header(valstr.ljust(100))
+        ostream.print_blank()
+
+        valstr = f'The {xcfun.get_func_label()} functional was used in DFT'
+        valstr += ' calculation. Reference(s):'
+        ostream.print_header(valstr.ljust(100))
+        printed_refs = []
+        for ref in xcfun.get_functional_reference():
+            if ref not in printed_refs:
+                ostream.print_header(ref.ljust(100))
+                printed_refs.append(ref)
+        ostream.print_blank()

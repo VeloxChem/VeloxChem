@@ -33,7 +33,7 @@
 
 #include "ChemicalElement.hpp"
 #include "LebedevLaikovQuadrature.hpp"
-#include "Log3Quadrature.hpp"
+#include "M4T2Quadrature.hpp"
 #include "MathConst.hpp"
 #include "MolecularGrid.hpp"
 #include "Molecule.hpp"
@@ -203,7 +203,7 @@ CGridDriver::_startHeader(const CMolecule& molecule) const
 
     ss << fstr::format(str, 54, fmt::left) << "\n";
 
-    str.assign("Radial Quadrature   : Log3");
+    str.assign("Radial Quadrature   : M4T2");
 
     ss << fstr::format(str, 54, fmt::left) << "\n";
 
@@ -384,7 +384,7 @@ CGridDriver::_genAtomGridPoints(CMemBlock2D<double>* rawGridPoints,
 
     // generate radial grid points
 
-    CLog3Quadrature rquad(nrpoints, idElemental);
+    CM4T2Quadrature rquad(nrpoints, idElemental);
 
     auto rpoints = rquad.generate();
 

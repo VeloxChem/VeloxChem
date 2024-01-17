@@ -4,6 +4,6 @@ target_sources(utests
     DensityGridTest.cpp
     GridDriverTest.cpp
     LebedevLaikovQuadratureTest.cpp
-    Log3QuadratureTest.cpp
+    M4T2QuadratureTest.cpp
     MolecularGridTest.cpp
   )
