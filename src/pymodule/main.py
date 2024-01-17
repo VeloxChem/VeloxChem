@@ -559,7 +559,7 @@ def main():
         else:
             prop_type = None
 
-        if prop_type in ['absorption', 'uv-vis', 'ecd', 'polarizability_gradient']: 
+        if prop_type in ['absorption', 'uv-vis', 'ecd']: 
 
             if 'orbital_response' in task.input_dict:
                 orbrsp_dict = task.input_dict['orbital_response']
@@ -614,8 +614,7 @@ def main():
             task.ostream.print_blank()
             info_msg = 'The excited state derivatives '
             info_msg += 'can only be computed if the response '
-            info_msg += 'property is "absorption", "uv-vis", "ecd",'
-            info_msg += 'or "polarizability gradient"'
+            info_msg += 'property is "absorption", "uv-vis", or "ecd"'
             task.ostream.print_info(info_msg)
             info_msg = 'Computation of gradient/Hessian will be skipped.'
             task.ostream.print_info(info_msg)
