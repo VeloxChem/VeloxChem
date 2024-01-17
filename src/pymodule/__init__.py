@@ -70,6 +70,7 @@ from .veloxchemlib import molorb
 from .veloxchemlib import moints
 
 # Python classes
+from .atomtypeidentifier import AtomTypeIdentifier
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .molecule import Molecule
@@ -125,8 +126,6 @@ from .hessiandriver import HessianDriver
 from .scfhessiandriver import ScfHessianDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .numerovdriver import NumerovDriver
-
-from .atomtypeidentifier import AtomTypeIdentifier
 
 # for backward compatibility
 from .veloxchemlib import XCIntegrator as XCNewIntegrator

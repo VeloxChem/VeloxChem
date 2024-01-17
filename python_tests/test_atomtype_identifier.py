@@ -1,18 +1,21 @@
 from veloxchem.atomtypeidentifier import AtomTypeIdentifier
 from veloxchem.molecule import Molecule
 
+
 class TestAtomTypeIdentifier:
 
     def run_atomtypeidentifier(self, xyz_string, expected_atomtypes):
 
         atomtypeidentifier = AtomTypeIdentifier()
-        molecule = Molecule.read_xyz_string(xyz_string)
+        atomtypeidentifier.ostream.mute()
 
+        molecule = Molecule.read_xyz_string(xyz_string)
         atomtypes = atomtypeidentifier.generate_gaff_atomtypes(molecule)
 
         assert atomtypes == expected_atomtypes
 
     def test_atomtypeidentifier_1(self):
+
         mol1 = """11
         (1E)-1-bromo-3-isocyanato-1-propene
         Br -2.267871 -0.291954 -0.040277
@@ -27,8 +30,10 @@ class TestAtomTypeIdentifier:
         H 0.279107 0.508641 -1.406687
         H -0.597210 0.737527 1.537844
         """
-        expected_atomtypes1 = ['br', 'o', 'n2', 'c3', 'c2', 'c2', 'c1', 'h1', 'h1', 'ha', 'h4']
-        
+        expected_atomtypes1 = [
+            'br', 'o', 'n2', 'c3', 'c2', 'c2', 'c1', 'h1', 'h1', 'ha', 'h4'
+        ]
+
         self.run_atomtypeidentifier(mol1, expected_atomtypes1)
 
     def test_atomtypeidentifier_2(self):
@@ -52,7 +57,10 @@ class TestAtomTypeIdentifier:
         H 0.956630 -1.813429 -1.257842
         H -0.754138 -2.423213 -1.266843
         """
-        expected_atomtypes2 = ['cx', 'cx', 'cx', 'cx', 'cx', 'cx', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc']
+        expected_atomtypes2 = [
+            'cx', 'cx', 'cx', 'cx', 'cx', 'cx', 'hc', 'hc', 'hc', 'hc', 'hc',
+            'hc', 'hc', 'hc', 'hc', 'hc'
+        ]
 
         self.run_atomtypeidentifier(mol2, expected_atomtypes2)
 
@@ -128,11 +136,15 @@ class TestAtomTypeIdentifier:
         H 2.101884 1.357766 -0.645531
         C 1.489213 0.820035 0.081422
         """
-        expected_atomtypes6 = ['c2', 'ha', 'c2', 'hc', 'hc', 'hc', 'c3', 'hc', 'hc', 'c5', 'hc', 'hc', 'c5', 'hc', 'hc', 'c5']
+        expected_atomtypes6 = [
+            'c2', 'ha', 'c2', 'hc', 'hc', 'hc', 'c3', 'hc', 'hc', 'c5', 'hc',
+            'hc', 'c5', 'hc', 'hc', 'c5'
+        ]
 
         self.run_atomtypeidentifier(mol6, expected_atomtypes6)
 
     def test_atomtypeidentifier_7(self):
+
         mol7 = """10
         2-bromoethylisocyanate
         Br -1.348575 -0.496729 0.033420
@@ -146,11 +158,14 @@ class TestAtomTypeIdentifier:
         H -0.560282 1.378536 -1.411868
         H -1.408068 1.998180 0.026210
         """
-        expected_atomtypes7 = ['br', 'o', 'n2', 'c3', 'c3', 'c1', 'h1', 'h1', 'h1', 'h1']
+        expected_atomtypes7 = [
+            'br', 'o', 'n2', 'c3', 'c3', 'c1', 'h1', 'h1', 'h1', 'h1'
+        ]
 
         self.run_atomtypeidentifier(mol7, expected_atomtypes7)
 
     def test_atomtypeidentifier_8(self):
+
         mol8 = """12
         2-pyridinol
         N -1.176140 0.295001 0.000000
@@ -166,11 +181,15 @@ class TestAtomTypeIdentifier:
         H -2.168354 -1.506394 0.000000
         H -0.919060 2.536214 0.000000
         """
-        expected_atomtypes8 = ['nb', 'ca', 'ca', 'ca', 'ca', 'ca', 'oh', 'ha', 'ha', 'ha', 'h4', 'ho']
+        expected_atomtypes8 = [
+            'nb', 'ca', 'ca', 'ca', 'ca', 'ca', 'oh', 'ha', 'ha', 'ha', 'h4',
+            'ho'
+        ]
 
         self.run_atomtypeidentifier(mol8, expected_atomtypes8)
 
     def test_atomtypeidentifier_9(self):
+
         mol9 = """19
         3-methyl-1H-indole
         C 2.400164 0.371989 0.000000
@@ -193,11 +212,15 @@ class TestAtomTypeIdentifier:
         H -2.957161 2.300824 0.000000
         H -1.628625 -2.348693 0.000000
         """
-        expected_atomtypes9 = ['ca', 'ca', 'ca', 'ca', 'cc', 'ca', 'cd', 'ca', 'c3', 'na', 'ha', 'ha', 'ha', 'ha', 'h4', 'hc', 'hc', 'hc', 'hn']
+        expected_atomtypes9 = [
+            'ca', 'ca', 'ca', 'ca', 'cc', 'ca', 'cd', 'ca', 'c3', 'na', 'ha',
+            'ha', 'ha', 'ha', 'h4', 'hc', 'hc', 'hc', 'hn'
+        ]
 
         self.run_atomtypeidentifier(mol9, expected_atomtypes9)
 
     def test_atomtypeidentifier_10(self):
+
         mol10 = """22
         4-propylphenol
         C -0.358008 -1.192497 -0.280254
@@ -223,12 +246,9 @@ class TestAtomTypeIdentifier:
         H 2.420111 -0.860563 1.224708
         H -4.105938 -0.798727 0.458901
         """
-        expected_atomtypes10 = ['ca', 'ca', 'ca', 'ca', 'ca', 'ca', 'c3', 'c3', 'c3', 'oh', 'ha', 'ha', 'ha', 'ha', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'ho']
+        expected_atomtypes10 = [
+            'ca', 'ca', 'ca', 'ca', 'ca', 'ca', 'c3', 'c3', 'c3', 'oh', 'ha',
+            'ha', 'ha', 'ha', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'hc', 'ho'
+        ]
 
         self.run_atomtypeidentifier(mol10, expected_atomtypes10)
-
-
-
-
-
-
