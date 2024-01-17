@@ -26,7 +26,6 @@
 from mpi4py import MPI
 import numpy as np
 import networkx as nx
-import matplotlib.pyplot as plt
 import sys
 import re
 
@@ -147,6 +146,11 @@ class AtomTypeIdentifier:
         """
         Plots a 3D connectivity map of the molecule using Matplotlib.
         """
+
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            raise ImportError('Unable to import Matplotlib')
 
         fig = plt.figure(figsize=(8, 8))
         ax = fig.add_subplot(111, projection='3d')
