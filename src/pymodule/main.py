@@ -317,7 +317,7 @@ def main():
         'hf', 'rhf', 'uhf', 'rohf', 'scf', 'uscf', 'roscf', 'wavefunction',
         'wave function', 'mp2', 'ump2', 'romp2', 'gradient', 'hessian',
         'optimize', 'response', 'pulses', 'visualization', 'loprop',
-        'frequencies', 'freq', 'cphf', 'polarizability_gradient'
+        'vibrational', 'freq', 'cphf', 'polarizability_gradient'
     ]
 
     if task_type == 'visualization' and 'visualization' in task.input_dict:
@@ -486,15 +486,28 @@ def main():
 
     # Ground state Hessian / Vibrational analysis
 
-    if task_type in ['freq', 'frequencies']:
+    #if task_type in ['freq', 'frequencies']:
+    if task_type in ['vib', 'vibrational']:
 
-        if 'frequencies' in task.input_dict:
-            freq_dict = task.input_dict['frequencies']
-        else:
-            freq_dict = {}
+        #if 'frequencies' in task.input_dict:
+        #    freq_dict = task.input_dict['frequencies']
+        #else:
+        #    freq_dict = {}
+
+        vib_dict = (task.input_dict['vibrational']
+                    if 'vibrational' in task.input_dict else {})
+        polgrad_dict = (task.input_dict['polarizability_gradient'] 
+                        if 'polarizability_gradient' in task.input_dict else {})
+        orbrsp_dict = (task.input_dict['orbital_response']
+                       if 'orbital_response' in task.input_dict else {})
+        rsp_dict = (dict(task.input_dict['response'])
+                    if 'response' in task.input_dict else {})
 
         hessian_drv = ScfHessianDriver(task.mpi_comm, task.ostream)
-        hessian_drv.update_settings(method_dict, freq_dict)
+        #hessian_drv.update_settings(method_dict, freq_dict)
+        hessian_drv.update_settings(method_dict, hess_dict = vib_dict, 
+                                    cphf_dict = orbrsp_dict, rsp_dict = rsp_dict,
+                                    polgrad_dict = polgrad_dict)
         hessian_drv.compute(task.molecule, task.ao_basis, scf_drv)
         # TODO: add output file name for geomeTRIC vibrational analysis
         hessian_drv.vibrational_analysis(task.molecule, task.ao_basis)
@@ -586,8 +599,8 @@ def main():
                                      # it works for TDA, but not RPA
 
             # Excited state Hessian and vibrational analysis
-            if 'frequencies' in task.input_dict:
-                freq_dict = task.input_dict['frequencies']
+            if 'vibrational' in task.input_dict:
+                freq_dict = task.input_dict['vibrational']
                 tdhfhessian_drv = TdhfHessianDriver(scf_drv, 
                                                     task.mpi_comm,
                                                     task.ostream)
