@@ -1130,3 +1130,88 @@ class CphfSolver(LinearSolver):
 
         self.ostream.print_blank()
         self.ostream.flush()
+
+    # TODO: remove once native integral derivatives are ready.
+    # See related TODO in ScfHessianDriver.
+    def furche_comp_lr_fock(self,
+                      fock,
+                      dens,
+                      molecule,
+                      basis,
+                      eri_dict,
+                      dft_dict,
+                      pe_dict,
+                      profiler=None):
+        """
+        Computes Fock/Fxc matrix (2e part) requires for the Hessian.
+
+        :param fock:
+            The Fock matrix (2e part).
+        :param dens:
+            The density matrix.
+        :param molecule:
+            The molecule.
+        :param basis:
+            The basis set.
+        :param eri_dict:
+            The dictionary containing ERI information.
+        :param dft_dict:
+            The dictionary containing DFT information.
+        :param pe_dict:
+            The dictionary containing PE information.
+        :param profiler:
+            The profiler.
+        """
+
+        screening = eri_dict['screening']
+
+        molgrid = dft_dict['molgrid']
+        gs_density = dft_dict['gs_density']
+
+        V_es = pe_dict['V_es']
+        pe_drv = pe_dict['pe_drv']
+
+        # set flags for Fock matrices
+
+        fock_flag = fockmat.rgenjk
+        if self._dft:
+            if self.xcfun.is_hybrid():
+                fock_flag = fockmat.rgenjkx
+                fact_xc = self.xcfun.get_frac_exact_exchange()
+                for i in range(fock.number_of_fock_matrices()):
+                    fock.set_scale_factor(fact_xc, i)
+            else:
+                fock_flag = fockmat.rgenj
+        for i in range(fock.number_of_fock_matrices()):
+            fock.set_fock_type(fock_flag, i)
+
+        t0 = tm.time()
+        eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
+        eri_drv.compute(fock, dens, molecule, basis, screening)
+        if profiler is not None:
+            profiler.add_timing_info('FockERI', tm.time() - t0)
+
+        if self._dft:
+            t0 = tm.time()
+            if not self.xcfun.is_hybrid():
+                for ifock in range(fock.number_of_fock_matrices()):
+                    fock.scale(2.0, ifock)
+
+            xc_drv = XCIntegrator(self.comm)
+            xc_drv.integrate_fxc_fock(fock, molecule, basis, dens,
+                                      gs_density, molgrid,
+                                      self.xcfun.get_func_label())
+
+            if profiler is not None:
+                profiler.add_timing_info('FockXC', tm.time() - t0)
+
+        if self._pe:
+            t0 = tm.time()
+            pe_drv.V_es = V_es.copy()
+            for ifock in range(fock.number_of_fock_matrices()):
+                dm = dens.alpha_to_numpy(ifock) + dens.beta_to_numpy(ifock)
+                e_pe, V_pe = pe_drv.get_pe_contribution(dm, elec_only=True)
+                if self.rank == mpi_master():
+                    fock.add_matrix(DenseMatrix(V_pe), ifock)
+            if profiler is not None:
+                profiler.add_timing_info('FockPE', tm.time() - t0)

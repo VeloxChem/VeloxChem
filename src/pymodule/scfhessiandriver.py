@@ -828,9 +828,10 @@ class ScfHessianDriver(HessianDriver):
                     P_P_Six_fock_ao = AOFockMatrix(P_P_Six_dm_ao)
 
                     # TODO: remove commented out code
-                    cphf_solver._comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao,
+                    cphf_solver.furche_comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao,
                                               molecule, ao_basis, eri_dict,
                                               dft_dict, pe_dict, profiler)
+
 
                     # Convert the auxiliary Fock matrices to numpy arrays 
                     # for further use
