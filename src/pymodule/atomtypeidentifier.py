@@ -124,7 +124,7 @@ class AtomTypeIdentifier:
         """
 
         num_atoms = len(self.coordinates)
-        self.connectivity_matrix = np.zeros((num_atoms, num_atoms), dtype=int)
+        self.connectivity_matrix = np.zeros((num_atoms, num_atoms), dtype='int32')
         self.distance_matrix = np.zeros((num_atoms, num_atoms))
 
         for i in range(num_atoms):

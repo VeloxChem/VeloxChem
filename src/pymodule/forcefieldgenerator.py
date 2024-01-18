@@ -537,7 +537,11 @@ class ForceFieldGenerator:
 
         coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
-        connected = self.get_connectivity()
+
+        atomtypeidentifier = AtomTypeIdentifier()
+        atomtypeidentifier.ostream.mute()
+        atom_types = atomtypeidentifier.generate_gaff_atomtypes(self.molecule)
+        connectivity_matrix = np.copy(atomtypeidentifier.connectivity_matrix)
 
         # preparing atom types and atom names
 
@@ -556,7 +560,7 @@ class ForceFieldGenerator:
         bond_indices = set()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
-                if connected[i, j]:
+                if connectivity_matrix[i, j] == 1:
                     bond_indices.add((i, j))
         bond_indices = sorted(list(bond_indices))
 
@@ -565,10 +569,10 @@ class ForceFieldGenerator:
             for k in range(n_atoms):
                 if k in [i, j]:
                     continue
-                if connected[j, k]:
+                if connectivity_matrix[j, k] == 1:
                     inds = (i, j, k) if i < k else (k, j, i)
                     angle_indices.add(inds)
-                if connected[k, i]:
+                if connectivity_matrix[k, i] == 1:
                     inds = (k, i, j) if k < j else (j, i, k)
                     angle_indices.add(inds)
         angle_indices = sorted(list(angle_indices))
@@ -578,10 +582,10 @@ class ForceFieldGenerator:
             for l in range(n_atoms):
                 if l in [i, j, k]:
                     continue
-                if connected[k, l]:
+                if connectivity_matrix[k, l] == 1:
                     inds = (i, j, k, l) if i < l else (l, k, j, i)
                     dihedral_indices.add(inds)
-                if connected[l, i]:
+                if connectivity_matrix[l, i] == 1:
                     inds = (l, i, j, k) if l < k else (k, j, i, l)
                     dihedral_indices.add(inds)
         dihedral_indices = sorted(list(dihedral_indices))
@@ -873,7 +877,7 @@ class ForceFieldGenerator:
                     continue
 
                 for l in range(n_atoms):
-                    if (l in [i, j, k]) or (not connected[l, j]):
+                    if (l in [i, j, k]) or (connectivity_matrix[l, j] != 1):
                         continue
                     at_4 = atom_types[l]
 
