@@ -198,6 +198,7 @@ class ScfHessianDriver(HessianDriver):
             self.ostream.print_blank()
             self.ostream.flush()
 
+    # TODO: check if compute numerical works with MPI
     def compute_numerical(self, molecule, ao_basis, scf_drv):
         """
         Performs the calculation of a numerical Hessian based only
@@ -450,11 +451,6 @@ class ScfHessianDriver(HessianDriver):
                 # (ei+ej)S^\chi_ij
                 orben_ovlp_deriv_oo = np.einsum('ij,xyij->xyij', eoo,
                                                ovlp_deriv_oo)
-                #hessian_first_order_derivatives = self.compute_pople(molecule,
-                #                    ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov,
-                #                    fock_uij, fock_deriv_oo,
-                #                    orben_ovlp_deriv_oo,
-                #                    perturbed_density, scf_drv, profiler)
             else:
                 cphf_rhs = cphf_solution_dict['cphf_rhs'].reshape(natm, 3,
                                                                   nocc, nvir)
@@ -462,6 +458,40 @@ class ScfHessianDriver(HessianDriver):
                 #                    ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
                 #                    cphf_ov, scf_drv, profiler)
 
+        else:
+            ovlp_deriv_oo = None
+            cphf_ov = None
+            perturbed_density = None
+
+            if self.pople_hessian:
+                fock_uij = None
+                fock_deriv_ao = None
+                fock_deriv_oo = None
+                orben_ovlp_deriv_oo = None
+            else:
+                cphf_rhs = None
+
+        ovlp_deriv_oo = self.comm.bcast(ovlp_deriv_oo, root=mpi_master())
+        cphf_ov = self.comm.bcast(cphf_ov, root=mpi_master())
+        perturbed_density = self.comm.bcast(perturbed_density,
+                                            root=mpi_master())
+
+        if self.pople_hessian:
+            fock_uij = self.comm.bcast(fock_uij, root=mpi_master())
+            fock_deriv_ao = self.comm.bcast(fock_deriv_ao, root=mpi_master())
+            fock_deriv_oo = self.comm.bcast(fock_deriv_oo, root=mpi_master())
+            orben_ovlp_deriv_oo = self.comm.bcast(orben_ovlp_deriv_oo,
+                                                 root=mpi_master())
+            hessian_first_order_derivatives = self.compute_pople(molecule,
+                                    ao_basis, -0.5 * ovlp_deriv_oo, cphf_ov,
+                                    fock_uij, fock_deriv_oo,
+                                    orben_ovlp_deriv_oo,
+                                    perturbed_density, scf_drv, profiler)
+        else:
+            cphf_rhs = self.comm.bcast(cphf_rhs, root=mpi_master())
+            hessian_first_order_derivatives = self.compute_furche(molecule,
+                                    ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
+                                    cphf_ov, scf_drv, profiler)
         ## amount of exact exchange
         frac_K = 1.0
 
@@ -609,78 +639,84 @@ class ScfHessianDriver(HessianDriver):
 
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
-        mo = scf_drv.scf_tensors['C']
-        mo_occ = mo[:, :nocc].copy()
-        mo_vir = mo[:, nocc:].copy()
-        nao = mo.shape[0]
-        density = scf_drv.scf_tensors['D_alpha']
-        mo_energies = scf_drv.scf_tensors['E']
-        eocc = mo_energies[:nocc]
-        eo_diag = np.diag(eocc)
-        epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
 
-        # Construct the perturbed density matrix, and perturbed omega
-        # TODO: consider if using the transpose makes the
-        # computation faster; consider using cphf coefficients in AO
-        # to compute the perturbed density matrix.
-        orben_perturbed_density = ( np.einsum('i,mj,xyij,ni->xymn',
-                                            eocc, mo_occ, cphf_oo, mo_occ)
-                                  + np.einsum('i,mi,xyij,nj->xymn',
-                                            eocc, mo_occ, cphf_oo, mo_occ)
-                                  + np.einsum('i,ma,xyia,ni->xymn',
-                                            eocc, mo_vir, cphf_ov, mo_occ)
-                                  +np.einsum('i,mi,xyia,na->xymn',
-                                            eocc, mo_occ, cphf_ov, mo_vir)
-                                 )
+        if self.rank == mpi_master():
+            mo = scf_drv.scf_tensors['C']
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nao = mo.shape[0]
+            density = scf_drv.scf_tensors['D_alpha']
+            mo_energies = scf_drv.scf_tensors['E']
+            eocc = mo_energies[:nocc]
+            eo_diag = np.diag(eocc)
+            epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
+
+            # Construct the perturbed density matrix, and perturbed omega
+            # TODO: consider if using the transpose makes the
+            # computation faster; consider using cphf coefficients in AO
+            # to compute the perturbed density matrix.
+            orben_perturbed_density = ( np.einsum('i,mj,xyij,ni->xymn',
+                                                eocc, mo_occ, cphf_oo, mo_occ)
+                                      + np.einsum('i,mi,xyij,nj->xymn',
+                                                eocc, mo_occ, cphf_oo, mo_occ)
+                                      + np.einsum('i,ma,xyia,ni->xymn',
+                                                eocc, mo_vir, cphf_ov, mo_occ)
+                                      +np.einsum('i,mi,xyia,na->xymn',
+                                                eocc, mo_occ, cphf_ov, mo_vir)
+                                     )
 
         fock_uia_numpy = self.construct_fock_matrix_cphf(molecule, ao_basis,
                                                          cphf_ov, scf_drv)
 
-        fock_cphf_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uij, mo_occ)
+        if self.rank == mpi_master():
+            fock_cphf_oo = np.einsum('mi,xymn,nj->xyij', mo_occ, fock_uij,
+                                     mo_occ)
 
-        fock_cphf_ov = ( np.einsum('mi,xymn,nj->xyij', mo_occ,
-                                   fock_uia_numpy, mo_occ)
-                        +np.einsum('mj,xymn,ni->xyij', mo_occ,
-                                   fock_uia_numpy, mo_occ)
-                        )
-        # Construct the derivative of the omega multipliers:
-        perturbed_omega_ao = - ( orben_perturbed_density
-                                + np.einsum('mi,xyij,nj->xymn', mo_occ,
-                                            fock_deriv_oo, mo_occ)
-                                -0.5*np.einsum('mi,xyij,nj->xymn', mo_occ,
-                                                orben_ovlp_deriv_oo, mo_occ)
-                                + 2*np.einsum('mi,xyij,nj->xymn', mo_occ,
-                                            fock_cphf_oo, mo_occ)
-                                + np.einsum('mi,xyij,nj->xymn', mo_occ,
-                                            fock_cphf_ov, mo_occ)
-                                )
+            fock_cphf_ov = ( np.einsum('mi,xymn,nj->xyij', mo_occ,
+                                       fock_uia_numpy, mo_occ)
+                            +np.einsum('mj,xymn,ni->xyij', mo_occ,
+                                       fock_uia_numpy, mo_occ)
+                            )
+            # Construct the derivative of the omega multipliers:
+            perturbed_omega_ao = - ( orben_perturbed_density
+                                    + np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                                fock_deriv_oo, mo_occ)
+                                    -0.5*np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                                    orben_ovlp_deriv_oo, mo_occ)
+                                    + 2*np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                                fock_cphf_oo, mo_occ)
+                                    + np.einsum('mi,xyij,nj->xymn', mo_occ,
+                                                fock_cphf_ov, mo_occ)
+                                    )
 
-        # First integral derivatives: partial Fock and overlap matrix
-        # derivatives
-        hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
+            # First integral derivatives: partial Fock and overlap matrix
+            # derivatives
+            hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
-        for i in range(natm):
-            # upper triangular part
-            for j in range(i, natm):
-                # First derivative of the Fock matrix
-                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j,
-                                          scf_drv)
-                # First derivative of overlap matrix
-                ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
-                # Add the contribution of the perturbed density matrix
-                hessian_first_integral_derivatives[i,j] += ( 
-                    np.einsum('xmn, ymn->xy',
-                              2*perturbed_density[i], fock_deriv_j) )
-                hessian_first_integral_derivatives[i,j] += ( 
-                    np.einsum('xmn, ymn->xy',
-                              2*perturbed_omega_ao[i], ovlp_deriv_j) )
+            for i in range(natm):
+                # upper triangular part
+                for j in range(i, natm):
+                    # First derivative of the Fock matrix
+                    fock_deriv_j = fock_deriv(molecule, ao_basis, density, j,
+                                              scf_drv)
+                    # First derivative of overlap matrix
+                    ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
+                    # Add the contribution of the perturbed density matrix
+                    hessian_first_integral_derivatives[i,j] += ( 
+                        np.einsum('xmn, ymn->xy',
+                                  2*perturbed_density[i], fock_deriv_j) )
+                    hessian_first_integral_derivatives[i,j] += ( 
+                        np.einsum('xmn, ymn->xy',
+                                  2*perturbed_omega_ao[i], ovlp_deriv_j) )
 
-            # lower triangular part
-            for j in range(i):
-                hessian_first_integral_derivatives[i,j] += (
-                                hessian_first_integral_derivatives[j,i].T )
+                # lower triangular part
+                for j in range(i):
+                    hessian_first_integral_derivatives[i,j] += (
+                                    hessian_first_integral_derivatives[j,i].T )
 
-        return hessian_first_integral_derivatives
+            return hessian_first_integral_derivatives
+        else:
+            return None
 
 
     def compute_furche(self, molecule, ao_basis, cphf_rhs, cphf_oo, cphf_ov,
@@ -708,13 +744,14 @@ class ScfHessianDriver(HessianDriver):
 
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
-        mo = scf_drv.scf_tensors['C']
-        mo_occ = mo[:, :nocc].copy()
-        nao = mo.shape[0]
-        density = scf_drv.scf_tensors['D_alpha']
-        mo_energies = scf_drv.scf_tensors['E']
-        eocc = mo_energies[:nocc]
-        omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
+        if self.rank == mpi_master():
+            mo = scf_drv.scf_tensors['C']
+            mo_occ = mo[:, :nocc].copy()
+            nao = mo.shape[0]
+            density = scf_drv.scf_tensors['D_alpha']
+            mo_energies = scf_drv.scf_tensors['E']
+            eocc = mo_energies[:nocc]
+            omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
         # TODO: remove commented out code
         #eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
@@ -732,83 +769,87 @@ class ScfHessianDriver(HessianDriver):
         # PE information
         pe_dict = cphf_solver._init_pe(molecule, ao_basis)
 
-        # RHS contracted with CPHF coefficients (ov)
-        hessian_cphf_coeff_rhs = 4 * np.einsum('ixka,jyka->ijxy',
-                                                cphf_ov, cphf_rhs)
+        # TODO: the MPI is not done properly here, fix once the new integral code is ready.
+        if self.rank == mpi_master():
+            # RHS contracted with CPHF coefficients (ov)
+            hessian_cphf_coeff_rhs = 4 * np.einsum('ixka,jyka->ijxy',
+                                                    cphf_ov, cphf_rhs)
 
-        # First integral derivatives: partial Fock and overlap matrix derivatives
-        hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
-        for i in range(natm):
-            fock_deriv_i = fock_deriv(molecule, ao_basis, density, i,
-                                      scf_drv)
-            ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
-            # upper triangular part
-            for j in range(i, natm):
-                ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
-                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j,
+            # First integral derivatives: partial Fock and overlap matrix derivatives
+            hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
+            for i in range(natm):
+                fock_deriv_i = fock_deriv(molecule, ao_basis, density, i,
                                           scf_drv)
-                Fix_Sjy = np.zeros((3,3))
-                Fjy_Six = np.zeros((3,3))
-                Six_Sjy = np.zeros((3,3))
-                for x in range(3):
-                    for y in range(3):
-                        Fix_Sjy[x,y] = np.trace(np.linalg.multi_dot([density,
-                                fock_deriv_i[x], density, ovlp_deriv_j[y]]))
-                        Fjy_Six[x,y] = np.trace(np.linalg.multi_dot([density,
-                                fock_deriv_j[y], density, ovlp_deriv_i[x]]))
-                        Six_Sjy[x,y] = ( 2*np.trace(np.linalg.multi_dot([
-                                omega_ao, ovlp_deriv_i[x], density,
-                                ovlp_deriv_j[y]])) )
-                hessian_first_integral_derivatives[i,j] += -2 * (Fix_Sjy 
-                                                        + Fjy_Six + Six_Sjy)
+                ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
+                # upper triangular part
+                for j in range(i, natm):
+                    ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
+                    fock_deriv_j = fock_deriv(molecule, ao_basis, density, j,
+                                              scf_drv)
+                    Fix_Sjy = np.zeros((3,3))
+                    Fjy_Six = np.zeros((3,3))
+                    Six_Sjy = np.zeros((3,3))
+                    for x in range(3):
+                        for y in range(3):
+                            Fix_Sjy[x,y] = np.trace(np.linalg.multi_dot([density,
+                                    fock_deriv_i[x], density, ovlp_deriv_j[y]]))
+                            Fjy_Six[x,y] = np.trace(np.linalg.multi_dot([density,
+                                    fock_deriv_j[y], density, ovlp_deriv_i[x]]))
+                            Six_Sjy[x,y] = ( 2*np.trace(np.linalg.multi_dot([
+                                    omega_ao, ovlp_deriv_i[x], density,
+                                    ovlp_deriv_j[y]])) )
+                    hessian_first_integral_derivatives[i,j] += -2 * (Fix_Sjy 
+                                                            + Fjy_Six + Six_Sjy)
 
-            # lower triangular part
-            for j in range(i):
-                hessian_first_integral_derivatives[i,j] += (
-                        hessian_first_integral_derivatives[j,i].T )
+                # lower triangular part
+                for j in range(i):
+                    hessian_first_integral_derivatives[i,j] += (
+                            hessian_first_integral_derivatives[j,i].T )
 
-        # Overlap derivative with ERIs
-        hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
-        for i in range(natm):
-            ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
-            # upper triangular part
-            for j in range(i, natm):
-                ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
+            # Overlap derivative with ERIs
+            hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
+            for i in range(natm):
+                ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
+                # upper triangular part
+                for j in range(i, natm):
+                    ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
 
-                # Overlap derivative contracted with two density matrices
-                P_P_Six = np.einsum('mn,xnk,kl->xml', density,
-                                     ovlp_deriv_i, density)
-                P_P_Sjy = np.einsum('mn,xnk,kl->xml', density,
-                                     ovlp_deriv_j, density)
+                    # Overlap derivative contracted with two density matrices
+                    P_P_Six = np.einsum('mn,xnk,kl->xml', density,
+                                         ovlp_deriv_i, density)
+                    P_P_Sjy = np.einsum('mn,xnk,kl->xml', density,
+                                         ovlp_deriv_j, density)
 
-                # Create a list of 2D numpy arrays to create
-                # AODensityMatrix objects
-                # and calculate auxiliary Fock matrix with ERI driver
-                P_P_Six_ao_list = list([P_P_Six[x] for x in range(3)])
-                P_P_Six_dm_ao = AODensityMatrix(P_P_Six_ao_list, denmat.rest)
-                P_P_Six_fock_ao = AOFockMatrix(P_P_Six_dm_ao)
+                    # Create a list of 2D numpy arrays to create
+                    # AODensityMatrix objects
+                    # and calculate auxiliary Fock matrix with ERI driver
+                    P_P_Six_ao_list = list([P_P_Six[x] for x in range(3)])
+                    P_P_Six_dm_ao = AODensityMatrix(P_P_Six_ao_list, denmat.rest)
+                    P_P_Six_fock_ao = AOFockMatrix(P_P_Six_dm_ao)
 
-                # TODO: remove commented out code
-                cphf_solver._comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao,
-                                          molecule, ao_basis, eri_dict,
-                                          dft_dict, pe_dict, profiler)
+                    # TODO: remove commented out code
+                    cphf_solver._comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao,
+                                              molecule, ao_basis, eri_dict,
+                                              dft_dict, pe_dict, profiler)
 
-                # Convert the auxiliary Fock matrices to numpy arrays 
-                # for further use
-                np_P_P_Six_fock = np.zeros((3,nao,nao))
-                for k in range(3):
-                    np_P_P_Six_fock[k] = P_P_Six_fock_ao.to_numpy(k)
+                    # Convert the auxiliary Fock matrices to numpy arrays 
+                    # for further use
+                    np_P_P_Six_fock = np.zeros((3,nao,nao))
+                    for k in range(3):
+                        np_P_P_Six_fock[k] = P_P_Six_fock_ao.to_numpy(k)
 
-                hessian_eri_overlap[i,j] += 2.0 * np.einsum('xmn,ymn->xy',
-                                                    np_P_P_Six_fock, P_P_Sjy)
+                    hessian_eri_overlap[i,j] += 2.0 * np.einsum('xmn,ymn->xy',
+                                                        np_P_P_Six_fock, P_P_Sjy)
 
-            # lower triangular part
-            for j in range(i):
-                hessian_eri_overlap[i,j] += hessian_eri_overlap[j,i].T
+                # lower triangular part
+                for j in range(i):
+                    hessian_eri_overlap[i,j] += hessian_eri_overlap[j,i].T
 
-        # return the sum of the three contributions
-        return (hessian_cphf_coeff_rhs + hessian_first_integral_derivatives
-                         + hessian_eri_overlap)
+            # return the sum of the three contributions
+            return (hessian_cphf_coeff_rhs + hessian_first_integral_derivatives
+                             + hessian_eri_overlap)
+        else:
+            return None
 
 
     def construct_fock_matrix_cphf(self, molecule, ao_basis, cphf_ov, scf_drv):
@@ -828,22 +869,28 @@ class ScfHessianDriver(HessianDriver):
         """
         natm = molecule.number_of_atoms()
         nocc = molecule.number_of_alpha_electrons()
-        mo = scf_drv.scf_tensors['C']
-        mo_occ = mo[:, :nocc].copy()
-        mo_vir = mo[:, nocc:].copy()
-        nao = mo.shape[0]
-        density = scf_drv.scf_tensors['D_alpha']
-        mo_energies = scf_drv.scf_tensors['E']
-        eocc = mo_energies[:nocc]
-        eo_diag = np.diag(eocc)
-        epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
-        # Transform the CPHF coefficients to AO:
-        uia_ao = np.einsum('mk,xykb,nb->xymn', mo_occ, 
-                            cphf_ov, mo_vir).reshape((3*natm, nao, nao))
-        
-        # create AODensity and Fock matrix objects, contract with ERI
-        uia_ao_list = list([uia_ao[x] for x in range(natm * 3)])
-        ao_density_uia = AODensityMatrix(uia_ao_list, denmat.rest)
+
+        if self.rank == mpi_master():
+            mo = scf_drv.scf_tensors['C']
+            mo_occ = mo[:, :nocc].copy()
+            mo_vir = mo[:, nocc:].copy()
+            nao = mo.shape[0]
+            density = scf_drv.scf_tensors['D_alpha']
+            mo_energies = scf_drv.scf_tensors['E']
+            eocc = mo_energies[:nocc]
+            eo_diag = np.diag(eocc)
+            epsilon_dm_ao = - np.linalg.multi_dot([mo_occ, eo_diag, mo_occ.T])
+            # Transform the CPHF coefficients to AO:
+            uia_ao = np.einsum('mk,xykb,nb->xymn', mo_occ, 
+                                cphf_ov, mo_vir).reshape((3*natm, nao, nao))
+            
+            # create AODensity and Fock matrix objects, contract with ERI
+            uia_ao_list = list([uia_ao[x] for x in range(natm * 3)])
+            ao_density_uia = AODensityMatrix(uia_ao_list, denmat.rest)
+        else:
+            ao_density_uia = AODensityMatrix()
+
+        ao_density_uia.broadcast(self.rank, self.comm)
 
         fock_uia = AOFockMatrix(ao_density_uia)
 
@@ -872,13 +919,16 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver._comp_lr_fock(fock_uia, ao_density_uia, molecule, ao_basis,
                                  eri_dict, dft_dict, pe_dict, profiler)
 
-        # TODO: can this be done in a different way?
-        fock_uia_numpy = np.zeros((natm,3,nao,nao))
-        for i in range(natm):
-            for x in range(3):
-                fock_uia_numpy[i,x] = fock_uia.to_numpy(3*i + x)
+        if self.rank == mpi_master():
+            # TODO: can this be done in a different way?
+            fock_uia_numpy = np.zeros((natm,3,nao,nao))
+            for i in range(natm):
+                for x in range(3):
+                    fock_uia_numpy[i,x] = fock_uia.to_numpy(3*i + x)
 
-        return fock_uia_numpy
+            return fock_uia_numpy
+        else:
+            return None
 
     def compute_perturbed_energy_weighted_density_matrix(self, molecule,
                                                          ao_basis, scf_drv):
