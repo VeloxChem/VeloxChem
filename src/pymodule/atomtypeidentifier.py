@@ -124,7 +124,8 @@ class AtomTypeIdentifier:
         """
 
         num_atoms = len(self.coordinates)
-        self.connectivity_matrix = np.zeros((num_atoms, num_atoms), dtype='int32')
+        self.connectivity_matrix = np.zeros((num_atoms, num_atoms),
+                                            dtype='int32')
         self.distance_matrix = np.zeros((num_atoms, num_atoms))
 
         for i in range(num_atoms):
@@ -515,12 +516,12 @@ class AtomTypeIdentifier:
                             d = info['ConnectedAtomsDistances'][
                                 index_in_distances]
 
-                            if d >= 1.4685:
+                            if d > 1.4685:
                                 biphenyl_carbon = {
                                     'opls': 'opls_521',
                                     'gaff': 'cp'
                                 }
-                            elif d <= 1.4685:
+                            else:
                                 biphenyl_carbon = {
                                     'opls': 'opls_CQ',
                                     'gaff': 'cq'
@@ -602,36 +603,18 @@ class AtomTypeIdentifier:
                                         'opls': 'opls_508',
                                         'gaff': 'cc'
                                 }:
-                                    if distance <= 1.4:
-                                        carbon_type = {
-                                            'opls': 'opls_XXX',
-                                            'gaff': 'cd'
-                                        }
-                                    elif distance > 1.4:
-                                        carbon_type = {
-                                            'opls': 'opls_508',
-                                            'gaff': 'cc'
-                                        }
-
+                                    pass
                                 elif existing_type == {
                                         'opls': 'opls_XXX',
                                         'gaff': 'cd'
                                 }:
-                                    if distance <= 1.4:
-                                        carbon_type = {
-                                            'opls': 'opls_508',
-                                            'gaff': 'cc'
-                                        }
-                                    elif distance > 1.4:
-                                        carbon_type = {
-                                            'opls': 'opls_XXX',
-                                            'gaff': 'cd'
-                                        }
-
+                                    carbon_type = {
+                                        'opls': 'opls_508',
+                                        'gaff': 'cc'
+                                    }
                                 else:
                                     continue
                             else:
-
                                 neighboring_cycle_number = self.atom_info_dict[
                                     neighboring_atom_number].get(
                                         'CycleNumber', 'none')
@@ -643,18 +626,10 @@ class AtomTypeIdentifier:
                                         != current_cycle_number):
                                     continue
                                 else:
-                                    if distance <= 1.4:
-                                        # Double bonded
-                                        conn_carbon_type = {
-                                            'opls': 'opls_XXX',
-                                            'gaff': 'cd'
-                                        }
-                                    else:
-                                        # Single bonded
-                                        conn_carbon_type = {
-                                            'opls': 'opls_508',
-                                            'gaff': 'cc'
-                                        }
+                                    conn_carbon_type = {
+                                        'opls': 'opls_508',
+                                        'gaff': 'cc'
+                                    }
 
                                     # Store the atomtype in the dictionary
                                     atom_num = neighboring_atom_number
@@ -2038,12 +2013,7 @@ class AtomTypeIdentifier:
                         sulfur_type = {'opls': 'opls_922X', 'gaff': 'sy'}
                     else:
                         sulfur_type = {'opls': 'opls_923S', 'gaff': 's6'}
-
-                # Sp3 S connected with hydrogen
-                elif info['NumConnectedAtoms'] == 4 and {
-                        'H', 'H', 'H'
-                } <= connected_symbols:  # use <= to check if a set is a subset
-                    sulfur_type = {'opls': 'opls_924S', 'gaff': 'sh'}
+                    # TODO: Sp3 S connected with hydrogen
 
                 else:
                     sulfur_type = {
@@ -2149,6 +2119,7 @@ class AtomTypeIdentifier:
                         f"{info['AtomicSymbol']}{info['AtomNumber']}" +
                         'Has not been found in the decision tree, check it carefully'
                     )
+                    self.ostream.flush()
 
         return self.atom_types_dict
 
@@ -2178,53 +2149,46 @@ class AtomTypeIdentifier:
         Those are cc-cd and ce-cf, cg-ch and nc-nd.
         The decide_atom_types method does assign a default atom type
         as cc, ce, cg and nc, but it does not assign the other atom type.
-
-        :return:
-            The dictionary with the atom types updated with the
-            alternating atom types
         """
 
         # Create a dictionary with the assigned bond types
         assigned_bonds = {}
-        atom_types = self.gaff_atom_types
+        atom_types = list(self.gaff_atom_types)
         distances = self.distance_matrix
 
         # Look for cc-cc, ce-ce, cg-cg and nc-nc bonds and append the distance
         # to the dictionary
         for i in range(len(atom_types)):
             for j in range(i + 1, len(atom_types)):
-                if atom_types[i] == atom_types[j]:
+                if (atom_types[i] == atom_types[j] and
+                        self.connectivity_matrix[i][j] == 1):
                     if atom_types[i] in ['cc', 'ce', 'cg', 'nc']:
                         assigned_bonds[(i, j)] = distances[i][j]
 
         # Check distances for alternation
         for bond in assigned_bonds:
             if atom_types[bond[0]] == 'cc':
-                if distances[bond[0]][bond[1]] < 1.4:
+                if distances[bond[0]][bond[1]] <= 1.4:
                     atom_types[bond[1]] = 'cd'
                 else:
                     atom_types[bond[1]] = 'cc'
             elif atom_types[bond[0]] == 'ce':
-
-                if distances[bond[0]][bond[1]] < 1.4:
+                if distances[bond[0]][bond[1]] <= 1.4:
                     atom_types[bond[1]] = 'cf'
                 else:
                     atom_types[bond[1]] = 'ce'
             elif atom_types[bond[0]] == 'cg':
-                if distances[bond[0]][bond[1]] < 1.4:
+                if distances[bond[0]][bond[1]] <= 1.4:
                     atom_types[bond[1]] = 'ch'
                 else:
                     atom_types[bond[1]] = 'cg'
             elif atom_types[bond[0]] == 'nc':
-                if distances[bond[0]][bond[1]] < 1.4:
+                if distances[bond[0]][bond[1]] <= 1.4:
                     atom_types[bond[1]] = 'nd'
                 else:
                     atom_types[bond[1]] = 'nc'
 
-        # Return an array with the new atom types
         self.gaff_atom_types = atom_types
-
-        return self.gaff_atom_types
 
     def generate_gaff_atomtypes(self, molecule):
         """
@@ -2248,7 +2212,7 @@ class AtomTypeIdentifier:
         self.create_atom_info_dict()
         self.atom_types_dict = self.decide_atom_type()
         self.extract_gaff_atom_types(self.atom_types_dict)
-        self.gaff_atom_types = self.check_alternating_atom_types()
+        self.check_alternating_atom_types()
 
         # Printing output
         self.ostream.print_info("VeloxChem Atom Type Identification")
@@ -2289,6 +2253,8 @@ class AtomTypeIdentifier:
 
         if self.bad_hydrogen:
             self.ostream.print_warning('Hydrogen type not defined in GAFF')
+
+        self.ostream.flush()
 
         return self.gaff_atom_types
 
