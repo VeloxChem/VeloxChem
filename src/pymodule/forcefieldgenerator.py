@@ -628,7 +628,7 @@ class ForceFieldGenerator:
                 atom_type_found = False
 
                 for line in ff_data_lines:
-                    if line.startswith(f'  {at}  '):
+                    if line.startswith(f'  {at}     '):
                         cur_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
                             at, at, 0., 0., 'A')
                         cur_str += '{:16.5e}{:14.5e}\n'.format(
