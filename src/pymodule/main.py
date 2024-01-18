@@ -578,7 +578,9 @@ def main():
             if 'orbital_response' in task.input_dict:
                 orbrsp_dict = task.input_dict['orbital_response']
                 orbrsp_drv = TddftOrbitalResponse(task.mpi_comm, task.ostream)
-                orbrsp_drv.update_settings(orbrsp_dict, rsp_dict, method_dict)
+                if 'tamm_dancoff' in rsp_dict:
+                    orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
+                orbrsp_drv.update_settings(orbrsp_dict, method_dict)
                 orbrsp_drv.compute(task.molecule, task.ao_basis,
                                    scf_drv.scf_tensors, rsp_prop._rsp_property)
 
@@ -593,11 +595,8 @@ def main():
                                              orbrsp_dict, method_dict)
                 tddftgrad_drv.compute(task.molecule, task.ao_basis,
                                      scf_drv,
-                                     rsp_prop._rsp_driver.solver,
+                                     rsp_prop._rsp_driver,
                                      rsp_prop._rsp_property)
-                                     # solver is the actual RPA/TDA driver
-                                     # with rsp_prop.rsp_driver
-                                     # it works for TDA, but not RPA
 
             # Excited state Hessian and vibrational analysis
             if 'vibrational' in task.input_dict:

@@ -214,20 +214,31 @@ class TddftOrbitalResponse(CphfSolver):
             dof = len(self.state_deriv_index)
             exc_vec = np.zeros((dof, nocc, nvir))
             deexc_vec = np.zeros((dof, nocc, nvir))
+        else:
+            self.state_deriv_index = None
+            dof = None
 
-            for i in range(dof):
-                ivec = self.state_deriv_index[i] - 1
-                if self.tamm_dancoff:
+        dof = self.comm.bcast(dof, root=mpi_master())
+        self.state_deriv_index = self.comm.bcast(self.state_deriv_index,
+                                                 root=mpi_master())
+
+        for i in range(dof):
+            ivec = self.state_deriv_index[i] - 1
+
+            if self.tamm_dancoff:
+                if self.rank == mpi_master():
                     exc_vec[i] = (
                         rsp_results['eigenvectors'][:nocc * nvir,
                                                     ivec].reshape(nocc, nvir)
                                 )
-                else:
-                    eigenvector = self.get_full_solution_vector(
+            else:
+                eigenvector = self.get_full_solution_vector(
                                 rsp_results['eigenvectors_distributed'][ivec])
+                if self.rank == mpi_master():
                     exc_vec[i] = eigenvector[:nocc * nvir].reshape(nocc, nvir)
                     deexc_vec[i] = eigenvector[nocc * nvir:].reshape(nocc, nvir)
 
+        if self.rank == mpi_master():
             # Construct plus/minus combinations of excitation
             # and de-excitation part
             x_plus_y = exc_vec + deexc_vec
@@ -310,8 +321,8 @@ class TddftOrbitalResponse(CphfSolver):
         # Fock matrices with corresponding type
         fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
 
-       # Set the vector-related components to general Fock matrix
-       # (not 1PDM part)
+        # Set the vector-related components to general Fock matrix
+        # (not 1PDM part)
         for ifock in range(dof, 3*dof):
             fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
 
