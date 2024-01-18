@@ -454,10 +454,6 @@ class ScfHessianDriver(HessianDriver):
             else:
                 cphf_rhs = cphf_solution_dict['cphf_rhs'].reshape(natm, 3,
                                                                   nocc, nvir)
-                #hessian_first_order_derivatives = self.compute_furche(molecule,
-                #                    ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
-                #                    cphf_ov, scf_drv, profiler)
-
         else:
             ovlp_deriv_oo = None
             cphf_ov = None
@@ -492,7 +488,7 @@ class ScfHessianDriver(HessianDriver):
             hessian_first_order_derivatives = self.compute_furche(molecule,
                                     ao_basis, cphf_rhs, -0.5 * ovlp_deriv_oo,
                                     cphf_ov, scf_drv, profiler)
-        ## amount of exact exchange
+        # amount of exact exchange
         frac_K = 1.0
 
         # DFT:
@@ -591,7 +587,7 @@ class ScfHessianDriver(HessianDriver):
             lr_results = lr_drv.compute(molecule, ao_basis, scf_drv.scf_tensors)
 
             # Set up the polarizability gradient driver
-            polgrad_drv = PolarizabilityGradient()
+            polgrad_drv = PolarizabilityGradient(self.comm, self.ostream)
             #self.cphf_dict['frequencies'] = [ 0.0 ]
             #polgrad_drv.update_settings(self.rsp_dict,
             polgrad_drv.update_settings(self.polgrad_dict,
@@ -753,11 +749,6 @@ class ScfHessianDriver(HessianDriver):
             eocc = mo_energies[:nocc]
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
 
-        # TODO: remove commented out code
-        #eri_drv = ElectronRepulsionIntegralsDriver(self.comm)
-        #screening = eri_drv.compute(get_qq_scheme(self.scf_drv.qq_type),
-        #                            self.scf_drv.eri_thresh, molecule, ao_basis)
-
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
         cphf_solver = CphfSolver(self.comm, self.ostream)
@@ -769,13 +760,15 @@ class ScfHessianDriver(HessianDriver):
         # PE information
         pe_dict = cphf_solver._init_pe(molecule, ao_basis)
 
-        # TODO: the MPI is not done properly here, fix once the new integral code is ready.
+        # TODO: the MPI is not done properly here,
+        # fix once the new integral code is ready.
         if self.rank == mpi_master():
             # RHS contracted with CPHF coefficients (ov)
             hessian_cphf_coeff_rhs = 4 * np.einsum('ixka,jyka->ijxy',
                                                     cphf_ov, cphf_rhs)
 
-            # First integral derivatives: partial Fock and overlap matrix derivatives
+            # First integral derivatives: partial Fock and overlap
+            # matrix derivatives
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
             for i in range(natm):
                 fock_deriv_i = fock_deriv(molecule, ao_basis, density, i,
@@ -791,10 +784,12 @@ class ScfHessianDriver(HessianDriver):
                     Six_Sjy = np.zeros((3,3))
                     for x in range(3):
                         for y in range(3):
-                            Fix_Sjy[x,y] = np.trace(np.linalg.multi_dot([density,
-                                    fock_deriv_i[x], density, ovlp_deriv_j[y]]))
-                            Fjy_Six[x,y] = np.trace(np.linalg.multi_dot([density,
-                                    fock_deriv_j[y], density, ovlp_deriv_i[x]]))
+                            Fix_Sjy[x,y] = np.trace(np.linalg.multi_dot([
+                                    density, fock_deriv_i[x], density,
+                                    ovlp_deriv_j[y]]))
+                            Fjy_Six[x,y] = np.trace(np.linalg.multi_dot([
+                                    density, fock_deriv_j[y],
+                                    density, ovlp_deriv_i[x]]))
                             Six_Sjy[x,y] = ( 2*np.trace(np.linalg.multi_dot([
                                     omega_ao, ovlp_deriv_i[x], density,
                                     ovlp_deriv_j[y]])) )
@@ -806,12 +801,15 @@ class ScfHessianDriver(HessianDriver):
                     hessian_first_integral_derivatives[i,j] += (
                             hessian_first_integral_derivatives[j,i].T )
 
+        if self.rank == mpi_master():
             # Overlap derivative with ERIs
             hessian_eri_overlap = np.zeros((natm, natm, 3, 3))
-            for i in range(natm):
+        for i in range(natm):
+            if self.rank == mpi_master():
                 ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
-                # upper triangular part
-                for j in range(i, natm):
+            # upper triangular part
+            for j in range(i, natm):
+                if self.rank == mpi_master():
                     ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
 
                     # Overlap derivative contracted with two density matrices
@@ -824,15 +822,21 @@ class ScfHessianDriver(HessianDriver):
                     # AODensityMatrix objects
                     # and calculate auxiliary Fock matrix with ERI driver
                     P_P_Six_ao_list = list([P_P_Six[x] for x in range(3)])
-                    P_P_Six_dm_ao = AODensityMatrix(P_P_Six_ao_list, denmat.rest)
-                    P_P_Six_fock_ao = AOFockMatrix(P_P_Six_dm_ao)
+                    P_P_Six_dm_ao = AODensityMatrix(P_P_Six_ao_list,
+                                                    denmat.rest)
+                else:
+                    P_P_Six_dm_ao = AODensityMatrix()
 
-                    # TODO: remove commented out code
-                    cphf_solver.furche_comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao,
-                                              molecule, ao_basis, eri_dict,
-                                              dft_dict, pe_dict, profiler)
+                P_P_Six_dm_ao.broadcast(self.rank, self.comm)
 
+                P_P_Six_fock_ao = AOFockMatrix(P_P_Six_dm_ao)
+                # TODO: use _comp_lr_fock
+                # MPI issue
+                cphf_solver._comp_lr_fock(P_P_Six_fock_ao, P_P_Six_dm_ao,
+                                          molecule, ao_basis, eri_dict,
+                                          dft_dict, pe_dict, profiler)
 
+                if self.rank == mpi_master():
                     # Convert the auxiliary Fock matrices to numpy arrays 
                     # for further use
                     np_P_P_Six_fock = np.zeros((3,nao,nao))
@@ -840,15 +844,18 @@ class ScfHessianDriver(HessianDriver):
                         np_P_P_Six_fock[k] = P_P_Six_fock_ao.to_numpy(k)
 
                     hessian_eri_overlap[i,j] += 2.0 * np.einsum('xmn,ymn->xy',
-                                                        np_P_P_Six_fock, P_P_Sjy)
+                                                      np_P_P_Six_fock, P_P_Sjy)
 
-                # lower triangular part
-                for j in range(i):
+            # lower triangular part
+            for j in range(i):
+                if self.rank == mpi_master():
                     hessian_eri_overlap[i,j] += hessian_eri_overlap[j,i].T
 
-            # return the sum of the three contributions
-            return (hessian_cphf_coeff_rhs + hessian_first_integral_derivatives
-                             + hessian_eri_overlap)
+        # return the sum of the three contributions
+        if self.rank == mpi_master():
+            return ( hessian_cphf_coeff_rhs
+                   + hessian_first_integral_derivatives
+                   + hessian_eri_overlap)
         else:
             return None
 

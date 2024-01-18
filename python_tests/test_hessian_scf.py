@@ -45,7 +45,7 @@ class TestScfHessianDriver:
                 np.abs(scf_hessian_drv.ir_intensities / ref_ir_intensities -
                        1.0))
             rel_diff_raman = np.max(
-                np.abs(scf_hessian_drv.raman_intensities /
+                np.abs(scf_hessian_drv.raman_intensities[0.0] /
                        ref_raman_intensities - 1.0))
 
             assert diff_hessian < 1.0e-5
