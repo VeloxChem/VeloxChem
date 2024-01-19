@@ -468,13 +468,14 @@ class PolarizabilityGradient():
         num_polgradient = np.zeros((n_freqs, 3, 3, 3 * natm))
 
         if not self.do_four_point:
-            self.ostream.print_blank()
-            self.ostream.print_info('do_four_point: False')
-            self.ostream.flush()
+            if self.rank == mpi_master():
+                self.ostream.print_blank()
+                self.ostream.print_info('do_four_point: False')
+                self.ostream.flush()
 
-            # mute the drivers
+            # mute the outputstreams
             scf_drv.ostream.mute()
-            lr_drv.ostream.state = False
+            lr_drv.ostream.mute()
 
             for i in range(natm):
                 for d in range(3):
@@ -499,18 +500,27 @@ class PolarizabilityGradient():
                         for aop, acomp in enumerate('xyz'):
                             for bop, bcomp in enumerate('xyz'):
                                 key = (acomp, bcomp, w)
-                                num_polgradient[f, aop, bop, 3 * i + d] = (
+                                if self.rank == mpi_master():
+                                    num_polgradient[f, aop, bop, 3 * i + d] = (
                                     (lr_results_p['response_functions'][key] -
                                      lr_results_m['response_functions'][key]) /
                                     (2.0 * self.delta_h))
-            for f, w in enumerate(self.frequencies):
-                polgrad_results[w] = num_polgradient[f]
-            self.polgradient = dict(polgrad_results)
+            if self.rank == mpi_master():
+                for f, w in enumerate(self.frequencies):
+                    polgrad_results[w] = num_polgradient[f]
+                self.polgradient = dict(polgrad_results)
+            else:
+                self.polgradient = {}
 
         # four-point approximation for debugging of analytical gradient
         else:
-            self.ostream.print_info('do_four_point: True')
-            self.ostream.flush()
+            if self.rank == mpi_master():
+                self.ostream.print_info('do_four_point: True')
+                self.ostream.flush()
+            # mute the outputstreams:
+            scf_drv.ostream.mute()
+            lr_drv.ostream.mute()
+
             for i in range(natm):
                 for d in range(3):
                     coords[i, d] += self.delta_h
@@ -548,18 +558,22 @@ class PolarizabilityGradient():
                                 # f'(x) ~ [ f(x - 2h) - 8 f(x - h)
                                 # + 8 f(x + h) - f(x + 2h) ] / ( 12h )
                                 key = (acomp, bcomp, w)
-                                num_polgradient[f, aop, bop, 3 * i + d] = ((
+                                if self.rank == mpi_master():
+                                    num_polgradient[f, aop, bop, 3 * i + d] = ((
                                     lr_results_m2['response_functions'][key] -
                                     8.0 * lr_results_m1['response_functions'][key] +
                                     8.0 * lr_results_p1['response_functions'][key] -
                                     lr_results_p2['response_functions'][key]) / (
                                         12.0 * self.delta_h))
-            for f, w in enumerate(self.frequencies):
-                polgrad_results[w] = num_polgradient[f]
-            self.polgradient = dict(polgrad_results)
+            if self.rank == mpi_master():
+                for f, w in enumerate(self.frequencies):
+                    polgrad_results[w] = num_polgradient[f]
+                self.polgradient = dict(polgrad_results)
+            else:
+                self.polgradient = {}
 
         scf_drv.ostream.unmute()
-        lr_drv.ostream.state = True
+        lr_drv.ostream.unmute()
 
     def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, x_minus_y_den,
                                 gs_density, xcfun_label):
