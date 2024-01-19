@@ -592,7 +592,8 @@ class ScfHessianDriver(HessianDriver):
             #polgrad_drv.update_settings(self.rsp_dict,
             polgrad_drv.update_settings(self.polgrad_dict,
                                         orbrsp_dict = self.cphf_dict,
-                                        method_dict = self.method_dict)
+                                        method_dict = self.method_dict,
+                                        scf_drv = scf_drv)
             polgrad_drv.compute(molecule, ao_basis,
                                 scf_drv.scf_tensors, lr_results)
             #self.polarizability_gradient = polgrad_drv.polgradient[0]
@@ -660,6 +661,10 @@ class ScfHessianDriver(HessianDriver):
                                       +np.einsum('i,mi,xyia,na->xymn',
                                                 eocc, mo_occ, cphf_ov, mo_vir)
                                      )
+        else:
+            density = None
+
+        density = self.comm.bcast(density, root=mpi_master())
 
         fock_uia_numpy = self.construct_fock_matrix_cphf(molecule, ao_basis,
                                                          cphf_ov, scf_drv)
@@ -689,12 +694,13 @@ class ScfHessianDriver(HessianDriver):
             # derivatives
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
 
-            for i in range(natm):
-                # upper triangular part
-                for j in range(i, natm):
-                    # First derivative of the Fock matrix
-                    fock_deriv_j = fock_deriv(molecule, ao_basis, density, j,
-                                              scf_drv)
+        for i in range(natm):
+            # upper triangular part
+            for j in range(i, natm):
+                # First derivative of the Fock matrix
+                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j,
+                                          scf_drv)
+                if self.rank == mpi_master():
                     # First derivative of overlap matrix
                     ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
                     # Add the contribution of the perturbed density matrix
@@ -705,11 +711,13 @@ class ScfHessianDriver(HessianDriver):
                         np.einsum('xmn, ymn->xy',
                                   2*perturbed_omega_ao[i], ovlp_deriv_j) )
 
+            if self.rank == mpi_master():
                 # lower triangular part
                 for j in range(i):
                     hessian_first_integral_derivatives[i,j] += (
-                                    hessian_first_integral_derivatives[j,i].T )
+                                     hessian_first_integral_derivatives[j,i].T )
 
+        if self.rank == mpi_master():
             return hessian_first_integral_derivatives
         else:
             return None
@@ -748,6 +756,10 @@ class ScfHessianDriver(HessianDriver):
             mo_energies = scf_drv.scf_tensors['E']
             eocc = mo_energies[:nocc]
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
+        else:
+            density = None
+
+        density = self.comm.bcast(density, root=mpi_master())
 
         # We use comp_lr_fock from CphfSolver to compute the eri
         # and xc contributions
@@ -770,15 +782,20 @@ class ScfHessianDriver(HessianDriver):
             # First integral derivatives: partial Fock and overlap
             # matrix derivatives
             hessian_first_integral_derivatives = np.zeros((natm, natm, 3, 3))
-            for i in range(natm):
-                fock_deriv_i = fock_deriv(molecule, ao_basis, density, i,
-                                          scf_drv)
+
+        for i in range(natm):
+            fock_deriv_i = fock_deriv(molecule, ao_basis, density, i,
+                                      scf_drv)
+            if self.rank == mpi_master():
                 ovlp_deriv_i = overlap_deriv(molecule, ao_basis, i)
-                # upper triangular part
-                for j in range(i, natm):
+
+            # upper triangular part
+            for j in range(i, natm):
+                fock_deriv_j = fock_deriv(molecule, ao_basis, density, j,
+                                          scf_drv)
+                if self.rank == mpi_master():
                     ovlp_deriv_j = overlap_deriv(molecule, ao_basis, j)
-                    fock_deriv_j = fock_deriv(molecule, ao_basis, density, j,
-                                              scf_drv)
+        
                     Fix_Sjy = np.zeros((3,3))
                     Fjy_Six = np.zeros((3,3))
                     Six_Sjy = np.zeros((3,3))
@@ -795,7 +812,8 @@ class ScfHessianDriver(HessianDriver):
                                     ovlp_deriv_j[y]])) )
                     hessian_first_integral_derivatives[i,j] += -2 * (Fix_Sjy 
                                                             + Fjy_Six + Six_Sjy)
-
+   
+            if self.rank == mpi_master(): 
                 # lower triangular part
                 for j in range(i):
                     hessian_first_integral_derivatives[i,j] += (

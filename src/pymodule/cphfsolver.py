@@ -915,14 +915,30 @@ class CphfSolver(LinearSolver):
         :returns:
             The RHS of the CPHF equations.
         """
+        self.profiler = Profiler({
+            'timing': self.timing,
+            'profiling': self.profiling,
+            'memory_profiling': self.memory_profiling,
+            'memory_tracing': self.memory_tracing,
+        })
 
-        t1 = tm.time()
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+
+        self.profiler.start_timer('RHS')
+        natm = molecule.number_of_atoms()
+
         if self.rank == mpi_master():
+
             density = scf_tensors['D_alpha']
-            natm = molecule.number_of_atoms()
             mo = scf_tensors['C_alpha']
             mo_energies = scf_tensors['E']
             nao = mo.shape[0]
+
             # nmo is sometimes different than nao (because of linear
             # dependencies which get removed during SCF)
             nmo = mo_energies.shape[0]
@@ -931,7 +947,7 @@ class CphfSolver(LinearSolver):
             mo_occ = mo[:, :nocc]
             mo_vir = mo[:, nocc:]
             eocc = mo_energies[:nocc]
-            eoo = eocc.reshape(-1, 1) + eocc #ei+ej
+            eoo = eocc.reshape(-1, 1) + eocc # ei + ej
             omega_ao = - np.linalg.multi_dot([mo_occ, np.diag(eocc), mo_occ.T])
             evir = mo_energies[nocc:]
             eov = eocc.reshape(-1, 1) - evir
@@ -939,29 +955,41 @@ class CphfSolver(LinearSolver):
             # preparing the CPHF RHS
             ovlp_deriv_ao = np.zeros((natm, 3, nao, nao))
             fock_deriv_ao = np.zeros((natm, 3, nao, nao))
+        else:
+            density = None
 
-            # import the integral derivatives
-            self.profiler.set_timing_key('derivs')
-            self.profiler.start_timer('derivs')
-            t0 = tm.time()
-            for i in range(natm):
+        density = self.comm.bcast(density, root=mpi_master())
+
+        # import the integral derivatives
+        self.profiler.set_timing_key('derivs')
+        self.profiler.start_timer('derivs')
+
+        t0 = tm.time()
+        for i in range(natm):
+            fock_deriv_i = fock_deriv(molecule, basis, density,
+                                      i, scf_drv)
+            if self.rank == mpi_master():
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
-                fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
-                                              i, scf_drv)
-            t1 = tm.time()
+                fock_deriv_ao[i] = fock_deriv_i
+        t1 = tm.time()
+
+        if self.rank == mpi_master():
             self.ostream.print_info("CPHF/CPKS import of integral derivatives"
                                     + ' took'
                                     + ' {:.2f} sec.'.format(t1 - t0))
             self.ostream.print_blank()
             self.ostream.flush()
-            self.profiler.stop_timer('derivs')
+            
+        self.profiler.stop_timer('derivs')
 
+        if self.rank == mpi_master():
             # transform integral derivatives to MO basis
             ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
             ovlp_deriv_oo = np.zeros((natm, 3, nocc, nocc))
             fock_deriv_ov = np.zeros((natm, 3, nocc, nvir))
             orben_ovlp_deriv_ov = np.zeros((natm, 3, nocc, nvir))
             tmp_eocc = eocc.reshape(-1,1)
+
             for a in range(natm):
                 for x in range(3):
                     ovlp_deriv_ov[a,x] = np.linalg.multi_dot([
@@ -994,34 +1022,21 @@ class CphfSolver(LinearSolver):
             ao_density_uij = AODensityMatrix(uij_ao_list, denmat.rest)
         else:
             ao_density_uij = AODensityMatrix()
-            mo_energies = None
-            eov = None
-            nao = None
 
-        mo_energies = self.comm.bcast(mo_energies, root=mpi_master())
-        eov = self.comm.bcast(eov, root=mpi_master())
-        nao = self.comm.bcast(nao, root=mpi_master())
-        nmo = mo_energies.shape[0]
-        nocc = molecule.number_of_alpha_electrons()
-        natm =  molecule.number_of_atoms()
-        nvir = nmo - nocc
         ao_density_uij.broadcast(self.rank, self.comm)
 
         fock_uij = AOFockMatrix(ao_density_uij)
+
+        # TODO: remove commented out code below once
+        # it's confirmed that the correct Hessian is calculated
+        # without this flag.
         #fock_flag = fockmat.rgenjk
         #fock_uij.set_fock_type(fock_flag, 1)
-        # ERI information
-        eri_dict = self._init_eri(molecule, basis)
-        # DFT information
-        dft_dict = self._init_dft(molecule, scf_tensors)
-        # PE information
-        pe_dict = self._init_pe(molecule, basis)
-        # Timing information
-        timing_dict = {}
 
-        self._comp_lr_fock(fock_uij, ao_density_uij, molecule,
-                          basis, eri_dict, dft_dict, pe_dict, self.profiler)
-        t2 = tm.time()
+        self._comp_lr_fock(fock_uij, ao_density_uij, molecule, basis,
+                           eri_dict, dft_dict, pe_dict, self.profiler)
+       
+        t2 = tm.time() 
         if self.rank == mpi_master():
             self.ostream.print_info('CPHF/CPKS RHS computed in' +
                                      ' {:.2f} sec.'.format(t2 - t1))
@@ -1029,7 +1044,7 @@ class CphfSolver(LinearSolver):
             self.ostream.flush()
 
             # TODO: how can this be done better?
-            fock_uij_numpy = np.zeros((natm,3,nao,nao))
+            fock_uij_numpy = np.zeros((natm, 3, nao, nao))
             fock_uij_mo = np.zeros((natm, 3, nocc, nvir))
             for i in range(natm):
                 for x in range(3):
@@ -1042,8 +1057,12 @@ class CphfSolver(LinearSolver):
             # sum up the terms of the RHS
             cphf_rhs = (fock_deriv_ov - orben_ovlp_deriv_ov
                         + 2 * fock_uij_mo)
+
+        self.profiler.stop_timer('RHS')
+
+        if self.rank == mpi_master():
             return {
-                'cphf_rhs': cphf_rhs.reshape(3*natm, nocc, nvir),
+                'cphf_rhs': cphf_rhs.reshape(natm*3, nocc, nvir),
                 'ovlp_deriv_oo': ovlp_deriv_oo,
                 'fock_deriv_ao': fock_deriv_ao,
                 'fock_uij': fock_uij_numpy,

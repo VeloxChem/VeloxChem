@@ -153,20 +153,24 @@ class PolarizabilityGradient():
         start_time = tm.time()
 
         if self.numerical:
-            valstr = '*** Calculating numerical polarizability gradient ***'
-            self.ostream.print_header(valstr)
-            self.ostream.print_blank()
-            self.ostream.flush()
+            # print only on the master node
+            if self.rank == mpi_master():
+                valstr = '*** Calculating numerical polarizability gradient ***'
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
             if self.scf_drv is None:
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
                 raise ValueError(error_message)
             self.compute_numerical(molecule, basis, self.scf_drv)
         else:
-            valstr = '*** Calculating analytical polarizability gradient ***'
-            self.ostream.print_header(valstr)
-            self.ostream.print_blank()
-            self.ostream.flush()
+            # print only on the master node
+            if self.rank == mpi_master():
+                valstr = '*** Calculating analytical polarizability gradient ***'
+                self.ostream.print_header(valstr)
+                self.ostream.print_blank()
+                self.ostream.flush()
             self.compute_analytical(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():

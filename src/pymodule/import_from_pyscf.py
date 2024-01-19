@@ -1990,7 +1990,9 @@ def hcore_deriv(molecule, basis, i=0, unit="au"):
 
     return vlx_hcore_deriv_atom_i
 
-
+# TODO: MPI does not work efficiently here. XC part is executed
+# using MPI, while the rest is run on each node separately.
+# Either fix, or replace with new integrals code.
 def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
     """
     Imports the derivatives of the Fock matrix

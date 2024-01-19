@@ -487,6 +487,7 @@ def main():
     # Ground state Hessian / Vibrational analysis
 
     #if task_type in ['freq', 'frequencies']:
+    # TODO: shouldn't this go together with hessian?
     if task_type in ['vib', 'vibrational']:
 
         #if 'frequencies' in task.input_dict:
@@ -522,7 +523,8 @@ def main():
 
         cphf_drv = CphfSolver(task.mpi_comm, task.ostream)
         cphf_drv.update_settings(cphf_dict, method_dict)
-        cphf_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors) 
+        cphf_drv.compute(task.molecule, task.ao_basis, scf_drv.scf_tensors,
+                         scf_drv) 
 
 
     # Polarizability gradient
@@ -545,7 +547,8 @@ def main():
         rsp_prop.compute(task.molecule, task.ao_basis, scf_results)
         
         polgrad_drv = PolarizabilityGradient(task.mpi_comm, task.ostream)
-        polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict)
+        polgrad_drv.update_settings(polgrad_dict, orbrsp_dict, method_dict,
+                                    scf_drv)
         polgrad_drv.compute(task.molecule, task.ao_basis, 
                             scf_drv.scf_tensors, rsp_prop._rsp_property)
     
