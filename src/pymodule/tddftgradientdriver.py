@@ -384,12 +384,12 @@ class TddftGradientDriver(GradientDriver):
         :param state_deriv_index:
             The index of the excited state of interest.
         """
-
-        if isinstance(self.state_deriv_index, int):
-            # Python numbering starts at 0
-            state_deriv_index = self.state_deriv_index - 1
-        else:
-            state_deriv_index = self.state_deriv_index[0] - 1
+        if self.rank == mpi_master():
+            if isinstance(self.state_deriv_index, int):
+                # Python numbering starts at 0
+                state_deriv_index = self.state_deriv_index - 1
+            else:
+                state_deriv_index = self.state_deriv_index[0] - 1
         scf_drv.restart = False
         scf_results = scf_drv.compute(molecule, basis)
         assert_msg_critical(scf_drv.is_converged,

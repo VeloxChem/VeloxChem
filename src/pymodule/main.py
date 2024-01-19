@@ -577,13 +577,17 @@ def main():
 
             if 'orbital_response' in task.input_dict:
                 orbrsp_dict = task.input_dict['orbital_response']
-                orbrsp_drv = TddftOrbitalResponse(task.mpi_comm, task.ostream)
                 if 'tamm_dancoff' in rsp_dict:
                     orbrsp_dict['tamm_dancoff'] = rsp_dict['tamm_dancoff']
-                orbrsp_drv.update_settings(orbrsp_dict, method_dict)
-                orbrsp_drv.compute(task.molecule, task.ao_basis,
-                                   scf_drv.scf_tensors, rsp_prop._rsp_property)
-
+                # TODO: if gradient dict is not defined, do just the
+                # orbital response. This is for testing/benchmarking
+                # only and should be removed or done in a better way
+                # (e.g. task_type = orbital-response)
+                if 'gradient' not in task.input_dict:
+                    orbrsp_drv = TddftOrbitalResponse(task.mpi_comm, task.ostream)
+                    orbrsp_drv.update_settings(orbrsp_dict, method_dict)
+                    orbrsp_drv.compute(task.molecule, task.ao_basis,
+                                       scf_drv.scf_tensors, rsp_prop._rsp_property)
             else:
                 orbrsp_dict = {}
 
