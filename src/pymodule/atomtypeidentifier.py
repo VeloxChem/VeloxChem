@@ -2152,41 +2152,80 @@ class AtomTypeIdentifier:
         """
 
         # Create a dictionary with the assigned bond types
-        assigned_bonds = {}
         atom_types = list(self.gaff_atom_types)
         distances = self.distance_matrix
 
         # Look for cc-cc, ce-ce, cg-cg and nc-nc bonds and append the distance
         # to the dictionary
+
+        assigned_bonds = []
+
+        counted_atom_ids = []
         for i in range(len(atom_types)):
-            for j in range(i + 1, len(atom_types)):
-                if (atom_types[i] == atom_types[j] and
-                        self.connectivity_matrix[i][j] == 1):
-                    if atom_types[i] in ['cc', 'ce', 'cg', 'nc']:
-                        assigned_bonds[(i, j)] = distances[i][j]
+            if atom_types[i] in ['cc', 'ce', 'cg', 'nc']:
+                counted_atom_ids.append(i)
+                break
+
+        while True:
+
+            counted_atom_ids_prev = list(counted_atom_ids)
+
+            all_found = True
+            new_index = None
+            for i in range(len(atom_types)):
+                if (atom_types[i] in ['cc', 'ce', 'cg', 'nc'] and
+                        i not in counted_atom_ids):
+                    all_found = False
+                    new_index = i
+                    break
+
+            if all_found:
+                break
+
+            for i in range(len(atom_types)):
+                if i in counted_atom_ids:
+                    for j in range(len(atom_types)):
+                        if j in counted_atom_ids:
+                            continue
+                        if (atom_types[i] in ['cc', 'ce', 'cg', 'nc'] and
+                                atom_types[i] == atom_types[j] and
+                                self.connectivity_matrix[i][j] == 1):
+                            assigned_bonds.append((i, j))
+                            counted_atom_ids.append(j)
+
+            if counted_atom_ids_prev == counted_atom_ids:
+                counted_atom_ids.append(new_index)
 
         # Check distances for alternation
         for bond in assigned_bonds:
-            if atom_types[bond[0]] == 'cc':
+
+            if atom_types[bond[0]] in ['cc', 'cd']:
                 if distances[bond[0]][bond[1]] <= 1.4:
-                    atom_types[bond[1]] = 'cd'
+                    atom_types[bond[1]] = ('cd' if atom_types[bond[0]] == 'cc'
+                                           else 'cc')
                 else:
-                    atom_types[bond[1]] = 'cc'
-            elif atom_types[bond[0]] == 'ce':
+                    atom_types[bond[1]] = atom_types[bond[0]]
+
+            elif atom_types[bond[0]] in ['ce', 'cf']:
                 if distances[bond[0]][bond[1]] <= 1.4:
-                    atom_types[bond[1]] = 'cf'
+                    atom_types[bond[1]] = ('cf' if atom_types[bond[0]] == 'ce'
+                                           else 'cf')
                 else:
-                    atom_types[bond[1]] = 'ce'
-            elif atom_types[bond[0]] == 'cg':
+                    atom_types[bond[1]] = atom_types[bond[0]]
+
+            elif atom_types[bond[0]] in ['cg', 'ch']:
                 if distances[bond[0]][bond[1]] <= 1.4:
-                    atom_types[bond[1]] = 'ch'
+                    atom_types[bond[1]] = ('ch' if atom_types[bond[0]] == 'cg'
+                                           else 'ch')
                 else:
-                    atom_types[bond[1]] = 'cg'
-            elif atom_types[bond[0]] == 'nc':
+                    atom_types[bond[1]] = atom_types[bond[0]]
+
+            elif atom_types[bond[0]] in ['nc', 'nd']:
                 if distances[bond[0]][bond[1]] <= 1.4:
-                    atom_types[bond[1]] = 'nd'
+                    atom_types[bond[1]] = ('nd' if atom_types[bond[0]] == 'nc'
+                                           else 'nd')
                 else:
-                    atom_types[bond[1]] = 'nc'
+                    atom_types[bond[1]] = atom_types[bond[0]]
 
         self.gaff_atom_types = atom_types
 
