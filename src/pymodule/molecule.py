@@ -334,6 +334,28 @@ def _Molecule_get_coordinates_in_angstrom(self):
     return self.get_coordinates_in_bohr() * bohr_in_angstrom()
 
 
+def _Molecule_get_distance_matrix_in_angstrom(self):
+    """
+    Returns distance matrix in Angstrom.
+
+    :return:
+        A numpy array of distance matrix (nxn) in Angstrom.
+    """
+
+    coords = self.get_coordinates_in_angstrom()
+    natoms = coords.shape[0]
+    distance_matrix = np.zeros((natoms, natoms))
+
+    for i in range(natoms):
+        for j in range(i, natoms):
+            rij = np.linalg.norm(coords[i, :] - coords[j, :])
+            distance_matrix[i, j] = rij
+            if i != j:
+                distance_matrix[j, i] = rij
+
+    return distance_matrix
+
+
 def _Molecule_get_xyz_string(self):
     """
     Returns xyz string of molecule.
@@ -601,6 +623,7 @@ Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates
 Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
+Molecule.get_distance_matrix_in_angstrom = _Molecule_get_distance_matrix_in_angstrom
 Molecule.get_xyz_string = _Molecule_get_xyz_string
 Molecule.write_xyz_file = _Molecule_write_xyz_file
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia
