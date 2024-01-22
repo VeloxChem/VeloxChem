@@ -14,6 +14,8 @@ import numpy as np
 import sys
 import h5py
 
+from mpi4py import MPI
+
 try:
     import pyscf
     # TODO: rename grad to pyscf_grad, hessian, etc.
@@ -2028,41 +2030,7 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
 
     gs_dm = ao_matrix_to_dalton(DenseMatrix(density), basis, molecule).to_numpy()
     nao = density.shape[0]
-    vlx_vxc_deriv_atom_i = np.zeros((3, nao, nao))
-
-    if scfdrv is not None:
-        if scfdrv._dft:
-            pyscf_scf = pyscf.scf.RKS(pyscf_molecule)
-            # set functional, convergence threshold and grid level 
-            pyscf_scf.xc = translate_to_pyscf(scfdrv.xcfun.get_func_label())
-            pyscf_scf.conv_tol = scfdrv.conv_thresh
-            if scfdrv.grid_level is None:
-                scfdrv.grid_level = get_default_grid_level(scfdrv.xcfun)
-            if scfdrv.grid_level == 6 or scfdrv.grid_level == 7:
-                pyscf_scf.grids.level = 9
-            else:
-                pyscf_scf.grids.level = scfdrv.grid_level
-
-            #if scfdrv.xcfun.get_func_type() == xcfun.lda:
-            grid_drv = GridDriver()
-            if scfdrv.grid_level is not None:
-                grid_drv.set_level(scfdrv.grid_level)
-            else:
-                grid_level = get_default_grid_level(scfdrv.xcfun)
-            xc_mol_hess = XCMolecularHessian()
-            mol_grid = grid_drv.generate(molecule)
-            vlx_density = scfdrv.density
-            vlx_vxc_deriv_atom_i = xc_mol_hess.integrate_vxc_fock_gradient(
-                                    molecule, basis, vlx_density, mol_grid,
-                                    scfdrv.xcfun.get_func_label(), i)
-            #else:
-            #    pyscf_scf.kernel()
-            #
-            #    pyscf_hessian = pyscf.hessian.rks.Hessian(pyscf_scf)
-        else:
-            pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
-    else:
-        pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
+    pyscf_scf = pyscf.scf.RHF(pyscf_molecule)
     
     if nao != pyscf_molecule.nao:
         error_text = "vlx and pyscf number of atomic orbitals are different!"
@@ -2145,12 +2113,55 @@ def fock_deriv(molecule, basis, density, i=0, scfdrv=None, unit="au"):
                                 )
 
     #if scfdrv.xcfun.get_func_type() == xcfun.lda:
-    return vlx_fock_deriv_atom_i + vlx_vxc_deriv_atom_i 
+    return vlx_fock_deriv_atom_i # + vlx_vxc_deriv_atom_i 
     #else:
     #    return vlx_fock_deriv_atom_i
 
+# FIXME: this routine does not work with MPI correctly!
+def vxc_deriv(molecule, basis, scfdrv, i=0):
+    """
+    Imports the derivatives of the Fock matrix
+    from pyscf and converts it to veloxchem format
 
-def vxc_deriv(molecule, basis, scfdrv, unit="au"):
+    :param molecule:
+        the vlx molecule object
+    :param basis:
+        the vlx basis object
+    :param scfdrv:
+        The SCF driver (needed for xc derivatives in DFT)
+    :param i:
+        the index of the atom for which the derivatives
+        are computed.
+
+    :return:
+        a numpy array of shape 3 x nao x nao
+        (nao = number of atomic orbitals)
+        corresponding to the derivative of the Vxc matrix
+        with respect to the x, y and z coords. of atom i.
+    """
+    pass
+#    nao = basis.get_dimension_of_basis(molecule)
+#    #vlx_vxc_deriv_atom_i = np.zeros((3, nao, nao))
+#
+#    if scfdrv._dft:
+#        grid_drv = GridDriver()
+#        if scfdrv.grid_level is not None:
+#            grid_drv.set_level(scfdrv.grid_level)
+#        else:
+#            grid_level = get_default_grid_level(scfdrv.xcfun)
+#        xc_mol_hess = XCMolecularHessian()
+#        mol_grid = grid_drv.generate(molecule)
+#        vlx_density = scfdrv.density
+#        vlx_vxc_deriv_atom_i = xc_mol_hess.integrate_vxc_fock_gradient(
+#                                    molecule, basis, vlx_density, mol_grid,
+#                                    scfdrv.xcfun.get_func_label(), i)
+#    
+#    if MPI.COMM_WORLD.rank == 0:   
+#        return vlx_vxc_deriv_atom_i
+#    else:
+#        return None
+
+def vxc_deriv_pyscf(molecule, basis, scfdrv, unit="au"):
     """
     Imports the derivatives of the Vxc matrix
     from pyscf and converts it to veloxchem format

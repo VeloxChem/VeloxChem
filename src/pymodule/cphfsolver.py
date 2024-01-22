@@ -35,6 +35,7 @@ from .veloxchemlib import fockmat
 from .veloxchemlib import AODensityMatrix
 from .veloxchemlib import AOFockMatrix
 from .veloxchemlib import ElectronRepulsionIntegralsDriver
+from .veloxchemlib import XCMolecularHessian
 from .outputstream import OutputStream
 from .profiler import Profiler
 from .distributedarray import DistributedArray
@@ -45,12 +46,14 @@ from .inputparser import parse_input
 from .qqscheme import get_qq_scheme
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
+from .dftutils import get_default_grid_level
 #from .checkpoint import check_rsp_hdf5, create_hdf5, write_rsp_solution
 from scipy.sparse import linalg
 
 # For PySCF integral derivatives
 from .import_from_pyscf import overlap_deriv
 from .import_from_pyscf import fock_deriv
+from .import_from_pyscf import vxc_deriv
 from .import_from_pyscf import eri_deriv
 
 class CphfSolver(LinearSolver):
@@ -959,18 +962,32 @@ class CphfSolver(LinearSolver):
             density = None
 
         density = self.comm.bcast(density, root=mpi_master())
+        mol_grid = dft_dict['molgrid'] 
+        gs_density = dft_dict['gs_density']
 
         # import the integral derivatives
         self.profiler.set_timing_key('derivs')
         self.profiler.start_timer('derivs')
 
         t0 = tm.time()
+        # TODO: test if XCMolecularHessian obejct outside 
+        # for-loop gives the correct Hessian
+        if scf_drv._dft: 
+            xc_mol_hess = XCMolecularHessian()
         for i in range(natm):
-            fock_deriv_i = fock_deriv(molecule, basis, density,
-                                      i, scf_drv)
+            if scf_drv._dft:
+                vxc_deriv_i = xc_mol_hess.integrate_vxc_fock_gradient(
+                                    molecule, basis, gs_density, mol_grid,
+                                    scf_drv.xcfun.get_func_label(), i)
+                vxc_deriv_i = self.comm.reduce(vxc_deriv_i, root=mpi_master())
             if self.rank == mpi_master():
                 ovlp_deriv_ao[i] = overlap_deriv(molecule, basis, i)
-                fock_deriv_ao[i] = fock_deriv_i
+                fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
+                                                i, scf_drv)
+                if scf_drv._dft:
+                    #print("\n\n", i, self.rank)
+                    #print(vxc_deriv_i, "\n\n")
+                    fock_deriv_ao[i] += vxc_deriv_i
         t1 = tm.time()
 
         if self.rank == mpi_master():
