@@ -86,7 +86,7 @@ updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int6
             const auto gto_norms  = gto_block.getNormalizationFactors();
             const auto gto_coords = gto_block.getCoordinates();
 
-            const auto gto_ao_inds = gto_block.getAtomicOrbitalsIndexes();
+            const auto gto_ao_inds_cart = gto_block.getAtomicOrbitalsIndexesForCartesian();
 
             for (int64_t j = 0; j < npgtos; j++)
             {
@@ -98,9 +98,9 @@ updatePrimitiveInfoForP(double* p_prim_info, uint32_t* p_prim_aoinds, const int6
                     p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 3] = gto_coords[i][1];
                     p_prim_info[p_prim_offset + i + j * ncgtos + p_prim_count * 4] = gto_coords[i][2];
 
-                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds[i + ncgtos * 0]);
-                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 1] = static_cast<uint32_t>(gto_ao_inds[i + ncgtos * 1]);
-                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 2] = static_cast<uint32_t>(gto_ao_inds[i + ncgtos * 2]);
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 0] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 0]);
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 1] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 1]);
+                    p_prim_aoinds[p_prim_offset + i + j * ncgtos + p_prim_count * 2] = static_cast<uint32_t>(gto_ao_inds_cart[i + ncgtos * 2]);
                 }
             }
 
