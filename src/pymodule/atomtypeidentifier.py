@@ -67,7 +67,6 @@ class AtomTypeIdentifier:
         - aromaticity: A list of aromaticity classifications for each cyclic
           structure.
         - cycles: A list of cyclic structures.
-        - cycle_ids: A list of cyclic structure IDs.
         - atom_cycle_info: A dictionary containing cycle information for each
           atom.
         - atom_info_dict: A dictionary containing detailed information for each
@@ -238,78 +237,70 @@ class AtomTypeIdentifier:
         ]
 
         # Remove super-cycles (cycles that contain smaller cycles)
-        self.reduced_cycles = filtered_cycles[:]
         cycles_to_remove = set()
-        for i, cycle in enumerate(filtered_cycles):
-            for j, larger_cycle in enumerate(filtered_cycles):
-                if len(cycle) < len(larger_cycle) and set(cycle).issubset(
-                        set(larger_cycle)):
-                    cycles_to_remove.add(tuple(larger_cycle))
+        for cycle in filtered_cycles:
+            for other_cycle in filtered_cycles:
+                if (len(cycle) < len(other_cycle) and
+                        set(cycle).issubset(set(other_cycle))):
+                    cycles_to_remove.add(tuple(other_cycle))
 
-        # Convert cycles_to_remove to list of lists and then to a set of tuples
-        # for faster lookup
-        cycles_to_remove = {tuple(c) for c in cycles_to_remove}
-
-        # Rebuild reduced_cycles excluding the ones in cycles_to_remove
+        # Build reduced_cycles by excluding the ones in cycles_to_remove
         self.reduced_cycles = [
-            cycle for cycle in self.reduced_cycles
+            cycle for cycle in filtered_cycles
             if tuple(cycle) not in cycles_to_remove
         ]
 
         self.cyclic_atoms = set()
-        self.cycle_sizes = []
         self.aromaticity = []
-        self.cycle_ids = []
         self.atom_cycle_info = {}
 
         # Assignation of aromaticity to all the reduced cycles
 
-        for cycle_id, cycle in enumerate(self.reduced_cycles):
+        for cycle in self.reduced_cycles:
             self.cyclic_atoms.update(cycle)
-
-            size = len(cycle)
-            self.cycle_sizes.append(size)
 
             cycle_elements = [self.atomic_symbols[i] for i in cycle]
 
-            cc_bond_distances = [
-                self.distance_matrix[cycle[i]][cycle[(i + 1) % size]]
-                for i in range(size)
-                if self.atomic_symbols[cycle[i]] == "C" and
-                self.atomic_symbols[cycle[(i + 1) % size]] == "C"
-            ]
+            cc_bond_distances = []
+            for ind, a_i in enumerate(cycle):
+                a_j = cycle[(ind + 1) % len(cycle)]
+                if (self.atomic_symbols[a_i] == 'C' and
+                        self.atomic_symbols[a_j] == 'C'):
+                    cc_bond_distances.append(self.distance_matrix[a_i][a_j])
 
-            max_distance = max(cc_bond_distances) if cc_bond_distances else 0
-            min_distance = min(cc_bond_distances) if cc_bond_distances else 0
+            max_distance, min_distance = 0.0, 0.0
+            if cc_bond_distances:
+                max_distance = max(cc_bond_distances)
+                min_distance = min(cc_bond_distances)
 
-            if size == 6 and all(elem in ["C", "N"] for elem in cycle_elements):
+            all_carbons_sp2 = all([
+                self.is_sp2_carbon(atom_idx)
+                for atom_idx in cycle
+                if self.atomic_symbols[atom_idx] == 'C'
+            ])
 
-                if (all(
-                        self.is_sp2_carbon(atom_idx)
-                        for atom_idx in cycle
-                        if self.atomic_symbols[atom_idx] == "C") and all(
-                            self.is_sp2_nitrogen(atom_idx)
-                            for atom_idx in cycle
-                            if self.atomic_symbols[atom_idx] == "N")):
+            all_nitrogens_sp2 = all([
+                self.is_sp2_nitrogen(atom_idx)
+                for atom_idx in cycle
+                if self.atomic_symbols[atom_idx] == 'N'
+            ])
+
+            if (len(cycle) == 6 and
+                    all([elem in ['C', 'N'] for elem in cycle_elements])):
+
+                if (all_carbons_sp2 and all_nitrogens_sp2):
                     if max_distance - min_distance <= 0.08:
                         aro = "pure_aromatic"
                     else:
                         aro = "non_pure_aromatic"
-                elif (all(
-                        self.is_sp2_carbon(atom_idx)
-                        for atom_idx in cycle
-                        if self.atomic_symbols[atom_idx] == "C") and
-                      max_distance - min_distance <= 0.08):
+                elif all_carbons_sp2 and max_distance - min_distance <= 0.08:
                     aro = "non_pure_aromatic"
                 else:
                     aro = "non_aromatic"
 
-            elif (size == 5 and all(
-                    self.is_sp2_carbon(atom_idx)
-                    for atom_idx in cycle
-                    if self.atomic_symbols[atom_idx] == "C")):
+            elif len(cycle) == 5 and all_carbons_sp2:
 
-                if "S" in cycle_elements:
+                if 'S' in cycle_elements:
                     # Check if the S is connected to 2 atoms in the cycle, if
                     # so, it is non_pure_aromatic
                     if len(
@@ -325,7 +316,7 @@ class AtomTypeIdentifier:
                     else:
                         aro = "non_aromatic"
 
-            elif size == 4:
+            elif len(cycle) == 4:
 
                 if all(
                         self.is_sp2_carbon(atom_idx)
@@ -347,10 +338,8 @@ class AtomTypeIdentifier:
                         'sizes': [],
                         'aromaticities': []
                     }
-                self.atom_cycle_info[atom]['sizes'].append(size)
+                self.atom_cycle_info[atom]['sizes'].append(len(cycle))
                 self.atom_cycle_info[atom]['aromaticities'].append(aro)
-
-            self.cycle_ids.append(cycle_id)
 
         # Additional logic for reassignment of aromaticity in special cases
         # where 3 atoms are shared with aromatic rings.
@@ -360,7 +349,7 @@ class AtomTypeIdentifier:
                 self.is_sp2_carbon(atom_idx)
                 for atom_idx in cycle
                 if self.atomic_symbols[atom_idx] == "C")
-            if (self.cycle_sizes[index] == 5 and
+            if (len(cycle) == 5 and
                     self.aromaticity[index] == 'non_aromatic' and
                     all_carbons_sp2):
                 count_pure_aromatic_atoms = sum([
@@ -424,8 +413,7 @@ class AtomTypeIdentifier:
                 info["CycleSize"] = self.atom_cycle_info[i]['sizes']
                 info["Aromaticity"] = self.atom_cycle_info[i]['aromaticities']
                 info["CycleNumber"] = [
-                    self.cycle_ids[self.reduced_cycles.index(c)]
-                    for c in self.reduced_cycles
+                    c_ind for c_ind, c in enumerate(self.reduced_cycles)
                     if i in c
                 ]
             else:
@@ -2257,14 +2245,16 @@ class AtomTypeIdentifier:
             self.ostream.print_info("{:<30} {:<20}".format(
                 f"{symbol} ({i})", gaff_type))
 
-        if self.cycle_ids:
-            cycle_suffix = 's' if len(self.cycle_ids) > 1 else ''
+        # Print cycle information (aromaticity) for each cycle
+        cycle_sizes = [len(cycle) for cycle in self.reduced_cycles]
+
+        if cycle_sizes:
+            cycle_suffix = 's' if len(cycle_sizes) > 1 else ''
             self.ostream.print_blank()
             self.ostream.print_info(
-                f"Detected {len(self.cycle_ids)} cycle{cycle_suffix}:")
+                f"Detected {len(cycle_sizes)} cycle{cycle_suffix}:")
 
-        # Print cycle information (aromaticity) for each cycle
-        for size, aromaticity in zip(self.cycle_sizes, self.aromaticity):
+        for size, aromaticity in zip(cycle_sizes, self.aromaticity):
             if aromaticity == "non_aromatic":
                 self.ostream.print_info(
                     f"Cycle size {size}: Non-aromatic Cycle")
