@@ -2150,7 +2150,7 @@ class AtomTypeIdentifier:
 
         atom_types = list(self.gaff_atom_types)
 
-        # Look for cc-cc, ce-ce, cg-cg and nc-nc bonds
+        # Look for bonds formed between cc, ce, cg, nc
 
         assigned_bonds = []
         counted_atom_ids = []
@@ -2206,7 +2206,21 @@ class AtomTypeIdentifier:
 
         for i, j in assigned_bonds:
 
-            if self.distance_matrix[i][j] <= 1.4:
+            is_c_n_bond = (
+                (atom_types[i][0] == 'c' and atom_types[j][0] == 'n') or
+                (atom_types[i][0] == 'n' and atom_types[j][0] == 'c'))
+
+            is_n_n_bond = (atom_types[i][0] == 'n' and atom_types[j][0] == 'n')
+
+            has_sp1_carbon = (atom_types[i] in ['cg', 'ch'] or
+                              atom_types[j] in ['cg', 'ch'])
+
+            if is_c_n_bond or is_n_n_bond or has_sp1_carbon:
+                single_bond_thresh = 1.35
+            else:
+                single_bond_thresh = 1.3985
+
+            if self.distance_matrix[i][j] <= single_bond_thresh:
                 if atom_types[i] in ['cc', 'ce', 'cg', 'nc']:
                     atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
                 else:
