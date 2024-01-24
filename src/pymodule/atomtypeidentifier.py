@@ -63,7 +63,6 @@ class AtomTypeIdentifier:
           atoms.
         - cyclic_atoms: A set of atom indices that are part of a cyclic
           structure.
-        - cycle_sizes: A list of the sizes of each cyclic structure.
         - aromaticity: A list of aromaticity classifications for each cyclic
           structure.
         - cycles: A list of cyclic structures.
@@ -342,35 +341,24 @@ class AtomTypeIdentifier:
         # Additional logic for reassignment of aromaticity in special cases
         # where 3 atoms are shared with aromatic rings.
         for index, cycle in enumerate(self.reduced_cycles):
-
-            all_carbons_sp2 = all([
+            # Check if all carbons in the cycle are sp2
+            all_carbons_sp2 = all(
                 self.is_sp2_carbon(atom_idx)
                 for atom_idx in cycle
-                if self.atomic_symbols[atom_idx] == 'C'
-            ])
-
+                if self.atomic_symbols[atom_idx] == "C")
             if (len(cycle) == 5 and all_carbons_sp2 and
                     self.aromaticity[index] == 'non_aromatic'):
-
-                count_pure_aromatic_atoms = 0
-                for atom in cycle:
-                    if 'pure_aromatic' in self.atom_cycle_info[atom][
-                            'aromaticities']:
-                        count_pure_aromatic_atoms += 1
-
+                count_pure_aromatic_atoms = sum([
+                    1 for atom in cycle if 'pure_aromatic' in
+                    self.atom_cycle_info[atom]['aromaticities']
+                ])
                 if count_pure_aromatic_atoms >= 3:
                     self.aromaticity[index] = 'non_pure_aromatic'
                     for atom in cycle:
-                        self.atom_cycle_info[atom]['aromaticities'] = []
-                        # TODO: match cycle and aromaticity in
-                        # atom_cycle_info[atom]['aromaticities']
-                        for a in self.atom_cycle_info[atom]['aromaticities']:
-                            if a == 'non_aromatic':
-                                self.atom_cycle_info[atom][
-                                    'aromaticities'].append('non_pure_aromatic')
-                            else:
-                                self.atom_cycle_info[atom][
-                                    'aromaticities'].append(a)
+                        self.atom_cycle_info[atom]['aromaticities'] = [
+                            'non_pure_aromatic' if a == 'non_aromatic' else a
+                            for a in self.atom_cycle_info[atom]['aromaticities']
+                        ]
 
     def create_atom_info_dict(self):
         """
@@ -455,11 +443,8 @@ class AtomTypeIdentifier:
 
             if info['AtomicSymbol'] == 'C':
 
-                # If this carbon was previously assigned, skip the rest of the
-                # loop
-                key = f"C{info['AtomNumber']}"
-                if key in self.atom_types_dict:
-                    continue
+                # Note: do identification regardless whether this carbon was
+                # previously assigned or not
 
                 # Chemical environment information
                 connected_symbols = set(info['ConnectedAtoms'])
@@ -483,7 +468,7 @@ class AtomTypeIdentifier:
                                     connected_atom_info.get('CycleNumber') and
                                     not set(
                                         connected_atom_info.get('CycleNumber'))
-                                    and set(info.get('CycleNumber')) and
+                                    & set(info.get('CycleNumber')) and
                                     'pure_aromatic'
                                     in connected_atom_info.get('Aromaticity')):
 
@@ -769,6 +754,7 @@ class AtomTypeIdentifier:
                         }
 
                 elif info.get('CyclicStructure') == 'none':
+
                     if info['NumConnectedAtoms'] == 4:
                         if 'C' and 'H' in connected_symbols:
                             carbon_type = {
@@ -927,6 +913,7 @@ class AtomTypeIdentifier:
                             'gaff': f'cx{info["AtomNumber"]}'
                         }
                 else:
+
                     carbon_type = {
                         'opls': f'opls_x{info["AtomNumber"]}',
                         'gaff': f'cx{info["AtomNumber"]}'
@@ -1344,6 +1331,7 @@ class AtomTypeIdentifier:
 
             # Nitrogen type decision
             elif info['AtomicSymbol'] == 'N':
+
                 connected_symbols = set(info['ConnectedAtoms'])
                 connected_atoms = info['ConnectedAtoms']
                 connected_atoms_numbers = info['ConnectedAtomsNumbers']
@@ -1670,6 +1658,11 @@ class AtomTypeIdentifier:
 
                     elif (info['NumConnectedAtoms'] == 3 and
                           'non_pure_aromatic' in info.get('Aromaticity')):
+
+                        # Default assignment
+                        # General n3 case
+                        nitrogen_type = {'opls': 'opls_na', 'gaff': 'na'}
+
                         if 'C' in connected_symbols:
                             # Check for amides and sulfamides by checking the
                             # connected atoms to the carbon
@@ -1683,9 +1676,10 @@ class AtomTypeIdentifier:
                                     atom_connectivity = self.atom_info_dict[
                                         connected_to_carbon][
                                             'NumConnectedAtoms']
-                                    if (atom_symbol == 'O' and atom_connectivity
-                                            == 1) or (atom_symbol == 'S' and
-                                                      atom_connectivity == 1):
+                                    if ((atom_symbol == 'O' and
+                                         atom_connectivity == 1) or
+                                        (atom_symbol == 'S' and
+                                         atom_connectivity == 1)):
                                         num_hydrogens = sum([
                                             1 for symbol in connected_atoms
                                             if symbol == 'H'
@@ -1709,16 +1703,6 @@ class AtomTypeIdentifier:
                                         break
                                 if found_CO:
                                     break
-                            else:
-                                nitrogen_type = {
-                                    'opls': 'opls_na',
-                                    'gaff': 'na'
-                                }  # General n3 case
-                        else:
-                            nitrogen_type = {
-                                'opls': f'opls_x{info["AtomNumber"]}',
-                                'gaff': f'nx{info["AtomNumber"]}'
-                            }
 
                     # Nitrogens in Non-aromatic cycles
                     elif (info['NumConnectedAtoms'] == 3 and
@@ -1858,6 +1842,7 @@ class AtomTypeIdentifier:
                     elif info[
                             'NumConnectedAtoms'] == 2 and 'non_aromatic' in info.get(
                                 'Aromaticity'):
+
                         nitrogen_type = {'opls': 'opls_903', 'gaff': 'n2'}
 
                     else:
@@ -1869,6 +1854,7 @@ class AtomTypeIdentifier:
                         }
 
                 else:
+
                     nitrogen_type = {
                         'opls': f'opls_x{info["AtomNumber"]}',
                         'gaff': f'nx{info["AtomNumber"]}'
