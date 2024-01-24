@@ -432,7 +432,6 @@ class ScfHessianDriver(HessianDriver):
         cphf_solver.compute(molecule, ao_basis, scf_tensors, scf_drv)
         
         if self.rank == mpi_master():
-            print("Solved CPHF...")
             hessian_first_order_derivatives = np.zeros((natm, natm, 3, 3))
             cphf_solution_dict = cphf_solver.cphf_results
             cphf_ov = cphf_solution_dict['cphf_ov'].reshape(natm, 3, nocc, nvir)
@@ -513,20 +512,11 @@ class ScfHessianDriver(HessianDriver):
             xc_mol_hess = XCMolecularHessian()
             mol_grid = grid_drv.generate(molecule)
 
-            #gs_density = scf_drv.density
-            # FIXME: this routine does not seem to work correctly when using
-            # more than one node (the result on mpi_master depends on the 
-            # number of nodes used)
-            nproc = self.comm.Get_size()
-            error_txt = "ScfHessianDriver: "
-            error_txt += "integrate_exc_hessian does not work correctly"
-            error_txt += "for more than 1 MPI process. Please use -np 1."
-            assert_msg_critical(nproc==1, error_txt)
             hessian_dft_xc = xc_mol_hess.integrate_exc_hessian(molecule,
                                                 ao_basis,
                                                 gs_density, mol_grid,
                                                 scf_drv.xcfun.get_func_label())
-            self.comm.reduce(hessian_dft_xc, root=mpi_master())
+            hessian_dft_xc = self.comm.reduce(hessian_dft_xc, root=mpi_master())
 
         if self.rank == mpi_master():
             t2 = tm.time()
@@ -581,7 +571,6 @@ class ScfHessianDriver(HessianDriver):
                             ).transpose(0,2,1,3).reshape(3*natm, 3*natm)
 
             if self.dft:
-                #print(self.rank, "Hessian\n", hessian_dft_xc)
                 self.hessian += hessian_dft_xc
 
             t3 = tm.time()

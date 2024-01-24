@@ -453,7 +453,6 @@ class CphfSolver(LinearSolver):
             eocc = mo_energies[:nocc]
             evir = mo_energies[nocc:]
             eov = eocc.reshape(-1, 1) - evir
-            #print("MPI MASTER here ", self.rank)
         else:
             nao = None
 
@@ -985,8 +984,6 @@ class CphfSolver(LinearSolver):
                 fock_deriv_ao[i] = fock_deriv(molecule, basis, density,
                                                 i, scf_drv)
                 if scf_drv._dft:
-                    #print("\n\n", i, self.rank)
-                    #print(vxc_deriv_i, "\n\n")
                     fock_deriv_ao[i] += vxc_deriv_i
         t1 = tm.time()
 
