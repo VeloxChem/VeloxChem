@@ -28,6 +28,7 @@ import numpy as np
 import networkx as nx
 import sys
 import re
+from collections import defaultdict
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom
 from .outputstream import OutputStream
@@ -2281,6 +2282,202 @@ class AtomTypeIdentifier:
         self.ostream.flush()
 
         return self.gaff_atom_types
+    
+    def identify_equivalences(self, depth=4):
+        """
+        Identifies equivalent atoms in the molecule.
+        The depth parameter specifies how many bonds are considered for the equivalence.
+        The default value is 4.
+
+        :param depth:
+            Depth of the equivalence search
+
+        """
+
+        def gather_neighbors(atom_index, current_depth=0, path=()):
+            """
+            Nested function to gather the paths to neighbors of an atom up to a certain depth.
+            """
+            if current_depth == depth:
+                return []
+
+            neighbors = []
+            for i, connected in enumerate(connectivity_matrix[atom_index]):
+                if connected and i not in path:
+                    new_path = path + (i,)
+                    neighbors.append(new_path)
+                    if current_depth < depth - 1:
+                        neighbors.extend(
+                            gather_neighbors(i, current_depth + 1, new_path))
+
+            return neighbors
+
+        # Main logic for identifying equivalences
+        connectivity_matrix = self.connectivity_matrix
+
+        atom_type_counts = defaultdict(int)
+        for atom in self.gaff_atom_types:
+            atom_type_counts[atom] += 1
+
+        repeated_atomtypes = [
+            atom for atom, count in atom_type_counts.items() if count > 1
+        ]
+        self.equivalent_atoms = defaultdict(list)
+
+        # Adjust for one-indexing in the equivalent_atoms dictionary
+        for atom_type in repeated_atomtypes:
+            atom_paths = defaultdict(list)
+
+            for i, atom in enumerate(self.gaff_atom_types,
+                                    start=1):  # Start indexing from 1
+                if atom == atom_type:
+                    paths = gather_neighbors(
+                        i -
+                        1)  # Convert back to zero-index for internal processing
+                    path_types = tuple(
+                        tuple(self.gaff_atom_types[step]
+                            for step in path)
+                        for path in paths)
+                    atom_paths[path_types].append(i)  # Use one-indexing
+
+            for index, (path_set, indices) in enumerate(atom_paths.items()):
+                for atom_index in indices:
+                    self.equivalent_atoms[
+                        atom_index] = f"{atom_type}_{index:02d}"
+
+        # Adjusting for one-indexing in the printing and equal_charges_str generation
+        # Printing section using ostream
+        self.ostream.print_blank()
+        self.ostream.print_info("VeloxChem Atom Type Equivalence")
+        self.ostream.print_info("-" * 40)  # Dashed line
+        self.ostream.print_info("Equivalent atoms:")
+        self.ostream.print_info("Atom\tEquivalent atoms")
+        for key, value in self.equivalent_atoms.items():
+            self.ostream.print_info(f"{key}\t{value}")
+
+        # Temporary dictionary to group equivalent atoms (now using one-indexed format)
+        temp_equivalent_groups = defaultdict(list)
+        for atom_index, equivalence_class in self.equivalent_atoms.items():
+            temp_equivalent_groups[equivalence_class].append(atom_index)
+
+        # Generating the formatted string for equivalent charges (one-indexed)
+        equal_charges_str = []
+        for group in temp_equivalent_groups.values():
+            if len(group) > 1:  # Only consider groups with more than one member
+                group_str = ' = '.join(map(str, group))  # Already one-indexed
+                equal_charges_str.append(group_str)
+
+        # Combine all group strings into one comma-separated string
+        self.equivalent_charges = {
+            "equal_charges": ', '.join(equal_charges_str)
+        }
+
+        # Update atom types with equivalence indices
+        self.equivalent_atom_names = [
+            atom if i +
+            1 not in self.equivalent_atoms else self.equivalent_atoms[i + 1]
+            for i, atom in enumerate(self.gaff_atom_types)
+        ]
+
+        # Append "_00" to the atomtypes that are not equivalent
+        for i, atom in enumerate(self.gaff_atom_types, start=1):
+            if i not in self.equivalent_atoms:
+                self.equivalent_atom_names[
+                    i - 1] = f"{atom}_00"  # Correct index in the list
+                
+    def check_for_bad_assignations(self, ff_data_lines):
+        '''
+        Method that checks if there are any atom types that have not been
+        assigned properly. To do that, the method will check if any of the 
+        bonds assigned do not exist in the GAFF force field. 
+
+        :param gaff_force_field:
+            The dat file containing the force field information
+
+        '''
+
+        # Create a dictionary with the assigned bond types
+        assigned_bonds = {}
+        atom_types = self.gaff_atom_types
+        distances = self.distance_matrix
+
+        for i in range(len(atom_types)):
+            for j in range(
+                    i + 1,
+                    len(atom_types)):  # Avoid checking the same bond twice
+                # Append the bond and the atom ids to the dictionary
+                if distances[i][j] != 0:
+                    atomtype1 = atom_types[i]
+                    atom_id1 = i + 1
+                    atomtype2 = atom_types[j]
+                    atom_id2 = j + 1
+                    bond = (atomtype1, atomtype2)
+                    assigned_bonds[bond] = (atom_id1, atom_id2)
+
+        start_bonds_section = False
+        # Save a list with the bonds in the force field
+        bonds = {}
+
+        for line in ff_data_lines:
+            if 'hn  ho  hs  n   na  nc  nd  ne  nf  n2  n3  n4' in line:
+                start_bonds_section = True
+                continue
+            elif line.strip() == '':
+                start_bonds_section = False
+            elif start_bonds_section:
+                # Bonds sections always are xy-zw or x -zw, so, the atom
+                # types are always in the same position
+                atomtype1 = line[0:2].strip()
+                element1 = atomtype1[0]
+                atomtype2 = line[3:5].strip()
+                element2 = atomtype2[0]
+                bond = (atomtype1, atomtype2)
+                bonds[bond] = (element1, element2)
+
+        # Check if the assigned bonds are in the force field
+
+        bad_bonds = {
+        }  # Dictionary with the bad bonds format {(atomtype1, atomtype2): (atom_id1, atom_id2)}
+        for bond in assigned_bonds:
+            # Check if the bond or the reverse bond is in the force field
+            if bond not in bonds and bond[::-1] not in bonds:
+                print('Warning:')
+                print(f'The atom type {bond[0]} with id {assigned_bonds[bond][0]}')
+                print(f'and the atom type {bond[1]} with id {assigned_bonds[bond][1]}')
+                print('may have not been assigned properly')
+
+                bad_bonds[bond] = assigned_bonds[bond]
+            else:
+                continue
+
+        if bad_bonds == {}: 
+            self.ostream.print_info('All atom types seems to be assigned properly')
+
+
+        # Print the definition of the atom types that have been assigned wrong
+        first_atoms = []
+        second_atoms = []
+
+        for key, value in bad_bonds.items():
+            first_atom = key[0]
+            first_atoms.append(first_atom)
+            second_atom = key[1]
+            second_atoms.append(second_atom)
+            found_first_atom = found_second_atom = False
+            for line in ff_data_lines[1:100]:
+                # Look for first atom type
+                if not found_first_atom and first_atom in line:
+                    parts = line.split()
+                    comment = ' '.join(parts[3:])
+                    print(f'{first_atom} is {comment}')
+                    found_first_atom = True
+                elif not found_second_atom and second_atom in line:
+                    parts = line.split()
+                    comment = ' '.join(parts[3:])
+                    print(f'{second_atom} is {comment}')
+                    found_second_atom = True
+                if found_first_atom and found_second_atom:
+                    break
 
     @staticmethod
     def get_atom_number(atom_type_str):

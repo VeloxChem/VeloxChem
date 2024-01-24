@@ -516,6 +516,440 @@ class ForceFieldGenerator:
             content = f_gaff.read().decode('utf-8')
 
         return content.splitlines()
+    
+    # def identify_atom_types(self):  
+    #     '''
+    #     Identifies GAFF atom types.
+    #     '''
+
+    #     atomtypeidentifier = AtomTypeIdentifier(self.comm, self.ostream)
+    #     self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
+    #         self.molecule)
+    #     atomtypeidentifier.check_for_bad_assignations(self.get_gaff_data_lines())
+    #     self.connectivity_matrix = np.copy(atomtypeidentifier.connectivity_matrix)
+
+    def generate_topology(self):
+        '''
+        Generates a topology dictionary.
+        '''
+
+        # Initialize the topology dictionary, the fields are:
+        # - atomtypes: The atom types as the GROMACS directive.
+        # - atoms: The atoms as the GROMACS directive.
+        # - bonds: The bonds as the GROMACS directive.
+        # - pairs: The pairs as the GROMACS directive.
+        # - angles: The angles as the GROMACS directive.
+        # - dihedrals: The dihedrals as the GROMACS directive.
+        # - impropers: The impropers as the GROMACS directive. 
+
+        self.topology = {
+            'atomtypes': [],
+            'atoms': [],
+            'bonds': [],
+            'pairs': [],
+            'angles': [],
+            'dihedrals': [],
+            'impropers': [],
+        }
+
+        # Read the force field data lines.
+
+        if self.force_field_data is None:
+            ff_data_lines = self.get_gaff_data_lines()
+        else:
+            with open(self.force_field_data, 'r') as ff_data:
+                ff_data_lines = ff_data.readlines()
+     
+        # Molecular information
+
+        coords = self.molecule.get_coordinates_in_bohr()
+        n_atoms = self.molecule.number_of_atoms()
+
+        atomtypeidentifier = AtomTypeIdentifier()
+        atomtypeidentifier.ostream.mute()
+
+        # The atomtypes shall be accesible for the validation of the force field.
+        self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(self.molecule)
+        atomtypeidentifier.check_for_bad_assignations(ff_data_lines)
+        self.connectivity_matrix = np.copy(atomtypeidentifier.connectivity_matrix)
+ 
+        # preparing atomtypes and atoms
+
+        assert_msg_critical(
+            len(self.atom_types) == n_atoms,
+            'ForceFieldGenerator: inconsistent atom_types')
+
+        for i in range(n_atoms):
+           self.atom_types[i] = f'{self.atom_types[i].strip():<2s}'
+        self.unique_atom_types = list(set(self.atom_types))
+        
+        # Populate the atomtypes field of the topology dictionary.
+        self.topology['atomtypes'] = self.unique_atom_types
+        
+        atom_names = self.get_atom_names()
+        self.topology['atoms'] = atom_names
+
+        # Bonds
+
+        bond_indices = set()
+        for i in range(n_atoms):
+            for j in range(i + 1, n_atoms):
+                if self.connectivity_matrix[i, j] == 1:
+                    bond_indices.add((i, j))
+        bond_indices = sorted(list(bond_indices))
+
+        # Angles
+
+        angle_indices = set()
+
+        for i, j in bond_indices:
+            for k in range(n_atoms):
+                if k in [i, j]:
+                    continue
+                if self.connectivity_matrix[j, k] == 1:
+                    inds = (i, j, k) if i < k else (k, j, i)
+                    angle_indices.add(inds)
+                if self.connectivity_matrix[k, i] == 1:
+                    inds = (k, i, j) if k < j else (j, i, k)
+                    angle_indices.add(inds)
+        angle_indices = sorted(list(angle_indices))
+
+        # Dihedrals
+
+        dihedral_indices = set()
+
+        for i, j, k in angle_indices:
+            for l in range(n_atoms):
+                if l in [i, j, k]:
+                    continue
+                if self.connectivity_matrix[k, l] == 1:
+                    inds = (i, j, k, l) if i < l else (l, k, j, i)
+                    dihedral_indices.add(inds)
+                if self.connectivity_matrix[l, i] == 1:
+                    inds = (l, i, j, k) if l < k else (k, j, i, l)
+                    dihedral_indices.add(inds)
+        dihedral_indices = sorted(list(dihedral_indices))
+
+        # Exclusions
+
+        exclusion_indices = []
+        if self.nrexcl >= 2:
+            for i, j in bond_indices:
+                exclusion_indices.append((i, j))
+        if self.nrexcl >= 3:
+            for i, j, k in angle_indices:
+                exclusion_indices.append((i, k))
+
+        # 1-4 pairs
+
+        pairs_14 = set()
+        for i, j, k, l in dihedral_indices:
+            if (i, l) not in exclusion_indices:
+                pairs_14.add((i, l))
+        pairs_14 = sorted(list(pairs_14))
+
+        # Read the force field and include the data in the topology dictionary.
+
+        for i, j in bond_indices: 
+
+            r_eq = np.linalg.norm(coords[i] - coords[j])
+            r_eq *= bohr_in_angstrom() * 0.1
+
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            patterns = [
+                re.compile(r'\A' + f'{at_1}-{at_2}  '),
+                re.compile(r'\A' + f'{at_2}-{at_1}  '),
+            ]
+
+            bond_found = False
+
+            for line in ff_data_lines:
+                matches = [re.search(p, line) for p in patterns]
+                if any(matches):
+                    bond_ff = line[5:].strip().split()
+                    r = float(bond_ff[1]) * 0.1
+                    k_r = float(bond_ff[0]) * 4.184 * 2 * 100
+                    bond_found = True
+                    break
+
+            if not bond_found:
+                warnmsg = f'ForceFieldGenerator: bond {at_1}-{at_2}'
+                warnmsg += ' is not available'
+                self.ostream.print_warning(warnmsg)
+                r = r_eq
+                k_r = 250000 #Default value for bonds
+
+            if self.eq_param:
+                if abs(r - r_eq) > self.r_thresh:
+                    msg = f'Updated bond length {i+1}-{j+1} '
+                    msg += f'({at_1}-{at_2}) to {r_eq:.3f} nm'
+                    self.ostream.print_info(msg)
+                    self.ostream.flush()
+                r = r_eq
+
+            # Save the data in the 'bonds' field of the topology dictionary.
+            self.topology['bonds'].append((i, j, r, k_r))
+
+        for i, j in pairs_14:
+            self.topology['pairs'].append((i, j))
+
+        for i, j, k in angle_indices:
+                
+                a = coords[i] - coords[j]
+                b = coords[k] - coords[j]
+                theta_eq = np.arccos(
+                    np.dot(a, b) / np.linalg.norm(a) /
+                    np.linalg.norm(b)) * 180 / np.pi
+    
+                at_1 = self.atom_types[i]
+                at_2 = self.atom_types[j]
+                at_3 = self.atom_types[k]
+                patterns = [
+                    re.compile(r'\A' + f'{at_1}-{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'{at_3}-{at_2}-{at_1} '),
+                ]
+    
+                angle_found = False
+    
+                for line in ff_data_lines:
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
+                        angle_ff = line[8:].strip().split()
+                        theta = float(angle_ff[1])
+                        k_theta = float(angle_ff[0]) * 4.184 * 2
+                        angle_found = True
+    
+                if not angle_found:
+                    warnmsg = f'ForceFieldGenerator: angle {at_1}-{at_2}-{at_3}'
+                    warnmsg += ' is not available.'
+                    self.ostream.print_warning(warnmsg)
+                    theta = theta_eq
+                    k_theta = 1000
+
+                if self.eq_param:
+                    if abs(theta - theta_eq) > self.theta_thresh:
+                        msg = f'Updated bond angle {i+1}-{j+1}-{k+1} '
+                        msg += f'({at_1}-{at_2}-{at_3}) to {theta_eq:.3f} deg'
+                        self.ostream.print_info(msg)
+                        self.ostream.flush()
+                    theta = theta_eq
+
+                # Save the data in the 'angles' field of the topology dictionary.
+                self.topology['angles'].append((i, j, k, theta, k_theta))
+
+        for i, j, k, l in dihedral_indices:
+
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
+            at_4 = self.atom_types[l]
+
+            patterns = [
+                re.compile(r'\A' + f'{at_1}-{at_2}-{at_3}-{at_4} '),
+                re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
+            ]
+
+            dihedral_found = False
+
+            dihedral_ff_lines = []
+            for line in ff_data_lines:
+                matches = [re.search(p, line) for p in patterns]
+                if any(matches):
+                    dihedral_ff = line[11:60].strip().split()
+                    if len(dihedral_ff) == 4:
+                        dihedral_ff_lines.append(line)
+                        dihedral_found = True
+
+            if not dihedral_found:
+                patterns = [
+                    re.compile(r'\A' + f'X -{at_2}-{at_3}-X  '),
+                    re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
+                ]
+
+                dihedral_ff_lines = []
+                for line in ff_data_lines:
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
+                        dihedral_ff = line[11:60].strip().split()
+                        if len(dihedral_ff) == 4:
+                            dihedral_ff_lines.append(line)
+                            dihedral_found = True
+
+            if not dihedral_found:
+                warnmsg = f'ForceFieldGenerator: dihedral {at_1}-{at_2}-{at_3}-{at_4}'
+                warnmsg += ' is not available.'
+                self.ostream.print_warning(warnmsg)
+
+            for line in dihedral_ff_lines:
+                dihedral_ff = line[11:60].strip().split()
+
+                multiplicity = int(dihedral_ff[0])
+                barrier = float(dihedral_ff[1]) * 4.184 / multiplicity
+                phase = float(dihedral_ff[2])
+                # Note: negative periodicity implies multitermed dihedral
+                # See https://ambermd.org/FileFormats.php
+                try:
+                    periodicity = int(dihedral_ff[3])
+                except ValueError:
+                    periodicity = int(float(dihedral_ff[3]))
+
+                # Save the data in the 'dihedrals' field of the topology dictionary.
+                self.topology['dihedrals'].append((i, j, k, l, multiplicity, barrier, phase, periodicity))
+
+                if periodicity > 0:
+                    break
+                
+
+        # Impropers
+                
+        sp2_atom_types = [
+            'c ', 'cs', 'c2', 'ca', 'cp', 'cq', 'cc', 'cd', 'ce', 'cf',
+            'cu', 'cv', 'cz', 'n ', 'n2', 'na', 'nb', 'nc', 'nd', 'ne',
+            'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
+        ]
+
+        improper_atom_inds = []
+
+        for i, j, k in angle_indices:
+            at_1 = self.atom_types[i]
+            at_2 = self.atom_types[j]
+            at_3 = self.atom_types[k]
+
+            if at_2 not in sp2_atom_types:
+                continue
+
+            if j not in improper_atom_inds:
+                improper_atom_inds.append(j)
+            else:
+                continue
+
+            for l in range(n_atoms):
+                if (l in [i, j, k]) or (self.connectivity_matrix[l, j] != 1):
+                    continue
+                at_4 = self.atom_types[l]
+
+                patterns = [
+                    re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
+                    re.compile(r'\A' + f'{at_1}-{at_3}-{at_2}-{at_4} '),
+                    re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
+                    re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
+                ]
+
+                dihedral_found = False
+
+                for line in ff_data_lines:
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
+                        dihedral_ff = line[11:60].strip().split()
+                        if len(dihedral_ff) == 3:
+                            dihedral_found = True
+                            break
+
+                if not dihedral_found:
+                    patterns = [
+                        re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_3} '),
+                        re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_1} '),
+                        re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
+                        re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
+                        re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
+                    ]
+
+                    for line in ff_data_lines:
+                        matches = [re.search(p, line) for p in patterns]
+                        if any(matches):
+                            dihedral_ff = line[11:60].strip().split()
+                            if len(dihedral_ff) == 3:
+                                dihedral_found = True
+                                break
+
+
+                if not dihedral_found:
+                    patterns = [
+                        re.compile(r'\A' + f'X -X -{at_2}-{at_3} '),
+                        re.compile(r'\A' + f'X -X -{at_2}-{at_1} '),
+                        re.compile(r'\A' + f'X -X -{at_2}-{at_4} '),
+                    ]
+
+                    for line in ff_data_lines:
+                        matches = [re.search(p, line) for p in patterns]
+                        if any(matches):
+                            dihedral_ff = line[11:60].strip().split()
+                            if len(dihedral_ff) == 3:
+                                dihedral_found = True
+                                break
+
+                if not dihedral_found:
+                    warnmsg = f'ForceFieldGenerator: improper {at_1}-{at_2}-{at_3}-{at_4}'
+                    warnmsg += ' is not available.'
+                    # Defaults for impropers (1.1 kcal/mol, 180 deg, 2)
+                    self.ostream.print_warning(warnmsg)
+                    dihedral_ff = ['1.1', '180.0', '2']
+                    continue
+
+                barrier = float(dihedral_ff[0]) * 4.184
+                phase = float(dihedral_ff[1])
+                periodicity = abs(int(float(dihedral_ff[2])))
+
+                assert_msg_critical(
+                    phase == 180.0,
+                    'ForceFieldGenerator: invalid improper dihedral phase')
+                assert_msg_critical(
+                    periodicity == 2,
+                    'ForceFieldGenerator: invalid improper dihedral periodicity'
+                )
+
+                # Save the data in the 'impropers' field of the topology dictionary.
+                self.topology['impropers'].append((i, j, k, l, barrier, phase, periodicity))
+
+
+    def write_top_file(self, top_file):
+        '''
+        Writes top file.
+        '''
+        # Will use the information contained in the dictionary self.topology
+        # to write the GROMACS top file.
+
+        top_fname = top_file if isinstance(top_file, str) else str(top_file)
+
+        mol_name = Path(self.molecule_name).stem
+
+        with open(top_fname, 'w') as f_top:
+                
+                # header
+    
+                f_top.write('; Generated by VeloxChem\n')
+    
+                # defaults
+    
+                f_top.write('\n[ defaults ]\n')
+                cur_str = '; nbfunc        comb-rule       gen-pairs'
+                cur_str += '       fudgeLJ fudgeQQ\n'
+                f_top.write(cur_str)
+                gen_pairs = 'yes' if self.gen_pairs else 'no'
+                f_top.write('{}{:16}{:>18}{:19.4f}{:8.4f}\n'.format(
+                    self.nbfunc, self.comb_rule, gen_pairs, self.fudgeLJ,
+                    self.fudgeQQ))
+    
+                # include itp
+    
+                f_top.write('\n#include "' + Path(self.molecule_name).name + '.itp"\n')
+    
+                # system
+    
+                f_top.write('\n[ system ]\n')
+                f_top.write(' {}\n'.format(mol_name))
+    
+                # molecules
+    
+                f_top.write('\n[ molecules ]\n')
+                f_top.write('; Compound        nmols\n')
+                f_top.write('{:>10}{:9}\n'.format(mol_name, 1))
+
+
 
     def write_original_itp(self, itp_file, atom_types, charges):
         """
@@ -541,7 +975,7 @@ class ForceFieldGenerator:
         atomtypeidentifier = AtomTypeIdentifier()
         atomtypeidentifier.ostream.mute()
         atom_types = atomtypeidentifier.generate_gaff_atomtypes(self.molecule)
-        connectivity_matrix = np.copy(atomtypeidentifier.connectivity_matrix)
+        self.connectivity_matrix = np.copy(atomtypeidentifier.self.connectivity_matrix)
 
         # preparing atom types and atom names
 
@@ -560,7 +994,7 @@ class ForceFieldGenerator:
         bond_indices = set()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
-                if connectivity_matrix[i, j] == 1:
+                if self.connectivity_matrix[i, j] == 1:
                     bond_indices.add((i, j))
         bond_indices = sorted(list(bond_indices))
 
@@ -569,10 +1003,10 @@ class ForceFieldGenerator:
             for k in range(n_atoms):
                 if k in [i, j]:
                     continue
-                if connectivity_matrix[j, k] == 1:
+                if self.connectivity_matrix[j, k] == 1:
                     inds = (i, j, k) if i < k else (k, j, i)
                     angle_indices.add(inds)
-                if connectivity_matrix[k, i] == 1:
+                if self.connectivity_matrix[k, i] == 1:
                     inds = (k, i, j) if k < j else (j, i, k)
                     angle_indices.add(inds)
         angle_indices = sorted(list(angle_indices))
@@ -582,10 +1016,10 @@ class ForceFieldGenerator:
             for l in range(n_atoms):
                 if l in [i, j, k]:
                     continue
-                if connectivity_matrix[k, l] == 1:
+                if self.connectivity_matrix[k, l] == 1:
                     inds = (i, j, k, l) if i < l else (l, k, j, i)
                     dihedral_indices.add(inds)
-                if connectivity_matrix[l, i] == 1:
+                if self.connectivity_matrix[l, i] == 1:
                     inds = (l, i, j, k) if l < k else (k, j, i, l)
                     dihedral_indices.add(inds)
         dihedral_indices = sorted(list(dihedral_indices))
@@ -877,7 +1311,7 @@ class ForceFieldGenerator:
                     continue
 
                 for l in range(n_atoms):
-                    if (l in [i, j, k]) or (connectivity_matrix[l, j] != 1):
+                    if (l in [i, j, k]) or (self.connectivity_matrix[l, j] != 1):
                         continue
                     at_4 = atom_types[l]
 
