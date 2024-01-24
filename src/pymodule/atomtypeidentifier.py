@@ -273,6 +273,9 @@ class AtomTypeIdentifier:
                 max_distance = max(cc_bond_distances)
                 min_distance = min(cc_bond_distances)
 
+            only_carbon_nitrogen_in_cycle = all(
+                [elem in ['C', 'N'] for elem in cycle_elements])
+
             all_carbons_sp2 = all([
                 self.is_sp2_carbon(atom_idx)
                 for atom_idx in cycle
@@ -285,50 +288,45 @@ class AtomTypeIdentifier:
                 if self.atomic_symbols[atom_idx] == 'N'
             ])
 
-            if (len(cycle) == 6 and
-                    all([elem in ['C', 'N'] for elem in cycle_elements])):
+            if len(cycle) == 6 and only_carbon_nitrogen_in_cycle:
 
-                if (all_carbons_sp2 and all_nitrogens_sp2):
+                if all_carbons_sp2 and all_nitrogens_sp2:
                     if max_distance - min_distance <= 0.08:
-                        aro = "pure_aromatic"
+                        aro = 'pure_aromatic'
                     else:
-                        aro = "non_pure_aromatic"
-                elif all_carbons_sp2 and max_distance - min_distance <= 0.08:
-                    aro = "non_pure_aromatic"
+                        aro = 'non_pure_aromatic'
+                elif all_carbons_sp2 and (max_distance - min_distance <= 0.08):
+                    aro = 'non_pure_aromatic'
                 else:
-                    aro = "non_aromatic"
+                    aro = 'non_aromatic'
 
             elif len(cycle) == 5 and all_carbons_sp2:
 
                 if 'S' in cycle_elements:
-                    # Check if the S is connected to 2 atoms in the cycle, if
-                    # so, it is non_pure_aromatic
-                    if len(
-                            list(
-                                self.graph.neighbors(
-                                    cycle[cycle_elements.index("S")]))) == 2:
-                        aro = "non_pure_aromatic"
+                    # TODO: take care of multiple S atoms
+                    # S connected to 2 atoms in the cycle: non_pure_aromatic
+                    atom_idx_S = cycle[cycle_elements.index('S')]
+                    neighbors_S = self.graph.neighbors(atom_idx_S)
+                    if len(list(neighbors_S)) == 2:
+                        aro = 'non_pure_aromatic'
                     else:
-                        aro = "non_aromatic"
+                        aro = 'non_aromatic'
                 else:
                     if 'N' in cycle_elements or 'O' in cycle_elements:
-                        aro = "non_pure_aromatic"
+                        aro = 'non_pure_aromatic'
                     else:
-                        aro = "non_aromatic"
+                        aro = 'non_aromatic'
 
             elif len(cycle) == 4:
 
-                if all(
-                        self.is_sp2_carbon(atom_idx)
-                        for atom_idx in cycle
-                        if self.atomic_symbols[atom_idx] == "C"):
-                    aro = "non_pure_aromatic"
+                if all_carbons_sp2:
+                    aro = 'non_pure_aromatic'
                 else:
-                    aro = "non_aromatic"
+                    aro = 'non_aromatic'
 
             else:
 
-                aro = "non_aromatic"
+                aro = 'non_aromatic'
 
             self.aromaticity.append(aro)
 
@@ -344,25 +342,35 @@ class AtomTypeIdentifier:
         # Additional logic for reassignment of aromaticity in special cases
         # where 3 atoms are shared with aromatic rings.
         for index, cycle in enumerate(self.reduced_cycles):
-            # Check if all carbons in the cycle are sp2
-            all_carbons_sp2 = all(
+
+            all_carbons_sp2 = all([
                 self.is_sp2_carbon(atom_idx)
                 for atom_idx in cycle
-                if self.atomic_symbols[atom_idx] == "C")
-            if (len(cycle) == 5 and
-                    self.aromaticity[index] == 'non_aromatic' and
-                    all_carbons_sp2):
-                count_pure_aromatic_atoms = sum([
-                    1 for atom in cycle if 'pure_aromatic' in
-                    self.atom_cycle_info[atom]['aromaticities']
-                ])
+                if self.atomic_symbols[atom_idx] == 'C'
+            ])
+
+            if (len(cycle) == 5 and all_carbons_sp2 and
+                    self.aromaticity[index] == 'non_aromatic'):
+
+                count_pure_aromatic_atoms = 0
+                for atom in cycle:
+                    if 'pure_aromatic' in self.atom_cycle_info[atom][
+                            'aromaticities']:
+                        count_pure_aromatic_atoms += 1
+
                 if count_pure_aromatic_atoms >= 3:
                     self.aromaticity[index] = 'non_pure_aromatic'
                     for atom in cycle:
-                        self.atom_cycle_info[atom]['aromaticities'] = [
-                            'non_pure_aromatic' if a == 'non_aromatic' else a
-                            for a in self.atom_cycle_info[atom]['aromaticities']
-                        ]
+                        self.atom_cycle_info[atom]['aromaticities'] = []
+                        # TODO: match cycle and aromaticity in
+                        # atom_cycle_info[atom]['aromaticities']
+                        for a in self.atom_cycle_info[atom]['aromaticities']:
+                            if a == 'non_aromatic':
+                                self.atom_cycle_info[atom][
+                                    'aromaticities'].append('non_pure_aromatic')
+                            else:
+                                self.atom_cycle_info[atom][
+                                    'aromaticities'].append(a)
 
     def create_atom_info_dict(self):
         """
@@ -904,10 +912,11 @@ class AtomTypeIdentifier:
                             if sp2_carbon_count == 2:
                                 carbon_type = {'opls': 'opls_235', 'gaff': 'c1'}
                             # If the current carbon is connected to 2 sp2 carbons
+                            # Note: only assign cg here
                             elif sp2_carbon_count + sp1_carbon_count + n_count == 2:
                                 carbon_type = {'opls': 'opls_XXX', 'gaff': 'cg'}
                             elif sp2_carbon_count + sp1_carbon_count + n2_count == 2:
-                                carbon_type = {'opls': 'opls_XXX', 'gaff': 'ch'}
+                                carbon_type = {'opls': 'opls_XXX', 'gaff': 'cg'}
                             else:
                                 carbon_type = {'opls': 'opls_235', 'gaff': 'c1'}
                     elif info['NumConnectedAtoms'] == 1:
@@ -2158,7 +2167,6 @@ class AtomTypeIdentifier:
                 for j in range(len(atom_types)):
                     if (j not in counted_atom_ids and
                             atom_types[j] in ['cc', 'ce', 'cg', 'nc'] and
-                            atom_types[i] == atom_types[j] and
                             self.connectivity_matrix[i][j] == 1):
                         assigned_bonds.append((i, j))
                         counted_atom_ids.append(j)
@@ -2185,20 +2193,29 @@ class AtomTypeIdentifier:
 
         # Check distances for alternation
 
+        conjugated_atom_type_pairs = {
+            'cc': ('cc', 'cd'),
+            'cd': ('cc', 'cd'),
+            'ce': ('ce', 'cf'),
+            'cf': ('ce', 'cf'),
+            'cg': ('cg', 'ch'),
+            'ch': ('cg', 'ch'),
+            'nc': ('nc', 'nd'),
+            'nd': ('nc', 'nd'),
+        }
+
         for i, j in assigned_bonds:
 
-            for ref_at_pair in [('cc', 'cd'), ('ce', 'cf'), ('cg', 'ch'),
-                                ('nc', 'nd')]:
-
-                if atom_types[i] in ref_at_pair:
-
-                    if self.distance_matrix[i][j] <= 1.4:
-                        if atom_types[i] == ref_at_pair[0]:
-                            atom_types[j] = ref_at_pair[1]
-                        else:
-                            atom_types[j] = ref_at_pair[0]
-                    else:
-                        atom_types[j] = atom_types[i]
+            if self.distance_matrix[i][j] <= 1.4:
+                if atom_types[i] in ['cc', 'ce', 'cg', 'nc']:
+                    atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
+                else:
+                    atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][0]
+            else:
+                if atom_types[i] in ['cc', 'ce', 'cg', 'nc']:
+                    atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][0]
+                else:
+                    atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
 
         self.gaff_atom_types = atom_types
 
