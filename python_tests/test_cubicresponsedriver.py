@@ -49,10 +49,10 @@ class TestCrf:
             'b_frequencies': [wb],
             'c_frequencies': [wc],
             'd_frequencies': [wd],
-            'a_components': 'y',
-            'b_components': 'y',
-            'c_components': 'z',
-            'd_components': 'z',
+            'a_component': 'y',
+            'b_component': 'y',
+            'c_component': 'z',
+            'd_component': 'z',
             'damping': 0.1
         }
 
@@ -70,13 +70,6 @@ class TestCrf:
 
     def test_crf(self):
 
-        ref_result = {
-            'E3': 0.33616818 - 24.75661969j,
-            'T4': 19.19944873 - 22.18050421j,
-            'X2': 211.57812207 + 56.41923653j,
-            'X3': 35.38383531 - 40.21250147j,
-            'A2': -262.74089736 + 405.99704670j,
-            'A3': 24.59268588 - 10.94409800j,
-        }
+        ref_result = {'crf': 28.34936268562558 + 364.3225598403005j}
 
         self.run_crf(ref_result)

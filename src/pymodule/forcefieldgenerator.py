@@ -31,6 +31,7 @@ import sys
 import re
 
 from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
+from .atomtypeidentifier import AtomTypeIdentifier
 from .molecule import Molecule
 from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
@@ -111,9 +112,7 @@ class ForceFieldGenerator:
         self.comb_rule = 2
         self.nbfunc = 1
         self.nrexcl = 3
-        # https://github.com/openmm/openmmforcefields/blob/master/amber/gaff/dat/gaff-2.11.dat
-        # https://raw.githubusercontent.com/openmm/openmmforcefields/master/amber/gaff/dat/gaff-2.11.dat
-        self.force_field_data = 'gaff-2.11.dat'
+        self.force_field_data = None
         self.force_field_data_extension = None
 
         # number of rounds for fitting dihedral potentials
@@ -193,25 +192,19 @@ class ForceFieldGenerator:
         if 'filename' in ffg_dict and 'molecule_name' not in ffg_dict:
             self.molecule_name = ffg_dict['filename']
 
-        force_field_file = Path(
-            self.molecule_name).parent / self.force_field_data
-        if force_field_file.is_file():
-            self.force_field_data = str(force_field_file)
-
-        assert_msg_critical(
-            Path(self.force_field_data).is_file(),
-            f'ForceFieldGenerator: force field file {self.force_field_data} ' +
-            'does not exist')
-
-        assert_msg_critical(
-            'gaff' in Path(self.force_field_data).name.lower(),
-            'ForceFieldGenerator: unrecognized force field ' +
-            f'{self.force_field_data}. Only GAFF is supported.')
-
-        if self.force_field_data_extension is None:
-            ff_file = Path(self.force_field_data)
-            self.force_field_data_extension = str(
-                ff_file.parent / (ff_file.stem + '_extension.dat'))
+        if self.force_field_data is not None:
+            force_field_file = Path(
+                self.molecule_name).parent / self.force_field_data
+            if force_field_file.is_file():
+                self.force_field_data = str(force_field_file)
+                assert_msg_critical(
+                    'gaff' in Path(self.force_field_data).name.lower(),
+                    'ForceFieldGenerator: unrecognized force field ' +
+                    f'{self.force_field_data}. Only GAFF is supported.')
+                if self.force_field_data_extension is None:
+                    ff_file = Path(self.force_field_data)
+                    self.force_field_data_extension = str(
+                        ff_file.parent / (ff_file.stem + '_extension.dat'))
 
         if resp_dict is None:
             resp_dict = {}
@@ -226,6 +219,13 @@ class ForceFieldGenerator:
         :param basis:
             The AO basis set.
         """
+
+        # atom type identification
+
+        if self.atom_types is None:
+            atomtypeidentifier = AtomTypeIdentifier(self.comm, self.ostream)
+            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
+                molecule)
 
         # sanity check
 
@@ -498,6 +498,25 @@ class ForceFieldGenerator:
             f_top.write('; Compound        nmols\n')
             f_top.write('{:>10}{:9}\n'.format(mol_name, 1))
 
+    @staticmethod
+    def get_gaff_data_lines():
+        """
+        Reads GAFF data lines into a list.
+        """
+
+        from urllib.request import urlopen
+
+        openmmff_commit = 'b3e92a373c80bfb8fd791e4a72beafc035fcc722'
+        gaff_url = (
+            'https://raw.githubusercontent.com/openmm/openmmforcefields/' +
+            openmmff_commit + '/openmmforcefields/ffxml/amber/gaff/dat/' +
+            'gaff-2.11.dat')
+
+        with urlopen(gaff_url) as f_gaff:
+            content = f_gaff.read().decode('utf-8')
+
+        return content.splitlines()
+
     def write_original_itp(self, itp_file, atom_types, charges):
         """
         Writes an itp file with the original parameters.
@@ -518,7 +537,11 @@ class ForceFieldGenerator:
 
         coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
-        connected = self.get_connectivity()
+
+        atomtypeidentifier = AtomTypeIdentifier()
+        atomtypeidentifier.ostream.mute()
+        atom_types = atomtypeidentifier.generate_gaff_atomtypes(self.molecule)
+        connectivity_matrix = np.copy(atomtypeidentifier.connectivity_matrix)
 
         # preparing atom types and atom names
 
@@ -537,7 +560,7 @@ class ForceFieldGenerator:
         bond_indices = set()
         for i in range(n_atoms):
             for j in range(i + 1, n_atoms):
-                if connected[i, j]:
+                if connectivity_matrix[i, j] == 1:
                     bond_indices.add((i, j))
         bond_indices = sorted(list(bond_indices))
 
@@ -546,10 +569,10 @@ class ForceFieldGenerator:
             for k in range(n_atoms):
                 if k in [i, j]:
                     continue
-                if connected[j, k]:
+                if connectivity_matrix[j, k] == 1:
                     inds = (i, j, k) if i < k else (k, j, i)
                     angle_indices.add(inds)
-                if connected[k, i]:
+                if connectivity_matrix[k, i] == 1:
                     inds = (k, i, j) if k < j else (j, i, k)
                     angle_indices.add(inds)
         angle_indices = sorted(list(angle_indices))
@@ -559,10 +582,10 @@ class ForceFieldGenerator:
             for l in range(n_atoms):
                 if l in [i, j, k]:
                     continue
-                if connected[k, l]:
+                if connectivity_matrix[k, l] == 1:
                     inds = (i, j, k, l) if i < l else (l, k, j, i)
                     dihedral_indices.add(inds)
-                if connected[l, i]:
+                if connectivity_matrix[l, i] == 1:
                     inds = (l, i, j, k) if l < k else (k, j, i, l)
                     dihedral_indices.add(inds)
         dihedral_indices = sorted(list(dihedral_indices))
@@ -581,10 +604,14 @@ class ForceFieldGenerator:
                 pairs_14.add((i, l))
         pairs_14 = sorted(list(pairs_14))
 
-        with open(self.force_field_data, 'r') as ff_data:
-            ff_data_lines = ff_data.readlines()
+        if self.force_field_data is None:
+            ff_data_lines = self.get_gaff_data_lines()
+        else:
+            with open(self.force_field_data, 'r') as ff_data:
+                ff_data_lines = ff_data.readlines()
 
-        if Path(self.force_field_data_extension).is_file():
+        if (self.force_field_data_extension is not None and
+                Path(self.force_field_data_extension).is_file()):
             with open(self.force_field_data_extension, 'r') as ff_extension:
                 ff_data_lines += ff_extension.readlines()
 
@@ -605,7 +632,7 @@ class ForceFieldGenerator:
                 atom_type_found = False
 
                 for line in ff_data_lines:
-                    if line.startswith(f'  {at}  '):
+                    if line.startswith(f'  {at}     '):
                         cur_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
                             at, at, 0., 0., 'A')
                         cur_str += '{:16.5e}{:14.5e}\n'.format(
@@ -850,7 +877,7 @@ class ForceFieldGenerator:
                     continue
 
                 for l in range(n_atoms):
-                    if (l in [i, j, k]) or (not connected[l, j]):
+                    if (l in [i, j, k]) or (connectivity_matrix[l, j] != 1):
                         continue
                     at_4 = atom_types[l]
 

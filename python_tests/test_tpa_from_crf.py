@@ -37,12 +37,6 @@ class TestTpaFromCrf:
         components = 'xyz'
 
         ref_tpa_results = {
-            'E3': 0.0,
-            'T4': 0.0,
-            'A3': 0.0,
-            'A2': 0.0,
-            'X3': 0.0,
-            'X2': 0.0,
             'gamma': 0.0,
         }
 
@@ -56,23 +50,16 @@ class TestTpaFromCrf:
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
                     'd_frequencies': [w3],
-                    'a_components': a,
-                    'b_components': a,
-                    'c_components': b,
-                    'd_components': b,
+                    'a_component': a,
+                    'b_component': a,
+                    'c_component': b,
+                    'd_component': b,
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)
                 crf_results = crf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_tpa_results['gamma'] += crf_results[('gamma', w1, w2,
-                                                             w3)]
-                    ref_tpa_results['E3'] += crf_results[('E3', w1, w2, w3)]
-                    ref_tpa_results['T4'] += crf_results[('T4', w1, w2, w3)]
-                    ref_tpa_results['A3'] += crf_results[('A3', w1, w2, w3)]
-                    ref_tpa_results['A2'] += crf_results[('A2', w1, w2, w3)]
-                    ref_tpa_results['X3'] += crf_results[('X3', w1, w2, w3)]
-                    ref_tpa_results['X2'] += crf_results[('X2', w1, w2, w3)]
+                    ref_tpa_results['gamma'] += crf_results[('crf', w1, w2, w3)]
 
         for a in components:
             for b in components:
@@ -80,23 +67,16 @@ class TestTpaFromCrf:
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
                     'd_frequencies': [w3],
-                    'a_components': a,
-                    'b_components': b,
-                    'c_components': a,
-                    'd_components': b,
+                    'a_component': a,
+                    'b_component': b,
+                    'c_component': a,
+                    'd_component': b,
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)
                 crf_results = crf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_tpa_results['gamma'] += crf_results[('gamma', w1, w2,
-                                                             w3)]
-                    ref_tpa_results['E3'] += crf_results[('E3', w1, w2, w3)]
-                    ref_tpa_results['T4'] += crf_results[('T4', w1, w2, w3)]
-                    ref_tpa_results['A3'] += crf_results[('A3', w1, w2, w3)]
-                    ref_tpa_results['A2'] += crf_results[('A2', w1, w2, w3)]
-                    ref_tpa_results['X3'] += crf_results[('X3', w1, w2, w3)]
-                    ref_tpa_results['X2'] += crf_results[('X2', w1, w2, w3)]
+                    ref_tpa_results['gamma'] += crf_results[('crf', w1, w2, w3)]
 
         for a in components:
             for b in components:
@@ -104,23 +84,16 @@ class TestTpaFromCrf:
                     'b_frequencies': [w1],
                     'c_frequencies': [w2],
                     'd_frequencies': [w3],
-                    'a_components': a,
-                    'b_components': b,
-                    'c_components': b,
-                    'd_components': a,
+                    'a_component': a,
+                    'b_component': b,
+                    'c_component': b,
+                    'd_component': a,
                     'damping': damping,
                 })
                 crf.update_settings(rsp_settings, method_settings)
                 crf_results = crf.compute(molecule, basis, scf_results)
                 if is_mpi_master():
-                    ref_tpa_results['gamma'] += crf_results[('gamma', w1, w2,
-                                                             w3)]
-                    ref_tpa_results['E3'] += crf_results[('E3', w1, w2, w3)]
-                    ref_tpa_results['T4'] += crf_results[('T4', w1, w2, w3)]
-                    ref_tpa_results['A3'] += crf_results[('A3', w1, w2, w3)]
-                    ref_tpa_results['A2'] += crf_results[('A2', w1, w2, w3)]
-                    ref_tpa_results['X3'] += crf_results[('X3', w1, w2, w3)]
-                    ref_tpa_results['X2'] += crf_results[('X2', w1, w2, w3)]
+                    ref_tpa_results['gamma'] += crf_results[('crf', w1, w2, w3)]
 
         rsp_settings = {
             'frequencies': [w1],
@@ -137,20 +110,11 @@ class TestTpaFromCrf:
                 ref_tpa_results[key] /= 15.0
                 ref_tpa_results[key] *= -1.0  # rsp func. -> gamma
 
-            key_aliases = {
-                'E3': 't3_dict',
-                'T4': 't4_dict',
-                'A3': 'NaA3NxNy',
-                'A2': 'NxA2Nyz',
-                'X3': 'NaX3NyNz',
-                'X2': 'NaX2Nyz',
-                'gamma': 'gamma',
-            }
             tol = 1.0e-5
 
             for key in ref_tpa_results:
                 ref_val = ref_tpa_results[key]
-                calc_val = tpa_results[key_aliases[key]][(w1, w2, w3)]
+                calc_val = tpa_results[key][(w1, w2, w3)]
                 assert abs(abs(calc_val.real / ref_val.real) - 1.0) < tol
                 assert abs(abs(calc_val.imag / ref_val.imag) - 1.0) < tol
 

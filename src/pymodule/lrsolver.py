@@ -498,6 +498,10 @@ class LinearResponseSolver(LinearSolver):
                 self._print_results(rsp_funcs, self.ostream)
 
                 return {
+                    'a_operator': self.a_operator,
+                    'a_components': self.a_components,
+                    'b_operator': self.b_operator,
+                    'b_components': self.b_components,
                     'response_functions': rsp_funcs,
                     'solutions': solutions,
                 }

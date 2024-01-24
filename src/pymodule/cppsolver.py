@@ -806,6 +806,10 @@ class ComplexResponse(LinearSolver):
                         self.ostream.print_blank()
 
                     ret_dict = {
+                        'a_operator': self.a_operator,
+                        'a_components': self.a_components,
+                        'b_operator': self.b_operator,
+                        'b_components': self.b_components,
                         'frequencies': list(self.frequencies),
                         'response_functions': rsp_funcs,
                         'solutions': solutions,

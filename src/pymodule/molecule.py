@@ -36,66 +36,41 @@ from .errorhandler import assert_msg_critical
 
 
 @staticmethod
-def _Molecule_smiles_to_xyz(smiles_str, optimize=True, no_hydrogen=False):
+def _Molecule_smiles_to_xyz(smiles_str, optimize=True, hydrogen=True):
     """
     Converts SMILES string to xyz string.
 
     :param smiles_str:
         The SMILES string.
+    :param optimize:
+        Boolean indicating whether to perform geometry optimization.
+    :param hydrogen:
+        Boolean indicating whether to remove hydrogens.
 
     :return:
         An xyz string (including number of atoms).
     """
 
     try:
-        from rdkit import Chem
-        from rdkit.Chem import AllChem
+        from openbabel import pybel as pb
 
-        mol_bare = Chem.MolFromSmiles(smiles_str)
-        mol_full = Chem.AddHs(mol_bare)
-        AllChem.EmbedMolecule(mol_full)
+        mol = pb.readstring('smiles', smiles_str)
+        mol.make3D()
+
         if optimize:
-            AllChem.UFFOptimizeMolecule(mol_full)
+            # TODO: Double check if UFF is needed
+            mol.localopt(forcefield="mmff94", steps=300)
 
-        if no_hydrogen:
-            return Chem.RemoveHs(mol_full)
+        if not hydrogen:
+            # remove hydrogens
+            mol.removeh()
+            return mol.write(format="xyz")
+
         else:
-            return Chem.MolToXYZBlock(mol_full)
+            return mol.write(format="xyz")
 
     except ImportError:
-        raise ImportError('Unable to import rdkit.')
-
-
-@staticmethod
-def _Molecule_draw_2d_svg(smiles_str, width=300, height=300):
-    """
-    Draw 2D representation for SMILES string.
-
-    :param smiles_str:
-        The SMILES string.
-    :param width:
-        The width of the drawing area.
-    :param height:
-        The height of the drawing area.
-    """
-
-    try:
-        from rdkit import Chem
-        from IPython.display import SVG
-        from IPython.display import display
-
-        mol_no_hydrogen = Molecule.smiles_to_xyz(smiles_str,
-                                                 optimize=True,
-                                                 no_hydrogen=True)
-
-        drawer = Chem.Draw.rdMolDraw2D.MolDraw2DSVG(width, height)
-        drawer.DrawMolecule(mol_no_hydrogen)
-        drawer.FinishDrawing()
-
-        display(SVG(drawer.GetDrawingText()))
-
-    except ImportError:
-        raise ImportError('Unable to import rdkit.Chem and/or IPython.display.')
+        raise ImportError('Unable to import openbabel')
 
 
 @staticmethod
@@ -359,6 +334,28 @@ def _Molecule_get_coordinates_in_angstrom(self):
     return self.get_coordinates_in_bohr() * bohr_in_angstrom()
 
 
+def _Molecule_get_distance_matrix_in_angstrom(self):
+    """
+    Returns distance matrix in Angstrom.
+
+    :return:
+        A numpy array of distance matrix (nxn) in Angstrom.
+    """
+
+    coords = self.get_coordinates_in_angstrom()
+    natoms = coords.shape[0]
+    distance_matrix = np.zeros((natoms, natoms))
+
+    for i in range(natoms):
+        for j in range(i, natoms):
+            rij = np.linalg.norm(coords[i, :] - coords[j, :])
+            distance_matrix[i, j] = rij
+            if i != j:
+                distance_matrix[j, i] = rij
+
+    return distance_matrix
+
+
 def _Molecule_get_xyz_string(self):
     """
     Returns xyz string of molecule.
@@ -443,6 +440,60 @@ def _Molecule_is_linear(self):
     else:
         pass
 
+
+
+def _Molecule_show(self, width=400, height=300):
+    """
+    Creates a 3D view with py3dmol.
+
+    :param width:
+        The width.
+    :param height:
+        The height.
+    """
+
+    try:
+        import py3Dmol
+        viewer = py3Dmol.view(width=width, height=height)
+        viewer.addModel(self.get_xyz_string())
+        viewer.setViewStyle({"style": "outline", "width": 0.05})
+        viewer.setStyle({"stick": {}, "sphere": {"scale": 0.25}})
+        viewer.zoomTo()
+        viewer.show()
+
+    except ImportError:
+        raise ImportError('Unable to import py3Dmol')
+
+
+def _Molecule_draw_2d(self, width=400, height=300):
+    """
+    Generates 2D representation of the molecule.
+
+    :param width:
+        The width.
+    :param height:
+        The height.
+    """
+
+    try:
+        from openbabel import pybel as pb
+        from IPython.display import SVG, display
+
+        molecule = self.get_xyz_string()
+
+        mol = pb.readstring('xyz', molecule)
+
+        mol.make2D()
+        mol.removeh()
+
+        # Convert to SVG using pybel's drawing method
+        svg_string = mol.write(format='svg', opt={'w': width, 'h': height})
+
+        # Display SVG
+        display(SVG(svg_string))
+
+    except ImportError:
+        raise ImportError('Unable to import openbabel and/or IPython.display.')
 
 
 def _Molecule_moments_of_inertia(self):
@@ -610,7 +661,8 @@ def _Molecule_deepcopy(self, memo):
 Molecule._get_input_keywords = _Molecule_get_input_keywords
 
 Molecule.smiles_to_xyz = _Molecule_smiles_to_xyz
-Molecule.draw_2d_svg = _Molecule_draw_2d_svg
+Molecule.show = _Molecule_show
+Molecule.draw_2d = _Molecule_draw_2d
 Molecule.read_smiles = _Molecule_read_smiles
 Molecule.read_molecule_string = _Molecule_read_molecule_string
 Molecule.read_xyz_file = _Molecule_read_xyz_file
@@ -624,6 +676,7 @@ Molecule.get_labels = _Molecule_get_labels
 Molecule.get_coordinates = _Molecule_get_coordinates
 Molecule.get_coordinates_in_bohr = _Molecule_get_coordinates_in_bohr
 Molecule.get_coordinates_in_angstrom = _Molecule_get_coordinates_in_angstrom
+Molecule.get_distance_matrix_in_angstrom = _Molecule_get_distance_matrix_in_angstrom
 Molecule.get_xyz_string = _Molecule_get_xyz_string
 Molecule.write_xyz_file = _Molecule_write_xyz_file
 Molecule.moments_of_inertia = _Molecule_moments_of_inertia

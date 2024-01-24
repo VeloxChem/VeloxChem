@@ -214,6 +214,24 @@ class TestMolData:
 
         assert elem == elem2
 
+    def test_distance_matrix(self):
+
+        xyz_string = """
+            3
+            water
+            O       0.944703950608    0.070615471110   -0.056477643546
+            H       1.903732770975    0.056427544902   -0.044142825330
+            H       0.642753278417   -0.616673016012    0.540640468876
+        """
+        mol = Molecule.read_xyz_string(xyz_string)
+        distance_matrix = mol.get_distance_matrix_in_angstrom()
+
+        ref_distrance_matrix = np.array([[0., 0.95921308, 0.95921307],
+                                         [0.95921308, 0., 1.54437856],
+                                         [0.95921307, 1.54437856, 0.]])
+
+        assert np.max(np.abs(distance_matrix - ref_distrance_matrix)) < 1.0e-8
+
     def test_dispersion_model(self):
 
         ref_energies = {

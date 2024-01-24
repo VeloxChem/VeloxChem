@@ -950,8 +950,8 @@ class TpaDriver(NonlinearSolver):
         self.ostream.print_blank()
 
         title = 'Two-Photon Absorption Spectrum'
-        self.ostream.print_header(title.ljust(width))
-        self.ostream.print_header(('=' * len(title)).ljust(width))
+        self.ostream.print_header(title)
+        self.ostream.print_header('=' * (len(title) + 2))
         self.ostream.print_blank()
 
         if len(self.frequencies) == 1 and self.frequencies[0] == 0.0:

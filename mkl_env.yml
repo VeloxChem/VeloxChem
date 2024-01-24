@@ -24,7 +24,7 @@ dependencies:
   - scipy
   - gtest
   - gmock
-  - rdkit
+  - openbabel
   - cppe
   - xtb
   - geometric

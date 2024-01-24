@@ -17,21 +17,6 @@ from veloxchem.forcefieldgenerator import ForceFieldGenerator
     'ignore:.*tostring.*tobytes:DeprecationWarning:geometric')
 class TestForceField:
 
-    def get_gaff_file(self, gaff_path, gaff_name):
-
-        from urllib.request import urlopen
-
-        openmmff_commit = '73a0707dc6411f05cac0365828eae017d05adfae'
-        gaff_url = (
-            'https://raw.githubusercontent.com/openmm/openmmforcefields/' +
-            openmmff_commit + '/amber/gaff/dat/' + gaff_name)
-
-        with urlopen(gaff_url) as f_gaff:
-            content = f_gaff.read().decode('utf-8')
-
-        with Path(gaff_path, gaff_name).open('w') as f_gaff:
-            f_gaff.write(content)
-
     @pytest.mark.skipif('openmm' not in sys.modules,
                         reason='openmm not available')
     def test_force_field(self):
@@ -42,12 +27,6 @@ class TestForceField:
         inpfile = str(here / 'inputs' / 'butane.inp')
 
         task = MpiTask([inpfile, None])
-
-        if is_mpi_master(task.mpi_comm):
-            gaff_file = here / 'inputs' / 'gaff-2.11.dat'
-            if not gaff_file.is_file():
-                self.get_gaff_file(gaff_file.parent, gaff_file.name)
-        task.mpi_comm.barrier()
 
         ff_dict = (task.input_dict['force_field']
                    if 'force_field' in task.input_dict else {})
@@ -86,9 +65,6 @@ class TestForceField:
 
             assert dih_parameters is not None
             assert np.max(np.abs(dih_parameters - ref_parameters)) < 1.0e-3
-
-            if gaff_file.is_file():
-                gaff_file.unlink()
 
             pdb_file = Path(inpfile).with_suffix('.pdb')
             if pdb_file.is_file():

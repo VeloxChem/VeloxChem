@@ -70,6 +70,7 @@ from .veloxchemlib import molorb
 from .veloxchemlib import moints
 
 # Python classes
+from .atomtypeidentifier import AtomTypeIdentifier
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .molecule import Molecule
