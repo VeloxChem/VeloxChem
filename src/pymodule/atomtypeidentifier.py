@@ -617,7 +617,7 @@ class AtomTypeIdentifier:
                             # Carbon double bonded to Sulfur
                             carbon_type = {'opls': 'opls_cs', 'gaff': 'cs'}
 
-                        elif 'C' in connected_symbols:
+                        elif 'C' in connected_symbols or 'N' in connected_symbols:
                             # Count the number of sp2-hybridized carbons
                             # connected to the current carbon
                             sp2_carbon_count = sum(
@@ -710,7 +710,7 @@ class AtomTypeIdentifier:
                             # Carbon double bonded to Sulfur
                             carbon_type = {'opls': 'opls_cs', 'gaff': 'cs'}
 
-                        elif 'C' in connected_symbols:
+                        elif 'C' in connected_symbols or 'N' in connected_symbols:
                             # Count the number of sp2-hybridized carbons
                             # connected to the current carbon
                             sp2_carbon_count = sum(
@@ -1488,16 +1488,37 @@ class AtomTypeIdentifier:
                                 }
 
                     elif info['NumConnectedAtoms'] == 2:
+
+                        has_sp1_nitrogen = any([
+                            self.atom_info_dict[atom]['AtomicSymbol'] == 'N' and
+                            self.atom_info_dict[atom]['NumConnectedAtoms'] == 1
+                            for atom in connected_atoms_numbers
+                        ])
+
+                        sp2_carbon_count = sum(
+                            1 for num in connected_atoms_numbers if
+                            self.atom_info_dict[num]['AtomicSymbol'] == 'C' and
+                            self.atom_info_dict[num]['NumConnectedAtoms'] == 3)
+                        sp1_carbon_count = sum(
+                            1 for num in connected_atoms_numbers if
+                            self.atom_info_dict[num]['AtomicSymbol'] == 'C' and
+                            self.atom_info_dict[num]['NumConnectedAtoms'] == 2)
+                        n2_count = sum(
+                            1 for num in connected_atoms_numbers if
+                            self.atom_info_dict[num]['AtomicSymbol'] == 'N' and
+                            self.atom_info_dict[num]['NumConnectedAtoms'] == 2)
+
                         # Check if the Nitrogen is connected to another
                         # Nitrogen with sp1 hybridization
-                        if any(self.atom_info_dict[atom]['AtomicSymbol'] == 'N'
-                               and self.atom_info_dict[atom]
-                               ['NumConnectedAtoms'] == 1
-                               for atom in connected_atoms_numbers):
+                        if has_sp1_nitrogen:
                             nitrogen_type = {
                                 'opls': 'opls_753',
                                 'gaff': 'n1'
                             }  # N triple bond
+
+                        elif sp2_carbon_count + sp1_carbon_count + n2_count == 2:
+                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'ne'}
+
                         else:
                             nitrogen_type = {
                                 'opls': 'opls_903',
@@ -1723,11 +1744,27 @@ class AtomTypeIdentifier:
                                     'gaff': f'nx{info["AtomNumber"]}'
                                 }
 
-                    elif info[
-                            'NumConnectedAtoms'] == 2 and 'non_aromatic' in info.get(
-                                'Aromaticity'):
+                    elif (info['NumConnectedAtoms'] == 2 and
+                          'non_aromatic' in info.get('Aromaticity')):
 
-                        nitrogen_type = {'opls': 'opls_903', 'gaff': 'n2'}
+                        sp2_carbon_count = sum(
+                            1 for num in connected_atoms_numbers if
+                            self.atom_info_dict[num]['AtomicSymbol'] == 'C' and
+                            self.atom_info_dict[num]['NumConnectedAtoms'] == 3)
+                        sp1_carbon_count = sum(
+                            1 for num in connected_atoms_numbers if
+                            self.atom_info_dict[num]['AtomicSymbol'] == 'C' and
+                            self.atom_info_dict[num]['NumConnectedAtoms'] == 2)
+                        n2_count = sum(
+                            1 for num in connected_atoms_numbers if
+                            self.atom_info_dict[num]['AtomicSymbol'] == 'N' and
+                            self.atom_info_dict[num]['NumConnectedAtoms'] == 2)
+
+                        if sp2_carbon_count + sp1_carbon_count + n2_count == 2:
+                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'ne'}
+
+                        else:
+                            nitrogen_type = {'opls': 'opls_903', 'gaff': 'n2'}
 
                     else:
                         # Add other conditions for cyclic nitrogen atoms if
@@ -2036,7 +2073,7 @@ class AtomTypeIdentifier:
             for i in counted_atom_ids:
                 for j in range(len(atom_types)):
                     if (j not in counted_atom_ids and
-                            atom_types[j] in ['cc', 'ce', 'cg', 'nc'] and
+                            atom_types[j] in ['cc', 'ce', 'cg', 'nc', 'ne'] and
                             self.connectivity_matrix[i][j] == 1):
                         assigned_bonds.append((i, j))
                         counted_atom_ids.append(j)
@@ -2050,7 +2087,7 @@ class AtomTypeIdentifier:
                 new_index = None
 
                 for i in range(len(atom_types)):
-                    if (atom_types[i] in ['cc', 'ce', 'cg', 'nc'] and
+                    if (atom_types[i] in ['cc', 'ce', 'cg', 'nc', 'ne'] and
                             i not in counted_atom_ids):
                         all_found = False
                         new_index = i
@@ -2072,6 +2109,8 @@ class AtomTypeIdentifier:
             'ch': ('cg', 'ch'),
             'nc': ('nc', 'nd'),
             'nd': ('nc', 'nd'),
+            'ne': ('ne', 'nf'),
+            'nf': ('ne', 'nf'),
         }
 
         for i, j in assigned_bonds:
@@ -2091,12 +2130,12 @@ class AtomTypeIdentifier:
                 single_bond_thresh = 1.3985
 
             if self.distance_matrix[i][j] <= single_bond_thresh:
-                if atom_types[i] in ['cc', 'ce', 'cg', 'nc']:
+                if atom_types[i] in ['cc', 'ce', 'cg', 'nc', 'ne']:
                     atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
                 else:
                     atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][0]
             else:
-                if atom_types[i] in ['cc', 'ce', 'cg', 'nc']:
+                if atom_types[i] in ['cc', 'ce', 'cg', 'nc', 'ne']:
                     atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][0]
                 else:
                     atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
