@@ -302,11 +302,21 @@ class AtomTypeIdentifier:
             elif len(cycle) == 5 and all_carbons_sp2:
 
                 if 'S' in cycle_elements:
-                    # TODO: take care of multiple S atoms
-                    # S connected to 2 atoms in the cycle: non_pure_aromatic
-                    atom_idx_S = cycle[cycle_elements.index('S')]
-                    neighbors_S = self.graph.neighbors(atom_idx_S)
-                    if len(list(neighbors_S)) == 2:
+                    # one S connected to 2 atoms in the cycle: non_pure_aromatic
+                    has_s_s_bond = False
+                    max_s_neighbors = 0
+                    for atom_idx, elem in zip(cycle, cycle_elements):
+                        if elem != 'S':
+                            continue
+                        s_neighbors = [
+                            self.atomic_symbols[i]
+                            for i in list(self.graph.neighbors(atom_idx))
+                        ]
+                        if 'S' in s_neighbors:
+                            has_s_s_bond = True
+                        if len(s_neighbors) > max_s_neighbors:
+                            max_s_neighbors = len(s_neighbors)
+                    if (not has_s_s_bond) and max_s_neighbors == 2:
                         aro = 'non_pure_aromatic'
                     else:
                         aro = 'non_aromatic'
@@ -530,26 +540,31 @@ class AtomTypeIdentifier:
                 elif (info.get('CyclicStructure') == 'cycle' and
                       'non_pure_aromatic' in info.get('Aromaticity')):
 
-                    if 'O' in connected_symbols:
-                        # Directly loop through the connected atom numbers
-                        for connected_atom_number in info[
-                                'ConnectedAtomsNumbers']:
-                            if ((self.atom_info_dict[connected_atom_number]
-                                 ['AtomicSymbol'] == 'O') and
-                                (self.atom_info_dict[connected_atom_number]
-                                 ['CyclicStructure'] == 'none')):
-                                if self.atom_info_dict[connected_atom_number][
-                                        'NumConnectedAtoms'] == 1:
-                                    # Carbonyl Carbon
-                                    carbon_type = {
-                                        'opls': 'opls_235',
-                                        'gaff': 'c'
-                                    }
-                                    # Exit the loop once the carbonyl carbon is
-                                    # identified
-                                    break
-                            else:
-                                carbon_type = {'opls': 'opls_508', 'gaff': 'cc'}
+                    has_terminal_oxygen = False
+                    has_terminal_sulfur = False
+                    for connected_atom_number in info['ConnectedAtomsNumbers']:
+                        if ((self.atom_info_dict[connected_atom_number]
+                             ['AtomicSymbol'] == 'O') and
+                            (self.atom_info_dict[connected_atom_number]
+                             ['CyclicStructure'] == 'none') and
+                            (self.atom_info_dict[connected_atom_number]
+                             ['NumConnectedAtoms'] == 1)):
+                            has_terminal_oxygen = True
+                        elif ((self.atom_info_dict[connected_atom_number]
+                               ['AtomicSymbol'] == 'S') and
+                              (self.atom_info_dict[connected_atom_number]
+                               ['CyclicStructure'] == 'none') and
+                              (self.atom_info_dict[connected_atom_number]
+                               ['NumConnectedAtoms'] == 1)):
+                            has_terminal_sulfur = True
+
+                    if has_terminal_oxygen:
+                        # Carbonyl Carbon
+                        carbon_type = {'opls': 'opls_235', 'gaff': 'c'}
+
+                    elif has_terminal_sulfur:
+                        # Carbon double bonded to Sulfur
+                        carbon_type = {'opls': 'opls_cs', 'gaff': 'cs'}
 
                     elif ('C' in connected_symbols and
                           info['NumConnectedAtoms'] == 3 and
@@ -776,51 +791,28 @@ class AtomTypeIdentifier:
 
                     elif info['NumConnectedAtoms'] == 3:
 
-                        if 'O' in connected_symbols:
-                            # Directly loop through the connected atom numbers
-                            for connected_atom_number in info[
-                                    'ConnectedAtomsNumbers']:
-                                if self.atom_info_dict[connected_atom_number][
-                                        'AtomicSymbol'] == 'O':
-                                    if self.atom_info_dict[
-                                            connected_atom_number][
-                                                'NumConnectedAtoms'] == 1:
-                                        # Carbonyl Carbon
-                                        carbon_type = {
-                                            'opls': 'opls_235',
-                                            'gaff': 'c'
-                                        }
-                                        # Exit the loop once the carbonyl
-                                        # carbon is identified
-                                        break
-                                    else:
-                                        carbon_type = {
-                                            'opls': 'opls_141',
-                                            'gaff': 'c2'
-                                        }
+                        has_terminal_oxygen = False
+                        has_terminal_sulfur = False
+                        for connected_atom_number in info[
+                                'ConnectedAtomsNumbers']:
+                            if ((self.atom_info_dict[connected_atom_number]
+                                 ['AtomicSymbol'] == 'O') and
+                                (self.atom_info_dict[connected_atom_number]
+                                 ['NumConnectedAtoms'] == 1)):
+                                has_terminal_oxygen = True
+                            elif ((self.atom_info_dict[connected_atom_number]
+                                   ['AtomicSymbol'] == 'S') and
+                                  (self.atom_info_dict[connected_atom_number]
+                                   ['NumConnectedAtoms'] == 1)):
+                                has_terminal_sulfur = True
 
-                        elif 'S' in connected_symbols:  # Double bond with a Sulfur
-                            for connected_atom_number in info[
-                                    'ConnectedAtomsNumbers']:
-                                if self.atom_info_dict[connected_atom_number][
-                                        'AtomicSymbol'] == 'S':
-                                    if self.atom_info_dict[
-                                            connected_atom_number][
-                                                'NumConnectedAtoms'] == 1:
-                                        # Carbon double bonded to Sulfur
-                                        carbon_type = {
-                                            'opls': 'opls_cs',
-                                            'gaff': 'cs'
-                                        }
-                                        # Exit the loop as soon as we find a
-                                        # sulfur atom with only one connected
-                                        # atom
-                                        break
-                                    else:
-                                        carbon_type = {
-                                            'opls': 'opls_141',
-                                            'gaff': 'c2'
-                                        }
+                        if has_terminal_oxygen:
+                            # Carbonyl Carbon
+                            carbon_type = {'opls': 'opls_235', 'gaff': 'c'}
+
+                        elif has_terminal_sulfur:
+                            # Carbon double bonded to Sulfur
+                            carbon_type = {'opls': 'opls_cs', 'gaff': 'cs'}
 
                         elif 'C' in connected_symbols:
                             # Count the number of sp2-hybridized carbons
