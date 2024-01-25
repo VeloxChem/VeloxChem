@@ -208,6 +208,44 @@ class AtomTypeIdentifier:
         return (self.atomic_symbols[atom_idx] == "N" and
                 len(list(self.graph.neighbors(atom_idx))) == 2)
 
+    def is_likely_sp2_nitrogen(self, atom_idx):
+        """
+        Determines if a N atom, identified by its index, is sp2 hybridized.
+
+        :param atom_idx:
+            Index of the atom in the molecule.
+
+        :return:
+            True if the atom is sp2 hybridized, False otherwise.
+        """
+
+        if self.atomic_symbols[atom_idx] != 'N':
+            return False
+
+        if len(list(self.graph.neighbors(atom_idx))) == 2:
+            return True
+
+        # Criteria for nitrogen with three connections:
+        # - connected carbon must be sp2
+        # - connected nitrogen must be strictly sp2
+        # - connected hydrogen cannot be more than one
+
+        hydrogen_count = 0
+        for i in list(self.graph.neighbors(atom_idx)):
+            if self.atomic_symbols[i] == 'C':
+                if not self.is_sp2_carbon(i):
+                    return False
+            elif self.atomic_symbols[i] == 'N':
+                if not self.is_sp2_nitrogen(i):
+                    return False
+            elif self.atomic_symbols[i] == 'H':
+                hydrogen_count += 1
+
+        if hydrogen_count > 1:
+            return False
+
+        return True
+
     def detect_closed_cyclic_structures(self):
         """
         Detects closed cyclic structures in a molecule and determines their
@@ -287,6 +325,12 @@ class AtomTypeIdentifier:
                 if self.atomic_symbols[atom_idx] == 'N'
             ])
 
+            all_nitrogens_likely_sp2 = all([
+                self.is_likely_sp2_nitrogen(atom_idx)
+                for atom_idx in cycle
+                if self.atomic_symbols[atom_idx] == 'N'
+            ])
+
             if len(cycle) == 6 and only_carbon_nitrogen_in_cycle:
 
                 if all_carbons_sp2 and all_nitrogens_sp2:
@@ -295,6 +339,8 @@ class AtomTypeIdentifier:
                     else:
                         aro = 'non_pure_aromatic'
                 elif all_carbons_sp2 and (max_distance - min_distance <= 0.08):
+                    aro = 'non_pure_aromatic'
+                elif all_carbons_sp2 and all_nitrogens_likely_sp2:
                     aro = 'non_pure_aromatic'
                 else:
                     aro = 'non_aromatic'
@@ -1125,9 +1171,8 @@ class AtomTypeIdentifier:
                 if info.get('CyclicStructure') == 'cycle':
                     connected_symbols = set(info['ConnectedAtoms'])
 
-                    if info['NumConnectedAtoms'] == 2 and connected_symbols == {
-                            'H'
-                    }:
+                    if (info['NumConnectedAtoms'] == 2 and
+                            connected_symbols == {'H'}):
                         oxygen_type = {
                             'opls': 'opls_154',
                             'gaff': 'oh'
@@ -1135,7 +1180,9 @@ class AtomTypeIdentifier:
 
                     elif info['NumConnectedAtoms'] == 2 and (
                             'C' in connected_symbols or 'S' in connected_symbols
-                            or 'N' in connected_symbols):  # Ether and thioether
+                            or 'N' in connected_symbols or
+                            'O' in connected_symbols):
+                        # Ether and thioether
                         if any(self.atom_info_dict[atom]['AtomicSymbol'] == 'O'
                                for atom in info['ConnectedAtomsNumbers']):
                             oxygen_type = {
