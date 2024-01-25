@@ -630,9 +630,19 @@ class AtomTypeIdentifier:
                                 if self.atom_info_dict[num]['AtomicSymbol'] ==
                                 'C' and self.atom_info_dict[num]
                                 ['NumConnectedAtoms'] == 2)
+                            n2_count = sum(
+                                1 for num in info['ConnectedAtomsNumbers']
+                                if self.atom_info_dict[num]['AtomicSymbol'] ==
+                                'N' and self.atom_info_dict[num]
+                                ['NumConnectedAtoms'] == 2)
                             # If the current carbon is connected to 2 sp2 carbons
                             if (sp2_carbon_count + sp1_carbon_count == 2 or
                                     sp2_carbon_count + sp1_carbon_count == 3):
+                                carbon_type = {
+                                    'opls': 'opls_XXX',
+                                    'gaff': 'ce'
+                                }  # Inner Sp2 carbons in conjugated systems
+                            elif sp2_carbon_count + sp1_carbon_count + n2_count == 2:
                                 carbon_type = {
                                     'opls': 'opls_XXX',
                                     'gaff': 'ce'
@@ -936,9 +946,6 @@ class AtomTypeIdentifier:
                                     'opls': 'opls_146',
                                     'gaff': 'ha'
                                 }  # Default sp2 Hydrogen for c2 and ca types
-
-                        elif carbon_type == {'opls': 'opls_XXX', 'gaff': 'ce'}:
-                            hydrogen_type = {'opls': 'opls_146', 'gaff': 'ha'}
 
                         elif carbon_type == {'opls': 'opls_521', 'gaff': 'ca'}:
                             # Hydrogens connected to C in heterocycle with N as
