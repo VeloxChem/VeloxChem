@@ -1309,13 +1309,17 @@ class AtomTypeIdentifier:
                         found_sp1_carbon = False
                         found_sp3_carbon = False
 
-                        if (sorted(info['ConnectedAtoms']) == sorted(
-                            ['C', 'O', 'O']) or sorted(info['ConnectedAtoms'])
-                                == sorted(['N', 'O', 'O'])):
+                        if (sorted(info['ConnectedAtoms']) in [
+                                sorted(['C', 'O', 'O']),
+                                sorted(['N', 'O', 'O']),
+                                sorted(['O', 'O', 'O']),
+                        ]):
                             found_nitro = True
 
                         elif 'C' in connected_symbols:
-                            for atom in connected_atoms_numbers:
+                            for idx, atom in enumerate(connected_atoms_numbers):
+                                if connected_atoms[idx] != 'C':
+                                    continue
 
                                 # Check for aromaticity
                                 if ('cycle' in self.atom_info_dict[atom]
@@ -1342,10 +1346,10 @@ class AtomTypeIdentifier:
                                                 'NumConnectedAtoms']
 
                                         # Amides and Sulfamides
-                                        if (atom_symbol == 'O' and
-                                                atom_connectivity == 1) or (
-                                                    atom_symbol == 'S' and
-                                                    atom_connectivity == 1):
+                                        if ((atom_symbol == 'O' and
+                                             atom_connectivity == 1) or
+                                            (atom_symbol == 'S' and
+                                             atom_connectivity == 1)):
                                             found_amide = True
 
                                         # Idines
@@ -1635,7 +1639,10 @@ class AtomTypeIdentifier:
                             # connected atoms to the carbon
                             found_CO = False
 
-                            for atom in connected_atoms_numbers:
+                            for idx, atom in enumerate(connected_atoms_numbers):
+                                if connected_atoms[idx] != 'C':
+                                    continue
+
                                 for connected_to_carbon in self.atom_info_dict[
                                         atom]['ConnectedAtomsNumbers']:
                                     atom_symbol = self.atom_info_dict[
@@ -1674,12 +1681,16 @@ class AtomTypeIdentifier:
                     # Nitrogens in Non-aromatic cycles
                     elif (info['NumConnectedAtoms'] == 3 and
                           'non_aromatic' in info.get('Aromaticity')):
+
                         if 'C' in connected_symbols:
                             # Check for amides and sulfamides by checking the
                             # connected atoms to the carbon
                             found_CO = False
 
-                            for atom in connected_atoms_numbers:
+                            for idx, atom in enumerate(connected_atoms_numbers):
+                                if connected_atoms[idx] != 'C':
+                                    continue
+
                                 for connected_to_carbon in self.atom_info_dict[
                                         atom]['ConnectedAtomsNumbers']:
                                     atom_symbol = self.atom_info_dict[
@@ -1687,9 +1698,10 @@ class AtomTypeIdentifier:
                                     atom_connectivity = self.atom_info_dict[
                                         connected_to_carbon][
                                             'NumConnectedAtoms']
-                                    if (atom_symbol == 'O' and atom_connectivity
-                                            == 1) or (atom_symbol == 'S' and
-                                                      atom_connectivity == 1):
+                                    if ((atom_symbol == 'O' and
+                                         atom_connectivity == 1) or
+                                        (atom_symbol == 'S' and
+                                         atom_connectivity == 1)):
                                         num_hydrogens = sum([
                                             1 for symbol in connected_atoms
                                             if symbol == 'H'
