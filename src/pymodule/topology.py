@@ -241,9 +241,9 @@ class Topology:
         self.pairs = ff_data['pairs']
         self.coordinates = self.molecule.get_coordinates_in_angstrom() * 0.1
 
-        # Update the atomtypes with the renamed atom types based on the equivalences
-        for atom_id, atom_data in self.atoms.items():
-            atom_data["type"] = self.renamed_atom_types[atom_id - 1]
+        # # Update the atomtypes with the renamed atom types based on the equivalences
+        # for atom_id, atom_data in self.atoms.items():
+        #     atom_data["type"] = self.renamed_atom_types[atom_id - 1]
 
     # Methods for updating the topology
             

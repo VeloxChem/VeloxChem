@@ -71,6 +71,8 @@ from .veloxchemlib import moints
 
 # Python classes
 from .atomtypeidentifier import AtomTypeIdentifier
+from .topology import Topology
+from .seminario import Seminario
 from .inputparser import InputParser
 from .outputstream import OutputStream
 from .molecule import Molecule

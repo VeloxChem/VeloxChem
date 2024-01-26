@@ -2507,3 +2507,569 @@ class AtomTypeIdentifier:
         """
 
         return np.linalg.norm(np.array(v1) - np.array(v2))
+    
+
+    ### TEMPORAL FOR TESTING PURPOSES !!! 
+    ### =================================
+
+    def compute_structural_features(self):
+        '''
+        Computes the structural features of a molecule based on its connectivity and distance matrices. 
+
+        :return:
+            A dictionary containing the lists of bonds, angles, dihedrals, impropers, 
+            and pairs with their respective structural information.
+        '''
+
+        # Initialize the dictionary structure for structural features
+
+        structural_features = {
+            'bonds': [],
+            'angles': [],
+            'dihedrals': [],
+            'impropers': [],
+            'pairs': []
+        }
+
+        # Compute bonds based on the connectivity matrix and the distance matrix
+        for y in range(len(self.connectivity_matrix)):  #Loop over every row
+            for x in range(y + 1, len(self.connectivity_matrix)
+                          ):  #Loop over every upper triangular element
+                if self.connectivity_matrix[y][x] == 1:
+                    bond = {
+                        'atoms': (y + 1, x + 1),
+                        'types':
+                            (self.gaff_atom_types[y], self.gaff_atom_types[x]),
+                        'distance': self.distance_matrix[y][x]
+                    }
+                    structural_features['bonds'].append(bond)
+
+        # Compute angles based on the connectivity matrix and the distance matrix
+
+        def add_angle(i, j, k):
+            angle = {
+                'atoms': (i + 1, j + 1, k + 1),
+                'types': (self.gaff_atom_types[i], self.gaff_atom_types[j],
+                          self.gaff_atom_types[k]),
+                'angle': self.measure_angle(self.coordinates[i],
+                                            self.coordinates[j],
+                                            self.coordinates[k])
+            }
+            structural_features['angles'].append(angle)
+
+        def add_dihedral(i, j, k, l):
+            dihedral = {
+                'atoms': (i + 1, j + 1, k + 1, l + 1),
+                'types': (self.gaff_atom_types[i], self.gaff_atom_types[j],
+                          self.gaff_atom_types[k], self.gaff_atom_types[l]),
+                'dihedral_angle': self.measure_dihedral(self.coordinates[i],
+                                                        self.coordinates[j],
+                                                        self.coordinates[k],
+                                                        self.coordinates[l])
+            }
+            structural_features['dihedrals'].append(dihedral)
+
+        def add_improper(i, j, k, l):
+
+            improper_dihedral = {
+                'atoms': (i + 1, j + 1, k + 1, l + 1),
+                'types': (self.gaff_atom_types[i], self.gaff_atom_types[j],
+                          self.gaff_atom_types[k], self.gaff_atom_types[l]),
+                'improper_angle': self.measure_dihedral(self.coordinates[i],
+                                                        self.coordinates[j],
+                                                        self.coordinates[k],
+                                                        self.coordinates[l])
+            }
+            structural_features['impropers'].append(improper_dihedral)
+
+        def check_improper(center, neighbours):
+            #todo add better functionality for recognising sp2 atom-types
+            sp2_atom_types = [
+                'c ', 'cs', 'c2', 'ca', 'cp', 'cq', 'cc', 'cd', 'ce', 'cf',
+                'cu', 'cv', 'cz', 'n ', 'n2', 'na', 'nb', 'nc', 'nd', 'ne',
+                'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
+            ]
+            if self.gaff_atom_types[center] in sp2_atom_types:
+                # check for cycle
+                cycle = False
+                if self.gaff_atom_types[neighbours[
+                        0]] in sp2_atom_types and self.gaff_atom_types[
+                            neighbours[1]] in sp2_atom_types:
+                    add_improper(center, neighbours[0], neighbours[1],
+                                 neighbours[2])
+                    cycle = True
+                if self.gaff_atom_types[neighbours[
+                        1]] in sp2_atom_types and self.gaff_atom_types[
+                            neighbours[2]] in sp2_atom_types:
+                    add_improper(center, neighbours[1], neighbours[2],
+                                 neighbours[0])
+                    cycle = True
+                if self.gaff_atom_types[neighbours[
+                        2]] in sp2_atom_types and self.gaff_atom_types[
+                            neighbours[0]] in sp2_atom_types:
+                    add_improper(center, neighbours[2], neighbours[0],
+                                 neighbours[1])
+                    cycle = True
+                if cycle:
+                    return
+
+                #check for double bond
+                if self.gaff_atom_types[neighbours[0]] in sp2_atom_types:
+                    add_improper(center, neighbours[1], neighbours[2],
+                                 neighbours[0])
+                if self.gaff_atom_types[neighbours[1]] in sp2_atom_types:
+                    add_improper(center, neighbours[2], neighbours[0],
+                                 neighbours[1])
+                if self.gaff_atom_types[neighbours[2]] in sp2_atom_types:
+                    add_improper(center, neighbours[0], neighbours[1],
+                                 neighbours[2])
+                return
+
+        for y in range(len(self.connectivity_matrix)):  #Loop over every row
+            x_ids = []
+            #Loop over the row, and collect the appearances of 1s
+            for x in range(len(self.connectivity_matrix)):
+                if self.connectivity_matrix[y][
+                        x] == 1:  # If i and j are connected
+                    x_ids.append(x)
+
+            #if there are 2 bonds, that is an angle
+            if len(x_ids) >= 2:
+                add_angle(x_ids[0], y, x_ids[1])
+
+            #if there are 3 bonds, it is a junction, which is made up of 3 angles and possibly an improper dihedral
+            if len(x_ids) >= 3:
+                add_angle(x_ids[0], y, x_ids[2])
+                add_angle(x_ids[1], y, x_ids[2])
+                check_improper(y, x_ids)
+
+            #if there are 4 bonds, it is a junction, which is made up of 3 angles and no impropers
+            if len(x_ids) == 4:
+                add_angle(x_ids[0], y, x_ids[3])
+                add_angle(x_ids[1], y, x_ids[3])
+                add_angle(x_ids[2], y, x_ids[3])
+
+            #Add dihedrals
+            for x_id in x_ids:  #for all bonds in this row
+                if x_id > y:  #if it is in the top triangular part
+                    for y2 in range(
+                            len(self.connectivity_matrix)
+                    ):  #Loop over the whole column corresponding to x_id
+                        if y2 != y and self.connectivity_matrix[
+                                x_id,
+                                y2] == 1:  #Find all the bonds (and thus skip the current row)
+                            #Loop over all other x_ids
+                            for x_id2 in x_ids:
+                                if x_id2 != x_id:
+                                    add_dihedral(y2, x_id, y, x_id2)
+
+        return structural_features
+
+    def generate_force_field_dict(self, ff_file_path):
+        '''
+        Generates a force field dictionary for a molecule based on its structural features 
+        and a given GAFF force field file.
+
+        :param ff_file_path:
+            The file path to the GAFF force field data file.
+
+        :return:
+            The dictionary containing force field parameters for atom types, 
+            bonds, angles, dihedrals, impropers, and non-bonded pairs.
+
+        '''
+
+        # Required structural features
+        self.structural_features = self.compute_structural_features()
+
+        # Initialize the dictionary to hold force field data
+        force_field_data = {
+            'atomtypes': {},
+            'bonds': {},
+            'angles': {},
+            'dihedrals': {},
+            'impropers': {},
+            'pairs': {}
+        }
+
+        # Conversion factors
+        angstrom_to_nm = 0.1
+        kcalmol_to_kjmol = 4.184
+
+        # Read the force field file
+        with open(ff_file_path, 'r') as ff_file:
+            ff_lines = ff_file.readlines()
+
+        # Create a dictionary from the force field file for atom types
+        atomtype_data = {
+            line.split()[0]: line
+            for line in ff_lines
+            if re.match(r'^\S+\s+\d+\.\d+\s+\d+\.\d+\s+.*$', line)
+        }
+
+        # Create a dictionary from the force field file for sigma and epsilon values
+        sigma_epsilon_data = {
+            line.split()[0]: line
+            for line in ff_lines
+            if re.match(r'^\s*\S+\s+\d+\.\d+\s+\d+\.\d+', line)
+        }
+
+        # Parse atomtypes section and initialize force field data with unique IDs
+        for index, gaff_atom_type in enumerate(
+                self.gaff_atom_types,
+                start=1):  # Start index at 1 since IDs start at 1
+            force_field_data['atomtypes'][index] = {
+                'element': self.atomic_symbols[index - 1],
+                'type': gaff_atom_type,
+                'mass': 0,
+                'sigma': 0,
+                'epsilon': 0,
+                'charge': 0,
+                'comment': 'undefined'
+            }
+
+            comment = ""
+            # If atom type data is found in the force field, update mass and info
+            if gaff_atom_type in atomtype_data:
+                atom_type_match = re.match(
+                    r'^(\S+)\s+(\d+\.\d+)\s+(\d+\.\d+)\s+(.+)$',
+                    atomtype_data[gaff_atom_type])
+                if atom_type_match:
+                    mass = float(atom_type_match.group(2))
+                    info = atom_type_match.group(4).strip()
+                    force_field_data['atomtypes'][index].update({
+                        'mass': mass,
+                        'comment': 'GAFF2 ' + info
+                    })
+                    comment += 'GAFF2 ' + info
+
+            # If sigma and epsilon data is found in the force field, update those values
+            if gaff_atom_type in sigma_epsilon_data:
+                sigma_epsilon_match = re.match(
+                    r'^\s*(\S+)\s+(\d+\.\d+)\s+(\d+\.\d+)',
+                    sigma_epsilon_data[gaff_atom_type])
+                if sigma_epsilon_match:
+                    sigma = float(sigma_epsilon_match.group(2)) * 2**(
+                        -1 / 6) * 2 * angstrom_to_nm
+                    epsilon = float(
+                        sigma_epsilon_match.group(3)) * kcalmol_to_kjmol
+                    force_field_data['atomtypes'][index].update({
+                        'sigma': sigma,
+                        'epsilon': epsilon
+                    })
+            force_field_data['atomtypes'][index].update({'comment': comment})
+
+        # Parse bonds section
+        for bond in self.structural_features['bonds']:
+            bond_type_pattern = r'\s?-'.join(sorted(bond['types']))
+            bond_regex = bond_type_pattern + r'\s+(\d+\.\d+)\s+(\d+\.\d+)'
+            match_found = False  # Flag to check if we find a match in the force field file
+            bond_key = tuple(sorted(bond['atoms']))
+
+            for line in ff_lines:
+                bond_match = re.search(bond_regex, line)
+                if bond_match:
+                    fc = float(bond_match.group(
+                        1)) * 2 * kcalmol_to_kjmol / angstrom_to_nm**2  #unit
+                    eq_distance = float(bond_match.group(2)) * angstrom_to_nm
+                    # The bond key will include atom types and IDs for uniqueness
+                    force_field_data['bonds'][bond_key] = {
+                        # 'ids': bond['atoms'],  # Include the atom IDs
+                        'types': bond['types'],
+                        'fc': fc,
+                        'eq': eq_distance,
+                        'comment': f"GAFF2, {bond['types']}".replace("'", "")
+                    }
+                    match_found = True
+                    break  # Exit the loop after finding the match
+
+            if not match_found:
+                # Default values if no match is found, using the computed distance from structural_features
+                computed_distance = bond[
+                    'distance']  # Assuming 'distance' is already in the correct units
+                # The bond key will include atom types and IDs for uniqueness
+                force_field_data['bonds'][bond_key] = {
+                    # 'ids': bond['atoms'],  # Include the atom IDs
+                    'types': bond['types'],
+                    'fc': 25000.000,  # Default force constant converted to kJ/mol
+                    'eq': computed_distance * angstrom_to_nm,
+                    'comment': f"unknown, {bond['types']}".replace("'", "")
+                }
+
+        # Parse angles section
+        for angle in self.structural_features['angles']:
+            angle_types = angle['types']
+            if angle_types[2] < angle_types[0]:
+                angle_types = angle_types[::-1]
+            angle_type_pattern = r'\s?-'.join(angle_types)
+            angle_regex = angle_type_pattern + r'\s+(\d+\.\d+)\s+(\d+\.\d+)'
+            match_found = False  # Flag to check if we find a match in the force field file
+            angle_key = tuple(angle['atoms'])
+            #Order the key so that the first index is always lower then the last one
+            if angle_key[0] > angle_key[2]:
+                angle_key = angle_key[::-1]
+
+            for line in ff_lines:
+                angle_match = re.search(angle_regex, line)
+                if angle_match:
+                    fc = float(
+                        angle_match.group(1)) * 2 * kcalmol_to_kjmol  #unit
+                    eq_angle_radians = float(angle_match.group(2))
+                    eq_angle_degrees = eq_angle_radians  # Assuming angle is in radians, convert to degrees if necessary
+                    # The angle key will include atom types and IDs for uniqueness
+                    force_field_data['angles'][angle_key] = {
+                        # 'ids': angle['atoms'],  # Include the atom IDs
+                        'types': angle['types'],
+                        'fc': fc,
+                        'eq': eq_angle_degrees,
+                        'comment': f"GAFF2, {angle['types']}".replace("'", "")
+                    }
+                    match_found = True
+                    break  # Exit the loop after finding the match
+
+            if not match_found:
+                # Default values if no match is found, using the computed angle from structural_features
+                computed_angle = angle[
+                    'angle']  # Assuming 'angle' is already computed and stored in degrees
+                # The angle key will include atom types and IDs for uniqueness
+                force_field_data['angles'][angle_key] = {
+                    # 'ids': angle['atoms'],  # Include the atom IDs
+                    'types': angle['types'],
+                    'fc': 500.00,  # Default force constant converted to kJ/mol #unit
+                    'eq': computed_angle,
+                    'comment': f"unknown, {angle['types']}".replace("'", "")
+                }
+
+        #todo get this to use the same code as in forcefieldgenerator, or other way around
+        for dihedral in self.structural_features['dihedrals']:
+            dihedral_key = tuple(dihedral['atoms'])
+            #Order the key so that the first index is always lower then the last one
+            if dihedral_key[0] > dihedral_key[3]:
+                dihedral_key = dihedral_key[::-1]
+
+            i, j, k, l = dihedral['atoms']
+            at_1, at_2, at_3, at_4 = dihedral['types']
+
+            patterns = [
+                re.compile(r'\A' + f'{at_1}-{at_2}-{at_3}-{at_4} '),
+                re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
+            ]
+            # Find the dihedral
+            dihedral_found = False
+
+            dihedral_ff_lines = []
+            for line in ff_lines:
+                matches = [re.search(p, line) for p in patterns]
+                if any(matches):
+                    dihedral_ff = line[11:60].strip().split()
+                    if len(dihedral_ff) == 4:
+                        dihedral_ff_lines.append(line)
+                        dihedral_found = True
+
+            if not dihedral_found:
+                patterns = [
+                    re.compile(r'\A' + f'X -{at_2}-{at_3}-X  '),
+                    re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
+                ]
+
+                dihedral_ff_lines = []
+                for line in ff_lines:
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
+                        dihedral_ff = line[11:60].strip().split()
+                        if len(dihedral_ff) == 4:
+                            dihedral_ff_lines.append(line)
+                            dihedral_found = True
+
+            errmsg = 'ForceFieldGenerator: proper dihedral'
+            errmsg += f' {at_1}-{at_2}-{at_3}-{at_4} is not available.'
+            # assert_msg_critical(dihedral_found, errmsg)
+
+            if dihedral_found:
+                for line in dihedral_ff_lines:
+                    dihedral_ff = line[11:60].strip().split()
+
+                    multiplicity = int(dihedral_ff[0])
+                    fc = float(dihedral_ff[1]) * 4.184 / multiplicity
+                    eq = float(dihedral_ff[2])
+                    # Note: negative periodicity implies multitermed dihedral
+                    # See https://ambermd.org/FileFormats.php
+                    try:
+                        periodicity = int(dihedral_ff[3])
+                    except ValueError:
+                        periodicity = int(float(dihedral_ff[3]))
+
+                    force_field_data['dihedrals'][dihedral_key] = {
+                        # 'ids': dihedral['atoms'],  # Include the atom IDs
+                        'types': dihedral['types'],
+                        'multiplicity': multiplicity,
+                        'fc': fc,
+                        'eq': eq,
+                        'periodicity': periodicity,
+                        'comment': f"GAFF2, {dihedral['types']}".replace(
+                            "'", ""),
+                        'type': 9
+                    }
+
+                    if periodicity > 0:
+                        break
+
+            else:
+                computed_angle = dihedral['dihedral_angle']
+                # The dihedral key will include atom types and IDs for uniqueness
+                force_field_data['dihedrals'][dihedral_key] = {
+                    # 'ids': dihedral['atoms'],  # Include the atom IDs
+                    'types': dihedral['types'],
+                    'multiplicity': -1,  # Default periodicity
+                    'fc': 0,  # Default force constant
+                    'eq': computed_angle,
+                    'periodicity': 1,  # Default phase
+                    'comment': f"unknown, {dihedral['types']}".replace("'", ""),
+                    'type': 9
+                }
+
+        # improper dihedrals
+        for improper in self.structural_features['impropers']:
+            at_1 = dihedral['types'][0]
+            at_2 = dihedral['types'][1]
+            at_3 = dihedral['types'][2]
+            at_4 = dihedral['types'][3]
+
+            patterns = [
+                re.compile(r'\A' + f'{at_4}-{at_1}-{at_2}-{at_3} '),
+                re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
+                re.compile(r'\A' + f'{at_1}-{at_3}-{at_2}-{at_4} '),
+                re.compile(r'\A' + f'{at_1}-{at_4}-{at_2}-{at_3} '),
+                re.compile(r'\A' + f'{at_3}-{at_1}-{at_2}-{at_4} '),
+                re.compile(r'\A' + f'{at_3}-{at_4}-{at_2}-{at_1} '),
+            ]
+
+            dihedral_found = False
+
+            for line in ff_lines:
+                matches = [re.search(p, line) for p in patterns]
+                if any(matches):
+                    dihedral_ff = line[11:60].strip().split()
+                    if len(dihedral_ff) == 3:
+                        dihedral_found = True
+                        break
+
+            if not dihedral_found:
+                patterns = [
+                    re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_1} '),
+                    re.compile(r'\A' + f'X -{at_3}-{at_2}-{at_4} '),
+                    re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'X -{at_1}-{at_2}-{at_4} '),
+                    re.compile(r'\A' + f'X -{at_4}-{at_2}-{at_1} '),
+                ]
+
+                for line in ff_lines:
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
+                        dihedral_ff = line[11:60].strip().split()
+                        if len(dihedral_ff) == 3:
+                            dihedral_found = True
+                            break
+
+            if not dihedral_found:
+                patterns = [
+                    re.compile(r'\A' + f'X -X -{at_2}-{at_3} '),
+                    re.compile(r'\A' + f'X -X -{at_2}-{at_1} '),
+                    re.compile(r'\A' + f'X -X -{at_2}-{at_4} '),
+                ]
+
+                for line in ff_lines:
+                    matches = [re.search(p, line) for p in patterns]
+                    if any(matches):
+                        dihedral_ff = line[11:60].strip().split()
+                        if len(dihedral_ff) == 3:
+                            dihedral_found = True
+                            break
+
+            fc = float(dihedral_ff[0]) * 4.184
+            eq = float(dihedral_ff[1])
+            periodicity = abs(int(float(dihedral_ff[2])))
+
+            improper_key = tuple(
+                improper['atoms'])  # Use atom IDs instead of types for the key
+            if improper_key[0] > improper_key[3]:
+                improper_key = improper_key[::-1]
+
+            if dihedral_found:
+                force_field_data['impropers'][improper_key] = {
+                    # 'ids': improper['ids'],  # Include the atom IDs
+                    'types': improper['types'],
+                    'periodicity': periodicity,
+                    'fc': fc,
+                    'eq': eq,
+                    'comment': f"GAFF2, {improper['types']}".replace("'", ""),
+                    'type': 4
+                }
+            else:
+                computed_angle = improper['improper_angle']
+                force_field_data['impropers'][improper_key] = {
+                    # 'ids': improper['ids'],  # Include the atom IDs
+                    'types': improper['types'],
+                    'periodicity': 2,
+                    'fc': 0,
+                    'eq': computed_angle,
+                    'comment': f"unknown, {improper['types']}".replace("'", ""),
+                    'type': 4
+                }
+
+        # Add all dihedral pairs
+        for dihedral in self.structural_features['dihedrals']:
+            # Extract first and last atoms from the dihedral by IDs
+            dihedral_pair_ids = (dihedral['atoms'][0], dihedral['atoms'][-1])
+            # Initialize the pair in the force field data
+            force_field_data['pairs'][dihedral_pair_ids] = {
+                'comment': 'computed from dihedrals'
+            }
+
+        # Exclude pairs that are already present in bonds
+        for par in self.structural_features['bonds']:
+            bond_pair_ids = (par['atoms'][0], par['atoms'][1])
+            # Remove the bond pair from the force field data if it exists
+            force_field_data['pairs'].pop(bond_pair_ids, None)
+
+        # Exclude terminal atoms present in angles
+        for angle in self.structural_features['angles']:
+            # Remove the first and last atom pair from pairs if it exists
+            angle_pair_ids = (angle['atoms'][0], angle['atoms'][-1])
+            force_field_data['pairs'].pop(angle_pair_ids, None)
+
+        return force_field_data
+    
+    @staticmethod
+    def measure_angle(v1, v2, v3):
+        "Calculates the angle v1-v2-v3 in degrees"
+        import math
+        rad_to_deg = 180 / np.pi
+        v12 = np.array(v1) - np.array(v2)
+        v32 = np.array(v3) - np.array(v2)
+
+        return math.acos(
+            np.dot(v12, v32) /
+            (np.linalg.norm(v12) * np.linalg.norm(v32))) * rad_to_deg
+
+    @staticmethod
+    def measure_dihedral(v1, v2, v3, v4):
+        """
+        Calculates the dihedral v1-v2-v3-v4 in degrees
+        https://en.wikipedia.org/wiki/Dihedral_angle#Mathematical_background
+        """
+        import math
+        rad_to_deg = 180 / np.pi
+        #Get normal vectors
+        u1 = np.array(v2) - np.array(v1)
+        u2 = np.array(v3) - np.array(v2)
+        u3 = np.array(v4) - np.array(v3)
+        n1 = np.cross(u1, u2)
+        n2 = np.cross(u2, u3)
+
+        x = np.dot(u2, np.cross(n1, n2))
+        y = np.linalg.norm(u2,) * np.dot(n1, n2)
+
+        return math.atan2(x, y) * rad_to_deg
+
