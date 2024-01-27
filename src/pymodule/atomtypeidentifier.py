@@ -50,7 +50,6 @@ class AtomTypeIdentifier:
         The output stream.
 
     Instance variables
-        - molecule: A VeloxChem molecule object.
         - atomic_symbols: A list of atomic symbols for each atom in the
           molecule.
         - coordinates: A 2D numpy array of atomic coordinates for each atom in
@@ -65,7 +64,6 @@ class AtomTypeIdentifier:
           structure.
         - aromaticity: A list of aromaticity classifications for each cyclic
           structure.
-        - cycles: A list of cyclic structures.
         - atom_cycle_info: A dictionary containing cycle information for each
           atom.
         - atom_info_dict: A dictionary containing detailed information for each
@@ -102,26 +100,13 @@ class AtomTypeIdentifier:
         Creates a connectivity matrix for the molecule based on the atomic
         coordinates and covalent radii, determining which atoms are bonded.
 
-        This method iterates through pairs of atoms and calculates the distance
-        between them. If this distance is less than or equal to the sum of
-        their covalent radii scaled by a factor, it is considered a bond, and
-        the connectivity matrix is updated accordingly. The method also
-        constructs a corresponding distance matrix with the actual distances
-        between connected atoms.
-
         :param factor:
             A scaling factor for the covalent radii to account for the bond
             threshold.  Default value is 1.3.
-
-        :return:
-            tuple: A tuple containing two 2D numpy arrays:
-                   - The first array is the connectivity matrix with 1s
-                     indicating bonded atom pairs.
-                   - The second array is the distance matrix with actual
-                     distances between atoms.
         """
 
-        num_atoms = len(self.coordinates)
+        num_atoms = self.coordinates.shape[0]
+
         self.connectivity_matrix = np.zeros((num_atoms, num_atoms),
                                             dtype='int32')
         self.distance_matrix = np.zeros((num_atoms, num_atoms))
@@ -131,15 +116,13 @@ class AtomTypeIdentifier:
                 distance = self.measure_length(self.coordinates[i],
                                                self.coordinates[j])
                 adjusted_threshold = (self.covalent_radii[i] +
-                                      self.covalent_radii[j]) * float(factor)
+                                      self.covalent_radii[j]) * factor
 
                 if distance <= adjusted_threshold:
                     self.connectivity_matrix[i][j] = 1
                     self.connectivity_matrix[j][i] = 1
                     self.distance_matrix[i][j] = distance
                     self.distance_matrix[j][i] = distance
-
-        return self.connectivity_matrix, self.distance_matrix
 
     def plot_connectivity_map_3D(self):
         """
@@ -191,7 +174,7 @@ class AtomTypeIdentifier:
             True if the atom is sp2 hybridized, False otherwise.
         """
 
-        return (self.atomic_symbols[atom_idx] == "C" and
+        return (self.atomic_symbols[atom_idx] == 'C' and
                 len(list(self.graph.neighbors(atom_idx))) == 3)
 
     def is_sp2_nitrogen(self, atom_idx):
@@ -205,7 +188,7 @@ class AtomTypeIdentifier:
             True if the atom is sp2 hybridized, False otherwise.
         """
 
-        return (self.atomic_symbols[atom_idx] == "N" and
+        return (self.atomic_symbols[atom_idx] == 'N' and
                 len(list(self.graph.neighbors(atom_idx))) == 2)
 
     def is_likely_sp2_nitrogen(self, atom_idx):
@@ -225,26 +208,31 @@ class AtomTypeIdentifier:
         if len(list(self.graph.neighbors(atom_idx))) == 2:
             return True
 
-        # Criteria for nitrogen with three connections:
-        # - connected carbon must be sp2
-        # - connected nitrogen must be strictly sp2
-        # - connected hydrogen cannot be more than one
+        elif len(list(self.graph.neighbors(atom_idx))) == 3:
 
-        hydrogen_count = 0
-        for i in list(self.graph.neighbors(atom_idx)):
-            if self.atomic_symbols[i] == 'C':
-                if not self.is_sp2_carbon(i):
-                    return False
-            elif self.atomic_symbols[i] == 'N':
-                if not self.is_sp2_nitrogen(i):
-                    return False
-            elif self.atomic_symbols[i] == 'H':
-                hydrogen_count += 1
+            # Criteria for nitrogen with three connections:
+            # - connected carbon must be sp2
+            # - connected nitrogen must be strictly sp2
+            # - connected hydrogen cannot be more than one
 
-        if hydrogen_count > 1:
+            hydrogen_count = 0
+            for i in list(self.graph.neighbors(atom_idx)):
+                if self.atomic_symbols[i] == 'C':
+                    if not self.is_sp2_carbon(i):
+                        return False
+                elif self.atomic_symbols[i] == 'N':
+                    if not self.is_sp2_nitrogen(i):
+                        return False
+                elif self.atomic_symbols[i] == 'H':
+                    hydrogen_count += 1
+
+            if hydrogen_count > 1:
+                return False
+
+            return True
+
+        else:
             return False
-
-        return True
 
     def detect_closed_cyclic_structures(self):
         """
