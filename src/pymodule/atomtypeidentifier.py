@@ -973,40 +973,22 @@ class AtomTypeIdentifier:
 
                     elif info['NumConnectedAtoms'] == 1:
 
-                        if any(self.atom_info_dict[atom]['AtomicSymbol'] == 'C'
-                               for atom in info['ConnectedAtomsNumbers']):
+                        # If necessary we could check if the carbon connected
+                        # to the oxygen is connected to another oxygen. It is
+                        # useful to identify carboxylic acids and esters.
 
-                            # This checks if the carbon connected to the oxygen
-                            # is connected to another oxygen.
-                            # It is useful to identify carboxylic acids and
-                            # esters.
-                            carbons = [
-                                atom for atom in info['ConnectedAtomsNumbers']
-                                if self.atom_info_dict[atom]['AtomicSymbol'] ==
-                                'C'
-                            ]
+                        # carbons = [
+                        #     atom for atom in info['ConnectedAtomsNumbers']
+                        #     if self.atom_info_dict[atom]['AtomicSymbol'] == 'C'
+                        # ]
+                        # if any('O' in self.atom_info_dict[carbon]['ConnectedAtoms']
+                        #        for carbon in carbons):
+                        #     ...
 
-                            if any('O' in self.atom_info_dict[carbon]
-                                   ['ConnectedAtoms'] for carbon in carbons):
-
-                                # Carboxylic acid or ester
-                                oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
-
-                            else:
-
-                                # Aldehyde
-                                oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
-
-                        elif any(
-                                self.atom_info_dict[atom]['AtomicSymbol'] == 'O'
-                                for atom in info['ConnectedAtomsNumbers']):
-
-                            oxygen_type = {'opls': 'opls_XXX', 'gaff': 'oo'}
-
-                        else:
-                            oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
+                        oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
 
                     else:
+
                         oxygen_type = {
                             'opls': f'opls_x{info["AtomNumber"]}',
                             'gaff': f'ox{info["AtomNumber"]}'
@@ -1029,39 +1011,19 @@ class AtomTypeIdentifier:
 
                     elif info['NumConnectedAtoms'] == 1:
 
-                        if any(self.atom_info_dict[atom]['AtomicSymbol'] == 'C'
-                               for atom in info['ConnectedAtomsNumbers']):
+                        # If necessary we could check if the carbon connected
+                        # to the oxygen is connected to another oxygen. It is
+                        # useful to identify carboxylic acids and esters.
 
-                            # This checks if the carbon connected to the oxygen
-                            # is connected to another oxygen.
-                            # It is useful to identify carboxylic acids and
-                            # esters.
-                            carbons = [
-                                atom for atom in info['ConnectedAtomsNumbers']
-                                if self.atom_info_dict[atom]['AtomicSymbol'] ==
-                                'C'
-                            ]
+                        # carbons = [
+                        #     atom for atom in info['ConnectedAtomsNumbers']
+                        #     if self.atom_info_dict[atom]['AtomicSymbol'] == 'C'
+                        # ]
+                        # if any('O' in self.atom_info_dict[carbon]['ConnectedAtoms']
+                        #        for carbon in carbons):
+                        #     ...
 
-                            if any('O' in self.atom_info_dict[carbon]
-                                   ['ConnectedAtoms'] for carbon in carbons):
-
-                                # Carboxylic acid or ester
-                                oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
-
-                            else:
-
-                                # Aldehyde
-                                oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
-
-                        elif any(
-                                self.atom_info_dict[atom]['AtomicSymbol'] == 'O'
-                                for atom in info['ConnectedAtomsNumbers']):
-
-                            oxygen_type = {'opls': 'opls_XXX', 'gaff': 'oo'}
-
-                        else:
-
-                            oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
+                        oxygen_type = {'opls': 'opls_XXX', 'gaff': 'o'}
 
                     else:
 
@@ -1082,7 +1044,7 @@ class AtomTypeIdentifier:
 
                         if oxygen_type == {'opls': 'opls_154', 'gaff': 'oh'}:
 
-                            hydrogen_type = {'opls': 'opls_240', 'gaff': 'ho'}
+                            hydrogen_type = {'opls': 'opls_155', 'gaff': 'ho'}
 
                         else:
 
@@ -1147,8 +1109,6 @@ class AtomTypeIdentifier:
                         found_amide = False
                         found_idine = False
                         found_sp2_carbon = False
-                        found_sp1_carbon = False
-                        found_sp3_carbon = False
 
                         if (sorted(info['ConnectedAtoms']) in [
                                 sorted(['C', 'O', 'O']),
@@ -1171,12 +1131,6 @@ class AtomTypeIdentifier:
                                         atom_info_dict[atom]['Aromaticity']):
 
                                     found_aromatic = True
-
-                                elif self.atom_info_dict[atom][
-                                        'NumConnectedAtoms'] == 4:
-
-                                    # Connected to an sp3 carbon
-                                    found_sp3_carbon = True
 
                                 elif self.atom_info_dict[atom][
                                         'NumConnectedAtoms'] == 3:
@@ -1204,12 +1158,6 @@ class AtomTypeIdentifier:
                                               atom_connectivity == 2):
 
                                             found_idine = True
-
-                                        # Connected to C sp1
-                                        elif (atom_symbol == 'C' and
-                                              atom_connectivity == 2):
-
-                                            found_sp1_carbon = True
 
                                         # Connected to C sp2
                                         elif (atom_symbol == 'C' and
@@ -1321,7 +1269,7 @@ class AtomTypeIdentifier:
                             nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'ne'}
 
                         else:
-                            nitrogen_type = {'opls': 'opls_903', 'gaff': 'n2'}
+                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'n2'}
 
                     elif info['NumConnectedAtoms'] == 1:
 
@@ -1354,7 +1302,7 @@ class AtomTypeIdentifier:
                           'pure_aromatic' in info.get('Aromaticity')):
 
                         # Pyridine as a ligand in an organometallic complex
-                        nitrogen_type = {'opls': 'opls_183', 'gaff': 'nb'}
+                        nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'nb'}
 
                     elif (info['NumConnectedAtoms'] == 3 and
                           'non_pure_aromatic' in info.get('Aromaticity')):
@@ -1602,7 +1550,7 @@ class AtomTypeIdentifier:
                             nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'ne'}
 
                         else:
-                            nitrogen_type = {'opls': 'opls_903', 'gaff': 'n2'}
+                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'n2'}
 
                     else:
 
