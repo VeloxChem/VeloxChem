@@ -238,10 +238,6 @@ class AtomTypeIdentifier:
         """
         Detects closed cyclic structures in a molecule and determines their
         aromaticity.
-
-        This method analyzes the graph of atoms and their connectivity to
-        identify cycles, determine the size of each cycle, and classify them
-        based on aromaticity criteria.
         """
 
         self.graph = nx.Graph()
@@ -408,15 +404,6 @@ class AtomTypeIdentifier:
         """
         Creates a dictionary containing detailed information for each atom in
         the molecule.
-
-        This method compiles the atomic symbol, atom number, number of
-        connected atoms, symbols of connected atoms, atom numbers of connected
-        atoms, distances to connected atoms, and cycle information into a
-        structured dictionary.
-
-        :return:
-            The dictionary where each key is an atom number and each value is
-            another dictionary of atom information.
         """
 
         self.atom_info_dict = {}
@@ -465,23 +452,11 @@ class AtomTypeIdentifier:
         """
         Analyzes the molecular structure information to assign atom types to
         each atom in the molecule.
-
-        This method traverses through the atom information dictionary created
-        from the molecular structure data and applies a series of rules to
-        determine the appropriate atom type for each atom. The rules consider
-        factors such as the atom's chemical environment, its connectivity to
-        other atoms, and whether it is part of a cyclic structure.
-
-        :return:
-            A dictionary where each key corresponds to an atom identifier
-            (e.g., "C1" for the first carbon atom), and each value is another
-            dictionary containing the 'opls' and 'gaff' force field identifiers
-            for the atom.
         """
 
-        self.bad_hydrogen = False
-
         self.atom_types_dict = {}
+
+        self.bad_hydrogen = False
 
         for atom_number, info in self.atom_info_dict.items():
 
@@ -1443,8 +1418,7 @@ class AtomTypeIdentifier:
                                         }
 
                                 else:
-                                    # n3 in GAFF but special cases n7 and n8
-                                    # added in GAFF2
+                                    # n3 and special cases
 
                                     if num_hydrogens == 1:
 
@@ -1792,7 +1766,7 @@ class AtomTypeIdentifier:
             # Decision for Transition Metals
 
             elif info['AtomicSymbol'] not in [
-                    'C', 'H', 'O', 'N', 'P', 'Br', 'Cl', 'F', 'I'
+                    'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'
             ]:
 
                 # Assign atom types based on AtomicSymbol and AtomNumber
@@ -1824,12 +1798,9 @@ class AtomTypeIdentifier:
                     )
                     self.ostream.flush()
 
-        return self.atom_types_dict
-
-    def extract_gaff_atom_types(self, atom_type):
+    def extract_gaff_atom_types(self):
         """
         Extracts GAFF atom types from the atom types dictionary.
-
         """
 
         # Initialize the list of gaff atom types
@@ -1848,10 +1819,8 @@ class AtomTypeIdentifier:
 
     def check_alternating_atom_types(self):
         """
-        This method checks the alternating atom types in GAFF2.
-        Those are cc-cd and ce-cf, cg-ch and nc-nd.
-        The decide_atom_types method does assign a default atom type
-        as cc, ce, cg and nc, but it does not assign the other atom type.
+        Checks alternating atom types in GAFF, including cc, cd, ce, cf, cg,
+        ch, nc, nd, ne and nf.
         """
 
         atom_types = list(self.gaff_atom_types)
@@ -1955,14 +1924,13 @@ class AtomTypeIdentifier:
         # Workflow of the method
         self.coordinates = molecule.get_coordinates_in_angstrom()
         self.atomic_symbols = molecule.get_labels()
-        self.num_atoms = len(self.atomic_symbols)
         self.covalent_radii = (molecule.covalent_radii_to_numpy() *
                                bohr_in_angstrom())
         self.create_connectivity_matrix()
         self.detect_closed_cyclic_structures()
         self.create_atom_info_dict()
-        self.atom_types_dict = self.decide_atom_type()
-        self.extract_gaff_atom_types(self.atom_types_dict)
+        self.decide_atom_type()
+        self.extract_gaff_atom_types()
         self.check_alternating_atom_types()
 
         # Printing output
@@ -1970,7 +1938,7 @@ class AtomTypeIdentifier:
         self.ostream.print_info("-" * 40)  # Dashed line
 
         # Detected number of atoms
-        num_atoms = len(self.atomic_symbols)
+        num_atoms = molecule.number_of_atoms()
         self.ostream.print_info(f"Detected number of atoms: {num_atoms}")
 
         # Print table header
@@ -2009,7 +1977,7 @@ class AtomTypeIdentifier:
 
         self.ostream.flush()
 
-        return self.gaff_atom_types
+        return list(self.gaff_atom_types)
 
     @staticmethod
     def get_atom_number(atom_type_str):
