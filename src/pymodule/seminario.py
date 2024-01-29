@@ -27,128 +27,67 @@ import numpy as np
 
 class Seminario:
     """
-    Class for calculating force constants using the Seminario method
+    Class for calculating force constants using the Seminario method.
     """
 
-    def __init__(self, H, coords):
-        self.H=H
-        self.coords = coords
+    def __init__(self, hessian_matrix, coordinates):
+        self.hessian_matrix = hessian_matrix
+        self.coordinates = coordinates
 
-    def eig_sum(self,a,b,vec):
+    def calculate_eigenvalue_sum(self, atom_index_a, atom_index_b, direction_vector):
         """
-        Calculate the eigenvalues and eigenvectors of the 3x3 submatrix of H starting with the left corner at (3*a,3*b), and return the sum of the vectors multiplied by their respective eigenvalue
+        Calculate the sum of eigenvectors multiplied by their respective eigenvalue for a given 3x3 submatrix of the Hessian matrix.
         """
-        k=-self.H[3*a:3*(a+1),3*b:3*(b+1)]
-        eig = np.linalg.eig(k)
-        l = eig.eigenvalues
-        v = eig.eigenvectors
-        v = np.transpose(v)
+        submatrix = -self.hessian_matrix[3 * atom_index_a : 3 * (atom_index_a + 1), 3 * atom_index_b : 3 * (atom_index_b + 1)]
+        eigenvalues, eigenvectors = np.linalg.eig(submatrix)
+        eigenvectors = np.transpose(eigenvectors)
 
-        sum = 0
-        for i in range(3):
-            sum+=l[i]*abs(np.dot(vec,v[i]))
-        return sum
+        eigenvalue_sum = sum(eigenvalues[i] * abs(np.dot(direction_vector, eigenvectors[i])) for i in range(3))
+        return eigenvalue_sum
+
+    def unit_vector(self, atom_index_a, atom_index_b):
+        displacement = self.coordinates[atom_index_a] - self.coordinates[atom_index_b]
+        return displacement / np.linalg.norm(displacement)
     
-    def u(self,a,b):
-        disp = self.coords[a]-self.coords[b]
-        return disp/np.linalg.norm(disp)
-    
-    #Equation (11) in the seminario paper
-    def u_N(self,a,b,c):
-        uab=self.u(a,b)
-        ucb=self.u(c,b)
-        cross=np.cross(ucb,uab) #Signs don't matter because all normal-vectors only appear inside |x| terms
-        return cross/np.linalg.norm(cross)
-
-    def Rsq(self,a,b):
-        return np.sum(np.square(self.coords[a]-self.coords[b]))
-
-    #equation (17)
-    def dihed_fc(self,a,b,c,d):
+    def normal_unit_vector(self, atom_index_a, atom_index_b, atom_index_c):
         """
-        Calculate the dihedral force constant
-
-        a,b(int): atom indices indicating the dihedral, starting at 0 and corresponding to the coords
+        Calculate the unit normal vector for the plane defined by three atoms.
         """
-        def calc_par(i,j,k,l):
-            u_ij = self.u(i,j)
-            u_jk = self.u(j,k)
-            u_kl = self.u(k,l)
-            prefac1 = self.Rsq(i,j)*np.sum(np.square(np.cross(u_ij,u_jk)))
-            prefac2 = self.Rsq(k,l)*np.sum(np.square(np.cross(u_jk,u_kl)))
+        vector_ab = self.unit_vector(atom_index_a, atom_index_b)
+        vector_cb = self.unit_vector(atom_index_c, atom_index_b)
+        cross_product = np.cross(vector_cb, vector_ab)
+        return cross_product / np.linalg.norm(cross_product)
 
-            denom1=prefac1*self.eig_sum(i,j,self.u_N(i,j,k))
-            denom2=prefac2*self.eig_sum(k,l,self.u_N(j,k,l))
-            
-            return (1/(1/denom1+1/denom2)).real
+    def squared_distance(self, atom_index_a, atom_index_b):
+        """
+        Calculate the squared distance between two atoms.
+        """
+        return np.sum(np.square(self.coordinates[atom_index_a] - self.coordinates[atom_index_b]))
+
+    def calculate_angle_force_constant(self, atom_index_a, atom_index_b, atom_index_c):
+        """
+        Calculate the angle force constant for a given set of three atom indices.
+        """
+        def calculate_partial_force_constant(i, j, k):
+            normal_vector = self.normal_unit_vector(i, j, k)
+            perp_vector_i = np.cross(normal_vector, self.unit_vector(i, j))
+            perp_vector_k = np.cross(self.unit_vector(k, j), normal_vector)
+
+            denominator1 = self.squared_distance(i, j) * self.calculate_eigenvalue_sum(i, j, perp_vector_i)
+            denominator2 = self.squared_distance(k, j) * self.calculate_eigenvalue_sum(k, j, perp_vector_k)
+
+            return 1 / (1 / denominator1 + 1 / denominator2).real
         
-        fc = max(0,0.5*(calc_par(a,b,c,d)+calc_par(a,c,b,d)))
-
-        return fc
-
-    #equation (14) 
-    def angle_fc(self,a,b,c):
-        """
-        Calculate the angle force constant
-        a,b,c(int): atom indices indicating the angle, starting at 0 and corresponding to the coords"""
-        def calc_par(i,j,k):
-            u_N=self.u_N(i,j,k)
-            u_P_i=np.cross(u_N,self.u(i,j))
-            u_P_k=np.cross(self.u(k,j),u_N)
-
-            denom1=self.Rsq(i,j)*self.eig_sum(i,j,u_P_i)
-            denom2=self.Rsq(k,j)*self.eig_sum(k,j,u_P_k)
-
-            return 1/(1/(denom1)+1/(denom2)).real
-        return max(0,0.5*(calc_par(a,b,c)+calc_par(c,b,a)))
+        return max(0, 0.5 * (calculate_partial_force_constant(atom_index_a, atom_index_b, atom_index_c) + calculate_partial_force_constant(atom_index_c, atom_index_b, atom_index_a)))
     
-    #equation (10)
-    def bond_fc(self,a,b):
+    def calculate_bond_force_constant(self, atom_index_a, atom_index_b):
         """
-        Calculate the bond force constant
-
-        a,b(int): atom indices indicating the bond, starting at 0 and corresponding to the coords
+        Calculate the bond force constant for a given pair of atom indices.
         """
-        def calc_par(i,j):
-            u_ab = self.u(i,j)
-            return self.eig_sum(i,j,u_ab).real
+        def calculate_partial_force_constant(i, j):
+            vector_ab = self.unit_vector(i, j)
+            return self.calculate_eigenvalue_sum(i, j, vector_ab).real
         
-        return max(0,0.5*(calc_par(a,b)+calc_par(b,a)))
+        return max(0, 0.5 * (calculate_partial_force_constant(atom_index_a, atom_index_b) + calculate_partial_force_constant(atom_index_b, atom_index_a)))
+
     
-    # Auxiliary function to parse the ORCA output file
-    # Intended to be temporary
-    @staticmethod
-    def parse_orca_hessian(filename):
-        """ Parse an ORCA hessian file and return the hessian matrix  
-        
-        Parameters
-        ----------
-        filename : str
-            Name of the ORCA output file ('.hess' extension)
-
-        Returns
-        -------
-        hessian : ndarray
-            Hessian matrix    
-        """
-
-        with open(filename, 'r') as f:
-            for line in f:
-
-                if '$hessian' in line:
-                    dimension = int(f.readline())
-                    matrix = np.zeros((dimension, dimension))
-                    while line != '\n':
-                        line = f.readline()
-                        if '.' not in line:
-                            jindex = [int(jj) for jj in line.split()]
-                        else:
-                            iindex = int(line.split()[0])
-                            datas = [float(val) for val in line.split()[1:]]
-                            for j, data in enumerate(datas):
-                                # print (j, jindex[j], iindex)
-                                matrix[iindex, jindex[j]] = data
-
-                    hessian = matrix
-
-        return hessian

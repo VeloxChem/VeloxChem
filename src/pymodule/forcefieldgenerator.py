@@ -517,30 +517,13 @@ class ForceFieldGenerator:
 
         return content.splitlines()
     
-    # def identify_atom_types(self):  
-    #     '''
-    #     Identifies GAFF atom types.
-    #     '''
 
-    #     atomtypeidentifier = AtomTypeIdentifier(self.comm, self.ostream)
-    #     self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
-    #         self.molecule)
-    #     atomtypeidentifier.check_for_bad_assignations(self.get_gaff_data_lines())
-    #     self.connectivity_matrix = np.copy(atomtypeidentifier.connectivity_matrix)
-
-    def analize_topology(self):
+    def create_topology(self):
         '''
-        Analizes the topology of the molecule and find parameters in GAFF.
+        Analizes the topology of the molecule and create a topology dictionary.
         '''
 
-        # Initialize the topology dictionary, the fields are:
-        # - atomtypes: The atom types as the GROMACS directive.
-        # - atoms: The atoms as the GROMACS directive.
-        # - bonds: The bonds as the GROMACS directive.
-        # - pairs: The pairs as the GROMACS directive.
-        # - angles: The angles as the GROMACS directive.
-        # - dihedrals: The dihedrals as the GROMACS directive.
-        # - impropers: The impropers as the GROMACS directive. 
+        # Temporal dictionary to store the topology data.
 
         topology = {
             'atomtypes': [],
@@ -646,7 +629,7 @@ class ForceFieldGenerator:
 
         # Read the force field and include the data in the topology dictionary.
 
-        # Atomtypes
+        # Atomtypes analysis
 
         for at in self.unique_atom_types:
             atom_type_found = False
@@ -672,7 +655,7 @@ class ForceFieldGenerator:
             topology['atomtypes'].append(
                 (at, sigma, epsilon, comment))
                 
-        # Atoms
+        # Atoms analysis
                 
         for i in range(n_atoms):
                     
@@ -689,8 +672,35 @@ class ForceFieldGenerator:
                     # Save the data in the 'atoms' field of the topology dictionary.
                     topology['atoms'].append(
                         (i + 1, atom_type, atom_name, i + 1, charge, mass))
+
+        # Atoms dictionary writing
+
+        self.atoms = {}
+
+        ids = []
+        types = []
+        masses = []
+        charges = []
+        sigmas = []
+        epsilons = []
+
+        for i in topology['atoms']:
+            ids.append(i[0])
+            types.append(i[1])
+            masses.append(i[-1])
+            charges.append(i[-2])
+
+        for i in types:
+            # Look for the type in the atomtypes dictionary
+            for j in topology['atomtypes']:
+                if i == j[0]:
+                    sigmas.append(j[1])
+                    epsilons.append(j[2])
+
+        for i in range(len(ids)):
+            self.atoms[ids[i]] = {'type': types[i], 'mass': masses[i], 'charge': charges[i], 'sigma': sigmas[i], 'epsilon': epsilons[i]}
                     
-        # Bonds
+        # Bonds analysis
 
         for i, j in bond_indices: 
 
@@ -735,12 +745,34 @@ class ForceFieldGenerator:
             # Save the data in the 'bonds' field of the topology dictionary.
             topology['bonds'].append((i, j, r, k_r, comment))
 
-        # Pairs
+        # Bonds dictionary writing
+
+        self.bonds = {}
+
+        ids = []
+        force_constants = []
+        equilibrium_distances = []
+        comments = []
+
+        for i in topology['bonds']:
+            ids.append((i[0], i[1]))
+            force_constants.append(i[3])
+            equilibrium_distances.append(i[2])
+            comments.append(i[-1])
+
+        for i in range(len(ids)):
+            self.bonds[ids[i]] = {'force_constant': force_constants[i], 'equilibrium': equilibrium_distances[i], 'comment': comments[i]}
+        
+        # Pairs writing
+        
+        self.pairs = {}
 
         for i, j in pairs_14:
-            topology['pairs'].append((i, j))
+            # Store the pairs in the pairs dictionary zero-indexed
+            self.pairs[(i, j)] = {}
 
-        # Angles
+
+        # Angles analysis
 
         for i, j, k in angle_indices:
                 
@@ -788,7 +820,25 @@ class ForceFieldGenerator:
                 # Save the data in the 'angles' field of the topology dictionary.
                 topology['angles'].append((i, j, k, theta, k_theta, comment))
 
-        # Dihedrals
+        # Angles dictionary writing
+            
+        self.angles = {}
+
+        ids = []
+        force_constants = []
+        equilibrium_angles = []
+        comments = []
+
+        for i in topology['angles']:
+            ids.append((i[0], i[1], i[2]))
+            force_constants.append(i[4])
+            equilibrium_angles.append(i[3])
+            comments.append(i[-1])
+
+        for i in range(len(ids)):
+            self.angles[ids[i]] = {'force_constant': force_constants[i], 'equilibrium': equilibrium_angles[i], 'comment': comments[i]}
+
+        # Dihedrals analysis
 
         for i, j, k, l in dihedral_indices:
 
@@ -854,8 +904,27 @@ class ForceFieldGenerator:
 
                 if periodicity > 0:
                     break
-                
 
+        # Dihedrals dictionary writing
+            
+        self.dihedrals = {}
+
+        ids = []
+        force_constants = []
+        equilibrium_angles = []
+        periodicities = []
+        comments = []
+
+        for i in topology['dihedrals']:
+            ids.append((i[0], i[1], i[2], i[3]))
+            force_constants.append(i[5])
+            equilibrium_angles.append(i[6])
+            periodicities.append(i[7])
+            comments.append(i[-1])
+
+        for i in range(len(ids)):
+            self.dihedrals[ids[i]] = {'force_constant': force_constants[i], 'equilibrium': equilibrium_angles[i], 'periodicity': periodicities[i], 'comment': comments[i]}
+                
         # Impropers
                 
         sp2_atom_types = [
@@ -965,103 +1034,6 @@ class ForceFieldGenerator:
                 # Save the data in the 'impropers' field of the topology dictionary.
                 topology['impropers'].append((i, j, k, l, barrier, phase, periodicity, comment))
         
-        return topology
-        
-    
-
-    def generate_topology(self):
-        '''
-        Generate topology dictionary.
-        '''
-
-        topology = self.analize_topology()
-
-        # Atoms
-          
-        self.atoms = {}
-
-        ids = []
-        types = []
-        masses = []
-        charges = []
-        sigmas = []
-        epsilons = []
-
-        for i in topology['atoms']:
-            ids.append(i[0] + 1) # IDs start at 1
-            types.append(i[1])
-            masses.append(i[-1])
-            charges.append(i[-2])
-
-        for i in types:
-            # Look for the type in the atomtypes dictionary
-            for j in topology['atomtypes']:
-                if i == j[0]:
-                    sigmas.append(j[1])
-                    epsilons.append(j[2])
-
-        for i in range(len(ids)):
-            self.atoms[ids[i]] = {'type': types[i], 'mass': masses[i], 'charge': charges[i], 'sigma': sigmas[i], 'epsilon': epsilons[i]}
-
-        # Bonds
-            
-        self.bonds = {}
-
-        ids = []
-        force_constants = []
-        equilibrium_distances = []
-        comments = []
-
-        for i in topology['bonds']:
-            ids.append((i[0] + 1, i[1] + 1))
-            force_constants.append(i[3])
-            equilibrium_distances.append(i[2])
-            comments.append(i[-1])
-
-        for i in range(len(ids)):
-            self.bonds[ids[i]] = {'fc': force_constants[i], 'eq': equilibrium_distances[i], 'comment': comments[i]}
-
-
-        # Angles
-            
-        self.angles = {}
-
-        ids = []
-        force_constants = []
-        equilibrium_angles = []
-        comments = []
-
-        for i in topology['angles']:
-            ids.append((i[0] + 1, i[1] + 1, i[2] + 1))
-            force_constants.append(i[4])
-            equilibrium_angles.append(i[3])
-            comments.append(i[-1])
-
-        for i in range(len(ids)):
-            self.angles[ids[i]] = {'fc': force_constants[i], 'eq': equilibrium_angles[i], 'comment': comments[i]}
-
-        # Dihedrals
-            
-        self.dihedrals = {}
-
-        ids = []
-        force_constants = []
-        equilibrium_angles = []
-        periodicities = []
-        comments = []
-
-        for i in topology['dihedrals']:
-            ids.append((i[0] + 1, i[1] + 1, i[2] + 1, i[3] + 1))
-            force_constants.append(i[5])
-            equilibrium_angles.append(i[6])
-            periodicities.append(i[7])
-            comments.append(i[-1])
-
-        for i in range(len(ids)):
-            self.dihedrals[ids[i]] = {'fc': force_constants[i], 'eq': equilibrium_angles[i], 'periodicity': periodicities[i], 'comment': comments[i]}
-
-        # Impropers
-            
         self.impropers = {}
 
         ids = []
@@ -1071,238 +1043,201 @@ class ForceFieldGenerator:
         comments = []
 
         for i in topology['impropers']:
-            ids.append((i[0] + 1, i[1] + 1, i[2] + 1, i[3] + 1))
+            ids.append((i[0], i[1], i[2], i[3]))
             force_constants.append(i[4])
             equilibrium_angles.append(i[5])
             periodicities.append(i[6])
             comments.append(i[-1])
 
         for i in range(len(ids)):
-            self.impropers[ids[i]] = {'fc': force_constants[i], 'eq': equilibrium_angles[i], 'periodicity': periodicities[i], 'comment': comments[i]}
-
-        # Pairs
-            
-        self.pairs = {}
-
-        ids = []
-
-        for i in topology['pairs']:
-            ids.append((i[0] + 1, i[1] + 1))
-
-        for i in range(len(ids)):
-            self.pairs[ids[i]] = {}
+            self.impropers[ids[i]] = {'force_constant': force_constants[i], 'equilibrium': equilibrium_angles[i], 'periodicity': periodicities[i], 'comment': comments[i]}
+        
 
     def reparameterize(self,
-                       hessian_matrix=None,
-                       origin='XTB',
-                       keys=None,
-                       element=None,
-                       print_all=False,
-                       only_eq=False,
-                       no_repar=False,
-                       repar_imp=False):
+                    hessian_matrix=None,
+                    origin='XTB',
+                    reparametrize_all=False):
         """
-        Reparameterizes all unknown parameters with the seminario method using the given hessian
+        Reparameterizes all unknown parameters with the Seminario method using the given Hessian matrix.
 
-        :param heassian_matrix:
-            Hessian matrix, if origin is 'Other' this must be provided. 2D numpy array.
+        :param hessian_matrix:
+            Hessian matrix, if origin is 'Other', this must be provided as a 2D numpy array.
         :param origin:
-            Origin of the hessian file, can be 'Other' or 'XTB'
-        :param keys:
-            List of tuples with the atom indices of the parameters to be reparameterized
-        :param element:
-            Element to be reparameterized
-        :param print_all:
-            Print all the parameters, not only the ones that are going to be reparameterized
-        :param only_eq:
-            Only reparameterize the equilibrium values
-        :param no_repar:
-            Do not reparameterize the force-field, only print the parameters
-        :param repar_imp:
-            Reparameterize the improper parameters. Experimental.
-
+            Origin of the Hessian file, can be 'Other' or 'XTB'.
+        :param reparametrize_all:
+            If True, all parameters are reparameterized. If False, only unknown parameters are reparameterized.
         """
+
         from .seminario import Seminario
         from .xtbdriver import XtbDriver
         from .xtbhessiandriver import XtbHessianDriver
         from .xtbgradientdriver import XtbGradientDriver
         from .optimizationdriver import OptimizationDriver
+        from .atomtypeidentifier import AtomTypeIdentifier
 
         print("""
 
-VeloxChem Force-Field Reparameterization
-Based on the Seminario method
-------------------------------------------------------------------------------------------
-Reference:
-J. M. Seminario (1996) Calculation of intramolecular force fields from second-derivative tensors. 
-Internat. J. Quant. Chem. 60:1271-1277
+    VeloxChem Force-Field Reparameterization
+    Based on the Seminario method
+    ------------------------------------------------------------------------------------------
+    Reference:
+    J. M. Seminario (1996) Calculation of intramolecular force fields from second-derivative tensors. 
+    Internat. J. Quant. Chem. 60:1271-1277
 
-Disclaimer: Dihedral and improper parameters are not reparameterized with this method.
-Consider scanning manually sensitive diherals and impropers.
+    Disclaimer: Dihedral and improper parameters are not reparameterized with this method.
+    Consider scanning manually sensitive dihedrals and impropers.
 
         """)
 
-        A_to_nm = 0.1  #1 angstrom is 0.1 nm
-        Bohr_to_nm = bohr_in_angstrom() * A_to_nm
-        cal_to_joule = 4.184  #1 calorie is 4.184 joule
-        Hartree_to_kJmol = hartree_in_kcalpermol() * cal_to_joule
+        angstrom_to_nm = 0.1  # 1 angstrom is 0.1 nm
+        bohr_to_nm = bohr_in_angstrom() * angstrom_to_nm
+        cal_to_joule = 4.184  # 1 calorie is 4.184 joule
+        hartree_to_kJmol = hartree_in_kcalpermol() * cal_to_joule
 
-        if (type(keys) == tuple):
-            keys = [keys]
-
-        # Generate the hessian matrix depending on the origin
+        # Generate the Hessian matrix depending on the origin
 
         if origin == 'Other':
-            # The hessian must be directly provided as a numpy array
-            hessian = hessian_matrix
+            # The Hessian must be directly provided as a numpy array
+            self.hessian = hessian_matrix
+
         elif origin == 'XTB':
-            # XTB optimization of the molecule before computing the hessian
-            xtb_drv = XtbDriver()
+            # XTB optimization of the molecule before computing the Hessian
+            xtb_driver = XtbDriver()
             method_settings = {'xtb': 'gfn2'}
-            xtb_drv.set_method(method_settings['xtb'].lower())
-            xtb_grad_drv = XtbGradientDriver()
-            xtb_grad_drv.ostream.mute()
-            xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
-            xtb_opt_drv.ostream.mute()
-            print("Optimizing the molecule with XTB...")
-            self.molecule = xtb_opt_drv.compute(self.molecule, xtb_drv)
-            print('Molecule optimized')
-            # XTB hessian
-            xtb_hessian = XtbHessianDriver()
-            xtb_hessian.ostream.mute()
-            print("Computing the hessian with XTB")
-            xtb_hessian.compute(self.molecule, xtb_drv)
-            self.hessian = xtb_hessian.hessian
+            xtb_driver.set_method(method_settings['xtb'].lower())
+            xtb_gradient_driver = XtbGradientDriver()
+            xtb_gradient_driver.ostream.mute()
+            xtb_optimization_driver = OptimizationDriver(xtb_gradient_driver)
+            xtb_optimization_driver.ostream.mute()
+            info_message = "Optimizing the molecule with XTB..."
+            self.ostream.print_info(info_message)
+            self.molecule = xtb_optimization_driver.compute(self.molecule, xtb_driver)
+            info_message = "Geometry optimized"
+            self.ostream.print_info(info_message)
+
+            # XTB Hessian
+            xtb_hessian_driver = XtbHessianDriver()
+            xtb_hessian_driver.ostream.mute()
+            info_message = "Computing the Hessian with XTB..."
+            self.ostream.print_info(info_message)
+            xtb_hessian_driver.compute(self.molecule, xtb_driver)
+            self.hessian = xtb_hessian_driver.hessian
             print("""
-                  
-Hessian computed with the XTB method
-------------------------------------------------------------------------------------------------
-C. Bannwarth, E. Caldeweyher, S. Ehlert, A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme 
-WIres Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
-                  
-                  """)
-            
-        # Method pending to be implemented. Waiting for the VeloxChem hessian.
+
+                
+    Hessian computed with the XTB method
+    ------------------------------------------------------------------------------------------------
+    C. Bannwarth, E. Caldeweyher, S. Ehlert, A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme 
+    WIres Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
+                
+                """)
+
+        # Method pending to be implemented. Waiting for the VeloxChem Hessian.
         elif origin == 'VeloxChem':
-            print("Method yet not implemented, please use the XTB driver")
+            print("Method is not yet implemented, please use the XTB driver")
             return
         else:
             raise Exception(
-                "Please specify the origin of the hessian as 'Other' or 'XTB'")
+                "Please specify the origin of the Hessian as 'Other' or 'XTB'")
 
         coordinates = self.molecule.get_coordinates_in_bohr(
-        )  #Coordinates in Bohr
+        )  # Coordinates in Bohr
+
+        seminario = Seminario(self.hessian, coordinates)
+            
         
-        sem = Seminario(self.hessian, coordinates)
+        # Reparameterize the bonds
 
-        def process_parameter(parameters, label):
-            for ids in parameters.keys():
-                eq = parameters[ids]["eq"]
-                fc = parameters[ids]["fc"]
+        bonds_list = []
 
-                if label == "bond":
-                    neweq = AtomTypeIdentifier.measure_length(
-                        coordinates[ids[0] - 1], coordinates[ids[1] - 1])
-                    neweq *= Bohr_to_nm  #Convert to nm
+        for bond in self.bonds.keys():
 
-                    newfc = sem.bond_fc(ids[0] - 1, ids[1] - 1)  #fc in H/Bohr^2
-                    newfc *= Hartree_to_kJmol / (Bohr_to_nm**2
-                                                )  #Convert to kJ/mol nm^2
-                elif label == "angle":
-                    neweq = AtomTypeIdentifier.measure_angle(
-                        coordinates[ids[0] - 1], coordinates[ids[1] - 1],
-                        coordinates[ids[2] - 1])
-                    newfc = sem.angle_fc(ids[0] - 1, ids[1] - 1, ids[2] -
-                                         1)  #Returns in H/rad^2 i think
-                    newfc *= Hartree_to_kJmol  #Convert to kJmol^-1/rad^2
-                elif label == "dihedral":
-                    perio = self.dihedrals[ids]["periodicity"]
-                elif label == "improper":
-                    perio = self.impropers[ids]["periodicity"]
-                    if repar_imp:
-                        neweq = AtomTypeIdentifier.measure_dihedral(
-                            coordinates[ids[0] - 1], coordinates[ids[1] - 1],
-                            coordinates[ids[2] - 1], coordinates[ids[3] - 1])
-                        newfc = sem.dihed_fc(
-                            ids[0] - 1,
-                            ids[1] - 1,
-                            ids[2] - 1,
-                            ids[3] - 1,
-                            avg_improper=True)  #Returns in H/rad^2 i think
-                        newfc *= Hartree_to_kJmol  #Convert to kJmol^-1/rad^2
-                    else:
-                        neweq = 0
-                        newfc = 0
+            if not reparametrize_all:
+                if self.bonds[bond]['comment'] != 'Unknown':
+                    continue
 
-                comment = parameters[ids]["comment"]  #GAFF2 or unknown
+            bonds_list.append(bond)
 
-                repar = False
-                if no_repar:
-                    ""
-                elif keys is not None:
-                    if ids in keys:
-                        repar = True
-                elif keys is None and element is not None:
-                    for id in ids:
-                        if element == self.molecule.get_labels()[id - 1]:
-                            repar = True
-                elif keys is None and element is None and 'Unknown' in comment:
-                    repar = True
+            # Change the equilibrium distance to the one measured in the geometry
+            # Calculate on the fly the equilibrium distance in Bohr
 
-                if repar:
-                    if label == "dihedral" and not repar_imp:
-                        comment += ", not reparameterizing dihedrals"
-                    elif not label == "dihedral":
-                        parameters[ids]["eq"] = neweq
-                        if not only_eq:
-                            parameters[ids]["fc"] = newfc
-                            comment += f", reparameterized from (eq,fc)=({eq:>.1f},{fc:.1f}) to (eq,fc)=({neweq:.1f},{newfc:.1f})"
-                        else:
-                            comment += f", reparameterized from eq={eq:>.1f} to eq={neweq:.1f}"
-                        parameters[ids]["comment"] = comment
+            new_equilibrium = np.linalg.norm(
+                coordinates[bond[0]] - coordinates[bond[1]])
+            
+            # New equilibrium distance in nm
+            new_equilibrium *= bohr_to_nm  # Convert to nm
 
-                        if label == "improper":
-                            parameters[ids]["type"] = 2
-                            parameters[ids]["periodicity"] = ""
-                    else:
-                        comment += ", reparameterization of proper dihedrals should be done with other method"
+            # Change the force constant to the one computed with the Hessian
+            new_force_constant = seminario.calculate_bond_force_constant(bond[0], bond[1])
+            new_force_constant *= hartree_to_kJmol / (
+                bohr_to_nm**2)
+            new_force_constant = abs(new_force_constant)
 
-                if repar or print_all:
-                    if label == "bond":
-                        print(
-                            f"{f'{ids}:':<{10}}\t{eq:>6f}\t{fc:>6f}\t\t{neweq:>6f}\t{newfc:>6f}\t\t{comment}"
-                        )
-                    if label == "angle":
-                        print(
-                            f"{f'{ids}:':<{15}}\t{eq:>6f}\t{fc:>6f}\t\t{neweq:>6f}\t{newfc:>6f}\t\t{comment}"
-                        )
-                    if label == "dihedral":
-                        print(
-                            f"{f'{ids}: ':<{20}}{eq:>6f}\t{fc:>6f}\t\t{abs(perio)}\t\t{comment}"
-                        )
-                    if label == "improper":
-                        print(
-                            f"{f'{ids}: ':<{20}}{eq:>6f}\t{fc:>6f}\t\t{perio}\t\t{neweq:.<3f}\t{newfc:.<3f}\t\t{perio}\t\t{comment}"
-                        )
+            # Update the parameters in the topology dictionary
+            self.bonds[bond]['equilibrium'] = new_equilibrium
+            self.bonds[bond]['force_constant'] = new_force_constant
+            self.bonds[bond]['comment'] = 'Reparameterized from ' + origin + ' Hessian'
 
-        print(
-            "Bond \t\tr0(nm) \t\tfc(kJmol^-1/nm^2) \tNew r0(nm) \tNew fc(kJmol^-1/nm^2) \tComment"
-        )
-        process_parameter(self.bonds, "bond")
+        # Reparameterize the angles
+            
+        angles_list = []
 
-        print(
-            "\nAngle \t\ttheta0(deg)  \tfc(kJmol^-1/rad^2) \tNew theta0(deg)\tNew fc(kJmol^-1/rad^2) \tComment"
-        )
-        process_parameter(self.angles, "angle")
+        for angle in self.angles.keys():
 
-        print("\nDihedrals\t\teq(deg)  \tfc(kJmol^-1) \tPeriodicity \tComment")
-        process_parameter(self.dihedrals, "dihedral")
+            if not reparametrize_all:
+                if self.angles[angle]['comment'] != 'Unknown':
+                    continue
+                
+            angles_list.append(angle)
 
-        print(
-            "\nImpropers\t\teq(deg)  \tfc(kJmol^-1/rad^2?) \tperiodicity \tNew eq(deg) \tNew fc(kJmol^-1/rad^2?)\tNew periodicity\tComment"
-        )
-        process_parameter(self.impropers, "improper")
+            # Change the equilibrium angle to the one measured in the geometry
+            # Calculate on the fly the equilibrium angle in degrees
 
+            a = coordinates[angle[0]] - coordinates[angle[1]]
+            b = coordinates[angle[2]] - coordinates[angle[1]]
+
+            new_equilibrium = np.arccos(
+                np.dot(a, b) / np.linalg.norm(a) /
+                np.linalg.norm(b)) * 180 / np.pi
+
+            new_force_constant = seminario.calculate_angle_force_constant(angle[0], angle[1],
+                                                    angle[2])
+            new_force_constant *= hartree_to_kJmol
+            self.angles[angle]['equilibrium'] = new_equilibrium
+            self.angles[angle]['force_constant'] = new_force_constant
+            self.angles[angle]['comment'] = 'Reparameterized from ' + origin + ' Hessian'
+
+
+        # Print bond parameters
+        # TODO Pass through the ostream
+            
+        print("Reparameterized parameters")
+        print("-" * 100)
+        print("Bond Parameters")
+        print("-" * 100)
+        print("{:<12} {:>22} {:>32} {:<}".format("Bond", "Equilibrium Distance (nm)", "Force Constant (kJ/mol/nm²)", "Comment"))
+        print("-" * 100)
+
+        for bond in bonds_list:
+            bond_id = f"{bond[0] + 1}-{bond[1] + 1}"
+            eq_dist = f"{self.bonds[bond]['equilibrium']:20.6f}"
+            force_const = f"{self.bonds[bond]['force_constant']:30.6f}"
+            comment = self.bonds[bond]['comment']
+            print("{:<12} {:>22} {:>32} {:<}".format(bond_id, eq_dist, force_const, comment))
+
+        # Print angle parameters
+        print("\n" + "-" * 100)
+        print("Angle Parameters")
+        print("-" * 100)
+        print("{:<17} {:>22} {:>32} {:<}".format("Angle", "Equilibrium Angle (deg)", "Force Constant (kJ/mol/rad²)", "Comment"))
+        print("-" * 100)
+
+        for angle in angles_list:
+            angle_id = f"{angle[0] + 1}-{angle[1] + 1}-{angle[2] + 1}"
+            eq_angle = f"{self.angles[angle]['equilibrium']:20.6f}"
+            force_const = f"{self.angles[angle]['force_constant']:30.6f}"
+            comment = self.angles[angle]['comment']
+            print("{:<17} {:>22} {:>32} {:<}".format(angle_id, eq_angle, force_const, comment))
 
     def write_top_file(self, top_file):
         '''
@@ -1347,6 +1282,135 @@ WIres Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
                 f_top.write('; Compound        nmols\n')
                 f_top.write('{:>10}{:9}\n'.format(mol_name, 1))
 
+
+    # TODO: Debug this method!!
+                
+    def write_itp_file(self, itp_file):
+        """
+        Writes an itp file with the original parameters.
+        
+        :param itp_file:
+            The itp file.
+        """
+        
+        # Will use the information contained in the dictionaries from topology
+
+        itp_fname = itp_file if isinstance(itp_file, str) else str(itp_file)
+
+        mol_name = Path(self.molecule_name).stem
+
+        # GROMACS atoms directive
+
+        with open(itp_fname, 'w') as f_itp:
+                
+                # header
+    
+                f_itp.write('; Generated by VeloxChem\n')
+    
+                # atom types
+    
+                f_itp.write('\n[ atomtypes ]\n')
+                cur_str = ';name   bond_type     mass     charge'
+                cur_str += '   ptype   sigma         epsilon\n'
+                f_itp.write(cur_str)
+    
+                for at in self.unique_atom_types:
+                    # Look for the type in the atoms dictionary
+                    for j in self.atoms.keys():
+                        if self.atoms[j]['type'] == at:
+                            sigma = self.atoms[j]['sigma']
+                            epsilon = self.atoms[j]['epsilon']
+                            break
+                    cur_str = '{:>3}{:>9}{:17.5f}{:9.5f}{:>4}'.format(
+                        at, at, 0., 0., 'A')
+                    cur_str += '{:16.5e}{:14.5e}\n'.format(sigma, epsilon)
+                    f_itp.write(cur_str)
+
+                # molecule type
+                    
+                f_itp.write('\n[ moleculetype ]\n')
+                f_itp.write(';name            nrexcl\n')
+                f_itp.write('{:>10}{:10}\n'.format(mol_name, self.nrexcl))
+
+                # atoms
+
+                f_itp.write('\n[ atoms ]\n')
+
+                for i in self.atoms.keys():
+                    atom_id = i
+                    atom_type = self.atoms[i]['type']
+                    # TODO: Add atom names in the topology dictionary
+                    atom_name = self.atoms[i]['type']
+                    charge = self.atoms[i]['charge']
+                    mass = self.atoms[i]['mass']
+                    f_itp.write('{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}\n'.format(
+                        atom_id, atom_name, atom_id, atom_type, atom_name, atom_id, charge, mass))
+                    
+                # bonds
+                    
+                f_itp.write('\n[ bonds ]\n')
+
+                for i in self.bonds.keys():
+                    atom1 = i[0]
+                    atom2 = i[1]
+                    force_constant = self.bonds[i]['force_constant']
+                    equilibrium = self.bonds[i]['equilibrium']
+                    f_itp.write('{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}\n'.format(
+                        atom1, atom2, 1, equilibrium, force_constant, 1))
+                    
+                # angles
+                    
+                f_itp.write('\n[ angles ]\n')
+
+                for i in self.angles.keys():
+                    atom1 = i[0]
+                    atom2 = i[1]
+                    atom3 = i[2]
+                    force_constant = self.angles[i]['force_constant']
+                    equilibrium = self.angles[i]['equilibrium']
+                    f_itp.write('{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}\n'.format(
+                        atom1, atom2, atom3, 1, equilibrium, force_constant))
+                    
+                # dihedrals
+                    
+                f_itp.write('\n[ dihedrals ]\n')
+
+                for i in self.dihedrals.keys():
+                    atom1 = i[0]
+                    atom2 = i[1]
+                    atom3 = i[2]
+                    atom4 = i[3]
+                    force_constant = self.dihedrals[i]['force_constant']
+                    equilibrium = self.dihedrals[i]['equilibrium']
+                    periodicity = self.dihedrals[i]['periodicity']
+                    f_itp.write('{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}\n'.format(
+                        atom1, atom2, atom3, atom4, periodicity, equilibrium, force_constant, 1))
+                    
+                # impropers
+                    
+                f_itp.write('\n[ dihedrals ]\n')
+
+                for i in self.impropers.keys():
+                    atom1 = i[0]
+                    atom2 = i[1]
+                    atom3 = i[2]
+                    atom4 = i[3]
+                    force_constant = self.impropers[i]['force_constant']
+                    equilibrium = self.impropers[i]['equilibrium']
+                    periodicity = self.impropers[i]['periodicity']
+                    f_itp.write('{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}\n'.format(
+                        atom1, atom2, atom3, atom4, periodicity, equilibrium, force_constant, 1))
+                    
+                # pairs
+                    
+                f_itp.write('\n[ pairs ]\n')
+
+                for i in self.pairs.keys():
+                    atom1 = i[0]
+                    atom2 = i[1]
+                    f_itp.write('{:>6}{:>6}{:>6}{:>6}{:>6}{:>6}\n'.format(
+                        atom1, atom2, 1, 0, 0, 1))
+                    
 
 
     def write_original_itp(self, itp_file, atom_types, charges):
@@ -2093,10 +2157,10 @@ WIres Comput. Mol. Sci., 2020, 11, e01493. DOI: 10.1002/wcms.1493
         dih_str = '{:6}{:7}{:7}{:7}{:7}'.format(*dihedral, 3)
         for coef in coefficients:
             dih_str += '{:11.5f}'.format(coef)
-        dih_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0] - 1],
-                                             atom_names[dihedral[1] - 1],
-                                             atom_names[dihedral[2] - 1],
-                                             atom_names[dihedral[3] - 1])
+        dih_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0]],
+                                             atom_names[dihedral[1]],
+                                             atom_names[dihedral[2]],
+                                             atom_names[dihedral[3]])
 
         with open(itp_fname, 'r') as f_itp:
             for line in f_itp:
