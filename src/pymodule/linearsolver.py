@@ -2277,13 +2277,13 @@ class LinearSolver:
         self.ostream.print_blank()
 
         for excitation in results['esa_results']:
-            s_1 = excitation['from']
-            s_2 = excitation['to']
+            from_state = excitation['from_state']
+            to_state = excitation['to_state']
             ene_in_ev = excitation['excitation_energy'] * hartree_in_ev()
             osc_str = excitation['oscillator_strength']
             trans_dipole = excitation['transition_dipole']
 
-            valstr = f'S{s_1:<3d}-> S{s_2:<3d}'
+            valstr = f'{from_state:<4s}-> {to_state:<4s}'
             valstr += f' {ene_in_ev:10.5f} eV'
             valstr += f'     Osc.Str. {osc_str:8.4f}'
             valstr += '    Trans.Dipole '

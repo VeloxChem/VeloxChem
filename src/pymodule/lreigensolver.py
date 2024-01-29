@@ -677,8 +677,8 @@ class LinearResponseEigenSolver(LinearSolver):
                                 esa_trans_dipole**2)
 
                             esa_results.append({
-                                'from': s_1 + 1,
-                                'to': s_2 + 1,
+                                'from_state': f'S{s_1 + 1}',
+                                'to_state': f'S{s_2 + 1}',
                                 'excitation_energy': esa_exc_ene,
                                 'oscillator_strength': esa_osc_str,
                                 'transition_dipole': esa_trans_dipole,
