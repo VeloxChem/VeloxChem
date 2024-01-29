@@ -460,15 +460,12 @@ class AtomTypeIdentifier:
 
         for atom_number, info in self.atom_info_dict.items():
 
+            # Chemical environment information
+            connected_symbols = set(info['ConnectedAtoms'])
+
             # Carbon type decision
 
             if info['AtomicSymbol'] == 'C':
-
-                # Note: do identification regardless whether this carbon was
-                # previously assigned or not
-
-                # Chemical environment information
-                connected_symbols = set(info['ConnectedAtoms'])
 
                 # Pure aromatic cycles
 
@@ -930,8 +927,6 @@ class AtomTypeIdentifier:
 
                 if info.get('CyclicStructure') == 'none':
 
-                    connected_symbols = set(info['ConnectedAtoms'])
-
                     if (info['NumConnectedAtoms'] == 2 and
                             connected_symbols == {'H'}):
 
@@ -972,8 +967,6 @@ class AtomTypeIdentifier:
                 # Cyclic
 
                 elif info.get('CyclicStructure') == 'cycle':
-
-                    connected_symbols = set(info['ConnectedAtoms'])
 
                     if (info['NumConnectedAtoms'] == 2 and
                             connected_symbols == {'H'}):
@@ -1035,7 +1028,6 @@ class AtomTypeIdentifier:
 
             elif info['AtomicSymbol'] == 'N':
 
-                connected_symbols = set(info['ConnectedAtoms'])
                 connected_atoms = info['ConnectedAtoms']
                 connected_atoms_numbers = info['ConnectedAtomsNumbers']
 
@@ -1560,11 +1552,11 @@ class AtomTypeIdentifier:
             elif info['AtomicSymbol'] == 'P':
 
                 if info.get('CyclicStructure') == 'none':
-                    connected_symbols = set(info['ConnectedAtoms'])
 
                     # Phosphate groups or phosphoric acid
-                    if info['NumConnectedAtoms'] == 4 and 'O' in connected_symbols:
-                        oxygen_count = list(connected_symbols).count('O')
+                    if (info['NumConnectedAtoms'] == 4 and
+                            'O' in connected_symbols):
+                        oxygen_count = info['ConnectedAtoms'].count('O')
 
                         if oxygen_count == 4:
                             # Simplified, it could be tetrahedral phosphate
@@ -1582,7 +1574,7 @@ class AtomTypeIdentifier:
                     # Phosphine
                     elif (info['NumConnectedAtoms'] == 3 and
                           'H' in connected_symbols):
-                        hydrogen_count = list(connected_symbols).count('H')
+                        hydrogen_count = info['ConnectedAtoms'].count('H')
 
                         if hydrogen_count == 3:
                             phosphorus_type = {
@@ -1599,7 +1591,7 @@ class AtomTypeIdentifier:
                     # Phosphine oxides
                     elif (info['NumConnectedAtoms'] == 4 and
                           'O' in connected_symbols):
-                        hydrogen_count = list(connected_symbols).count('H')
+                        hydrogen_count = info['ConnectedAtoms'].count('H')
 
                         if hydrogen_count == 3:
                             phosphorus_type = {
@@ -1616,7 +1608,7 @@ class AtomTypeIdentifier:
                     # Phosphonates and Phosphites
                     elif (info['NumConnectedAtoms'] == 3 and
                           'O' in connected_symbols):
-                        oxygen_count = list(connected_symbols).count('O')
+                        oxygen_count = info['ConnectedAtoms'].count('O')
 
                         if oxygen_count == 2:
                             # Again simplified, could distinguish between
@@ -1648,8 +1640,6 @@ class AtomTypeIdentifier:
             # Sulfur type decision
 
             elif info['AtomicSymbol'] == 'S':
-
-                connected_symbols = set(info['ConnectedAtoms'])
 
                 # S with one connected atom
                 if info['NumConnectedAtoms'] == 1:
