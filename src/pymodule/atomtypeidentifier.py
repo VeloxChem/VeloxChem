@@ -191,49 +191,6 @@ class AtomTypeIdentifier:
         return (self.atomic_symbols[atom_idx] == 'N' and
                 len(list(self.graph.neighbors(atom_idx))) == 2)
 
-    def is_likely_sp2_nitrogen(self, atom_idx):
-        """
-        Determines if a N atom, identified by its index, is sp2 hybridized.
-
-        :param atom_idx:
-            Index of the atom in the molecule.
-
-        :return:
-            True if the atom is sp2 hybridized, False otherwise.
-        """
-
-        if self.atomic_symbols[atom_idx] != 'N':
-            return False
-
-        if len(list(self.graph.neighbors(atom_idx))) == 2:
-            return True
-
-        elif len(list(self.graph.neighbors(atom_idx))) == 3:
-
-            # Criteria for nitrogen with three connections:
-            # - connected carbon must be sp2
-            # - connected nitrogen must be strictly sp2
-            # - connected hydrogen cannot be more than one
-
-            hydrogen_count = 0
-            for i in list(self.graph.neighbors(atom_idx)):
-                if self.atomic_symbols[i] == 'C':
-                    if not self.is_sp2_carbon(i):
-                        return False
-                elif self.atomic_symbols[i] == 'N':
-                    if not self.is_sp2_nitrogen(i):
-                        return False
-                elif self.atomic_symbols[i] == 'H':
-                    hydrogen_count += 1
-
-            if hydrogen_count > 1:
-                return False
-
-            return True
-
-        else:
-            return False
-
     def detect_closed_cyclic_structures(self):
         """
         Detects closed cyclic structures in a molecule and determines their
@@ -309,11 +266,27 @@ class AtomTypeIdentifier:
                 if self.atomic_symbols[atom_idx] == 'N'
             ])
 
-            all_nitrogens_likely_sp2 = all([
-                self.is_likely_sp2_nitrogen(atom_idx)
-                for atom_idx in cycle
-                if self.atomic_symbols[atom_idx] == 'N'
-            ])
+            all_nitrogens_likely_sp2 = True
+            for atom_idx in cycle:
+                if self.atomic_symbols[atom_idx] == 'N':
+                    n_neighbors = list(self.graph.neighbors(atom_idx))
+                    if len(n_neighbors) == 2:
+                        continue
+                    elif len(n_neighbors) == 3:
+                        for n_neighbor_idx in n_neighbors:
+                            if n_neighbor_idx in cycle:
+                                if (self.atomic_symbols[n_neighbor_idx] == 'C'
+                                        and self.is_sp2_carbon(n_neighbor_idx)):
+                                    continue
+                                elif (self.atomic_symbols[n_neighbor_idx] == 'N'
+                                      and self.is_sp2_nitrogen(n_neighbor_idx)):
+                                    continue
+                                else:
+                                    all_nitrogens_likely_sp2 = False
+                                    break
+                    else:
+                        all_nitrogens_likely_sp2 = False
+                        break
 
             if len(cycle) == 6 and only_carbon_nitrogen_in_cycle:
 
@@ -331,34 +304,38 @@ class AtomTypeIdentifier:
 
             elif len(cycle) == 5 and all_carbons_sp2:
 
-                if 'S' in cycle_elements:
-                    # one S connected to 2 atoms in the cycle: non_pure_aromatic
-                    has_s_s_bond = False
-                    max_s_neighbors = 0
+                if 'S' in cycle_elements or 'O' in cycle_elements:
+                    has_ss_so_oo_bond = False
+                    max_s_or_o_neighbors = 0
                     for atom_idx, elem in zip(cycle, cycle_elements):
-                        if elem != 'S':
+                        if elem not in ['S', 'O']:
                             continue
-                        s_neighbors = [
+                        s_or_o_neighbors = [
                             self.atomic_symbols[i]
                             for i in list(self.graph.neighbors(atom_idx))
                         ]
-                        if 'S' in s_neighbors:
-                            has_s_s_bond = True
-                        if len(s_neighbors) > max_s_neighbors:
-                            max_s_neighbors = len(s_neighbors)
-                    if (not has_s_s_bond) and max_s_neighbors == 2:
-                        aro = 'non_pure_aromatic'
+                        if 'S' in s_or_o_neighbors or 'O' in s_or_o_neighbors:
+                            has_ss_so_oo_bond = True
+                        if len(s_or_o_neighbors) > max_s_or_o_neighbors:
+                            max_s_or_o_neighbors = len(s_or_o_neighbors)
+                    if (not has_ss_so_oo_bond) and max_s_or_o_neighbors == 2:
+                        if 'N' in cycle_elements:
+                            aro = ('non_pure_aromatic' if
+                                   all_nitrogens_likely_sp2 else 'non_aromatic')
+                        else:
+                            aro = 'non_pure_aromatic'
                     else:
                         aro = 'non_aromatic'
                 else:
-                    if 'N' in cycle_elements or 'O' in cycle_elements:
-                        aro = 'non_pure_aromatic'
+                    if 'N' in cycle_elements:
+                        aro = ('non_pure_aromatic'
+                               if all_nitrogens_likely_sp2 else 'non_aromatic')
                     else:
                         aro = 'non_aromatic'
 
             elif len(cycle) == 4:
 
-                if all_carbons_sp2:
+                if set(cycle_elements) == {'C'} and all_carbons_sp2:
                     aro = 'non_pure_aromatic'
                 else:
                     aro = 'non_aromatic'
