@@ -1308,8 +1308,6 @@ class ForceFieldGenerator:
                 f_top.write('; Compound        nmols\n')
                 f_top.write('{:>10}{:9}\n'.format(mol_name, 1))
 
-
-    # TODO: Debug this method!!
                 
     def write_itp_file(self, itp_file):
         """
@@ -1358,7 +1356,7 @@ class ForceFieldGenerator:
             for i in self.bonds:
                 force_constant = self.bonds[i]['force_constant']
                 equilibrium = self.bonds[i]['equilibrium']
-                f_itp.write(f'{i[0]:>6}{i[1]:>6}{"1":>6}{equilibrium:13.4e}{force_constant:13.4e} ;\n')
+                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{"1":>6}{equilibrium:13.4e}{force_constant:13.4e} ;\n')
 
             # Angles
             f_itp.write('\n[ angles ]\n')
@@ -1366,7 +1364,7 @@ class ForceFieldGenerator:
             for i in self.angles:
                 force_constant = self.angles[i]['force_constant']
                 equilibrium = self.angles[i]['equilibrium']
-                f_itp.write(f'{i[0]:>6}{i[1]:>6}{i[2]:>6}{"1":>6}{equilibrium:13.4e}{force_constant:13.4e} ;\n')
+                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{i[2] + 1:>6}{"1":>6}{equilibrium:13.4e}{force_constant:13.4e} ;\n')
 
             # Dihedrals (propers)
             f_itp.write('\n[ dihedrals ] ; propers\n')
@@ -1374,7 +1372,7 @@ class ForceFieldGenerator:
                 force_constant = self.dihedrals[i]['force_constant']
                 equilibrium = self.dihedrals[i]['equilibrium']
                 periodicity = self.dihedrals[i]['periodicity']
-                f_itp.write(f'{i[0]:>6}{i[1]:>6}{i[2]:>6}{i[3]:>6}{"1":>6}{equilibrium:>8.2f}{force_constant:10.5f}{periodicity:>6} ;\n')
+                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{i[2] + 1:>6}{i[3] + 1:>6}{"1":>6}{equilibrium:>8.2f}{force_constant:10.5f}{periodicity:>6} ;\n')
 
             # Impropers
             f_itp.write('\n[ dihedrals ] ; impropers\n')
@@ -1382,13 +1380,13 @@ class ForceFieldGenerator:
                 force_constant = self.impropers[i]['force_constant']
                 equilibrium = self.impropers[i]['equilibrium']
                 periodicity = self.impropers[i]['periodicity']
-                f_itp.write(f'{i[0]:>6}{i[1]:>6}{i[2]:>6}{i[3]:>6}{"4":>6}{equilibrium:>8.2f}{force_constant:10.5f}{periodicity:>6} ;\n')
+                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{i[2] + 1:>6}{i[3] + 1:>6}{"4":>6}{equilibrium:>8.2f}{force_constant:10.5f}{periodicity:>6} ;\n')
 
             # Pairs
             f_itp.write('\n[ pairs ]\n')
             f_itp.write(';   ai     aj    funct\n')
             for i in self.pairs:
-                f_itp.write(f'{i[0]:>6}{i[1]:>6}{"1":>6} ;\n')
+                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{"1":>6} ;\n')
 
     def write_gro_file(self, gro_file):
         """
