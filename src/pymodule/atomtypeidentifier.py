@@ -552,37 +552,23 @@ class AtomTypeIdentifier:
                 elif (info.get('CyclicStructure') == 'cycle' and
                       'non_aromatic' in info.get('Aromaticity')):
 
-                    if (info['NumConnectedAtoms'] == 4 and
-                            3 in info['CycleSize']):
+                    if info['NumConnectedAtoms'] == 4:
 
-                        carbon_type = {'opls': 'opls_CX', 'gaff': 'cx'}
+                        if 3 in info['CycleSize']:
+                            carbon_type = {'opls': 'opls_CX', 'gaff': 'cx'}
 
-                    elif (info['NumConnectedAtoms'] == 4 and
-                          4 in info['CycleSize']):
+                        elif 4 in info['CycleSize']:
+                            carbon_type = {'opls': 'opls_CY', 'gaff': 'cy'}
 
-                        carbon_type = {'opls': 'opls_CY', 'gaff': 'cy'}
+                        elif 5 in info['CycleSize']:
+                            carbon_type = {'opls': 'opls_c5', 'gaff': 'c5'}
 
-                    elif (info['NumConnectedAtoms'] == 4 and
-                          5 in info['CycleSize']):
+                        elif 6 in info['CycleSize']:
+                            carbon_type = {'opls': 'opls_c6', 'gaff': 'c6'}
 
-                        carbon_type = {'opls': 'opls_c5', 'gaff': 'c5'}
+                        else:
+                            carbon_type = {'opls': 'opls_135', 'gaff': 'c3'}
 
-                    elif (info['NumConnectedAtoms'] == 4 and
-                          6 in info['CycleSize']):
-
-                        carbon_type = {'opls': 'opls_c6', 'gaff': 'c6'}
-
-                    elif (info['NumConnectedAtoms'] == 3 and
-                          3 in info['CycleSize']):
-
-                        carbon_type = {'opls': 'opls_CU', 'gaff': 'cu'}
-
-                    elif (info['NumConnectedAtoms'] == 3 and
-                          4 in info['CycleSize']):
-
-                        carbon_type = {'opls': 'opls_CV', 'gaff': 'cv'}
-
-                    # general Non-aromatic cycles bigger than 4
                     elif info['NumConnectedAtoms'] == 3:
 
                         has_terminal_oxygen = False
@@ -607,6 +593,12 @@ class AtomTypeIdentifier:
                         elif has_terminal_sulfur:
                             # Carbon double bonded to Sulfur
                             carbon_type = {'opls': 'opls_cs', 'gaff': 'cs'}
+
+                        elif 3 in info['CycleSize']:
+                            carbon_type = {'opls': 'opls_CU', 'gaff': 'cu'}
+
+                        elif 4 in info['CycleSize']:
+                            carbon_type = {'opls': 'opls_CV', 'gaff': 'cv'}
 
                         elif 'C' in connected_symbols or 'N' in connected_symbols:
                             # Count the number of sp2/sp1 hybridized C and N
@@ -746,7 +738,29 @@ class AtomTypeIdentifier:
                                   == 2 or
                                   sp2_carbon_count + sp1_carbon_count + n2_count
                                   == 2):
-                                carbon_type = {'opls': 'opls_XXX', 'gaff': 'cg'}
+                                # Check bond length
+                                vec_ji = (
+                                    self.coordinates[
+                                        info['ConnectedAtomsNumbers'][0] - 1] -
+                                    self.coordinates[info['AtomNumber'] - 1])
+                                vec_jk = (
+                                    self.coordinates[
+                                        info['ConnectedAtomsNumbers'][1] - 1] -
+                                    self.coordinates[info['AtomNumber'] - 1])
+                                bond_length_ji = np.linalg.norm(vec_ji)
+                                bond_length_jk = np.linalg.norm(vec_jk)
+
+                                if (bond_length_ji <= 1.3475 and
+                                        bond_length_jk <= 1.3475):
+                                    carbon_type = {
+                                        'opls': 'opls_235',
+                                        'gaff': 'c1'
+                                    }
+                                else:
+                                    carbon_type = {
+                                        'opls': 'opls_XXX',
+                                        'gaff': 'cg'
+                                    }
 
                             else:
                                 carbon_type = {'opls': 'opls_235', 'gaff': 'c1'}
@@ -1049,9 +1063,8 @@ class AtomTypeIdentifier:
 
                         # List of flags
                         found_nitro = False
-                        found_aromatic = False
                         found_amide = False
-                        found_idine = False
+                        found_aromatic = False
                         found_sp2_carbon = False
 
                         if (sorted(info['ConnectedAtoms']) in [
@@ -1079,8 +1092,7 @@ class AtomTypeIdentifier:
                                 elif self.atom_info_dict[atom][
                                         'NumConnectedAtoms'] == 3:
 
-                                    # Connected to an sp2 carbon
-                                    # Check the atoms connected to the Carbon
+                                    # Check for amide
                                     for connected_to_carbon in self.atom_info_dict[
                                             atom]['ConnectedAtomsNumbers']:
                                         atom_symbol = self.atom_info_dict[
@@ -1089,33 +1101,22 @@ class AtomTypeIdentifier:
                                             connected_to_carbon][
                                                 'NumConnectedAtoms']
 
-                                        # Amides and Sulfamides
                                         if ((atom_symbol == 'O' and
                                              atom_connectivity == 1) or
                                             (atom_symbol == 'S' and
                                              atom_connectivity == 1)):
 
                                             found_amide = True
+                                            break
 
-                                        # Idines
-                                        elif (atom_symbol == 'N' and
-                                              atom_connectivity == 2):
-
-                                            found_idine = True
-
-                                        # Connected to C sp2
-                                        elif (atom_symbol == 'C' and
-                                              atom_connectivity == 3):
-
-                                            found_sp2_carbon = True
+                                    if not found_amide:
+                                        found_sp2_carbon = True
 
                         # Now assign nitrogen types based on the flags using
                         # the following hierarchy:
                         # 1. Nitro
                         # 2. Amide
-                        # 3. Idine
-                        # 4. Aromatic
-                        # 5. Sp2 carbon
+                        # 3. Aromatic / sp2 carbon
 
                         if found_nitro:
 
@@ -1142,7 +1143,7 @@ class AtomTypeIdentifier:
                                     'gaff': 'n'
                                 }
 
-                        elif found_idine or found_aromatic or found_sp2_carbon:
+                        elif found_aromatic or found_sp2_carbon:
 
                             if num_hydrogens == 1:
                                 nitrogen_type = {
@@ -1206,14 +1207,34 @@ class AtomTypeIdentifier:
                         # Check if the Nitrogen is connected to another
                         # Nitrogen with sp1 hybridization
                         if has_sp1_nitrogen:
-
                             nitrogen_type = {'opls': 'opls_753', 'gaff': 'n1'}
 
                         elif sp2_carbon_count + sp1_carbon_count + n2_count == 2:
                             nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'ne'}
 
                         else:
-                            nitrogen_type = {'opls': 'opls_XXX', 'gaff': 'n2'}
+                            # Check bond angle
+                            vec_ji = (
+                                self.coordinates[connected_atoms_numbers[0] - 1]
+                                - self.coordinates[info['AtomNumber'] - 1])
+                            vec_jk = (
+                                self.coordinates[connected_atoms_numbers[1] - 1]
+                                - self.coordinates[info['AtomNumber'] - 1])
+                            theta_ijk = np.arccos(
+                                np.dot(vec_ji, vec_jk) /
+                                (np.linalg.norm(vec_ji) *
+                                 np.linalg.norm(vec_jk)))
+
+                            if theta_ijk * 180.0 / np.pi > 170.0:
+                                nitrogen_type = {
+                                    'opls': 'opls_753',
+                                    'gaff': 'n1'
+                                }
+                            else:
+                                nitrogen_type = {
+                                    'opls': 'opls_XXX',
+                                    'gaff': 'n2'
+                                }
 
                     elif info['NumConnectedAtoms'] == 1:
 
