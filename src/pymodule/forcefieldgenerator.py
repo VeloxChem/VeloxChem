@@ -33,6 +33,7 @@ import re
 from .veloxchemlib import mpi_master, bohr_in_angstrom, hartree_in_kcalpermol
 from .atomtypeidentifier import AtomTypeIdentifier
 from .molecule import Molecule
+from .molecularbasis import MolecularBasis
 from .outputstream import OutputStream
 from .respchargesdriver import RespChargesDriver
 from .openmmdriver import OpenMMDriver
@@ -518,22 +519,11 @@ class ForceFieldGenerator:
         return content.splitlines()
     
 
-    def create_topology(self):
+    def create_topology(self, molecule, basis=None):
         '''
-        Analizes the topology of the molecule and create a topology dictionary.
+        Analizes the topology of the molecule and create dictionaries
+        for the atoms, bonds, angles, dihedrals, impropers and pairs.
         '''
-
-        # Temporal dictionary to store the topology data.
-
-        topology = {
-            'atomtypes': [],
-            'atoms': [],
-            'bonds': [],
-            'pairs': [],
-            'angles': [],
-            'dihedrals': [],
-            'impropers': [],
-        }
 
         # Read the force field data lines.
 
@@ -545,6 +535,8 @@ class ForceFieldGenerator:
      
         # Molecular information
 
+        self.molecule = molecule
+
         coords = self.molecule.get_coordinates_in_bohr()
         n_atoms = self.molecule.number_of_atoms()
 
@@ -555,6 +547,20 @@ class ForceFieldGenerator:
         self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(self.molecule)
         atomtypeidentifier.check_for_bad_assignations(ff_data_lines)
         self.connectivity_matrix = np.copy(atomtypeidentifier.connectivity_matrix)
+
+        atomtypeidentifier.identify_equivalences()
+
+        if self.partial_charges is None:
+            if basis is None:
+                basis = MolecularBasis.read(self.molecule, '6-31G*')
+
+            resp_drv = RespChargesDriver(self.comm, self.ostream)
+            resp_drv.ostream.mute()
+            
+            resp_drv.equal_charges = atomtypeidentifier.equivalent_charges['equal_charges']
+
+            self.partial_charges = resp_drv.compute(self.molecule, basis, 'resp')
+
  
         # preparing atomtypes and atoms
 
@@ -629,6 +635,24 @@ class ForceFieldGenerator:
 
         # Read the force field and include the data in the topology dictionary.
 
+        self.atoms = {}
+
+        # Auxiliary data structures
+
+        atomtypes = []
+        atoms = []
+
+        # Dictionary fields
+
+        ids = []
+        types = []
+        names = []
+        masses = []
+        charges = []
+        sigmas = []
+        epsilons = []
+        equivalent_atoms = []
+
         # Atomtypes analysis
 
         for at in self.unique_atom_types:
@@ -650,57 +674,63 @@ class ForceFieldGenerator:
                 epsilon = 0.0
                 comment = 'Unknown'
 
-
             # Save the data in the 'atomtypes' field of the topology dictionary.
-            topology['atomtypes'].append(
-                (at, sigma, epsilon, comment))
+            atomtypes.append(
+                 (at, sigma, epsilon, comment))
+                        
                 
         # Atoms analysis
                 
         for i in range(n_atoms):
                     
-                    atom_type = self.atom_types[i]
-                    atom_name = atom_names[i]
-                    if self.partial_charges is None:
-                        charge = 0.0
-                        warnmsg = f'ForceFieldGenerator: No partial charges'
-                    else:
-                        charge = self.partial_charges[i]
+            atom_type = self.atom_types[i]
+            atom_name = atom_names[i]
+            equivalent_atom = atomtypeidentifier.equivalent_atom_names[i]
+            if self.partial_charges is None:
+                charge = 0.0
+                warnmsg = f'ForceFieldGenerator: No partial charges'
+            else:
+                charge = self.partial_charges[i]
 
-                    mass = self.molecule.masses_to_numpy()[i]
-        
-                    # Save the data in the 'atoms' field of the topology dictionary.
-                    topology['atoms'].append(
-                        (i + 1, atom_type, atom_name, i + 1, charge, mass))
+            mass = self.molecule.masses_to_numpy()[i]
+            
 
-        # Atoms dictionary writing
-
-        self.atoms = {}
-
-        ids = []
-        types = []
-        masses = []
-        charges = []
-        sigmas = []
-        epsilons = []
-
-        for i in topology['atoms']:
+            # Save the data in the 'atoms' field of the topology dictionary.
+            atoms.append(
+                 (i, atom_type, atom_name, charge, mass, equivalent_atom))
+            
+        # Append data
+        for i in atoms:
             ids.append(i[0])
             types.append(i[1])
-            masses.append(i[-1])
-            charges.append(i[-2])
+            names.append(i[2])
+            charges.append(i[3])
+            masses.append(i[4])
+            equivalent_atoms.append(i[5])
 
         for i in types:
             # Look for the type in the atomtypes dictionary
-            for j in topology['atomtypes']:
+            for j in atomtypes:
                 if i == j[0]:
                     sigmas.append(j[1])
                     epsilons.append(j[2])
 
+                    
+        # Atoms dictionary writing
+
         for i in range(len(ids)):
-            self.atoms[ids[i]] = {'type': types[i], 'mass': masses[i], 'charge': charges[i], 'sigma': sigmas[i], 'epsilon': epsilons[i]}
+            self.atoms[ids[i]] = {'type': types[i], 'name': names[i], 'mass': masses[i],
+                                   'charge': charges[i], 'sigma': sigmas[i], 'epsilon': epsilons[i], 
+                                   'equivalent_atom': equivalent_atoms[i]}
                     
         # Bonds analysis
+
+        self.bonds = {}
+
+        ids = []
+        force_constants = []
+        equilibrium_distances = []
+        comments = []
 
         for i, j in bond_indices: 
 
@@ -727,12 +757,12 @@ class ForceFieldGenerator:
                     break
 
             if not bond_found:
-                warnmsg = f'ForceFieldGenerator: bond {at_1}-{at_2}'
-                warnmsg += ' is not available'
-                self.ostream.print_warning(warnmsg)
-                r = r_eq
-                k_r = 250000 #Default value for bonds
-                comment = 'Unknown'
+                    warnmsg = f'ForceFieldGenerator: bond {at_1}-{at_2}'
+                    warnmsg += ' is not available'
+                    self.ostream.print_warning(warnmsg)
+                    r = r_eq
+                    k_r = 250000 #Default value for bonds
+                    comment = 'Unknown'
 
             if self.eq_param:
                 if abs(r - r_eq) > self.r_thresh:
@@ -742,24 +772,15 @@ class ForceFieldGenerator:
                     self.ostream.flush()
                 r = r_eq
 
-            # Save the data in the 'bonds' field of the topology dictionary.
-            topology['bonds'].append((i, j, r, k_r, comment))
+            # Append data
 
-        # Bonds dictionary writing
+            ids.append((i, j))
+            force_constants.append(k_r)
+            equilibrium_distances.append(r)
+            comments.append(comment)
 
-        self.bonds = {}
-
-        ids = []
-        force_constants = []
-        equilibrium_distances = []
-        comments = []
-
-        for i in topology['bonds']:
-            ids.append((i[0], i[1]))
-            force_constants.append(i[3])
-            equilibrium_distances.append(i[2])
-            comments.append(i[-1])
-
+            # Bonds dictionary writing
+                
         for i in range(len(ids)):
             self.bonds[ids[i]] = {'force_constant': force_constants[i], 'equilibrium': equilibrium_distances[i], 'comment': comments[i]}
         
@@ -773,6 +794,13 @@ class ForceFieldGenerator:
 
 
         # Angles analysis
+            
+        self.angles = {}
+
+        ids = []
+        force_constants = []
+        equilibrium_angles = []
+        comments = []
 
         for i, j, k in angle_indices:
                 
@@ -800,6 +828,7 @@ class ForceFieldGenerator:
                         k_theta = float(angle_ff[0]) * 4.184 * 2
                         comment = 'GAFF'
                         angle_found = True
+                        break
     
                 if not angle_found:
                     warnmsg = f'ForceFieldGenerator: angle {at_1}-{at_2}-{at_3}'
@@ -817,29 +846,24 @@ class ForceFieldGenerator:
                         self.ostream.flush()
                     theta = theta_eq
 
-                # Save the data in the 'angles' field of the topology dictionary.
-                topology['angles'].append((i, j, k, theta, k_theta, comment))
+                # Append data
+                    
+                ids.append((i, j, k))
+                force_constants.append(k_theta)
+                equilibrium_angles.append(theta)
+                comments.append(comment)
 
         # Angles dictionary writing
-            
-        self.angles = {}
-
-        ids = []
-        force_constants = []
-        equilibrium_angles = []
-        comments = []
-
-        for i in topology['angles']:
-            ids.append((i[0], i[1], i[2]))
-            force_constants.append(i[4])
-            equilibrium_angles.append(i[3])
-            comments.append(i[-1])
-
+                
         for i in range(len(ids)):
             self.angles[ids[i]] = {'force_constant': force_constants[i], 'equilibrium': equilibrium_angles[i], 'comment': comments[i]}
 
         # Dihedrals analysis
-
+            
+        # Due to multitermed dihedrals, we need to store the data in a list of dictionaries.
+        
+        self.dihedrals = [] 
+        
         for i, j, k, l in dihedral_indices:
 
             at_1 = self.atom_types[i]
@@ -900,32 +924,22 @@ class ForceFieldGenerator:
                     periodicity = int(float(dihedral_ff[3]))
 
                 # Save the data in the 'dihedrals' field of the topology dictionary.
-                topology['dihedrals'].append((i, j, k, l, multiplicity, barrier, phase, periodicity, comment))
+                # Dictionary with list of parameters.
+                    
+                self.dihedrals.append({'ids': (i, j, k, l), 'multiplicity': multiplicity, 'barrier' : barrier,'phase': phase,'periodicity': periodicity, 'comment': comment})
 
                 if periodicity > 0:
                     break
-
-        # Dihedrals dictionary writing
-            
-        self.dihedrals = {}
+                
+        # Impropers
+                
+        self.impropers = {}
 
         ids = []
         force_constants = []
         equilibrium_angles = []
         periodicities = []
         comments = []
-
-        for i in topology['dihedrals']:
-            ids.append((i[0], i[1], i[2], i[3]))
-            force_constants.append(i[5])
-            equilibrium_angles.append(i[6])
-            periodicities.append(i[7])
-            comments.append(i[-1])
-
-        for i in range(len(ids)):
-            self.dihedrals[ids[i]] = {'force_constant': force_constants[i], 'equilibrium': equilibrium_angles[i], 'periodicity': periodicities[i], 'comment': comments[i]}
-                
-        # Impropers
                 
         sp2_atom_types = [
             'c ', 'cs', 'c2', 'ca', 'cp', 'cq', 'cc', 'cd', 'ce', 'cf',
@@ -1031,23 +1045,15 @@ class ForceFieldGenerator:
                     'ForceFieldGenerator: invalid improper dihedral periodicity'
                 )
 
-                # Save the data in the 'impropers' field of the topology dictionary.
-                topology['impropers'].append((i, j, k, l, barrier, phase, periodicity, comment))
-        
-        self.impropers = {}
+                # Append data
 
-        ids = []
-        force_constants = []
-        equilibrium_angles = []
-        periodicities = []
-        comments = []
+                ids.append((i, j, k, l))
+                force_constants.append(barrier)
+                equilibrium_angles.append(phase)
+                periodicities.append(periodicity)
+                comments.append(comment)
 
-        for i in topology['impropers']:
-            ids.append((i[0], i[1], i[2], i[3]))
-            force_constants.append(i[4])
-            equilibrium_angles.append(i[5])
-            periodicities.append(i[6])
-            comments.append(i[-1])
+        # Impropers dictionary writing
 
         for i in range(len(ids)):
             self.impropers[ids[i]] = {'force_constant': force_constants[i], 'equilibrium': equilibrium_angles[i], 'periodicity': periodicities[i], 'comment': comments[i]}
@@ -1325,14 +1331,16 @@ class ForceFieldGenerator:
 
             # Atom types
             f_itp.write('\n[ atomtypes ]\n')
-            f_itp.write(';name   bond_type     mass     charge   ptype   sigma         epsilon       Amb\n')
+            f_itp.write(';name   bond_type     mass     charge   ptype   sigma         epsilon\n')
             for at in self.unique_atom_types:
                 for j in self.atoms:
                     if self.atoms[j]['type'] == at:
+                        mass = self.atoms[j]['mass']
+                        charge = self.atoms[j]['charge']
                         sigma = self.atoms[j]['sigma']
                         epsilon = self.atoms[j]['epsilon']
                         break
-                f_itp.write(f'{at:>3}{at:>9}{0.0:17.5f}{0.0:9.5f}{"A":>4}{sigma:16.5e}{epsilon:14.5e} ; {sigma:5.2f}  {epsilon:6.4f}\n')
+                f_itp.write(f'{at:>3}{at:>9}{0.0:17.5f}{0.0:9.5f}{"A":>4}{sigma:16.5e}{epsilon:14.5e}\n')
 
             # Molecule type
             f_itp.write('\n[ moleculetype ]\n')
@@ -1341,38 +1349,55 @@ class ForceFieldGenerator:
 
             # Atoms
             f_itp.write('\n[ atoms ]\n')
-            f_itp.write(';   nr  type  resi  res  atom  cgnr     charge      mass\n')
+            f_itp.write(';   nr  type  resi  res  atom  cgnr     charge      mass                 Equivalence\n')
             total_charge = 0.0
             for i in self.atoms:
                 atom_type = self.atoms[i]['type']
                 charge = self.atoms[i]['charge']
                 mass = self.atoms[i]['mass']
+                name = self.atoms[i]['name']
+                equivalent_atom = self.atoms[i]['equivalent_atom']
                 total_charge += charge
-                f_itp.write(f'{i:>6}{atom_type:>6}{i:>6}{mol_name:>6}{atom_type:>6}{i:>6}{charge:10.6f}{mass:12.5f} ; qtot {total_charge:6.3f}\n')
+                f_itp.write(f'{i + 1:>6}{atom_type:>6}{1:>6}{mol_name:>6}{name:>6}{i + 1:>6}{charge:10.6f}{mass:12.5f} ; qtot {total_charge:6.3f}    {equivalent_atom}\n')
 
             # Bonds
             f_itp.write('\n[ bonds ]\n')
             f_itp.write(';   ai     aj funct   r             k\n')
             for i in self.bonds:
+                name_1 = self.atoms[i[0]]['name']
+                name_2 = self.atoms[i[1]]['name']
                 force_constant = self.bonds[i]['force_constant']
                 equilibrium = self.bonds[i]['equilibrium']
-                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{"1":>6}{equilibrium:13.4e}{force_constant:13.4e} ;\n')
+                comment = self.bonds[i]['comment']
+                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{"1":>6}{equilibrium:13.4e}{force_constant:13.4e} ;    {name_1}-{name_2}    {comment}\n')
 
             # Angles
             f_itp.write('\n[ angles ]\n')
             f_itp.write(';   ai     aj     ak    funct   theta         cth\n')
             for i in self.angles:
+                name_1 = self.atoms[i[0]]['name']
+                name_2 = self.atoms[i[1]]['name']
+                name_3 = self.atoms[i[2]]['name']
                 force_constant = self.angles[i]['force_constant']
                 equilibrium = self.angles[i]['equilibrium']
-                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{i[2] + 1:>6}{"1":>6}{equilibrium:13.4e}{force_constant:13.4e} ;\n')
+                comment = self.angles[i]['comment']
+                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{i[2] + 1:>6}{"1":>6}{equilibrium:13.4e}{force_constant:13.4e} ;    {name_1}-{name_2}-{name_3}    {comment}\n')
 
             # Dihedrals (propers)
             f_itp.write('\n[ dihedrals ] ; propers\n')
+            f_itp.write(';    i      j      k      l   func   phase     kd      pn\n')
             for i in self.dihedrals:
-                force_constant = self.dihedrals[i]['force_constant']
-                equilibrium = self.dihedrals[i]['equilibrium']
-                periodicity = self.dihedrals[i]['periodicity']
-                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{i[2] + 1:>6}{i[3] + 1:>6}{"1":>6}{equilibrium:>8.2f}{force_constant:10.5f}{periodicity:>6} ;\n')
+                name_1 = self.atoms[i['ids'][0]]['name']
+                name_2 = self.atoms[i['ids'][1]]['name']
+                name_3 = self.atoms[i['ids'][2]]['name']
+                name_4 = self.atoms[i['ids'][3]]['name']
+                ids = i['ids']
+                force_constant = i['barrier']
+                equilibrium = i['phase']
+                periodicity = abs(i['periodicity'])
+                comment = i['comment']
+                f_itp.write(f'{ids[0] + 1:>6}{ids[1] + 1:>6}{ids[2] + 1:>6}{ids[3] + 1:>6}{"9":>6}{equilibrium:>8.2f}{force_constant:10.5f}{periodicity:>6} ;   {name_1}-{name_2}-{name_3}-{name_4}    {comment}\n')
+        
 
             # Impropers
             f_itp.write('\n[ dihedrals ] ; impropers\n')
@@ -1380,7 +1405,8 @@ class ForceFieldGenerator:
                 force_constant = self.impropers[i]['force_constant']
                 equilibrium = self.impropers[i]['equilibrium']
                 periodicity = self.impropers[i]['periodicity']
-                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{i[2] + 1:>6}{i[3] + 1:>6}{"4":>6}{equilibrium:>8.2f}{force_constant:10.5f}{periodicity:>6} ;\n')
+                comment = self.impropers[i]['comment']
+                f_itp.write(f'{i[0] + 1:>6}{i[1] + 1:>6}{i[2] + 1:>6}{i[3] + 1:>6}{"4":>6}{equilibrium:>8.2f}{force_constant:10.5f}{periodicity:>6} ;      {name_1}-{name_2}-{name_3}-{name_4}    {comment}\n')
 
             # Pairs
             f_itp.write('\n[ pairs ]\n')
@@ -1420,10 +1446,10 @@ class ForceFieldGenerator:
                 coordinates = self.molecule.get_coordinates_in_bohr()[i - 1]
                 coordinates *= bohr_in_angstrom() * 0.1
 
-                f_gro.write(f'{1 % 100000:>5d}{residue_name:<5}{atom_name:<5}{i % 100000:>5d}{coordinates[0]:8.3f}{coordinates[1]:8.3f}{coordinates[2]:8.3f}\n')
+                f_gro.write(f'{1 % 100000:>5d}{residue_name:<5}{atom_name:<5}{i % 100000:>5d}{coordinates[0]:12.7f}{coordinates[1]:12.7f}{coordinates[2]:12.7f}\n')
 
             # Box dimensions (assuming cubic box for simplicity)
-            box_dimension = 2  # Replace with actual box dimension if available
+            box_dimension = 10  # Replace with actual box dimension if available
             f_gro.write(f'{box_dimension:10.5f}{box_dimension:10.5f}{box_dimension:10.5f}\n')
 
     # Wrapper method to write all the GROMACS files
