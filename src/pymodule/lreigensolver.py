@@ -30,6 +30,7 @@ import numpy as np
 import time as tm
 import sys
 
+from .veloxchemlib import ElectricDipoleIntegralsDriver
 from .veloxchemlib import XCFunctional, MolecularGrid
 from .veloxchemlib import denmat
 from .veloxchemlib import (mpi_master, rotatory_strength_in_cgs, hartree_in_ev,
@@ -102,6 +103,9 @@ class LinearResponseEigenSolver(LinearSolver):
         self.cube_stepsize = None
         self.cube_points = [80, 80, 80]
 
+        self.esa = False
+        self.esa_from_state = None
+
         self._input_keywords['response'].update({
             'nstates': ('int', 'number of excited states'),
             'core_excitation': ('bool', 'compute core-excited states'),
@@ -110,6 +114,9 @@ class LinearResponseEigenSolver(LinearSolver):
             'nto_pairs': ('int', 'number of NTO pairs in NTO analysis'),
             'nto_cubes': ('bool', 'write NTO cube files'),
             'detach_attach': ('bool', 'analyze detachment/attachment density'),
+            'esa': ('bool', 'compute excited state absorption'),
+            'esa_from_state':
+                ('int', 'the state to excite from (e.g. 1 for S1)'),
             'cube_origin': ('seq_fixed', 'origin of cubic grid points'),
             'cube_stepsize': ('seq_fixed', 'step size of cubic grid points'),
             'cube_points': ('seq_fixed_int', 'number of cubic grid points'),
@@ -607,6 +614,76 @@ class LinearResponseEigenSolver(LinearSolver):
                     if self.rank == mpi_master():
                         dens_cube_files.append(dens_cube_fnames)
 
+                if self.esa:
+                    dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+                    dipole_matrices = dipole_drv.compute(molecule, basis)
+
+                    if self.rank == mpi_master():
+                        dipole_integrals = (dipole_matrices.x_to_numpy(),
+                                            dipole_matrices.y_to_numpy(),
+                                            dipole_matrices.z_to_numpy())
+                    else:
+                        dipole_integrals = None
+
+                    if self.esa_from_state is None:
+                        source_states = list(range(self.nstates))
+                    else:
+                        source_states = [self.esa_from_state - 1]
+
+                    esa_pairs = [(s_1, s_2)
+                                 for s_1 in source_states
+                                 for s_2 in range(s_1 + 1, self.nstates)]
+
+                    if self.rank == mpi_master():
+                        esa_results = []
+                    else:
+                        esa_results = None
+
+                    for s_1, s_2 in esa_pairs:
+                        eigvec_1 = self.get_full_solution_vector(
+                            exc_solutions[s_1])
+                        eigvec_2 = self.get_full_solution_vector(
+                            exc_solutions[s_2])
+
+                        if self.rank == mpi_master():
+                            half_size = eigvec_1.shape[0] // 2
+
+                            z_mat_1 = eigvec_1[:half_size].reshape(nocc, -1)
+                            y_mat_1 = eigvec_1[half_size:].reshape(nocc, -1)
+
+                            z_mat_2 = eigvec_2[:half_size].reshape(nocc, -1)
+                            y_mat_2 = eigvec_2[half_size:].reshape(nocc, -1)
+
+                            esa_trans_dens = (
+                                np.linalg.multi_dot(
+                                    [mo_vir, z_mat_1.T, z_mat_2, mo_vir.T]) -
+                                np.linalg.multi_dot(
+                                    [mo_occ, z_mat_1, z_mat_2.T, mo_occ.T]))
+
+                            esa_trans_dens += (
+                                np.linalg.multi_dot(
+                                    [mo_occ, y_mat_1, y_mat_2.T, mo_occ.T]) -
+                                np.linalg.multi_dot(
+                                    [mo_vir, y_mat_1.T, y_mat_2, mo_vir.T]))
+
+                            esa_trans_dipole = np.array([
+                                -1.0 *
+                                np.sum(esa_trans_dens * dipole_integrals[i])
+                                for i in range(3)
+                            ])
+
+                            esa_exc_ene = exc_energies[s_2] - exc_energies[s_1]
+                            esa_osc_str = (2.0 / 3.0) * esa_exc_ene * np.sum(
+                                esa_trans_dipole**2)
+
+                            esa_results.append({
+                                'from_state': f'S{s_1 + 1}',
+                                'to_state': f'S{s_2 + 1}',
+                                'excitation_energy': esa_exc_ene,
+                                'oscillator_strength': esa_osc_str,
+                                'transition_dipole': esa_trans_dipole,
+                            })
+
                 if self.rank == mpi_master():
                     for ind, comp in enumerate('xyz'):
                         elec_trans_dipoles[s, ind] = np.vdot(
@@ -658,6 +735,9 @@ class LinearResponseEigenSolver(LinearSolver):
 
                     if self.detach_attach:
                         ret_dict['density_cubes'] = dens_cube_files
+
+                    if self.esa:
+                        ret_dict['esa_results'] = esa_results
 
                     if (self.save_solutions and
                             self.checkpoint_file is not None):
@@ -1042,6 +1122,10 @@ class LinearResponseEigenSolver(LinearSolver):
         self._print_absorption('One-Photon Absorption', results)
         self._print_ecd('Electronic Circular Dichroism', results)
         self._print_excitation_details('Character of excitations:', results)
+
+        if self.esa:
+            self._print_excited_state_absorption('Excited state absorption:',
+                                                 results)
 
     def __deepcopy__(self, memo):
         """
