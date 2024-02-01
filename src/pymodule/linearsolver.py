@@ -2261,3 +2261,35 @@ class LinearSolver:
             self.ostream.print_blank()
 
         self.ostream.flush()
+
+    def _print_excited_state_absorption(self, title, results):
+        """
+        Prints excited state absorption.
+
+        :param title:
+            The title to be printed to the output stream.
+        :param results:
+            The dictionary containing response results.
+        """
+
+        self.ostream.print_blank()
+        self.ostream.print_header(title.ljust(92))
+        self.ostream.print_blank()
+
+        for excitation in results['esa_results']:
+            from_state = excitation['from_state']
+            to_state = excitation['to_state']
+            ene_in_ev = excitation['excitation_energy'] * hartree_in_ev()
+            osc_str = excitation['oscillator_strength']
+            trans_dipole = excitation['transition_dipole']
+
+            valstr = f'{from_state:<4s}-> {to_state:<4s}'
+            valstr += f' {ene_in_ev:10.5f} eV'
+            valstr += f'     Osc.Str. {osc_str:8.4f}'
+            valstr += '    Trans.Dipole '
+            for i in range(3):
+                valstr += f'{trans_dipole[i]:8.4f}'
+            self.ostream.print_header(valstr.ljust(92))
+
+        self.ostream.print_blank()
+        self.ostream.flush()
