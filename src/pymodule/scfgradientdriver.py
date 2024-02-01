@@ -135,7 +135,7 @@ class ScfGradientDriver(GradientDriver):
                 t0 = tm.time()
                 d_ovlp = overlap_deriv(molecule, ao_basis, i)
                 d_hcore = hcore_deriv(molecule, ao_basis, i)
-                d_eri = eri_deriv(molecule, ao_basis, i)
+                d_eri_partial = eri_deriv(molecule, ao_basis, i, full_deriv=False) 
                 t1 = tm.time()
                 self.ostream.print_info("Import of integral derivatives"
                                     + ' took'
@@ -158,10 +158,21 @@ class ScfGradientDriver(GradientDriver):
                 else:
                     frac_K = 1.0
 
-                self.gradient[i] += 2.0 * np.einsum(
-                    'mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
-                self.gradient[i] -= frac_K * np.einsum(
-                    'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+                # place in C-layer, aux Fock build, (derivative on first AO index, m)
+                # (m* n | t p)
+                aux_Fock_deriv_j = np.einsum('xmntp,tp->xmn', d_eri_partial, one_pdm_ao)
+                aux_Fock_deriv_k = np.einsum('xmtnp,tp->xmn', d_eri_partial, one_pdm_ao)
+                aux_Fock_deriv = 2 * aux_Fock_deriv_j - frac_K * aux_Fock_deriv_k
+
+                # The factor 4 comes from the permutations of the AO index where the derivative is taken 
+                self.gradient[i] += 4.0 * np.einsum('xmn,mn->x', aux_Fock_deriv, one_pdm_ao)
+
+                # TODO: remove old commented out code
+                #self.gradient[i] += 2.0 * np.einsum(
+                #    'mt,np,xmtnp->x', one_pdm_ao, one_pdm_ao, d_eri)
+                #self.gradient[i] -= frac_K * np.einsum(
+                #    'mt,np,xmnpt->x', one_pdm_ao, one_pdm_ao, d_eri)
+
                 t3 = tm.time()
                 self.ostream.print_info("Two electron integral derivatives"
                                     + ' contribution computed in'
