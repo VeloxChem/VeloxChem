@@ -90,4 +90,13 @@ def _XtbDriver_compute(self, molecule, ostream=None):
             ostream.flush()
 
 
+def _XtbDriver_get_reference(self):
+
+    ref_str = 'C. Bannwarth, E. Caldeweyher, S. Ehlert, '
+    ref_str += 'A. Hansen, P. Pracht, J. Seibert, S. Spicher, S. Grimme, '
+    ref_str += 'WIREs Comput. Mol. Sci., 2020, 11, e01493'
+    return ref_str
+
+
 XtbDriver.compute = _XtbDriver_compute
+XtbDriver.get_reference = _XtbDriver_get_reference

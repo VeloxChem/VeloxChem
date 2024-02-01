@@ -324,6 +324,27 @@ class OutputStream:
         for line in lines:
             self.print_header(line)
 
+    def print_reference(self, line):
+        """
+        Prints reference to output stream.
+
+        :param lines:
+            The reference line.
+        """
+
+        if not self.state:
+            return
+
+        cur_line = line
+        spaces = ' ' * 9
+
+        while len(cur_line) > 100:
+            index = cur_line[:100].strip().rfind(' ')
+            self.buffer_lines.append(spaces + cur_line[:index].strip())
+            cur_line = cur_line[index:]
+
+        self.buffer_lines.append(spaces + cur_line.strip())
+
     def print_start_header(self, num_nodes):
         """
         Prints start header to output stream.

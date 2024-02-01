@@ -36,8 +36,15 @@ class Seminario:
         Initializes the Seminaro object.
         """
 
-        self.hessian_matrix = hessian_matrix
+        self.hessian_matrix = np.copy(hessian_matrix)
         self.coordinates = coordinates
+
+    def get_reference(self):
+        """
+        Get string for reference paper.
+        """
+
+        return 'J. M. Seminario, Int. J. Quantum Chem. 60, 1271-1277 (1996)'
 
     def calculate_interatomic_k(self, atom_index_a, atom_index_b, vector_u):
         """
