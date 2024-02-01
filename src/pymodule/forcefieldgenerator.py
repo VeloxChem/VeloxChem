@@ -227,10 +227,7 @@ class ForceFieldGenerator:
 
         # atom type identification
 
-        if self.atom_types is None:
-            atomtypeidentifier = AtomTypeIdentifier(self.comm, self.ostream)
-            self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
-                molecule)
+        self.create_topology(molecule, basis)
 
         # sanity check
 
@@ -245,16 +242,6 @@ class ForceFieldGenerator:
         assert_msg_critical(
             len(self.atom_types) == molecule.number_of_atoms(),
             'ForceFieldGenerator.compute: inconsistent number of atom_types')
-
-        self.molecule = molecule
-
-        # RESP charges
-
-        if self.partial_charges is None and self.original_top_file is None:
-            resp_drv = RespChargesDriver(self.comm, self.ostream)
-            resp_drv.update_settings(self.resp_dict)
-            self.partial_charges = resp_drv.compute(self.molecule, basis,
-                                                    'resp')
 
         # read QM scan
 
@@ -510,7 +497,6 @@ class ForceFieldGenerator:
 
         self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
             self.molecule)
-        atomtypeidentifier.check_for_bad_assignations(ff_data_lines)
         atomtypeidentifier.identify_equivalences()
 
         self.connectivity_matrix = np.copy(
@@ -530,14 +516,14 @@ class ForceFieldGenerator:
                 self.ostream.flush()
 
             resp_drv = RespChargesDriver(self.comm)
+            # TODO update settings using self.resp_dict
             resp_drv.ostream.mute()
-
-            # TODO use "equal_charges" string from atomtypeidentifier
-            resp_drv.equal_charges = atomtypeidentifier.equivalent_charges[
-                'equal_charges']
+            resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
             self.partial_charges = resp_drv.compute(self.molecule, basis,
                                                     'resp')
+            self.partial_charges = self.comm.bcast(self.partial_charges,
+                                                   root=mpi_master())
 
         # preparing atomtypes and atoms
 
@@ -643,7 +629,7 @@ class ForceFieldGenerator:
 
         atom_names = self.get_atom_names()
         atom_masses = self.molecule.masses_to_numpy()
-        equivalent_atoms = atomtypeidentifier.equivalent_atom_names
+        equivalent_atoms = list(atomtypeidentifier.equivalent_atoms)
 
         for i in range(n_atoms):
             at = self.atom_types[i]
@@ -1326,20 +1312,20 @@ class ForceFieldGenerator:
                     dih['comment'])
                 f_itp.write(line_str)
 
-    def write_gro(self, gro_file):
+    def write_gro(self, gro_file, residue_name='MOL'):
         """
         Writes a GRO file with the original coordinates.
 
         :param gro_file:
             The GRO file path.
+        :param residue_name:
+            The residue name.
         """
 
         gro_filename = str(gro_file)
         mol_name = Path(self.molecule_name).stem
 
         coords_in_nm = self.molecule.get_coordinates_in_angstrom() * 0.1
-        # TODO: think about default residue name
-        residue_name = 'MOL'
 
         with open(gro_filename, 'w') as f_gro:
             # Header
