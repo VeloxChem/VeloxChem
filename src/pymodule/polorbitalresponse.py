@@ -39,7 +39,7 @@ class PolOrbitalResponse(CphfSolver):
 
         self.flag = 'Polarizability Orbital Response'
 
-        self.complex = False
+        self.is_complex = False
         
         self.frequencies = (0,)
         self.vector_components = 'xyz'
@@ -48,7 +48,7 @@ class PolOrbitalResponse(CphfSolver):
         self._input_keywords['orbitalresponse'].update({
                 'vector_components': ('str_lower', 'Cartesian components of operator'),
                 'frequencies': ('seq_range', 'frequencies'),
-                'complex': ('boolean', 'whether the polarizability is complex'),
+                'is_complex': ('bool', 'whether the polarizability is complex'),
             })
 
     def update_settings(self, orbrsp_dict, method_dict=None):
@@ -70,9 +70,48 @@ class PolOrbitalResponse(CphfSolver):
 
         parse_input(self, orbrsp_keywords, orbrsp_dict)
 
-    # TODO: get_full_solution_vector for complex distirbuted array
+    def get_full_solution_vector(self, solution):
+        """ Gets a full solution vector from a general distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The full solution vector
+        """
+
+        if self.is_complex:
+            return self.get_full_solution_vector_complex(solution)
+        else:
+            return self.get_full_solution_vector_real(solution)
+
     @staticmethod
-    def get_full_solution_vector(solution):
+    def get_full_solution_vector_complex(solution):
+        """
+        Gets a full complex solution vector from the distributed solution.
+
+        :param solution:
+            The distributed solution as a tuple.
+
+        :return:
+            The real and imaginary parts of the full solution vector.
+        """
+        x_realger = solution.get_full_vector(0)
+        x_realung = solution.get_full_vector(1)
+        x_imagung = solution.get_full_vector(2)
+        x_imagger = solution.get_full_vector(3)
+
+        if solution.rank == mpi_master():
+            x_real = np.hstack((x_realger, x_realger)) + np.hstack(
+                (x_realung, -x_realung))
+            x_imag = np.hstack((x_imagung, -x_imagung)) + np.hstack(
+                (x_imagger, x_imagger))
+            return x_real, x_imag
+        else:
+            return None
+
+    @staticmethod
+    def get_full_solution_vector_real(solution):
         """
         Gets a full solution vector from the distributed solution.
 
@@ -95,10 +134,10 @@ class PolOrbitalResponse(CphfSolver):
 
     def compute_rhs(self, molecule, basis, scf_tensors, lr_results):
 
-        if self.complex:
-            self.compute_rhs_complex(self, molecule, basis, scf_tensors, lr_results)
+        if self.is_complex:
+            return self.compute_rhs_complex(molecule, basis, scf_tensors, lr_results)
         else:
-            self.compute_rhs_real(self, molecule, basis, scf_tensors, lr_results)
+            return self.compute_rhs_real(molecule, basis, scf_tensors, lr_results)
 
 
     def compute_rhs_complex(self, molecule, basis, scf_tensors, lr_results):
@@ -167,8 +206,12 @@ class PolOrbitalResponse(CphfSolver):
 
             # TODO: make get_full_solution_vector directly available from the
             # parent class (i.e. lrsolver)?
-            full_vec = ([self.get_full_solution_vector(lr_results['solutions'][
-                        x, w]) for x in self.vector_components])
+            full_vec_real = []
+            full_vec_imag = []
+            for x in self.vector_components:
+                x_vec_real, x_vec_imag = self.get_full_solution_vector(lr_results['solutions'][x, w])
+                full_vec_real.append(x_vec_real)
+                full_vec_imag.append(x_vec_imag)
 
             if self.rank == mpi_master():
                 # Save the number of vector components
@@ -177,30 +220,41 @@ class PolOrbitalResponse(CphfSolver):
                 # Extract the excitation and de-excitation components
                 # from the full solution vector.
                 exc_vec_real = (1 / sqrt2 *
-                            np.array(full_vec.real)[:, :nocc * nvir].reshape(dof, nocc, nvir))
+                            np.array(full_vec_real)[:, :nocc * nvir].reshape(dof, nocc, nvir))
                 deexc_vec_real = (1 / sqrt2 *
-                            np.array(full_vec.real)[:, nocc * nvir:].reshape(dof, nocc, nvir))
+                            np.array(full_vec_real)[:, nocc * nvir:].reshape(dof, nocc, nvir))
                 exc_vec_imag = (1 / sqrt2 *
-                            np.array(full_vec.imag)[:, :nocc * nvir].reshape(dof, nocc, nvir))
+                            np.array(full_vec_imag)[:, :nocc * nvir].reshape(dof, nocc, nvir))
                 deexc_vec_imag = (1 / sqrt2 *
-                            np.array(full_vec.imag)[:, nocc * nvir:].reshape(dof, nocc, nvir))
+                            np.array(full_vec_imag)[:, nocc * nvir:].reshape(dof, nocc, nvir))
 
 
                 # Construct plus/minus combinations of excitation and
                 # de-excitation part
-                x_plus_y = exc_vec + deexc_vec
-                x_minus_y = exc_vec - deexc_vec
+                x_plus_y_real = exc_vec_real + deexc_vec_real
+                x_minus_y_real = exc_vec_real - deexc_vec_real
+                x_plus_y_imag = exc_vec_imag + deexc_vec_imag  
+                x_minus_y_imag = exc_vec_imag - deexc_vec_imag
 
                 mdot_start_time = tm.time()
 
                 # Transform the vectors to the AO basis
-                x_plus_y_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, x_plus_y[x], mo_vir.T]) 
-                    for x in range(x_plus_y.shape[0])
+                x_plus_y_ao_real = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_real[x], mo_vir.T]) 
+                    for x in range(x_plus_y_real.shape[0])
                 ])
-                x_minus_y_ao = np.array([
-                    np.linalg.multi_dot([mo_occ, x_minus_y[x], mo_vir.T]) 
-                    for x in range(x_minus_y.shape[0])
+                x_minus_y_ao_real = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_real[x], mo_vir.T]) 
+                    for x in range(x_minus_y_real.shape[0])
+                ])
+
+                x_plus_y_ao_imag = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_imag[x], mo_vir.T]) 
+                    for x in range(x_plus_y_imag.shape[0])
+                ])
+                x_minus_y_ao_imag = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_imag[x], mo_vir.T]) 
+                    for x in range(x_minus_y_imag.shape[0])
                 ])
 
                 #valstr = ' * comput_rhs() > Time spent on mdot #0: '
@@ -210,49 +264,53 @@ class PolOrbitalResponse(CphfSolver):
                 #self.ostream.flush()
 
                 # Turn them into a list (for AODensityMatrix)
-                xpmy_ao_list = list(x_plus_y_ao) + list(x_minus_y_ao)
+                # For the real part of the two-particle denisty matrix we must sum over
+                # the real and imaginary parts of xpy and xmy ( xpy = xpy_real + xpy_imag )
+                xpmy_ao_real_list = list(x_plus_y_ao_real + x_plus_y_ao_imag) + list(x_minus_y_ao_real + x_minus_y_ao_imag)
 
                 mdot_start_time = tm.time()
 
                 # Calculate the symmetrized unrelaxed one-particle density matrix
                 # in MO basis
-                dm_oo = np.zeros((dof, dof, nocc, nocc))
-                dm_vv = np.zeros((dof, dof, nvir, nvir))
+                dm_oo_real = np.zeros((dof, dof, nocc, nocc))
+                dm_vv_real = np.zeros((dof, dof, nvir, nvir))
+                dm_oo_imag = np.zeros((dof, dof, nocc, nocc))
+                dm_vv_imag = np.zeros((dof, dof, nvir, nvir))
                 for x in range(dof):
                     for y in range(dof):
-                        dm_vv[x,y] = 0.25 * (np.linalg.multi_dot([
-                                x_plus_y[x].T,
-                                x_plus_y[y]
+                        dm_vv_real[x,y] = 0.25 * (np.linalg.multi_dot([
+                                (x_plus_y_real[x].T + x_plus_y_imag[x].T),
+                                (x_plus_y_real[y] + x_plus_y_imag[y])
                             ]).T
                             + np.linalg.multi_dot([
-                                x_minus_y[x].T,
-                                x_minus_y[y]
+                                (x_minus_y_real[x].T + x_minus_y_imag[x].T),
+                                (x_minus_y_real[y] + x_minus_y_imag[y])
                             ]).T
                             + np.linalg.multi_dot([
-                                x_plus_y[x].T,
-                                x_plus_y[y]
+                                (x_plus_y_real[x].T + x_plus_y_imag[x].T),
+                                (x_plus_y_real[y] + x_plus_y_imag[y])
                             ])
                             + np.linalg.multi_dot([
-                                x_minus_y[x].T,
-                                x_minus_y[y]
+                                (x_minus_y_real[x].T + x_minus_y_imag[x].T),
+                                (x_minus_y_real[y] + x_minus_y_imag[y])
                             ])
                         )
-                        dm_oo[x,y] = -0.25 * (
+                        dm_oo_real[x,y] = -0.25 * (
                             np.linalg.multi_dot([
-                                x_plus_y[x],
-                                x_plus_y[y].T
+                                (x_plus_y_real[x] + x_plus_y_imag[x]),
+                                (x_plus_y_real[y].T + x_plus_y_imag[y].T)
                             ])
                             + np.linalg.multi_dot([
-                                x_minus_y[x],
-                                x_minus_y[y].T
+                                (x_minus_y_real[x] + x_minus_y_imag[x]),
+                                (x_minus_y_real[y].T + x_minus_y_imag[y].T)
                             ])
                             + np.linalg.multi_dot([
-                                x_plus_y[x],
-                                x_plus_y[y].T
+                                (x_plus_y_real[x] + x_plus_y_imag[x]),
+                                (x_plus_y_real[y].T + x_plus_y_imag[y].T)
                             ]).T
                             + np.linalg.multi_dot([
-                                x_minus_y[x],
-                                x_minus_y[y].T
+                                (x_minus_y_real[x] + x_minus_y_imag[x]),
+                                (x_minus_y_real[y].T + x_minus_y_imag[y].T)
                             ]).T
                         )
                         
@@ -266,13 +324,13 @@ class PolOrbitalResponse(CphfSolver):
 
                 # Transform unrelaxed one-particle density matrix to
                 # AO basis and create a list
-                unrel_dm_ao = np.zeros((dof, dof, nao, nao))
+                unrel_dm_ao_real = np.zeros((dof, dof, nao, nao))
                 for x in range(dof):
                     for y in range(dof):
-                        unrel_dm_ao[x,y] = (np.linalg.multi_dot([ mo_occ, dm_oo[x,y], mo_occ.T ])
-                        + np.linalg.multi_dot([ mo_vir, dm_vv[x,y], mo_vir.T ])
+                        unrel_dm_ao_real[x,y] = (np.linalg.multi_dot([ mo_occ, dm_oo_real[x,y], mo_occ.T ])
+                        + np.linalg.multi_dot([ mo_vir, dm_vv_real[x,y], mo_vir.T ])
                         )
-                dm_ao_list = list(unrel_dm_ao.reshape(dof**2, nao, nao))
+                dm_ao_real_list = list(unrel_dm_ao_real.reshape(dof**2, nao, nao))
 
                 #valstr = ' * comput_rhs() > Time spent on mdot #2: '
                 #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
@@ -281,8 +339,9 @@ class PolOrbitalResponse(CphfSolver):
                 #self.ostream.flush()
 
                 # 2) Construct the right-hand side
-                dm_ao_rhs = AODensityMatrix(dm_ao_list + xpmy_ao_list, denmat.rest)
+                dm_ao_rhs_real = AODensityMatrix(dm_ao_real_list + xpmy_ao_real_list, denmat.rest)
 
+                # FIXME split in real/imag
                 if self._dft:
                     # 3) Construct density matrices for E[3] term:
                     # XCIntegrator expects a DM with real and imaginary part,
@@ -308,25 +367,27 @@ class PolOrbitalResponse(CphfSolver):
                     zero_dm_ao = AODensityMatrix(zero_dm_ao_list, denmat.rest)
             else:
                 dof = None
-                dm_ao_rhs = AODensityMatrix()
+                dm_ao_rhs_real = AODensityMatrix()
+                # FIXME split in real/imag
                 if self._dft:
                     perturbed_dm_ao = AODensityMatrix()
                     zero_dm_ao = AODensityMatrix()
 
             dof = self.comm.bcast(dof, root=mpi_master())
 
-            dm_ao_rhs.broadcast(self.rank, self.comm)
+            dm_ao_rhs_real.broadcast(self.rank, self.comm)
 
             molgrid = dft_dict['molgrid']
             gs_density = dft_dict['gs_density']
 
             # Fock matrices with corresponding type
-            fock_ao_rhs = AOFockMatrix(dm_ao_rhs)
+            fock_ao_rhs_real = AOFockMatrix(dm_ao_rhs_real)
             # Set the vector-related components to general Fock matrix
             # (not 1PDM part)
             for ifock in range(dof**2, dof**2 + 2 * dof):
-                fock_ao_rhs.set_fock_type(fockmat.rgenjk, ifock)
+                fock_ao_rhs_real.set_fock_type(fockmat.rgenjk, ifock)
             if self._dft:
+                # FIXME split in real/imag 
                 perturbed_dm_ao.broadcast(self.rank, self.comm)
                 zero_dm_ao.broadcast(self.rank, self.comm)
                 # Fock matrix for computing the DFT E[3] term g^xc
@@ -352,6 +413,7 @@ class PolOrbitalResponse(CphfSolver):
             else:
                 fock_gxc_ao = None  # None if not DFT
 
+            # FIXME split in real/imag
             if self._dft:
                 if not self.xcfun.is_hybrid():
                     for ifock in range(fock_gxc_ao.number_of_fock_matrices()):
@@ -364,101 +426,117 @@ class PolOrbitalResponse(CphfSolver):
 
                 fock_gxc_ao.reduce_sum(self.rank, self.nodes, self.comm)
 
-            self._comp_lr_fock(fock_ao_rhs, dm_ao_rhs, molecule, basis, eri_dict,
+            self._comp_lr_fock(fock_ao_rhs_real, dm_ao_rhs_real, molecule, basis, eri_dict,
                                dft_dict, pe_dict, self.profiler)
 
             # Calculate the RHS and transform it to the MO basis
             if self.rank == mpi_master():
                 # extract the 1PDM contributions
-                fock_ao_rhs_1dm = np.zeros((dof**2, nao, nao))
+                fock_ao_rhs_1dm_real = np.zeros((dof**2, nao, nao))
                 for i in range(dof**2):
-                    fock_ao_rhs_1dm[i] = fock_ao_rhs.alpha_to_numpy(i)
+                    fock_ao_rhs_1dm_real[i] = fock_ao_rhs_real.alpha_to_numpy(i)
 
                 # Transform to MO basis
-                fock_mo_rhs_1dm = np.array([
-                   np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm[x], mo_vir])
+                fock_mo_rhs_1dm_real = np.array([
+                   np.linalg.multi_dot([mo_occ.T, fock_ao_rhs_1dm_real[x], mo_vir])
                    for x in range(dof**2)
                 ])
 
                 # extract the x_plus_y and x_minus_y contributions
                 # TODO: extract all Fock matrices at the same time?
-                fock_ao_rhs_x_plus_y = np.zeros((dof, nao, nao))
-                fock_ao_rhs_x_minus_y = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_plus_y_real = np.zeros((dof, nao, nao))
+                fock_ao_rhs_x_minus_y_real = np.zeros((dof, nao, nao))
                 for i in range(dof):
-                    fock_ao_rhs_x_plus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 + i)
-                    fock_ao_rhs_x_minus_y[i] = fock_ao_rhs.alpha_to_numpy(dof**2 +
+                    fock_ao_rhs_x_plus_y_real[i] = fock_ao_rhs_real.alpha_to_numpy(dof**2 + i)
+                    fock_ao_rhs_x_minus_y_real[i] = fock_ao_rhs_real.alpha_to_numpy(dof**2 +
                                                                           dof + i)
 
                 mdot_start_time = tm.time()
 
-                fock_mo_rhs_2dm = np.zeros((dof, dof, nocc, nvir))
+                fock_mo_rhs_2dm_real = np.zeros((dof, dof, nocc, nvir))
                 for x in range(dof):
                     for y in range(dof):
-                        tmp = np.linalg.multi_dot([fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y]])
-                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
-                           mo_occ.T, tmp, ovlp, mo_vir 
+                        tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_plus_y_real[x], 
+                                    (x_plus_y_ao_real[y] + x_plus_y_ao_imag[y])])
+                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                           mo_occ.T, tmp_real, ovlp, mo_vir 
                         ])
-                        tmp = np.linalg.multi_dot([fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y]])
-                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
-                            mo_occ.T, tmp, ovlp, mo_vir
+                        tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_minus_y_real[x],
+                                    (x_minus_y_ao_real[y] + x_minus_y_ao_imag[y])])
+                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
-                        tmp = np.linalg.multi_dot([x_plus_y_ao[x].T, fock_ao_rhs_x_plus_y[y].T])
-                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
-                            mo_occ.T, tmp, ovlp, mo_vir
+                        tmp_real = np.linalg.multi_dot([(x_plus_y_ao_real[x].T + x_plus_y_ao_imag[x].T),
+                                    fock_ao_rhs_x_plus_y_real[y].T])
+                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                            mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
-                        tmp = np.linalg.multi_dot([x_minus_y_ao[x].T, fock_ao_rhs_x_minus_y[y].T])
-                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
-                            mo_occ.T, tmp, ovlp, mo_vir
+                        tmp_real = np.linalg.multi_dot([(x_minus_y_ao_real[x].T + x_minus_y_ao_imag[x].T),
+                                    fock_ao_rhs_x_minus_y_real[y].T])
+                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
-                        tmp = np.linalg.multi_dot([fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y]])
-                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
-                            mo_occ.T, tmp, ovlp, mo_vir
+                        tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_plus_y_real[x].T, 
+                                    (x_plus_y_ao_real[y] + x_plus_y_ao_imag[y])])
+                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
-                        tmp = np.linalg.multi_dot([fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y]])
-                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
-                            mo_occ.T, tmp, ovlp, mo_vir
+                        tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_minus_y_real[x].T, 
+                                    (x_minus_y_ao_real[y] + x_minus_y_ao_imag[y])])
+                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
-                        tmp = np.linalg.multi_dot([x_plus_y_ao[x].T, fock_ao_rhs_x_plus_y[y]])
-                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
-                            mo_occ.T, tmp, ovlp, mo_vir
+                        tmp_real = np.linalg.multi_dot([(x_plus_y_ao_real[x].T + x_plus_y_ao_imag[x].T), 
+                                    fock_ao_rhs_x_plus_y_real[y]])
+                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
-                        tmp = np.linalg.multi_dot([x_minus_y_ao[x].T, fock_ao_rhs_x_minus_y[y]])
-                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
-                            mo_occ.T, tmp, ovlp, mo_vir
+                        tmp_real = np.linalg.multi_dot([(x_minus_y_ao_real[x].T + x_minus_y_ao_imag[x].T),
+                                    fock_ao_rhs_x_minus_y_real[y]])
+                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ.T, tmp_real, ovlp, mo_vir
                         ])
-                        tmp = np.linalg.multi_dot([fock_ao_rhs_x_plus_y[x], x_plus_y_ao[y].T]).T
-                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
-                            mo_occ.T, ovlp.T, tmp, mo_vir 
+                        tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_plus_y_real[x], 
+                                    (x_plus_y_ao_real[y].T + x_plus_y_ao_imag[y].T)]).T
+                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                            mo_occ.T, ovlp.T, tmp_real, mo_vir 
                         ])
-                        tmp = np.linalg.multi_dot([fock_ao_rhs_x_minus_y[x], x_minus_y_ao[y].T]).T
-                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
-                            mo_occ.T, ovlp.T, tmp, mo_vir 
+                        tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_minus_y_real[x], 
+                                    (x_minus_y_ao_real[y].T + x_minus_y_ao_imag[y].T)]).T
+                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                            mo_occ.T, ovlp.T, tmp_real, mo_vir 
                         ])
-                        tmp = np.linalg.multi_dot([x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y].T])
-                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
-                            mo_occ.T, ovlp.T, tmp, mo_vir 
+                        tmp_real = np.linalg.multi_dot([(x_plus_y_ao_real[x] + x_plus_y_ao_imag[x]),
+                                    fock_ao_rhs_x_plus_y_real[y].T])
+                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                            mo_occ.T, ovlp.T, tmp_real, mo_vir 
                         ])
-                        tmp = np.linalg.multi_dot([x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y].T])
-                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
-                            mo_occ.T, ovlp.T, tmp, mo_vir 
+                        tmp_real = np.linalg.multi_dot([(x_minus_y_ao_real[x] + x_minus_y_ao_imag[x]),
+                                    fock_ao_rhs_x_minus_y_real[y].T])
+                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                            mo_occ.T, ovlp.T, tmp_real, mo_vir 
                         ])
-                        tmp = np.linalg.multi_dot([fock_ao_rhs_x_plus_y[x].T, x_plus_y_ao[y].T])
-                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
-                            mo_occ.T, ovlp.T, tmp.T, mo_vir 
+                        tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_plus_y_real[x].T,
+                                    (x_plus_y_ao_real[y].T + x_plus_y_ao_imag[y].T)])
+                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ.T, ovlp.T, tmp_real.T, mo_vir 
                         ])
-                        tmp = np.linalg.multi_dot([fock_ao_rhs_x_minus_y[x].T, x_minus_y_ao[y].T])
-                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
-                            mo_occ.T, ovlp.T, tmp.T, mo_vir 
+                        tmp_real = np.linalg.multi_dot([fock_ao_rhs_x_minus_y_real[x].T,
+                                     (x_minus_y_ao_real[y].T + x_minus_y_ao_imag[y].T)])
+                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                            mo_occ.T, ovlp.T, tmp_real.T, mo_vir 
                         ])
-                        tmp = np.linalg.multi_dot([x_plus_y_ao[x], fock_ao_rhs_x_plus_y[y]]).T
-                        fock_mo_rhs_2dm[x,y] = -1.0 * np.linalg.multi_dot([
-                            mo_occ.T, ovlp.T, tmp.T, mo_vir 
+                        tmp_real = np.linalg.multi_dot([(x_plus_y_ao_real[x] + x_plus_y_ao_imag[x]),
+                                    fock_ao_rhs_x_plus_y_real[y]]).T
+                        fock_mo_rhs_2dm_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ.T, ovlp.T, tmp_real.T, mo_vir 
                         ])
-                        tmp = np.linalg.multi_dot([x_minus_y_ao[x], fock_ao_rhs_x_minus_y[y]]).T
-                        fock_mo_rhs_2dm[x,y] = np.linalg.multi_dot([
-                            mo_occ.T, ovlp.T, tmp.T, mo_vir 
+                        tmp_real = np.linalg.multi_dot([(x_minus_y_ao_real[x] + x_minus_y_ao_imag[x]),
+                                    fock_ao_rhs_x_minus_y_real[y]]).T
+                        fock_mo_rhs_2dm_real[x,y] = np.linalg.multi_dot([
+                            mo_occ.T, ovlp.T, tmp_real.T, mo_vir 
                         ])
-                fock_mo_rhs_2dm = 0.25 * fock_mo_rhs_2dm.reshape(dof**2, nocc, nvir)
+                fock_mo_rhs_2dm_real = 0.25 * fock_mo_rhs_2dm_real.reshape(dof**2, nocc, nvir)
 
                 #valstr = ' * comput_rhs() > Time spent on mdot #3: '
                 #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
@@ -494,18 +572,18 @@ class PolOrbitalResponse(CphfSolver):
                 mdot_start_time = tm.time()
 
                 # Contract with vectors to get dipole contribution to the RHS
-                rhs_dipole_contrib = np.zeros((dof, dof, nocc, nvir))
+                rhs_dipole_contrib_real = np.zeros((dof, dof, nocc, nvir))
                 for x in range(dof):
                     for y in range(dof):
-                        rhs_dipole_contrib[x,y] = ( 
-                            0.5 * ( np.linalg.multi_dot([x_minus_y[x].T, dipole_ints_oo[y]]).T
-                            + np.linalg.multi_dot([dipole_ints_oo[x], x_minus_y[y]]))
+                        rhs_dipole_contrib_real[x,y] = ( 
+                            0.5 * ( np.linalg.multi_dot([x_minus_y_real[x].T, dipole_ints_oo[y]]).T
+                            + np.linalg.multi_dot([dipole_ints_oo[x], x_minus_y_real[y]]))
                             - 0.5 * (
-                            np.linalg.multi_dot([x_minus_y[x], dipole_ints_vv[y]])
-                            + np.linalg.multi_dot([dipole_ints_vv[x], x_minus_y[y].T]).T
+                            np.linalg.multi_dot([x_minus_y_real[x], dipole_ints_vv[y]])
+                            + np.linalg.multi_dot([dipole_ints_vv[x], x_minus_y_real[y].T]).T
                             ) 
                         )
-                rhs_dipole_contrib = rhs_dipole_contrib.reshape(dof**2, nocc, nvir)
+                rhs_dipole_contrib_real = rhs_dipole_contrib_real.reshape(dof**2, nocc, nvir)
 
                 #valstr = ' * comput_rhs() > Time spent on mdot #4: '
                 #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
@@ -513,9 +591,10 @@ class PolOrbitalResponse(CphfSolver):
                 #self.ostream.print_blank()
                 #self.ostream.flush()
 
-                rhs_mo = fock_mo_rhs_1dm + fock_mo_rhs_2dm + rhs_dipole_contrib
+                rhs_mo_real = fock_mo_rhs_1dm_real + fock_mo_rhs_2dm_real + rhs_dipole_contrib_real
 
                 # Add DFT E[3] contribution to the RHS:
+                # FIXME split in real/imag
                 if self._dft:
                     gxc_ao = np.zeros((dof**2, nao, nao))
 
@@ -533,6 +612,12 @@ class PolOrbitalResponse(CphfSolver):
             self.profiler.stop_timer('RHS')
 
             if self.rank == mpi_master():
+                rhs_mo = rhs_mo_real
+                dm_oo = dm_oo_real
+                dm_vv = dm_vv_real
+                x_plus_y_ao = x_plus_y_ao_real
+                x_minus_y_ao = x_minus_y_ao_real
+                unrel_dm_ao = unrel_dm_ao_real
                 orbrsp_rhs[(w)] = {
                     'cphf_rhs': rhs_mo,
                     'dm_oo': dm_oo,
@@ -540,7 +625,8 @@ class PolOrbitalResponse(CphfSolver):
                     'x_plus_y_ao': x_plus_y_ao,
                     'x_minus_y_ao': x_minus_y_ao,
                     'unrel_dm_ao': unrel_dm_ao,
-                    'fock_ao_rhs': fock_ao_rhs,
+                    'fock_ao_rhs': fock_ao_rhs_real,
+                    # 'fock_ao_rhs_imag': fock_ao_rhs_imag,
                     'fock_gxc_ao': fock_gxc_ao,  # None if not DFT
                 }
                 if (f == 0):
@@ -1003,7 +1089,7 @@ class PolOrbitalResponse(CphfSolver):
                 else:
                     tot_rhs_mo = np.append(tot_rhs_mo, rhs_mo, axis=0)
 
-        valstr = '** Time spent on constructing the orbrsp RHS for '
+        valstr = '** Time spent on constructing the orbrsp complex RHS for '
         valstr += '{} frequencies: '.format(len(self.frequencies))
         valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
         self.ostream.print_header(valstr)
