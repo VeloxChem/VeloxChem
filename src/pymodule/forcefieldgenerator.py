@@ -43,8 +43,8 @@ from .inputparser import parse_input, get_random_string_parallel
 from .errorhandler import assert_msg_critical
 from .seminario import Seminario
 from .xtbdriver import XtbDriver
-from .xtbhessiandriver import XtbHessianDriver
 from .xtbgradientdriver import XtbGradientDriver
+from .xtbhessiandriver import XtbHessianDriver
 
 
 class ForceFieldGenerator:
@@ -516,9 +516,11 @@ class ForceFieldGenerator:
                 self.ostream.flush()
 
             resp_drv = RespChargesDriver(self.comm)
-            # TODO update settings using self.resp_dict
-            resp_drv.ostream.mute()
-            resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
+            resp_drv.filename = self.molecule_name
+            if self.resp_dict is not None:
+                resp_drv.update_settings(self.resp_dict)
+            if resp_drv.equal_charges is None:
+                resp_drv.equal_charges = atomtypeidentifier.equivalent_charges
 
             self.partial_charges = resp_drv.compute(self.molecule, basis,
                                                     'resp')
@@ -1006,6 +1008,7 @@ class ForceFieldGenerator:
             xtb_grad_drv = XtbGradientDriver(self.comm)
             xtb_grad_drv.ostream.state = False
             xtb_opt_drv = OptimizationDriver(xtb_grad_drv)
+            xtb_opt_drv.filename = self.molecule_name
             self.molecule = xtb_opt_drv.compute(self.molecule, xtb_drv)
 
             # XTB Hessian
