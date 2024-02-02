@@ -785,6 +785,7 @@ class ForceFieldGenerator:
                             dihedral_ff_lines.append(line)
                             dihedral_matches.append(m.group(0))
                             dihedral_found = True
+                            break
 
             if not dihedral_found:
                 patterns = [
@@ -803,6 +804,7 @@ class ForceFieldGenerator:
                                 dihedral_ff_lines.append(line)
                                 dihedral_matches.append(m.group(0))
                                 dihedral_found = True
+                                break
 
             if not dihedral_found:
                 warnmsg = f'ForceFieldGenerator: dihedral {at_1}-{at_2}-{at_3}-{at_4}'

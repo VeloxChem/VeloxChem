@@ -152,7 +152,7 @@ class AtomTypeIdentifier:
             ax.text(self.coordinates[i, 0],
                     self.coordinates[i, 1],
                     self.coordinates[i, 2],
-                    symbol,
+                    f'{symbol} ({i + 1})',
                     fontsize=12,
                     ha='center',
                     va='center')
@@ -2015,6 +2015,9 @@ class AtomTypeIdentifier:
             if current_depth == depth:
                 return []
 
+            if current_depth == 0 and not path:
+                path = (atom_index,)
+
             neighbors = []
 
             for i, connected in enumerate(connectivity_matrix[atom_index]):
@@ -2044,10 +2047,12 @@ class AtomTypeIdentifier:
             for idx, at in enumerate(self.gaff_atom_types):
                 if at == atom_type:
                     paths = gather_neighbors(idx)
-                    path_types = tuple(
+                    path_types = [
                         tuple(self.gaff_atom_types[step]
                               for step in path)
-                        for path in paths)
+                        for path in paths
+                    ]
+                    path_types = tuple(sorted(path_types))
                     atom_paths[path_types].append(idx)
 
             for eq_id, (path_set, indices) in enumerate(atom_paths.items()):
