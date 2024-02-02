@@ -53,7 +53,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .qqscheme import get_qq_type
 from .qqscheme import get_qq_scheme
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, print_libxc_reference
 from .sanitychecks import molecule_sanity_check, dft_sanity_check
 from .errorhandler import assert_msg_critical
 from .checkpoint import create_hdf5, write_scf_tensors
@@ -567,6 +567,8 @@ class ScfDriver:
 
         # generate integration grid
         if self._dft:
+            print_libxc_reference(self.xcfun, self.ostream)
+
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)

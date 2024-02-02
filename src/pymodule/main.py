@@ -62,7 +62,6 @@ from .xtbgradientdriver import XtbGradientDriver
 from .xtbhessiandriver import XtbHessianDriver
 from .veloxchemlib import DiagEriDriver
 from .cli import cli
-from .dftutils import print_libxc_reference
 from .errorhandler import assert_msg_critical
 
 
@@ -598,5 +597,4 @@ def main():
 
     # All done
 
-    print_libxc_reference(method_dict.get('xcfun', None), task.ostream)
     task.finish()

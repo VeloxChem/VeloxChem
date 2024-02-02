@@ -1142,14 +1142,7 @@ class ExcitonModelDriver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
-            grid_t0 = tm.time()
             dimer_molgrid = grid_drv.generate(dimer)
-            n_grid_points = dimer_molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {} points generated in {:.2f} sec.'.format(
-                    n_grid_points,
-                    tm.time() - grid_t0))
-            self.ostream.print_blank()
         else:
             dimer_molgrid = None
 

@@ -325,14 +325,7 @@ class NonlinearSolver:
                           if self.grid_level is None else self.grid_level)
             grid_drv.set_level(grid_level)
 
-            grid_t0 = tm.time()
             molgrid = grid_drv.generate(molecule)
-            n_grid_points = molgrid.number_of_points()
-            self.ostream.print_info(
-                'Molecular grid with {0:d} points generated in {1:.2f} sec.'.
-                format(n_grid_points,
-                       tm.time() - grid_t0))
-            self.ostream.print_blank()
 
             if self.rank == mpi_master():
                 gs_density = AODensityMatrix([scf_tensors['D_alpha']],

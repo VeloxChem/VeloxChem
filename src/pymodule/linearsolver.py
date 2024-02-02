@@ -49,7 +49,7 @@ from .inputparser import (parse_input, print_keywords, print_attributes,
                           get_random_string_parallel)
 from .qqscheme import get_qq_scheme
 from .qqscheme import get_qq_type
-from .dftutils import get_default_grid_level
+from .dftutils import get_default_grid_level, print_libxc_reference
 from .checkpoint import write_rsp_hdf5
 from .batchsize import get_batch_size
 from .batchsize import get_number_of_batches
@@ -418,6 +418,8 @@ class LinearSolver:
         """
 
         if self._dft:
+            print_libxc_reference(self.xcfun, self.ostream)
+
             grid_drv = GridDriver(self.comm)
             grid_level = (get_default_grid_level(self.xcfun)
                           if self.grid_level is None else self.grid_level)
