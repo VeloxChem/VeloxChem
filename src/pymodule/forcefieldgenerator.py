@@ -1211,7 +1211,7 @@ class ForceFieldGenerator:
             f_top.write('; Compound        nmols\n')
             f_top.write('{:>10}{:9}\n'.format(mol_name, 1))
 
-    def write_itp(self, itp_file):
+    def write_itp(self, itp_file, mol_name='MOL'):
         """
         Writes an ITP file with the original parameters.
 
@@ -1257,7 +1257,7 @@ class ForceFieldGenerator:
             for i, atom in self.atoms.items():
                 total_charge += atom['charge']
                 line_str = '{:6}{:>5}{:6}{:>6}{:>6}'.format(
-                    i + 1, atom['type'], 1, 'MOL', atom['name'])
+                    i + 1, atom['type'], 1, mol_name, atom['name'])
                 line_str += '{:5}{:13.6f}{:13.5f}'.format(
                     i + 1, atom['charge'], atom['mass'])
                 line_str += ' ; qtot{:7.3f}  equiv. {}\n'.format(
@@ -1310,21 +1310,19 @@ class ForceFieldGenerator:
             f_itp.write(
                 ';   ai     aj     ak     al    funct    phase     k_d      n\n'
             )
-            for (i, j, k, l), dih in self.impropers:
+            for (i, j, k, l), dih in self.impropers.items():
                 line_str = '{:6}{:7}{:7}{:7}'.format(l + 1, i + 1, j + 1, k + 1)
                 line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
                     4, dih['phase'], dih['barrier'], abs(dih['periodicity']),
                     dih['comment'])
                 f_itp.write(line_str)
 
-    def write_gro(self, gro_file, residue_name='MOL'):
+    def write_gro(self, gro_file, mol_name='MOL'):
         """
         Writes a GRO file with the original coordinates.
 
         :param gro_file:
             The GRO file path.
-        :param residue_name:
-            The residue name.
         """
 
         gro_filename = str(gro_file)
@@ -1340,7 +1338,7 @@ class ForceFieldGenerator:
             # Atoms
             for i, atom in self.atoms.items():
                 atom_name = atom['name']
-                line_str = f'{1:>5d}{residue_name:<5s}{atom_name:<5s}{i + 1:>5d}'
+                line_str = f'{1:>5d}{mol_name:<5s}{atom_name:<5s}{i + 1:>5d}'
                 for d in range(3):
                     line_str += f'{coords_in_nm[i][d]:12.7f}'
                 line_str += '\n'
@@ -1351,13 +1349,20 @@ class ForceFieldGenerator:
             line_str = f'{box_dimension:10.5f}' * 3
             f_gro.write(line_str)
 
-    def write_gromacs_files(self, filename):
+    def write_gromacs_files(self, filename, mol_name=None):
         """
         Writes all the needed files for a MD simulation with GROMACS.
 
         :param filename:
             The name of the molecule.
+        :param mol_name:
+            Str. The name of the molecule.
         """
+
+        if mol_name is None:
+            self.molecule_name = 'MOL'
+        else:
+            self.molecule_name = mol_name
 
         itp_file = Path(filename).with_suffix('.itp')
         top_file = Path(filename).with_suffix('.top')
