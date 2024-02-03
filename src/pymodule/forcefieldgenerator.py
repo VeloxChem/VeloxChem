@@ -964,12 +964,12 @@ class ForceFieldGenerator:
                     'ForceFieldGenerator: invalid improper dihedral periodicity'
                 )
 
-            self.impropers[(i, j, k, l)] = {
-                'barrier': barrier,
-                'phase': phase,
-                'periodicity': periodicity,
-                'comment': comment
-            }
+                self.impropers[(i, j, k, l)] = {
+                    'barrier': barrier,
+                    'phase': phase,
+                    'periodicity': periodicity,
+                    'comment': comment
+                }
 
     def reparameterize(self,
                        hessian=None,
