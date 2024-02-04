@@ -872,6 +872,52 @@ class ForceFieldGenerator:
                     'comment': dihedral_comments,
                 }
 
+        # convert multi-termed dihedral to RB type
+        for (i, j, k, l), dih in self.dihedrals.items():
+
+            if dih['multiple']:
+
+                valid_phases = True
+                for phase in dih['phase']:
+                    if not (abs(phase) < 1.0e-3 or abs(phase - 180.0) < 1.0e-3):
+                        valid_phases = False
+                        break
+
+                valid_periodicity = True
+                for periodicity in dih['periodicity']:
+                    if abs(periodicity) not in [1, 2, 3, 4]:
+                        valid_periodicity = False
+                        break
+
+                if not (valid_phases and valid_periodicity):
+                    continue
+
+                F_coefs = {x: 0.0 for x in [1, 2, 3, 4]}
+
+                for barrier, phase, periodicity in zip(dih['barrier'],
+                                                       dih['phase'],
+                                                       dih['periodicity']):
+                    if abs(periodicity) in [1, 3]:
+                        prefac = 1.0 if abs(phase) < 1.0e-3 else -1.0
+                    elif abs(periodicity) in [2, 4]:
+                        prefac = -1.0 if abs(phase) < 1.0e-3 else 1.0
+                    F_coefs[abs(periodicity)] += 2.0 * prefac * barrier
+
+                C_coefs = [0.0 for x in range(6)]
+
+                C_coefs[0] = F_coefs[2] + 0.5 * (F_coefs[1] + F_coefs[3])
+                C_coefs[1] = 0.5 * (-1.0 * F_coefs[1] + 3.0 * F_coefs[3])
+                C_coefs[2] = -1.0 * F_coefs[2] + 4.0 * F_coefs[4]
+                C_coefs[3] = -2.0 * F_coefs[3]
+                C_coefs[4] = -4.0 * F_coefs[4]
+                C_coefs[5] = 0.0
+
+                self.dihedrals[(i, j, k, l)] = {
+                    'type': 'RB',
+                    'RB_coefficients': C_coefs,
+                    'comment': dih['comment'][0] + ' RB',
+                }
+
         # Impropers
 
         self.impropers = {}
