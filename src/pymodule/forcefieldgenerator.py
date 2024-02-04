@@ -402,10 +402,11 @@ class ForceFieldGenerator:
                 if re.search(pattern, line):
                     energies.append(float(line.split('Energy')[1].split()[0]))
                     dih_angles.append(float(line.split('=')[1].split()[0]))
-                    dih_inds = [
-                        int(i)
+                    i, j, k, l = [
+                        int(i) - 1
                         for i in line.split('Dihedral')[1].split()[0].split('-')
                     ]
+                    dih_inds = [i, j, k, l] if i < l else [l, k, j, i]
             self.scan_energies.append(energies)
             self.scan_dih_angles.append(dih_angles)
             self.target_dihedrals.append(dih_inds)
@@ -1567,8 +1568,8 @@ class ForceFieldGenerator:
         qm_scan = self.scan_energies[i]
         angles = self.scan_dih_angles[i]
 
-        self.ostream.print_info('Fitting dihedral angle ' +
-                                '{}-{}-{}-{}'.format(*dih) + '...')
+        dih_str = f'{dih[0]+1}-{dih[1]+1}-{dih[2]+1}-{dih[3]+1}'
+        self.ostream.print_info(f'Fitting dihedral angle {dih_str}...')
         self.ostream.flush()
 
         # MM scan with dihedral parameters set to zero
@@ -1643,8 +1644,8 @@ class ForceFieldGenerator:
 
         dih = self.target_dihedrals[i]
 
-        self.ostream.print_info(
-            '  Target dihedral angle: {}-{}-{}-{}'.format(*dih))
+        dih_str = f'{dih[0]+1}-{dih[1]+1}-{dih[2]+1}-{dih[3]+1}'
+        self.ostream.print_info(f'  Target dihedral angle: {dih_str}')
         self.ostream.print_blank()
 
         geom = self.scan_geometries[i]
@@ -1730,7 +1731,12 @@ class ForceFieldGenerator:
 
             # energy minimization with dihedral constraint
             constraints = ['$set']
-            constraints += ['dihedral {} {} {} {} {}'.format(*dihedral, angle)]
+            constraints += [
+                'dihedral {} {} {} {} {}'.format(dihedral[0] + 1,
+                                                 dihedral[1] + 1,
+                                                 dihedral[2] + 1,
+                                                 dihedral[3] + 1, angle)
+            ]
             pot_energy = self.minimize_mm_energy(geom, local_top_fname,
                                                  constraints)
             # convert to kJ/mol
@@ -1774,75 +1780,41 @@ class ForceFieldGenerator:
 
         return openmm_drv.get_energy()
 
-    def set_dihedral_parameters(self, itp_file, dihedral, coefficients):
+    def set_dihedral_parameters(self, itp_file, dihedral_key, coefficients):
         """
         Sets dihedral parameters of topology.
 
         :param itp_file:
             The internal topology file.
-        :param dihedral:
+        :param dihedral_key:
             The dihedral (list of four atom ids).
         :param coefficients:
             The coefficients for Ryckaert-Bellemans funciton.
         """
 
-        # TODO: use write_itp
+        dih = self.dihedrals[tuple(dihedral_key)]
 
-        itp_fname = str(itp_file)
+        if dih['type'] == 'Fourier' and dih['multiple']:
+            comment = dih['comment'][0]
+        else:
+            comment = dih['comment']
 
-        atom_names = self.get_atom_names()
+        self.dihedrals[tuple(dihedral_key)] = {
+            'type': 'RB',
+            'RB_coefficients': list(coefficients),
+            'comment': comment
+        }
 
-        # read itp file and remove existing parameters for chosen dihedral
+        dih_keys_to_remove = []
+        for i, j, k, l in self.dihedrals:
+            if [i, j, k, l] == dihedral_key:
+                continue
+            if [j, k] == dihedral_key[1:3] or [k, j] == dihedral_key[1:3]:
+                dih_keys_to_remove.append((i, j, k, l))
+        for dih_key in dih_keys_to_remove:
+            del self.dihedrals[dih_key]
 
-        dihedral_flag = False
-        dihedral_pattern = re.compile(r'\[\s*dihedrals\s*\]')
-        saved_itp_lines = []
-
-        added_dih_str = False
-        dih_str = '{:6}{:7}{:7}{:7}{:7}'.format(*dihedral, 3)
-        for coef in coefficients:
-            dih_str += '{:11.5f}'.format(coef)
-        dih_str += ' ; {}-{}-{}-{}\n'.format(atom_names[dihedral[0]],
-                                             atom_names[dihedral[1]],
-                                             atom_names[dihedral[2]],
-                                             atom_names[dihedral[3]])
-
-        with open(itp_fname, 'r') as f_itp:
-            for line in f_itp:
-                title = line.split(';')[0].strip()
-
-                if title.startswith('['):
-                    if re.search(dihedral_pattern, title):
-                        dihedral_flag = True
-                    else:
-                        dihedral_flag = False
-
-                if dihedral_flag:
-                    content = line.split()
-                    try:
-                        i, j, k, l, funct = tuple(
-                            [int(content[n]) for n in range(5)])
-                        condition_1 = (funct in [1, 3, 9])
-                        condition_2 = ([i, j, k, l] == dihedral or
-                                       [l, k, j, i] == dihedral or
-                                       [j, k] == dihedral[1:3] or
-                                       [k, j] == dihedral[1:3])
-                        if condition_1 and condition_2:
-                            if not added_dih_str:
-                                saved_itp_lines.append(dih_str)
-                                added_dih_str = True
-                        else:
-                            saved_itp_lines.append(line)
-                    except (ValueError, IndexError):
-                        saved_itp_lines.append(line)
-                else:
-                    saved_itp_lines.append(line)
-
-        # update itp file with constraints for chosen dihedral
-
-        with open(itp_fname, 'w') as f_itp:
-            for line in saved_itp_lines:
-                f_itp.write(line)
+        self.write_itp(itp_file)
 
     def visualize(self, validation_result):
         """
