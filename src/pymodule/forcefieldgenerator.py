@@ -279,8 +279,7 @@ class ForceFieldGenerator:
             original_top_file = original_itp_file.with_suffix('.top')
 
             if self.rank == mpi_master():
-                self.write_itp(original_itp_file)
-                self.write_top(original_top_file, original_itp_file)
+                self.write_gromacs_files(original_itp_file)
             self.comm.barrier()
 
         else:
@@ -515,7 +514,7 @@ class ForceFieldGenerator:
                 self.ostream.print_info(msg)
                 self.ostream.flush()
 
-            resp_drv = RespChargesDriver(self.comm)
+            resp_drv = RespChargesDriver(self.comm, self.ostream)
             resp_drv.filename = self.molecule_name
             if self.resp_dict is not None:
                 resp_drv.update_settings(self.resp_dict)
@@ -1190,7 +1189,7 @@ class ForceFieldGenerator:
                 self.angles[(i, j, k)]['equilibrium'] = aver_theta
                 self.angles[(i, j, k)]['force_constant'] = aver_k_theta
 
-    def write_top(self, top_file, itp_file):
+    def write_top(self, top_file, itp_file, mol_name=None):
         """
         Writes a topology file.
 
@@ -1203,7 +1202,8 @@ class ForceFieldGenerator:
         top_fname = str(top_file)
         itp_fname = str(itp_file)
 
-        mol_name = Path(self.molecule_name).stem
+        if mol_name is None:
+            mol_name = Path(self.molecule_name).stem
 
         with open(top_fname, 'w') as f_top:
 
@@ -1237,7 +1237,7 @@ class ForceFieldGenerator:
             f_top.write('; Compound        nmols\n')
             f_top.write('{:<10}{:9}\n'.format(mol_name, 1))
 
-    def write_itp(self, itp_file, mol_name='MOL'):
+    def write_itp(self, itp_file, mol_name=None):
         """
         Writes an ITP file with the original parameters.
 
@@ -1246,7 +1246,9 @@ class ForceFieldGenerator:
         """
 
         itp_filename = str(itp_file)
-        mol_name = Path(self.molecule_name).stem
+        if mol_name is None:
+            mol_name = Path(self.molecule_name).stem
+        res_name = 'MOL'
 
         with open(itp_filename, 'w') as f_itp:
             # Header
@@ -1271,7 +1273,7 @@ class ForceFieldGenerator:
             # Molecule type
             f_itp.write('\n[ moleculetype ]\n')
             f_itp.write(';name            nrexcl\n')
-            f_itp.write(f'{mol_name:<10}{self.nrexcl:10}\n')
+            f_itp.write(f'{mol_name:<10}  {self.nrexcl:10}\n')
 
             # Atoms
             f_itp.write('\n[ atoms ]\n')
@@ -1283,7 +1285,7 @@ class ForceFieldGenerator:
             for i, atom in self.atoms.items():
                 total_charge += atom['charge']
                 line_str = '{:6}{:>5}{:6}{:>6}{:>6}'.format(
-                    i + 1, atom['type'], 1, mol_name, atom['name'])
+                    i + 1, atom['type'], 1, res_name, atom['name'])
                 line_str += '{:5}{:13.6f}{:13.5f}'.format(
                     i + 1, atom['charge'], atom['mass'])
                 line_str += ' ; qtot{:7.3f}  equiv. {}\n'.format(
@@ -1393,16 +1395,20 @@ class ForceFieldGenerator:
                     dih['comment'])
                 f_itp.write(line_str)
 
-    def write_gro(self, gro_file, mol_name='MOL'):
+    def write_gro(self, gro_file, mol_name=None):
         """
         Writes a GRO file with the original coordinates.
 
         :param gro_file:
             The GRO file path.
+        :param residue_name:
+            The residue name.
         """
 
         gro_filename = str(gro_file)
-        mol_name = Path(self.molecule_name).stem
+        if mol_name is None:
+            mol_name = Path(self.molecule_name).stem
+        res_name = 'MOL'
 
         coords_in_nm = self.molecule.get_coordinates_in_angstrom() * 0.1
 
@@ -1414,7 +1420,7 @@ class ForceFieldGenerator:
             # Atoms
             for i, atom in self.atoms.items():
                 atom_name = atom['name']
-                line_str = f'{1:>5d}{mol_name:<5s}{atom_name:<5s}{i + 1:>5d}'
+                line_str = f'{1:>5d}{res_name:<5s}{atom_name:<5s}{i + 1:>5d}'
                 for d in range(3):
                     line_str += f'{coords_in_nm[i][d]:12.7f}'
                 line_str += '\n'
@@ -1431,22 +1437,18 @@ class ForceFieldGenerator:
 
         :param filename:
             The name of the molecule.
-        :param mol_name:
-            Str. The name of the molecule.
         """
 
         if mol_name is None:
-            self.molecule_name = 'MOL'
-        else:
-            self.molecule_name = mol_name
+            mol_name = Path(self.molecule_name).stem
 
         itp_file = Path(filename).with_suffix('.itp')
         top_file = Path(filename).with_suffix('.top')
         gro_file = Path(filename).with_suffix('.gro')
 
-        self.write_itp(itp_file)
-        self.write_top(top_file, itp_file)
-        self.write_gro(gro_file)
+        self.write_itp(itp_file, mol_name)
+        self.write_top(top_file, itp_file, mol_name)
+        self.write_gro(gro_file, mol_name)
 
     @staticmethod
     def copy_file(src, dest):
@@ -1533,7 +1535,8 @@ class ForceFieldGenerator:
             output_dir.mkdir(parents=True, exist_ok=True)
             self.copy_file(Path(new_itp_fname), zero_itp_file)
             self.write_top(zero_top_file, zero_itp_file)
-            self.set_dihedral_parameters(zero_itp_file, dih, [0.] * 6)
+            self.set_dihedral_parameters(zero_itp_file, dih,
+                                         [0.0 for x in range(6)])
         self.comm.barrier()
 
         mm_zero_scan = self.perform_mm_scan(zero_top_file,
@@ -1637,7 +1640,7 @@ class ForceFieldGenerator:
         :param top_file:
             The topology file.
         :param dihedral:
-            The dihedral.
+            The dihedral (list of four atom ids).
         :param geometries:
             The scanned geometris for this dihedral.
         :param angles:
@@ -1732,10 +1735,12 @@ class ForceFieldGenerator:
         :param itp_file:
             The internal topology file.
         :param dihedral:
-            The dihedral.
+            The dihedral (list of four atom ids).
         :param coefficients:
             The coefficients for Ryckaert-Bellemans funciton.
         """
+
+        # TODO: use write_itp
 
         itp_fname = str(itp_file)
 

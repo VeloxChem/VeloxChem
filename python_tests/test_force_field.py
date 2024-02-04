@@ -38,6 +38,7 @@ class TestForceField:
 
         ff_drv = ForceFieldGenerator(task.mpi_comm, task.ostream)
         ff_drv.update_settings(ff_dict, resp_dict)
+        ff_drv.ostream.mute()
         ff_drv.compute(task.molecule, task.ao_basis)
 
         if is_mpi_master(task.mpi_comm):
