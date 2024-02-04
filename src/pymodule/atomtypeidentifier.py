@@ -2032,7 +2032,7 @@ class AtomTypeIdentifier:
 
         # Main logic for identifying equivalences
 
-        self.equivalent_atoms = [None for a in range(len(self.gaff_atom_types))]
+        self.equivalent_atoms = [f'{at}_00' for at in self.gaff_atom_types]
 
         connectivity_matrix = self.connectivity_matrix
 

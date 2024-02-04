@@ -617,6 +617,7 @@ class ForceFieldGenerator:
             if not atom_type_found:
                 warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
                 self.ostream.print_warning(warnmsg)
+                # Default value for atomtypes
                 sigma, epsilon, comment = 0.0, 0.0, 'Unknown'
 
             atom_type_params[at] = {
@@ -690,6 +691,7 @@ class ForceFieldGenerator:
                 r = r_eq
 
             self.bonds[(i, j)] = {
+                'type': 'harmonic',
                 'force_constant': k_r,
                 'equilibrium': r,
                 'comment': comment
@@ -753,6 +755,7 @@ class ForceFieldGenerator:
                 theta = theta_eq
 
             self.angles[(i, j, k)] = {
+                'type': 'harmonic',
                 'force_constant': k_theta,
                 'equilibrium': theta,
                 'comment': comment
@@ -813,14 +816,19 @@ class ForceFieldGenerator:
                 warnmsg += ' is not available.'
                 self.ostream.print_warning(warnmsg)
                 # Default value for dihedrals
-                self.dihedrals[(i, j, k, l)] = [{
+                self.dihedrals[(i, j, k, l)] = {
+                    'type': 'Fourier',
+                    'multiple': False,
                     'barrier': 0.0,
                     'phase': 0.0,
                     'periodicity': 1,
                     'comment': 'Unknown'
-                }]
-            else:
-                self.dihedrals[(i, j, k, l)] = []
+                }
+
+            dihedral_barriers = []
+            dihedral_phases = []
+            dihedral_periodicities = []
+            dihedral_comments = []
 
             for line, comment in zip(dihedral_ff_lines, dihedral_matches):
                 dihedral_ff = line[11:60].strip().split()
@@ -835,18 +843,35 @@ class ForceFieldGenerator:
                 except ValueError:
                     periodicity = int(float(dihedral_ff[3]))
 
-                # TODO: use RB type for multitermed dihedral
-
-                self.dihedrals[(i, j, k, l)].append({
-                    'type': 'Fourier',
-                    'barrier': barrier,
-                    'phase': phase,
-                    'periodicity': periodicity,
-                    'comment': comment
-                })
+                dihedral_barriers.append(barrier)
+                dihedral_phases.append(phase)
+                dihedral_periodicities.append(periodicity)
+                dihedral_comments.append(comment)
 
                 if periodicity > 0:
                     break
+
+            if len(dihedral_barriers) == 1:
+
+                self.dihedrals[(i, j, k, l)] = {
+                    'type': 'Fourier',
+                    'multiple': False,
+                    'barrier': dihedral_barriers[0],
+                    'phase': dihedral_phases[0],
+                    'periodicity': dihedral_periodicities[0],
+                    'comment': dihedral_comments[0]
+                }
+
+            elif len(dihedral_barriers) > 1:
+
+                self.dihedrals[(i, j, k, l)] = {
+                    'type': 'Fourier',
+                    'multiple': True,
+                    'barrier': dihedral_barriers,
+                    'phase': dihedral_phases,
+                    'periodicity': dihedral_periodicities,
+                    'comment': dihedral_comments,
+                }
 
         # Impropers
 
@@ -965,6 +990,7 @@ class ForceFieldGenerator:
                 )
 
                 self.impropers[(i, j, k, l)] = {
+                    'type': 'Fourier',
                     'barrier': barrier,
                     'phase': phase,
                     'periodicity': periodicity,
@@ -1209,7 +1235,7 @@ class ForceFieldGenerator:
 
             f_top.write('\n[ molecules ]\n')
             f_top.write('; Compound        nmols\n')
-            f_top.write('{:>10}{:9}\n'.format(mol_name, 1))
+            f_top.write('{:<10}{:9}\n'.format(mol_name, 1))
 
     def write_itp(self, itp_file, mol_name='MOL'):
         """
@@ -1245,7 +1271,7 @@ class ForceFieldGenerator:
             # Molecule type
             f_itp.write('\n[ moleculetype ]\n')
             f_itp.write(';name            nrexcl\n')
-            f_itp.write(f'{mol_name:>10}{self.nrexcl:10}\n')
+            f_itp.write(f'{mol_name:<10}{self.nrexcl:10}\n')
 
             # Atoms
             f_itp.write('\n[ atoms ]\n')
@@ -1265,8 +1291,10 @@ class ForceFieldGenerator:
                 f_itp.write(line_str)
 
             # Bonds
-            f_itp.write('\n[ bonds ]\n')
-            f_itp.write(';   ai     aj    funct       r           k_r\n')
+            if self.bonds:
+                f_itp.write('\n[ bonds ]\n')
+                f_itp.write(';   ai     aj    funct       r           k_r\n')
+
             for (i, j), bond in self.bonds.items():
                 line_str = '{:6}{:7}{:7}{:14.4e}{:14.4e} ; {}\n'.format(
                     i + 1, j + 1, 1, bond['equilibrium'],
@@ -1274,15 +1302,19 @@ class ForceFieldGenerator:
                 f_itp.write(line_str)
 
             # Pairs
-            f_itp.write('\n[ pairs ]\n')
-            f_itp.write(';   ai     aj    funct\n')
+            if self.pairs:
+                f_itp.write('\n[ pairs ]\n')
+                f_itp.write(';   ai     aj    funct\n')
+
             for i, j in self.pairs:
                 f_itp.write('{:6}{:7}{:7}\n'.format(i + 1, j + 1, 1))
 
             # Angles
-            f_itp.write('\n[ angles ]\n')
-            f_itp.write(
-                ';   ai     aj     ak    funct     theta       k_theta\n')
+            if self.angles:
+                f_itp.write('\n[ angles ]\n')
+                f_itp.write(
+                    ';   ai     aj     ak    funct     theta       k_theta\n')
+
             for (i, j, k), angle in self.angles.items():
                 line_str = '{:6}{:7}{:7}{:7}{:14.4e}{:14.4e} ; {}\n'.format(
                     i + 1, j + 1, k + 1, 1, angle['equilibrium'],
@@ -1290,26 +1322,70 @@ class ForceFieldGenerator:
                 f_itp.write(line_str)
 
             # Proper dihedrals
-            f_itp.write('\n[ dihedrals ]\n')
-            f_itp.write('; propers\n')
-            f_itp.write(
-                ';   ai     aj     ak     al    funct    phase     k_d      n\n'
-            )
-            for (i, j, k, l), dihedral_params in self.dihedrals.items():
-                for dih in dihedral_params:
-                    line_str = '{:6}{:7}{:7}{:7}'.format(
-                        i + 1, j + 1, k + 1, l + 1)
-                    line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
-                        9, dih['phase'], dih['barrier'],
-                        abs(dih['periodicity']), dih['comment'])
-                    f_itp.write(line_str)
+            if self.dihedrals:
+                f_itp.write('\n[ dihedrals ]\n')
+                f_itp.write('; propers\n')
+
+            dih_RB_lines = []
+            dih_fourier_lines = []
+
+            for (i, j, k, l), dih in self.dihedrals.items():
+                if dih['type'] == 'RB':
+                    line_str = '{:6}{:7}{:7}{:7}{:7}'.format(
+                        i + 1, j + 1, k + 1, l + 1, 3)
+                    for coef in dih['RB_coefficients']:
+                        line_str += '{:11.5f}'.format(coef)
+                    line_str += ' ; {}\n'.format(dih['comment'])
+                    dih_RB_lines.append(line_str)
+
+                elif dih['type'] == 'Fourier':
+                    if dih['multiple']:
+                        for barrier, phase, periodicity, comment in zip(
+                                dih['barrier'], dih['phase'],
+                                dih['periodicity'], dih['comment']):
+                            line_str = '{:6}{:7}{:7}{:7}'.format(
+                                i + 1, j + 1, k + 1, l + 1)
+                            line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
+                                9, phase, barrier, abs(periodicity), comment)
+                            dih_fourier_lines.append(line_str)
+                    else:
+                        line_str = '{:6}{:7}{:7}{:7}'.format(
+                            i + 1, j + 1, k + 1, l + 1)
+                        line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
+                            9, dih['phase'], dih['barrier'],
+                            abs(dih['periodicity']), dih['comment'])
+                        dih_fourier_lines.append(line_str)
+
+                else:
+                    errmsg = 'ForceFieldGenerator.create_topology:'
+                    errmsg += ' Invalid dihedral type ' + dih['type']
+                    assert_msg_critical(False, errmsg)
+
+            if dih_RB_lines:
+                line_str = ';   ai     aj     ak     al    funct'
+                line_str += '     C0         C1         C2         C3'
+                line_str += '         C4         C5\n'
+                f_itp.write(line_str)
+
+            for line_str in dih_RB_lines:
+                f_itp.write(line_str)
+
+            if dih_fourier_lines:
+                f_itp.write(
+                    ';   ai     aj     ak     al    funct    phase     k_d      n\n'
+                )
+
+            for line_str in dih_fourier_lines:
+                f_itp.write(line_str)
 
             # Improper dihedrals
-            f_itp.write('\n[ dihedrals ]\n')
-            f_itp.write('; impropers\n')
-            f_itp.write(
-                ';   ai     aj     ak     al    funct    phase     k_d      n\n'
-            )
+            if self.impropers:
+                f_itp.write('\n[ dihedrals ]\n')
+                f_itp.write('; impropers\n')
+                f_itp.write(
+                    ';   ai     aj     ak     al    funct    phase     k_d      n\n'
+                )
+
             for (i, j, k, l), dih in self.impropers.items():
                 line_str = '{:6}{:7}{:7}{:7}'.format(l + 1, i + 1, j + 1, k + 1)
                 line_str += '{:7}{:11.2f}{:11.5f}{:4} ; {}\n'.format(
