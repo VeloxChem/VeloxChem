@@ -893,23 +893,29 @@ class ForceFieldGenerator:
                     continue
 
                 F_coefs = {x: 0.0 for x in [1, 2, 3, 4]}
+                E_shift = 0.0
 
                 for barrier, phase, periodicity in zip(dih['barrier'],
                                                        dih['phase'],
                                                        dih['periodicity']):
-                    if abs(periodicity) in [1, 3]:
-                        prefac = 1.0 if abs(phase) < 1.0e-3 else -1.0
-                    elif abs(periodicity) in [2, 4]:
-                        prefac = -1.0 if abs(phase) < 1.0e-3 else 1.0
-                    F_coefs[abs(periodicity)] += 2.0 * prefac * barrier
+                    if abs(phase) < 1.0e-3:
+                        # phase == 0 degree
+                        F_coefs[abs(periodicity)] += barrier
+                    else:
+                        # phase == 180 degree
+                        F_coefs[abs(periodicity)] -= barrier
+                        E_shift += 2.0 * barrier
 
                 C_coefs = [0.0 for x in range(6)]
 
-                C_coefs[0] = F_coefs[2] + 0.5 * (F_coefs[1] + F_coefs[3])
-                C_coefs[1] = 0.5 * (-1.0 * F_coefs[1] + 3.0 * F_coefs[3])
-                C_coefs[2] = -1.0 * F_coefs[2] + 4.0 * F_coefs[4]
-                C_coefs[3] = -2.0 * F_coefs[3]
-                C_coefs[4] = -4.0 * F_coefs[4]
+                # JPCA 2021, 125, 2673-2681
+                # Note that we also take into account the phases in Fourier series
+                C_coefs[0] = (F_coefs[1] + F_coefs[3] + 2.0 * F_coefs[4] +
+                              E_shift)
+                C_coefs[1] = -1.0 * F_coefs[1] + 3.0 * F_coefs[3]
+                C_coefs[2] = 2.0 * F_coefs[2] - 8.0 * F_coefs[4]
+                C_coefs[3] = -4.0 * F_coefs[3]
+                C_coefs[4] = 8.0 * F_coefs[4]
                 C_coefs[5] = 0.0
 
                 self.dihedrals[(i, j, k, l)] = {
