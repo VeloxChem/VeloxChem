@@ -99,7 +99,7 @@ class RespChargesDriver:
         self.ostream = ostream
 
         # filename
-        self.filename = 'veloxchem_esp_' + get_random_string_parallel(self.comm)
+        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
 
         # method
         self.xcfun = None

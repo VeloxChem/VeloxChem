@@ -102,8 +102,7 @@ class ForceFieldGenerator:
         self.ostream = ostream
 
         # molecule
-        self.molecule_name = 'veloxchem_ff_' + get_random_string_parallel(
-            self.comm)
+        self.molecule_name = 'vlx_' + get_random_string_parallel(self.comm)
         self.scan_xyz_files = None
         self.atom_types = None
 
@@ -1262,10 +1261,10 @@ class ForceFieldGenerator:
 
             f_top.write('\n[ defaults ]\n')
             cur_str = '; nbfunc        comb-rule       gen-pairs'
-            cur_str += '       fudgeLJ fudgeQQ\n'
+            cur_str += '        fudgeLJ   fudgeQQ\n'
             f_top.write(cur_str)
             gen_pairs = 'yes' if self.gen_pairs else 'no'
-            f_top.write('{}{:16}{:>18}{:19.4f}{:8.4f}\n'.format(
+            f_top.write('{}{:16}{:>18}{:21.6f}{:10.6f}\n'.format(
                 self.nbfunc, self.comb_rule, gen_pairs, self.fudgeLJ,
                 self.fudgeQQ))
 
@@ -1276,7 +1275,7 @@ class ForceFieldGenerator:
             # system
 
             f_top.write('\n[ system ]\n')
-            f_top.write(' {}\n'.format(mol_name))
+            f_top.write('{}\n'.format(mol_name))
 
             # molecules
 
@@ -1475,7 +1474,7 @@ class ForceFieldGenerator:
 
             # Box
             box_dimension = 10.0
-            line_str = f'{box_dimension:10.5f}' * 3
+            line_str = f'{box_dimension:10.5f}' * 3 + '\n'
             f_gro.write(line_str)
 
     def write_gromacs_files(self, filename, mol_name=None):

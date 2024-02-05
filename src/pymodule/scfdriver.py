@@ -234,8 +234,7 @@ class ScfDriver:
         self.program_end_time = None
 
         # filename
-        self._filename = 'veloxchem_scf_' + get_random_string_parallel(
-            self.comm)
+        self._filename = 'vlx_' + get_random_string_parallel(self.comm)
 
         # input keywords
         self._input_keywords = {

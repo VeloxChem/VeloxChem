@@ -102,8 +102,7 @@ class TrajectoryDriver:
         self.mm_pol_region = None
         self.mm_nonpol_region = None
 
-        self.filename = 'veloxchem_traj_' + get_random_string_parallel(
-            self.comm)
+        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
         self.method_dict = None
         self.description = 'N/A'
 

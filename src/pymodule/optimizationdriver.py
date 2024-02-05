@@ -92,7 +92,7 @@ class OptimizationDriver:
 
         self.keep_files = True
 
-        self.filename = 'veloxchem_opt_' + get_random_string_parallel(self.comm)
+        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
         self.grad_drv = grad_drv
 
         self.cna = False

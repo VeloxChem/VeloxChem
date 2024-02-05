@@ -161,8 +161,7 @@ class ExcitonModelDriver:
         self.checkpoint_file = None
 
         # filename
-        self.filename = 'veloxchem_exciton_' + get_random_string_parallel(
-            self.comm)
+        self.filename = 'vlx_' + get_random_string_parallel(self.comm)
 
         # input keywords
         self.input_keywords = {
