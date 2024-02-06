@@ -478,11 +478,16 @@ class ForceFieldGenerator:
             with open(self.force_field_data, 'r') as ff_data:
                 ff_data_lines = ff_data.readlines()
 
+        # check GAFF version
+        gaff_version = None
         if ff_data_lines[0].startswith('AMBER General Force Field'):
             ff_data_version = ff_data_lines[0].split('Version')[1].split()[0]
             ff_data_version = ff_data_version.replace(',', '')
-        else:
-            ff_data_version = None
+            if '.' in ff_data_version:
+                version_major = ff_data_version.split('.')[0]
+                version_minor = ff_data_version.split('.')[1]
+                if version_major.isdigit() and version_minor.isdigit():
+                    gaff_version = f'{version_major}.{version_minor}'
 
         # Molecular information
 
@@ -493,6 +498,8 @@ class ForceFieldGenerator:
 
         atomtypeidentifier = AtomTypeIdentifier(self.comm)
         atomtypeidentifier.ostream.mute()
+        # set GAFF version
+        atomtypeidentifier.gaff_version = gaff_version
 
         self.atom_types = atomtypeidentifier.generate_gaff_atomtypes(
             self.molecule)

@@ -96,6 +96,9 @@ class AtomTypeIdentifier:
         # output stream
         self.ostream = ostream
 
+        # GAFF version
+        self.gaff_version = None
+
     def create_connectivity_matrix(self, factor=1.3):
         """
         Creates a connectivity matrix for the molecule based on the atomic
@@ -436,6 +439,17 @@ class AtomTypeIdentifier:
 
         self.bad_hydrogen = False
 
+        using_gaff_220 = False
+        if self.gaff_version is not None:
+            gaff_version_major = self.gaff_version.split('.')[0]
+            gaff_version_minor = self.gaff_version.split('.')[1]
+            # here we only compare the first digit of gaff_version_minor...
+            if gaff_version_minor:
+                gaff_version_minor = gaff_version_minor[0]
+            if gaff_version_major.isdigit() and gaff_version_minor.isdigit():
+                using_gaff_220 = (int(gaff_version_major) >= 2 and
+                                  int(gaff_version_minor) >= 2)
+
         for atom_number, info in self.atom_info_dict.items():
 
             # Chemical environment information
@@ -561,10 +575,10 @@ class AtomTypeIdentifier:
                         elif 4 in info['CycleSize']:
                             carbon_type = {'opls': 'opls_CY', 'gaff': 'cy'}
 
-                        elif 5 in info['CycleSize']:
+                        elif 5 in info['CycleSize'] and using_gaff_220:
                             carbon_type = {'opls': 'opls_c5', 'gaff': 'c5'}
 
-                        elif 6 in info['CycleSize']:
+                        elif 6 in info['CycleSize'] and using_gaff_220:
                             carbon_type = {'opls': 'opls_c6', 'gaff': 'c6'}
 
                         else:
