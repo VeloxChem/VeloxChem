@@ -682,11 +682,8 @@ class ForceFieldGenerator:
                         break
 
             if not bond_found:
-                warnmsg = f'ForceFieldGenerator: bond {at_1}-{at_2}'
-                warnmsg += ' is not available'
-                self.ostream.print_warning(warnmsg)
                 # Default value for bonds
-                r, k_r, comment = r_eq, 2.5e+5, 'Unknown'
+                r, k_r, comment = r_eq, 2.5e+5, 'Guessed'
 
             if self.eq_param:
                 if abs(r - r_eq) > self.r_thresh:
@@ -746,11 +743,8 @@ class ForceFieldGenerator:
                         break
 
             if not angle_found:
-                warnmsg = f'ForceFieldGenerator: angle {at_1}-{at_2}-{at_3}'
-                warnmsg += ' is not available.'
-                self.ostream.print_warning(warnmsg)
                 # Default value for angles
-                theta, k_theta, comment = theta_eq, 1000, 'Unknown'
+                theta, k_theta, comment = theta_eq, 1000, 'Guessed'
 
             if self.eq_param:
                 if abs(theta - theta_eq) > self.theta_thresh:
@@ -803,6 +797,24 @@ class ForceFieldGenerator:
                     re.compile(r'\A' + f'X -{at_2}-{at_3}-X  '),
                     re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
                 ]
+
+                # guesses for proper dihedrals
+                if at_2 in ['cc', 'ce'] and at_3 in ['cc', 'ce']:
+                    patterns.append(r'\A' + 'X -cc-cc-X  ')
+                elif at_2 in ['cd', 'cf'] and at_3 in ['cd', 'cf']:
+                    patterns.append(r'\A' + 'X -cd-cd-X  ')
+                elif ((at_2 in ['cc', 'ce'] and at_3 in ['cd', 'cf']) or
+                      (at_2 in ['cd', 'cf'] and at_3 in ['cc', 'ce'])):
+                    patterns.append(r'\A' + 'X -cc-cd-X  ')
+                    patterns.append(r'\A' + 'X -cd-cc-X  ')
+                elif ((at_2 == 'ca' and at_3 in ['cc', 'cd', 'ce', 'cf']) or
+                      (at_2 in ['cc', 'cd', 'ce', 'cf'] and at_3 == 'ca')):
+                    patterns.append(r'\A' + 'X -c2-ca-X  ')
+                    patterns.append(r'\A' + 'X -ca-c2-X  ')
+                elif ((at_2 == 'ss' and at_3 in ['cc', 'cd', 'ce', 'cf']) or
+                      (at_2 in ['cc', 'cd', 'ce', 'cf'] and at_3 == 'ss')):
+                    patterns.append(r'\A' + 'X -c2-ss-X  ')
+                    patterns.append(r'\A' + 'X -ss-c2-X  ')
 
                 dihedral_ff_lines = []
                 dihedral_matches = []
@@ -1030,13 +1042,9 @@ class ForceFieldGenerator:
                                     break
 
                 if not dihedral_found:
-                    warnmsg = 'ForceFieldGenerator: '
-                    warnmsg += f'improper {at_1}-{at_2}-{at_3}-{at_4} '
-                    warnmsg += 'is not available.'
-                    self.ostream.print_warning(warnmsg)
                     # Default values for impropers
                     barrier, phase, periodicity = 1.1 * 4.184, 180.0, 2
-                    comment = 'Unknown'
+                    comment = 'Guessed'
 
                 assert_msg_critical(
                     phase == 180.0,
@@ -1143,7 +1151,7 @@ class ForceFieldGenerator:
 
             if not reparameterize_all:
                 if reparameterize_keys is None:
-                    if self.bonds[(i, j)]['comment'].capitalize() != 'Unknown':
+                    if self.bonds[(i, j)]['comment'].capitalize() != 'Guessed':
                         continue
                 elif (i, j) not in reparameterize_keys:
                     continue
@@ -1196,7 +1204,7 @@ class ForceFieldGenerator:
             if not reparameterize_all:
                 if reparameterize_keys is None:
                     if (self.angles[(i, j, k)]['comment'].capitalize()
-                            != 'Unknown'):
+                            != 'Guessed'):
                         continue
                 elif (i, j, k) not in reparameterize_keys:
                     continue
