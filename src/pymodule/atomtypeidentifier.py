@@ -2046,6 +2046,19 @@ class AtomTypeIdentifier:
 
         # Main logic for identifying equivalences
 
+        conjugated_atomtype_mapping = {
+            'cc': 'cd',
+            'cd': 'cc',
+            'ce': 'cf',
+            'cf': 'ce',
+            'cg': 'ch',
+            'ch': 'cg',
+            'nc': 'nd',
+            'nd': 'nc',
+            'ne': 'nf',
+            'nf': 'ne',
+        }
+
         # TODO: also identify equivalences for conjugated atom types (cc/cd/...)
 
         self.equivalent_atoms = [f'{at}_00' for at in self.gaff_atom_types]
@@ -2054,6 +2067,9 @@ class AtomTypeIdentifier:
 
         for atom_type in list(set(self.gaff_atom_types)):
 
+            swapped_atom_type = conjugated_atomtype_mapping.get(
+                atom_type, atom_type)
+
             # skip non-repeating atom types
             if self.gaff_atom_types.count(atom_type) == 1:
                 continue
@@ -2061,7 +2077,7 @@ class AtomTypeIdentifier:
             atom_paths = defaultdict(list)
 
             for idx, at in enumerate(self.gaff_atom_types):
-                if at == atom_type:
+                if at in [atom_type, swapped_atom_type]:
                     paths = gather_neighbors(idx)
                     path_types = [
                         tuple(self.gaff_atom_types[step]
@@ -2069,7 +2085,19 @@ class AtomTypeIdentifier:
                         for path in paths
                     ]
                     path_types = tuple(sorted(path_types))
-                    atom_paths[path_types].append(idx)
+
+                    swapped_path_types = [
+                        tuple(
+                            conjugated_atomtype_mapping.get(at, at)
+                            for at in path)
+                        for path in path_types
+                    ]
+                    swapped_path_types = tuple(sorted(swapped_path_types))
+
+                    if swapped_path_types in atom_paths:
+                        atom_paths[swapped_path_types].append(idx)
+                    else:
+                        atom_paths[path_types].append(idx)
 
             for eq_id, (path_set, indices) in enumerate(atom_paths.items()):
                 for idx in indices:
