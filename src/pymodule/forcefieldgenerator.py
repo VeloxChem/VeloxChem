@@ -798,24 +798,6 @@ class ForceFieldGenerator:
                     re.compile(r'\A' + f'X -{at_3}-{at_2}-X  '),
                 ]
 
-                # guesses for proper dihedrals
-                if at_2 in ['cc', 'ce'] and at_3 in ['cc', 'ce']:
-                    patterns.append(r'\A' + 'X -cc-cc-X  ')
-                elif at_2 in ['cd', 'cf'] and at_3 in ['cd', 'cf']:
-                    patterns.append(r'\A' + 'X -cd-cd-X  ')
-                elif ((at_2 in ['cc', 'ce'] and at_3 in ['cd', 'cf']) or
-                      (at_2 in ['cd', 'cf'] and at_3 in ['cc', 'ce'])):
-                    patterns.append(r'\A' + 'X -cc-cd-X  ')
-                    patterns.append(r'\A' + 'X -cd-cc-X  ')
-                elif ((at_2 == 'ca' and at_3 in ['cc', 'cd', 'ce', 'cf']) or
-                      (at_2 in ['cc', 'cd', 'ce', 'cf'] and at_3 == 'ca')):
-                    patterns.append(r'\A' + 'X -c2-ca-X  ')
-                    patterns.append(r'\A' + 'X -ca-c2-X  ')
-                elif ((at_2 == 'ss' and at_3 in ['cc', 'cd', 'ce', 'cf']) or
-                      (at_2 in ['cc', 'cd', 'ce', 'cf'] and at_3 == 'ss')):
-                    patterns.append(r'\A' + 'X -c2-ss-X  ')
-                    patterns.append(r'\A' + 'X -ss-c2-X  ')
-
                 dihedral_ff_lines = []
                 dihedral_matches = []
                 for line in ff_data_lines:
@@ -830,6 +812,25 @@ class ForceFieldGenerator:
                                 break
 
             if not dihedral_found:
+                # guesses for proper dihedrals
+                patterns = self.get_dihedral_guess_patterns(at_2, at_3)
+
+                dihedral_ff_lines = []
+                dihedral_matches = []
+                for line in ff_data_lines:
+                    for p in patterns:
+                        m = re.search(p, line)
+                        if m is not None:
+                            dihedral_ff = line[11:60].strip().split()
+                            if len(dihedral_ff) == 4:
+                                dihedral_ff_lines.append(line)
+                                dihedral_matches.append(
+                                    m.group(0) + '(Guessed for ' +
+                                    f'{at_1}-{at_2}-{at_3}-{at_4})')
+                                dihedral_found = True
+                                break
+
+            if not dihedral_found:
                 warnmsg = f'ForceFieldGenerator: dihedral {at_1}-{at_2}-{at_3}-{at_4}'
                 warnmsg += ' is not available.'
                 self.ostream.print_warning(warnmsg)
@@ -840,7 +841,7 @@ class ForceFieldGenerator:
                     'barrier': 0.0,
                     'phase': 0.0,
                     'periodicity': 1,
-                    'comment': 'Unknown'
+                    'comment': f'Unknown {at_1}-{at_2}-{at_3}-{at_4}'
                 }
 
             dihedral_barriers = []
@@ -1062,6 +1063,91 @@ class ForceFieldGenerator:
                     'periodicity': periodicity,
                     'comment': comment
                 }
+
+    def get_dihedral_guess_patterns(self, at_2, at_3):
+        """
+        Gets guesses for dihedral parameters.
+
+        :param at_2:
+            The index of the second atom in the dihedral.
+        :param at_3:
+            The index of the third atom in the dihedral.
+
+        :return:
+            A list of patterns.
+        """
+
+        if [at_2, at_3] in [['ce', 'c3'], ['c3', 'ce']]:
+            return [
+                re.compile(r'\A' + 'X -c3-cc-X  '),
+                re.compile(r'\A' + 'X -cc-c3-X  '),
+            ]
+
+        elif [at_2, at_3] in [['cf', 'c3'], ['c3', 'cf']]:
+            return [
+                re.compile(r'\A' + 'X -c3-cd-X  '),
+                re.compile(r'\A' + 'X -cd-c3-X  '),
+            ]
+
+        elif [at_2, at_3] in [['ce', 'cc'], ['cc', 'ce']]:
+            return [
+                re.compile(r'\A' + 'X -ce-ce-X  '),
+            ]
+
+        elif [at_2, at_3] in [['cf', 'cd'], ['cd', 'cf']]:
+            return [
+                re.compile(r'\A' + 'X -cf-cf-X  '),
+            ]
+
+        elif ([at_2, at_3] in [['ce', 'cd'], ['cd', 'ce']] or
+              [at_2, at_3] in [['cf', 'cc'], ['cc', 'cf']]):
+            return [
+                re.compile(r'\A' + 'X -ce-cf-X  '),
+                re.compile(r'\A' + 'X -cf-ce-X  '),
+            ]
+
+        elif ([at_2, at_3] in [['ce', 'n2'], ['n2', 'ce']] or
+              [at_2, at_3] in [['cf', 'n2'], ['n2', 'cf']]):
+            return [
+                re.compile(r'\A' + 'X -c2-n2-X  '),
+                re.compile(r'\A' + 'X -n2-c2-X  '),
+            ]
+
+        for at_val in ['ca', 'os', 'ss']:
+            condition_1 = (at_2 == at_val and at_3 in ['cc', 'cd', 'ce', 'cf'])
+            condition_2 = (at_2 in ['cc', 'cd', 'ce', 'cf'] and at_3 == at_val)
+            if condition_1 or condition_2:
+                return [
+                    re.compile(r'\A' + f'X -c2-{at_val}-X  '),
+                    re.compile(r'\A' + f'X -{at_val}-c2-X  '),
+                ]
+
+        atom_types_mapping = {
+            ('cu', 'cv'): 'c2',
+            ('cx', 'cy', 'c5', 'c6'): 'c3',
+            ('nt', 'ns'): 'n ',
+            ('nu', 'nv'): 'nh',
+            ('n7', 'n8', 'n5', 'n6'): 'n3',
+            ('cs',): 'c ',
+        }
+        new_at_2, new_at_3 = at_2, at_3
+        for key, val in atom_types_mapping.items():
+            if at_2 in key:
+                new_at_2 = val
+            if at_3 in key:
+                new_at_3 = val
+        if new_at_2 != at_2 or new_at_3 != at_3:
+            if new_at_2 == new_at_3:
+                return [
+                    re.compile(r'\A' + f'X -{new_at_2}-{new_at_3}-X  '),
+                ]
+            else:
+                return [
+                    re.compile(r'\A' + f'X -{new_at_2}-{new_at_3}-X  '),
+                    re.compile(r'\A' + f'X -{new_at_3}-{new_at_2}-X  '),
+                ]
+
+        return []
 
     def reparameterize(self,
                        hessian=None,
