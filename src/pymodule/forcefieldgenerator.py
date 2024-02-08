@@ -950,8 +950,8 @@ class ForceFieldGenerator:
 
         sp2_atom_types = [
             'c ', 'cs', 'c2', 'ca', 'cp', 'cq', 'cc', 'cd', 'ce', 'cf', 'cu',
-            'cv', 'cz', 'n ', 'n2', 'na', 'nb', 'nc', 'nd', 'ne', 'nf', 'pb',
-            'pc', 'pd', 'pe', 'pf'
+            'cv', 'cz', 'n ', 'ns', 'nt', 'n2', 'na', 'nb', 'nc', 'nd', 'ne',
+            'nf', 'pb', 'pc', 'pd', 'pe', 'pf'
         ]
 
         improper_atom_inds = []
@@ -1077,43 +1077,56 @@ class ForceFieldGenerator:
             A list of patterns.
         """
 
-        if [at_2, at_3] in [['ce', 'c3'], ['c3', 'ce']]:
-            return [
-                re.compile(r'\A' + 'X -c3-cc-X  '),
-                re.compile(r'\A' + 'X -cc-c3-X  '),
-            ]
+        atomtype_pairs_mapping = {
+            ('nb', 'nb'): ('ca', 'nb'),
+            ('nb', 'cp'): ('ca', 'cp'),
+            # ---
+            ('cc', 'no'): ('ca', 'no'),
+            ('cd', 'no'): ('ca', 'no'),
+            # ---
+            ('ce', 'c3'): ('c2', 'c3'),
+            ('ce', 'c5'): ('c2', 'c3'),
+            ('ce', 'c6'): ('c2', 'c3'),
+            ('cf', 'c3'): ('c2', 'c3'),
+            ('cf', 'c5'): ('c2', 'c3'),
+            ('cf', 'c6'): ('c2', 'c3'),
+            # ---
+            ('ce', 'cc'): ('ce', 'ce'),
+            ('cf', 'cd'): ('cf', 'cf'),
+            ('ce', 'cd'): ('ce', 'cf'),
+            ('cc', 'cf'): ('ce', 'cf'),
+            # ---
+            ('ne', 'cc'): ('ne', 'ce'),
+            ('nf', 'cd'): ('nf', 'cf'),
+            # ---
+            ('cc', 'n2'): ('cc', 'nc'),
+            ('cd', 'n2'): ('cd', 'nd'),
+            # ---
+            ('ce', 'nf'): ('c2', 'n2'),
+            ('cf', 'ne'): ('c2', 'n2'),
+            ('ce', 'n2'): ('c2', 'n2'),
+            ('cf', 'n2'): ('c2', 'n2'),
+            # ---
+            ('ce', 'nu'): ('c2', 'nh'),
+            ('ce', 'nv'): ('c2', 'nh'),
+            ('cf', 'nu'): ('c2', 'nh'),
+            ('cf', 'nv'): ('c2', 'nh'),
+        }
 
-        elif [at_2, at_3] in [['cf', 'c3'], ['c3', 'cf']]:
-            return [
-                re.compile(r'\A' + 'X -c3-cd-X  '),
-                re.compile(r'\A' + 'X -cd-c3-X  '),
-            ]
+        for at_pair, new_at_pair in atomtype_pairs_mapping.items():
+            if (at_2, at_3) == at_pair or (at_3, at_2) == at_pair:
+                new_at_2, new_at_3 = new_at_pair
+                if new_at_2 == new_at_3:
+                    return [
+                        re.compile(r'\A' + f'X -{new_at_2}-{new_at_3}-X  '),
+                    ]
+                else:
+                    return [
+                        re.compile(r'\A' + f'X -{new_at_2}-{new_at_3}-X  '),
+                        re.compile(r'\A' + f'X -{new_at_3}-{new_at_2}-X  '),
+                    ]
 
-        elif [at_2, at_3] in [['ce', 'cc'], ['cc', 'ce']]:
-            return [
-                re.compile(r'\A' + 'X -ce-ce-X  '),
-            ]
-
-        elif [at_2, at_3] in [['cf', 'cd'], ['cd', 'cf']]:
-            return [
-                re.compile(r'\A' + 'X -cf-cf-X  '),
-            ]
-
-        elif ([at_2, at_3] in [['ce', 'cd'], ['cd', 'ce']] or
-              [at_2, at_3] in [['cf', 'cc'], ['cc', 'cf']]):
-            return [
-                re.compile(r'\A' + 'X -ce-cf-X  '),
-                re.compile(r'\A' + 'X -cf-ce-X  '),
-            ]
-
-        elif ([at_2, at_3] in [['ce', 'n2'], ['n2', 'ce']] or
-              [at_2, at_3] in [['cf', 'n2'], ['n2', 'cf']]):
-            return [
-                re.compile(r'\A' + 'X -c2-n2-X  '),
-                re.compile(r'\A' + 'X -n2-c2-X  '),
-            ]
-
-        for at_val in ['ca', 'os', 'ss']:
+        for at_val in ['ca', 'os', 'ss', 'oh', 'sh']:
             condition_1 = (at_2 == at_val and at_3 in ['cc', 'cd', 'ce', 'cf'])
             condition_2 = (at_2 in ['cc', 'cd', 'ce', 'cf'] and at_3 == at_val)
             if condition_1 or condition_2:
