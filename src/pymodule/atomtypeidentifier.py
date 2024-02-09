@@ -475,15 +475,29 @@ class AtomTypeIdentifier:
                             connected_atom_info = self.atom_info_dict[
                                 connected_atom_number]
 
-                            if (connected_atom_info.get('AtomicSymbol') == 'C'
-                                    and
-                                    connected_atom_info.get('CycleNumber') and
-                                    not set(
-                                        connected_atom_info.get('CycleNumber'))
-                                    & set(info.get('CycleNumber')) and
-                                    'pure_aromatic'
-                                    in connected_atom_info.get('Aromaticity')):
+                            if connected_atom_info.get('AtomicSymbol') != 'C':
+                                continue
 
+                            if not connected_atom_info.get('CycleNumber'):
+                                continue
+
+                            if 'pure_aromatic' not in connected_atom_info.get(
+                                    'Aromaticity'):
+                                continue
+
+                            common_cycle_numbers = (
+                                set(connected_atom_info.get('CycleNumber')) &
+                                set(info.get('CycleNumber')))
+
+                            # Note: Here we count both pure_aromatic and
+                            # non_pure_aromatic rings
+                            common_aromatic_cycles = [
+                                cycle_num for cycle_num in common_cycle_numbers
+                                if self.aromaticity[cycle_num] in
+                                ['pure_aromatic', 'non_pure_aromatic']
+                            ]
+
+                            if not common_aromatic_cycles:
                                 connected_carbon_atom = connected_atom_number
                                 break
 
@@ -495,28 +509,6 @@ class AtomTypeIdentifier:
 
                         elif connected_carbon_atom is not None:
                             carbon_type = {'opls': 'opls_521', 'gaff': 'cp'}
-
-                            index_in_distances = info[
-                                'ConnectedAtomsNumbers'].index(
-                                    connected_carbon_atom)
-                            d = info['ConnectedAtomsDistances'][
-                                index_in_distances]
-
-                            if d > 1.4685:
-                                biphenyl_carbon = {
-                                    'opls': 'opls_521',
-                                    'gaff': 'cp'
-                                }
-                            else:
-                                biphenyl_carbon = {
-                                    'opls': 'opls_CQ',
-                                    'gaff': 'cq'
-                                }
-
-                            # Store the atomtype in the dictionary for the
-                            # biphenyl carbon
-                            self.atom_types_dict[
-                                f'C{connected_carbon_atom}'] = biphenyl_carbon
 
                         else:
                             carbon_type = {'opls': 'opls_145', 'gaff': 'ca'}
@@ -1828,7 +1820,7 @@ class AtomTypeIdentifier:
 
         atom_types = list(self.gaff_atom_types)
 
-        # Look for bonds formed between cc, ce, cg, nc
+        # Look for bonds formed between cc, ce, cg, nc, ne
 
         assigned_bonds = []
         counted_atom_ids = []
@@ -1911,7 +1903,45 @@ class AtomTypeIdentifier:
                 else:
                     atom_types[j] = conjugated_atom_type_pairs[atom_types[j]][1]
 
+        # Look for bonds formed between cp
+
+        for i, at_i in enumerate(atom_types):
+            for j, at_j in enumerate(atom_types):
+                if (j > i and self.connectivity_matrix[i][j] == 1 and
+                        at_i in ['cp', 'cq'] and at_j in ['cp', 'cq']):
+                    if self.get_common_cycles(i, j, 'pure_aromatic'):
+                        atom_types[j] = 'cq' if atom_types[i] == 'cp' else 'cp'
+                    else:
+                        atom_types[j] = atom_types[i]
+
         self.gaff_atom_types = atom_types
+
+    def get_common_cycles(self, i, j, cycle_type='any'):
+        """
+        Gets number of common cycles shared by a pair of atoms.
+
+        :param i:
+            The index of the first atom.
+        :param j:
+            The index of the second atom.
+        :param cycle_type:
+            The type of cycles.
+
+        :return:
+            The number of common cycles.
+        """
+
+        common_cycle_numbers = (
+            set(self.atom_info_dict[i + 1].get('CycleNumber')) &
+            set(self.atom_info_dict[j + 1].get('CycleNumber')))
+
+        if cycle_type in ['pure_aromatic', 'non_pure_aromatic', 'non_aromatic']:
+            return [
+                cycle_num for cycle_num in common_cycle_numbers
+                if self.aromaticity[cycle_num] == cycle_type
+            ]
+        else:
+            return list(common_cycle_numbers)
 
     def generate_gaff_atomtypes(self, molecule):
         """

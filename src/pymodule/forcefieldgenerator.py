@@ -777,6 +777,30 @@ class ForceFieldGenerator:
                 re.compile(r'\A' + f'{at_4}-{at_3}-{at_2}-{at_1} '),
             ]
 
+            # special treatment for rotatable bonds, e.g. cc-cc, cd-cd, cc-na
+            # and cd-na bonds between non-pure aromatic rings
+            special_comment = ''
+
+            if [at_2, at_3] in [['cc', 'cc'], ['cd', 'cd']]:
+                if not atomtypeidentifier.get_common_cycles(
+                        j, k, 'non_pure_aromatic'):
+                    patterns = [
+                        re.compile(r'\A' + 'X -cp-cp-X  '),
+                    ]
+                    special_comment = ('(Guessed for rotatable ' +
+                                       f'{at_1}-{at_2}-{at_3}-{at_4})')
+
+            elif [at_2, at_3] in [['cc', 'na'], ['na', 'cc'], ['cd', 'na'],
+                                  ['na', 'cd']]:
+                if not atomtypeidentifier.get_common_cycles(
+                        j, k, 'non_pure_aromatic'):
+                    patterns = [
+                        re.compile(r'\A' + 'X -ca-na-X  '),
+                        re.compile(r'\A' + 'X -na-ca-X  '),
+                    ]
+                    special_comment = ('(Guessed for rotatable ' +
+                                       f'{at_1}-{at_2}-{at_3}-{at_4})')
+
             dihedral_found = False
 
             dihedral_ff_lines = []
@@ -788,7 +812,8 @@ class ForceFieldGenerator:
                         dihedral_ff = line[11:60].strip().split()
                         if len(dihedral_ff) == 4:
                             dihedral_ff_lines.append(line)
-                            dihedral_matches.append(m.group(0))
+                            dihedral_matches.append(
+                                m.group(0) + special_comment)
                             dihedral_found = True
                             break
 
@@ -1078,6 +1103,8 @@ class ForceFieldGenerator:
         """
 
         atomtype_pairs_mapping = {
+            ('cp', 'cq'): ('ca', 'ca'),
+            # ---
             ('nb', 'nb'): ('ca', 'nb'),
             ('nb', 'cp'): ('ca', 'cp'),
             # ---
