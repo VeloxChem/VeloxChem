@@ -213,7 +213,7 @@ class ScfHessianDriver(HessianDriver):
             The SCF driver.
         """
 
-#        scf_drv.ostream.mute()
+        scf_drv.ostream.mute()
 
         # atom labels
         labels = molecule.get_labels()
@@ -542,15 +542,37 @@ class ScfHessianDriver(HessianDriver):
                         # Add diagonal (same atom) contributions, 2S + 2J - K
                         hessian_2nd_order_derivatives[i,i] += 2*np.einsum(
                                     'mn,xymn->xy', omega_ao, ovlp_2nd_deriv_ii)
-                        hessian_2nd_order_derivatives[i,i] += 2*np.einsum(
-                        'mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
-                        hessian_2nd_order_derivatives[i,i] -= frac_K*np.einsum(
-                         'mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
+
+                        # Build Fock matrices by contractig the density matrix
+                        # with the second order derivatives of the two-electron
+                        # integrals 
+                        aux_ii_Fock_2nd_deriv_j = np.einsum(
+                        'kl,xymnkl->xymn', density, eri_2nd_deriv_ii)
+                        aux_ii_Fock_2nd_deriv_k = np.einsum(
+                        'kl,xymknl->xymn', density, eri_2nd_deriv_ii)
+
+                        #hessian_2nd_order_derivatives[i,i] += 2*np.einsum(
+                        #'mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
+                        hessian_2nd_order_derivatives[i, i] += 2 * np.einsum(
+                        'mn,xymn->xy', density, aux_ii_Fock_2nd_deriv_j)
+                        hessian_2nd_order_derivatives[i, i] -= frac_K * np.einsum(
+                        'mn,xymn->xy', density, aux_ii_Fock_2nd_deriv_k)
+                        #hessian_2nd_order_derivatives[i,i] -= frac_K*np.einsum(
+                        # 'mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ii)
+
                     # Add non-diagonal contributions, 2S + 2J - K + 2h
-                    hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
-                         'mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
-                    hessian_2nd_order_derivatives[i,j] -= frac_K*np.einsum(
-                         'mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
+                    aux_ij_Fock_2nd_deriv_j = np.einsum(
+                    'kl,xymnkl->xymn', density, eri_2nd_deriv_ij)
+                    aux_ij_Fock_2nd_deriv_k = np.einsum(
+                    'kl,xymknl->xymn', density, eri_2nd_deriv_ij)
+                    hessian_2nd_order_derivatives[i, j] += 2 * np.einsum(
+                    'mn,xymn->xy', density, aux_ij_Fock_2nd_deriv_j)
+                    hessian_2nd_order_derivatives[i, j] -= frac_K * np.einsum(
+                    'mn,xymn->xy', density, aux_ij_Fock_2nd_deriv_k)
+                    #hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
+                    #     'mn,kl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
+                    #hessian_2nd_order_derivatives[i,j] -= frac_K*np.einsum(
+                    #     'mk,nl,xymnkl->xy', density, density, eri_2nd_deriv_ij)
                     hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
                             'mn,xymn->xy', omega_ao, ovlp_2nd_deriv_ij)
                     hessian_2nd_order_derivatives[i,j] += 2*np.einsum(
