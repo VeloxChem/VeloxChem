@@ -1986,7 +1986,10 @@ class ForceFieldGenerator:
 
         plt.grid()
         plt.legend(loc='upper right')
-        plt.xlabel('dihedral angle {}-{}-{}-{}'.format(*dihedral_indices))
+        plt.xlabel('dihedral angle {}-{}-{}-{}'.format(dihedral_indices[0] + 1,
+                                                       dihedral_indices[1] + 1,
+                                                       dihedral_indices[2] + 1,
+                                                       dihedral_indices[3] + 1))
         plt.ylabel('E in kJ/mol')
         plt.title('dihedral potential of {}'.format(self.molecule_name))
         plt.show()
