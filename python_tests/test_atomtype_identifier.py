@@ -409,8 +409,10 @@ class TestAtomTypeIdentifier:
             'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'cp',
             'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha', 'ca', 'ha'
         ]
-        expected_equal_charges_list = [[12, 20], [13, 21], [14, 18], [15, 19],
-                                       [23, 31], [24, 32], [25, 29], [26, 30]]
+        expected_equal_charges_list = [[1, 8], [2, 7], [3, 5], [4, 6], [9, 10],
+                                       [11, 22], [12, 20, 23, 31],
+                                       [13, 21, 24, 32], [14, 18, 25, 29],
+                                       [15, 19, 26, 30], [16, 27], [17, 28]]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
                                     expected_equal_charges_list)

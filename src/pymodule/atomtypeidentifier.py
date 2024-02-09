@@ -2087,6 +2087,8 @@ class AtomTypeIdentifier:
             'nd': 'nc',
             'ne': 'nf',
             'nf': 'ne',
+            'cp': 'cq',
+            'cq': 'cp',
         }
 
         # TODO: also identify equivalences for conjugated atom types (cc/cd/...)
