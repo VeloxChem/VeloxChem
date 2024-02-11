@@ -465,6 +465,8 @@ def import_2e_integral(molecule, basis, int_type, atom1=1, shell1=None,
     else:
         pyscf_int = sign * pyscf_molecule.intor(pyscf_int_type, aosym='s1')
 
+    print("Import 2e integral derivatives: ", int_type, sign, pyscf_int_type)
+
     nao = pyscf_molecule.nao
 
     # Transform integral to veloxchem format
@@ -866,6 +868,133 @@ def numerical_electric_dipole_derivatives(molecule, ao_basis, int_type,
         return vlx_int_block
     else:
         return vlx_int_deriv
+
+def import_1e_second_order_integral_derivative_braket(bra_molecule,
+                                  bra_basis, ket_molecule, ket_basis, int_type,
+                                  atomi, atomj, unit="au", full_deriv=False):
+    """
+    Imports one electron integral derivatives from pyscf and converts
+    to veloxchem format. Specific atoms and shells can be selected.
+
+    :param bra_molecule:
+        the vlx molecule object for the bra side.
+    :param bra_basis:
+        the vlx basis object for the bra side.
+    :param int_type:
+        the type of one-electron integral: overlap, kinetic_energy,
+                                           nuclear_attraction 
+    :param atomi:
+        the index of the atom with respect to which the derivatives
+        are taken (indexing starts at 1)
+    :param atomj:
+        the index of the second atom with respect to which the derivatives
+        are taken (indexing starts at 1)
+    :param unit:
+        the units to be used for the molecular geometry;
+        possible values: "au" (default), "Angstrom"
+    :param full_deriv:
+        if to calculate the full derivative
+        (nabla m | operator | n) + (m | operator | nabla n) (for debugging).
+
+
+    :return:
+        a numpy array corresponding to a specified block of 
+        the selected 1e integral derivative matrix.
+    """
+
+    bra_molecule_string = get_molecule_string(bra_molecule)
+    bra_basis_set_label = bra_basis.get_label()
+    ket_molecule_string = get_molecule_string(ket_molecule)
+    ket_basis_set_label = ket_basis.get_label()
+
+    bra_pyscf_basis = translate_to_pyscf(bra_basis_set_label)
+    bra_pyscf_molecule = pyscf.gto.M(atom=bra_molecule_string,
+                                 basis=bra_pyscf_basis, unit=unit,
+                                 charge=bra_molecule.get_charge())
+    ket_pyscf_basis = translate_to_pyscf(ket_basis_set_label)
+    ket_pyscf_molecule = pyscf.gto.M(atom=ket_molecule_string,
+                                 basis=ket_pyscf_basis, unit=unit,
+                                 charge=ket_molecule.get_charge())
+
+    # Get the AO indeces corresponding to atom i
+    i = atomi - 1 # to use pyscf indexing
+    j = atomj - 1
+
+    pyscf_int_type = get_pyscf_integral_type(int_type)
+    sign = get_sign(pyscf_int_type)
+
+    # TODO: modify to include all rinv-related integral derivatives
+    if pyscf_int_type in ["int1e_iprinvip", "int1e_ipiprinv"]:
+        # TODO: check if Zilvinas wants it this way
+        sign *= molecule.elem_ids_to_numpy()[j] # Z-number
+        # (nabla_i m | nabla_j operator | n)
+        with pyscf_molecule.with_rinv_at_nucleus(j): 
+            pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
+                                                        bra_pyscf_molecule,
+                                                        ket_pyscf_molecule)
+    else:
+        pyscf_int_deriv = sign * pyscf.gto.intor_cross(pyscf_int_type,
+                                                       bra_pyscf_molecule,
+                                                    ket_pyscf_molecule)
+
+
+    print("Integral type and sign", sign, pyscf_int_type)
+    
+    bra_ao_slices = bra_pyscf_molecule.aoslice_by_atom()
+    ket_ao_slices = ket_pyscf_molecule.aoslice_by_atom()
+
+    ki, kf = bra_ao_slices[i, 2:]
+    kj, kg = ket_ao_slices[j, 2:]
+
+    pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
+
+    if pyscf_int_type in ["int1e_iprinvip", "int1e_ipiprinv"]:
+        # (nabla_i m | nabla_j operator | n)
+        pyscf_int_deriv_atoms_ij[:,ki:kf,:] = pyscf_int_deriv[:,ki:kf,:]
+    else:
+        pyscf_int_deriv_atoms_ij[:,ki:kf,kj:kg] = pyscf_int_deriv[:,ki:kf,kj:kg]
+
+
+    # (nabla**2 m | operator | n) + (m | operator | nabla**2 n)
+    # or (nabla m | operator | nabla n) + (nabla n | operator | nabla m)
+    # TODO: remove
+    #nao = pyscf_molecule.nao
+    ##if full_deriv:
+    ##    pyscf_int_deriv_atoms_ij += pyscf_int_deriv_atoms_ij.transpose(0,2,1)
+    ##    if pyscf_int_type in ["int1e_iprinvip"]:
+    ##        sign = get_sign(pyscf_int_type) * molecule.elem_ids_to_numpy()[i]
+    ##        # (nabla_j m | nabla_i operator | n)
+    ##        with pyscf_molecule.with_rinv_at_nucleus(i): 
+    ##            new_pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
+    ##                                            aosym='s1').reshape((3,3,nao,nao))
+    ##        transposed_new_pyscf_int_deriv = new_pyscf_int_deriv.transpose(1,0,2,3)
+    ##        reshaped_new_pyscf_int_deriv = transposed_new_pyscf_int_deriv.reshape((3*3,nao,nao))
+    ##        new_pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
+    ##        new_pyscf_int_deriv_atoms_ij[:,kj:kg] += reshaped_new_pyscf_int_deriv[:,kj:kg]
+    ##        new_pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij.transpose(0,2,1)
+    ##        pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij
+    ##    elif pyscf_int_type in ["int1e_ipiprinv"]:
+    ##        sign = get_sign(pyscf_int_type) * molecule.elem_ids_to_numpy()[i]
+    ##        # (nabla_j m | nabla_i operator | n)
+    ##        with pyscf_molecule.with_rinv_at_nucleus(i): 
+    ##            new_pyscf_int_deriv = sign * pyscf_molecule.intor(pyscf_int_type,
+    ##                                            aosym='s1')
+    ##        new_pyscf_int_deriv_atoms_ij = np.zeros(pyscf_int_deriv.shape)
+    ##        new_pyscf_int_deriv_atoms_ij[:,kj:kg] += new_pyscf_int_deriv[:,kj:kg]
+    ##        new_pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij.transpose(0,2,1)
+    ##        pyscf_int_deriv_atoms_ij += new_pyscf_int_deriv_atoms_ij
+
+    # Transform integral to veloxchem format
+    vlx_int_deriv = np.zeros_like(pyscf_int_deriv_atoms_ij)
+
+    # number of derivatives (3)
+    n_deriv = pyscf_int_deriv_atoms_ij.shape[0]
+    for x in range(n_deriv):
+        vlx_int_deriv[x] = ao_matrix_to_veloxchem(
+                                 DenseMatrix(pyscf_int_deriv_atoms_ij[x]),
+                                 bra_basis, bra_molecule).to_numpy()
+
+    return vlx_int_deriv
 
 
 def import_1e_second_order_integral_derivative(molecule, basis, int_type,
