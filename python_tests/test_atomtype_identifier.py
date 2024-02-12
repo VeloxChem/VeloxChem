@@ -5,7 +5,8 @@ from veloxchem.molecule import Molecule
 class TestAtomTypeIdentifier:
 
     def run_atomtypeidentifier(self, xyz_string, expected_atomtypes,
-                               expected_equal_charges_list):
+                               expected_equal_charges_list,
+                               expected_equiv_atoms):
 
         atomtypeidentifier = AtomTypeIdentifier()
         atomtypeidentifier.ostream.mute()
@@ -25,6 +26,8 @@ class TestAtomTypeIdentifier:
             equal_charges_list.sort()
 
         assert equal_charges_list == expected_equal_charges_list
+
+        assert atomtypeidentifier.equivalent_atoms == expected_equiv_atoms
 
     def test_atomtypeidentifier_1(self):
 
@@ -46,9 +49,14 @@ class TestAtomTypeIdentifier:
             'br', 'o', 'n2', 'c3', 'c2', 'c2', 'c1', 'h1', 'h1', 'ha', 'h4'
         ]
         expected_equal_charges_list = [[8, 9]]
+        expected_equiv_atoms = [
+            'br_00', 'o_00', 'n2_00', 'c3_00', 'c2_00', 'c2_01', 'c1_00',
+            'h1_00', 'h1_00', 'ha_00', 'h4_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_2(self):
 
@@ -77,9 +85,15 @@ class TestAtomTypeIdentifier:
         ]
         expected_equal_charges_list = [[1, 3, 5, 6], [2, 4],
                                        [7, 8, 10, 11, 13, 14, 15, 16], [9, 12]]
+        expected_equiv_atoms = [
+            'cx_00', 'cx_01', 'cx_00', 'cx_01', 'cx_00', 'cx_00', 'hc_00',
+            'hc_00', 'hc_01', 'hc_00', 'hc_00', 'hc_01', 'hc_00', 'hc_00',
+            'hc_00', 'hc_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_3(self):
 
@@ -96,9 +110,14 @@ class TestAtomTypeIdentifier:
         """
         expected_atomtypes = ['cl', 'ss', 's', 'cs', 'c3', 'h1', 'h1', 'h1']
         expected_equal_charges_list = [[6, 7, 8]]
+        expected_equiv_atoms = [
+            'cl_00', 'ss_00', 's_00', 'cs_00', 'c3_00', 'h1_00', 'h1_00',
+            'h1_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_4(self):
 
@@ -115,9 +134,14 @@ class TestAtomTypeIdentifier:
         """
         expected_atomtypes = ['c3', 'c3', 'cl', 'cl', 'cl', 'cl', 'cl', 'cl']
         expected_equal_charges_list = [[1, 2], [3, 4, 5, 6, 7, 8]]
+        expected_equiv_atoms = [
+            'c3_00', 'c3_00', 'cl_00', 'cl_00', 'cl_00', 'cl_00', 'cl_00',
+            'cl_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_5(self):
 
@@ -135,9 +159,14 @@ class TestAtomTypeIdentifier:
         """
         expected_atomtypes = ['c', 'c', 'c3', 'o', 'o', 'h4', 'h4', 'hc', 'hc']
         expected_equal_charges_list = [[1, 2], [4, 5], [6, 7], [8, 9]]
+        expected_equiv_atoms = [
+            'c_00', 'c_00', 'c3_00', 'o_00', 'o_00', 'h4_00', 'h4_00', 'hc_00',
+            'hc_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_6(self):
 
@@ -158,9 +187,14 @@ class TestAtomTypeIdentifier:
             'br', 'o', 'n2', 'c3', 'c3', 'c1', 'h1', 'h1', 'h1', 'h1'
         ]
         expected_equal_charges_list = [[7, 8], [9, 10]]
+        expected_equiv_atoms = [
+            'br_00', 'o_00', 'n2_00', 'c3_00', 'c3_01', 'c1_00', 'h1_00',
+            'h1_00', 'h1_01', 'h1_01'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_7(self):
 
@@ -184,9 +218,14 @@ class TestAtomTypeIdentifier:
             'ho'
         ]
         expected_equal_charges_list = []
+        expected_equiv_atoms = [
+            'nb_00', 'ca_00', 'ca_01', 'ca_02', 'ca_03', 'ca_04', 'oh_00',
+            'ha_00', 'ha_01', 'ha_02', 'h4_00', 'ho_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_8(self):
 
@@ -217,9 +256,15 @@ class TestAtomTypeIdentifier:
             'ha', 'ha', 'ha', 'h4', 'hc', 'hc', 'hc', 'hn'
         ]
         expected_equal_charges_list = [[16, 17, 18]]
+        expected_equiv_atoms = [
+            'ca_00', 'ca_01', 'ca_02', 'ca_03', 'cc_00', 'ca_04', 'cc_01',
+            'ca_05', 'c3_00', 'na_00', 'ha_00', 'ha_01', 'ha_02', 'ha_03',
+            'h4_00', 'hc_00', 'hc_00', 'hc_00', 'hn_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_9(self):
 
@@ -254,9 +299,16 @@ class TestAtomTypeIdentifier:
         ]
         expected_equal_charges_list = [[1, 2], [3, 4], [11, 12], [13, 14],
                                        [15, 16, 17], [18, 19], [20, 21]]
+        expected_equiv_atoms = [
+            'ca_00', 'ca_00', 'ca_01', 'ca_01', 'ca_02', 'ca_03', 'c3_00',
+            'c3_01', 'c3_02', 'oh_00', 'ha_00', 'ha_00', 'ha_01', 'ha_01',
+            'hc_00', 'hc_00', 'hc_00', 'hc_01', 'hc_01', 'hc_02', 'hc_02',
+            'ho_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_10(self):
 
@@ -305,9 +357,17 @@ class TestAtomTypeIdentifier:
             'h1', 'h1'
         ]
         expected_equal_charges_list = [[33, 34, 35]]
+        expected_equiv_atoms = [
+            'ca_00', 'ca_01', 'h4_00', 'nb_00', 'ca_02', 'h4_01', 'ca_03',
+            'ha_00', 'ca_04', 'cc_00', 'ha_01', 'cc_01', 'h4_02', 'na_00',
+            'cc_02', 'ss_00', 'cc_03', 'ha_02', 'cc_04', 'ha_03', 'cc_05',
+            'cc_06', 'cc_07', 'ha_04', 'cc_08', 'ha_05', 'ss_01', 'cc_09',
+            'c_00', 'o_00', 'os_00', 'c3_00', 'h1_00', 'h1_00', 'h1_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_hexatriene(self):
 
@@ -334,9 +394,14 @@ class TestAtomTypeIdentifier:
         ]
         expected_equal_charges_list = [[1, 11], [2, 10], [3, 4, 13, 14], [5, 7],
                                        [6, 12], [8, 9]]
+        expected_equiv_atoms = [
+            'c2_00', 'ce_00', 'ha_00', 'ha_00', 'ce_01', 'ha_01', 'ce_01',
+            'ha_02', 'ha_02', 'ce_00', 'c2_00', 'ha_01', 'ha_00', 'ha_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_butane(self):
 
@@ -363,9 +428,59 @@ class TestAtomTypeIdentifier:
         ]
         expected_equal_charges_list = [[1, 11], [2, 3, 4, 12, 13, 14], [5, 8],
                                        [6, 7, 9, 10]]
+        expected_equiv_atoms = [
+            'c3_00', 'hc_00', 'hc_00', 'hc_00', 'c3_01', 'hc_01', 'hc_01',
+            'c3_01', 'hc_01', 'hc_01', 'c3_00', 'hc_00', 'hc_00', 'hc_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
+    def test_atomtypeidentifier_noradrenaline(self):
+
+        xyz_string = """23
+        noradrenaline
+        H       -1.8193999674   -2.5097458050   -0.5507950455
+        C       -1.4355452194   -1.5284769930   -0.2951571832
+        C       -2.3089191215   -0.4593458985   -0.1886635299
+        O       -3.6690464443   -0.5422210733   -0.3841138405
+        C       -1.8255516449    0.8097372093    0.1469046451
+        C       -0.4687604354    0.9845502431    0.3694347370
+        H       -0.1169650009    1.9731850398    0.6359161766
+        C        0.4203521635   -0.0850019011    0.2563051158
+        C        1.9048341672    0.1432961237    0.4528861030
+        C       -0.0738036281   -1.3439593880   -0.0746469636
+        H        0.6049466138   -2.1813113202   -0.1482676236
+        O       -2.6753261092    1.8678164911    0.2657837532
+        H       -3.9133744651   -1.4429007059   -0.6142762974
+        H       -3.5694739457    1.5581900821    0.0765607930
+        O        2.5513450005   -0.9759063254    1.0721777983
+        H        2.0561900870    1.0385736809    1.0650086348
+        C        2.6349951121    0.3620412906   -0.8693646417
+        H        2.1445626765    1.1787081547   -1.4017612725
+        N        4.0273077512    0.7299013711   -0.6192540306
+        H        2.5065073570   -0.5476233229   -1.4727537911
+        H        4.4869804996   -0.0238192548   -0.1223947057
+        H        4.5220904955    0.8575433726   -1.4930596178
+        H        2.1653934540   -1.1046663754    1.9436295799
+        """
+        expected_atomtypes = [
+            'ha', 'ca', 'ca', 'oh', 'ca', 'ca', 'ha', 'ca', 'c3', 'ca', 'ha',
+            'oh', 'ho', 'ho', 'oh', 'h1', 'c3', 'h1', 'n8', 'h1', 'hn', 'hn',
+            'ho'
+        ]
+        expected_equal_charges_list = [[18, 20], [21, 22]]
+        expected_equiv_atoms = [
+            'ha_00', 'ca_00', 'ca_01', 'oh_00', 'ca_02', 'ca_03', 'ha_01',
+            'ca_04', 'c3_00', 'ca_05', 'ha_02', 'oh_01', 'ho_00', 'ho_01',
+            'oh_02', 'h1_00', 'c3_01', 'h1_01', 'n8_00', 'h1_01', 'hn_00',
+            'hn_00', 'ho_02'
+        ]
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_cp_cq(self):
 
@@ -413,9 +528,17 @@ class TestAtomTypeIdentifier:
                                        [11, 22], [12, 20, 23, 31],
                                        [13, 21, 24, 32], [14, 18, 25, 29],
                                        [15, 19, 26, 30], [16, 27], [17, 28]]
+        expected_equiv_atoms = [
+            'ha_00', 'ca_00', 'ca_01', 'ha_01', 'ca_01', 'ha_01', 'ca_00',
+            'ha_00', 'cp_00', 'cp_00', 'cp_01', 'ca_02', 'ha_02', 'ca_03',
+            'ha_03', 'ca_04', 'ha_04', 'ca_03', 'ha_03', 'ca_02', 'ha_02',
+            'cp_01', 'ca_02', 'ha_02', 'ca_03', 'ha_03', 'ca_04', 'ha_04',
+            'ca_03', 'ha_03', 'ca_02', 'ha_02'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_ca(self):
 
@@ -450,9 +573,15 @@ class TestAtomTypeIdentifier:
         expected_equal_charges_list = [[1, 12], [2, 13], [3, 14], [4, 15],
                                        [5, 16], [6, 17], [7, 18], [8, 19],
                                        [9, 20], [10, 11]]
+        expected_equiv_atoms = [
+            'ca_00', 'ca_01', 'ha_00', 'ca_02', 'ha_01', 'ca_03', 'ha_02',
+            'ca_04', 'ha_03', 'ca_05', 'ca_05', 'ca_00', 'ca_01', 'ha_00',
+            'ca_02', 'ha_01', 'ca_03', 'ha_02', 'ca_04', 'ha_03', 'ss_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
 
     def test_atomtypeidentifier_cp(self):
 
@@ -494,6 +623,13 @@ class TestAtomTypeIdentifier:
                                        [5, 16], [6, 17], [7, 18], [8, 19],
                                        [9, 20], [10, 11], [21, 22],
                                        [23, 24, 25, 26]]
+        expected_equiv_atoms = [
+            'ha_00', 'ca_00', 'ca_01', 'ha_01', 'ca_02', 'ha_02', 'ca_03',
+            'ha_03', 'ca_04', 'cp_00', 'cp_00', 'ca_00', 'ha_00', 'ca_01',
+            'ha_01', 'ca_02', 'ha_02', 'ca_03', 'ha_03', 'ca_04', 'c3_00',
+            'c3_00', 'hc_00', 'hc_00', 'hc_00', 'hc_00'
+        ]
 
         self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
-                                    expected_equal_charges_list)
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)

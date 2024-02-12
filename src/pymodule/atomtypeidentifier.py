@@ -2041,7 +2041,7 @@ class AtomTypeIdentifier:
 
         return np.linalg.norm(np.array(v1) - np.array(v2))
 
-    def identify_equivalences(self, depth=4):
+    def identify_equivalences(self, depth=20):
         """
         Identifies equivalent atoms in the molecule.
         The depth parameter specifies how many bonds are considered for the equivalence.
@@ -2097,14 +2097,22 @@ class AtomTypeIdentifier:
 
         for atom_type in list(set(self.gaff_atom_types)):
 
+            # skip cd/cf/ch/nd/nf/cq since they will be counted by
+            # cc/ce/cg/nc/ne/cp
+            if atom_type in ['cd', 'cf', 'ch', 'nd', 'nf', 'cq']:
+                continue
+
             swapped_atom_type = conjugated_atomtype_mapping.get(
                 atom_type, atom_type)
 
-            # skip non-repeating atom types
-            if self.gaff_atom_types.count(atom_type) == 1:
+            atom_type_count = self.gaff_atom_types.count(atom_type)
+            if swapped_atom_type != atom_type:
+                atom_type_count += self.gaff_atom_types.count(swapped_atom_type)
+
+            if atom_type_count == 1:
                 continue
 
-            atom_paths = defaultdict(list)
+            atom_paths = defaultdict(set)
 
             for idx, at in enumerate(self.gaff_atom_types):
                 if at in [atom_type, swapped_atom_type]:
@@ -2125,9 +2133,9 @@ class AtomTypeIdentifier:
                     swapped_path_types = tuple(sorted(swapped_path_types))
 
                     if swapped_path_types in atom_paths:
-                        atom_paths[swapped_path_types].append(idx)
+                        atom_paths[swapped_path_types].add(idx)
                     else:
-                        atom_paths[path_types].append(idx)
+                        atom_paths[path_types].add(idx)
 
             for eq_id, (path_set, indices) in enumerate(atom_paths.items()):
                 for idx in indices:
