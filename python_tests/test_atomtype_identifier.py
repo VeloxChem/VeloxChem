@@ -403,6 +403,22 @@ class TestAtomTypeIdentifier:
                                     expected_equal_charges_list,
                                     expected_equiv_atoms)
 
+    def test_atomtypeidentifier_water(self):
+
+        xyz_string = """3
+        water
+        O      1.035010   -0.055790    0.042900
+        H      2.002900   -0.067860    0.087740
+        H      0.756160   -0.297060    0.939000
+        """
+        expected_atomtypes = ['ow', 'hw', 'hw']
+        expected_equal_charges_list = [[2, 3]]
+        expected_equiv_atoms = ['ow_00', 'hw_00', 'hw_00']
+
+        self.run_atomtypeidentifier(xyz_string, expected_atomtypes,
+                                    expected_equal_charges_list,
+                                    expected_equiv_atoms)
+
     def test_atomtypeidentifier_butane(self):
 
         xyz_string = """14

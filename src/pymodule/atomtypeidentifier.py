@@ -928,7 +928,7 @@ class AtomTypeIdentifier:
                     if (info['NumConnectedAtoms'] == 2 and
                             connected_symbols == {'H'}):
 
-                        oxygen_type = {'opls': 'opls_154', 'gaff': 'ow'}
+                        oxygen_type = {'opls': 'opls_111', 'gaff': 'ow'}
 
                     elif (info['NumConnectedAtoms'] == 2 and
                           'H' in connected_symbols):
@@ -1008,7 +1008,11 @@ class AtomTypeIdentifier:
                     if (connected_atom_info['AtomicSymbol'] == 'H' and
                             connected_atom_info['NumConnectedAtoms'] == 1):
 
-                        if oxygen_type == {'opls': 'opls_154', 'gaff': 'oh'}:
+                        if oxygen_type == {'opls': 'opls_111', 'gaff': 'ow'}:
+
+                            hydrogen_type = {'opls': 'opls_112', 'gaff': 'hw'}
+
+                        elif oxygen_type == {'opls': 'opls_154', 'gaff': 'oh'}:
 
                             hydrogen_type = {'opls': 'opls_155', 'gaff': 'ho'}
 

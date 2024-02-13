@@ -621,10 +621,15 @@ class ForceFieldGenerator:
                     break
 
             if not atom_type_found:
-                warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
-                self.ostream.print_warning(warnmsg)
-                # Default value for atomtypes
-                sigma, epsilon, comment = 0.0, 0.0, 'Unknown'
+                if at == 'ow':
+                    sigma, epsilon, comment = 3.15061e-01, 6.36386e-01, 'OW'
+                elif at == 'hw':
+                    sigma, epsilon, comment = 0.0, 0.0, 'HW'
+                else:
+                    warnmsg = f'ForceFieldGenerator: atom type {at} is not in GAFF.'
+                    self.ostream.print_warning(warnmsg)
+                    # Default value for atomtypes
+                    sigma, epsilon, comment = 0.0, 0.0, 'Unknown'
 
             atom_type_params[at] = {
                 'sigma': sigma,
