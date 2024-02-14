@@ -46,9 +46,9 @@ class PolOrbitalResponse(CphfSolver):
         self.cphf_results = None
 
         self._input_keywords['orbitalresponse'].update({
-                'vector_components': ('str_lower', 'Cartesian components of operator'),
-                'frequencies': ('seq_range', 'frequencies'),
-                'is_complex': ('bool', 'whether the polarizability is complex'),
+            'vector_components': ('str_lower', 'Cartesian components of operator'),
+            'frequencies': ('seq_range', 'frequencies'),
+            'is_complex': ('bool', 'whether the polarizability is complex'),
             })
 
     def update_settings(self, orbrsp_dict, method_dict=None):
