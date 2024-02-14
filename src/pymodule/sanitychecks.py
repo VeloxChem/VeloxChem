@@ -168,6 +168,7 @@ def polgrad_sanity_check(obj, method_flag, lr_results):
     for frequency in obj.frequencies:
         if (obj.vector_components[0], frequency) not in response_results.keys():
             error_text = 'Frequency {:2.3f} in '.format(frequency)
-            error_text += method_flag + ' not found in linear response results.' 
+            error_text += method_flag + ' not found in linear response results ' 
+            error_text += 'for vector compontent ' + obj.vector_components[0] 
             raise ValueError(error_text)
 
