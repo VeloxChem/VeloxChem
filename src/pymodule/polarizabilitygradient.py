@@ -14,9 +14,11 @@ from .veloxchemlib import denmat
 from .veloxchemlib import MolecularGrid
 # from .veloxchemlib import parse_xc_func
 from .veloxchemlib import GridDriver, XCMolecularGradient
+from .veloxchemlib import hartree_in_wavenumber
 # from .cphfsolver import CphfSolver
 from .polorbitalresponse import PolOrbitalResponse
 from .lrsolver import LinearResponseSolver
+from .cppsolver import ComplexResponse
 from .molecule import Molecule
 from .outputstream import OutputStream
 # from .qqscheme import get_qq_scheme
@@ -63,6 +65,9 @@ class PolarizabilityGradient():
         self.polgradient = None
         self.delta_h = 0.001
 
+        self.is_complex = False
+        self.damping = 1000.0 / hartree_in_wavenumber() # for numerical complex gradient
+
         self.numerical = False
         self.do_four_point = False
 
@@ -81,6 +86,8 @@ class PolarizabilityGradient():
                 'numerical': ('bool', 'do numerical integration'),
                 'do_four_point': ('bool', 'do four-point numerical integration'),
                 'delta_h': ('float', 'the displacement for finite difference'),
+                'is_complex': ('bool', 'whether the polarizability is complex'),
+                'damping': ('float', 'damping parameter for complex numerical'),
             },
             'method_settings': {
                 'xcfun': ('str_upper', 'exchange-correlation functional'),
@@ -127,6 +134,8 @@ class PolarizabilityGradient():
 
         if 'frequencies' not in orbrsp_dict:
             orbrsp_dict['frequencies'] = self.frequencies
+        if 'is_complex' not in orbrsp_dict:
+            orbrsp_dict['is_complex'] = self.is_complex
 
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
@@ -163,7 +172,12 @@ class PolarizabilityGradient():
                 error_message = 'PolarizabilityGradient: missing input SCF driver '
                 error_message += 'for numerical calculations'
                 raise ValueError(error_message)
-            self.compute_numerical(molecule, basis, self.scf_drv)
+            if self.is_complex:
+                # error_message = 'Complex numerical pol. gradient not yet implemented'
+                # raise NotImplementedError(error_message)
+                self.compute_numerical_complex(molecule, basis, self.scf_drv)
+            else:
+                self.compute_numerical_real(molecule, basis, self.scf_drv)
         else:
             # print only on the master node
             if self.rank == mpi_master():
@@ -171,7 +185,11 @@ class PolarizabilityGradient():
                 self.ostream.print_header(valstr)
                 self.ostream.print_blank()
                 self.ostream.flush()
-            self.compute_analytical(molecule, basis, scf_tensors, lr_results)
+            if self.is_complex:
+                error_message = 'Complex analytical pol. gradient not yet implemented'
+                raise NotImplementedError(error_message)
+            else:
+                self.compute_analytical_real(molecule, basis, scf_tensors, lr_results)
 
         if self.rank == mpi_master():
             self.print_geometry(molecule)
@@ -185,9 +203,9 @@ class PolarizabilityGradient():
             self.ostream.print_blank()
             self.ostream.flush()
 
-    def compute_analytical(self, molecule, basis, scf_tensors, lr_results):
+    def compute_analytical_real(self, molecule, basis, scf_tensors, lr_results):
         """
-        Performs calculation of analytical polarizability gradient.
+        Performs calculation of the real analytical polarizability gradient.
 
         :param molecule:
             The molecule.
@@ -427,10 +445,11 @@ class PolarizabilityGradient():
         self.ostream.print_blank()
         self.ostream.flush()
 
-    def compute_numerical(self, molecule, ao_basis, scf_drv):
+
+    def compute_numerical_real(self, molecule, ao_basis, scf_drv):
         """
         Performs calculation of numerical nuclear gradient
-        of the electric dipole polarizability.
+        of the real electric dipole polarizability.
 
         Moved from tddftgradientdriver.py 18/10/2023
 
@@ -574,6 +593,154 @@ class PolarizabilityGradient():
 
         scf_drv.ostream.unmute()
         lr_drv.ostream.unmute()
+
+    def compute_numerical_complex(self, molecule, ao_basis, scf_drv):
+        """
+        Performs calculation of numerical nuclear gradient
+        of the complex electric dipole polarizability.
+
+        :param molecule:
+            The molecule.
+        :param ao_basis:
+            The AO basis set.
+        :param scf_drv:
+            The SCF driver.
+        """
+
+        # number of atoms
+        natm = molecule.number_of_atoms()
+
+        # atom labels
+        labels = molecule.get_labels()
+
+        # atom coordinates (nx3)
+        coords = molecule.get_coordinates()
+
+        # number of frequencies
+        n_freqs = len(self.frequencies)
+
+        # dictionary
+        polgrad_results = {}
+
+        # linear response driver for polarizability calculation
+        cpp_drv = ComplexResponse(self.comm, self.ostream)
+        cpp_drv.frequencies = self.frequencies
+        cpp_drv.damping = self.damping
+
+        # polarizability: 3 coordinates x 3 coordinates (ignoring frequencies)
+        # polarizability gradient: dictionary goes through 3 coordinates
+        # x 3 coordinates, each entry having values for
+        # no. atoms x 3 coordinates
+        # datatype: complex
+        num_polgradient = np.zeros((n_freqs, 3, 3, 3 * natm), dtype = complex)
+
+        if not self.do_four_point:
+            if self.rank == mpi_master():
+                self.ostream.print_blank()
+                self.ostream.print_info('do_four_point: False')
+                self.ostream.flush()
+
+            # mute the outputstreams
+            scf_drv.ostream.mute()
+            cpp_drv.ostream.mute()
+
+            for i in range(natm):
+                for d in range(3):
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    scf_drv.compute(new_mol, ao_basis)
+                    cpp_drv._is_converged = False
+                    cpp_results_p = cpp_drv.compute(new_mol, ao_basis,
+                                                  scf_drv.scf_tensors)
+
+                    coords[i, d] -= 2.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    scf_drv.compute(new_mol, ao_basis)
+                    cpp_drv._is_converged = False
+                    cpp_results_m = cpp_drv.compute(new_mol, ao_basis,
+                                                  scf_drv.scf_tensors)
+
+                    coords[i, d] += self.delta_h
+                    for f, w in enumerate(self.frequencies):
+                        self.ostream.print_info('{}'.format(w))
+                        self.ostream.flush()
+                        for aop, acomp in enumerate('xyz'):
+                            for bop, bcomp in enumerate('xyz'):
+                                key = (acomp, bcomp, w)
+                                if self.rank == mpi_master():
+                                    num_polgradient[f, aop, bop, 3 * i + d] = (
+                                    (cpp_results_p['response_functions'][key] -
+                                     cpp_results_m['response_functions'][key]) /
+                                    (2.0 * self.delta_h))
+            if self.rank == mpi_master():
+                for f, w in enumerate(self.frequencies):
+                    polgrad_results[w] = num_polgradient[f]
+                self.polgradient = dict(polgrad_results)
+            else:
+                self.polgradient = {}
+
+        # four-point approximation for debugging of analytical gradient
+        else:
+            if self.rank == mpi_master():
+                self.ostream.print_info('do_four_point: True')
+                self.ostream.flush()
+            # mute the outputstreams:
+            scf_drv.ostream.mute()
+            cpp_drv.ostream.mute()
+
+            for i in range(natm):
+                for d in range(3):
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    scf_drv.compute(new_mol, ao_basis)
+                    cpp_drv._is_converged = False
+                    cpp_results_p1 = cpp_drv.compute(new_mol, ao_basis,
+                                                   scf_drv.scf_tensors)
+
+                    coords[i, d] += self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    scf_drv.compute(new_mol, ao_basis)
+                    cpp_drv._is_converged = False
+                    cpp_results_p2 = cpp_drv.compute(new_mol, ao_basis,
+                                                   scf_drv.scf_tensors)
+
+                    coords[i, d] -= 3.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    scf_drv.compute(new_mol, ao_basis)
+                    cpp_drv._is_converged = False
+                    cpp_results_m1 = cpp_drv.compute(new_mol, ao_basis,
+                                                   scf_drv.scf_tensors)
+
+                    coords[i, d] -= 1.0 * self.delta_h
+                    new_mol = Molecule(labels, coords, units='au')
+                    scf_drv.compute(new_mol, ao_basis)
+                    cpp_drv._is_converged = False
+                    cpp_results_m2 = cpp_drv.compute(new_mol, ao_basis,
+                                                   scf_drv.scf_tensors)
+
+                    coords[i, d] += 2.0 * self.delta_h
+                    for f, w in enumerate(self.frequencies):
+                        for aop, acomp in enumerate('xyz'):
+                            for bop, bcomp in enumerate('xyz'):
+                                # f'(x) ~ [ f(x - 2h) - 8 f(x - h)
+                                # + 8 f(x + h) - f(x + 2h) ] / ( 12h )
+                                key = (acomp, bcomp, w)
+                                if self.rank == mpi_master():
+                                    num_polgradient[f, aop, bop, 3 * i + d] = ((
+                                    cpp_results_m2['response_functions'][key] -
+                                    8.0 * cpp_results_m1['response_functions'][key] +
+                                    8.0 * cpp_results_p1['response_functions'][key] -
+                                    cpp_results_p2['response_functions'][key]) / (
+                                        12.0 * self.delta_h))
+            if self.rank == mpi_master():
+                for f, w in enumerate(self.frequencies):
+                    polgrad_results[w] = num_polgradient[f]
+                self.polgradient = dict(polgrad_results)
+            else:
+                self.polgradient = {}
+
+        scf_drv.ostream.unmute()
+        cpp_drv.ostream.unmute()
 
     def grad_polgrad_xc_contrib(self, molecule, ao_basis, rhow_den, x_minus_y_den,
                                 gs_density, xcfun_label):
