@@ -153,7 +153,7 @@ class PolOrbitalResponse(CphfSolver):
         :param scf_tensors:
             The dictionary of tensors from converged SCF calculation.
         :param lr_results:
-            The results from converged linear response calculation.
+            The results from converged CPP calculation.
 
         :return:
             A dictionary containing the orbital-response RHS and
@@ -257,12 +257,6 @@ class PolOrbitalResponse(CphfSolver):
                     for x in range(x_minus_y_imag.shape[0])
                 ])
 
-                #valstr = ' * comput_rhs() > Time spent on mdot #0: '
-                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                #self.ostream.print_header(valstr)
-                #self.ostream.print_blank()
-                #self.ostream.flush()
-
                 # Turn them into a list (for AODensityMatrix)
                 # For the real part of the two-particle denisty matrix we must sum over
                 # the real and imaginary parts of xpy and xmy ( xpy = xpy_real + xpy_imag )
@@ -313,12 +307,6 @@ class PolOrbitalResponse(CphfSolver):
                                 (x_minus_y_real[y].T + x_minus_y_imag[y].T)
                             ]).T
                         )
-                        
-                #valstr = ' * comput_rhs() > Time spent on mdot #1: '
-                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                #self.ostream.print_header(valstr)
-                #self.ostream.print_blank()
-                #self.ostream.flush()
 
                 mdot_start_time = tm.time()
 
@@ -331,12 +319,6 @@ class PolOrbitalResponse(CphfSolver):
                         + np.linalg.multi_dot([ mo_vir, dm_vv_real[x,y], mo_vir.T ])
                         )
                 dm_ao_real_list = list(unrel_dm_ao_real.reshape(dof**2, nao, nao))
-
-                #valstr = ' * comput_rhs() > Time spent on mdot #2: '
-                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                #self.ostream.print_header(valstr)
-                #self.ostream.print_blank()
-                #self.ostream.flush()
 
                 # 2) Construct the right-hand side
                 dm_ao_rhs_real = AODensityMatrix(dm_ao_real_list + xpmy_ao_real_list, denmat.rest)
@@ -538,12 +520,6 @@ class PolOrbitalResponse(CphfSolver):
                         ])
                 fock_mo_rhs_2dm_real = 0.25 * fock_mo_rhs_2dm_real.reshape(dof**2, nocc, nvir)
 
-                #valstr = ' * comput_rhs() > Time spent on mdot #3: '
-                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                #self.ostream.print_header(valstr)
-                #self.ostream.print_blank()
-                #self.ostream.flush()
-
                 # Calculate the dipole contributions to the RHS:
                 # Dipole integrals in AO basis
                 dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
@@ -584,12 +560,6 @@ class PolOrbitalResponse(CphfSolver):
                             ) 
                         )
                 rhs_dipole_contrib_real = rhs_dipole_contrib_real.reshape(dof**2, nocc, nvir)
-
-                #valstr = ' * comput_rhs() > Time spent on mdot #4: '
-                #valstr += '{:.6f} sec * '.format(tm.time() - mdot_start_time)
-                #self.ostream.print_header(valstr)
-                #self.ostream.print_blank()
-                #self.ostream.flush()
 
                 rhs_mo_real = fock_mo_rhs_1dm_real + fock_mo_rhs_2dm_real + rhs_dipole_contrib_real
 
@@ -1108,9 +1078,24 @@ class PolOrbitalResponse(CphfSolver):
     #   - fock_ao_rhs and fock_gxc_ao come from cphfsolver dictionary
     #   - fock_lambda not returned yet, put in dictionary from cphfsolver
     #     (otherwise needs to be recalculated)
+
     def compute_omega(self, molecule, basis, scf_tensors, lr_results):
         """
-        Calculates the polarizability Lagrange multipliers for the
+        Guides the calculation of the polarizability Lagrange multipliers
+        for the overlap matrix according to is_complex instance variable
+        """
+
+        if self.is_complex:
+            #error_msg = 'Complex omega multipliers not implemented!'
+            #raise NotImplementedError(error_msg)
+            #return None
+            return self.compute_omega_complex(molecule, basis, scf_tensors, lr_results)
+        else:
+            return self.compute_omega_real(molecule, basis, scf_tensors, lr_results)
+
+    def compute_omega_real(self, molecule, basis, scf_tensors, lr_results):
+        """
+        Calculates the real  polarizability Lagrange multipliers for the
         overlap matrix.
 
         :param molecule:
@@ -1432,6 +1417,353 @@ class PolOrbitalResponse(CphfSolver):
 
         if self.rank == mpi_master():
             valstr = '** Time spent on constructing omega multipliers '
+            valstr += 'for {} frequencies: '.format(n_freqs)
+            valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
+            self.ostream.print_header(valstr)
+            self.ostream.print_blank()
+            self.ostream.flush()
+
+    def compute_omega_complex(self, molecule, basis, scf_tensors, lr_results):
+        """
+        Calculates the complex polarizability Lagrange multipliers for the
+        overlap matrix.
+
+        :param molecule:
+            The molecule.
+        :param basis:
+            The AO basis set.
+        :param scf_tensors:
+            The tensors from the converged SCF calculation.
+        :param lr_results:
+            The results from the CPP calculation.
+        """
+
+        # ERI information
+        eri_dict = self._init_eri(molecule, basis)
+        # DFT information
+        dft_dict = self._init_dft(molecule, scf_tensors)
+        # PE information
+        pe_dict = self._init_pe(molecule, basis)
+
+        n_freqs = len(self.frequencies)
+
+        loop_start_time = tm.time()
+
+        for f, w in enumerate(self.frequencies):
+            self.ostream.print_info('Building omega for w = {:4.3f}'.format(w))
+            self.ostream.flush()
+
+            if self.rank == mpi_master():
+
+                # Get overlap, MO coefficients from scf_tensors
+                ovlp = scf_tensors['S']
+                nocc = molecule.number_of_alpha_electrons()
+                mo = scf_tensors['C']
+                mo_occ = mo[:, :nocc]
+                mo_vir = mo[:, nocc:]
+                nocc = mo_occ.shape[1]
+                nvir = mo_vir.shape[1]
+                nao = mo_occ.shape[0]
+
+                mo_energies = scf_tensors['E']
+                eocc = mo_energies[:nocc]
+                evir = mo_energies[nocc:]
+                eo_diag = np.diag(eocc)
+                ev_diag = np.diag(evir)
+
+                # Get fock matrices from cphf_results
+                # FIXME for now only real part is in cphf_results
+                fock_ao_rhs_real = self.cphf_results[w]['fock_ao_rhs']
+                fock_gxc_ao_real = self.cphf_results[w]['fock_gxc_ao'] #FIXME when DFT cmplx
+                dm_oo_real = self.cphf_results[w]['dm_oo']
+                dm_vv_real = self.cphf_results[w]['dm_vv']
+
+                # TODO: MPI should this be done before loop over freqs?
+                # FIXME for now only real part is in cphf_results
+                all_cphf_ov_real = self.cphf_results['cphf_ov']
+                dof = int(all_cphf_ov_real.shape[0] / n_freqs)
+                cphf_ov_real = all_cphf_ov_real.reshape(n_freqs, dof, nocc, nvir)[f]
+
+                # TODO: do we keep this factor like that?
+                sqrt2 = np.sqrt(2.0)
+
+            # FIXME the full vector is complex!
+            full_vec_real = []
+            full_vec_imag = []
+            #full_vec = ([self.get_full_solution_vector(lr_results['solutions'][
+            #            x, w]) for x in self.vector_components])
+            for x in self.vector_components:
+                x_vec_real, x_vec_imag = self.get_full_solution_vector(lr_results['solutions'][x, w])
+                full_vec_real.append(x_vec_real)
+                full_vec_imag.append(x_vec_imag)
+
+            if self.rank == mpi_master():
+                # Save the number of vector components
+                dof = len(self.vector_components)
+
+                # Extract the excitation and de-excitation components
+                # from the full solution vector.
+                exc_vec_real = (1 / sqrt2 *
+                            np.array(full_vec_real)[:, :nocc * nvir].reshape(dof, nocc, nvir))
+                deexc_vec_real = (1 / sqrt2 *
+                            np.array(full_vec_real)[:, nocc * nvir:].reshape(dof, nocc, nvir))
+                exc_vec_imag = (1 / sqrt2 *
+                            np.array(full_vec_imag)[:, :nocc * nvir].reshape(dof, nocc, nvir))
+                deexc_vec_imag = (1 / sqrt2 *
+                            np.array(full_vec_imag)[:, nocc * nvir:].reshape(dof, nocc, nvir))
+
+                x_plus_y_real = exc_vec_real + deexc_vec_real
+                x_minus_y_real = exc_vec_real - deexc_vec_real
+                x_plus_y_imag = exc_vec_imag + deexc_vec_imag  
+                x_minus_y_imag = exc_vec_imag - deexc_vec_imag
+
+                # Get dipole moment integrals and transform to MO
+                dipole_drv = ElectricDipoleIntegralsDriver(self.comm)
+                dipole_mats = dipole_drv.compute(molecule, basis)
+                dipole_ints_ao = np.zeros((dof, nao, nao))
+                k = 0
+                if 'x' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.x_to_numpy()
+                    k += 1
+                if 'y' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.y_to_numpy()
+                    k += 1
+                if 'z' in self.vector_components:
+                    dipole_ints_ao[k] = dipole_mats.z_to_numpy()
+
+                # Transform them to MO basis (oo and ov blocks only)
+                dipole_ints_oo = np.array([
+                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_occ])
+                    for x in range(dof)
+                ])
+                dipole_ints_ov = np.array([
+                    np.linalg.multi_dot([mo_occ.T, dipole_ints_ao[x], mo_vir])
+                    for x in range(dof)
+                ])
+
+                mdot_start_time = tm.time()
+
+                # Calculate the dipole moment integrals' contribution to omega
+                dipole_ints_contrib_ao = np.zeros((dof, dof, nao, nao))
+                for x in range(dof):
+                    for y in range(dof):
+                        tmp_oo = 0.5 * (
+                            np.linalg.multi_dot([x_minus_y_real[x], dipole_ints_ov[y].T ]).T
+                            + np.linalg.multi_dot([dipole_ints_ov[x], x_minus_y_real[y].T
+                            ]))
+                        tmp_ov = 0.5 * (
+                            np.linalg.multi_dot([x_minus_y_real[x].T, dipole_ints_oo[y]
+                            ]).T
+                            + np.linalg.multi_dot([dipole_ints_oo[x].T, x_minus_y_real[y]
+                            ]))
+                        tmp_vv = 0.5 * (
+                            np.linalg.multi_dot([x_minus_y_real[x].T, dipole_ints_ov[y]
+                            ]).T
+                            + np.linalg.multi_dot([dipole_ints_ov[x].T, x_minus_y_real[y]
+                            ]))
+                        dipole_ints_contrib_ao[x,y] = (
+                            np.linalg.multi_dot([mo_occ, tmp_oo, mo_occ.T])
+                            + np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T])
+                            + np.linalg.multi_dot([mo_occ, tmp_ov, mo_vir.T]).T
+                            + np.linalg.multi_dot([mo_vir, tmp_vv, mo_vir.T]))
+
+                mdot_start_time = tm.time()
+
+                # Transform the vectors to the AO basis
+                x_plus_y_ao_real = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_real[x], mo_vir.T]) 
+                    for x in range(x_plus_y_real.shape[0])
+                ])
+                x_minus_y_ao_real = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_real[x], mo_vir.T]) 
+                    for x in range(x_minus_y_real.shape[0])
+                ])
+
+                x_plus_y_ao_imag = np.array([
+                    np.linalg.multi_dot([mo_occ, x_plus_y_imag[x], mo_vir.T]) 
+                    for x in range(x_plus_y_imag.shape[0])
+                ])
+                x_minus_y_ao_imag = np.array([
+                    np.linalg.multi_dot([mo_occ, x_minus_y_imag[x], mo_vir.T]) 
+                    for x in range(x_minus_y_imag.shape[0])
+                ])
+
+                # The density matrix; only alpha block;
+                # Only works for the restricted case
+                # (since scf_tensors['C'] only gives alpha block...)
+                D_occ = np.matmul(mo_occ, mo_occ.T)
+                D_vir = np.matmul(mo_vir, mo_vir.T)
+
+                # FIXME will cphf_ov become complex?
+                # Construct fock_lambda (or fock_cphf)
+                cphf_ao_real = np.array([
+                    np.linalg.multi_dot([mo_occ, cphf_ov_real[x], mo_vir.T])
+                    for x in range(dof**2)
+                ])
+                cphf_ao_real_list = list([cphf_ao_real[x] for x in range(dof**2)])
+                ao_density_cphf_real = AODensityMatrix(cphf_ao_real_list, denmat.rest)
+            else:
+                dof = None
+                ao_density_cphf_real = AODensityMatrix()
+
+            dof = self.comm.bcast(dof, root=mpi_master())
+            ao_density_cphf_real.broadcast(self.rank, self.comm)
+            fock_cphf_real = AOFockMatrix(ao_density_cphf_real)
+
+            # TODO: what has to be on MPI master and what not?
+            self._comp_lr_fock(fock_cphf_real, ao_density_cphf_real, molecule, basis,
+                               eri_dict, dft_dict, pe_dict, self.profiler)
+
+            # For now we:
+            # - loop over indices m and n
+            # - select component m or n in x_plus_y, x_minus_y,
+            # fock_ao_rhs and fock_lambda
+            # - symmetrize with respect to m and n (only 2PDM?)
+            # Notes: fock_ao_rhs is a list with dof**2 matrices corresponding to
+            # the contraction of the 1PDMs with ERIs; dof matrices corresponding
+            # to the contraction of x_plus_y; and other dof matrices corresponding to
+            # the contraction of x_minus_y.
+
+            if self.rank == mpi_master():
+                # TODO: what shape should we use: (dof**2, nao, nao)
+                #       or (dof, dof, nao, nao)?
+                omega_real = np.zeros((dof * dof, nao, nao))
+                omega_imag = np.zeros((dof * dof, nao, nao))
+
+                mdot_start_time = tm.time()
+
+                # FIXME the dm_oo and dm_vv will become complex when
+                # the complex RHS is fully implemented!
+                # Calculate omega (without for-loops, only the diagonal parts
+                # possible for now)
+                # Construct epsilon_dm_ao
+                epsilon_dm_ao_real = np.zeros((dof, dof, nao, nao))
+                epsilon_cphf_ao_real = np.zeros((dof, dof, nao, nao))
+                # the _imag DMs remain empty for now
+                epsilon_dm_ao_imag = np.zeros((dof, dof, nao, nao))
+                epsilon_cphf_ao_imag = np.zeros((dof, dof, nao, nao))
+
+                for x in range(dof):
+                    for y in range(dof):
+                        epsilon_dm_ao_real[x,y] = -1.0 * np.linalg.multi_dot([
+                            mo_occ, eo_diag, dm_oo_real[x,y], mo_occ.T
+                        ])
+                        epsilon_dm_ao_real[x,y] -= np.linalg.multi_dot([
+                            mo_vir, ev_diag, dm_vv_real[x,y], mo_vir.T
+                        ])
+                        epsilon_cphf_ao_real[x,y] = np.linalg.multi_dot([
+                            mo_occ, eo_diag, cphf_ov_real.reshape(dof, dof, nocc, nvir)[x,y], 
+                            mo_vir.T
+                        ])
+
+                # OV + VO
+                epsilon_dm_ao_real -= (epsilon_cphf_ao_real +
+                                  epsilon_cphf_ao_real.transpose(0, 1, 3, 2))
+
+                for m in range(dof):
+                    for n in range(dof):
+                        # TODO: move outside for-loop when all Fock matrices can be
+                        # extracted into a numpy array at the same time.
+
+                        # Because the excitation vector is not symmetric,
+                        # we need both the matrix (OO block in omega, and probably VO)
+                        # and its transpose (VV, OV blocks)
+                        # this comes from the transformation of the 2PDM contribution
+                        # from MO to AO basis
+                        fock_ao_rhs_1_m_real = fock_ao_rhs_real.alpha_to_numpy(dof**2 +
+                                                                     m)  # x_plus_y
+                        fock_ao_rhs_2_m_real = fock_ao_rhs_real.alpha_to_numpy(dof**2 + dof +
+                                                                     m)  # x_minus_y
+
+                        fock_ao_rhs_1_n_real = fock_ao_rhs_real.alpha_to_numpy(dof**2 +
+                                                                     n)  # x_plus_y
+                        fock_ao_rhs_2_n_real = fock_ao_rhs_real.alpha_to_numpy(dof**2 + dof +
+                                                                     n)  # x_minus_y
+
+                        Fp1_vv_real = 0.25 * (np.linalg.multi_dot([
+                            fock_ao_rhs_1_m_real.T, (x_plus_y_ao_real[n] + x_plus_y_ao_imag[n]), ovlp.T
+                        ]) + np.linalg.multi_dot(
+                            [fock_ao_rhs_1_n_real.T, (x_plus_y_ao_real[m] + x_plus_y_ao_imag[m]), ovlp.T]))
+
+                        Fm1_vv_real = 0.25 * (np.linalg.multi_dot([
+                            fock_ao_rhs_2_m_real.T, (x_minus_y_ao_real[n] + x_minus_y_ao_imag[n]), ovlp.T
+                        ]) + np.linalg.multi_dot(
+                            [fock_ao_rhs_2_n_real.T, (x_minus_y_ao_real[m] + x_minus_y_ao_imag[m]), ovlp.T]))
+
+                        Fp2_vv_real = 0.25 * (np.linalg.multi_dot([
+                            fock_ao_rhs_1_m_real, (x_plus_y_ao_real[n] + x_plus_y_ao_imag[n]), ovlp.T
+                        ]) + np.linalg.multi_dot(
+                            [fock_ao_rhs_1_n_real, (x_plus_y_ao_real[m] + x_plus_y_ao_imag[m]), ovlp.T]))
+
+                        Fm2_vv_real = 0.25 * (np.linalg.multi_dot([
+                            fock_ao_rhs_2_m_real, (x_minus_y_ao_real[n] + x_minus_y_ao_imag[n]), ovlp.T
+                        ]) + np.linalg.multi_dot(
+                            [fock_ao_rhs_2_n_real, (x_minus_y_ao_real[m] + x_minus_y_ao_imag[m]), ovlp.T]))
+
+                        Fp1_oo_real = 0.25 * (np.linalg.multi_dot([
+                            fock_ao_rhs_1_m_real, (x_plus_y_ao_real[n] + x_plus_y_ao_imag[n]).T, ovlp.T
+                        ]) + np.linalg.multi_dot(
+                            [fock_ao_rhs_1_n_real, (x_plus_y_ao_real[m] + x_plus_y_ao_imag[m]).T, ovlp.T]))
+
+                        Fm1_oo_real = 0.25 * (np.linalg.multi_dot([
+                            fock_ao_rhs_2_m_real, (x_minus_y_ao_real[n] + x_minus_y_ao_imag[n]).T, ovlp.T
+                        ]) + np.linalg.multi_dot(
+                            [fock_ao_rhs_2_n_real, (x_minus_y_ao_real[m] + x_minus_y_ao_imag[m]).T, ovlp.T]))
+
+                        Fp2_oo_real = 0.25 * (np.linalg.multi_dot([
+                            fock_ao_rhs_1_m_real.T, (x_plus_y_ao_real[n] + x_plus_y_ao_imag[n]).T, ovlp.T
+                        ]) + np.linalg.multi_dot(
+                            [fock_ao_rhs_1_n_real.T, (x_plus_y_ao_real[m] + x_plus_y_ao_imag[m]).T, ovlp.T]))
+
+                        Fm2_oo_real = 0.25 * (np.linalg.multi_dot([
+                            fock_ao_rhs_2_m_real.T, (x_minus_y_ao_real[n] + x_minus_y_ao_imag[n]).T, ovlp.T
+                        ]) + np.linalg.multi_dot(
+                            [fock_ao_rhs_2_n_real.T, (x_minus_y_ao_real[m] + x_minus_y_ao_imag[m]).T, ovlp.T]))
+                        # We see that:
+                        # Fp1_vv = Fp1_ov and Fm1_vv = Fm1_ov
+                        # Fp2_vv = Fp2_ov and Fm2_vv = Fm2_ov
+
+                        # Compute the contributions from the 2PDM and the relaxed 1PDM
+                        # to the omega Lagrange multipliers:
+                        fmat_real = (fock_cphf_real.alpha_to_numpy(m * dof + n) +
+                                fock_cphf_real.alpha_to_numpy(m * dof + n).T +
+                                fock_ao_rhs_real.alpha_to_numpy(m * dof + n))
+                        # dof=3  (0,0), (0,1), (0,2); (1,0), (1,1), (1,2),
+                        #        (2,0), (2,1), (2,2) * dof
+                        # gamma_{zx} =
+
+                        omega_1pdm_2pdm_contribs_real = -(
+                            np.linalg.multi_dot(
+                                [D_vir, Fp1_vv_real + Fm1_vv_real - Fp2_vv_real + Fm2_vv_real, D_vir]) +
+                            np.linalg.multi_dot(
+                                [D_occ, Fp1_vv_real + Fm1_vv_real - Fp2_vv_real + Fm2_vv_real, D_vir]) +
+                            np.linalg.multi_dot(
+                                [D_occ, Fp1_vv_real + Fm1_vv_real - Fp2_vv_real + Fm2_vv_real, D_vir]).T +
+                            np.linalg.multi_dot(
+                                [D_occ, Fp1_oo_real + Fm1_oo_real - Fp2_oo_real + Fm2_oo_real, D_occ]) +
+                            np.linalg.multi_dot([D_occ, fmat_real, D_occ]))
+
+                        omega_real[m * dof + n] = (
+                            epsilon_dm_ao_real[m, n] + omega_1pdm_2pdm_contribs_real +
+                            dipole_ints_contrib_ao[m, n]
+                        )
+
+                        if self._dft:
+                            if self.is_complex:
+                                raise NotImplementedError('Complex mult. for DFT')
+                            # FIXME will be real/im when complex RHS fully implemented
+                            factor = -0.5
+                            omega[m * dof + n] += factor * np.linalg.multi_dot([
+                                D_occ,
+                                fock_gxc_ao.alpha_to_numpy(2 * (m * dof + n)), D_occ
+                            ])
+
+                # add omega multipliers in AO basis to cphf_results dictionary
+                omega = omega_real
+                self.cphf_results[(w)]['omega_ao'] = omega_real
+
+        if self.rank == mpi_master():
+            valstr = '** Time spent on constructing complex omega multipliers '
             valstr += 'for {} frequencies: '.format(n_freqs)
             valstr += '{:.6f} sec **'.format(tm.time() - loop_start_time)
             self.ostream.print_header(valstr)
