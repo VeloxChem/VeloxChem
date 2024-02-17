@@ -134,8 +134,10 @@ class PolarizabilityGradient():
 
         if 'frequencies' not in orbrsp_dict:
             orbrsp_dict['frequencies'] = self.frequencies
-        if 'is_complex' not in orbrsp_dict:
-            orbrsp_dict['is_complex'] = self.is_complex
+
+        # must be set without an if-statement in case the orbital response
+        # dictionary has previously been set
+        orbrsp_dict['is_complex'] = self.is_complex
 
         self.method_dict = dict(method_dict)
         self.orbrsp_dict = dict(orbrsp_dict)
@@ -446,7 +448,7 @@ class PolarizabilityGradient():
         self.ostream.flush()
 
     # WIP
-    def compute_analytical_complex(self, molecule, basis, scf_tensors, cpp_results):
+    def compute_analytical_complex(self, molecule, basis, scf_tensors, lr_results):
         """
         Performs calculation of the complex analytical polarizability gradient.
 
@@ -456,7 +458,7 @@ class PolarizabilityGradient():
             The AO basis set.
         :param scf_tensors:
             The tensors from the converged SCF calculation.
-        :param cpp_results:
+        :param lr_results:
             The results of the CPP calculation.
         """
 
@@ -473,8 +475,8 @@ class PolarizabilityGradient():
         orbrsp_drv = PolOrbitalResponse(self.comm, self.ostream)
         orbrsp_drv.update_settings(self.orbrsp_dict, self.method_dict)
         # is_complex has been set to true in the init
-        orbrsp_drv.compute(molecule, basis, scf_tensors, cpp_results)
-        orbrsp_drv.compute_omega(molecule, basis, scf_tensors, cpp_results)
+        orbrsp_drv.compute(molecule, basis, scf_tensors, lr_results)
+        orbrsp_drv.compute_omega(molecule, basis, scf_tensors, lr_results)
         all_orbrsp_results = orbrsp_drv.cphf_results
 
         valstr = '** Time spent on orbital response for {} frequencies: '.format(
