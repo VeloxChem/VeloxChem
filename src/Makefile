@@ -22,7 +22,6 @@ endif
 # Add includes directories
 VLX_INCLUDES := ${shell find * \
 					-not -path pymodule \
-					-not -path t2c_nuclear_potential_geom_020 \
 					-type d -print}
 
 # Update CXX flags & includes path
@@ -35,7 +34,6 @@ CXXFLAGS += $(MATH_INC)
 # Add list of internal libraries
 VLX_LIBS_DIR := ${shell find * \
 					-not -path pymodule \
-					-not -path t2c_nuclear_potential_geom_020 \
 					-type d -print}
 
 # Generate all internal libraries related files
