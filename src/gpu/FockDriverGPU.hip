@@ -213,13 +213,10 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     gtoinfo::updatePrimitiveInfoForS(s_prim_info.data(), s_prim_aoinds.data(), s_prim_count, gto_blocks);
 
     double*   d_s_prim_info;
-    uint32_t* d_s_prim_aoinds;
 
     hipSafe(hipMalloc(&d_s_prim_info, s_prim_info.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_s_prim_aoinds, s_prim_aoinds.size() * sizeof(uint32_t)));
 
     hipSafe(hipMemcpy(d_s_prim_info, s_prim_info.data(), s_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_s_prim_aoinds, s_prim_aoinds.data(), s_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     // P gto block
 
@@ -229,13 +226,10 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     gtoinfo::updatePrimitiveInfoForP(p_prim_info.data(), p_prim_aoinds.data(), p_prim_count, gto_blocks);
 
     double*   d_p_prim_info;
-    uint32_t* d_p_prim_aoinds;
 
     hipSafe(hipMalloc(&d_p_prim_info, p_prim_info.size() * sizeof(double)));
-    hipSafe(hipMalloc(&d_p_prim_aoinds, p_prim_aoinds.size() * sizeof(uint32_t)));
 
     hipSafe(hipMemcpy(d_p_prim_info, p_prim_info.data(), p_prim_info.size() * sizeof(double), hipMemcpyHostToDevice));
-    hipSafe(hipMemcpy(d_p_prim_aoinds, p_prim_aoinds.data(), p_prim_aoinds.size() * sizeof(uint32_t), hipMemcpyHostToDevice));
 
     // GTO block pairs
 
@@ -486,16 +480,14 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
         }
     }
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipFree(d_boys_func_table));
     hipSafe(hipFree(d_boys_func_ft));
 
     hipSafe(hipFree(d_s_prim_info));
-    hipSafe(hipFree(d_s_prim_aoinds));
 
     hipSafe(hipFree(d_p_prim_info));
-    hipSafe(hipFree(d_p_prim_aoinds));
-
-    hipSafe(hipFree(d_points_info));
 
     hipSafe(hipFree(d_mat_S));
     hipSafe(hipFree(d_mat_T));
@@ -507,6 +499,8 @@ computeOneElectronIntegralsOnGPU(const CMolecule& molecule, const CMolecularBasi
     hipSafe(hipFree(d_sp_second_inds_local));
     hipSafe(hipFree(d_pp_first_inds_local));
     hipSafe(hipFree(d_pp_second_inds_local));
+
+    hipSafe(hipFree(d_points_info));
 
     }}
 
@@ -658,6 +652,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         hipblasSafe(hipblasDestroy(handle));
     }
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipFree(d_matrix_A));
     hipSafe(hipFree(d_matrix_B));
     hipSafe(hipFree(d_matrix_C));
@@ -670,6 +666,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
     const double Q_prime_thresh = 1.0e-7;
 
     screening.form_pair_inds_for_K(s_prim_count, p_prim_count, mat_full, Q_prime_thresh);
+
+    mat_full = CDenseMatrix();
 
     timer.stop("Prep. preLinK");
 
@@ -1298,6 +1296,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
         timer.stop("  J block PP");
     }
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipFree(d_mat_D));
     hipSafe(hipFree(d_mat_J));
 
@@ -1831,6 +1831,8 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 
     timer.stop("K computation");
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipFree(d_boys_func_table));
     hipSafe(hipFree(d_boys_func_ft));
 
@@ -1936,6 +1938,8 @@ computeMatrixMultiplication(double* C, const double* A, const double* B, const i
 
     hipSafe(hipMemcpy(C, d_C, nrows_A * ncols_B * sizeof(double), hipMemcpyDeviceToHost));
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipFree(d_A));
     hipSafe(hipFree(d_B));
     hipSafe(hipFree(d_C));
@@ -1991,6 +1995,8 @@ diagonalizeMatrix(double* A, double* W, const int64_t nrows_A) -> void
     //hipblasSafe(hipblasGetMatrix(n, n, sizeof(double), d_A, ldda, A, n));
     hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
 
+    hipSafe(hipDeviceSynchronize());
+
     hipSafe(hipFree(d_A));
 
     hipSafe(hipHostFree(wA));
@@ -2035,6 +2041,8 @@ diagonalizeMatrix(double* A, double* D, const int64_t nrows_A) -> void
     hipSafe(hipMemcpy(&h_info, d_info, sizeof(int32_t), hipMemcpyDeviceToHost));
     hipSafe(hipMemcpy(A, d_A, n * n * sizeof(double), hipMemcpyDeviceToHost));
     hipSafe(hipMemcpy(D, d_D, n * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipDeviceSynchronize());
 
     hipSafe(hipFree(d_A));
     hipSafe(hipFree(d_D));
