@@ -23,13 +23,6 @@ endif
 VLX_INCLUDES := ${shell find * \
 					-not -path pymodule \
 					-not -path t2c_nuclear_potential_geom_020 \
-					-not -path t2c_overlap_geom_101 \
-					-not -path t2c_overlap_geom_200 \
-					-not -path t2c_overlap_geom_201 \
-					-not -path t2c_overlap_geom_202 \
-					-not -path t2c_overlap_geom_300 \
-					-not -path t2c_overlap_geom_301 \
-					-not -path t2c_overlap_geom_400 \
 					-type d -print}
 
 # Update CXX flags & includes path
@@ -43,13 +36,6 @@ CXXFLAGS += $(MATH_INC)
 VLX_LIBS_DIR := ${shell find * \
 					-not -path pymodule \
 					-not -path t2c_nuclear_potential_geom_020 \
-					-not -path t2c_overlap_geom_101 \
-					-not -path t2c_overlap_geom_200 \
-					-not -path t2c_overlap_geom_201 \
-					-not -path t2c_overlap_geom_202 \
-					-not -path t2c_overlap_geom_300 \
-					-not -path t2c_overlap_geom_301 \
-					-not -path t2c_overlap_geom_400 \
 					-type d -print}
 
 # Generate all internal libraries related files
