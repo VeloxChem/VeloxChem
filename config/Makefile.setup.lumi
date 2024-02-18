@@ -40,10 +40,10 @@ CXX_REL_FLG := -fopenmp -std=c++17
 CXX_DEB_FLG := -fopenmp -std=c++17
 
 MATH_INC := -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/openblas/include
-MATH_INC += -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/magma/src/icl-magma-16ae28340736/include
+MATH_INC += -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/magma/include
 #MATH_LIB := -lomp -lpthread -lm -ldl
 MATH_LIB := -L/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/openblas/lib -lopenblas
-MATH_LIB += -L/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/magma/src/icl-magma-16ae28340736/lib -lmagma
+MATH_LIB += -L/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/magma/lib -lmagma
 
 XC_INC := -I/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/libxc/include
 XC_LIB := -L/projappl/project_462000480/xinli2424/gitlab/VeloxChemMP.test-gpu/dependencies/libxc/lib
