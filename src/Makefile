@@ -22,7 +22,6 @@ endif
 # Add includes directories
 VLX_INCLUDES := ${shell find * \
 					-not -path pymodule \
-					-not -path t2c_octupole \
 					-not -path t2c_nuclear_potential_geom_020 \
 					-not -path t2c_overlap_geom_101 \
 					-not -path t2c_overlap_geom_200 \
@@ -43,7 +42,6 @@ CXXFLAGS += $(MATH_INC)
 # Add list of internal libraries
 VLX_LIBS_DIR := ${shell find * \
 					-not -path pymodule \
-					-not -path t2c_octupole \
 					-not -path t2c_nuclear_potential_geom_020 \
 					-not -path t2c_overlap_geom_101 \
 					-not -path t2c_overlap_geom_200 \
