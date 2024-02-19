@@ -1887,6 +1887,40 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 }
 
 auto
+computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& data_pointers, const int64_t size) -> void
+{
+    auto n = static_cast<int32_t>(size);
+
+    double *d_X, *d_Y;
+
+    hipSafe(hipMalloc(&d_X, n * sizeof(double)));
+    hipSafe(hipMalloc(&d_Y, n * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_Y, weighted_data, n * sizeof(double), hipMemcpyHostToDevice));
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    for (size_t i = 0; i < data_pointers.size(); i++)
+    {
+        double alpha = weights[i];
+
+        hipSafe(hipMemcpy(d_X, data_pointers[i], n * sizeof(double), hipMemcpyHostToDevice));
+
+        hipblasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1);
+    }
+
+    hipblasSafe(hipblasDestroy(handle));
+
+    hipSafe(hipMemcpy(weighted_data, d_Y, n * sizeof(double), hipMemcpyDeviceToHost));
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipFree(d_X));
+    hipSafe(hipFree(d_Y));
+}
+
+auto
 computeMatrixMultiplication(double* C, const double* A, const double* B, const int64_t nrows_A, const int64_t ncols_A, const int64_t ncols_B) -> void
 {
     // TODO allow computeMatrixMultiplication on non-master MPI rank

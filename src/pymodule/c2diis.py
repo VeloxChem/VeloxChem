@@ -25,7 +25,7 @@
 
 import numpy as np
 
-from .veloxchemlib import matmul_gpu
+from .veloxchemlib import matmul_gpu, weighted_sum_gpu
 
 
 class CTwoDiis:
@@ -89,9 +89,7 @@ class CTwoDiis:
 
         else:
             weights = self.compute_weights()
-            effmat = np.zeros(self.fock_matrices[0].shape)
-            for w, fmat in zip(weights, self.fock_matrices):
-                effmat += w * fmat
+            effmat = weighted_sum_gpu(weights, self.fock_matrices)
             return effmat
 
     def compute_error_vectors_restricted(self, fock_matrices, density_matrices,
@@ -262,13 +260,8 @@ class CTwoDiis:
         wmin = weights[0]
 
         for w in weights:
-            evec = np.zeros(self.error_vectors[0].shape, dtype='float64')
-
-            for f, v in zip(w, self.error_vectors):
-                evec = evec + f * v
-
+            evec = weighted_sum_gpu(w, self.error_vectors)
             fact = np.vdot(evec, evec)
-
             if fmin > fact:
                 fmin = fact
                 wmin = w

@@ -84,6 +84,37 @@ export_gpu(py::module& m)
         "Computes GTO values and derivatives on grid points using GPU.");
 
     m.def(
+        "weighted_sum_gpu",
+        [](const std::vector<double>& weights, const std::vector<py::array_t<double>>& arrays) -> py::array_t<double> {
+            std::string errsize("weighted_sum_gpu: Mismatch in size");
+            errors::assertMsgCritical(weights.size() == arrays.size(), errsize);
+
+            std::string errzero("weighted_sum_gpu: Expecting at least one array");
+            errors::assertMsgCritical(arrays.size() > 0, errzero);
+
+            const auto nrows = static_cast<int64_t>(arrays[0].shape(0));
+            const auto ncols = static_cast<int64_t>(arrays[0].shape(1));
+
+            std::vector<double> weighted_array(nrows * ncols, 0.0);
+
+            std::vector<const double*> data_pointers;
+
+            for (size_t i = 0; i < arrays.size(); i++)
+            {
+                std::string errstyle("weighted_sum_gpu: Expecting contiguous numpy array");
+                auto c_style = py::detail::check_flags(arrays[i].ptr(), py::array::c_style);
+                errors::assertMsgCritical(c_style, errstyle);
+
+                data_pointers.push_back(arrays[i].data());
+            }
+
+            gpu::computeWeightedSum(weighted_array.data(), weights, data_pointers, nrows * ncols);
+
+            return vlx_general::pointer_to_numpy(weighted_array.data(), {nrows, ncols});
+        },
+        "Computes weighted sum of matrices.");
+
+    m.def(
         "matmul_gpu",
         [](const py::array_t<double>& A, const py::array_t<double>& B) -> py::array_t<double> {
             std::string errshape("matmul_gpu: Mismatch in matrix shape");
