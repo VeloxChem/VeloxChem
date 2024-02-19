@@ -25,7 +25,7 @@
 
 import numpy as np
 
-from .veloxchemlib import matmul_gpu, weighted_sum_gpu
+from .veloxchemlib import matmul_gpu, weighted_sum_gpu, dot_product_gpu
 
 
 class CTwoDiis:
@@ -72,7 +72,7 @@ class CTwoDiis:
 
             n_vecs = len(self.error_vectors)
             for i in range(n_vecs):
-                fij = np.vdot(self.error_vectors[i],
+                fij = dot_product_gpu(self.error_vectors[i],
                               self.error_vectors[n_vecs - 1])
                 self.b_matrix[i, n_vecs - 1] = fij
                 self.b_matrix[n_vecs - 1, i] = fij
@@ -261,7 +261,7 @@ class CTwoDiis:
 
         for w in weights:
             evec = weighted_sum_gpu(w, self.error_vectors)
-            fact = np.vdot(evec, evec)
+            fact = dot_product_gpu(evec, evec)
             if fmin > fact:
                 fmin = fact
                 wmin = w

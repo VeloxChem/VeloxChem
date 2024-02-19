@@ -32,7 +32,7 @@ import os
 from .veloxchemlib import mpi_master
 from .veloxchemlib import fock_t as fockmat
 from .veloxchemlib import XCFunctional, MolecularGrid
-from .veloxchemlib import matmul_gpu, eigh_gpu
+from .veloxchemlib import matmul_gpu, eigh_gpu, dot_product_gpu
 from .molecularorbitals import MolecularOrbitals, molorb
 from .outputstream import OutputStream
 from .scfdriver import ScfDriver
@@ -131,7 +131,8 @@ class ScfRestrictedDriver(ScfDriver):
             old_dmat = old_den_mat.alpha_to_numpy(0)
             ddmat = dmat - old_dmat
 
-            diff_den = np.linalg.norm(ddmat)
+            #diff_den = np.linalg.norm(ddmat)
+            diff_den = np.sqrt(dot_product_gpu(ddmat, ddmat))
         else:
             diff_den = 0.0
 

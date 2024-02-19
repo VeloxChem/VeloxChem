@@ -84,6 +84,23 @@ export_gpu(py::module& m)
         "Computes GTO values and derivatives on grid points using GPU.");
 
     m.def(
+        "dot_product_gpu",
+        [](const py::array_t<double>& A, const py::array_t<double>& B) -> double {
+            std::string errsize("dot_product_gpu: Mismatch in size");
+            errors::assertMsgCritical(A.size() == B.size(), errsize);
+
+            std::string errstyle("dot_product_gpu: Expecting contiguous numpy array");
+            auto c_style_A = py::detail::check_flags(A.ptr(), py::array::c_style);
+            auto c_style_B = py::detail::check_flags(B.ptr(), py::array::c_style);
+            errors::assertMsgCritical(c_style_A && c_style_B, errstyle);
+
+            const auto n = static_cast<int64_t>(A.size());
+
+            return gpu::computeDotProduct(A.data(), B.data(), n);
+        },
+        "Computes dot product.");
+
+    m.def(
         "weighted_sum_gpu",
         [](const std::vector<double>& weights, const std::vector<py::array_t<double>>& arrays) -> py::array_t<double> {
             std::string errsize("weighted_sum_gpu: Mismatch in size");

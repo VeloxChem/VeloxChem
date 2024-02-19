@@ -1887,6 +1887,35 @@ computeFockOnGPU(const CMolecule& molecule, const CMolecularBasis& basis, const 
 }
 
 auto
+computeDotProduct(const double* A, const double* B, const int64_t size) -> double
+{
+    auto n = static_cast<int32_t>(size);
+
+    double *d_A, *d_B;
+
+    hipSafe(hipMalloc(&d_A, n * sizeof(double)));
+    hipSafe(hipMalloc(&d_B, n * sizeof(double)));
+
+    hipSafe(hipMemcpy(d_A, A, n * sizeof(double), hipMemcpyHostToDevice));
+    hipSafe(hipMemcpy(d_B, B, n * sizeof(double), hipMemcpyHostToDevice));
+
+    hipblasHandle_t handle;
+    hipblasSafe(hipblasCreate(&handle));
+
+    double dot_product;
+    hipblasSafe(hipblasDdot(handle, n, d_A, 1, d_B, 1, &dot_product));
+
+    hipblasSafe(hipblasDestroy(handle));
+
+    hipSafe(hipDeviceSynchronize());
+
+    hipSafe(hipFree(d_A));
+    hipSafe(hipFree(d_B));
+
+    return dot_product;
+}
+
+auto
 computeWeightedSum(double* weighted_data, const std::vector<double>& weights, const std::vector<const double*>& data_pointers, const int64_t size) -> void
 {
     auto n = static_cast<int32_t>(size);
@@ -1907,7 +1936,7 @@ computeWeightedSum(double* weighted_data, const std::vector<double>& weights, co
 
         hipSafe(hipMemcpy(d_X, data_pointers[i], n * sizeof(double), hipMemcpyHostToDevice));
 
-        hipblasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1);
+        hipblasSafe(hipblasDaxpy(handle, n, &alpha, d_X, 1, d_Y, 1));
     }
 
     hipblasSafe(hipblasDestroy(handle));
